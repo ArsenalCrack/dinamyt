@@ -1,0 +1,15 @@
+# Ignorar Frontend
+frontend/node_modules
+frontend/dist
+frontend/.angular
+
+# Ignorar Backend
+backend/target
+backend/.mvn
+backend/mvnw
+backend/mvnw.cmd
+backend/.idea
+backend/*.iml
+
+# General
+.DS_Store
