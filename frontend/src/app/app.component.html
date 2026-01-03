@@ -1,17 +1,7 @@
-<div class="container mt-5 text-center">
-  <h1>Sistema DINAMYT 🥋</h1>
-  <hr>
-  <div class="card mx-auto" style="width: 18rem;">
-    <div class="card-body">
-      <h5 class="card-title">Estado del Servidor</h5>
+<app-navbar></app-navbar>
 
-      <h6 class="card-subtitle mb-2"
-          [class.text-success]="estadoBackend === 'Online'"
-          [class.text-danger]="estadoBackend !== 'Online'">
-        {{ estadoBackend }}
-      </h6>
-
-      <p class="card-text">{{ mensajeBackend }}</p>
-    </div>
-  </div>
+<div class="container min-vh-100 py-4">
+  <router-outlet></router-outlet>
 </div>
+
+<app-footer></app-footer>

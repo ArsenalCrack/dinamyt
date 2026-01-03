@@ -1,20 +1,30 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ApiService } from './services/api.service';
 import { CommonModule } from '@angular/common';
+import { NavbarComponent } from './shared/components/navbar/navbar.component';
+import { FooterComponent } from './shared/components/footer/footer.component';
+import { ApiService } from './core/services/api.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, CommonModule],
+  imports: [
+    RouterOutlet,
+    CommonModule,
+    NavbarComponent,
+    FooterComponent
+  ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
 export class AppComponent implements OnInit {
+
+  private api = inject(ApiService);
+
   mensajeBackend: string = 'Esperando conexión...';
   estadoBackend: string = 'Desconocido';
 
-  constructor(private api: ApiService) {}
+  constructor() {}
 
   ngOnInit() {
     this.api.getSaludo().subscribe({
