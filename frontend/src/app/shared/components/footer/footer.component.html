@@ -1,1 +1,16 @@
-<p>footer works!</p>
+<footer class="bg-light text-center text-lg-start mt-auto py-3 border-top">
+  <div class="container text-center">
+    <span class="text-muted small">
+      © 2026 <b>DINAMYT System</b> - Hapkido Tournament Manager.
+    </span>
+
+    <div class="mt-1" style="font-size: 0.8rem;">
+      Estado del Servidor:
+      <span [class.text-success]="estadoBackend === 'Online'"
+            [class.text-danger]="estadoBackend !== 'Online'"
+            class="fw-bold">
+        {{ estadoBackend }} 🟢
+      </span>
+    </div>
+  </div>
+</footer>
