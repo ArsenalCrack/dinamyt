@@ -1,16 +1,70 @@
-<footer class="bg-light text-center text-lg-start mt-auto py-3 border-top">
-  <div class="container text-center">
-    <span class="text-muted small">
-      © 2026 <b>DINAMYT System</b> - Hapkido Tournament Manager.
-    </span>
+<footer class="footer-dinamyt">
+  <div class="footer-container">
 
-    <div class="mt-1" style="font-size: 0.8rem;">
-      Estado del Servidor:
-      <span [class.text-success]="estadoBackend === 'Online'"
-            [class.text-danger]="estadoBackend !== 'Online'"
-            class="fw-bold">
-        {{ estadoBackend }} 🟢
-      </span>
+    <div class="footer-grid">
+
+      <!-- BRAND / LOGO -->
+      <div class="footer-brand">
+        <img
+          src="assets/imgs/logoDHBlanco.png"
+          alt="Logo Dinamyt"
+          class="footer-logo"
+        />
+
+        <p class="footer-description">
+          Plataforma líder en gestión de campeonatos de Hapkido.
+          Optimizamos la competencia desde el registro hasta el podio.
+        </p>
+
+        <div class="social-links">
+          <a href="#"><i class="fab fa-facebook-f"></i></a>
+          <a href="#"><i class="fab fa-instagram"></i></a>
+          <a href="#"><i class="fab fa-youtube"></i></a>
+        </div>
+      </div>
+
+      <!-- NAV -->
+      <div class="footer-nav">
+        <h4>Navegación</h4>
+        <ul>
+          <li><a routerLink="/">Inicio</a></li>
+          <li><a routerLink="/campeonatos">Campeonatos</a></li>
+          <li><a routerLink="/ranking">Resultados</a></li>
+        </ul>
+      </div>
+
+      <!-- SYSTEM -->
+      <div class="footer-system">
+        <h4>Soporte y Sistema</h4>
+
+        <p class="support-email">
+          <i class="fas fa-envelope"></i> soporte&#64;dinamyt.com
+        </p>
+
+        <div class="server-status">
+          <span class="server-label">Estado del servidor</span>
+
+          <span
+            *ngIf="estadoBackend === 'Online'"
+            class="status online"
+          >
+            <i class="fas fa-check-circle"></i> Online
+          </span>
+
+          <span
+            *ngIf="estadoBackend !== 'Online'"
+            class="status offline"
+          >
+            <i class="fas fa-times-circle"></i> Offline
+          </span>
+        </div>
+      </div>
+
     </div>
+
+    <div class="footer-bottom">
+      © 2026 <strong>DINAMYT System</strong> · Todos los derechos reservados
+    </div>
+
   </div>
 </footer>

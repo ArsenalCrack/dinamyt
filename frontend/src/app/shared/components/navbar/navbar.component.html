@@ -1,7 +1,8 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-danger border-3">
-  <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="#">
-      <span class="text-danger">DINAMYT</span> 🥋
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark custom-navbar">
+  <div class="container-fluid d-flex align-items-center justify-content-between">
+
+    <a class="navbar-brand fw-bold" routerLink="/">
+      <img src="assets/imgs/logoDHBlanco.png" alt="Logo Dinamyt" class="logo-img">
     </a>
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -9,20 +10,19 @@
     </button>
 
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
+      <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
         <li class="nav-item">
-          <a class="nav-link active" routerLink="/">Inicio</a>
+          <a class="nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Inicio</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" routerLink="/campeonatos">Campeonatos</a>
+          <a class="nav-link" routerLink="/campeonatos" routerLinkActive="active">Campeonatos</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" routerLink="/ranking">Ranking</a>
+          <a class="nav-link" routerLink="/ranking" routerLinkActive="active">Resultados</a>
         </li>
       </ul>
-
-      <div class="d-flex ms-lg-3">
-        <button class="btn btn-outline-danger btn-sm">Login</button>
+      <div class="d-flex ms-lg-4 justify-content-center mt-3 mt-lg-0">
+        <button class="btn btn-login-dark" routerLink="/login">Iniciar Sesión</button>
       </div>
     </div>
   </div>

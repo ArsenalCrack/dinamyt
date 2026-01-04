@@ -1,11 +1,12 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ApiService } from '../../../core/services/api.service'; // Ajusta la ruta si es necesario
+import { ApiService } from '../../../core/services/api.service';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule], // Importante para usar *ngIf
   templateUrl: './footer.component.html',
   styleUrl: './footer.component.scss'
 })
@@ -16,7 +17,7 @@ export class FooterComponent implements OnInit {
 
   ngOnInit() {
     this.api.getSaludo().subscribe({
-      next: (datos) => { this.estadoBackend = datos.estado; },
+      next: (data) => { this.estadoBackend = 'Online'; },
       error: () => { this.estadoBackend = 'Offline'; }
     });
   }

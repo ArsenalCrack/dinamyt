@@ -1,0 +1,175 @@
+/* --- NAVBAR: ESTRUCTURA DASHBOARD + ESTILO DARK --- */
+.custom-navbar {
+    background-color: #111 !important;
+    min-height: 80px;
+    padding: 0 20px;
+    /* Tu línea roja de identidad */
+    border-bottom: 3px solid var(--color-acento) !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+
+    /* CORRECCIÓN: Aseguramos que el contenido principal no se pegue arriba */
+    display: flex;
+    align-items: center;
+
+    /* Esto envuelve el logo y el botón para que no se muevan al abrir el menú */
+    .container-fluid {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 80px; /* Misma altura que el navbar */
+    }
+}
+
+/* --- LOGO RESPONSIVO --- */
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    margin: 0; /* Quitamos márgenes que puedan desplazarlo */
+    flex: 0 1 auto;
+    max-width: 70%;
+
+    .logo-img {
+        height: auto;
+        width: 200px; /* Tamaño máximo en Desktop */
+        max-width: 100%;
+        object-fit: contain;
+        transition: width 0.3s ease, transform 0.3s ease;
+
+        &:hover {
+            transform: scale(1.02);
+        }
+    }
+}
+
+/* --- ENLACES DEL MENÚ --- */
+.nav-link {
+    color: rgba(255, 255, 255, 0.7) !important;
+    font-weight: 500;
+    font-size: 1rem;
+    margin: 0 10px;
+    padding: 8px 0;
+    position: relative;
+    transition: all 0.3s;
+    font-family: 'Roboto', sans-serif;
+
+    &:hover {
+        color: var(--color-acento) !important;
+        transform: translateY(-1px);
+    }
+
+    &.active {
+        color: #ffffff !important;
+        font-weight: 700;
+
+        &::after {
+            content: '';
+            display: block;
+            width: 100%;
+            height: 3px;
+            background: var(--color-acento);
+            border-radius: 2px;
+            margin-top: 5px;
+            box-shadow: 0 0 8px var(--color-acento);
+            transition: all 0.3s ease;
+        }
+    }
+}
+
+/* --- BOTÓN LOGIN (Estilo Dashboard Pill) --- */
+.btn-login-dark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 30px;
+    border-radius: 50px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background-color: transparent;
+    color: var(--color-acento);
+    border: 2px solid var(--color-acento);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+        background-color: var(--color-acento);
+        color: white;
+        box-shadow: 0 0 15px rgba(214, 0, 0, 0.6);
+        transform: translateY(-2px);
+    }
+}
+
+/* --- RESPONSIVE (Móvil y Tablets) --- */
+
+@media (max-width: 991px) {
+    .custom-navbar {
+        min-height: 75px;
+        height: auto; /* Permite que crezca hacia abajo sin mover el top */
+        display: block; /* Cambiamos a block para que el menú colapsable fluya abajo */
+
+        .container-fluid {
+            min-height: 75px; /* Mantiene el logo y botón centrados en su franja */
+            padding-top: 5px;
+            padding-bottom: 5px;
+        }
+    }
+
+    .navbar-brand .logo-img {
+        width: 160px;
+    }
+
+    .navbar-toggler {
+        border-color: rgba(255,255,255,0.1);
+        padding: 8px;
+        margin: 10px;
+        &:focus { box-shadow: none; }
+    }
+
+    /* Menú desplegable */
+    .navbar-collapse {
+        background-color: #111;
+        padding: 20px;
+        margin-left: -20px; /* Compensa el padding del navbar */
+        margin-right: -20px;
+        border-top: 1px solid #333;
+        /* No usamos bordes redondeados abajo para que se vea como una extensión */
+    }
+
+    .nav-link {
+        text-align: center;
+        margin: 10px 0;
+        padding: 12px 0;
+        &.active::after {
+            margin: 5px auto 0;
+            width: 40px;
+        }
+    }
+
+    .btn-login-dark {
+        width: 100%;
+        margin-top: 15px;
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 576px) {
+    .navbar-brand .logo-img {
+        width: 135px;
+    }
+}
+
+@media (max-width: 360px) {
+    .navbar-brand .logo-img {
+        width: 115px;
+    }
+    .custom-navbar {
+        padding: 0 10px;
+    }
+}
