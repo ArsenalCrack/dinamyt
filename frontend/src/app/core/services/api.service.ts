@@ -13,4 +13,10 @@ export class ApiService {
   getSaludo(): Observable<any> {
     return this.http.get(`${this.apiUrl}/saludo`);
   }
+  registrarUsuario(usuario: any) {
+  return this.http.post(
+    'http://localhost:8080/api/registro',
+    usuario
+  );
+  }
 }

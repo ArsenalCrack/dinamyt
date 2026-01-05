@@ -27,8 +27,8 @@
         <label>Número de documento</label>
         <input
           type="number"
-          name="documento"
-          ngModel
+          name="idDocumento"
+          [(ngModel)]="idDocumento"
           required
           minlength="6"
           maxlength="15"
@@ -45,8 +45,8 @@
         <label>Nombre completo</label>
         <input
           type="text"
-          name="nombre"
-          ngModel
+          name="nombreC"
+          [(ngModel)]="nombreC"
           required
           placeholder="Tu nombre completo"
         >
@@ -55,7 +55,7 @@
       <!-- Sexo -->
       <div class="form-group">
         <label>Sexo</label>
-        <select name="sexo" ngModel required>
+        <select name="sexo" [(ngModel)]="sexo" required>
           <option value="" disabled selected>Seleccione el sexo</option>
           <option value="Femenino">Femenino</option>
           <option value="Masculino">Masculino</option>
@@ -65,7 +65,7 @@
       <!-- Nacionalidad -->
       <div class="form-group">
         <label>Nacionalidad</label>
-        <select name="nacionalidad" ngModel required>
+        <select name="nacionalidad" [(ngModel)]="nacionalidad" required>
           <option value="" disabled selected> Seleccione una nacionalidad </option>
                         <option value="alemania">Alemania</option>
                         <option value="argentina">Argentina</option>
@@ -106,7 +106,7 @@
         <input
           type="email"
           name="correo"
-          ngModel
+          [(ngModel)]="correo"
           required
           placeholder="tucorreo@email.com"
         >
@@ -117,8 +117,8 @@
         <label>Contraseña</label>
         <input
           type="password"
-          name="password"
-          ngModel
+          name="contrasena"
+          [(ngModel)]="contrasena"
           required
           minlength="8"
           placeholder="Mínimo 8 caracteres"
@@ -151,6 +151,9 @@
           ¿Ya tienes una cuenta?
           <a routerLink="/login">Iniciar sesión</a>
         </p>
+          <span class="status">
+            {{ Mensajes }}
+          </span>
       </div>
 
     </form>
