@@ -1,0 +1,79 @@
+import { Component, inject, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterModule } from '@angular/router';
+import { ApiService } from '../../core/services/api.service';
+
+@Component({
+  selector: 'app-reset-password',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './reset-password.component.html',
+  styleUrls: ['./reset-password.component.scss']
+})
+export class ResetPasswordComponent implements OnInit {
+
+  private api = inject(ApiService);
+  private router = inject(Router);
+
+  // Variable del correo (recuperado de sesión)
+  correo: string = '';
+
+  // Modelo (Aquí corregimos el nombre para que coincida con el HTML y BD)
+  contrasena: string = '';
+  confirmPassword: string = '';
+
+  // Visibilidad
+  mostrarPass: boolean = false;
+  mostrarConfirm: boolean = false;
+
+  // Estado
+  cargando: boolean = false;
+  mensaje: string = '';
+  exito: boolean = false;
+
+  ngOnInit() {
+    // Recuperamos el correo usando la clave que definimos antes
+    this.correo = sessionStorage.getItem('emailParaVerificar') || '';
+
+    // Si no hay correo, lo sacamos (protección extra al Guard)
+    if (!this.correo) {
+      this.router.navigate(['/login']);
+    }
+  }
+
+  cambiarPassword() {
+    if (this.contrasena !== this.confirmPassword) {
+      this.mensaje = 'Las contraseñas no coinciden.';
+      return;
+    }
+
+    this.cargando = true;
+    this.mensaje = '';
+
+    const payload = {
+      correo: this.correo,
+      nuevaContrasena: this.contrasena // Enviamos 'contrasena' al backend
+    };
+
+    this.api.cambiarPassword(payload).subscribe({
+      next: (res) => {
+        this.cargando = false;
+        this.exito = true;
+        this.mensaje = 'Contraseña actualizada correctamente.';
+
+        // LIMPIEZA: Usamos los nombres correctos de tus variables de sesión
+        sessionStorage.removeItem('emailParaVerificar');
+        sessionStorage.removeItem('verifyMode');
+
+        // Al login
+        setTimeout(() => this.router.navigate(['/login']), 2000);
+      },
+      error: (err) => {
+        this.cargando = false;
+        this.exito = false;
+        this.mensaje = err.error?.message || 'Error al actualizar la contraseña.';
+      }
+    });
+  }
+}

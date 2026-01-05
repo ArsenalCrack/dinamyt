@@ -1,163 +1,225 @@
 <div class="registro-wrapper">
-
   <div class="container">
 
-    <!-- Botón volver -->
-    <a routerLink="/" class="btn-back" title="Volver al inicio">
+    <a (click)="volverAtras()" class="btn-back" title="Volver atrás">
       <i class="fas fa-arrow-left fa-2x"></i>
     </a>
 
-    <!-- Header -->
+
     <header class="header">
       <a routerLink="/" title="Ir a la página principal">
-        <img
-          src="assets/imgs/LogotipoNegroD.png"
-          alt="Logo Dinamyt"
-          class="logo-img"
-        >
+        <img src="assets/imgs/LogotipoNegroD.png" alt="Logo Dinamyt" class="logo-img">
       </a>
       <h2>Registro de Usuario</h2>
     </header>
 
-    <!-- Formulario -->
     <form #registroForm="ngForm" (ngSubmit)="registrar()">
 
-      <!-- Documento -->
       <div class="form-group">
         <label>Número de documento</label>
         <input
-          type="number"
+          type="text"
           name="idDocumento"
           [(ngModel)]="idDocumento"
+          #doc="ngModel"
           required
           minlength="6"
           maxlength="15"
+          pattern="^[0-9]+$"
           placeholder="Ej: 1090..."
-        >
+          [class.input-error]="doc.invalid && (doc.dirty || doc.touched)">
 
-        <small *ngIf="registroForm.submitted && registroForm.controls['documento']?.invalid">
-          Mínimo 6 y máximo 15 dígitos
-        </small>
+        <div *ngIf="doc.invalid && (doc.dirty || doc.touched)" class="msg-error">
+          <small *ngIf="doc.errors?.['required']">El documento es obligatorio.</small>
+          <small *ngIf="doc.errors?.['minlength']">Mínimo 6 dígitos.</small>
+          <small *ngIf="doc.errors?.['pattern']">Solo se permiten números (sin puntos ni guiones).</small>
+        </div>
       </div>
 
-      <!-- Nombre -->
       <div class="form-group">
         <label>Nombre completo</label>
         <input
           type="text"
           name="nombreC"
           [(ngModel)]="nombreC"
+          #nom="ngModel"
           required
-          placeholder="Tu nombre completo"
-        >
+          minlength="5"
+          pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+"
+          placeholder="Nombres y Apellidos"
+          [class.input-error]="nom.invalid && (nom.dirty || nom.touched)">
+
+        <div *ngIf="nom.invalid && (nom.dirty || nom.touched)" class="msg-error">
+          <small *ngIf="nom.errors?.['required']">El nombre es obligatorio.</small>
+          <small *ngIf="nom.errors?.['pattern']">No se permiten números ni caracteres especiales.</small>
+          <small *ngIf="nom.errors?.['minlength']">Por favor ingresa nombre y apellido real.</small>
+        </div>
       </div>
 
-      <!-- Sexo -->
+      <div class="form-group">
+        <label>Fecha de Nacimiento</label>
+        <input
+          type="date"
+          name="fechaNacimiento"
+          [(ngModel)]="fechaNacimiento"
+          #fecha="ngModel"
+          required
+          [max]="fechaMaximaPermitida"
+          [class.input-error]="fecha.invalid && (fecha.dirty || fecha.touched)">
+
+        <div *ngIf="fecha.invalid && (fecha.dirty || fecha.touched)" class="msg-error">
+          <small *ngIf="fecha.errors?.['required']">La fecha es obligatoria.</small>
+          <small *ngIf="fecha.errors?.['max']">El participante debe tener al menos 4 años.</small>
+        </div>
+      </div>
+
       <div class="form-group">
         <label>Sexo</label>
-        <select name="sexo" [(ngModel)]="sexo" required>
+        <select
+          name="sexo"
+          [(ngModel)]="sexo"
+          #sex="ngModel"
+          required
+          [class.input-error]="sex.invalid && (sex.touched)">
           <option value="" disabled selected>Seleccione el sexo</option>
           <option value="Femenino">Femenino</option>
           <option value="Masculino">Masculino</option>
         </select>
+        <div *ngIf="sex.invalid && sex.touched" class="msg-error">
+          <small>Debes seleccionar una opción.</small>
+        </div>
       </div>
 
-      <!-- Nacionalidad -->
       <div class="form-group">
         <label>Nacionalidad</label>
-        <select name="nacionalidad" [(ngModel)]="nacionalidad" required>
-          <option value="" disabled selected> Seleccione una nacionalidad </option>
-                        <option value="alemania">Alemania</option>
-                        <option value="argentina">Argentina</option>
-                        <option value="bolivia">Bolivia</option>
-                        <option value="brasil">Brasil</option>
-                        <option value="canada">Canadá</option>
-                        <option value="chile">Chile</option>
-                        <option value="colombia">Colombia</option>
-                        <option value="costa_rica">Costa Rica</option>
-                        <option value="cuba">Cuba</option>
-                        <option value="ecuador">Ecuador</option>
-                        <option value="el_salvador">El Salvador</option>
-                        <option value="espana">España</option>
-                        <option value="estados_unidos">Estados Unidos</option>
-                        <option value="francia">Francia</option>
-                        <option value="guatemala">Guatemala</option>
-                        <option value="guyana">Guyana</option>
-                        <option value="haiti">Haití</option>
-                        <option value="honduras">Honduras</option>
-                        <option value="italia">Italia</option>
-                        <option value="mexico">México</option>
-                        <option value="nicaragua">Nicaragua</option>
-                        <option value="panama">Panamá</option>
-                        <option value="paraguay">Paraguay</option>
-                        <option value="peru">Perú</option>
-                        <option value="puerto_rico">Puerto Rico</option>
-                        <option value="republica_dominicana">República Dominicana</option>
-                        <option value="surinam">Surinam</option>
-                        <option value="uruguay">Uruguay</option>
-                        <option value="venezuela">Venezuela</option>
-                        <option value="otro">Otro</option>
+        <select
+          name="nacionalidad"
+          [(ngModel)]="nacionalidad"
+          #nac="ngModel"
+          required
+          [class.input-error]="nac.invalid && (nac.touched)">
+          <option value="" disabled selected>Seleccione una nacionalidad</option>
+          <option value="alemania">Alemania</option>
+          <option value="argentina">Argentina</option>
+          <option value="bolivia">Bolivia</option>
+          <option value="brasil">Brasil</option>
+          <option value="canada">Canadá</option>
+          <option value="chile">Chile</option>
+          <option value="colombia">Colombia</option>
+          <option value="costa_rica">Costa Rica</option>
+          <option value="cuba">Cuba</option>
+          <option value="ecuador">Ecuador</option>
+          <option value="el_salvador">El Salvador</option>
+          <option value="espana">España</option>
+          <option value="estados_unidos">Estados Unidos</option>
+          <option value="francia">Francia</option>
+          <option value="guatemala">Guatemala</option>
+          <option value="guyana">Guyana</option>
+          <option value="haiti">Haití</option>
+          <option value="honduras">Honduras</option>
+          <option value="italia">Italia</option>
+          <option value="mexico">México</option>
+          <option value="nicaragua">Nicaragua</option>
+          <option value="panama">Panamá</option>
+          <option value="paraguay">Paraguay</option>
+          <option value="peru">Perú</option>
+          <option value="puerto_rico">Puerto Rico</option>
+          <option value="republica_dominicana">República Dominicana</option>
+          <option value="surinam">Surinam</option>
+          <option value="uruguay">Uruguay</option>
+          <option value="venezuela">Venezuela</option>
+          <option value="otro">Otro</option>
         </select>
+        <div *ngIf="nac.invalid && nac.touched" class="msg-error">
+          <small>Selecciona tu país.</small>
+        </div>
       </div>
 
-      <!-- Correo -->
       <div class="form-group">
         <label>Correo</label>
         <input
           type="email"
           name="correo"
           [(ngModel)]="correo"
+          #emailRef="ngModel"
           required
+          pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
           placeholder="tucorreo@email.com"
-        >
+          [class.input-error]="emailRef.invalid && (emailRef.dirty || emailRef.touched)">
+
+        <div *ngIf="emailRef.invalid && (emailRef.dirty || emailRef.touched)" class="msg-error">
+          <small *ngIf="emailRef.errors?.['pattern']">Formato de correo inválido.</small>
+        </div>
       </div>
 
-      <!-- Contraseña -->
       <div class="form-group">
         <label>Contraseña</label>
-        <input
-          type="password"
-          name="contrasena"
-          [(ngModel)]="contrasena"
-          required
-          minlength="8"
-          placeholder="Mínimo 8 caracteres"
-        >
+
+        <div class="password-wrapper">
+          <input
+            [type]="mostrarPass ? 'text' : 'password'"
+            name="contrasena"
+            [(ngModel)]="contrasena"
+            #pass="ngModel"
+            required
+            minlength="8"
+            pattern="(?=.*[!@#$%^&*]).{8,}"
+            placeholder="Mín. 8 caracteres y 1 símbolo (!@#$)"
+            [class.input-error]="pass.invalid && (pass.dirty || pass.touched)">
+
+          <span class="eye-icon" (click)="mostrarPass = !mostrarPass">
+            <i class="fas" [ngClass]="mostrarPass ? 'fa-eye-slash' : 'fa-eye'"></i>
+          </span>
+        </div>
+
+        <div *ngIf="pass.invalid && (pass.dirty || pass.touched)" class="msg-error">
+          <small *ngIf="pass.errors?.['required']">La contraseña es obligatoria.</small>
+          <small *ngIf="pass.errors?.['minlength']">Mínimo 8 caracteres.</small>
+          <small *ngIf="pass.errors?.['pattern']">Debe incluir al menos un carácter especial (!&#64;#$%^&*).</small>
+        </div>
       </div>
 
-      <!-- Confirmar -->
       <div class="form-group">
         <label>Confirmar contraseña</label>
-        <input
-          type="password"
-          name="confirmPassword"
-          ngModel
-          required
-          placeholder="Repite tu contraseña"
-        >
+
+        <div class="password-wrapper">
+          <input
+            [type]="mostrarConfirmPass ? 'text' : 'password'"
+            name="confirmPassword"
+            [(ngModel)]="confirmPassword"
+            #confirm="ngModel"
+            required
+            placeholder="Repite tu contraseña"
+            [class.input-error]="(confirm.invalid || confirm.value !== contrasena) && (confirm.dirty || confirm.touched)">
+
+          <span class="eye-icon" (click)="mostrarConfirmPass = !mostrarConfirmPass">
+            <i class="fas" [ngClass]="mostrarConfirmPass ? 'fa-eye-slash' : 'fa-eye'"></i>
+          </span>
+        </div>
+
+        <div *ngIf="(confirm.value !== contrasena) && (confirm.dirty || confirm.touched)" class="msg-error">
+          <small>Las contraseñas no coinciden.</small>
+        </div>
       </div>
 
-      <!-- Botón -->
       <button
         type="submit"
         class="btn-submit"
-        [disabled]="registroForm.invalid">
+        [disabled]="registroForm.invalid || (contrasena !== confirmPassword)">
         Registrar
       </button>
 
-      <!-- Link login -->
-      <div class="link-bottom">
+      <div class="server-msg" *ngIf="Mensajes" [ngClass]="{'success': exito, 'error': !exito}">
         <p>
-          ¿Ya tienes una cuenta?
-          <a routerLink="/login">Iniciar sesión</a>
+          <i class="fas" [ngClass]="exito ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+          {{ Mensajes }}
         </p>
-          <span class="status">
-            {{ Mensajes }}
-          </span>
+      </div>
+
+      <div class="link-bottom">
+        <p>¿Ya tienes una cuenta? <a routerLink="/login">Iniciar sesión</a></p>
       </div>
 
     </form>
-
   </div>
-
 </div>

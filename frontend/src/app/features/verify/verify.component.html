@@ -1,0 +1,65 @@
+<div class="login-container">
+  <div class="login-card">
+
+    <header class="header">
+      <a routerLink="/" title="Ir a la página principal">
+        <img src="assets/imgs/LogotipoNegroD.png" alt="Logo Dinamyt" class="logo-img">
+      </a>
+      <h2>Verificación de Seguridad</h2>
+    </header>
+
+    <div class="info-text">
+      <p class="text-muted">Hemos enviado un código de 6 dígitos a:</p>
+      <p class="email-highlight">{{ emailUsuario }}</p>
+    </div>
+
+    <form (ngSubmit)="verificar()" #verifyForm="ngForm">
+
+      <div class="form-group text-center">
+        <label for="codigoInput">Ingresa el Código</label>
+
+        <input
+          type="text"
+          id="codigoInput"
+          name="codigo"
+          [(ngModel)]="codigo"
+          #codeInput="ngModel"
+          required
+          maxlength="6"
+          pattern="[0-9]*"
+          inputmode="numeric"
+          placeholder="0 0 0 0 0 0"
+          class="input-otp"
+          autocomplete="one-time-code"
+          [class.input-error]="codeInput.invalid && (codeInput.dirty || codeInput.touched)">
+
+          <div *ngIf="codeInput.invalid && (codeInput.dirty || codeInput.touched)" class="msg-error-center">
+            <small *ngIf="codeInput.errors?.['required']">El código es requerido.</small>
+            <small *ngIf="codeInput.errors?.['pattern']">Solo números.</small>
+          </div>
+      </div>
+
+      <button
+        type="submit"
+        class="btn-submit"
+        [disabled]="verifyForm.invalid || codigo.length < 6 || cargando">
+        {{ cargando ? 'Verificando...' : 'Verificar Cuenta' }}
+      </button>
+
+      <div class="login-footer">
+        <p class="help-text no-border">
+          ¿No recibiste el código?
+          <a class="link-reenviar" (click)="reenviarCodigo()">Reenviar código</a>
+        </p>
+      </div>
+
+      <div class="server-msg" *ngIf="mensaje" [ngClass]="{'success': exito, 'error': !exito}">
+        <p>
+          <i class="fas" [ngClass]="exito ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+          {{ mensaje }}
+        </p>
+      </div>
+
+    </form>
+  </div>
+</div>

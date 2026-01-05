@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Location } from '@angular/common';
 
 @Component({
   selector: 'app-login',
@@ -12,10 +13,19 @@ import { FormsModule } from '@angular/forms';
 })
 export class LoginComponent {
 
+  private location = inject(Location);
+
+  mostrarPass: boolean = false;
   errorMessage: string | null = null;
+
+  volverAtras() {
+    this.location.back();
+  }
 
   login() {
     console.log('Formulario enviado');
   }
+
+
 
 }

@@ -19,4 +19,24 @@ export class ApiService {
     usuario
   );
   }
+
+
+  solicitarRecuperacion(correo: string) {
+    // Ajusta la URL según tu backend
+    return this.http.post(`${this.apiUrl}/recuperar-password`, { correo });
+  }
+
+  verificarCodigo(codigo: string) {
+    // Enviamos el código. El backend probablemente espera un objeto JSON.
+    // Ajusta la estructura { codigo: codigo } según lo que espere tu Java.
+    return this.http.post(`${this.apiUrl}/verificar`, { codigo });
+  }
+
+  reenviarCodigo(correo: string) {
+    return this.http.post(`${this.apiUrl}/reenviar`, { correo });
+  }
+
+  cambiarPassword(data: any) {
+  return this.http.post(`${this.apiUrl}/cambiar-password`, data);
+}
 }

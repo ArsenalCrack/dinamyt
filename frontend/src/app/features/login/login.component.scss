@@ -178,6 +178,37 @@
   }
 }
 
+/* ---------- ESTILOS PARA EL OJO (VISIBILIDAD) ---------- */
+
+.password-wrapper {
+    position: relative;
+    width: 100%;
+
+    input {
+        /* Espacio a la derecha para que el texto no se monte sobre el ojo */
+        padding-right: 45px;
+    }
+}
+
+.eye-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%); /* Centrado vertical exacto */
+    cursor: pointer;
+    color: var(--color-texto); /* Gris suave */
+    transition: color 0.3s ease;
+    z-index: 10;
+
+    i {
+        font-size: 1.1rem;
+    }
+
+    &:hover {
+        color: var(--color-acento); /* Rojo al pasar el mouse */
+    }
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 600px) {
   .login-container {

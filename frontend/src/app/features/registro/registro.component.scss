@@ -157,6 +157,107 @@
   }
 }
 
+.input-error {
+    border-color: var(--color-acento) !important;
+    background-color: rgba(183, 28, 28, 0.03) !important;
+    animation: shake 0.3s ease-in-out;
+}
+
+/* Contenedor de mensajes de error campo por campo */
+.msg-error {
+    margin-top: 5px;
+    display: flex;
+    flex-direction: column;
+
+    small {
+        color: var(--color-acento);
+        font-size: 0.8rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+
+        &::before {
+            content: '\f06a'; /* Icono de alerta de FontAwesome */
+            font-family: "Font Awesome 5 Free";
+            font-weight: 900;
+            margin-right: 5px;
+        }
+    }
+}
+
+/* Mensaje General del Servidor (Abajo) */
+.server-msg {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+
+    &.error {
+        background-color: rgba(183, 28, 28, 0.1);
+        color: var(--color-acento);
+        border: 1px solid rgba(183, 28, 28, 0.2);
+    }
+
+    &.success {
+        background-color: rgba(46, 204, 113, 0.1);
+        color: #27ae60;
+        border: 1px solid rgba(46, 204, 113, 0.2);
+    }
+}
+
+/* Animación de vibración sutil para errores */
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    50% { transform: translateX(3px); }
+    75% { transform: translateX(-3px); }
+    100% { transform: translateX(0); }
+}
+
+/* Asegura que el input date tenga el mismo estilo */
+input[type="date"] {
+    font-family: 'Roboto', sans-serif;
+    color: var(--color-principal);
+}
+
+/* ---------- ESTILOS PARA EL OJO DE CONTRASEÑA ---------- */
+
+.password-wrapper {
+    position: relative; /* Necesario para posicionar el ícono absoluto */
+    width: 100%;
+
+    input {
+        /* Damos espacio a la derecha para que el texto no choque con el ojo */
+        padding-right: 45px;
+    }
+}
+
+.eye-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%); /* Centrado vertical perfecto */
+    cursor: pointer;
+    color: var(--color-texto); /* Gris suave */
+    transition: color 0.3s ease;
+    z-index: 10; /* Asegura que esté por encima del input */
+
+    i {
+        font-size: 1.1rem;
+    }
+
+    &:hover {
+        color: var(--color-acento); /* Se pone rojo al pasar el mouse */
+    }
+}
+
+/* Ajuste para cuando hay error (para que el ojo no se vea raro con el fondo rojo) */
+.input-error + .eye-icon {
+    color: var(--color-acento);
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 600px) {
   .registro-wrapper {

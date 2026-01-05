@@ -1,0 +1,64 @@
+<div class="login-container">
+
+  <div class="login-card">
+
+    <a (click)="volverAtras()" class="btn-back" title="Volver atrás">
+      <i class="fas fa-arrow-left fa-2x"></i>
+    </a>
+
+    <header class="header">
+
+      <a routerLink="/" title="Ir a la página principal">
+        <img src="assets/imgs/LogotipoNegroD.png" alt="Logo Dinamyt" class="logo-img">
+      </a>
+      <h2>Recuperar Cuenta</h2>
+    </header>
+
+    <div class="info-text text-center mb-4">
+      <p class="text-muted">
+        Ingresa tu correo electrónico asociado. Te enviaremos un código de seguridad para restablecer tu contraseña.
+      </p>
+    </div>
+
+    <form (ngSubmit)="enviarCodigo()" #emailForm="ngForm">
+
+      <div class="form-group">
+        <label for="email">Correo Electrónico</label>
+        <div class="input-wrapper">
+          <input
+            type="email"
+            id="email"
+            name="email"
+            [(ngModel)]="correo"
+            #emailRef="ngModel"
+            required
+            pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
+            placeholder="ejemplo@correo.com"
+            [class.input-error]="emailRef.invalid && (emailRef.dirty || emailRef.touched)">
+
+            <i class="fas fa-envelope input-icon"></i>
+        </div>
+
+        <div *ngIf="emailRef.invalid && (emailRef.dirty || emailRef.touched)" class="msg-error">
+          <small *ngIf="emailRef.errors?.['required']">El correo es obligatorio.</small>
+          <small *ngIf="emailRef.errors?.['pattern']">Formato inválido.</small>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        class="btn-submit"
+        [disabled]="emailForm.invalid || cargando">
+        {{ cargando ? 'Enviando...' : 'Enviar Código' }}
+      </button>
+
+      <div class="server-msg" *ngIf="mensaje" [ngClass]="{'success': exito, 'error': !exito}">
+        <p>
+          <i class="fas" [ngClass]="exito ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
+          {{ mensaje }}
+        </p>
+      </div>
+
+    </form>
+  </div>
+</div>
