@@ -47,7 +47,7 @@ export class VerifyComponent implements OnInit {
   this.mensaje = '';
 
   this.api.verificarCodigo(this.codigo).subscribe({
-    next: (rest: any): => {
+    next: (rest: any) => {
       this.cargando = false;
       this.exito = true;
       this.mensaje = 'Código verificado correctamente. Redirigiendo...';
@@ -78,7 +78,7 @@ export class VerifyComponent implements OnInit {
     this.mensaje = '';
 
     this.api.reenviarCodigo(this.emailUsuario).subscribe({
-      next: (res) => {
+      next: (res: any) => {
         this.cargando = false;
         this.exito = true; // Usamos true para mostrar mensaje en verde
         this.mensaje = 'Nuevo código enviado. Revisa tu bandeja de entrada.';

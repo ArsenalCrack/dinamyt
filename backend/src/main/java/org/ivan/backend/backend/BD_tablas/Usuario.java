@@ -9,43 +9,44 @@ public class Usuario {
 
     @Id
     @Column(name = "ID_documento")
-    private long idDocumento;
+    protected long idDocumento;
 
     @Column(name = "nombreC", length = 150)
-    private String nombreC;
+    protected String nombreC;
 
     @Column(length = 20)
-    private String sexo;
+    protected String sexo;
 
     @Column(name = "fecha_nacimiento")
-    private LocalDate fechaNacimiento;
+    protected LocalDate fechaNacimiento;
 
     @Column(name = "cinturon_rango", length = 20)
-    private String cinturonRango;
+    protected String cinturonRango;
 
     @Column(length = 20)
-    private String nacionalidad;
+    protected String nacionalidad;
 
     @Column(name = "Correo", length = 120)
-    private String correo;
+    protected String correo;
 
     @Column(name = "Contraseña", length = 255)
-    private String contrasena;
+    protected String contrasena;
 
     @Column(name = "numero_celular")
-    private Integer numeroCelular;
+    protected Integer numeroCelular;
 
     @Column(name = "verificacion")
-    private String codigoVerificacion;
+    protected String codigo;
 
     // ===== GETTERS & SETTERS =====
 
-    public String getCodigoVerificacion() {
-        return codigoVerificacion;
+
+    public String getCodigo() {
+        return codigo;
     }
 
-    public void setCodigoVerificacion(String codigoVerificacion) {
-        this.codigoVerificacion = codigoVerificacion;
+    public void setCodigo(String codigo) {
+        this.codigo = codigo;
     }
 
     public void setIdDocumento(long idDocumento) {

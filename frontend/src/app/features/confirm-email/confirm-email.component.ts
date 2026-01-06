@@ -50,13 +50,7 @@ export class ConfirmEmailComponent {
       error: (err) => {
         this.cargando = false;
         this.exito = false;
-
-        // Manejo de errores específicos
-        if (err.status === 404) {
-          this.mensaje = 'Este correo no pertenece a ninguna cuenta existente.';
-        } else {
-          this.mensaje = err.error?.message || 'Error al conectar con el servidor.';
-        }
+        this.mensaje = err.error?.message;
       }
     });
   }

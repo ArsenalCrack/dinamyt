@@ -2,7 +2,6 @@
 package org.ivan.backend.backend.controladores;
 import org.ivan.backend.backend.EmailService;
 import org.ivan.backend.backend.BD_tablas.Usuario;
-import org.ivan.backend.backend.JSON.CODIGOV;
 import org.ivan.backend.backend.repositorios.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -26,8 +25,12 @@ public class controlador_principal {
         this.usuarioRepository = usuarioRepository;
     }
 
+    private String GenerarCodigo() {
+        return String.valueOf((int) (Math.random() * 900000) + 100000);
+    }
+
     @GetMapping("/saludo") // 2. Ahora sí responde en "/saludo"
-    public Map<String, String> prueba() {
+    public Map<String, String> Prueba() {
         // 3. Devolvemos un JSON estructurado, no un texto suelto
         Map<String, String> respuesta = new HashMap<>();
         respuesta.put("estado", "Online");
@@ -35,9 +38,9 @@ public class controlador_principal {
         return respuesta;
     }
     @PostMapping("/registro")
-    public ResponseEntity<?> crear(@RequestBody Usuario usuario){
+    public ResponseEntity<?> Crear(@RequestBody Usuario usuario){
 
-        String codigo =generarCodigo();
+        String codigo =GenerarCodigo();
 
         if (usuarioRepository.existsById(usuario.getIdDocumento())) {
             return ResponseEntity.badRequest().body(Map.of("message", "❌ Ya existe un usuario con ese documento"));
@@ -47,26 +50,45 @@ public class controlador_principal {
         }
         emailService.enviarCodigo(usuario.getCorreo(), codigo);
         guardado= usuario;
-        guardado.setCodigoVerificacion(codigo);
+        guardado.setCodigo(codigo);
         return ResponseEntity.ok("");
     }
     @PostMapping("/verificar")
-    private ResponseEntity<?>  verificar(@RequestBody CODIGOV CodigoRecibido){
-        System.out.println(guardado.getCodigoVerificacion());
+    private ResponseEntity<?>  Verificar(@RequestBody Usuario CodigoRecibido){
+        System.out.println(guardado.getCodigo());
         System.out.println(CodigoRecibido.getCodigo());
-        if (guardado.getCodigoVerificacion().equals(CodigoRecibido.getCodigo())){
+        if (guardado.getCodigo().equals(CodigoRecibido.getCodigo())){
             usuarioRepository.save(guardado);
             return ResponseEntity.ok(Map.of("message", "correcto"));
         }
         return ResponseEntity.badRequest().body(Map.of("message", "❌ El codigo no coincide ❌"));
     }
     @PostMapping("/reenviar")
-    private ResponseEntity<?> reenviarcodigo (){
-        guardado.setCodigoVerificacion(generarCodigo());
-        emailService.enviarCodigo(guardado.getCorreo(), guardado.getCodigoVerificacion());
+    private ResponseEntity<?> ReenviarCodigo (){
+        guardado.setCodigo(GenerarCodigo());
+        emailService.enviarCodigo(guardado.getCorreo(), guardado.getCodigo());
         return ResponseEntity.ok(Map.of("message", "reenviado"));
     }
-    private String generarCodigo() {
-        return String.valueOf((int) (Math.random() * 900000) + 100000);
+    @PostMapping("recuperar-password")
+    private ResponseEntity<?> VerificarCorreo(@RequestBody Usuario correo){
+        if (usuarioRepository.existsByCorreo(correo.getCorreo())){
+            guardado=usuarioRepository.findByCorreo((correo.getCorreo()));
+            guardado.setCodigo(GenerarCodigo());
+            emailService.enviarCodigo(guardado.getCorreo(), guardado.getCodigo());
+            return ResponseEntity.ok(Map.of("message", "Correo verificado"));
+        }else{
+            return ResponseEntity.badRequest().body(Map.of("message", "❌ Correo no registrado"));
+        }
+    }
+    @PostMapping("/cambiar-password")
+    private ResponseEntity<?> CambiarContraseña(@RequestBody Usuario datos){
+        guardado=usuarioRepository.findByCorreo((datos.getCorreo()));
+        if (guardado!=null){
+            guardado.setContrasena(datos.getContrasena());
+            usuarioRepository.save(guardado);
+            return ResponseEntity.ok(Map.of("message", "Contraseña Actualizada"));
+        }else{
+            return ResponseEntity.badRequest().body(Map.of("message", "Error"));
+        }
     }
 }
