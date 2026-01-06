@@ -77,14 +77,14 @@ export class RegistroComponent implements OnInit {
     this.api.registrarUsuario(usuario).subscribe({
       next: (res) => {
         this.exito = true;
-        this.Mensajes = "¡Registro exitoso! Redirigiendo...";
+        this.Mensajes = "¡Formulario exitoso! Redirigiendo...";
         sessionStorage.setItem('verifyMode', 'register');
         sessionStorage.setItem('emailParaVerificar', this.correo);
         setTimeout(() => this.router.navigate(['/verify']), 1500);
       },
       error: (err) => {
         this.exito = false;
-        this.Mensajes = err.error?.message || "Error al conectar con el servidor";
+        this.Mensajes = err.error?.message;
       }
     });
   }

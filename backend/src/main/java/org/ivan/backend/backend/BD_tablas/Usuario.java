@@ -35,13 +35,28 @@ public class Usuario {
     @Column(name = "numero_celular")
     private Integer numeroCelular;
 
+    @Column(name = "verificacion")
+    private String codigoVerificacion;
+
     // ===== GETTERS & SETTERS =====
+
+    public String getCodigoVerificacion() {
+        return codigoVerificacion;
+    }
+
+    public void setCodigoVerificacion(String codigoVerificacion) {
+        this.codigoVerificacion = codigoVerificacion;
+    }
+
+    public void setIdDocumento(long idDocumento) {
+        this.idDocumento = idDocumento;
+    }
 
     public long getIdDocumento() {
         return idDocumento;
     }
 
-    public void setIdDocumento(Integer idDocumento) {
+    public void setIdDocumento(Long idDocumento) {
         this.idDocumento = idDocumento;
     }
 

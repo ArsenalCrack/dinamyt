@@ -1,6 +1,8 @@
+//echo por Andres Gonzalez 1077294332
 package org.ivan.backend.backend.controladores;
 import org.ivan.backend.backend.EmailService;
 import org.ivan.backend.backend.BD_tablas.Usuario;
+import org.ivan.backend.backend.JSON.CODIGOV;
 import org.ivan.backend.backend.repositorios.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ public class controlador_principal {
     private EmailService emailService;
 
     private final UsuarioRepository usuarioRepository;
+    Usuario guardado;
 
     public controlador_principal(UsuarioRepository usuarioRepository) {
         this.usuarioRepository = usuarioRepository;
@@ -37,12 +40,31 @@ public class controlador_principal {
         String codigo =generarCodigo();
 
         if (usuarioRepository.existsById(usuario.getIdDocumento())) {
-            return ResponseEntity.badRequest().body("❌ Ya existe un usuario con ese documento");
+            return ResponseEntity.badRequest().body(Map.of("message", "❌ Ya existe un usuario con ese documento"));
+        }
+        if (usuarioRepository.existsByCorreo(usuario.getCorreo())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "❌ Ya existe un usuario con ese correo"));
         }
         emailService.enviarCodigo(usuario.getCorreo(), codigo);
-        Usuario guardado = usuarioRepository.save(usuario);
-
-        return ResponseEntity.ok(guardado);
+        guardado= usuario;
+        guardado.setCodigoVerificacion(codigo);
+        return ResponseEntity.ok("");
+    }
+    @PostMapping("/verificar")
+    private ResponseEntity<?>  verificar(@RequestBody CODIGOV CodigoRecibido){
+        System.out.println(guardado.getCodigoVerificacion());
+        System.out.println(CodigoRecibido.getCodigo());
+        if (guardado.getCodigoVerificacion().equals(CodigoRecibido.getCodigo())){
+            usuarioRepository.save(guardado);
+            return ResponseEntity.ok(Map.of("message", "correcto"));
+        }
+        return ResponseEntity.badRequest().body(Map.of("message", "❌ El codigo no coincide ❌"));
+    }
+    @PostMapping("/reenviar")
+    private ResponseEntity<?> reenviarcodigo (){
+        guardado.setCodigoVerificacion(generarCodigo());
+        emailService.enviarCodigo(guardado.getCorreo(), guardado.getCodigoVerificacion());
+        return ResponseEntity.ok(Map.of("message", "reenviado"));
     }
     private String generarCodigo() {
         return String.valueOf((int) (Math.random() * 900000) + 100000);

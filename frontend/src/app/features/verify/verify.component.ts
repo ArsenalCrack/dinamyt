@@ -27,7 +27,6 @@ export class VerifyComponent implements OnInit {
   mensaje: string = '';
   exito: boolean = false;
   cargando: boolean = false;
-
   ngOnInit() {
     // Intentar recuperar el correo del usuario registrado (si lo guardaste en el servicio/localStorage)
     // Por ahora pondremos un placeholder o lo recuperamos del localStorage si existe
@@ -48,7 +47,7 @@ export class VerifyComponent implements OnInit {
   this.mensaje = '';
 
   this.api.verificarCodigo(this.codigo).subscribe({
-    next: () => {
+    next: (rest: any): => {
       this.cargando = false;
       this.exito = true;
       this.mensaje = 'Código verificado correctamente. Redirigiendo...';
@@ -68,7 +67,7 @@ export class VerifyComponent implements OnInit {
     error: (err) => {
       this.cargando = false;
       this.exito = false;
-      this.mensaje = err.error?.message || 'Código incorrecto o expirado.';
+      this.mensaje = err.error?.message;
     }
   });
 }

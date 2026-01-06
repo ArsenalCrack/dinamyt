@@ -25,19 +25,22 @@ public class EmailService {
 
 
         mensaje.setTo(correo);
-        mensaje.setSubject("Verificación de cuenta - DidaMartials");
+        mensaje.setSubject("Verificación de cuenta - Dinamyt");
 
+        String cuerpoMensaje =
+                "¡Bienvenido a Dinamyt! 🚀\n\n" +
+                        "Gracias por registrarte en nuestra plataforma de gestión de artes marciales.\n\n" +
+                        "Para completar tu registro y verificar tu identidad, utiliza el siguiente código de seguridad:\n\n" +
+                        "══════════════════════════════\n" +
+                        "        CÓDIGO: " + codigo + "\n" +
+                        "══════════════════════════════\n\n" +
+                        "⚠️ Importante:\n" +
+                        "Este código es personal y confidencial. No lo compartas con nadie.\n\n" +
+                        "Si no solicitaste este código, puedes ignorar este mensaje o contactar con nuestro equipo de soporte.\n\n" +
+                        "Atentamente,\n" +
+                        "El equipo de Dinamyt\n" +
+                        "Área de Administración y Seguridad";
 
-        String cuerpoMensaje = "¡Bienvenido a DidaMartials!\n\n" +
-                "Gracias por registrarte en nuestra plataforma de gestión de artes marciales.\n" +
-                "Para completar tu registro y verificar tu identidad, por favor utiliza el siguiente código de seguridad:\n\n" +
-                "--------------------------------\n" +
-                "   CÓDIGO: " + codigo + "\n" +
-                "--------------------------------\n\n" +
-                "Si no has solicitado este código, por favor ignora este mensaje o contacta a soporte.\n\n" +
-                "Atentamente,\n" +
-                "El equipo de DidaMartials\n" +
-                "Administración y Seguridad";
 
         mensaje.setText(cuerpoMensaje);
 

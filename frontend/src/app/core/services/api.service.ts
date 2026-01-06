@@ -14,12 +14,8 @@ export class ApiService {
     return this.http.get(`${this.apiUrl}/saludo`);
   }
   registrarUsuario(usuario: any) {
-  return this.http.post(
-    'http://localhost:8080/api/registro',
-    usuario
-  );
+  return this.http.post(`${this.apiUrl}/registro`,usuario);
   }
-
 
   solicitarRecuperacion(correo: string) {
     // Ajusta la URL según tu backend
