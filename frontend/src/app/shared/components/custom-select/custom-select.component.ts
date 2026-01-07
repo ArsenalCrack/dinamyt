@@ -61,8 +61,8 @@ export class CustomSelectComponent implements ControlValueAccessor {
   close() { this.isOpen = false; }
 
   @HostListener('document:click', ['$event.target'])
-  onClickOutside(target: HTMLElement) {
-    if (!this.host.nativeElement.contains(target)) {
+  onClickOutside(target: EventTarget | null) {
+    if (target && !this.host.nativeElement.contains(target as Node)) {
       this.close();
     }
   }
@@ -72,12 +72,12 @@ export class CustomSelectComponent implements ControlValueAccessor {
     if (this.isOpen) this.positionOptions();
   }
 
-  @HostListener('window:scroll', ['$event'])
+  @HostListener('window:scroll')
   onWindowScroll() {
     if (this.isOpen) this.positionOptions();
   }
 
-  @HostListener('window:touchmove', ['$event'])
+  @HostListener('window:touchmove')
   onTouchMove() {
     if (this.isOpen) this.positionOptions();
   }

@@ -31,6 +31,18 @@
       <button #bannerResendBtn class="btn btn-sm btn-primary" (click)="enviarCodigo()">Reenviar código</button>
     </div>
 
+    <!-- Modal para errores del servidor -->
+    <div *ngIf="mensaje && !exito" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-body">
+          <i class="fas fa-exclamation-circle modal-icon error"></i>
+          <div class="modal-text">{{ mensaje }}</div>
+        </div>
+        <button class="modal-close" (click)="closeMensaje()" aria-label="Cerrar">✕</button>
+        <button class="modal-action" (click)="closeMensaje()">Cerrar</button>
+      </div>
+    </div>
+
     <form (ngSubmit)="enviarCodigo()" #emailForm="ngForm">
 
       <div class="form-group">
@@ -63,9 +75,9 @@
         {{ cargando ? 'Enviando...' : 'Enviar Código' }}
       </button>
 
-      <div class="server-msg" *ngIf="mensaje" [ngClass]="{'success': exito, 'error': !exito}">
+      <div class="server-msg" *ngIf="mensaje && exito" [ngClass]="{'success': true}">
         <p>
-          <i class="fas" [ngClass]="exito ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
+          <i class="fas fa-check-circle"></i>
           {{ mensaje }}
         </p>
       </div>

@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, inject, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, AfterViewInit, inject, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -18,6 +18,7 @@ export class RegistroComponent implements OnInit {
   private api = inject(ApiService);
   private router = inject(Router);
   private location = inject(Location);
+  private cdr = inject(ChangeDetectorRef);
 
 
   // VARIABLES PARA VISIBILIDAD DE CONTRASEÑA
@@ -111,49 +112,119 @@ export class RegistroComponent implements OnInit {
 
   // Recalcula días según mes/año seleccionados y ajusta selección si queda fuera de rango
   updateDias() {
-    if (!this.mesSeleccionado || !this.anioSeleccionado) return;
-    const year = Number(this.anioSeleccionado);
+    // Si no hay mes seleccionado, mostrar 31 días por defecto
+    if (!this.mesSeleccionado) {
+      this.diasOptions = Array.from({ length: 31 }, (_, i) => {
+        const val = String(i + 1).padStart(2, '0');
+        return { value: val, label: String(i + 1) };
+      });
+      return;
+    }
+
+    // Usar año seleccionado o año actual para calcular días del mes
+    // Esto es importante para febrero en años bisiestos
+    const year = this.anioSeleccionado ? Number(this.anioSeleccionado) : new Date().getFullYear();
     const month = Number(this.mesSeleccionado);
+
+    // Esta función calcula automáticamente los días según el año (incluye años bisiestos)
     const daysInMonth = new Date(year, month, 0).getDate();
+
+    // Actualizar opciones
     this.diasOptions = Array.from({ length: daysInMonth }, (_, i) => {
       const val = String(i + 1).padStart(2, '0');
       return { value: val, label: String(i + 1) };
     });
-    // if selected day exceeds new max, clear it
+
+    // Si el día seleccionado excede el máximo, limpiarlo DESPUÉS de actualizar opciones
     if (this.diaSeleccionado && Number(this.diaSeleccionado) > daysInMonth) {
+      const esBisiesto = month === 2 && daysInMonth === 29;
       this.diaSeleccionado = '';
-      this.fechaErrorMsg = 'El día no existe para el mes/año seleccionados.';
+      this.fechaNacimiento = '';
+      if (month === 2 && esBisiesto) {
+        this.fechaErrorMsg = `El año ${year} es bisiesto, febrero tiene 29 días. Debes seleccionar un día entre 1 y 29.`;
+      } else {
+        this.fechaErrorMsg = `El mes seleccionado solo tiene ${daysInMonth} días. Debes seleccionar un día entre 1 y ${daysInMonth}.`;
+      }
+      // Forzar detección de cambios
+      this.cdr.detectChanges();
+    } else if (this.fechaErrorMsg.includes('mes seleccionado solo tiene')) {
+      // Limpiar mensaje de error si ahora el día es válido
+      this.fechaErrorMsg = '';
     }
+  }
+
+  onDiaChange(value: string) {
+    this.diaSeleccionado = value;
+    this.validateDiaForCurrentMonth();
+    this.updateFechaFromSelects();
   }
 
   onMesChange(value: string) {
     this.mesSeleccionado = value;
     this.updateDias();
-    this.updateFechaFromSelects();
+    if (this.diaSeleccionado && this.mesSeleccionado && this.anioSeleccionado) {
+      this.updateFechaFromSelects();
+    }
   }
 
   onAnioChange(value: string) {
     this.anioSeleccionado = value;
     this.updateDias();
-    this.updateFechaFromSelects();
+    if (this.diaSeleccionado && this.mesSeleccionado && this.anioSeleccionado) {
+      this.updateFechaFromSelects();
+    }
+  }
+
+  // Valida si el día seleccionado es válido para el mes/año actual
+  validateDiaForCurrentMonth() {
+    if (!this.diaSeleccionado || !this.mesSeleccionado) return;
+
+    const year = this.anioSeleccionado ? Number(this.anioSeleccionado) : new Date().getFullYear();
+    const month = Number(this.mesSeleccionado);
+    const day = Number(this.diaSeleccionado);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    if (day > daysInMonth) {
+      this.diaSeleccionado = '';
+      this.fechaNacimiento = '';
+      this.fechaErrorMsg = `El mes seleccionado solo tiene ${daysInMonth} días. Por favor, selecciona un día válido.`;
+    }
   }
 
   updateFechaFromSelects() {
     if (!this.diaSeleccionado || !this.mesSeleccionado || !this.anioSeleccionado) {
       this.fechaNacimiento = '';
-      this.fechaErrorMsg = '';
+      // No mostrar error si simplemente no han completado los campos aún
       return;
     }
-    const candidate = `${this.anioSeleccionado}-${this.mesSeleccionado}-${this.diaSeleccionado}`;
-    // Check for valid date (e.g., 31 feb)
-    const d = new Date(candidate);
-    if (isNaN(d.getTime()) || (d.getFullYear() !== Number(this.anioSeleccionado) || (d.getMonth() + 1) !== Number(this.mesSeleccionado) || d.getDate() !== Number(this.diaSeleccionado))) {
-      this.fechaNacimiento = candidate; // keep selection string
+
+    // Validar que el día sea válido para el mes/año antes de construir la fecha
+    const year = Number(this.anioSeleccionado);
+    const month = Number(this.mesSeleccionado);
+    const day = Number(this.diaSeleccionado);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    if (day > daysInMonth) {
+      this.fechaNacimiento = '';
+      // No mostrar error aquí, updateDias ya lo maneja
+      return;
+    }
+
+    // Construir fecha usando constructor con parámetros para evitar problemas de zona horaria
+    const d = new Date(year, month - 1, day);
+
+    // Validar que la fecha construida sea correcta (JavaScript ajusta fechas inválidas)
+    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+      this.fechaNacimiento = '';
       this.fechaErrorMsg = 'Fecha no válida para el día/mes seleccionados.';
       return;
     }
+
+    // Si todo es válido, asignar la fecha en formato YYYY-MM-DD y limpiar errores
+    const candidate = `${this.anioSeleccionado}-${this.mesSeleccionado}-${this.diaSeleccionado}`;
     this.fechaNacimiento = candidate;
-    // ejecutar validación completa (forzada)
+    this.fechaErrorMsg = '';
+    // Ejecutar validación de rango de edad
     this.validateFecha(true);
   }
 
@@ -213,14 +284,69 @@ export class RegistroComponent implements OnInit {
   }
 
   registrar() {
-    // validar fecha antes de enviar
-    this.validateFecha(true);
-    if (this.fechaErrorMsg) {
-      // dejar el modal de mensaje visible (ya se setea en validateFecha)
+    console.log('Valores de fecha:', {
+      dia: this.diaSeleccionado,
+      mes: this.mesSeleccionado,
+      anio: this.anioSeleccionado
+    });
+
+    // VALIDACIÓN 1: Verificar que todos los campos de fecha estén completos
+    if (!this.diaSeleccionado || !this.mesSeleccionado || !this.anioSeleccionado) {
+      const faltantes = [];
+      if (!this.diaSeleccionado) faltantes.push('día');
+      if (!this.mesSeleccionado) faltantes.push('mes');
+      if (!this.anioSeleccionado) faltantes.push('año');
+
+      if (faltantes.length === 3) {
+        this.Mensajes = "No has ingresado tu fecha de nacimiento. Por favor selecciona día, mes y año.";
+      } else {
+        this.Mensajes = `Fecha de nacimiento incompleta. Falta seleccionar: ${faltantes.join(', ')}.`;
+      }
+      this.exito = false;
       return;
     }
+
+    // VALIDACIÓN 2: Verificar que el día sea válido para el mes seleccionado
+    const year = Number(this.anioSeleccionado);
+    const month = Number(this.mesSeleccionado);
+    const day = Number(this.diaSeleccionado);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    if (day > daysInMonth) {
+      const mesesNombres = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      this.Mensajes = `Fecha incorrecta: el día ${day} no existe en ${mesesNombres[month]}. ` +
+                      `Este mes solo tiene ${daysInMonth} días. Por favor cambia el día a un valor entre 1 y ${daysInMonth}.`;
+      this.exito = false;
+      return;
+    }
+
+    // VALIDACIÓN 3: Verificar que la fecha construida sea válida
+    const fechaTest = new Date(year, month - 1, day);
+    if (fechaTest.getFullYear() !== year ||
+        fechaTest.getMonth() !== month - 1 ||
+        fechaTest.getDate() !== day) {
+      this.Mensajes = `La fecha ${day}/${month}/${year} no es válida. Por favor verifica los datos ingresados.`;
+      this.exito = false;
+      return;
+    }
+
+    // Construir fechaNacimiento en formato YYYY-MM-DD
+    const mesStr = String(month).padStart(2, '0');
+    const diaStr = String(day).padStart(2, '0');
+    this.fechaNacimiento = `${year}-${mesStr}-${diaStr}`;
+
+    // VALIDACIÓN 4: Validar rango de edad (mínimo 4 años)
+    this.validateFecha(true);
+    if (this.fechaErrorMsg) {
+      this.Mensajes = this.fechaErrorMsg;
+      this.exito = false;
+      return;
+    }
+
     if (this.contrasena !== this.confirmPassword) {
       this.Mensajes = "Las contraseñas no coinciden";
+      this.exito = false;
       return;
     }
 
@@ -244,7 +370,7 @@ export class RegistroComponent implements OnInit {
       next: (res) => {
         // Éxito: mantenemos overlay visible hasta 2s para dar feedback
         this.exito = true;
-        this.Mensajes = "¡Formulario exitoso!";
+        this.Mensajes = "¡Registro exitoso! Revisa tu correo para verificar tu cuenta.";
         sessionStorage.setItem('verifyMode', 'register');
         sessionStorage.setItem('emailParaVerificar', this.correo);
         // Guardar expiración del código: 5 minutos desde ahora
@@ -287,10 +413,13 @@ export class RegistroComponent implements OnInit {
       next: () => {
         this.cargando = false;
         this.exito = true;
-        this.Mensajes = 'Se envió un nuevo código. Revisa tu correo.';
+        this.Mensajes = 'Se envió un nuevo código a tu correo. Ahora puedes ir a verificar tu cuenta.';
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
-        this.showExpiredBanner = false;
+        sessionStorage.setItem('verifyMode', 'register');
+        sessionStorage.setItem('emailParaVerificar', this.correo);
+        // Mantener el banner visible pero actualizar el mensaje
+        // El usuario puede cerrar el modal y ver el banner actualizado
       },
       error: (err) => {
         this.cargando = false;

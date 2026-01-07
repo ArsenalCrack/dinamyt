@@ -19,7 +19,10 @@
 
     <div *ngIf="showExpiredBanner" class="banner expired-banner">
       <p>El código ha caducado. Puedes solicitar uno nuevo para continuar:</p>
-      <button #bannerResendBtn class="btn btn-sm btn-primary" (click)="reenviarDesdeBanner()">Reenviar código</button>
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button #bannerResendBtn class="btn btn-sm btn-primary" (click)="reenviarDesdeBanner()">Reenviar código</button>
+        <button class="btn btn-sm btn-secondary" routerLink="/verify">Ir a verificar</button>
+      </div>
     </div>
 
     <!-- Modal for server messages -->
@@ -29,8 +32,8 @@
           <i class="fas" [ngClass]="exito ? 'fa-check-circle modal-icon success' : 'fa-exclamation-circle modal-icon error'"></i>
           <div class="modal-text">{{ Mensajes }}</div>
         </div>
-        <button class="modal-close" (click)="closeMensaje()" aria-label="Cerrar">✕</button>
-        <button class="modal-action" (click)="closeMensaje()">Cerrar</button>
+        <button *ngIf="!exito" class="modal-close" (click)="closeMensaje()" aria-label="Cerrar">✕</button>
+        <button *ngIf="!exito" class="modal-action" (click)="closeMensaje()">Cerrar</button>
       </div>
     </div>
 
@@ -83,14 +86,16 @@
         <div class="date-selects">
           <div class="small-col">
             <app-custom-select
+              name="diaSeleccionado"
               [(ngModel)]="diaSeleccionado"
-              (ngModelChange)="updateFechaFromSelects()"
+              (ngModelChange)="onDiaChange($event)"
               [options]="diasOptions"
               placeholder="Día">
             </app-custom-select>
           </div>
           <div class="small-col month-col">
             <app-custom-select
+              name="mesSeleccionado"
               [(ngModel)]="mesSeleccionado"
               (ngModelChange)="onMesChange($event)"
               [options]="mesesOptions"
@@ -99,6 +104,7 @@
           </div>
           <div class="large-col year-col">
             <app-custom-select
+              name="anioSeleccionado"
               [(ngModel)]="anioSeleccionado"
               (ngModelChange)="onAnioChange($event)"
               [options]="aniosOptions"
@@ -107,7 +113,7 @@
           </div>
         </div>
 
-        <div *ngIf="!fechaNacimiento && (diaSeleccionado || mesSeleccionado || anioSeleccionado)" class="msg-error">
+        <div *ngIf="!fechaNacimiento && (diaSeleccionado || mesSeleccionado || anioSeleccionado) && !fechaErrorMsg" class="msg-error">
           <small>La fecha está incompleta.</small>
         </div>
         <div *ngIf="fechaErrorMsg" class="msg-error">

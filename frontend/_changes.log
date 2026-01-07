@@ -1,0 +1,1 @@
+2026-01-07: Adjust expiry to 30s and prevent auto-redirect on expired modal close in verify component.

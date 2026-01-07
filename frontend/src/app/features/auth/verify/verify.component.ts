@@ -111,7 +111,10 @@ export class VerifyComponent implements OnInit {
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
         this.expiresAt = expires;
+        // Resetear estado de expiración para permitir manejar nuevas caducidades
         this.expired = false;
+        this.expiredHandled = false;
+        this.expiredModalVisible = false;
         this.startTimer();
       },
       error: (err) => {
@@ -157,15 +160,10 @@ export class VerifyComponent implements OnInit {
   expiredModalVisible = false;
 
   closeExpiredModal() {
-    // limpiar permiso y expiración, luego redirigir al flujo previo
-    sessionStorage.removeItem('verifyMode');
-    sessionStorage.removeItem('verifyExpiresAt');
+    // Solo cerrar el modal y permanecer en la página de verificación
     this.expiredModalVisible = false;
-    if (this.modo === 'recovery') {
-      this.router.navigate(['/recoverAccount']);
-    } else {
-      this.router.navigate(['/register']);
-    }
+    this.mensaje = 'El código ha caducado. Reenvía para obtener uno nuevo.';
+    this.exito = false;
   }
 
   formatRemaining(): string {

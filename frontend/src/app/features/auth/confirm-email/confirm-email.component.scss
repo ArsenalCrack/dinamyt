@@ -4,3 +4,55 @@
 .header .logo-img { width: 150px; }
 .input-wrapper input { padding-left: 45px; }
 
+/* Modal styles */
+.modal-overlay {
+	position: fixed;
+	inset: 0;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	background: rgba(0,0,0,0.45);
+	z-index: 2000;
+}
+.modal-box {
+	background: #fff;
+	padding: 1.25rem 1.4rem;
+	border-radius: 12px;
+	min-width: 280px;
+	max-width: 92%;
+	width: 100%;
+	box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+	position: relative;
+	display:flex;
+	flex-direction: column;
+	align-items:center;
+	gap: 0.8rem;
+}
+.modal-body { display:flex; align-items:center; gap:0.8rem; justify-content:center; text-align:center; }
+.modal-icon { font-size:1.6rem; }
+.modal-icon.error { color: #b71c1c; }
+.modal-icon.success { color: #2e7d32; }
+.modal-text { font-size:1rem; color:#222; }
+.modal-close { position:absolute; right:8px; top:6px; background:transparent; border:none; font-size:1.05rem; cursor:pointer; }
+
+/* Action button inside modal (red) - now in normal flow below the text */
+.modal-action {
+	margin-top: 12px;
+	background: #c62828;
+	color: #fff;
+	border: none;
+	padding: 0.6rem 1rem;
+	border-radius: 8px;
+	cursor: pointer;
+	font-weight: 700;
+}
+.modal-action:focus { outline: 2px solid rgba(198,40,40,0.25); }
+
+@media (min-width: 560px) {
+	.modal-box { min-width: 420px; max-width: 720px; }
+	.modal-text { font-size:1rem; }
+}
+
+@media (max-width: 420px) {
+	.modal-action { width: 100%; }
+}

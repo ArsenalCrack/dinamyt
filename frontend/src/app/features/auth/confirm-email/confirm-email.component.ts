@@ -26,6 +26,10 @@ export class ConfirmEmailComponent {
   mensaje: string = '';
   exito: boolean = false;
 
+  closeMensaje() {
+    this.mensaje = '';
+  }
+
   volverAtras() {
     this.location.back();
   }
