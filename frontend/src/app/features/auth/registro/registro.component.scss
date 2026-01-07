@@ -1,0 +1,73 @@
+@import '../_auth-base.scss';
+
+/* Registro-specific tweaks */
+.header .logo-img { width: 150px; }
+.modal-overlay {
+	position: fixed;
+	inset: 0;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	background: rgba(0,0,0,0.45);
+	z-index: 2000;
+}
+.modal-box {
+	background: #fff;
+	padding: 1.25rem 1.4rem;
+	border-radius: 12px;
+	min-width: 280px;
+	max-width: 92%;
+	width: 100%;
+	box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+	position: relative;
+	display:flex;
+	flex-direction: column;
+	align-items:center;
+	gap: 0.8rem;
+}
+.modal-body { display:flex; align-items:center; gap:0.8rem; justify-content:center; text-align:center; }
+.modal-icon { font-size:1.6rem; }
+.modal-icon.error { color: #b71c1c; }
+.modal-text { font-size:1rem; color:#222; }
+.modal-close { position:absolute; right:8px; top:6px; background:transparent; border:none; font-size:1.05rem; cursor:pointer; }
+
+/* Action button inside modal (red) - now in normal flow below the text */
+.modal-action {
+	margin-top: 12px;
+	background: #c62828;
+	color: #fff;
+	border: none;
+	padding: 0.6rem 1rem;
+	border-radius: 8px;
+	cursor: pointer;
+	font-weight: 700;
+}
+.modal-action:focus { outline: 2px solid rgba(198,40,40,0.25); }
+
+@media (min-width: 560px) {
+	.modal-box { min-width: 420px; max-width: 720px; }
+	.modal-text { font-size:1rem; }
+}
+
+@media (max-width: 420px) {
+	.modal-action { width: 100%; }
+}
+
+/* Small tweak for link-bottom spacing in registro (kept here if needed) */
+.link-bottom { margin-top: 18px; }
+
+.date-selects { display:flex; gap:12px; align-items:center; width:100%; }
+/* Desktop: dar más espacio al día y al mes, mantener distancia consistente con otros inputs */
+.date-selects .small-col{ flex: 1 1 0; min-width:56px; } /* día: crece para usar espacio disponible */
+.date-selects .month-col{ flex: 1.4 1 0; min-width:100px; } /* mes: un poco más ancho para nombres */
+.date-selects .year-col{ flex: 0.9 1 0; min-width:70px; } /* año: algo más pequeño */
+
+/* Responsive: mantener horizontalidad, reducir padding/font-size para evitar scrollbars */
+@media (max-width: 520px) {
+  .date-selects { flex-direction: row; gap:8px; overflow-x:hidden; }
+  .date-selects .small-col{ flex: 0 1 26%; min-width:40px; }
+  .date-selects .month-col{ flex: 0 1 48%; min-width:70px; }
+  .date-selects .year-col{ flex: 0 1 26%; min-width:48px; }
+  .date-selects .custom-select .selected { font-size:0.92rem; padding:8px 10px; white-space:nowrap; text-overflow:ellipsis; overflow:hidden }
+}
+

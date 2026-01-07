@@ -1,11 +1,9 @@
 import { Routes } from '@angular/router';
 import { HomeComponent } from './features/home/home.component';
-import { LoginComponent } from './features/login/login.component';
-import { RegistroComponent } from './features/registro/registro.component';
-import { VerifyComponent } from './features/verify/verify.component';
+import { LoginComponent, RegistroComponent, ConfirmEmailComponent, VerifyComponent, ResetPasswordComponent } from './features/auth/index';
 import { verificationGuard } from './core/guards/verification.guard';
-import { ConfirmEmailComponent } from './features/confirm-email/confirm-email.component';
-import { ResetPasswordComponent } from './features/reset-password/reset-password.component';
+import { authGuard } from './core/guards/auth.guard';
+import { DashboardComponent } from './features/dashboard/dashboard.component';
 
 export const routes: Routes = [
   // 1. Rutas específicas primero
@@ -13,6 +11,8 @@ export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'recoverAccount', component: ConfirmEmailComponent },
   { path: 'register', component: RegistroComponent },
+
+  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
 
 
   {

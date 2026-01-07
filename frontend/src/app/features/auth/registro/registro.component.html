@@ -1,10 +1,14 @@
 <div class="registro-wrapper">
   <div class="container">
 
+    <div *ngIf="cargando" class="loading-overlay">
+      <i class="fas fa-spinner fa-spin spinner-icon"></i>
+      <p class="loading-text">Procesando... por favor espera</p>
+    </div>
+
     <a (click)="volverAtras()" class="btn-back" title="Volver atrás">
       <i class="fas fa-arrow-left fa-2x"></i>
     </a>
-
 
     <header class="header">
       <a routerLink="/" title="Ir a la página principal">
@@ -13,20 +17,38 @@
       <h2>Registro de Usuario</h2>
     </header>
 
+    <div *ngIf="showExpiredBanner" class="banner expired-banner">
+      <p>El código ha caducado. Puedes solicitar uno nuevo para continuar:</p>
+      <button #bannerResendBtn class="btn btn-sm btn-primary" (click)="reenviarDesdeBanner()">Reenviar código</button>
+    </div>
+
+    <!-- Modal for server messages -->
+    <div *ngIf="Mensajes" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-body">
+          <i class="fas" [ngClass]="exito ? 'fa-check-circle modal-icon success' : 'fa-exclamation-circle modal-icon error'"></i>
+          <div class="modal-text">{{ Mensajes }}</div>
+        </div>
+        <button class="modal-close" (click)="closeMensaje()" aria-label="Cerrar">✕</button>
+        <button class="modal-action" (click)="closeMensaje()">Cerrar</button>
+      </div>
+    </div>
+
     <form #registroForm="ngForm" (ngSubmit)="registrar()">
 
       <div class="form-group">
         <label>Número de documento</label>
         <input
           type="text"
+          inputmode="numeric"
           name="idDocumento"
           [(ngModel)]="idDocumento"
           #doc="ngModel"
           required
           minlength="6"
           maxlength="20"
-          pattern="^[0-9]+$"
           placeholder="Ej: 1090..."
+          (input)="onlyDigits($event)"
           [class.input-error]="doc.invalid && (doc.dirty || doc.touched)">
 
         <div *ngIf="doc.invalid && (doc.dirty || doc.touched)" class="msg-error">
@@ -58,33 +80,55 @@
 
       <div class="form-group">
         <label>Fecha de Nacimiento</label>
-        <input
-          type="date"
-          name="fechaNacimiento"
-          [(ngModel)]="fechaNacimiento"
-          #fecha="ngModel"
-          required
-          [max]="fechaMaximaPermitida"
-          [class.input-error]="fecha.invalid && (fecha.dirty || fecha.touched)">
+        <div class="date-selects">
+          <div class="small-col">
+            <app-custom-select
+              [(ngModel)]="diaSeleccionado"
+              (ngModelChange)="updateFechaFromSelects()"
+              [options]="diasOptions"
+              placeholder="Día">
+            </app-custom-select>
+          </div>
+          <div class="small-col month-col">
+            <app-custom-select
+              [(ngModel)]="mesSeleccionado"
+              (ngModelChange)="onMesChange($event)"
+              [options]="mesesOptions"
+              placeholder="Mes">
+            </app-custom-select>
+          </div>
+          <div class="large-col year-col">
+            <app-custom-select
+              [(ngModel)]="anioSeleccionado"
+              (ngModelChange)="onAnioChange($event)"
+              [options]="aniosOptions"
+              placeholder="Año">
+            </app-custom-select>
+          </div>
+        </div>
 
-        <div *ngIf="fecha.invalid && (fecha.dirty || fecha.touched)" class="msg-error">
-          <small *ngIf="fecha.errors?.['required']">La fecha es obligatoria.</small>
-          <small *ngIf="fecha.errors?.['max']">El participante debe tener al menos 4 años.</small>
+        <div *ngIf="!fechaNacimiento && (diaSeleccionado || mesSeleccionado || anioSeleccionado)" class="msg-error">
+          <small>La fecha está incompleta.</small>
+        </div>
+        <div *ngIf="fechaErrorMsg" class="msg-error">
+          <small>{{ fechaErrorMsg }}</small>
         </div>
       </div>
 
       <div class="form-group">
         <label>Sexo</label>
-        <select
+        <app-custom-select
           name="sexo"
           [(ngModel)]="sexo"
           #sex="ngModel"
           required
-          [class.input-error]="sex.invalid && (sex.touched)">
-          <option value="" disabled selected>Seleccione el sexo</option>
-          <option value="Femenino">Femenino</option>
-          <option value="Masculino">Masculino</option>
-        </select>
+          [options]="[
+            { value: '', label: 'Seleccione el sexo', disabled: true },
+            { value: 'Femenino', label: 'Femenino' },
+            { value: 'Masculino', label: 'Masculino' }
+          ]"
+          placeholder="Seleccione el sexo">
+        </app-custom-select>
         <div *ngIf="sex.invalid && sex.touched" class="msg-error">
           <small>Debes seleccionar una opción.</small>
         </div>
@@ -92,44 +136,46 @@
 
       <div class="form-group">
         <label>Nacionalidad</label>
-        <select
+        <app-custom-select
           name="nacionalidad"
           [(ngModel)]="nacionalidad"
           #nac="ngModel"
           required
-          [class.input-error]="nac.invalid && (nac.touched)">
-          <option value="" disabled selected>Seleccione una nacionalidad</option>
-          <option value="alemania">Alemania</option>
-          <option value="argentina">Argentina</option>
-          <option value="bolivia">Bolivia</option>
-          <option value="brasil">Brasil</option>
-          <option value="canada">Canadá</option>
-          <option value="chile">Chile</option>
-          <option value="colombia">Colombia</option>
-          <option value="costa_rica">Costa Rica</option>
-          <option value="cuba">Cuba</option>
-          <option value="ecuador">Ecuador</option>
-          <option value="el_salvador">El Salvador</option>
-          <option value="espana">España</option>
-          <option value="estados_unidos">Estados Unidos</option>
-          <option value="francia">Francia</option>
-          <option value="guatemala">Guatemala</option>
-          <option value="guyana">Guyana</option>
-          <option value="haiti">Haití</option>
-          <option value="honduras">Honduras</option>
-          <option value="italia">Italia</option>
-          <option value="mexico">México</option>
-          <option value="nicaragua">Nicaragua</option>
-          <option value="panama">Panamá</option>
-          <option value="paraguay">Paraguay</option>
-          <option value="peru">Perú</option>
-          <option value="puerto_rico">Puerto Rico</option>
-          <option value="republica_dominicana">República Dominicana</option>
-          <option value="surinam">Surinam</option>
-          <option value="uruguay">Uruguay</option>
-          <option value="venezuela">Venezuela</option>
-          <option value="otro">Otro</option>
-        </select>
+          [options]="[
+            { value: '', label: 'Seleccione una nacionalidad', disabled: true },
+            { value: 'alemania', label: 'Alemania' },
+            { value: 'argentina', label: 'Argentina' },
+            { value: 'bolivia', label: 'Bolivia' },
+            { value: 'brasil', label: 'Brasil' },
+            { value: 'canada', label: 'Canadá' },
+            { value: 'chile', label: 'Chile' },
+            { value: 'colombia', label: 'Colombia' },
+            { value: 'costa_rica', label: 'Costa Rica' },
+            { value: 'cuba', label: 'Cuba' },
+            { value: 'ecuador', label: 'Ecuador' },
+            { value: 'el_salvador', label: 'El Salvador' },
+            { value: 'espana', label: 'España' },
+            { value: 'estados_unidos', label: 'Estados Unidos' },
+            { value: 'francia', label: 'Francia' },
+            { value: 'guatemala', label: 'Guatemala' },
+            { value: 'guyana', label: 'Guyana' },
+            { value: 'haiti', label: 'Haití' },
+            { value: 'honduras', label: 'Honduras' },
+            { value: 'italia', label: 'Italia' },
+            { value: 'mexico', label: 'México' },
+            { value: 'nicaragua', label: 'Nicaragua' },
+            { value: 'panama', label: 'Panamá' },
+            { value: 'paraguay', label: 'Paraguay' },
+            { value: 'peru', label: 'Perú' },
+            { value: 'puerto_rico', label: 'Puerto Rico' },
+            { value: 'republica_dominicana', label: 'República Dominicana' },
+            { value: 'surinam', label: 'Surinam' },
+            { value: 'uruguay', label: 'Uruguay' },
+            { value: 'venezuela', label: 'Venezuela' },
+            { value: 'otro', label: 'Otro' }
+          ]"
+          placeholder="Seleccione una nacionalidad">
+        </app-custom-select>
         <div *ngIf="nac.invalid && nac.touched" class="msg-error">
           <small>Selecciona tu país.</small>
         </div>
@@ -154,7 +200,6 @@
 
       <div class="form-group">
         <label>Contraseña</label>
-
         <div class="password-wrapper">
           <input
             [type]="mostrarPass ? 'text' : 'password'"
@@ -181,7 +226,6 @@
 
       <div class="form-group">
         <label>Confirmar contraseña</label>
-
         <div class="password-wrapper">
           <input
             [type]="mostrarConfirmPass ? 'text' : 'password'"
@@ -205,16 +249,11 @@
       <button
         type="submit"
         class="btn-submit"
-        [disabled]="registroForm.invalid || (contrasena !== confirmPassword)">
-        Registrar
+        [disabled]="registroForm.invalid || (contrasena !== confirmPassword) || cargando">
+        {{ cargando ? 'Registrando...' : 'Registrar' }}
       </button>
 
-      <div class="server-msg" *ngIf="Mensajes" [ngClass]="{'success': exito, 'error': !exito}">
-        <p>
-          <i class="fas" [ngClass]="exito ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
-          {{ Mensajes }}
-        </p>
-      </div>
+      <!-- Modal alert centered, blocks background until closed (single instance kept above) -->
 
       <div class="link-bottom">
         <p>¿Ya tienes una cuenta? <a routerLink="/login">Iniciar sesión</a></p>

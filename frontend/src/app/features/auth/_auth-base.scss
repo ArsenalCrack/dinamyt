@@ -1,0 +1,161 @@
+/* Shared styles for auth components - keep minimal and scoped by Angular emulated styles */
+
+/* Container and card */
+.login-container, .registro-wrapper {
+  min-height: 100vh;
+  background-color: var(--color-fondo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-card, .container {
+  position: relative;
+  background-color: var(--color-card);
+  padding: 40px 50px;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.9);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  z-index:60;
+  border-radius: 20px;
+}
+.spinner-icon { font-size:2rem; color:var(--color-acento); margin-bottom:10px; }
+.loading-text { font-weight:700; color:var(--color-principal); }
+
+/* Back button */
+.btn-back {
+  position: absolute;
+  top: 25px;
+  left: 30px;
+  color: var(--color-principal);
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+.btn-back:hover { color: var(--color-acento); transform: translateX(-5px) scale(1.1); }
+
+/* Header */
+.header { display:flex; flex-direction:column; align-items:center; margin-bottom:30px; }
+.header .logo-img { width:160px; margin-bottom:15px; object-fit:contain; }
+.header h2 { font-family: 'Montserrat', sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:1px; font-size:1.5rem; color:var(--color-principal); }
+
+/* Form elements */
+.form-group { text-align:left; margin-bottom:20px; }
+.form-group label { display:block; margin-bottom:8px; font-family:'Montserrat',sans-serif; font-weight:600; font-size:0.9rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--color-texto); }
+.form-group input, .form-group select { width:100%; padding:14px 16px; border:2px solid var(--color-borde); border-radius:10px; background:#fcfcfc; font-size:1rem; font-family:'Montserrat',sans-serif; color:var(--color-principal); transition:all 0.3s ease; }
+.form-group input:focus, .form-group select:focus { border-color:var(--color-acento); background:#fff; outline:none; box-shadow:0 4px 10px rgba(214,0,0,0.12); }
+
+/* Styled selects with custom arrow and red accent */
+
+.form-group select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  /* Arrow as a V using inline SVG, stroke matches --color-acento */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'><path d='M1 1 L7 7 L13 1' stroke='%23D60000' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-position: right 18px center;
+  background-size: 14px 8px;
+  background-repeat: no-repeat;
+  padding-right: 44px;
+  border: 2px solid rgba(183,28,28,0.18);
+  color: var(--color-principal);
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.18s ease;
+}
+
+/* Ensure select is nicely rounded and responsive */
+.form-group select { border-radius: 12px; }
+.form-group select:focus { border-color: var(--color-acento) !important; box-shadow: 0 6px 18px rgba(214,0,0,0.12); outline: none; }
+
+/* Hover styling to highlight select on pointer hover */
+.form-group select:hover { border-color: var(--color-acento); background: rgba(214,0,0,0.04); color: var(--color-principal); }
+
+/* Remove default native expand in IE/Edge and tweak appearance */
+.form-group select::-ms-expand { display: none; }
+
+/* Try to reduce native blue highlight in some OSes by forcing focus styles */
+.form-group select:focus::-ms-value { color: var(--color-principal); }
+.form-group select option, .form-group select optgroup { font-family: 'Montserrat', sans-serif; }
+
+/* Hover/focus styles for options (note: limited support in some browsers) */
+.form-group select option:hover,
+.form-group select option:focus {
+  background: rgba(214,0,0,0.08) !important;
+  color: var(--color-acento) !important;
+}
+
+/* Selected option style inside the dropdown (where supported) */
+.form-group select option:checked {
+  background: rgba(214,0,0,0.12) !important;
+  color: #fff !important;
+}
+
+/* Try to style option (limited by browser) */
+.form-group select option { font-family: 'Montserrat', sans-serif; padding: 8px; }
+
+@media (max-width: 600px) {
+  .form-group select { font-size: 1rem; padding: 12px 14px; }
+  .form-group input, .form-group select { padding: 12px 12px; }
+}
+
+/* Input with left/right icons */
+.input-wrapper { position: relative; }
+.input-wrapper input { width: 100%; padding-left: 45px; }
+.input-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #aaa; font-size: 1.1rem; pointer-events: none; }
+.input-wrapper input:focus + .input-icon { color: var(--color-acento); }
+
+/* Buttons */
+.btn-submit { background-color:var(--color-acento); color:#fff; border:none; padding:15px; width:100%; border-radius:50px; font-family:'Montserrat',sans-serif; font-size:1rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; cursor:pointer; margin-top:25px; transition:all 0.3s ease; box-shadow:0 4px 15px rgba(183,28,28,0.3); }
+.btn-submit:hover:not(:disabled){ background-color:var(--color-acento-hover); transform:translateY(-2px); }
+.btn-submit:disabled { opacity:0.5; cursor:not-allowed; }
+
+/* Generic helpers */
+.input-error { border-color:var(--color-acento) !important; background-color:rgba(183,28,28,0.03) !important; animation:shake 0.3s ease-in-out; }
+.msg-error small { color:var(--color-acento); font-size:0.9rem; font-weight:400; display:flex; align-items:center; font-family: 'Montserrat', sans-serif; }
+.server-msg { margin-top:15px; padding:10px; border-radius:8px; text-align:center; font-size:0.9rem; font-weight:600; font-family: 'Montserrat', sans-serif; }
+.server-msg.error { background-color:rgba(183,28,28,0.1); color:var(--color-acento); border:1px solid rgba(183,28,28,0.2); }
+.server-msg.success { background-color:rgba(46,204,113,0.1); color:#27ae60; border:1px solid rgba(46,204,113,0.2); }
+
+/* Password eye */
+.password-wrapper { position:relative; width:100%; }
+.password-wrapper input { padding-right:45px; }
+.eye-icon { position:absolute; right:15px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--color-texto); z-index:10; }
+.eye-icon i { font-size:1.1rem; }
+.eye-icon:hover { color:var(--color-acento); }
+
+/* Link styles used across auth screens */
+.link-bottom { display: block; margin-top: 18px; text-align: center; }
+.link-bottom p { font-family: 'Montserrat', sans-serif; font-size: 0.95rem; color: var(--color-texto); font-weight:400; }
+.link-bottom a { color: var(--color-acento) !important; font-weight: 700; font-family: 'Montserrat', sans-serif; text-decoration: none; transition: color 0.3s ease; }
+.link-bottom a:hover { color: var(--color-acento-hover) !important; text-decoration: underline; }
+
+/* Reenviar link in footer */
+.login-footer .link-reenviar { color: var(--color-acento) !important; font-weight: 700; text-decoration: none; cursor: pointer; }
+.login-footer .link-reenviar:hover { color: var(--color-acento-hover) !important; text-decoration: underline; }
+
+/* Ensure spacing between primary button and following links */
+.btn-submit { margin-bottom: 12px; }
+.btn-submit + .link-bottom { margin-top: 6px; }
+.btn-submit + .login-footer { margin-top: 6px; }
+
+/* Login-specific link selectors (register/help) */
+.login-footer a, .register-text a, .help-text a { color: var(--color-acento) !important; font-weight:700; text-decoration:none; }
+.login-footer a:hover, .register-text a:hover, .help-text a:hover { color: var(--color-acento-hover) !important; text-decoration: underline; }
+
+@keyframes shake { 0%{transform:translateX(0)}25%{transform:translateX(-3px)}50%{transform:translateX(3px)}75%{transform:translateX(-3px)}100%{transform:translateX(0)} }
+
+/* Responsive tweaks */
+@media (max-width:600px){ .login-container, .registro-wrapper{ padding:0; } .login-card, .container{ padding:20px 25px; border-radius:0; box-shadow:none; max-width:100%; min-height:100vh; display:flex; flex-direction:column; justify-content:center; } .header .logo-img{ width:140px; } .header h2{ font-size:1.3rem; } .btn-back{ left:24px; } }

@@ -1,0 +1,52 @@
+<div class="dashboard-wrapper">
+  <div class="dashboard-card">
+    <h1>Bienvenido</h1>
+    <p>Este es tu panel de control. Aquí irán los accesos rápidos y estadísticas.</p>
+<div class="dashboard-wrap">
+  <div class="dashboard-header">
+    <h2>Bienvenido{{ username ? (', ' + username) : '' }}</h2>
+    <p class="subtitle">Panel de control — Accede rápidamente a las secciones principales</p>
+  </div>
+
+  <div class="cards">
+    <a routerLink="/CrearCampeonato" class="card" *ngIf="canCreate">
+      <div class="card-icon">🛠️</div>
+      <div class="card-body">
+        <h3>Crear campeonato</h3>
+        <p>Crea y configura un nuevo campeonato.</p>
+      </div>
+    </a>
+
+    <a routerLink="/campeonato/lista" class="card">
+      <div class="card-icon">🏆</div>
+      <div class="card-body">
+        <h3>Campeonatos</h3>
+        <p>Ver todos los campeonatos disponibles.</p>
+      </div>
+    </a>
+
+    <a routerLink="/campeonato/manage/mis-campeonatos" class="card" *ngIf="hasMyChampionships">
+      <div class="card-icon">📋</div>
+      <div class="card-body">
+        <h3>Mis campeonatos</h3>
+        <p>Gestiona tus campeonatos creados.</p>
+      </div>
+    </a>
+
+    <a routerLink="/perfil" class="card">
+      <div class="card-icon">👤</div>
+      <div class="card-body">
+        <h3>Mi perfil</h3>
+        <p>Actualiza tus datos y preferencias.</p>
+      </div>
+    </a>
+
+    <a routerLink="/mis-inscripciones" class="card">
+      <div class="card-icon">📝</div>
+      <div class="card-body">
+        <h3>Mis inscripciones</h3>
+        <p>Revisa las competiciones en las que estás inscrito.</p>
+      </div>
+    </a>
+  </div>
+</div>

@@ -1,8 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
-import { ApiService } from '../../core/services/api.service';
+import { ApiService } from '../../../core/services/api.service';
 import { Location } from '@angular/common';
 
 @Component({
@@ -13,6 +13,9 @@ import { Location } from '@angular/common';
   styleUrls: ['./confirm-email.component.scss']
 })
 export class ConfirmEmailComponent {
+
+  showExpiredBanner = false;
+  @ViewChild('bannerResendBtn') bannerResendBtn?: ElementRef<HTMLButtonElement>;
 
   private api = inject(ApiService);
   private router = inject(Router);
@@ -41,8 +44,11 @@ export class ConfirmEmailComponent {
         // ¡CLAVE! Aquí guardamos el permiso para que el Guard deje entrar a /verify
         sessionStorage.setItem('verifyMode', 'recovery');
         sessionStorage.setItem('emailParaVerificar', this.correo);
+        // Guardar expiración del código: 5 minutos desde ahora
+        const expires = Date.now() + 5 * 60 * 1000;
+        sessionStorage.setItem('verifyExpiresAt', String(expires));
 
-        this.mensaje = 'Código enviado. Redirigiendo...';
+        this.mensaje = 'Código enviado.';
 
         // Redirigimos a la pantalla de poner el código
         setTimeout(() => this.router.navigate(['/verify']), 1500);
@@ -53,5 +59,21 @@ export class ConfirmEmailComponent {
         this.mensaje = err.error?.message;
       }
     });
+  }
+
+  ngOnInit(): void {
+    const flag = sessionStorage.getItem('verifyExpiredRedirect');
+    if (flag === 'recovery') {
+      // show banner and prefill email if possible
+      this.showExpiredBanner = true;
+      this.correo = this.correo || (sessionStorage.getItem('emailParaVerificar') || '');
+      sessionStorage.removeItem('verifyExpiredRedirect');
+    }
+  }
+
+  ngAfterViewInit(): void {
+    if (this.showExpiredBanner && this.bannerResendBtn) {
+      setTimeout(() => this.bannerResendBtn?.nativeElement.focus(), 120);
+    }
   }
 }

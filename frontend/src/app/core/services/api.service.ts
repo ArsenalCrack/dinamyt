@@ -13,6 +13,14 @@ export class ApiService {
   getSaludo(): Observable<any> {
     return this.http.get(`${this.apiUrl}/saludo`);
   }
+
+  getCurrentUser() {
+    return this.http.get(`${this.apiUrl}/me`);
+  }
+
+  login(credentials: { email: string; password: string }) {
+    return this.http.post(`${this.apiUrl}/login`, credentials);
+  }
   registrarUsuario(usuario: any) {
   return this.http.post(`${this.apiUrl}/registro`,usuario);
   }

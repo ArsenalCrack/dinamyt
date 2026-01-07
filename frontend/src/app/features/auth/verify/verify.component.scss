@@ -1,0 +1,91 @@
+@import '../_auth-base.scss';
+
+/* Verify-specific styles */
+.verify-timer-wrap {
+  margin-top: 1.2rem;
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+
+  .timer-label { color: #666; font-size: 0.9rem; }
+
+  .verify-timer {
+    font-weight: 600;
+    padding: 0.18rem 0.55rem;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.04);
+    color: #0b0; /* verde por defecto */
+    min-width: 62px;
+    text-align: center;
+  }
+
+  .verify-timer.valid { color: #0a7e07; background: rgba(10,126,7,0.06); }
+  .verify-timer.expired { color: #b71c1c; background: rgba(183,28,28,0.06); }
+}
+
+/* Modal styles for verify expiration */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(0,0,0,0.45);
+  z-index: 2500;
+}
+.modal-box {
+  background: #fff;
+  padding: 1.25rem 1.4rem;
+  border-radius: 12px;
+  min-width: 280px;
+  max-width: 92%;
+  width: 100%;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+  position: relative;
+  display:flex;
+  flex-direction: column;
+  align-items:center;
+  gap: 0.8rem;
+}
+.modal-body { display:flex; align-items:center; gap:0.8rem; justify-content:center; text-align:center; }
+.modal-icon { font-size:1.6rem; color: #b71c1c; }
+.modal-text { font-size:1rem; color:#222; }
+.modal-close { position:absolute; right:8px; top:6px; background:transparent; border:none; font-size:1.05rem; cursor:pointer; }
+
+/* Action button inside modal (red) - now in normal flow below the text */
+.modal-action {
+  margin-top: 12px;
+  background: #c62828;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.modal-action:focus { outline: 2px solid rgba(198,40,40,0.25); }
+
+@media (min-width: 560px) {
+  .modal-box { min-width: 420px; max-width: 720px; }
+  .modal-text { font-size:1rem; }
+}
+
+@media (max-width: 420px) {
+  .modal-action { width: 100%; }
+}
+.input-otp {
+  width: 100%;
+  padding: 15px;
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 15px;
+  border-radius: 12px;
+  background-color: #fcfcfc;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.msg-error-center { margin-top: 8px; color: var(--color-acento); font-size: 0.85rem; font-weight: 600; }
+

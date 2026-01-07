@@ -20,9 +20,23 @@
         <li class="nav-item">
           <a class="nav-link" routerLink="/ranking" routerLinkActive="active">Resultados</a>
         </li>
+        <li class="nav-item" *ngIf="isLoggedIn">
+          <a class="nav-link" routerLink="/perfil" routerLinkActive="active">Mi perfil</a>
+        </li>
       </ul>
       <div class="d-flex ms-lg-4 justify-content-center mt-3 mt-lg-0">
-        <button class="btn btn-login-dark" routerLink="/login">Iniciar Sesión</button>
+        <ng-container *ngIf="!loading">
+          <ng-container *ngIf="!isLoggedIn; else loggedTpl">
+            <button class="btn btn-login-dark" routerLink="/login">Iniciar Sesión</button>
+          </ng-container>
+
+          <ng-template #loggedTpl>
+            <div class="d-flex align-items-center gap-2">
+              <span class="nav-username">Hola, {{ username || 'usuario' }}</span>
+              <button class="btn btn-sm btn-logout" (click)="logout()">Cerrar sesión</button>
+            </div>
+          </ng-template>
+        </ng-container>
       </div>
     </div>
   </div>

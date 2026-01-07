@@ -24,7 +24,7 @@ body {
     margin: 0;
     padding: 0;
     background: var(--color-fondo);
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     color: var(--color-principal);
     line-height: 1.6;
     overflow-x: hidden;
@@ -34,4 +34,32 @@ h1, h2, h3, h4 {
     font-family: 'Montserrat', sans-serif;
     font-weight: 700;
     margin-top: 0;
+}
+
+/* Los estilos de componentes deben ser encapsulados vía `styleUrls` en cada componente. */
+
+/* Textos secundarios globales: aplicar tipografía del proyecto (Montserrat) y peso normal */
+p, small, label, span, li, a:not(.btn), .muted, .secondary {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 400;
+    color: var(--color-texto);
+}
+
+/* Mantener que los elementos con énfasis sigan usando peso alto (strong, b, .bold) */
+strong, b, h1, h2, h3, h4 { font-family: 'Montserrat', sans-serif; font-weight: 700; }
+
+/* Force project typography on input placeholders and form controls */
+input, textarea, select {
+    font-family: 'Montserrat', sans-serif;
+}
+
+::placeholder { /* standard */
+    font-family: 'Montserrat', sans-serif;
+    color: rgba(26,26,26,0.45);
+}
+:-ms-input-placeholder { /* IE 10+ */
+    font-family: 'Montserrat', sans-serif;
+}
+::-ms-input-placeholder { /* Edge */
+    font-family: 'Montserrat', sans-serif;
 }

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 
@@ -12,4 +12,10 @@ import { RouterModule } from '@angular/router';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent {}
+export class HomeComponent implements OnInit {
+  username: string | null = null;
+
+  ngOnInit(): void {
+    this.username = sessionStorage.getItem('username') || sessionStorage.getItem('userName');
+  }
+}

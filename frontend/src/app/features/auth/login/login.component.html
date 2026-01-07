@@ -5,6 +5,12 @@
       <i class="fas fa-arrow-left fa-2x"></i>
     </a>
 
+      <!-- Overlay de carga -->
+      <div *ngIf="cargando" class="loading-overlay">
+        <i class="fas fa-spinner fa-spin spinner-icon"></i>
+        <p class="loading-text">Iniciando sesión...</p>
+      </div>
+
     <header class="header">
       <a routerLink="/" title="Ir a la página principal">
         <img
@@ -50,7 +56,7 @@
       <button
         type="submit"
         class="btn-submit"
-        [disabled]="loginForm.invalid">
+        [disabled]="loginForm.invalid || cargando">
         Ingresar
       </button>
 
@@ -60,15 +66,25 @@
           <a routerLink="/register">Regístrate</a>
         </p>
 
+        <div class="login-sep" aria-hidden></div>
+
         <p class="help-text">
           ¿Has olvidado tus datos?
           <a routerLink="/recoverAccount">Recuperar cuenta</a>
         </p>
       </div>
 
-      <p class="error-msg" *ngIf="errorMessage">
-        <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
-      </p>
+    <!-- Modal alert centered, blocks background until closed -->
+    <div *ngIf="errorMessage" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-body">
+          <i class="fas fa-exclamation-circle modal-icon"></i>
+          <div class="modal-text">{{ errorMessage }}</div>
+        </div>
+        <button class="modal-close" (click)="closeError()" aria-label="Cerrar">✕</button>
+        <button class="modal-action" (click)="closeError()">Cerrar</button>
+      </div>
+    </div>
 
     </form>
   </div>

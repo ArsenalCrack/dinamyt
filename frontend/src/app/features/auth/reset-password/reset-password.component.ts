@@ -2,7 +2,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { ApiService } from '../../core/services/api.service';
+import { ApiService } from '../../../core/services/api.service';
 
 @Component({
   selector: 'app-reset-password',

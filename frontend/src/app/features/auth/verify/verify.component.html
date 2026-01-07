@@ -1,6 +1,12 @@
 <div class="login-container">
   <div class="login-card">
 
+    <!-- Overlay de carga -->
+    <div *ngIf="cargando" class="loading-overlay">
+      <i class="fas fa-spinner fa-spin spinner-icon"></i>
+      <p class="loading-text">Verificando...</p>
+    </div>
+
     <header class="header">
       <a routerLink="/" title="Ir a la página principal">
         <img src="assets/imgs/LogotipoNegroD.png" alt="Logo Dinamyt" class="logo-img">
@@ -11,6 +17,22 @@
     <div class="info-text">
       <p class="text-muted">Hemos enviado un código de 6 dígitos a:</p>
       <p class="email-highlight">{{ emailUsuario }}</p>
+      <div class="verify-timer-wrap">
+        <span class="timer-label">Código válido durante:</span>
+        <span class="verify-timer" [ngClass]="{ 'expired': expired, 'valid': !expired }">{{ formatRemaining() }}</span>
+      </div>
+    </div>
+
+    <!-- Expiration modal: show when expiredModalVisible is true -->
+    <div *ngIf="expiredModalVisible" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-body">
+          <i class="fas fa-exclamation-circle modal-icon"></i>
+          <div class="modal-text">El código ha caducado.</div>
+        </div>
+        <button class="modal-close" (click)="closeExpiredModal()">✕</button>
+        <button class="modal-action" (click)="closeExpiredModal()">Cerrar</button>
+      </div>
     </div>
 
     <form (ngSubmit)="verificar()" #verifyForm="ngForm">
@@ -53,9 +75,9 @@
         </p>
       </div>
 
-      <div class="server-msg" *ngIf="mensaje" [ngClass]="{'success': exito, 'error': !exito}">
+        <div class="server-msg" *ngIf="mensaje" [ngClass]="{'success': exito, 'error': !exito}">
         <p>
-          <i class="fas" [ngClass]="exito ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+          <i class="fas" [ngClass]="exito ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
           {{ mensaje }}
         </p>
       </div>
