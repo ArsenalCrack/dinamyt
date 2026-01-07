@@ -2,6 +2,7 @@ package org.ivan.backend.backend.BD_tablas;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "usuario")
@@ -35,11 +36,33 @@ public class Usuario {
     @Column(name = "numero_celular")
     protected Integer numeroCelular;
 
-    @Column(name = "verificacion")
+
+    @Transient
     protected String codigo;
 
+    @Transient
+    private LocalDateTime fechaCodigo;
+
+    @Transient
+    private String  modo;
     // ===== GETTERS & SETTERS =====
 
+
+    public String getModo() {
+        return modo;
+    }
+
+    public void setModo(String modo) {
+        this.modo = modo;
+    }
+
+    public LocalDateTime getFechaCodigo() {
+        return fechaCodigo;
+    }
+
+    public void setFechaCodigo(LocalDateTime fechaCodigo) {
+        this.fechaCodigo = fechaCodigo;
+    }
 
     public String getCodigo() {
         return codigo;

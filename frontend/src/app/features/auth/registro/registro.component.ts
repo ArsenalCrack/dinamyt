@@ -370,7 +370,7 @@ export class RegistroComponent implements OnInit {
       next: (res) => {
         // Éxito: mantenemos overlay visible hasta 2s para dar feedback
         this.exito = true;
-        this.Mensajes = "¡Registro exitoso! Revisa tu correo para verificar tu cuenta.";
+        this.Mensajes = "¡Formulario exitoso! Revisa tu correo para verificar tu cuenta y registrarla.";
         sessionStorage.setItem('verifyMode', 'register');
         sessionStorage.setItem('emailParaVerificar', this.correo);
         // Guardar expiración del código: 5 minutos desde ahora

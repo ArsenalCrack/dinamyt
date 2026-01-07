@@ -70,8 +70,12 @@ export class VerifyComponent implements OnInit {
 
   this.cargando = true;
   this.mensaje = '';
-
-  this.api.verificarCodigo(this.codigo).subscribe({
+  const datos = {
+    codigo: this.codigo,
+    correo: this.emailUsuario,
+    modo: this.modo
+  };
+  this.api.verificarCodigo(datos).subscribe({
     next: (rest: any) => {
       this.cargando = false;
       this.exito = true;

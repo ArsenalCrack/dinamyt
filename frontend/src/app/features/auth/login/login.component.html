@@ -30,7 +30,7 @@
           type="email"
           id="email"
           name="email"
-          ngModel
+          [(ngModel)]="correo"
           required
           placeholder="Ingresa tu correo registrado">
       </div>
@@ -43,7 +43,7 @@
             [type]="mostrarPass ? 'text' : 'password'"
             id="password"
             name="password"
-            ngModel
+            [(ngModel)]="contrasena"
             required
             placeholder="Ingresa tu contraseña">
 

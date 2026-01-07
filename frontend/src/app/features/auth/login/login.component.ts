@@ -24,8 +24,8 @@ export class LoginComponent {
   cargando: boolean = false;
   errorMessage: string | null = null;
 
-  email: string = '';
-  password: string = '';
+  correo: string = '';
+  contrasena: string = '';
 
   volverAtras() {
     this.location.back();
@@ -35,7 +35,7 @@ export class LoginComponent {
     this.errorMessage = null;
     this.cargando = true;
 
-    this.api.login({ email: this.email, password: this.password }).subscribe({
+    this.api.login({ correo: this.correo, contrasena: this.contrasena }).subscribe({
       next: (res: any) => {
         this.cargando = false;
         // Backend expected to return token and user info
@@ -50,6 +50,7 @@ export class LoginComponent {
         }
         // if login successful, navigate to dashboard
         this.router.navigate(['/dashboard']);
+
       },
       error: (err: HttpErrorResponse) => {
         this.cargando = false;

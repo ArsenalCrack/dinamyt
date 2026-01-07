@@ -18,7 +18,7 @@ export class ApiService {
     return this.http.get(`${this.apiUrl}/me`);
   }
 
-  login(credentials: { email: string; password: string }) {
+  login(credentials: { correo: string; contrasena: string }) {
     return this.http.post(`${this.apiUrl}/login`, credentials);
   }
   registrarUsuario(usuario: any) {
@@ -30,10 +30,10 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/recuperar-password`, { correo });
   }
 
-  verificarCodigo(codigo: string) {
+  verificarCodigo(datos: any) {
     // Enviamos el código. El backend probablemente espera un objeto JSON.
     // Ajusta la estructura { codigo: codigo } según lo que espere tu Java.
-    return this.http.post(`${this.apiUrl}/verificar`, { codigo });
+    return this.http.post(`${this.apiUrl}/verificar`, datos);
   }
 
   reenviarCodigo(correo: string) {
