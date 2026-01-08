@@ -43,4 +43,17 @@ export class ApiService {
   cambiarPassword(data: any) {
   return this.http.post(`${this.apiUrl}/cambiar-password`, data);
 }
+
+  // Actualizar datos de perfil (parcial)
+  updateProfile(data: any) {
+    // Ajusta la ruta según tu backend (PUT o PATCH)
+    return this.http.put(`${this.apiUrl}/perfil`, data);
+  }
+
+  // Subir foto de perfil
+  uploadProfilePhoto(file: File) {
+    const form = new FormData();
+    form.append('foto', file);
+    return this.http.post(`${this.apiUrl}/perfil/foto`, form);
+  }
 }

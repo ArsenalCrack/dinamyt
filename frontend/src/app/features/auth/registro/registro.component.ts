@@ -5,11 +5,13 @@ import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { Location } from '@angular/common';
 import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
+import { CountryAutocompleteComponent } from '../../../shared/components/country-autocomplete/country-autocomplete.component';
+import { PAISES } from '../../../core/models/paises';
 
 @Component({
   selector: 'app-registro',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, CountryAutocompleteComponent],
   templateUrl: './registro.component.html',
   styleUrls: ['./registro.component.scss']
 })
@@ -34,7 +36,12 @@ export class RegistroComponent implements OnInit {
   nombreC!: string;
   sexo: string = '';
   nacionalidad: string = '';
+  academia: string = '';
+  instructor: string = '';
   fechaNacimiento!: string;
+
+  // Lista de países para el autocompletado
+  paisesList: string[] = PAISES;
   // Component-bound selects for custom date picker
   diasOptions: Array<{ value: string; label: string }> = [];
   mesesOptions: Array<{ value: string; label: string }> = [];
@@ -355,6 +362,8 @@ export class RegistroComponent implements OnInit {
       nombreC: this.nombreC?.trim(), // Limpiamos espacios extra
       sexo: this.sexo,
       nacionalidad: this.nacionalidad,
+      academia: this.academia?.trim() || undefined,
+      instructor: this.instructor?.trim() || undefined,
       fechaNacimiento: this.fechaNacimiento,
       correo: this.correo,
       contrasena: this.contrasena

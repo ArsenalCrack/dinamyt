@@ -3,24 +3,19 @@
     background-color: #111 !important;
     min-height: 80px;
     padding: 0 20px;
-    /* Tu línea roja de identidad */
     border-bottom: 3px solid var(--color-acento) !important;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     position: sticky;
     top: 0;
     z-index: 1000;
+}
 
-    /* CORRECCIÓN: Aseguramos que el contenido principal no se pegue arriba */
+.navbar-content {
     display: flex;
     align-items: center;
-
-    /* Esto envuelve el logo y el botón para que no se muevan al abrir el menú */
-    .container-fluid {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        min-height: 80px; /* Misma altura que el navbar */
-    }
+    justify-content: space-between;
+    width: 100%;
+    min-height: 80px;
 }
 
 /* --- LOGO RESPONSIVO --- */
@@ -28,16 +23,15 @@
     display: flex;
     align-items: center;
     padding: 0;
-    margin: 0; /* Quitamos márgenes que puedan desplazarlo */
-    flex: 0 1 auto;
-    max-width: 70%;
+    margin: 0;
+    transition: all 0.3s ease;
 
     .logo-img {
         height: auto;
-        width: 200px; /* Tamaño máximo en Desktop */
+        width: 200px;
         max-width: 100%;
         object-fit: contain;
-        transition: width 0.3s ease, transform 0.3s ease;
+        transition: transform 0.3s ease;
 
         &:hover {
             transform: scale(1.02);
@@ -45,13 +39,19 @@
     }
 }
 
+/* --- NAVEGACIÓN CENTRADA --- */
+.navbar-nav {
+    display: flex;
+    gap: 15px;
+    margin-right: 30px; // Espacio entre links y menú de usuario
+}
+
 /* --- ENLACES DEL MENÚ --- */
 .nav-link {
     color: rgba(255, 255, 255, 0.7) !important;
     font-weight: 500;
     font-size: 1rem;
-    margin: 0 10px;
-    padding: 8px 0;
+    padding: 8px 16px;
     position: relative;
     transition: all 0.3s;
     font-family: 'Roboto', sans-serif;
@@ -79,7 +79,7 @@
     }
 }
 
-/* --- BOTÓN LOGIN (Estilo Dashboard Pill) --- */
+/* --- BOTÓN LOGIN --- */
 .btn-login-dark {
     display: inline-flex;
     align-items: center;
@@ -106,19 +106,234 @@
     }
 }
 
+/* --- MENÚ DE USUARIO CON DROPDOWN --- */
+.user-actions {
+    display: flex;
+    align-items: center;
+}
+
+.user-menu-wrapper {
+    position: relative;
+}
+
+.user-trigger {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, rgba(214, 0, 0, 0.15), rgba(214, 0, 0, 0.05));
+    border: 2px solid var(--color-acento);
+    border-radius: 50px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+
+    .user-icon {
+        font-size: 24px;
+        color: var(--color-acento);
+    }
+
+    .user-name {
+        font-size: 1rem;
+        letter-spacing: 0.5px;
+        color: #ffffff;
+    }
+
+    .arrow-icon {
+        font-size: 12px;
+        color: var(--color-acento);
+        transition: transform 0.3s ease;
+
+        &.rotated {
+            transform: rotate(180deg);
+        }
+    }
+
+    &:hover, &.active {
+        background: linear-gradient(135deg, rgba(214, 0, 0, 0.25), rgba(214, 0, 0, 0.15));
+        box-shadow: 0 4px 15px rgba(214, 0, 0, 0.3);
+        transform: translateY(-2px);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+}
+
+/* --- DROPDOWN MENU --- */
+.user-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 280px;
+    background: #1a1a1a;
+    border: 2px solid rgba(214, 0, 0, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    padding: 8px;
+    z-index: 9999;
+    animation: dropdownFadeIn 0.3s ease;
+
+    .dropdown-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        margin-bottom: 4px;
+
+        .header-icon {
+            font-size: 40px;
+            color: var(--color-acento);
+        }
+
+        .header-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+
+            .header-name {
+                font-family: 'Montserrat', sans-serif;
+                font-weight: 600;
+                font-size: 1rem;
+                color: #ffffff;
+            }
+
+            .header-email {
+                font-size: 0.85rem;
+                color: rgba(255, 255, 255, 0.6);
+            }
+        }
+    }
+
+    .dropdown-divider {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        margin: 8px 0;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 12px 16px;
+        background: transparent;
+        border: none;
+        border-radius: 10px;
+        color: #ffffff !important;
+        font-family: 'Roboto', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: left;
+
+        span {
+            color: #ffffff !important;
+        }
+
+        i {
+            font-size: 18px;
+            color: #ffffff !important;
+            width: 20px;
+            text-align: center;
+        }
+
+        &:hover:not(:disabled) {
+            background: rgba(214, 0, 0, 0.15);
+            color: #ffffff !important;
+
+            span {
+                color: #ffffff !important;
+            }
+
+            i {
+                color: var(--color-acento) !important;
+            }
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        &.logout-item {
+            margin-top: 4px;
+
+            i {
+                color: #dc3545 !important;
+            }
+
+            &:hover:not(:disabled) {
+                background: rgba(220, 53, 69, 0.15);
+
+                i {
+                    color: #dc3545 !important;
+                }
+            }
+        }
+    }
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- OVERLAY DE LOGOUT --- */
+.logout-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+
+    .spinner-icon {
+        font-size: 60px;
+        color: var(--color-acento);
+        margin-bottom: 20px;
+        animation: spin 1s linear infinite;
+    }
+
+    .logout-text {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 24px;
+        font-weight: 600;
+        color: #ffffff;
+        margin: 0;
+        letter-spacing: 0.5px;
+    }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 /* --- RESPONSIVE (Móvil y Tablets) --- */
 
 @media (max-width: 991px) {
     .custom-navbar {
         min-height: 75px;
-        height: auto; /* Permite que crezca hacia abajo sin mover el top */
-        display: block; /* Cambiamos a block para que el menú colapsable fluya abajo */
+    }
 
-        .container-fluid {
-            min-height: 75px; /* Mantiene el logo y botón centrados en su franja */
-            padding-top: 5px;
-            padding-bottom: 5px;
-        }
+    .navbar-content {
+        flex-wrap: wrap;
     }
 
     .navbar-brand .logo-img {
@@ -132,14 +347,19 @@
         &:focus { box-shadow: none; }
     }
 
-    /* Menú desplegable */
     .navbar-collapse {
         background-color: #111;
         padding: 20px;
-        margin-left: -20px; /* Compensa el padding del navbar */
+        margin-left: -20px;
         margin-right: -20px;
         border-top: 1px solid #333;
-        /* No usamos bordes redondeados abajo para que se vea como una extensión */
+        margin-top: 15px;
+    }
+
+    .navbar-nav {
+        flex-direction: column;
+        gap: 0;
+        width: 100%;
     }
 
     .nav-link {
@@ -155,7 +375,26 @@
     .btn-login-dark {
         width: 100%;
         margin-top: 15px;
-        margin-bottom: 10px;
+    }
+
+    .user-actions {
+        width: 100%;
+        margin-top: 15px;
+    }
+
+    .user-menu-wrapper {
+        width: 100%;
+    }
+
+    .user-trigger {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .user-dropdown {
+        left: 0;
+        right: 0;
+        min-width: unset;
     }
 }
 

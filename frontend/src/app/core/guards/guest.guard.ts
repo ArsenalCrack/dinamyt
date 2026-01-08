@@ -1,18 +1,19 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 
-export const authGuard: CanActivateFn = (route, state) => {
+// Permite acceso solo a usuarios NO autenticados.
+export const guestGuard: CanActivateFn = () => {
   const router = inject(Router);
 
   const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
   const username = sessionStorage.getItem('username') || sessionStorage.getItem('userName');
   const correo = sessionStorage.getItem('correo');
 
-  // Permitir acceso si hay token, username o correo (identificador de sesión)
   if (token || username || correo) {
-    return true;
+    // Ya autenticado: redirigir al dashboard
+    router.navigate(['/dashboard']);
+    return false;
   }
 
-  router.navigate(['/login']);
-  return false;
+  return true;
 };

@@ -1,42 +1,77 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark custom-navbar">
-  <div class="container-fluid d-flex align-items-center justify-content-between">
+  <!-- Overlay de carga al cerrar sesión -->
+  <div *ngIf="loggingOut" class="logout-overlay">
+    <i class="fas fa-spinner fa-spin spinner-icon"></i>
+    <p class="logout-text">Cerrando sesión...</p>
+  </div>
 
-    <a class="navbar-brand fw-bold" routerLink="/">
-      <img src="assets/imgs/logoDHBlanco.png" alt="Logo Dinamyt" class="logo-img">
-    </a>
+  <div class="container-fluid">
+    <div class="navbar-content">
+      <!-- Logo -->
+      <a class="navbar-brand" routerLink="/">
+        <img src="assets/imgs/logoDHBlanco.png" alt="Logo Dinamyt" class="logo-img">
+      </a>
 
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
+      <!-- Toggle para móvil -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
 
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
-        <li class="nav-item">
-          <a class="nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Inicio</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" routerLink="/campeonatos" routerLinkActive="active">Campeonatos</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" routerLink="/ranking" routerLinkActive="active">Resultados</a>
-        </li>
-        <li class="nav-item" *ngIf="isLoggedIn">
-          <a class="nav-link" routerLink="/perfil" routerLinkActive="active">Mi perfil</a>
-        </li>
-      </ul>
-      <div class="d-flex ms-lg-4 justify-content-center mt-3 mt-lg-0">
-        <ng-container *ngIf="!loading">
-          <ng-container *ngIf="!isLoggedIn; else loggedTpl">
-            <button class="btn btn-login-dark" routerLink="/login">Iniciar Sesión</button>
+      <!-- Navegación -->
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto align-items-center">
+          <li class="nav-item">
+            <a class="nav-link" [routerLink]="isLoggedIn ? '/dashboard' : '/'" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+              {{ isLoggedIn ? 'Panel' : 'Inicio' }}
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/campeonatos" routerLinkActive="active">Campeonatos</a>
+          </li>
+
+        </ul>
+
+        <!-- Sección de usuario -->
+        <div class="user-actions">
+          <ng-container *ngIf="!loading">
+            <ng-container *ngIf="!isLoggedIn; else loggedTpl">
+              <button class="btn btn-login-dark" routerLink="/login">Iniciar Sesión</button>
+            </ng-container>
+
+            <ng-template #loggedTpl>
+              <div class="user-menu-wrapper">
+                <button class="user-trigger" (click)="toggleUserDropdown()" [class.active]="showUserDropdown">
+                  <i class="fas fa-user-circle user-icon"></i>
+                  <span class="user-name">{{ username || 'Usuario' }}</span>
+                  <i class="fas fa-chevron-down arrow-icon" [class.rotated]="showUserDropdown"></i>
+                </button>
+
+                <div class="user-dropdown" *ngIf="showUserDropdown" (click)="$event.stopPropagation()">
+                  <div class="dropdown-header">
+                    <i class="fas fa-user-circle header-icon"></i>
+                    <div class="header-info">
+                      <span class="header-name">{{ username || 'Usuario' }}</span>
+                    </div>
+                  </div>
+                  <div class="dropdown-divider"></div>
+                  <button class="dropdown-item" (click)="goToProfile()">
+                    <i class="fas fa-user"></i>
+                    <span>Mi Perfil</span>
+                  </button>
+                  <button class="dropdown-item" disabled title="Próximamente">
+                    <i class="fas fa-cog"></i>
+                    <span>Configuración</span>
+                  </button>
+                  <div class="dropdown-divider"></div>
+                  <button class="dropdown-item logout-item" (click)="logout()" [disabled]="loggingOut">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Cerrar Sesión</span>
+                  </button>
+                </div>
+              </div>
+            </ng-template>
           </ng-container>
-
-          <ng-template #loggedTpl>
-            <div class="d-flex align-items-center gap-2">
-              <span class="nav-username">Hola, {{ username || 'usuario' }}</span>
-              <button class="btn btn-sm btn-logout" (click)="logout()">Cerrar sesión</button>
-            </div>
-          </ng-template>
-        </ng-container>
+        </div>
       </div>
     </div>
   </div>

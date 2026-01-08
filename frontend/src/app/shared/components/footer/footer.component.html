@@ -27,9 +27,21 @@
       <div class="footer-nav">
         <h4>Navegación</h4>
         <ul>
-          <li><a routerLink="/">Inicio</a></li>
-          <li><a routerLink="/campeonatos">Campeonatos</a></li>
-          <li><a routerLink="/ranking">Resultados</a></li>
+          <!-- Links cuando NO está logueado -->
+          <ng-container *ngIf="!isLoggedIn">
+            <li><a routerLink="/">Inicio</a></li>
+            <li><a routerLink="/campeonatos">Explorar Campeonatos</a></li>
+            <li><a routerLink="/login">Iniciar Sesión</a></li>
+            <li><a routerLink="/register">Registro</a></li>
+          </ng-container>
+
+          <!-- Links cuando SÍ está logueado -->
+          <ng-container *ngIf="isLoggedIn">
+            <li><a routerLink="/dashboard">Panel</a></li>
+            <li><a routerLink="/campeonatos">Explorar Campeonatos</a></li>
+            <li><a routerLink="/mis-campeonatos">Mis Campeonatos</a></li>
+            <li><a routerLink="/perfil">Mi Perfil</a></li>
+          </ng-container>
         </ul>
       </div>
 

@@ -39,10 +39,10 @@ h1, h2, h3, h4 {
 /* Los estilos de componentes deben ser encapsulados vía `styleUrls` en cada componente. */
 
 /* Textos secundarios globales: aplicar tipografía del proyecto (Montserrat) y peso normal */
-p, small, label, span, li, a:not(.btn), .muted, .secondary {
+p, small, label, span, li, a:not(.btn):not(.btn-action-horizontal):not(.btn-action):not(.btn-primary):not(.btn-secondary):not(.btn-link), .muted, .secondary {
     font-family: 'Montserrat', sans-serif;
     font-weight: 400;
-    color: var(--color-texto);
+    /* color: var(--color-texto); */
 }
 
 /* Mantener que los elementos con énfasis sigan usando peso alto (strong, b, .bold) */

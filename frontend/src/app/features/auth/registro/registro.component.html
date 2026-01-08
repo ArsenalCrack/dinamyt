@@ -129,7 +129,6 @@
           #sex="ngModel"
           required
           [options]="[
-            { value: '', label: 'Seleccione el sexo', disabled: true },
             { value: 'Femenino', label: 'Femenino' },
             { value: 'Masculino', label: 'Masculino' }
           ]"
@@ -142,49 +141,36 @@
 
       <div class="form-group">
         <label>Nacionalidad</label>
-        <app-custom-select
+        <app-country-autocomplete
           name="nacionalidad"
           [(ngModel)]="nacionalidad"
           #nac="ngModel"
           required
-          [options]="[
-            { value: '', label: 'Seleccione una nacionalidad', disabled: true },
-            { value: 'alemania', label: 'Alemania' },
-            { value: 'argentina', label: 'Argentina' },
-            { value: 'bolivia', label: 'Bolivia' },
-            { value: 'brasil', label: 'Brasil' },
-            { value: 'canada', label: 'Canadá' },
-            { value: 'chile', label: 'Chile' },
-            { value: 'colombia', label: 'Colombia' },
-            { value: 'costa_rica', label: 'Costa Rica' },
-            { value: 'cuba', label: 'Cuba' },
-            { value: 'ecuador', label: 'Ecuador' },
-            { value: 'el_salvador', label: 'El Salvador' },
-            { value: 'espana', label: 'España' },
-            { value: 'estados_unidos', label: 'Estados Unidos' },
-            { value: 'francia', label: 'Francia' },
-            { value: 'guatemala', label: 'Guatemala' },
-            { value: 'guyana', label: 'Guyana' },
-            { value: 'haiti', label: 'Haití' },
-            { value: 'honduras', label: 'Honduras' },
-            { value: 'italia', label: 'Italia' },
-            { value: 'mexico', label: 'México' },
-            { value: 'nicaragua', label: 'Nicaragua' },
-            { value: 'panama', label: 'Panamá' },
-            { value: 'paraguay', label: 'Paraguay' },
-            { value: 'peru', label: 'Perú' },
-            { value: 'puerto_rico', label: 'Puerto Rico' },
-            { value: 'republica_dominicana', label: 'República Dominicana' },
-            { value: 'surinam', label: 'Surinam' },
-            { value: 'uruguay', label: 'Uruguay' },
-            { value: 'venezuela', label: 'Venezuela' },
-            { value: 'otro', label: 'Otro' }
-          ]"
-          placeholder="Seleccione una nacionalidad">
-        </app-custom-select>
-        <div *ngIf="nac.invalid && nac.touched" class="msg-error">
-          <small>Selecciona tu país.</small>
+          [paises]="paisesList"
+          [hasError]="!!(nac.invalid && (nac.dirty || nac.touched))"
+          placeholder="Escribe o selecciona tu país">
+        </app-country-autocomplete>
+        <div *ngIf="nac.invalid && (nac.dirty || nac.touched)" class="msg-error">
+          <small>Debes seleccionar un país de la lista.</small>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label>Academia (opcional)</label>
+        <input
+          type="text"
+          name="academia"
+          [(ngModel)]="academia"
+          placeholder="Nombre de tu academia/club">
+      </div>
+
+      <div class="form-group">
+        <label>Instructor (opcional)</label>
+        <input
+          type="text"
+          name="instructor"
+          [(ngModel)]="instructor"
+          placeholder="Nombre de tu instructor principal">
       </div>
 
       <div class="form-group">

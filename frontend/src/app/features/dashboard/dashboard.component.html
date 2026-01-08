@@ -1,52 +1,104 @@
-<div class="dashboard-wrapper">
-  <div class="dashboard-card">
-    <h1>Bienvenido</h1>
-    <p>Este es tu panel de control. Aquí irán los accesos rápidos y estadísticas.</p>
-<div class="dashboard-wrap">
-  <div class="dashboard-header">
-    <h2>Bienvenido{{ username ? (', ' + username) : '' }}</h2>
-    <p class="subtitle">Panel de control — Accede rápidamente a las secciones principales</p>
+<div class="dashboard-container">
+
+  <header class="welcome-header">
+    <h1>Hola, <span>{{ username || 'Artista Marcial' }}</span></h1>
+    <p>Bienvenido a tu panel de gestión.</p>
+  </header>
+
+  <!-- Estado del perfil -->
+  <section class="profile-status">
+    <div class="status-card">
+      <div class="status-header">
+        <i class="fas fa-id-card"></i>
+        <h3>Estado de tu perfil</h3>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="profileCompletion"></div>
+      </div>
+      <p class="progress-text">{{ profileCompletion }}% completo</p>
+      <div *ngIf="missingFields.length" class="missing-list">
+        <p>Faltan: {{ missingFields.join(', ') }}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mis Inscripciones arriba -->
+  <div class="horizontal-card">
+    <div class="horizontal-card-content">
+      <div class="card-icon-horizontal">
+        <i class="fas fa-clipboard-list"></i>
+      </div>
+      <div>
+        <h3>Mis Inscripciones</h3>
+        <p>Revisa el estado de tus inscripciones en campeonatos activos.</p>
+      </div>
+    </div>
+    <div class="horizontal-card-action">
+      <a routerLink="/mis-inscripciones" class="btn-action-horizontal">
+        <span>Ver Inscripciones</span>
+        <i class="fas fa-arrow-right"></i>
+      </a>
+    </div>
   </div>
 
-  <div class="cards">
-    <a routerLink="/CrearCampeonato" class="card" *ngIf="canCreate">
-      <div class="card-icon">🛠️</div>
-      <div class="card-body">
-        <h3>Crear campeonato</h3>
-        <p>Crea y configura un nuevo campeonato.</p>
-      </div>
-    </a>
+  <section class="actions-grid">
 
-    <a routerLink="/campeonato/lista" class="card">
-      <div class="card-icon">🏆</div>
-      <div class="card-body">
-        <h3>Campeonatos</h3>
-        <p>Ver todos los campeonatos disponibles.</p>
+    <div class="action-card" *ngIf="canCreate">
+      <div class="card-icon">
+        <i class="fas fa-plus-circle"></i>
       </div>
-    </a>
+      <h3>Organizar Campeonato</h3>
+      <p>Crea un nuevo campeonato desde cero y configura las categorías.</p>
+      <a routerLink="/CrearCampeonato" class="btn-action">Crear ahora</a>
+    </div>
 
-    <a routerLink="/campeonato/manage/mis-campeonatos" class="card" *ngIf="hasMyChampionships">
-      <div class="card-icon">📋</div>
-      <div class="card-body">
-        <h3>Mis campeonatos</h3>
-        <p>Gestiona tus campeonatos creados.</p>
+    <div class="action-card outlined">
+      <div class="card-icon">
+        <i class="fas fa-search"></i>
       </div>
-    </a>
+      <h3>Explorar Campeonatos</h3>
+      <p>Busca campeonatos activos creados por otros usuarios e inscríbete.</p>
+      <a routerLink="/campeonatos" class="btn-action">Ver Campeonatos</a>
+    </div>
 
-    <a routerLink="/perfil" class="card">
-      <div class="card-icon">👤</div>
-      <div class="card-body">
-        <h3>Mi perfil</h3>
-        <p>Actualiza tus datos y preferencias.</p>
+    <div class="action-card" *ngIf="hasMyChampionships">
+      <div class="card-icon">
+        <i class="fas fa-user-tie"></i>
       </div>
-    </a>
+      <h3>Mis Campeonatos Creados</h3>
+      <p>Gestiona los torneos que has organizado como administrador.</p>
+      <a routerLink="/mis-campeonatos" class="btn-action">Gestionar Campeonatos</a>
+    </div>
 
-    <a routerLink="/mis-inscripciones" class="card">
-      <div class="card-icon">📝</div>
-      <div class="card-body">
-        <h3>Mis inscripciones</h3>
-        <p>Revisa las competiciones en las que estás inscrito.</p>
-      </div>
-    </a>
+  </section>
+
+  <!-- Separador visual -->
+  <div class="section-divider">
+    <hr>
+    <h2 class="section-title">Otras Opciones</h2>
   </div>
+
+  <!-- Accesos seguros (rutas existentes en Angular) -->
+  <section class="actions-grid">
+    <div class="action-card">
+      <div class="card-icon">
+        <i class="fas fa-shield-alt"></i>
+      </div>
+      <h3>Seguridad de la Cuenta</h3>
+      <p>Actualiza tu contraseña periódicamente y mantén tu cuenta segura.</p>
+      <a routerLink="/resetPassword" class="btn-action">Gestionar seguridad</a>
+    </div>
+
+    <div class="action-card">
+      <div class="card-icon">
+        <i class="fas fa-life-ring"></i>
+      </div>
+      <h3>Centro de Ayuda</h3>
+      <p>Encuentra respuestas a preguntas frecuentes y soporte.</p>
+      <button class="btn-action btn-disabled" disabled>Próximamente</button>
+    </div>
+  </section>
+
+
+
 </div>

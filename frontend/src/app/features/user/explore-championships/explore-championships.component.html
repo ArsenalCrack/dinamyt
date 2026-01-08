@@ -1,0 +1,102 @@
+<div class="explore-championships-container">
+  <div class="explore-championships-card">
+    <a (click)="goBack()" class="btn-back" title="Volver atrás">
+      <i class="fas fa-arrow-left fa-2x"></i>
+    </a>
+
+    <header class="header">
+      <h1>Explorar Campeonatos</h1>
+      <p class="subtitle">Descubre campeonatos disponibles en la plataforma e inscríbete.</p>
+    </header>
+
+    <div class="search-section">
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Buscar por nombre, ubicación u organizador..."
+        [(ngModel)]="searchQuery"
+        (input)="onSearchChange()">
+      <i class="fas fa-search search-icon"></i>
+    </div>
+
+    <div class="championships-grid">
+      <ng-container *ngIf="filteredChampionships.length > 0; else noResults">
+        <div class="championship-card" *ngFor="let championship of filteredChampionships">
+          <div class="card-header">
+            <h3>{{ championship.nombre }}</h3>
+            <span class="badge" [ngClass]="'badge-' + championship.estado.toLowerCase()">
+              {{ championship.estado }}
+            </span>
+          </div>
+
+          <div class="card-body">
+            <div class="info-row">
+              <i class="fas fa-calendar-alt"></i>
+              <span>{{ championship.fecha | date: 'dd/MM/yyyy' }}</span>
+            </div>
+            <div class="info-row">
+              <i class="fas fa-map-marker-alt"></i>
+              <span>{{ championship.ubicacion }}</span>
+            </div>
+            <div class="info-row">
+              <i class="fas fa-user-tie"></i>
+              <span>{{ championship.organizador }}</span>
+            </div>
+            <div class="info-row">
+              <i class="fas fa-tag"></i>
+              <span>{{ championship.categoria }}</span>
+            </div>
+
+            <div class="capacity-section">
+              <div class="capacity-info">
+                <span class="capacity-label">Participantes:</span>
+                <span class="capacity-text">{{ championship.participantes }} / {{ championship.capacidad }}</span>
+              </div>
+              <div class="capacity-bar">
+                <div class="capacity-fill" [style.width.%]="getProgressPercentage(championship.participantes, championship.capacidad)"></div>
+              </div>
+              <p class="available-slots">{{ getAvailableSlots(championship.participantes, championship.capacidad) }} espacios disponibles</p>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn-secondary" (click)="viewDetails(championship.id)">
+              <i class="fas fa-eye"></i>
+              Ver detalles
+            </button>
+            <button class="btn-primary" (click)="registerChampionship(championship.id)"
+              [disabled]="getAvailableSlots(championship.participantes, championship.capacidad) === 0">
+              <i class="fas fa-check"></i>
+              Inscribirse
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-template #noResults>
+        <div class="no-results">
+          <i class="fas fa-inbox"></i>
+          <p>No encontramos campeonatos que coincidan con tu búsqueda.</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Modal para solicitar login -->
+  <div *ngIf="showLoginModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-body">
+        <i class="fas fa-lock modal-icon"></i>
+        <div class="modal-text">Debes iniciar sesión para inscribirte en un campeonato</div>
+      </div>
+      <button class="modal-close" (click)="closeLoginModal()" aria-label="Cerrar">✕</button>
+      <div class="modal-actions">
+        <button class="modal-action-primary" (click)="goToLogin()">
+          <i class="fas fa-sign-in-alt"></i>
+          Iniciar Sesión
+        </button>
+        <button class="modal-action-secondary" (click)="closeLoginModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>

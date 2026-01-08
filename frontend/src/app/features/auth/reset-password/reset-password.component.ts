@@ -72,7 +72,14 @@ export class ResetPasswordComponent implements OnInit {
       error: (err) => {
         this.cargando = false;
         this.exito = false;
-        this.mensaje = err.error?.message || 'Error al actualizar la contraseña.';
+        const msgRaw = (err?.error?.message || err?.error?.error || '').toString().toLowerCase();
+        if (msgRaw.includes('utilizada') || msgRaw.includes('reutilizada') || msgRaw.includes('usada') || msgRaw.includes('reused') || msgRaw.includes('already')) {
+          this.mensaje = 'Esta contraseña ya fue utilizada anteriormente. Por favor, elige una contraseña diferente.';
+        } else if (msgRaw.includes('deb') || msgRaw.includes('weak')) {
+          this.mensaje = 'La nueva contraseña no cumple los requisitos de seguridad.';
+        } else {
+          this.mensaje = err.error?.message || 'Error al actualizar la contraseña.';
+        }
       }
     });
   }

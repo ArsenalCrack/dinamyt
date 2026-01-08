@@ -1,0 +1,35 @@
+<div class="country-autocomplete" [class.has-error]="hasError">
+  <i class="fas fa-globe icon-left"></i>
+
+  <input
+    type="text"
+    class="search-input"
+    [(ngModel)]="searchText"
+    [placeholder]="placeholder"
+    [disabled]="disabled"
+    [class.input-error]="hasError"
+    (input)="onInputChange()"
+    (focus)="onInputFocus()"
+    (blur)="onInputBlur()"
+    (keydown)="onKeydown($event)"
+    autocomplete="off">
+
+  <span class="arrow"
+        [class.arrow-open]="isOpen"
+        (click)="toggleDropdown()"
+        (mousedown)="$event.preventDefault()"></span>
+
+  <ul class="options" *ngIf="isOpen && filteredPaises.length > 0" role="listbox" [ngStyle]="optionsStyle">
+    <li *ngFor="let pais of filteredPaises; let i = index"
+        role="option"
+        [class.focus]="i === focusedIndex"
+        (click)="selectPais(pais)"
+        (mouseenter)="focusedIndex = i">
+      {{ pais }}
+    </li>
+  </ul>
+
+  <div class="no-results" *ngIf="isOpen && filteredPaises.length === 0" [ngStyle]="optionsStyle">
+    No se encontraron países
+  </div>
+</div>

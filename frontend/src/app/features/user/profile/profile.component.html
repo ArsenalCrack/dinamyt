@@ -1,0 +1,60 @@
+<div class="profile-wrapper">
+  <a (click)="goBack()" class="btn-back" title="Volver atrás">
+    <i class="fas fa-arrow-left fa-2x"></i>
+  </a>
+
+  <h2>Mi Perfil</h2>
+
+  <div class="avatar-row">
+    <div class="avatar" [style.backgroundImage]="(fotoPreview || fotoUrl) ? 'url(' + (fotoPreview || fotoUrl) + ')' : 'none'">
+      <i *ngIf="!(fotoPreview || fotoUrl)" class="fas fa-user"></i>
+    </div>
+    <div class="avatar-actions">
+      <label class="btn-secondary">
+        <input type="file" accept="image/*" (change)="onFileChange($event)" hidden>
+        Seleccionar foto
+      </label>
+      <button class="btn-primary" (click)="uploadPhoto()" [disabled]="!fotoFile || saving">{{ saving ? 'Subiendo...' : 'Subir' }}</button>
+      <button class="btn-link" (click)="goChangePassword()">Cambiar contraseña</button>
+    </div>
+  </div>
+
+  <form (ngSubmit)="saveProfile()">
+    <div class="profile-grid">
+      <!-- Bloqueados -->
+      <div class="field disabled"><label>Nombre completo</label><p>{{ user.nombreC || '—' }}</p></div>
+      <div class="field disabled"><label>Documento</label><p>{{ user.idDocumento || '—' }}</p></div>
+      <div class="field disabled"><label>Fecha de nacimiento</label><p>{{ user.fechaNacimiento || '—' }}</p></div>
+      <div class="field disabled"><label>Sexo</label><p>{{ user.sexo || '—' }}</p></div>
+      <div class="field disabled"><label>Nacionalidad</label><p>{{ user.nacionalidad || '—' }}</p></div>
+
+      <!-- Editables -->
+      <div class="field editable">
+        <label>Correo</label>
+        <input type="email" [(ngModel)]="user.correo" name="correo" />
+      </div>
+      <div class="field editable">
+        <label>Teléfono</label>
+        <input type="text" [(ngModel)]="user.numeroCelular" name="numeroCelular" />
+      </div>
+      <div class="field editable">
+        <label>Cinturón/Rango</label>
+        <input type="text" [(ngModel)]="user.cinturonRango" name="cinturonRango" />
+      </div>
+      <div class="field editable">
+        <label>Academia</label>
+        <input type="text" [(ngModel)]="user.academia" name="academia" />
+      </div>
+      <div class="field editable">
+        <label>Instructor</label>
+        <input type="text" [(ngModel)]="user.instructor" name="instructor" />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" type="submit" [disabled]="saving">{{ saving ? 'Guardando...' : 'Guardar cambios' }}</button>
+    </div>
+  </form>
+
+  <div *ngIf="message" class="alert" [class.success]="success">{{ message }}</div>
+</div>
