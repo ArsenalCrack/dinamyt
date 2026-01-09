@@ -39,6 +39,7 @@ export class LoginComponent {
 
     this.api.login({ correo: this.correo, contrasena: this.contrasena }).subscribe({
       next: (res: any) => {
+        localStorage.setItem('usuario', JSON.stringify(res));
         console.log('Respuesta del backend:', res);
 
         // Backend expected to return token and user info
@@ -61,7 +62,7 @@ export class LoginComponent {
           // Guardar datos del usuario según las variables del proyecto
           const name = user?.nombreC || user?.username || user?.name || user?.nombre || null;
           if (name) {
-            sessionStorage.setItem('username', name);
+            sessionStorage.setItem('nombreC', name);
             console.log('Username guardado:', name);
             this.auth.setLoggedIn(true, name);
           }
@@ -74,7 +75,7 @@ export class LoginComponent {
           if (user?.nacionalidad) sessionStorage.setItem('nacionalidad', user.nacionalidad);
           if (user?.numeroCelular) sessionStorage.setItem('numeroCelular', user.numeroCelular);
           if (user?.academia) sessionStorage.setItem('academia', user.academia);
-          if (user?.instructor) sessionStorage.setItem('instructor', user.instructor);
+          if (user?.Instructor) sessionStorage.setItem('instructor', user.Instructor);
         }
 
         // Mantener el spinner visible por 2 segundos antes de navegar

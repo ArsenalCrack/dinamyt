@@ -112,9 +112,17 @@ public class controlador_principal {
             usuariosPendientes.put(respuesta.getCorreo(), usuarioRepository.findByCorreo((respuesta.getCorreo())));
             Usuario pendiente3 = usuariosPendientes.get(respuesta.getCorreo());
             if (pendiente3.getContrasena().equals(respuesta.getContrasena())){
-                return ResponseEntity.ok(Map.of("message", "Correcto"));
+                return ResponseEntity.ok(pendiente3);
 
             }
+        }
+        return ResponseEntity.badRequest().body(Map.of("message", "Error"));
+    }
+    @PostMapping("/me")
+    private ResponseEntity<?> me(@RequestBody Usuario respuesta){
+        System.out.println("a"+respuesta);
+        if (respuesta!=null) {
+            return ResponseEntity.ok(respuesta);
         }
         return ResponseEntity.badRequest().body(Map.of("message", "Error"));
     }

@@ -18,7 +18,7 @@ export class NavbarComponent implements OnInit {
   loading = true;
   loggingOut = false;
   showUserDropdown = false;
-
+  usuario: any;
   constructor(private api: ApiService, private router: Router, private auth: AuthService) {
     // Escuchar cambios de navegación para actualizar el estado
     this.router.events.pipe(
@@ -29,15 +29,16 @@ export class NavbarComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
     this.checkLoginStatus();
-    this.api.getCurrentUser().subscribe({
+    this.api.getCurrentUser(this.usuario).subscribe({
       next: (u: any) => {
         // Priorizar nombreC del backend o del sessionStorage
         const storedName = sessionStorage.getItem('username');
         this.username = u?.nombreC || storedName || u?.username || u?.name || u?.nombre || null;
         // Si el backend devuelve nombreC y no lo teníamos, guardarlo
         if (u?.nombreC && !storedName) {
-          sessionStorage.setItem('username', u.nombreC);
+          sessionStorage.setItem('nombreC', u.nombreC);
         }
         this.isLoggedIn = true;
         this.auth.setLoggedIn(true, this.username);
@@ -52,7 +53,7 @@ export class NavbarComponent implements OnInit {
 
   checkLoginStatus(): void {
     // Obtener el username que guardó el login (que contiene nombreC del registro)
-    this.username = sessionStorage.getItem('username') || sessionStorage.getItem('userName');
+    this.username = sessionStorage.getItem('nombreC') || sessionStorage.getItem('nombreC');
     const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
     const correo = sessionStorage.getItem('correo');
     // consider user logged if token exists, username exists, or correo exists

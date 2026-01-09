@@ -14,9 +14,10 @@ export class ApiService {
     return this.http.get(`${this.apiUrl}/saludo`);
   }
 
-  getCurrentUser() {
-    return this.http.get(`${this.apiUrl}/me`);
+  getCurrentUser(user: any) {
+    return this.http.post(`${this.apiUrl}/me`, user);
   }
+
 
   login(credentials: { correo: string; contrasena: string }) {
     return this.http.post(`${this.apiUrl}/login`, credentials);

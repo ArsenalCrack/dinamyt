@@ -14,7 +14,7 @@ import { ApiService } from '../../../core/services/api.service';
 })
 export class ProfileComponent {
   user = {
-    nombreC: sessionStorage.getItem('username') || '',
+    nombreC: sessionStorage.getItem('nombreC') || '',
     correo: sessionStorage.getItem('correo') || '',
     idDocumento: sessionStorage.getItem('idDocumento') || '',
     sexo: sessionStorage.getItem('sexo') || '',

@@ -13,26 +13,29 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class DashboardComponent {
   canCreate = false;
-  username: string | null = null;
+  nombreC: string | null = null;
   hasMyChampionships = false;
   // Estado de perfil
   profileCompletion = 0;
   missingFields: string[] = [];
+  usuario: any;
 
   constructor(private apiService: ApiService, private auth: AuthService) { }
 
   ngOnInit(): void {
+    this.usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
     // Obtener el username que contiene el nombreC del registro
-    this.username = sessionStorage.getItem('username') || sessionStorage.getItem('userName');
 
-    this.apiService.getCurrentUser().subscribe({
+    this.apiService.getCurrentUser(this.usuario).subscribe({
       next: (u: any) => {
+        console.log("u",u.nombreC);
+
         // Priorizar nombreC del backend
         if (u?.nombreC) {
-          this.username = u.nombreC;
-          sessionStorage.setItem('username', u.nombreC);
-        } else if (!this.username) {
-          this.username = u?.username || u?.name || null;
+          this.nombreC = u.nombreC;
+          sessionStorage.setItem('nombreC', u.nombreC);
+        } else if (!this.nombreC) {
+          this.nombreC = u?.username || u?.name || null;
         }
 
         // permission heuristics: backend may expose roles or explicit flags
@@ -100,7 +103,9 @@ export class DashboardComponent {
 
     for (const f of fields) {
       const val = (user && user[f.key]) || sessionStorage.getItem(f.key);
+      console.log(val)
       if (val && String(val).trim().length > 0) {
+        
         completed++;
       } else {
         missing.push(f.label);
