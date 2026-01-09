@@ -48,6 +48,21 @@
 }
 .modal-action:focus { outline: 2px solid rgba(198,40,40,0.25); }
 
+/* Overlay de carga centrado en viewport */
+.loading-overlay {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255,255,255,0.8);
+	z-index: 2600;
+	overflow: hidden;
+	touch-action: none;
+	overscroll-behavior: contain;
+}
+
 @media (min-width: 560px) {
 	.modal-box { min-width: 420px; max-width: 720px; }
 	.modal-text { font-size:1rem; }

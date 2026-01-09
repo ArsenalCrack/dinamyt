@@ -3,7 +3,7 @@
 
     <div *ngIf="cargando" class="loading-overlay">
       <i class="fas fa-spinner fa-spin spinner-icon"></i>
-      <p class="loading-text">Procesando... por favor espera</p>
+      <p class="loading-text">{{ loadingText }}</p>
     </div>
 
     <a (click)="volverAtras()" class="btn-back" title="Volver atrás">
@@ -20,13 +20,13 @@
     <div *ngIf="showExpiredBanner" class="banner expired-banner">
       <p>El código ha caducado. Puedes solicitar uno nuevo para continuar:</p>
       <div style="display: flex; gap: 10px; justify-content: center;">
-        <button #bannerResendBtn class="btn btn-sm btn-primary" (click)="reenviarDesdeBanner()">Reenviar código</button>
+        <button #bannerResendBtn class="btn btn-sm btn-primary">Reenviar código</button>
         <button class="btn btn-sm btn-secondary" routerLink="/verify">Ir a verificar</button>
       </div>
     </div>
 
     <!-- Modal for server messages -->
-    <div *ngIf="Mensajes" class="modal-overlay">
+    <div *ngIf="Mensajes && !exito" class="modal-overlay">
       <div class="modal-box">
         <div class="modal-body">
           <i class="fas" [ngClass]="exito ? 'fa-check-circle modal-icon success' : 'fa-exclamation-circle modal-icon error'"></i>
@@ -51,7 +51,6 @@
           minlength="6"
           maxlength="20"
           placeholder="Ej: 1090..."
-          (input)="onlyDigits($event)"
           [class.input-error]="doc.invalid && (doc.dirty || doc.touched)">
 
         <div *ngIf="doc.invalid && (doc.dirty || doc.touched)" class="msg-error">
@@ -62,22 +61,42 @@
       </div>
 
       <div class="form-group">
-        <label>Nombre completo</label>
+        <label>Nombres</label>
         <input
           type="text"
-          name="nombreC"
-          [(ngModel)]="nombreC"
+          name="nombres"
+          [(ngModel)]="nombres"
           #nom="ngModel"
           required
-          minlength="5"
+          minlength="3"
           pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+"
-          placeholder="Nombres y Apellidos"
+          placeholder="Tus nombres"
           [class.input-error]="nom.invalid && (nom.dirty || nom.touched)">
 
         <div *ngIf="nom.invalid && (nom.dirty || nom.touched)" class="msg-error">
-          <small *ngIf="nom.errors?.['required']">El nombre es obligatorio.</small>
+          <small *ngIf="nom.errors?.['required']">Los nombres son obligatorios.</small>
           <small *ngIf="nom.errors?.['pattern']">No se permiten números ni caracteres especiales.</small>
-          <small *ngIf="nom.errors?.['minlength']">Por favor ingresa nombre y apellido real.</small>
+          <small *ngIf="nom.errors?.['minlength']">Por favor ingresa al menos 3 caracteres.</small>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Apellidos</label>
+        <input
+          type="text"
+          name="apellidos"
+          [(ngModel)]="apellidos"
+          #ape="ngModel"
+          required
+          minlength="3"
+          pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+"
+          placeholder="Tus apellidos"
+          [class.input-error]="ape.invalid && (ape.dirty || ape.touched)">
+
+        <div *ngIf="ape.invalid && (ape.dirty || ape.touched)" class="msg-error">
+          <small *ngIf="ape.errors?.['required']">Los apellidos son obligatorios.</small>
+          <small *ngIf="ape.errors?.['pattern']">No se permiten números ni caracteres especiales.</small>
+          <small *ngIf="ape.errors?.['minlength']">Por favor ingresa al menos 3 caracteres.</small>
         </div>
       </div>
 
@@ -156,21 +175,18 @@
       </div>
 
       <div class="form-group">
-        <label>Academia (opcional)</label>
-        <input
-          type="text"
-          name="academia"
-          [(ngModel)]="academia"
-          placeholder="Nombre de tu academia/club">
-      </div>
-
-      <div class="form-group">
-        <label>Instructor (opcional)</label>
-        <input
-          type="text"
-          name="instructor"
-          [(ngModel)]="instructor"
-          placeholder="Nombre de tu instructor principal">
+        <label>Cinturón</label>
+        <app-custom-select
+          name="cinturon_rango"
+          [(ngModel)]="cinturon_rango"
+          #cinturonRef="ngModel"
+          required
+          [options]="cinturones"
+          placeholder="Selecciona tu cinturón">
+        </app-custom-select>
+        <div *ngIf="cinturonRef.invalid && cinturonRef.touched" class="msg-error">
+          <small>Debes seleccionar un cinturón.</small>
+        </div>
       </div>
 
       <div class="form-group">

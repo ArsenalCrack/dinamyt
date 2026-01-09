@@ -41,7 +41,6 @@ h1, h2, h3, h4 {
 /* Textos secundarios globales: aplicar tipografía del proyecto (Montserrat) y peso normal */
 p, small, label, span, li, a:not(.btn):not(.btn-action-horizontal):not(.btn-action):not(.btn-primary):not(.btn-secondary):not(.btn-link), .muted, .secondary {
     font-family: 'Montserrat', sans-serif;
-    font-weight: 400;
     /* color: var(--color-texto); */
 }
 

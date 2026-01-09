@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, inject, OnInit, AfterViewInit, ViewChild, ElementRef, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -12,7 +12,7 @@ import { Location } from '@angular/common';
   templateUrl: './confirm-email.component.html',
   styleUrls: ['./confirm-email.component.scss']
 })
-export class ConfirmEmailComponent {
+export class ConfirmEmailComponent implements OnInit, AfterViewInit, OnDestroy {
 
   showExpiredBanner = false;
   @ViewChild('bannerResendBtn') bannerResendBtn?: ElementRef<HTMLButtonElement>;
@@ -26,6 +26,9 @@ export class ConfirmEmailComponent {
   mensaje: string = '';
   exito: boolean = false;
 
+  private lockScroll() { document.body.style.overflow = 'hidden'; }
+  private unlockScroll() { document.body.style.overflow = ''; }
+
   closeMensaje() {
     this.mensaje = '';
   }
@@ -36,6 +39,7 @@ export class ConfirmEmailComponent {
 
   enviarCodigo() {
     this.cargando = true;
+    this.lockScroll();
     this.mensaje = '';
     this.exito = false;
 
@@ -43,6 +47,7 @@ export class ConfirmEmailComponent {
     this.api.solicitarRecuperacion(this.correo).subscribe({
       next: (res) => {
         this.cargando = false;
+        this.unlockScroll();
         this.exito = true;
 
         // ¡CLAVE! Aquí guardamos el permiso para que el Guard deje entrar a /verify
@@ -59,6 +64,7 @@ export class ConfirmEmailComponent {
       },
       error: (err) => {
         this.cargando = false;
+        this.unlockScroll();
         this.exito = false;
         this.mensaje = err.error?.message;
       }
@@ -79,5 +85,9 @@ export class ConfirmEmailComponent {
     if (this.showExpiredBanner && this.bannerResendBtn) {
       setTimeout(() => this.bannerResendBtn?.nativeElement.focus(), 120);
     }
+  }
+
+  ngOnDestroy(): void {
+    this.unlockScroll();
   }
 }

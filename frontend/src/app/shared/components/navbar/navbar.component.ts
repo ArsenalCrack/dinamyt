@@ -1,9 +1,10 @@
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, HostListener, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { filter } from 'rxjs/operators';
+import { filter, takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
 
 @Component({
   selector: 'app-navbar',
@@ -12,31 +13,55 @@ import { filter } from 'rxjs/operators';
   templateUrl: './navbar.component.html',
   styleUrls: ['./navbar.component.scss']
 })
-export class NavbarComponent implements OnInit {
+export class NavbarComponent implements OnInit, OnDestroy {
   username: string | null = null;
   isLoggedIn = false;
   loading = true;
   loggingOut = false;
   showUserDropdown = false;
   usuario: any;
+  private destroy$ = new Subject<void>();
+
   constructor(private api: ApiService, private router: Router, private auth: AuthService) {
     // Escuchar cambios de navegación para actualizar el estado
     this.router.events.pipe(
-      filter(event => event instanceof NavigationEnd)
+      filter(event => event instanceof NavigationEnd),
+      takeUntil(this.destroy$)
     ).subscribe(() => {
       this.checkLoginStatus();
     });
   }
 
   ngOnInit(): void {
-    this.usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
     this.checkLoginStatus();
+    if (this.isLoggedIn) {
+      this.usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+      if (!this.username && this.usuario?.nombreC) {
+        this.username = this.usuario.nombreC;
+        sessionStorage.setItem('nombreC', this.usuario.nombreC);
+      }
+    }
+    
+    this.auth.isLoggedIn$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(isLoggedIn => {
+      this.isLoggedIn = isLoggedIn;
+      if (!isLoggedIn) {
+        this.username = null;
+        this.usuario = null;
+      }
+    });
+
+    this.auth.username$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(username => {
+      this.username = username || sessionStorage.getItem('nombreC') || this.usuario?.nombreC || null;
+    });
+
     this.api.getCurrentUser(this.usuario).subscribe({
       next: (u: any) => {
-        // Priorizar nombreC del backend o del sessionStorage
-        const storedName = sessionStorage.getItem('username');
-        this.username = u?.nombreC || storedName || u?.username || u?.name || u?.nombre || null;
-        // Si el backend devuelve nombreC y no lo teníamos, guardarlo
+        const storedName = sessionStorage.getItem('nombreC');
+        this.username = u?.nombreC || storedName || this.usuario?.nombreC || null;
         if (u?.nombreC && !storedName) {
           sessionStorage.setItem('nombreC', u.nombreC);
         }
@@ -45,24 +70,26 @@ export class NavbarComponent implements OnInit {
         this.loading = false;
       },
       error: () => {
-        // API may fail if no cookie/token; keep inferred state
         this.loading = false;
       }
     });
   }
 
+  private lockScroll() { document.body.style.overflow = 'hidden'; }
+  private unlockScroll() { document.body.style.overflow = ''; }
+
+  ngOnDestroy(): void {
+    this.unlockScroll();
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   checkLoginStatus(): void {
-    // Obtener el username que guardó el login (que contiene nombreC del registro)
-    this.username = sessionStorage.getItem('nombreC') || sessionStorage.getItem('nombreC');
+    this.username = sessionStorage.getItem('nombreC') || this.usuario?.nombreC || null;
     const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
     const correo = sessionStorage.getItem('correo');
-    // consider user logged if token exists, username exists, or correo exists
     this.isLoggedIn = !!(token || this.username || correo);
     this.auth.setLoggedIn(this.isLoggedIn, this.username);
-
-    console.log('checkLoginStatus - username capturado:', this.username);
-    console.log('checkLoginStatus - correo:', correo);
-    console.log('checkLoginStatus - isLoggedIn:', this.isLoggedIn);
   }
 
   toggleUserDropdown(): void {
@@ -90,22 +117,25 @@ export class NavbarComponent implements OnInit {
   logout(): void {
     this.closeDropdown();
     this.loggingOut = true;
+    this.lockScroll();
+    
+    // Limpiar datos inmediatamente
+    sessionStorage.clear();
+    localStorage.removeItem('usuario');
+    
+    // Actualizar estado local inmediatamente
+    this.username = null;
+    this.isLoggedIn = false;
+    this.usuario = null;
+    
+    // Notificar al AuthService inmediatamente
+    this.auth.setLoggedIn(false, null);
+    
+    // Navegar después de 500ms (solo para mostrar overlay)
     setTimeout(() => {
-      sessionStorage.clear();
-      this.username = null;
-      this.isLoggedIn = false;
       this.loggingOut = false;
-      this.auth.setLoggedIn(false, null);
-      // Forzar actualización de Home si ya estamos en '/'
-      const onHome = this.router.url === '/';
-      if (onHome) {
-        // disparar navegación simulada para refrescar bindings que dependan del router
-        this.router.navigateByUrl('/dashboard', { skipLocationChange: true }).then(() => {
-          this.router.navigate(['/']);
-        });
-      } else {
-        this.router.navigate(['/']);
-      }
-    }, 1000);
+      this.unlockScroll();
+      this.router.navigate(['/']);
+    }, 500);
   }
 }

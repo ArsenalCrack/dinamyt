@@ -51,6 +51,22 @@ h2 { margin: 0 0 15px 0; }
 }
 
 .field.editable input { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; }
+.field.editable .input-condicional {
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  font-family: 'Montserrat', sans-serif;
+  transition: border-color 0.3s;
+  
+  &:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+  }
+}
 .field.disabled { opacity: .85; }
 
 .actions { margin-top: 16px; }
@@ -59,3 +75,19 @@ h2 { margin: 0 0 15px 0; }
 
 .alert { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: #ffe3e3; color: #a40000; }
 .alert.success { background: #e7f7ec; color: #137333; }
+
+.loading-overlay {
+	position: fixed;
+	inset: 0;
+	width: 100vw;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255,255,255,0.8);
+	z-index: 2600;
+	overflow: hidden;
+	touch-action: none;
+	overscroll-behavior: contain;
+}

@@ -12,7 +12,7 @@ import { ApiService } from '../../../core/services/api.service';
   templateUrl: './verify.component.html',
   styleUrls: ['./verify.component.scss']
 })
-export class VerifyComponent implements OnInit {
+export class VerifyComponent implements OnInit, OnDestroy {
 
   private api = inject(ApiService);
   private router = inject(Router);
@@ -27,12 +27,14 @@ export class VerifyComponent implements OnInit {
   mensaje: string = '';
   exito: boolean = false;
   cargando: boolean = false;
+  loadingText: string = 'Verificando...';
   // Temporizador
   expiresAt: number | null = null;
   remainingMs: number = 0;
   expired: boolean = false;
   private timerHandle: any = null;
   private expiredHandled: boolean = false;
+  codeNotMatchModalVisible: boolean = false;
   ngOnInit() {
     this.emailUsuario = sessionStorage.getItem('emailParaVerificar') || '';
 
@@ -60,55 +62,68 @@ export class VerifyComponent implements OnInit {
     this.startTimer();
   }
 
+  private lockScroll() { document.body.style.overflow = 'hidden'; }
+  private unlockScroll() { document.body.style.overflow = ''; }
+
   verificar() {
-  if (this.codigo.length !== 6) return;
-  if (this.expired) {
-    this.mensaje = 'El código ha caducado. Solicita uno nuevo.';
-    this.exito = false;
-    return;
-  }
-
-  this.cargando = true;
-  this.mensaje = '';
-  const datos = {
-    codigo: this.codigo,
-    correo: this.emailUsuario,
-    modo: this.modo
-  };
-  this.api.verificarCodigo(datos).subscribe({
-    next: (rest: any) => {
-      this.cargando = false;
-      this.exito = true;
-      this.mensaje = 'Código verificado correctamente. Redirigiendo...';
-
-      setTimeout(() => {
-        if (this.modo === 'register') {
-          sessionStorage.removeItem('emailParaVerificar');
-          sessionStorage.removeItem('verifyMode');
-          sessionStorage.removeItem('verifyExpiresAt');
-          this.router.navigate(['/login']);
-        } else if (this.modo === 'recovery') {
-          sessionStorage.removeItem('verifyExpiresAt');
-          this.router.navigate(['/resetPassword']);
-        }
-      }, 2000);
-    },
-    error: (err) => {
-      this.cargando = false;
+    if (this.codigo.length !== 6) return;
+    if (this.expired) {
+      this.mensaje = 'El código ha caducado. Solicita uno nuevo.';
       this.exito = false;
-      this.mensaje = err.error?.message;
+      return;
     }
-  });
-}
+
+    this.cargando = true;
+    this.loadingText = 'Verificando...';
+    this.lockScroll();
+    this.mensaje = '';
+    const datos = {
+      codigo: this.codigo,
+      correo: this.emailUsuario,
+      modo: this.modo
+    };
+    this.api.verificarCodigo(datos).subscribe({
+      next: (rest: any) => {
+        // mantener spinner mientras redirige
+        this.cargando = true;
+        this.loadingText = 'Redirigiendo...';
+        this.exito = true;
+        this.mensaje = 'Código verificado correctamente. Redirigiendo...';
+
+        setTimeout(() => {
+          this.unlockScroll();
+          if (this.modo === 'register') {
+            sessionStorage.removeItem('emailParaVerificar');
+            sessionStorage.removeItem('verifyMode');
+            sessionStorage.removeItem('verifyExpiresAt');
+            this.router.navigate(['/login']);
+          } else if (this.modo === 'recovery') {
+            sessionStorage.removeItem('verifyExpiresAt');
+            this.router.navigate(['/resetPassword']);
+          }
+        }, 2000);
+      },
+      error: (err) => {
+        this.cargando = false;
+        this.unlockScroll();
+        this.exito = false;
+        this.mensaje = err.error?.message || 'El código no coincide. Intenta nuevamente.';
+        this.codeNotMatchModalVisible = true;
+      }
+    });
+  }
 
 
   reenviarCodigo() {
     this.cargando = true;
+    this.loadingText = 'Verificando...';
+    this.lockScroll();
     this.mensaje = '';
 
     this.api.reenviarCodigo(this.emailUsuario).subscribe({
       next: (res: any) => {
         this.cargando = false;
+        this.unlockScroll();
         this.exito = true; // Usamos true para mostrar mensaje en verde
         this.mensaje = 'Nuevo código enviado. Revisa tu bandeja de entrada.';
         // actualizar expiración a 5 minutos desde ahora
@@ -123,6 +138,7 @@ export class VerifyComponent implements OnInit {
       },
       error: (err) => {
         this.cargando = false;
+        this.unlockScroll();
         this.exito = false;
         this.mensaje = 'No se pudo reenviar el código. Intenta más tarde.';
       }
@@ -170,6 +186,13 @@ export class VerifyComponent implements OnInit {
     this.exito = false;
   }
 
+  closeCodeNotMatchModal() {
+    // Cerrar el modal y limpiar el código para que intente nuevamente
+    this.codeNotMatchModalVisible = false;
+    this.codigo = '';
+    this.mensaje = '';
+  }
+
   formatRemaining(): string {
     const total = Math.max(0, this.remainingMs);
     const sec = Math.floor(total / 1000);
@@ -179,6 +202,7 @@ export class VerifyComponent implements OnInit {
   }
 
   ngOnDestroy(): void {
+    this.unlockScroll();
     if (this.timerHandle) {
       clearInterval(this.timerHandle);
       this.timerHandle = null;

@@ -19,6 +19,9 @@
       <div *ngIf="missingFields.length" class="missing-list">
         <p>Faltan: {{ missingFields.join(', ') }}</p>
       </div>
+      <div class="status-actions">
+        <a routerLink="/perfil" class="btn-action">Ir a mi perfil</a>
+      </div>
     </div>
   </section>
 

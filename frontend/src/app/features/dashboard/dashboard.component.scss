@@ -77,6 +77,41 @@
             margin-top: 10px;
             p { color: var(--color-texto); font-size: 0.9rem; }
         }
+
+        .status-actions {
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-start;
+
+            .btn-action {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding: 10px 16px;
+                border-radius: 10px;
+                border: 2px solid var(--color-acento);
+                background: var(--color-acento);
+                color: #fff;
+                font-family: 'Montserrat', sans-serif;
+                font-weight: 700;
+                font-size: 0.95rem;
+                text-decoration: none;
+                transition: all 0.3s ease;
+                cursor: pointer;
+
+                &:hover {
+                    background: #b10000;
+                    border-color: #b10000;
+                    box-shadow: 0 4px 12px rgba(214,0,0,0.2);
+                    transform: translateY(-1px);
+                }
+
+                &:active {
+                    transform: translateY(0);
+                }
+            }
+        }
     }
 }
 
@@ -268,7 +303,7 @@
             text-decoration: none;
             border-radius: 50px;
             font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
+            font-weight: 700;
             font-size: 0.95rem;
             transition: all 0.3s ease;
             white-space: nowrap;

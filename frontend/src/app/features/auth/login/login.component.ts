@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -15,7 +15,7 @@ import { HttpErrorResponse } from '@angular/common/http';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss']
 })
-export class LoginComponent {
+export class LoginComponent implements OnDestroy {
 
   private location = inject(Location);
   private router = inject(Router);
@@ -33,9 +33,13 @@ export class LoginComponent {
     this.location.back();
   }
 
+  private lockScroll() { document.body.style.overflow = 'hidden'; }
+  private unlockScroll() { document.body.style.overflow = ''; }
+
   login() {
     this.errorMessage = null;
     this.cargando = true;
+    this.lockScroll();
 
     this.api.login({ correo: this.correo, contrasena: this.contrasena }).subscribe({
       next: (res: any) => {
@@ -82,6 +86,7 @@ export class LoginComponent {
         console.log('Esperando 2 segundos antes de navegar...');
         setTimeout(() => {
           this.cargando = false;
+          this.unlockScroll();
           console.log('Navegando a dashboard...');
           this.router.navigate(['/dashboard']);
         }, 2000);
@@ -89,6 +94,7 @@ export class LoginComponent {
       error: (err: HttpErrorResponse) => {
         console.error('Error en login:', err);
         this.cargando = false;
+        this.unlockScroll();
 
         // Mensajes de error más específicos según el código de estado
         if (err.status === 401) {
@@ -122,6 +128,7 @@ export class LoginComponent {
     this.errorMessage = null;
   }
 
-
-
+  ngOnDestroy(): void {
+    this.unlockScroll();
+  }
 }

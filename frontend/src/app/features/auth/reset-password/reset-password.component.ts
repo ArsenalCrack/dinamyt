@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -11,7 +11,7 @@ import { ApiService } from '../../../core/services/api.service';
   templateUrl: './reset-password.component.html',
   styleUrls: ['./reset-password.component.scss']
 })
-export class ResetPasswordComponent implements OnInit {
+export class ResetPasswordComponent implements OnInit, OnDestroy {
 
   private api = inject(ApiService);
   private router = inject(Router);
@@ -42,6 +42,9 @@ export class ResetPasswordComponent implements OnInit {
     }
   }
 
+  private lockScroll() { document.body.style.overflow = 'hidden'; }
+  private unlockScroll() { document.body.style.overflow = ''; }
+
   cambiarPassword() {
     if (this.contrasena !== this.confirmPassword) {
       this.mensaje = 'Las contraseñas no coinciden.';
@@ -50,6 +53,7 @@ export class ResetPasswordComponent implements OnInit {
 
     this.cargando = true;
     this.mensaje = '';
+    this.lockScroll();
 
     const payload = {
       correo: this.correo,
@@ -59,6 +63,7 @@ export class ResetPasswordComponent implements OnInit {
     this.api.cambiarPassword(payload).subscribe({
       next: (res) => {
         this.cargando = false;
+        this.unlockScroll();
         this.exito = true;
         this.mensaje = 'Contraseña actualizada correctamente.';
 
@@ -71,6 +76,7 @@ export class ResetPasswordComponent implements OnInit {
       },
       error: (err) => {
         this.cargando = false;
+        this.unlockScroll();
         this.exito = false;
         const msgRaw = (err?.error?.message || err?.error?.error || '').toString().toLowerCase();
         if (msgRaw.includes('utilizada') || msgRaw.includes('reutilizada') || msgRaw.includes('usada') || msgRaw.includes('reused') || msgRaw.includes('already')) {
@@ -82,5 +88,9 @@ export class ResetPasswordComponent implements OnInit {
         }
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.unlockScroll();
   }
 }

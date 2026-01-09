@@ -10,8 +10,8 @@ export const routes: Routes = [
   // 1. Rutas específicas primero
   { path: '', component: HomeComponent },
   { path: 'login', component: LoginComponent, canActivate: [guestGuard] },
-  { path: 'recoverAccount', component: ConfirmEmailComponent },
-  { path: 'register', component: RegistroComponent },
+  { path: 'recoverAccount', component: ConfirmEmailComponent, canActivate: [guestGuard] },
+  { path: 'register', component: RegistroComponent, canActivate: [guestGuard] },
 
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
   {

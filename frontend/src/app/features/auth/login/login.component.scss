@@ -82,3 +82,18 @@
 	}
 }
 
+/* Overlay de carga centrado en viewport */
+.loading-overlay {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255,255,255,0.8);
+	z-index: 2600;
+	overflow: hidden;
+	touch-action: none;
+	overscroll-behavior: contain;
+}
+

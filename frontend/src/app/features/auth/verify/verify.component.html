@@ -4,7 +4,7 @@
     <!-- Overlay de carga -->
     <div *ngIf="cargando" class="loading-overlay">
       <i class="fas fa-spinner fa-spin spinner-icon"></i>
-      <p class="loading-text">Verificando...</p>
+      <p class="loading-text">{{ loadingText }}</p>
     </div>
 
     <header class="header">
@@ -32,6 +32,18 @@
         </div>
         <button class="modal-close" (click)="closeExpiredModal()">✕</button>
         <button class="modal-action" (click)="closeExpiredModal()">Cerrar</button>
+      </div>
+    </div>
+
+    <!-- Code not match modal: show when code doesn't match -->
+    <div *ngIf="codeNotMatchModalVisible" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-body">
+          <i class="fas fa-times-circle modal-icon modal-icon-error"></i>
+          <div class="modal-text">El código no coincide.</div>
+        </div>
+        <button class="modal-close" (click)="closeCodeNotMatchModal()">✕</button>
+        <button class="modal-action modal-action-error" (click)="closeCodeNotMatchModal()">Cerrar</button>
       </div>
     </div>
 

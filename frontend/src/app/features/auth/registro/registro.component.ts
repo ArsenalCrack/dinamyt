@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, inject, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, inject, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -15,7 +15,7 @@ import { PAISES } from '../../../core/models/paises';
   templateUrl: './registro.component.html',
   styleUrls: ['./registro.component.scss']
 })
-export class RegistroComponent implements OnInit {
+export class RegistroComponent implements OnInit, OnDestroy {
 
   private api = inject(ApiService);
   private router = inject(Router);
@@ -30,15 +30,40 @@ export class RegistroComponent implements OnInit {
   Mensajes: string = '';
   exito: boolean = false;
   cargando: boolean = false;
+  loadingText: string = 'Procesando... por favor espera';
 
   // Datos del modelo
   idDocumento!: string;
+  nombres!: string;
+  apellidos!: string;
   nombreC!: string;
   sexo: string = '';
   nacionalidad: string = '';
-  academia: string = '';
-  instructor: string = '';
+  cinturon_rango: string = '';
   fechaNacimiento!: string;
+  correo!: string;
+  contrasena!: string;
+  confirmPassword!: string;
+  academia: string = '';
+  academiaOtra: string = '';
+  instructor: string = '';
+  instructorOtro: string = '';
+  telefonoOpcional: string = '';
+
+  // Opciones para dropdowns
+  cinturones: Array<{ value: string; label: string }> = [
+    { value: 'Blanco', label: 'Blanco' },
+    { value: 'Amarillo', label: 'Amarillo' },
+    { value: 'Naranja', label: 'Naranja' },
+    { value: 'Naranja/verde', label: 'Naranja/verde' },
+    { value: 'Verde', label: 'Verde' },
+    { value: 'Verde/azul', label: 'Verde/azul' },
+    { value: 'Azul', label: 'Azul' },
+    { value: 'Rojo', label: 'Rojo' },
+    { value: 'Marrón', label: 'Marrón' },
+    { value: 'Marrón/negro', label: 'Marrón/negro' },
+    { value: 'Negro', label: 'Negro' }
+  ];
 
   // Lista de países para el autocompletado
   paisesList: string[] = PAISES;
@@ -49,9 +74,6 @@ export class RegistroComponent implements OnInit {
   diaSeleccionado: string = '';
   mesSeleccionado: string = '';
   anioSeleccionado: string = '';
-  correo!: string;
-  contrasena!: string;
-  confirmPassword!: string;
 
   // Variable para validar la edad (Mínimo 4 años)
   fechaMaximaPermitida!: string;
@@ -338,32 +360,27 @@ export class RegistroComponent implements OnInit {
       return;
     }
 
-    // Construir fechaNacimiento en formato YYYY-MM-DD
-    const mesStr = String(month).padStart(2, '0');
-    const diaStr = String(day).padStart(2, '0');
-    this.fechaNacimiento = `${year}-${mesStr}-${diaStr}`;
+    // Combinar nombres y apellidos en nombreC
+    this.nombreC = `${this.nombres?.trim()} ${this.apellidos?.trim()}`.trim();
 
-    // VALIDACIÓN 4: Validar rango de edad (mínimo 4 años)
-    this.validateFecha(true);
-    if (this.fechaErrorMsg) {
-      this.Mensajes = this.fechaErrorMsg;
-      this.exito = false;
-      return;
-    }
-
-    if (this.contrasena !== this.confirmPassword) {
-      this.Mensajes = "Las contraseñas no coinciden";
+    // VALIDACIÓN: Verificar que cinturon_rango esté seleccionado
+    if (!this.cinturon_rango || this.cinturon_rango === '') {
+      this.Mensajes = "Debes seleccionar un cinturón.";
       this.exito = false;
       return;
     }
 
     const usuario = {
       idDocumento: Number(this.idDocumento),
-      nombreC: this.nombreC?.trim(), // Limpiamos espacios extra
+      nombreC: this.nombreC,
       sexo: this.sexo,
       nacionalidad: this.nacionalidad,
-      academia: this.academia?.trim() || undefined,
-      instructor: this.instructor?.trim() || undefined,
+      academia: this.academia === 'otra' ? this.academiaOtra?.trim() : this.academia?.trim() || undefined,
+      instructor: this.instructor === 'otro' ? this.instructorOtro?.trim() : this.instructor?.trim() || undefined,
+      telefonoOpcional: this.telefonoOpcional?.trim() || undefined,
+      // Enviamos con ambos nombres para compatibilidad con la BD
+      cinturon_rango: this.cinturon_rango,
+      cinturon: this.cinturon_rango,
       fechaNacimiento: this.fechaNacimiento,
       correo: this.correo,
       contrasena: this.contrasena
@@ -371,29 +388,30 @@ export class RegistroComponent implements OnInit {
 
     // Mostrar overlay bloqueante desde que se envía la petición
     this.cargando = true;
+    this.loadingText = 'Procesando... por favor espera';
+    this.lockScroll();
     this.Mensajes = '';
 
     console.log('Enviando usuario:', usuario);
 
     this.api.registrarUsuario(usuario).subscribe({
       next: (res) => {
-        // Éxito: mantenemos overlay visible hasta 2s para dar feedback
         this.exito = true;
-        this.Mensajes = "¡Formulario exitoso! Revisa tu correo para verificar tu cuenta y registrarla.";
+        this.loadingText = 'Verificando código...';
+        this.Mensajes = '';
         sessionStorage.setItem('verifyMode', 'register');
         sessionStorage.setItem('emailParaVerificar', this.correo);
-        // Guardar expiración del código: 5 minutos desde ahora
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
 
         setTimeout(() => {
-          this.cargando = false;
+          this.unlockScroll();
           this.router.navigate(['/verify']);
         }, 2000);
       },
       error: (err) => {
-        // Error: quitar overlay y mostrar mensaje
         this.cargando = false;
+        this.unlockScroll();
         this.exito = false;
         this.Mensajes = err.error?.message || 'Error al registrar.';
       }
@@ -402,10 +420,9 @@ export class RegistroComponent implements OnInit {
 
   // Permitir solo dígitos en el campo documento
   onlyDigits(event: Event) {
-    const el = event.target as HTMLInputElement;
-    const clean = (el.value || '').replace(/\D+/g, '');
-    el.value = clean;
-    this.idDocumento = clean;
+    const input = event.target as HTMLInputElement;
+    input.value = input.value.replace(/\D/g, '');
+    this.idDocumento = input.value;
   }
 
   ngAfterViewInit(): void {
@@ -416,25 +433,33 @@ export class RegistroComponent implements OnInit {
 
   // Reenviar código desde banner (para usuarios que vuelven tras expiración)
   reenviarDesdeBanner() {
-    if (!this.correo) return;
+    if (!this.correo) {
+      alert('No hay un correo registrado');
+      return;
+    }
     this.cargando = true;
+    this.lockScroll();
     this.api.reenviarCodigo(this.correo).subscribe({
       next: () => {
         this.cargando = false;
-        this.exito = true;
-        this.Mensajes = 'Se envió un nuevo código a tu correo. Ahora puedes ir a verificar tu cuenta.';
+        this.unlockScroll();
+        this.showExpiredBanner = false;
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
-        sessionStorage.setItem('verifyMode', 'register');
-        sessionStorage.setItem('emailParaVerificar', this.correo);
-        // Mantener el banner visible pero actualizar el mensaje
-        // El usuario puede cerrar el modal y ver el banner actualizado
+        this.router.navigate(['/verify']);
       },
-      error: (err) => {
+      error: () => {
         this.cargando = false;
-        this.exito = false;
-        this.Mensajes = err.error?.message || 'No se pudo reenviar el código.';
+        this.unlockScroll();
+        alert('No se pudo reenviar el código');
       }
     });
+  }
+
+  private lockScroll() { document.body.style.overflow = 'hidden'; }
+  private unlockScroll() { document.body.style.overflow = ''; }
+
+  ngOnDestroy(): void {
+    this.unlockScroll();
   }
 }

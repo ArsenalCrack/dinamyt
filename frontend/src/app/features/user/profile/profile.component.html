@@ -3,6 +3,11 @@
     <i class="fas fa-arrow-left fa-2x"></i>
   </a>
 
+  <div *ngIf="saving" class="loading-overlay">
+    <i class="fas fa-spinner fa-spin spinner-icon"></i>
+    <p class="loading-text">Guardando cambios...</p>
+  </div>
+
   <h2>Mi Perfil</h2>
 
   <div class="avatar-row">
@@ -35,19 +40,51 @@
       </div>
       <div class="field editable">
         <label>Teléfono</label>
-        <input type="text" [(ngModel)]="user.numeroCelular" name="numeroCelular" />
+        <input type="tel" [(ngModel)]="user.numero_celular" name="numero_celular" inputmode="tel" />
       </div>
       <div class="field editable">
         <label>Cinturón/Rango</label>
-        <input type="text" [(ngModel)]="user.cinturonRango" name="cinturonRango" />
+        <app-custom-select
+          name="cinturon_rango"
+          [(ngModel)]="user.cinturon_rango"
+          [options]="cinturones"
+          placeholder="Selecciona tu cinturón">
+        </app-custom-select>
+        <p *ngIf="!user.cinturon_rango" class="no-seleccionado">No seleccionado</p>
       </div>
       <div class="field editable">
         <label>Academia</label>
-        <input type="text" [(ngModel)]="user.academia" name="academia" />
+        <app-custom-select
+          name="academia"
+          [(ngModel)]="user.academia"
+          [options]="academias.concat([{ value: 'otra', label: 'Otra' }])"
+          placeholder="Selecciona tu academia">
+        </app-custom-select>
+        <input
+          *ngIf="user.academia === 'otra'"
+          type="text"
+          name="academiaOtra"
+          [(ngModel)]="academiaOtra"
+          placeholder="Especifica tu academia"
+          class="input-condicional">
+        <p *ngIf="!user.academia" class="no-seleccionado">No seleccionado</p>
       </div>
       <div class="field editable">
         <label>Instructor</label>
-        <input type="text" [(ngModel)]="user.instructor" name="instructor" />
+        <app-custom-select
+          name="Instructor"
+          [(ngModel)]="user.Instructor"
+          [options]="instructores.concat([{ value: 'otro', label: 'Otro' }])"
+          placeholder="Selecciona tu instructor">
+        </app-custom-select>
+        <input
+          *ngIf="user.Instructor === 'otro'"
+          type="text"
+          name="instructorOtro"
+          [(ngModel)]="instructorOtro"
+          placeholder="Especifica tu instructor"
+          class="input-condicional">
+        <p *ngIf="!user.Instructor" class="no-seleccionado">No seleccionado</p>
       </div>
     </div>
 

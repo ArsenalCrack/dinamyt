@@ -1,5 +1,5 @@
 <div class="custom-select" [class.open]="isOpen" tabindex="0" (click)="toggle()" (keydown)="onKeydown($event)">
-  <div class="selected">{{ getLabel() || placeholder }}</div>
+  <div class="selected" [class.has-value]="value && value !== ''">{{ getLabel() || placeholder }}</div>
   <div class="arrow" aria-hidden="true"></div>
   <ul class="options" *ngIf="isOpen" role="listbox" [ngStyle]="optionsStyle">
     <li *ngFor="let opt of options; let i = index"

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -12,7 +12,7 @@ import { ApiService } from '../../../core/services/api.service';
   templateUrl: './change-password.component.html',
   styleUrls: ['./change-password.component.scss']
 })
-export class ChangePasswordComponent {
+export class ChangePasswordComponent implements OnDestroy {
   actual = '';
   nueva = '';
   confirmar = '';
@@ -30,6 +30,9 @@ export class ChangePasswordComponent {
     this.location.back();
   }
 
+  private lockScroll() { document.body.style.overflow = 'hidden'; }
+  private unlockScroll() { document.body.style.overflow = ''; }
+
   submit() {
     this.mensaje = null;
     if (!this.nueva || this.nueva.length < 8) {
@@ -41,12 +44,16 @@ export class ChangePasswordComponent {
       return;
     }
     this.cargando = true;
+    this.lockScroll();
     const payload: any = { contrasenaActual: this.actual, nuevaContrasena: this.nueva };
     this.api.cambiarPassword(payload).subscribe({
       next: () => {
         this.exito = true;
         this.mensaje = 'Contraseña actualizada correctamente.';
-        setTimeout(() => this.router.navigate(['/perfil']), 1200);
+        setTimeout(() => {
+          this.unlockScroll();
+          this.router.navigate(['/perfil']);
+        }, 1200);
       },
       error: (err) => {
         this.exito = false;
@@ -61,7 +68,12 @@ export class ChangePasswordComponent {
           this.mensaje = err?.error?.message || 'No se pudo cambiar la contraseña.';
         }
         this.cargando = false;
+        this.unlockScroll();
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.unlockScroll();
   }
 }
