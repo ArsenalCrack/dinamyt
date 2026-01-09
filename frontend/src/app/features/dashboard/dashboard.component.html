@@ -55,15 +55,6 @@
       <a routerLink="/CrearCampeonato" class="btn-action">Crear ahora</a>
     </div>
 
-    <div class="action-card outlined">
-      <div class="card-icon">
-        <i class="fas fa-search"></i>
-      </div>
-      <h3>Explorar Campeonatos</h3>
-      <p>Busca campeonatos activos creados por otros usuarios e inscríbete.</p>
-      <a routerLink="/campeonatos" class="btn-action">Ver Campeonatos</a>
-    </div>
-
     <div class="action-card" *ngIf="hasMyChampionships">
       <div class="card-icon">
         <i class="fas fa-user-tie"></i>
@@ -77,8 +68,7 @@
 
   <!-- Separador visual -->
   <div class="section-divider">
-    <hr>
-    <h2 class="section-title">Otras Opciones</h2>
+    <hr aria-label="Opciones de seguridad y ayuda">
   </div>
 
   <!-- Accesos seguros (rutas existentes en Angular) -->
