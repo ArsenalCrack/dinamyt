@@ -41,7 +41,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
         sessionStorage.setItem('nombreC', this.usuario.nombreC);
       }
     }
-    
+
     this.auth.isLoggedIn$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(isLoggedIn => {
@@ -118,19 +118,19 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.closeDropdown();
     this.loggingOut = true;
     this.lockScroll();
-    
+
     // Limpiar datos inmediatamente
     sessionStorage.clear();
     localStorage.removeItem('usuario');
-    
+
     // Actualizar estado local inmediatamente
     this.username = null;
     this.isLoggedIn = false;
     this.usuario = null;
-    
+
     // Notificar al AuthService inmediatamente
     this.auth.setLoggedIn(false, null);
-    
+
     // Navegar después de 500ms (solo para mostrar overlay)
     setTimeout(() => {
       this.loggingOut = false;
