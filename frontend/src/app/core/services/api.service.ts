@@ -18,10 +18,10 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/me`, user);
   }
 
-
   login(credentials: { correo: string; contrasena: string }) {
     return this.http.post(`${this.apiUrl}/login`, credentials);
   }
+
   registrarUsuario(usuario: any) {
   return this.http.post(`${this.apiUrl}/registro`,usuario);
   }
@@ -43,7 +43,7 @@ export class ApiService {
 
   cambiarPassword(data: any) {
   return this.http.post(`${this.apiUrl}/cambiar-password`, data);
-}
+  }
 
   // Actualizar datos de perfil (parcial)
   updateProfile(data: any) {
@@ -56,5 +56,13 @@ export class ApiService {
     const form = new FormData();
     form.append('foto', file);
     return this.http.post(`${this.apiUrl}/perfil/foto`, form);
+  }
+
+  cargaracademias(): Observable<any[]>{
+    return this.http.get<any[]>(`${this.apiUrl}/academias`);
+  }
+
+  cargarinstructor(academia : any): Observable<any[]>{
+    return this.http.post<any[]>(`${this.apiUrl}/instructores`, academia);
   }
 }

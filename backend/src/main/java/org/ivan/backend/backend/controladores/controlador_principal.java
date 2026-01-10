@@ -1,7 +1,9 @@
 //echo por Andres Gonzalez 1077294332
 package org.ivan.backend.backend.controladores;
+import org.ivan.backend.backend.BD_tablas.Academia;
 import org.ivan.backend.backend.EmailService;
 import org.ivan.backend.backend.BD_tablas.Usuario;
+import org.ivan.backend.backend.repositorios.AcademiaRepository;
 import org.ivan.backend.backend.repositorios.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -19,10 +22,12 @@ public class controlador_principal {
     private EmailService emailService;
 
     private final UsuarioRepository usuarioRepository;
+    private final AcademiaRepository academiaRepository;
     private final Map<String, Usuario> usuariosPendientes = new HashMap<>();
 
-    public controlador_principal(UsuarioRepository usuarioRepository) {
+    public controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository) {
         this.usuarioRepository = usuarioRepository;
+        this.academiaRepository = academiaRepository;
     }
 
     private String GenerarCodigo() {
@@ -66,6 +71,7 @@ public class controlador_principal {
                 usuarioRepository.save(pendiente1);
                 usuariosPendientes.remove(datos.getCorreo());
             }
+            usuariosPendientes.remove(datos.getCorreo());
             return ResponseEntity.ok(Map.of("message", "correcto"));
         }
         return ResponseEntity.badRequest().body(Map.of("message", "El codigo no coincide"));
@@ -87,7 +93,6 @@ public class controlador_principal {
             pendiente3.setCodigo(GenerarCodigo());
             pendiente3.setFechaCodigo(LocalDateTime.now());
             emailService.enviarCodigo(pendiente3.getCorreo(), pendiente3.getCodigo());
-            usuariosPendientes.remove(correo.getCorreo());
             return ResponseEntity.ok(Map.of("message", "Correo verificado"));
         }else{
             return ResponseEntity.badRequest().body(Map.of("message", "Correo no registrado"));
@@ -119,11 +124,8 @@ public class controlador_principal {
     }
     @PostMapping("/login")
     private ResponseEntity<?> login(@RequestBody Usuario respuesta){
-        System.out.println(respuesta.getCorreo());
-        System.out.println(respuesta.getContrasena());
         if (usuarioRepository.existsByCorreo(respuesta.getCorreo())) {
-            usuariosPendientes.put(respuesta.getCorreo(), usuarioRepository.findByCorreo((respuesta.getCorreo())));
-            Usuario pendiente3 = usuariosPendientes.get(respuesta.getCorreo());
+            Usuario pendiente3 = usuarioRepository.findByCorreo((respuesta.getCorreo()));
             if (pendiente3.getContrasena().equals(respuesta.getContrasena())){
                 usuariosPendientes.remove(respuesta.getCorreo());
                 return ResponseEntity.ok(pendiente3);
@@ -139,6 +141,14 @@ public class controlador_principal {
         System.out.println("a"+respuesta);
         if (respuesta!=null) {
             return ResponseEntity.ok(respuesta);
+        }
+        return ResponseEntity.badRequest().body(Map.of("message", "Error"));
+    }
+    @GetMapping("/academias")
+    private ResponseEntity<?> academiass(){
+        List<Academia> academias = academiaRepository.findAll();
+        if (academias!=null){
+            return ResponseEntity.ok(academias);
         }
         return ResponseEntity.badRequest().body(Map.of("message", "Error"));
     }

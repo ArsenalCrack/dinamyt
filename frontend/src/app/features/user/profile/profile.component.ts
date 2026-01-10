@@ -61,27 +61,22 @@ export class ProfileComponent implements OnDestroy {
   }
 
   cargarAcademias() {
-    // TODO: Implementar cuando se agregue el endpoint en el backend
-    // Por ahora, academias está vacío. Se llenará desde la API
-    this.academias = [];
-    // Ejemplo cuando esté lista la API:
-    // this.api.getAcademias().subscribe({
-    //   next: (data: any[]) => {
-    //     this.academias = data.map(a => ({ value: a.nombre, label: a.nombre }));
-    //   }
-    // });
+    this.api.cargaracademias().subscribe({
+      next: (u: any[]) => {
+        this.academias = u.map(a => ({value: a.id?.toString() ?? null,label: a.nombre}));
+      },
+      error: (err) => {
+        console.log(err);
+      }
+    })
+
+
   }
 
   cargarInstructores() {
-    // TODO: Implementar cuando se agregue el endpoint en el backend
-    // Por ahora, instructores está vacío. Se llenará desde la API
+
     this.instructores = [];
-    // Ejemplo cuando esté lista la API:
-    // this.api.getInstructores().subscribe({
-    //   next: (data: any[]) => {
-    //     this.instructores = data.map(i => ({ value: i.nombre, label: i.nombre }));
-    //   }
-    // });
+
   }
 
   // Opciones con valores nulos para UX consistente

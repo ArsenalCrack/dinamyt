@@ -39,14 +39,19 @@ public class Usuario {
     @Column(name = "numero_celular", length = 30)
     private String numeroCelular;
 
-    @Column(name = "TipoUsuario")
-    private Integer tipousuario;
+    //relaciones con las tablas
+    @ManyToOne
+    @JoinColumn(name = "Instructor", referencedColumnName = "ID_documento")
+    private Usuario Instructor;
 
-    @Column(name = "Instructor")
-    private Integer Instructor;
+    @ManyToOne
+    @JoinColumn(name = "academia", referencedColumnName = "ID_academia")
+    private Academia academia;
 
-    @Column(name = "academia")
-    private Integer academia;
+    @ManyToOne
+    @JoinColumn(name = "TipoUsuario", referencedColumnName = "ID_Tipo")
+    private Tipousuario tipousuario;
+
 
     // ===== CAMPOS TRANSIENTES =====
     @Transient
@@ -57,53 +62,29 @@ public class Usuario {
 
     @Transient
     private String modo;
-
-    @Transient
-    private String nombreInstructor;
-
-    @Transient
-    private String nombreacademia;
-
     // ===== GETTERS & SETTERS =====
 
-
-    public String getNombreInstructor() {
-        return nombreInstructor;
-    }
-
-    public void setNombreInstructor(String nombreInstructor) {
-        this.nombreInstructor = nombreInstructor;
-    }
-
-    public String getNombreacademia() {
-        return nombreacademia;
-    }
-
-    public void setNombreacademia(String nombreacademia) {
-        this.nombreacademia = nombreacademia;
-    }
-
-    public Integer getTipousuario() {
+    public Tipousuario getTipousuario() {
         return tipousuario;
     }
 
-    public void setTipousuario(Integer tipousuario) {
+    public void setTipousuario(Tipousuario tipousuario) {
         this.tipousuario = tipousuario;
     }
 
-    public Integer getInstructor() {
+    public Usuario getInstructor() {
         return Instructor;
     }
 
-    public void setInstructor(Integer instructor) {
+    public void setInstructor(Usuario instructor) {
         Instructor = instructor;
     }
 
-    public Integer getAcademia() {
+    public Academia getAcademia() {
         return academia;
     }
 
-    public void setAcademia(Integer academia) {
+    public void setAcademia(Academia academia) {
         this.academia = academia;
     }
 
