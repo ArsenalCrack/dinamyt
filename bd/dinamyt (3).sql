@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 09-01-2026 a las 02:48:40
+-- Tiempo de generación: 10-01-2026 a las 01:44:26
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.0.30
 
@@ -76,7 +76,6 @@ CREATE TABLE `usuario` (
   `Correo` varchar(120) DEFAULT NULL,
   `Contraseña` varchar(255) DEFAULT NULL,
   `numero_celular` varchar(30) DEFAULT NULL,
-  `TipoUsuario` int(11) DEFAULT NULL,
   `Instructor` bigint(20) DEFAULT NULL,
   `academia` int(11) DEFAULT NULL,
   `tipo_usuario` int(11) DEFAULT NULL
@@ -86,9 +85,8 @@ CREATE TABLE `usuario` (
 -- Volcado de datos para la tabla `usuario`
 --
 
-INSERT INTO `usuario` (`ID_documento`, `nombreC`, `sexo`, `fecha_nacimiento`, `cinturon_rango`, `Nacionalidad`, `Correo`, `Contraseña`, `numero_celular`, `TipoUsuario`, `Instructor`, `academia`, `tipo_usuario`) VALUES
-(123456, 'andres', 'masculino', '2026-01-13', 'negro', 'colombia', 'andresivan0807@gmail.com', 'andres@2', '3243100882', 1, 1077294332, 12, NULL),
-(1077294332, 'ivan', 'Masculino', '2026-01-01', 'negro', 'colombia', 'andresivan08@gmail.com', '2', '3243100882', 2, NULL, NULL, NULL);
+INSERT INTO `usuario` (`ID_documento`, `nombreC`, `sexo`, `fecha_nacimiento`, `cinturon_rango`, `Nacionalidad`, `Correo`, `Contraseña`, `numero_celular`, `Instructor`, `academia`, `tipo_usuario`) VALUES
+(123456, 'Andres Gonzalez', 'Masculino', '2019-04-04', 'Blanco', 'Colombia', 'andresivan0807@gmail.com', 'yicell@040712', NULL, NULL, NULL, NULL);
 
 --
 -- Índices para tablas volcadas
@@ -112,11 +110,9 @@ ALTER TABLE `tipo_usuario`
 ALTER TABLE `usuario`
   ADD PRIMARY KEY (`ID_documento`),
   ADD UNIQUE KEY `academia` (`academia`),
-  ADD UNIQUE KEY `TipoUsuario` (`TipoUsuario`),
   ADD KEY `idx_instructor` (`Instructor`),
-  ADD KEY `idx_tipo_usuario` (`TipoUsuario`),
   ADD KEY `idx_academia` (`academia`),
-  ADD KEY `TipoUsuario_2` (`TipoUsuario`);
+  ADD KEY `fk_usuario_tipo` (`tipo_usuario`);
 
 --
 -- Restricciones para tablas volcadas
@@ -128,7 +124,7 @@ ALTER TABLE `usuario`
 ALTER TABLE `usuario`
   ADD CONSTRAINT `fk_usuario_academia` FOREIGN KEY (`academia`) REFERENCES `academia` (`ID_academia`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_usuario_instructor` FOREIGN KEY (`Instructor`) REFERENCES `usuario` (`ID_documento`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_usuario_tipo` FOREIGN KEY (`TipoUsuario`) REFERENCES `tipo_usuario` (`ID_Tipo`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_usuario_tipo` FOREIGN KEY (`tipo_usuario`) REFERENCES `tipo_usuario` (`ID_Tipo`) ON DELETE SET NULL ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
