@@ -45,7 +45,12 @@ export class ChangePasswordComponent implements OnDestroy {
     }
     this.cargando = true;
     this.lockScroll();
-    const payload: any = { contrasenaActual: this.actual, nuevaContrasena: this.nueva };
+    const payload: any = { 
+      correo: sessionStorage.getItem("correo"),
+      contrasena: this.actual, 
+      codigo: this.nueva,//nueva contraseña toca acomodarlo asi para que llegue xd
+      modo: "cambiar"
+    };
     this.api.cambiarPassword(payload).subscribe({
       next: () => {
         this.exito = true;

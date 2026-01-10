@@ -73,6 +73,7 @@ export class LoginComponent implements OnDestroy {
 
           // Guardar otros datos del usuario si están disponibles
           if (user?.idDocumento) sessionStorage.setItem('idDocumento', user.idDocumento);
+          if (user?.correo) sessionStorage.setItem('correo', user.correo);
           if (user?.sexo) sessionStorage.setItem('sexo', user.sexo);
           if (user?.fechaNacimiento) sessionStorage.setItem('fechaNacimiento', user.fechaNacimiento);
           if (user?.cinturonRango) sessionStorage.setItem('cinturonRango', user.cinturonRango);

@@ -57,7 +57,8 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
 
     const payload = {
       correo: this.correo,
-      contrasena: this.contrasena // Enviamos 'contrasena' al backend
+      contrasena: this.contrasena, // Enviamos 'contrasena' al backend
+      modo: "recuperar"
     };
 
     this.api.cambiarPassword(payload).subscribe({

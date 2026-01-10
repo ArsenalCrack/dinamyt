@@ -379,8 +379,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
       instructor: this.instructor === 'otro' ? this.instructorOtro?.trim() : this.instructor?.trim() || undefined,
       telefonoOpcional: this.telefonoOpcional?.trim() || undefined,
       // Enviamos con ambos nombres para compatibilidad con la BD
-      cinturon_rango: this.cinturon_rango,
-      cinturon: this.cinturon_rango,
+      cinturonRango: this.cinturon_rango,
       fechaNacimiento: this.fechaNacimiento,
       correo: this.correo,
       contrasena: this.contrasena

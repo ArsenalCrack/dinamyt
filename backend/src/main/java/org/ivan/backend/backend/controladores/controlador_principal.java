@@ -87,6 +87,7 @@ public class controlador_principal {
             pendiente3.setCodigo(GenerarCodigo());
             pendiente3.setFechaCodigo(LocalDateTime.now());
             emailService.enviarCodigo(pendiente3.getCorreo(), pendiente3.getCodigo());
+            usuariosPendientes.remove(correo.getCorreo());
             return ResponseEntity.ok(Map.of("message", "Correo verificado"));
         }else{
             return ResponseEntity.badRequest().body(Map.of("message", "❌ Correo no registrado"));
@@ -94,15 +95,27 @@ public class controlador_principal {
     }
     @PostMapping("/cambiar-password")
     private ResponseEntity<?> CambiarContraseña(@RequestBody Usuario datos){
-        Usuario pendiente4 = usuariosPendientes.get(datos.getCorreo());
+        System.out.println("a: "+datos.getCorreo());
+        Usuario pendiente4 = usuarioRepository.findByCorreo((datos.getCorreo()));
         if (pendiente4!=null){
-            pendiente4.setContrasena(datos.getContrasena());
-            usuarioRepository.save(pendiente4);
-            usuariosPendientes.remove(datos.getCorreo());
-            return ResponseEntity.ok(Map.of("message", "Contraseña Actualizada"));
+            System.out.println("a");
+            if (datos.getModo().equals("recuperar")){
+                pendiente4.setContrasena(datos.getContrasena());
+                usuarioRepository.save(pendiente4);
+                usuariosPendientes.remove(datos.getCorreo());
+                return ResponseEntity.ok(Map.of("message", "Contraseña Actualizada"));
+            }if (datos.getModo().equals("cambiar")){
+               if (pendiente4.getContrasena().equals(datos.getContrasena())){
+                    pendiente4.setContrasena(datos.getCodigo());
+                    usuarioRepository.save(pendiente4);
+                    return ResponseEntity.ok(Map.of("message", "Contraseña Actualizada"));
+                }
+            }
+
         }else{
-            return ResponseEntity.badRequest().body(Map.of("message", "Error"));
+            return ResponseEntity.badRequest().body(Map.of("message", "usuario no encontrado"));
         }
+        return ResponseEntity.badRequest().body(Map.of("message", "Contraseña actual incorrecta"));
     }
     @PostMapping("/login")
     private ResponseEntity<?> login(@RequestBody Usuario respuesta){
@@ -112,11 +125,14 @@ public class controlador_principal {
             usuariosPendientes.put(respuesta.getCorreo(), usuarioRepository.findByCorreo((respuesta.getCorreo())));
             Usuario pendiente3 = usuariosPendientes.get(respuesta.getCorreo());
             if (pendiente3.getContrasena().equals(respuesta.getContrasena())){
+                usuariosPendientes.remove(respuesta.getCorreo());
                 return ResponseEntity.ok(pendiente3);
 
+            }else{
+                return ResponseEntity.badRequest().body(Map.of("message", "Contraseña incorrecta"));
             }
         }
-        return ResponseEntity.badRequest().body(Map.of("message", "Error"));
+        return ResponseEntity.badRequest().body(Map.of("message", "El correo no se encuentra registrado"));
     }
     @PostMapping("/me")
     private ResponseEntity<?> me(@RequestBody Usuario respuesta){
