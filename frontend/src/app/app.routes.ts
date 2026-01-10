@@ -33,6 +33,11 @@ export const routes: Routes = [
     path: 'campeonatos',
     loadComponent: () => import('./features/user/explore-championships/explore-championships.component').then(m => m.ExploreChampionshipsComponent)
   },
+  {
+    path: 'campeonatos/crear',
+    loadComponent: () => import('./features/championship/create-championship/create-championship.component').then(m => m.CreateChampionshipComponent),
+    canActivate: [authGuard]
+  },
 
 
   {

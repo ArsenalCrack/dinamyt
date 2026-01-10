@@ -71,6 +71,20 @@
   .date-selects .custom-select .selected { font-size:0.92rem; padding:8px 10px; white-space:nowrap; text-overflow:ellipsis; overflow:hidden }
 }
 
+/* Mensaje de advertencia (límite de caracteres) */
+.msg-warning {
+	color: #b71c1c;
+	font-size: 0.85rem;
+	margin-top: 4px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.msg-warning small {
+	font-weight: 600;
+}
+
 /* Overlay de carga centrado en viewport */
 .loading-overlay {
 	position: fixed;

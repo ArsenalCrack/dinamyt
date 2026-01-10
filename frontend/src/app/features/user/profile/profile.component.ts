@@ -20,17 +20,18 @@ export class ProfileComponent implements OnDestroy {
     idDocumento: sessionStorage.getItem('idDocumento') || '',
     sexo: sessionStorage.getItem('sexo') || '',
     fechaNacimiento: sessionStorage.getItem('fechaNacimiento') || '',
-    cinturon_rango: sessionStorage.getItem('cinturon_rango') || '',
+    cinturon_rango: sessionStorage.getItem('cinturon_rango') ?? sessionStorage.getItem('cinturonRango') ?? null,
     nacionalidad: sessionStorage.getItem('nacionalidad') || '',
-    numero_celular: sessionStorage.getItem('numero_celular') || '',
+    numero_celular: (sessionStorage.getItem('numero_celular') ?? sessionStorage.getItem('numeroCelular')) || '',
     academia: sessionStorage.getItem('academia') || '',
-    Instructor: sessionStorage.getItem('Instructor') || ''
+    Instructor: (sessionStorage.getItem('Instructor') ?? sessionStorage.getItem('instructor')) || ''
   };
 
   // Opciones para dropdowns
-  academias: Array<{ value: string; label: string }> = [];
-  instructores: Array<{ value: string; label: string }> = [];
-  cinturones: Array<{ value: string; label: string }> = [
+  academias: Array<{ value: string | null; label: string }> = [];
+  instructores: Array<{ value: string | null; label: string }> = [];
+  cinturones: Array<{ value: string | null; label: string }> = [
+    { value: null, label: 'Sin cinturón' },
     { value: 'Blanco', label: 'Blanco' },
     { value: 'Amarillo', label: 'Amarillo' },
     { value: 'Naranja', label: 'Naranja' },
@@ -83,6 +84,15 @@ export class ProfileComponent implements OnDestroy {
     // });
   }
 
+  // Opciones con valores nulos para UX consistente
+  get academiaOptions(): Array<{ value: string | null; label: string }> {
+    return [{ value: null, label: 'Sin academia' }, ...this.academias, { value: 'otra', label: 'Otra' }];
+  }
+
+  get instructorOptions(): Array<{ value: string | null; label: string }> {
+    return [{ value: null, label: 'Independiente' }, ...this.instructores, { value: 'otro', label: 'Otro' }];
+  }
+
   goBack(): void {
     this.location.back();
   }
@@ -95,6 +105,8 @@ export class ProfileComponent implements OnDestroy {
       const reader = new FileReader();
       reader.onload = () => this.fotoPreview = String(reader.result || '');
       reader.readAsDataURL(file);
+      // Subir foto automáticamente
+      this.uploadPhoto();
     }
   }
 
@@ -130,21 +142,56 @@ export class ProfileComponent implements OnDestroy {
     this.message = null;
     this.saving = true;
     this.lockScroll();
+    const cinturonValue = this.user.cinturon_rango === null ? null : this.user.cinturon_rango?.trim() || null;
+    const academiaValue = this.user.academia === 'otra'
+      ? (this.academiaOtra?.trim() || null)
+      : (this.user.academia?.trim() || null);
+    const instructorValue = this.user.Instructor === 'otro'
+      ? (this.instructorOtro?.trim() || null)
+      : (this.user.Instructor?.trim() || null);
+
     const payload: any = {
       correo: this.user.correo?.trim(),
       numero_celular: this.user.numero_celular?.trim(),
-      cinturon_rango: this.user.cinturon_rango?.trim(),
-      academia: this.user.academia === 'otra' ? this.academiaOtra?.trim() : this.user.academia?.trim(),
-      Instructor: this.user.Instructor === 'otro' ? this.instructorOtro?.trim() : this.user.Instructor?.trim()
+      cinturon_rango: cinturonValue,
+      academia: academiaValue,
+      Instructor: instructorValue
     };
     this.api.updateProfile(payload).subscribe({
       next: (u: any) => {
         // Persistir en sessionStorage si el backend devuelve los valores actualizados
         if (payload.correo) sessionStorage.setItem('correo', payload.correo);
-        if (payload.numero_celular) sessionStorage.setItem('numero_celular', payload.numero_celular);
-        if (payload.cinturon_rango) sessionStorage.setItem('cinturon_rango', payload.cinturon_rango);
-        if (payload.academia) sessionStorage.setItem('academia', payload.academia);
-        if (payload.Instructor) sessionStorage.setItem('Instructor', payload.Instructor);
+        if (payload.numero_celular !== undefined) {
+          if (!payload.numero_celular) {
+            sessionStorage.removeItem('numero_celular');
+            sessionStorage.removeItem('numeroCelular');
+          } else {
+            sessionStorage.setItem('numero_celular', payload.numero_celular);
+            sessionStorage.setItem('numeroCelular', payload.numero_celular);
+          }
+        }
+        if (payload.cinturon_rango !== undefined) {
+          if (payload.cinturon_rango === null) {
+            sessionStorage.removeItem('cinturon_rango');
+            sessionStorage.removeItem('cinturonRango');
+          } else {
+            sessionStorage.setItem('cinturon_rango', payload.cinturon_rango);
+            sessionStorage.setItem('cinturonRango', payload.cinturon_rango);
+          }
+        }
+        if (payload.academia !== undefined) {
+          if (!payload.academia) sessionStorage.removeItem('academia');
+          else sessionStorage.setItem('academia', payload.academia);
+        }
+        if (payload.Instructor !== undefined) {
+          if (!payload.Instructor) {
+            sessionStorage.removeItem('Instructor');
+            sessionStorage.removeItem('instructor');
+          } else {
+            sessionStorage.setItem('Instructor', payload.Instructor);
+            sessionStorage.setItem('instructor', payload.Instructor);
+          }
+        }
         this.success = true;
         this.message = 'Perfil actualizado.';
         this.saving = false;

@@ -39,7 +39,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
   nombreC!: string;
   sexo: string = '';
   nacionalidad: string = '';
-  cinturon_rango: string = '';
+  cinturon_rango: string | null = '';
   fechaNacimiento!: string;
   correo!: string;
   contrasena!: string;
@@ -51,7 +51,8 @@ export class RegistroComponent implements OnInit, OnDestroy {
   telefonoOpcional: string = '';
 
   // Opciones para dropdowns
-  cinturones: Array<{ value: string; label: string }> = [
+  cinturones: Array<{ value: string | null; label: string }> = [
+    { value: null, label: 'Sin cinturón' },
     { value: 'Blanco', label: 'Blanco' },
     { value: 'Amarillo', label: 'Amarillo' },
     { value: 'Naranja', label: 'Naranja' },
@@ -81,6 +82,10 @@ export class RegistroComponent implements OnInit, OnDestroy {
   fechaMinimaPermitida!: string;
   fechaErrorMsg: string = '';
   showExpiredBanner = false;
+  nombresMaxLength = 40;
+  apellidosMaxLength = 40;
+  nombresLimitMsg: string = '';
+  apellidosLimitMsg: string = '';
   @ViewChild('bannerResendBtn') bannerResendBtn?: ElementRef<HTMLButtonElement>;
 
   volverAtras() {
@@ -89,6 +94,46 @@ export class RegistroComponent implements OnInit, OnDestroy {
 
   closeMensaje() {
     this.Mensajes = '';
+  }
+
+  onDocumentoInput(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const soloNumeros = (target.value || '').replace(/\D+/g, '');
+    target.value = soloNumeros;
+    this.idDocumento = soloNumeros;
+  }
+
+  onNombreInput(field: 'nombres' | 'apellidos', event: Event) {
+    const target = event.target as HTMLInputElement;
+    const maxLength = field === 'nombres' ? this.nombresMaxLength : this.apellidosMaxLength;
+    let value = target.value;
+
+    // Actualizar el modelo
+    if (field === 'nombres') {
+      this.nombres = value;
+      // Mostrar mensaje si se alcanzó el límite
+      if (value.length === maxLength) {
+        this.nombresLimitMsg = `Has alcanzado el límite máximo de ${maxLength} caracteres.`;
+      } else if (value.length > maxLength - 10) {
+        // Mostrar advertencia cuando falten pocos caracteres
+        const remaining = maxLength - value.length;
+        this.nombresLimitMsg = `Te quedan ${remaining} caracteres disponibles.`;
+      } else {
+        this.nombresLimitMsg = '';
+      }
+    } else {
+      this.apellidos = value;
+      // Mostrar mensaje si se alcanzó el límite
+      if (value.length === maxLength) {
+        this.apellidosLimitMsg = `Has alcanzado el límite máximo de ${maxLength} caracteres.`;
+      } else if (value.length > maxLength - 10) {
+        // Mostrar advertencia cuando falten pocos caracteres
+        const remaining = maxLength - value.length;
+        this.apellidosLimitMsg = `Te quedan ${remaining} caracteres disponibles.`;
+      } else {
+        this.apellidosLimitMsg = '';
+      }
+    }
   }
 
 
@@ -360,11 +405,21 @@ export class RegistroComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Combinar nombres y apellidos en nombreC
-    this.nombreC = `${this.nombres?.trim()} ${this.apellidos?.trim()}`.trim();
+    // Normalizar nombres/apellidos y validar longitud total (varchar(150))
+    const nombresClean = (this.nombres || '').trim().replace(/\s+/g, ' ');
+    const apellidosClean = (this.apellidos || '').trim().replace(/\s+/g, ' ');
+    this.nombres = nombresClean;
+    this.apellidos = apellidosClean;
+    this.nombreC = `${nombresClean} ${apellidosClean}`.trim().replace(/\s+/g, ' ');
 
-    // VALIDACIÓN: Verificar que cinturon_rango esté seleccionado
-    if (!this.cinturon_rango || this.cinturon_rango === '') {
+    if (this.nombreC.length > 150) {
+      this.Mensajes = 'El nombre completo supera los 150 caracteres permitidos. Ajusta nombres o apellidos.';
+      this.exito = false;
+      return;
+    }
+
+    // VALIDACIÓN: Verificar que cinturon_rango esté seleccionado (permitir "Sin cinturón" como null)
+    if (this.cinturon_rango === '' || this.cinturon_rango === undefined) {
       this.Mensajes = "Debes seleccionar un cinturón.";
       this.exito = false;
       return;
@@ -379,7 +434,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
       instructor: this.instructor === 'otro' ? this.instructorOtro?.trim() : this.instructor?.trim() || undefined,
       telefonoOpcional: this.telefonoOpcional?.trim() || undefined,
       // Enviamos con ambos nombres para compatibilidad con la BD
-      cinturonRango: this.cinturon_rango,
+      cinturonRango: this.cinturon_rango === '' ? null : this.cinturon_rango,
       fechaNacimiento: this.fechaNacimiento,
       correo: this.correo,
       contrasena: this.contrasena

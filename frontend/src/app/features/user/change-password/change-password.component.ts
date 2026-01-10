@@ -30,6 +30,10 @@ export class ChangePasswordComponent implements OnDestroy {
     this.location.back();
   }
 
+  closeMensaje(): void {
+    this.mensaje = null;
+  }
+
   private lockScroll() { document.body.style.overflow = 'hidden'; }
   private unlockScroll() { document.body.style.overflow = ''; }
 
@@ -45,9 +49,9 @@ export class ChangePasswordComponent implements OnDestroy {
     }
     this.cargando = true;
     this.lockScroll();
-    const payload: any = { 
+    const payload: any = {
       correo: sessionStorage.getItem("correo"),
-      contrasena: this.actual, 
+      contrasena: this.actual,
       codigo: this.nueva,//nueva contraseña toca acomodarlo asi para que llegue xd
       modo: "cambiar"
     };
@@ -55,10 +59,10 @@ export class ChangePasswordComponent implements OnDestroy {
       next: () => {
         this.exito = true;
         this.mensaje = 'Contraseña actualizada correctamente.';
+        this.cargando = false;
         setTimeout(() => {
-          this.unlockScroll();
           this.router.navigate(['/perfil']);
-        }, 1200);
+        }, 2000);
       },
       error: (err) => {
         this.exito = false;

@@ -43,10 +43,10 @@ public class controlador_principal {
         String codigo =GenerarCodigo();
 
         if (usuarioRepository.existsById(usuario.getIdDocumento())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "❌ Ya existe un usuario con ese documento"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Ya existe un usuario con ese documento"));
         }
         if (usuarioRepository.existsByCorreo(usuario.getCorreo())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "❌ Ya existe un usuario con ese correo"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Ya existe un usuario con ese correo"));
         }
         emailService.enviarCodigo(usuario.getCorreo(), codigo);
         usuario.setCodigo(codigo);
@@ -59,7 +59,7 @@ public class controlador_principal {
         Usuario pendiente1 = usuariosPendientes.get(datos.getCorreo());
         if (LocalDateTime.now().isAfter(pendiente1.getFechaCodigo().plusMinutes(5))) {
             pendiente1.setCodigo("*");
-            return ResponseEntity.badRequest().body(Map.of("message", "❌ El código ha vencido"));
+            return ResponseEntity.badRequest().body(Map.of("message", "El código ha vencido"));
         }
         if (pendiente1.getCodigo().equals(datos.getCodigo())){
             if (datos.getModo().equals("register")) {
@@ -68,7 +68,7 @@ public class controlador_principal {
             }
             return ResponseEntity.ok(Map.of("message", "correcto"));
         }
-        return ResponseEntity.badRequest().body(Map.of("message", "❌ El codigo no coincide ❌"));
+        return ResponseEntity.badRequest().body(Map.of("message", "El codigo no coincide"));
     }
     @PostMapping("/reenviar")
     private ResponseEntity<?> ReenviarCodigo (@RequestBody Usuario datos){
@@ -90,7 +90,7 @@ public class controlador_principal {
             usuariosPendientes.remove(correo.getCorreo());
             return ResponseEntity.ok(Map.of("message", "Correo verificado"));
         }else{
-            return ResponseEntity.badRequest().body(Map.of("message", "❌ Correo no registrado"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Correo no registrado"));
         }
     }
     @PostMapping("/cambiar-password")

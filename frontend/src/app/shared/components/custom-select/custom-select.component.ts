@@ -103,12 +103,14 @@ export class CustomSelectComponent implements ControlValueAccessor {
       // space below and above (relative to viewport)
       const spaceBelow = vh - rect.bottom - margin;
       const spaceAbove = rect.top - margin;
-      const maxHeight = Math.max(Math.min(240, spaceBelow > 120 ? spaceBelow : spaceAbove), 120);
+      // use the larger side to keep the dropdown height consistent when it opens upward
+      const availableSpace = Math.max(spaceBelow, spaceAbove);
+      const maxHeight = Math.max(Math.min(240, availableSpace), 120);
 
-      // choose vertical placement: prefer below
+      // choose vertical placement: prefer below when space is equal or greater
       let top: number | null = null;
       let bottom: number | null = null;
-      if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+      if (spaceBelow >= spaceAbove) {
         // place below using viewport coordinates (rect.bottom is viewport-relative)
         top = rect.bottom + 8;
       } else {

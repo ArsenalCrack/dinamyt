@@ -1,0 +1,350 @@
+<div class="create-championship">
+  <div class="page-card">
+    <button class="btn-back" type="button" (click)="goBack()" aria-label="Volver">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Organizar campeonato</p>
+        <h1>Crear campeonato</h1>
+        <p class="subtitle">Define la información general y configura las modalidades con sus categorías.</p>
+      </div>
+    </header>
+
+    <form class="form-grid" (ngSubmit)="onSubmit()" novalidate>
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">General</p>
+            <h2>Datos del evento</h2>
+          </div>
+        </div>
+        <div class="card-body grid-2">
+          <label class="field">
+            <span>Nombre del campeonato *</span>
+            <input type="text" [(ngModel)]="campeonato.nombre" name="nombre" placeholder="Ej: Copa Regional 2025" maxlength="50" required>
+          </label>
+
+          <label class="field">
+            <span>Ubicación / Sede *</span>
+            <input type="text" [(ngModel)]="campeonato.ubicacion" name="ubicacion" placeholder="Ej: Coliseo Mayor" maxlength="50" required>
+          </label>
+
+          <label class="field">
+            <span>Fecha de inicio *</span>
+            <input type="date" [(ngModel)]="campeonato.fechaInicio" name="fechaInicio" [min]="minDate" required>
+          </label>
+
+          <label class="field">
+            <span>Fecha de fin *</span>
+            <input type="date" [(ngModel)]="campeonato.fechaFin" name="fechaFin" [min]="campeonato.fechaInicio || minDate" required>
+          </label>
+
+          <label class="field">
+            <span>Ámbito *</span>
+            <select [(ngModel)]="campeonato.alcance" name="alcance">
+              <option *ngFor="let opt of alcanceOptions" [value]="opt">{{ opt }}</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header collapsible" (click)="tatamisExpanded = !tatamisExpanded">
+          <div>
+            <p class="eyebrow">Logística</p>
+            <h2>Configuración de áreas</h2>
+          </div>
+          <i class="fas" [ngClass]="tatamisExpanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+        </div>
+
+        <div class="card-body" *ngIf="tatamisExpanded">
+          <label class="field">
+            <span>Número de áreas (Tatamis) *</span>
+            <p class="hint">Máximo 12 áreas. Mínimo 1 área obligatoria.</p>
+            <input
+              type="text"
+              inputmode="numeric"
+              [(ngModel)]="campeonato.numTatamis"
+              name="numTatamis"
+              (input)="onDocumentoInput($event)"
+              (blur)="limitarTatamis()"
+              min="1"
+              max="12"
+              placeholder="1">
+          </label>
+          <p class="info-text">Áreas configuradas: <strong>{{ campeonato.numTatamis }}</strong></p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Modalidades</p>
+            <h2>Configuración de categorías</h2>
+            <p class="hint">Cada modalidad puede dividirse por categorías (cinturón, edad, peso, género).</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="modalidad" *ngFor="let mod of modalidades">
+            <div class="modalidad-head" (click)="toggleModalidad(mod.id)" tabindex="0">
+              <div class="title-row">
+                <label class="switch" (click)="$event.stopPropagation()">
+                  <input type="checkbox" [(ngModel)]="mod.activa" name="{{mod.id}}-activa">
+                  <span class="slider"></span>
+                </label>
+                <h3>{{ mod.nombre }}</h3>
+              </div>
+              <i class="fas" [ngClass]="mod.expanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </div>
+
+            <div class="modalidad-body" *ngIf="mod.expanded">
+              <p class="section-label">Dividir competidores por:</p>
+
+              <!-- Cinturón -->
+              <div class="category-group">
+                <div class="category-toggle">
+                  <label class="switch">
+                    <input type="checkbox" [checked]="mod.categorias.cinturon && mod.categorias.cinturon.length > 0" name="{{mod.id}}-cinturon" (change)="mod.categorias.cinturon = $any($event.target).checked ? [{ nombre: 'Cinturón 1', activa: true, tipo: 'individual' }] : []">
+                    <span class="slider"></span>
+                  </label>
+                  <span>Cinturón / Nivel</span>
+                </div>
+
+                <div class="category-options" *ngIf="mod.categorias.cinturon && mod.categorias.cinturon.length > 0">
+                  <p class="section-hint">Añade combinaciones de cinturones individuales y/o rangos.</p>
+
+                  <!-- Inputs de categoría -->
+                  <div class="categoria-inputs">
+                    <div class="categoria-item" *ngFor="let cat of mod.categorias.cinturon; let i = index">
+                      <div class="input-row" [class.input-rango]="cat.tipo === 'rango'">
+                        <select *ngIf="cat.tipo === 'individual'"
+                          [(ngModel)]="cat.valor"
+                          name="{{mod.id}}-cinturon-valor-{{i}}"
+                          class="input-field select-field">
+                          <option value="" disabled>Selecciona una opción</option>
+                          <option *ngFor="let c of cinturones" [value]="c.value">{{ c.label }}</option>
+                        </select>
+
+                        <div *ngIf="cat.tipo === 'rango'" class="rango-inputs">
+                          <select [(ngModel)]="cat.desde"
+                            name="{{mod.id}}-cinturon-desde-{{i}}"
+                            class="input-field select-field">
+                            <option value="" disabled>Desde</option>
+                            <option *ngFor="let c of cinturones" [value]="c.value">{{ c.label }}</option>
+                          </select>
+                          <span class="rango-separator">a</span>
+                          <select [(ngModel)]="cat.hasta"
+                            name="{{mod.id}}-cinturon-hasta-{{i}}"
+                            class="input-field select-field">
+                            <option value="" disabled>Hasta</option>
+                            <option *ngFor="let c of cinturones" [value]="c.value">{{ c.label }}</option>
+                          </select>
+                        </div>
+
+                        <button type="button" class="btn-remove" (click)="removeCategoryItem(mod, 'cinturon', i)" aria-label="Eliminar">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="error-message" *ngIf="categoryError[mod.id + '-cinturon']">
+                    <i class="fas fa-exclamation-circle"></i>
+                    {{ categoryError[mod.id + '-cinturon'] }}
+                  </div>
+
+                  <div class="category-type-buttons">
+                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'cinturon', 'individual')">
+                      <i class="fas fa-plus"></i> Individual
+                    </button>
+                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'cinturon', 'rango')">
+                      <i class="fas fa-arrows-alt-h"></i> Rango
+                    </button>
+                  </div>
+
+                  <p class="info-small">Selecciona cinturones predefinidos del sistema.</p>
+                </div>
+              </div>
+
+              <!-- Edad -->
+              <div class="category-group">
+                <div class="category-toggle">
+                  <label class="switch">
+                    <input type="checkbox" [checked]="mod.categorias.edad && mod.categorias.edad.length > 0" name="{{mod.id}}-edad" (change)="mod.categorias.edad = $any($event.target).checked ? [{ nombre: 'Edad 1', activa: true, tipo: 'individual' }] : []">
+                    <span class="slider"></span>
+                  </label>
+                  <span>Edad</span>
+                </div>
+
+                <div class="category-options" *ngIf="mod.categorias.edad && mod.categorias.edad.length > 0">
+                  <p class="section-hint">Añade edades únicas y/o rangos de edades.</p>
+
+                  <!-- Inputs de categoría -->
+                  <div class="categoria-inputs">
+                    <div class="categoria-item" *ngFor="let cat of mod.categorias.edad; let i = index">
+                      <div class="input-row" [class.input-rango]="cat.tipo === 'rango'">
+                        <input *ngIf="cat.tipo === 'individual'"
+                          type="number"
+                          [(ngModel)]="cat.valor"
+                          name="{{mod.id}}-edad-valor-{{i}}"
+                          placeholder="Ej: 25 años"
+                          max="100"
+                          (input)="limitarEdad($event)"
+                          class="input-field">
+
+                        <div *ngIf="cat.tipo === 'rango'" class="rango-inputs">
+                          <input type="number"
+                            [(ngModel)]="cat.desde"
+                            name="{{mod.id}}-edad-desde-{{i}}"
+                            placeholder="Desde"
+                            max="100"
+                            (input)="limitarEdad($event)"
+                            class="input-field">
+                          <span class="rango-separator">a</span>
+                          <input type="number"
+                            [(ngModel)]="cat.hasta"
+                            name="{{mod.id}}-edad-hasta-{{i}}"
+                            placeholder="Hasta"
+                            max="100"
+                            (input)="limitarEdad($event)"
+                            class="input-field">
+                        </div>
+
+                        <button type="button" class="btn-remove" (click)="removeCategoryItem(mod, 'edad', i)" aria-label="Eliminar">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="error-message" *ngIf="categoryError[mod.id + '-edad']">
+                    <i class="fas fa-exclamation-circle"></i>
+                    {{ categoryError[mod.id + '-edad'] }}
+                  </div>
+
+                  <div class="category-type-buttons">
+                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'edad', 'individual')">
+                      <i class="fas fa-plus"></i> Edad única
+                    </button>
+                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'edad', 'rango')">
+                      <i class="fas fa-arrows-alt-h"></i> Rango de edades
+                    </button>
+                  </div>
+
+                  <p class="info-small">Máximo 100 años.</p>
+                </div>
+              </div>
+
+              <!-- Peso -->
+              <div class="category-group">
+                <div class="category-toggle">
+                  <label class="switch">
+                    <input type="checkbox" [checked]="mod.categorias.peso && mod.categorias.peso.length > 0" name="{{mod.id}}-peso" (change)="mod.categorias.peso = $any($event.target).checked ? [{ nombre: 'Peso 1', activa: true, tipo: 'individual' }] : []">
+                    <span class="slider"></span>
+                  </label>
+                  <span>Peso</span>
+                </div>
+
+                <div class="category-options" *ngIf="mod.categorias.peso && mod.categorias.peso.length > 0">
+                  <p class="section-hint">Añade pesos únicos y/o rangos de peso.</p>
+
+                  <!-- Inputs de categoría -->
+                  <div class="categoria-inputs">
+                    <div class="categoria-item" *ngFor="let cat of mod.categorias.peso; let i = index">
+                      <div class="input-row" [class.input-rango]="cat.tipo === 'rango'">
+                        <input *ngIf="cat.tipo === 'individual'"
+                          type="text"
+                          [(ngModel)]="cat.valor"
+                          name="{{mod.id}}-peso-valor-{{i}}"
+                          placeholder="Ej: 065 kg"
+                          maxlength="3"
+                          (input)="limitarPeso($event)"
+                          class="input-field">
+
+                        <div *ngIf="cat.tipo === 'rango'" class="rango-inputs">
+                          <input type="text"
+                            [(ngModel)]="cat.desde"
+                            name="{{mod.id}}-peso-desde-{{i}}"
+                            placeholder="Desde (kg)"
+                            maxlength="3"
+                            (input)="limitarPeso($event)"
+                            class="input-field">
+                          <span class="rango-separator">a</span>
+                          <input type="text"
+                            [(ngModel)]="cat.hasta"
+                            name="{{mod.id}}-peso-hasta-{{i}}"
+                            placeholder="Hasta (kg)"
+                            maxlength="3"
+                            (input)="limitarPeso($event)"
+                            class="input-field">
+                        </div>
+
+                        <button type="button" class="btn-remove" (click)="removeCategoryItem(mod, 'peso', i)" aria-label="Eliminar">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="error-message" *ngIf="categoryError[mod.id + '-peso']">
+                    <i class="fas fa-exclamation-circle"></i>
+                    {{ categoryError[mod.id + '-peso'] }}
+                  </div>
+
+                  <div class="category-type-buttons">
+                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'peso', 'individual')">
+                      <i class="fas fa-plus"></i> Peso único
+                    </button>
+                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'peso', 'rango')">
+                      <i class="fas fa-arrows-alt-h"></i> Rango de peso
+                    </button>
+                  </div>
+
+                  <p class="info-small">Máximo 400 kg.</p>
+                </div>
+              </div>
+
+              <!-- Género -->
+              <div class="category-group">
+                <div class="category-toggle">
+                  <label class="switch">
+                    <input type="checkbox" [checked]="mod.categorias.genero !== null" name="{{mod.id}}-genero" (change)="mod.categorias.genero = $any($event.target).checked ? 'individual' : null">
+                    <span class="slider"></span>
+                  </label>
+                  <span>Género</span>
+                </div>
+                <div class="category-options" *ngIf="mod.categorias.genero">
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input type="radio" name="{{mod.id}}-genero-type" value="individual" [checked]="mod.categorias.genero === 'individual'" (change)="mod.categorias.genero = 'individual'">
+                      Individual (por género)
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="{{mod.id}}-genero-type" value="mixto" [checked]="mod.categorias.genero === 'mixto'" (change)="mod.categorias.genero = 'mixto'">
+                      Mixto (compiten juntos)
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <button type="button" class="btn ghost" (click)="goBack()">Cancelar</button>
+        <button type="submit" class="btn primary" [disabled]="saving">
+          <span *ngIf="!saving">Guardar borrador</span>
+          <span *ngIf="saving" class="loading">Guardando...</span>
+        </button>
+      </div>
+
+      <div class="alert" *ngIf="message" [class.success]="success" [class.error]="!success">
+        <i class="fas" [ngClass]="success ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
+        <span>{{ message }}</span>
+      </div>
+    </form>
+  </div>
+</div>

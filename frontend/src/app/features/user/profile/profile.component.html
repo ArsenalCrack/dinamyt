@@ -1,33 +1,33 @@
 <div class="profile-wrapper">
-  <a (click)="goBack()" class="btn-back" title="Volver atrás">
-    <i class="fas fa-arrow-left fa-2x"></i>
-  </a>
-
   <div *ngIf="saving" class="loading-overlay">
     <i class="fas fa-spinner fa-spin spinner-icon"></i>
     <p class="loading-text">Guardando cambios...</p>
   </div>
 
-  <h2>Mi Perfil</h2>
+  <div class="header-profile">
+    <a (click)="goBack()" class="btn-back" title="Volver atrás">
+      <i class="fas fa-arrow-left fa-lg"></i>
+    </a>
+    <h2>Mi Perfil</h2>
+  </div>
 
-  <div class="avatar-row">
+  <div class="avatar-section">
     <div class="avatar" [style.backgroundImage]="(fotoPreview || fotoUrl) ? 'url(' + (fotoPreview || fotoUrl) + ')' : 'none'">
       <i *ngIf="!(fotoPreview || fotoUrl)" class="fas fa-user"></i>
     </div>
-    <div class="avatar-actions">
-      <label class="btn-secondary">
+    <div class="avatar-info">
+      <p class="avatar-name">{{ user.nombreC || '—' }}</p>
+      <label class="btn-upload-photo">
         <input type="file" accept="image/*" (change)="onFileChange($event)" hidden>
-        Seleccionar foto
+        <i class="fas fa-camera"></i>
+        Cambiar foto
       </label>
-      <button class="btn-primary" (click)="uploadPhoto()" [disabled]="!fotoFile || saving">{{ saving ? 'Subiendo...' : 'Subir' }}</button>
-      <button class="btn-link" (click)="goChangePassword()">Cambiar contraseña</button>
     </div>
   </div>
 
   <form (ngSubmit)="saveProfile()">
     <div class="profile-grid">
       <!-- Bloqueados -->
-      <div class="field disabled"><label>Nombre completo</label><p>{{ user.nombreC || '—' }}</p></div>
       <div class="field disabled"><label>Documento</label><p>{{ user.idDocumento || '—' }}</p></div>
       <div class="field disabled"><label>Fecha de nacimiento</label><p>{{ user.fechaNacimiento || '—' }}</p></div>
       <div class="field disabled"><label>Sexo</label><p>{{ user.sexo || '—' }}</p></div>
@@ -50,14 +50,14 @@
           [options]="cinturones"
           placeholder="Selecciona tu cinturón">
         </app-custom-select>
-        <p *ngIf="!user.cinturon_rango" class="no-seleccionado">No seleccionado</p>
+        <p *ngIf="user.cinturon_rango === ''" class="no-seleccionado">No seleccionado</p>
       </div>
       <div class="field editable">
         <label>Academia</label>
         <app-custom-select
           name="academia"
           [(ngModel)]="user.academia"
-          [options]="academias.concat([{ value: 'otra', label: 'Otra' }])"
+          [options]="academiaOptions"
           placeholder="Selecciona tu academia">
         </app-custom-select>
         <input
@@ -67,14 +67,14 @@
           [(ngModel)]="academiaOtra"
           placeholder="Especifica tu academia"
           class="input-condicional">
-        <p *ngIf="!user.academia" class="no-seleccionado">No seleccionado</p>
+        <p *ngIf="user.academia === ''" class="no-seleccionado">No seleccionado</p>
       </div>
       <div class="field editable">
         <label>Instructor</label>
         <app-custom-select
           name="Instructor"
           [(ngModel)]="user.Instructor"
-          [options]="instructores.concat([{ value: 'otro', label: 'Otro' }])"
+          [options]="instructorOptions"
           placeholder="Selecciona tu instructor">
         </app-custom-select>
         <input
@@ -84,12 +84,13 @@
           [(ngModel)]="instructorOtro"
           placeholder="Especifica tu instructor"
           class="input-condicional">
-        <p *ngIf="!user.Instructor" class="no-seleccionado">No seleccionado</p>
+        <p *ngIf="user.Instructor === ''" class="no-seleccionado">No seleccionado</p>
       </div>
     </div>
 
     <div class="actions">
       <button class="btn-primary" type="submit" [disabled]="saving">{{ saving ? 'Guardando...' : 'Guardar cambios' }}</button>
+      <button class="btn-secondary" type="button" (click)="goChangePassword()">Cambiar contraseña</button>
     </div>
   </form>
 
