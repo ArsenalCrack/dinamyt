@@ -90,22 +90,31 @@ export class DashboardComponent {
       { key: 'idDocumento', label: 'Documento' },
       { key: 'sexo', label: 'Sexo' },
       { key: 'fechaNacimiento', label: 'Fecha de nacimiento' },
-      { key: 'cinturonRango', label: 'Cinturón/Rango' },
+      // En el proyecto coexisten claves antiguas y nuevas
+      { key: 'cinturon_rango', label: 'Cinturón/Rango' },
       { key: 'nacionalidad', label: 'Nacionalidad' },
-      { key: 'numeroCelular', label: 'Teléfono' },
+      { key: 'numero_celular', label: 'Teléfono' },
       { key: 'correo', label: 'Correo' },
       { key: 'academia', label: 'Academia' },
-      { key: 'instructor', label: 'Instructor' }
+      { key: 'Instructor', label: 'Instructor' }
     ];
 
     let completed = 0;
     const missing: string[] = [];
 
+    const sessionFallbackKeys: Record<string, string[]> = {
+      cinturon_rango: ['cinturon_rango', 'cinturonRango'],
+      numero_celular: ['numero_celular', 'numeroCelular'],
+      Instructor: ['Instructor', 'instructor']
+    };
+
     for (const f of fields) {
-      const val = (user && user[f.key]) || sessionStorage.getItem(f.key);
-      console.log(val)
+      const valFromUser = user ? (user as any)[f.key] : null;
+      const fallbackKeys = sessionFallbackKeys[f.key] || [f.key];
+      const valFromSession = fallbackKeys.map(k => sessionStorage.getItem(k)).find(v => v !== null);
+      const val = valFromUser ?? valFromSession;
+
       if (val && String(val).trim().length > 0) {
-        
         completed++;
       } else {
         missing.push(f.label);

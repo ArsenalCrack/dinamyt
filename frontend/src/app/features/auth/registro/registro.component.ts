@@ -84,8 +84,10 @@ export class RegistroComponent implements OnInit, OnDestroy {
   showExpiredBanner = false;
   nombresMaxLength = 40;
   apellidosMaxLength = 40;
+  correoMaxLength = 40;
   nombresLimitMsg: string = '';
   apellidosLimitMsg: string = '';
+  correoLimitMsg: string = '';
   @ViewChild('bannerResendBtn') bannerResendBtn?: ElementRef<HTMLButtonElement>;
 
   volverAtras() {
@@ -133,6 +135,28 @@ export class RegistroComponent implements OnInit, OnDestroy {
       } else {
         this.apellidosLimitMsg = '';
       }
+    }
+  }
+
+  onCorreoInput(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const maxLength = this.correoMaxLength;
+    let value = target.value || '';
+
+    if (value.length > maxLength) {
+      value = value.slice(0, maxLength);
+      target.value = value;
+    }
+
+    this.correo = value;
+
+    if (value.length === maxLength) {
+      this.correoLimitMsg = `Has alcanzado el límite máximo de ${maxLength} caracteres.`;
+    } else if (value.length > maxLength - 10) {
+      const remaining = maxLength - value.length;
+      this.correoLimitMsg = `Te quedan ${remaining} caracteres disponibles.`;
+    } else {
+      this.correoLimitMsg = '';
     }
   }
 

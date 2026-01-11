@@ -63,6 +63,25 @@ export class LoginComponent implements OnDestroy {
         console.log('Correo guardado:', this.correo);
 
         if (user && typeof user === 'object') {
+          const toSessionString = (val: any): string | null => {
+            if (val === null || val === undefined) return null;
+            if (typeof val === 'string') {
+              const s = val.trim();
+              return s ? s : null;
+            }
+            if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+            if (typeof val === 'object') {
+              const id = (val as any)?.id;
+              if (id !== null && id !== undefined) return String(id);
+              const nombre = (val as any)?.nombre ?? (val as any)?.name;
+              if (nombre !== null && nombre !== undefined) {
+                const s = String(nombre).trim();
+                return s ? s : null;
+              }
+            }
+            return null;
+          };
+
           // Guardar datos del usuario según las variables del proyecto
           const name = user?.nombreC || user?.username || user?.name || user?.nombre || null;
           if (name) {
@@ -72,15 +91,39 @@ export class LoginComponent implements OnDestroy {
           }
 
           // Guardar otros datos del usuario si están disponibles
-          if (user?.idDocumento) sessionStorage.setItem('idDocumento', user.idDocumento);
-          if (user?.correo) sessionStorage.setItem('correo', user.correo);
-          if (user?.sexo) sessionStorage.setItem('sexo', user.sexo);
-          if (user?.fechaNacimiento) sessionStorage.setItem('fechaNacimiento', user.fechaNacimiento);
-          if (user?.cinturonRango) sessionStorage.setItem('cinturonRango', user.cinturonRango);
-          if (user?.nacionalidad) sessionStorage.setItem('nacionalidad', user.nacionalidad);
-          if (user?.numeroCelular) sessionStorage.setItem('numeroCelular', user.numeroCelular);
-          if (user?.academia) sessionStorage.setItem('academia', user.academia);
-          if (user?.Instructor) sessionStorage.setItem('instructor', user.Instructor);
+          const idDocumento = toSessionString(user?.idDocumento);
+          if (idDocumento) sessionStorage.setItem('idDocumento', idDocumento);
+
+          const correo = toSessionString(user?.correo);
+          if (correo) sessionStorage.setItem('correo', correo);
+
+          const sexo = toSessionString(user?.sexo);
+          if (sexo) sessionStorage.setItem('sexo', sexo);
+
+          const fechaNacimiento = toSessionString(user?.fechaNacimiento);
+          if (fechaNacimiento) sessionStorage.setItem('fechaNacimiento', fechaNacimiento);
+
+          const cinturonRango = toSessionString(user?.cinturonRango);
+          if (cinturonRango) sessionStorage.setItem('cinturonRango', cinturonRango);
+
+          const nacionalidad = toSessionString(user?.nacionalidad);
+          if (nacionalidad) sessionStorage.setItem('nacionalidad', nacionalidad);
+
+          const numeroCelular = toSessionString(user?.numeroCelular);
+          if (numeroCelular) sessionStorage.setItem('numeroCelular', numeroCelular);
+
+          const academia = toSessionString(user?.academia);
+          if (academia) sessionStorage.setItem('academia', academia);
+          else sessionStorage.removeItem('academia');
+
+          const instructor = toSessionString(user?.Instructor ?? user?.instructor);
+          if (instructor) {
+            sessionStorage.setItem('Instructor', instructor);
+            sessionStorage.setItem('instructor', instructor);
+          } else {
+            sessionStorage.removeItem('Instructor');
+            sessionStorage.removeItem('instructor');
+          }
         }
 
         // Mantener el spinner visible por 2 segundos antes de navegar

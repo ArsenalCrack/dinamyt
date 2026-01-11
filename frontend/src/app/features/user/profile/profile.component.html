@@ -36,11 +36,38 @@
       <!-- Editables -->
       <div class="field editable">
         <label>Correo</label>
-        <input type="email" [(ngModel)]="user.correo" name="correo" />
+        <input
+          type="email"
+          [(ngModel)]="user.correo"
+          name="correo"
+          maxlength="40"
+          (input)="onCorreoInput($event)" />
+        <div *ngIf="correoLimitMsg" class="msg-warning">
+          <small>{{ correoLimitMsg }}</small>
+        </div>
       </div>
       <div class="field editable">
         <label>Teléfono</label>
-        <input type="tel" [(ngModel)]="user.numero_celular" name="numero_celular" inputmode="tel" />
+        <div class="phone-row">
+          <div class="phone-code">
+            <app-custom-select
+              name="telefonoCodigo"
+              [(ngModel)]="telefonoCodigo"
+              [options]="phoneCodeOptions"
+              placeholder="Prefijo">
+            </app-custom-select>
+          </div>
+          <input
+            type="tel"
+            class="phone-number"
+            [(ngModel)]="user.numero_celular"
+            name="numero_celular"
+            inputmode="numeric"
+            pattern="^[0-9]*$"
+            maxlength="20"
+            (input)="onTelefonoInput($event)"
+            placeholder="Número" />
+        </div>
       </div>
       <div class="field editable">
         <label>Cinturón/Rango</label>
@@ -54,36 +81,124 @@
       </div>
       <div class="field editable">
         <label>Academia</label>
-        <app-custom-select
-          name="academia"
-          [(ngModel)]="user.academia"
-          [options]="academiaOptions"
-          placeholder="Selecciona tu academia">
-        </app-custom-select>
+        <div class="profile-autocomplete" #academiaAutocomplete>
+          <input
+            type="text"
+            class="search-input"
+            [(ngModel)]="academiaSearchText"
+            [ngModelOptions]="{standalone:true}"
+            placeholder="Escribe o selecciona tu academia"
+            maxlength="50"
+            (input)="onAcademiaInputChange()"
+            (focus)="onAcademiaInputFocus()"
+            (blur)="onAcademiaInputBlur()"
+            (keydown)="onAcademiaKeydown($event)"
+            autocomplete="off" />
+
+          <span
+            class="arrow"
+            [class.arrow-open]="academiaIsOpen"
+            (click)="toggleAcademiaDropdown()"
+            (mousedown)="$event.preventDefault()"></span>
+
+          <ul
+            class="options"
+            *ngIf="academiaIsOpen && academiaFilteredOptions.length > 0"
+            role="listbox"
+            [ngStyle]="academiaOptionsStyle">
+            <li
+              *ngFor="let opt of academiaFilteredOptions; let i = index"
+              role="option"
+              [class.focus]="i === academiaFocusedIndex"
+              (click)="selectAcademia(opt)"
+              (mouseenter)="academiaFocusedIndex = i">
+              {{ opt.label }}
+            </li>
+          </ul>
+
+          <div
+            class="no-results"
+            *ngIf="academiaIsOpen && academiaFilteredOptions.length === 0"
+            [ngStyle]="academiaOptionsStyle">
+            No se encontraron academias
+          </div>
+        </div>
+        <div *ngIf="academiaLimitMsg" class="msg-warning">
+          <small>{{ academiaLimitMsg }}</small>
+        </div>
         <input
           *ngIf="user.academia === 'otra'"
           type="text"
           name="academiaOtra"
           [(ngModel)]="academiaOtra"
           placeholder="Especifica tu academia"
+          maxlength="50"
+          (input)="onAcademiaOtraInput()"
           class="input-condicional">
+        <div *ngIf="academiaOtraLimitMsg" class="msg-warning">
+          <small>{{ academiaOtraLimitMsg }}</small>
+        </div>
         <p *ngIf="user.academia === ''" class="no-seleccionado">No seleccionado</p>
       </div>
       <div class="field editable">
         <label>Instructor</label>
-        <app-custom-select
-          name="Instructor"
-          [(ngModel)]="user.Instructor"
-          [options]="instructorOptions"
-          placeholder="Selecciona tu instructor">
-        </app-custom-select>
+        <div class="profile-autocomplete" #instructorAutocomplete>
+          <input
+            type="text"
+            class="search-input"
+            [(ngModel)]="instructorSearchText"
+            [ngModelOptions]="{standalone:true}"
+            placeholder="Escribe o selecciona tu instructor"
+            maxlength="50"
+            (input)="onInstructorInputChange()"
+            (focus)="onInstructorInputFocus()"
+            (blur)="onInstructorInputBlur()"
+            (keydown)="onInstructorKeydown($event)"
+            autocomplete="off" />
+
+          <span
+            class="arrow"
+            [class.arrow-open]="instructorIsOpen"
+            (click)="toggleInstructorDropdown()"
+            (mousedown)="$event.preventDefault()"></span>
+
+          <ul
+            class="options"
+            *ngIf="instructorIsOpen && instructorFilteredOptions.length > 0"
+            role="listbox"
+            [ngStyle]="instructorOptionsStyle">
+            <li
+              *ngFor="let opt of instructorFilteredOptions; let i = index"
+              role="option"
+              [class.focus]="i === instructorFocusedIndex"
+              (click)="selectInstructor(opt)"
+              (mouseenter)="instructorFocusedIndex = i">
+              {{ opt.label }}
+            </li>
+          </ul>
+
+          <div
+            class="no-results"
+            *ngIf="instructorIsOpen && instructorFilteredOptions.length === 0"
+            [ngStyle]="instructorOptionsStyle">
+            No se encontraron instructores
+          </div>
+        </div>
+        <div *ngIf="instructorLimitMsg" class="msg-warning">
+          <small>{{ instructorLimitMsg }}</small>
+        </div>
         <input
           *ngIf="user.Instructor === 'otro'"
           type="text"
           name="instructorOtro"
           [(ngModel)]="instructorOtro"
           placeholder="Especifica tu instructor"
+          maxlength="50"
+          (input)="onInstructorOtroInput()"
           class="input-condicional">
+        <div *ngIf="instructorOtroLimitMsg" class="msg-warning">
+          <small>{{ instructorOtroLimitMsg }}</small>
+        </div>
         <p *ngIf="user.Instructor === ''" class="no-seleccionado">No seleccionado</p>
       </div>
     </div>

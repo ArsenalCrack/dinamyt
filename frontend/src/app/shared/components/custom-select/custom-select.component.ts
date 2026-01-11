@@ -1,4 +1,4 @@
-import { Component, Input, forwardRef, ElementRef, HostListener } from '@angular/core';
+import { Component, ElementRef, HostListener, Input, forwardRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -38,8 +38,7 @@ export class CustomSelectComponent implements ControlValueAccessor {
     if (this.disabled) return;
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
-      // set focus index to current value or 0
-      const idx = this.options.findIndex(o => o.value === this.value);
+      const idx = this.options.findIndex(o => this.compareValues(o.value, this.value));
       this.focusedIndex = idx >= 0 ? idx : 0;
       this.positionOptions();
     }
@@ -54,8 +53,16 @@ export class CustomSelectComponent implements ControlValueAccessor {
   }
 
   getLabel() {
-    const found = this.options.find(o => o.value === this.value);
+    const found = this.options.find(o => this.compareValues(o.value, this.value));
     return found ? found.label : '';
+  }
+
+  compareValues(a: any, b: any): boolean {
+    if (a === null && b === null) return true;
+    if (a === undefined && b === undefined) return true;
+    if (a === null || b === null) return false;
+    if (a === undefined || b === undefined) return false;
+    return String(a) === String(b);
   }
 
   close() { this.isOpen = false; }

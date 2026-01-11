@@ -210,12 +210,18 @@
           [(ngModel)]="correo"
           #emailRef="ngModel"
           required
+          maxlength="40"
           pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
+          (input)="onCorreoInput($event)"
           placeholder="tucorreo@email.com"
           [class.input-error]="emailRef.invalid && (emailRef.dirty || emailRef.touched)">
 
         <div *ngIf="emailRef.invalid && (emailRef.dirty || emailRef.touched)" class="msg-error">
           <small *ngIf="emailRef.errors?.['pattern']">Formato de correo inválido.</small>
+          <small *ngIf="emailRef.errors?.['maxlength']">Máximo 40 caracteres.</small>
+        </div>
+        <div *ngIf="correoLimitMsg" class="msg-warning">
+          <small>{{ correoLimitMsg }}</small>
         </div>
       </div>
 

@@ -13,6 +13,15 @@
     --color-acento-hover: #a30000;
     --color-card: #ffffff;
     --color-borde: #e0e0e0;
+
+    /* Tamaños UI consistentes */
+    --back-arrow-size: clamp(20px, 2.8vw, 28px);
+}
+
+/* Unificar tamaño de flechas (volver) en todo el proyecto */
+.btn-back i[class*="fa-arrow-"] {
+    font-size: var(--back-arrow-size) !important;
+    line-height: 1 !important;
 }
 
 /* --- 3. RESET BÁSICO --- */

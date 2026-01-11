@@ -1,0 +1,35 @@
+<div class="option-autocomplete" [class.has-error]="hasError">
+  <input
+    type="text"
+    class="search-input"
+    [(ngModel)]="searchText"
+    [placeholder]="placeholder"
+    [disabled]="disabled"
+    [class.input-error]="hasError"
+    (input)="onInputChange()"
+    (focus)="onInputFocus()"
+    (blur)="onInputBlur()"
+    (keydown)="onKeydown($event)"
+    autocomplete="off">
+
+  <span
+    class="arrow"
+    [class.arrow-open]="isOpen"
+    (click)="toggleDropdown()"
+    (mousedown)="$event.preventDefault()"></span>
+
+  <ul class="options" *ngIf="isOpen && filteredOptions.length > 0" role="listbox" [ngStyle]="optionsStyle">
+    <li *ngFor="let opt of filteredOptions; let i = index"
+        role="option"
+        [class.focus]="i === focusedIndex"
+        [class.disabled]="opt.disabled"
+        (click)="selectOption(opt)"
+        (mouseenter)="focusedIndex = i">
+      {{ opt.label }}
+    </li>
+  </ul>
+
+  <div class="no-results" *ngIf="isOpen && filteredOptions.length === 0" [ngStyle]="optionsStyle">
+    No se encontraron resultados
+  </div>
+</div>
