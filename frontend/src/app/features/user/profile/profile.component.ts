@@ -223,10 +223,11 @@ export class ProfileComponent implements OnDestroy {
 
         // Si en sessionStorage hay un texto (academia personalizada), forzar modo 'otra'
         this.normalizeAcademiaFromStoredValue();
-        this.syncAcademiaSearchTextFromValue();
-
-        // Con academia ya normalizada, cargar instructores si aplica
-        this.cargarInstructores();
+        this.syncAcademiaSearchTextFromValue(); 
+        console.log(this.user.Instructor);
+        if (this.user.academia && this.user.academia !== 'otra') {
+          this.cargarInstructores(this.user.academia);
+        }
       },
       error: (err) => {
         console.log(err);
@@ -236,37 +237,41 @@ export class ProfileComponent implements OnDestroy {
 
   }
 
-  cargarInstructores() {
-    if (!this.user.academia || this.user.academia === 'otra') {
-      this.instructores = [];
+  cargarInstructores(idAcademia: string | number | null): void {
+  const id = Number(idAcademia);
+  // Validaciones
+  if (!idAcademia || idAcademia === 'otra' || isNaN(id)) {
+    this.instructores = [];
+    this.normalizeInstructorFromStoredValue();
+    this.syncInstructorSearchTextFromValue();
+    return;
+  }
 
-      // Si el instructor guardado era un texto libre, mantenerlo como 'otro'
-      this.normalizeInstructorFromStoredValue();
-      this.syncInstructorSearchTextFromValue();
-      return;
-    }
-    this.api.cargarinstructor({academia_id: this.user.academia}).subscribe({
-      next: (u: any[]) => {
-        this.instructores = (u || []).map(i => {
+  this.api.cargarInstructor(id).subscribe({
+    next: (u: any[]) => {
+      this.instructores = (u || [])
+        .map(i => {
           const rawId = i?.idDocumento ?? i?.ID_documento ?? i?.id_documento ?? i?.id;
           const rawNombre = i?.nombreC ?? i?.nombre ?? i?.name;
-          return {
-            value: rawId !== null && rawId !== undefined ? String(rawId) : null,
-            label: rawNombre !== null && rawNombre !== undefined ? String(rawNombre) : ''
-          };
-        }).filter(i => i.label);
 
-        // Si en sessionStorage hay un texto (instructor personalizado), forzar modo 'otro'
-        this.normalizeInstructorFromStoredValue();
-        this.syncInstructorSearchTextFromValue();
-      },
-      error: (err) => {
-        console.log(err);
-        this.instructores = [];
-        this.syncInstructorSearchTextFromValue();
-      }
-    });
-  }
+          return {
+            value: rawId != null ? String(rawId) : null,
+            label: rawNombre != null ? String(rawNombre) : ''
+          };
+        })
+        .filter(i => i.label);
+
+      this.normalizeInstructorFromStoredValue();
+      this.syncInstructorSearchTextFromValue();
+    },
+    error: err => {
+      console.error(err);
+      this.instructores = [];
+      this.syncInstructorSearchTextFromValue();
+    }
+  });
+}
+
 
   private normalizeAcademiaFromStoredValue() {
     const current = this.user.academia;
@@ -330,11 +335,11 @@ export class ProfileComponent implements OnDestroy {
 
   // Opciones con valores nulos para UX consistente
   get academiaOptions(): Array<{ value: string | null; label: string }> {
-    return [{ value: null, label: 'Sin academia' }, ...this.academias, { value: 'otra', label: 'Otra' }];
+    return [...this.academias, { value: 'otra', label: 'Otra' }];
   }
 
   get instructorOptions(): Array<{ value: string | null; label: string }> {
-    return [{ value: null, label: 'Independiente' }, ...this.instructores, { value: 'otro', label: 'Otro' }];
+    return [...this.instructores, { value: 'otro', label: 'Otro' }];
   }
 
   private compareValues(a: any, b: any): boolean {
@@ -448,16 +453,27 @@ export class ProfileComponent implements OnDestroy {
     this.location.back();
   }
 
-  onAcademiaChange(value: any): void {
-    this.user.academia = value;
-    this.user.Instructor = null;
-    this.instructorOtro = '';
-    if (this.user.academia !== 'otra') {
-      this.academiaOtra = '';
-    }
+onAcademiaChange(value: string | null): void {
+
+  // Guardar academia (ID o 'otra')
+  this.user.academia = value;
+
+  // Reset instructor
+  this.user.Instructor = null;
+  this.instructores = [];
+
+  if (value === 'otra' || !value) {
+    this.academiaOtra = '';
     this.syncAcademiaSearchTextFromValue();
-    this.cargarInstructores();
+    return;
   }
+
+  // Cargar instructores usando el ID
+  this.cargarInstructores(value);
+
+  this.syncAcademiaSearchTextFromValue();
+}
+
 
   onInstructorChange(value: any): void {
     this.user.Instructor = value;
@@ -721,8 +737,8 @@ export class ProfileComponent implements OnDestroy {
       correo: emailValue,
       numero_celular: phoneFull,
       cinturon_rango: cinturonValue,
-      academia: academiaValue,
-      Instructor: instructorValue
+      codigo: academiaValue,
+      modo: instructorValue
     };
     this.api.updateProfile(payload).subscribe({
       next: (u: any) => {

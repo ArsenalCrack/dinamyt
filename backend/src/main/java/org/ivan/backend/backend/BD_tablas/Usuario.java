@@ -1,9 +1,10 @@
 package org.ivan.backend.backend.BD_tablas;
 
+
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
+
 
 @Entity
 @Table(name = "usuario")

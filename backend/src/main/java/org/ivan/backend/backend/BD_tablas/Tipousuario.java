@@ -11,7 +11,7 @@ public class Tipousuario {
 
     @Id
     @Column(name = "ID_Tipo")
-    private Integer ID_Tipo;
+    private Integer IDTipo;
 
     @Column(length = 20)
     private String descripcion;
@@ -25,11 +25,11 @@ public class Tipousuario {
     }
 
     public Integer getID_Tipo() {
-        return ID_Tipo;
+        return IDTipo;
     }
 
     public void setID_Tipo(Integer ID_Tipo) {
-        this.ID_Tipo = ID_Tipo;
+        this.IDTipo = ID_Tipo;
     }
 }
 

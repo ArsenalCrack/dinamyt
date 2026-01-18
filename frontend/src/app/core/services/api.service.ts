@@ -62,7 +62,10 @@ export class ApiService {
     return this.http.get<any[]>(`${this.apiUrl}/academias`);
   }
 
-  cargarinstructor(academia : any): Observable<any[]>{
-    return this.http.post<any[]>(`${this.apiUrl}/instructores`, academia);
-  }
+cargarInstructor(idAcademia: number): Observable<any[]> {
+  return this.http.post<any[]>(
+    `${this.apiUrl}/instructores`,
+    idAcademia
+  );
+}
 }

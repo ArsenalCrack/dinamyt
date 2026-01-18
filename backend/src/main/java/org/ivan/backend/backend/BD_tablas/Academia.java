@@ -11,18 +11,18 @@ public class Academia {
 
     @Id
     @Column(name = "ID_academia")
-    private Integer ID_academia;
+    private Integer IDacademia;
     @Column(name = "nombre")
     private String nombre;
     @Column(name = "descripcion")
     private String descripcion;
 
     public Integer getID_academia() {
-        return ID_academia;
+        return IDacademia;
     }
 
     public void setID_academia(Integer ID_academia) {
-        this.ID_academia = ID_academia;
+        this.IDacademia = ID_academia;
     }
 
     public String getNombre() {

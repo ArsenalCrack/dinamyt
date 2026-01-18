@@ -126,9 +126,11 @@ public class controlador_principal {
     private ResponseEntity<?> login(@RequestBody Usuario respuesta){
         if (usuarioRepository.existsByCorreo(respuesta.getCorreo())) {
             Usuario pendiente3 = usuarioRepository.findByCorreo((respuesta.getCorreo()));
+            Usuario instructor = pendiente3.getInstructor();
+            System.out.println(instructor);
             if (pendiente3.getContrasena().equals(respuesta.getContrasena())){
                 usuariosPendientes.remove(respuesta.getCorreo());
-                return ResponseEntity.ok(pendiente3);
+                return ResponseEntity.ok(Map.of("usuario",pendiente3,"instructor",instructor));
 
             }else{
                 return ResponseEntity.badRequest().body(Map.of("message", "Contraseña incorrecta"));
@@ -152,4 +154,26 @@ public class controlador_principal {
         }
         return ResponseEntity.badRequest().body(Map.of("message", "Error"));
     }
+    @PostMapping("/instructores")
+    private ResponseEntity<?> instructores(@RequestBody int idAcademia) {
+
+        // AJUSTA "Instructor" según tu BD
+        List<Usuario> instructores = usuarioRepository.findByAcademia_IDacademiaAndTipousuario_IDTipo(idAcademia, 2);
+        System.out.println("id academia"+idAcademia);
+        System.out.println(instructores);
+        if (instructores.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
+        }
+
+        return ResponseEntity.ok(instructores);
+    }
+    @PutMapping("/perfil")
+    private ResponseEntity<?> actualizar_datos(@RequestBody Usuario datos){
+        System.out.println("a"+datos.getCorreo());
+        if(datos.getCorreo()==null){
+            return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
+        }
+        return ResponseEntity.ok("perfecto");
+    }
+
 }

@@ -43,12 +43,14 @@ export class LoginComponent implements OnDestroy {
 
     this.api.login({ correo: this.correo, contrasena: this.contrasena }).subscribe({
       next: (res: any) => {
-        localStorage.setItem('usuario', JSON.stringify(res));
+        localStorage.setItem('usuario', JSON.stringify(res.usuario));
         console.log('Respuesta del backend:', res);
 
         // Backend expected to return token and user info
         const token = res?.token || res?.accessToken || null;
         const user = res?.user || res?.usuario || res;
+        const instructorObj = res?.instructor.idDocumento;
+
 
         console.log('Token extraído:', token);
         console.log('Usuario extraído:', user);
@@ -116,10 +118,11 @@ export class LoginComponent implements OnDestroy {
           if (academia) sessionStorage.setItem('academia', academia);
           else sessionStorage.removeItem('academia');
 
-          const instructor = toSessionString(user?.Instructor ?? user?.instructor);
-          if (instructor) {
-            sessionStorage.setItem('Instructor', instructor);
-            sessionStorage.setItem('instructor', instructor);
+
+          console.log(instructorObj);
+          if (instructorObj) {
+            sessionStorage.setItem('Instructor', instructorObj);
+            sessionStorage.setItem('instructor', instructorObj);
           } else {
             sessionStorage.removeItem('Instructor');
             sessionStorage.removeItem('instructor');
