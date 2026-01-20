@@ -58,9 +58,6 @@ public class controlador_principal {
         usuario.setCodigo(codigo);
         usuario.setFechaCodigo(LocalDateTime.now());
         
-        // Asignar valores por defecto
-        usuario.setInstructorIndependiente(false);
-        
         if (usuario.getTipousuario() == null) {
             Tipousuario tipo = new Tipousuario();
             tipo.setID_Tipo(1);
