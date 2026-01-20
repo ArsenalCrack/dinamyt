@@ -1,5 +1,6 @@
 //echo por Andres Gonzalez 1077294332
 package org.ivan.backend.backend.controladores;
+
 import org.ivan.backend.backend.BD_tablas.Academia;
 import org.ivan.backend.backend.EmailService;
 import org.ivan.backend.backend.BD_tablas.Usuario;
@@ -43,10 +44,11 @@ public class controlador_principal {
 
         return respuesta;
     }
-    @PostMapping("/registro")
-    public ResponseEntity<?> Crear(@RequestBody Usuario usuario){
 
-        String codigo =GenerarCodigo();
+    @PostMapping("/registro")
+    public ResponseEntity<?> Crear(@RequestBody Usuario usuario) {
+
+        String codigo = GenerarCodigo();
 
         if (usuarioRepository.existsById(usuario.getIdDocumento())) {
             return ResponseEntity.badRequest().body(Map.of("message", "Ya existe un usuario con ese documento"));
@@ -57,7 +59,7 @@ public class controlador_principal {
         emailService.enviarCodigo(usuario.getCorreo(), codigo);
         usuario.setCodigo(codigo);
         usuario.setFechaCodigo(LocalDateTime.now());
-        
+
         if (usuario.getTipousuario() == null) {
             Tipousuario tipo = new Tipousuario();
             tipo.setID_Tipo(1);
@@ -65,18 +67,19 @@ public class controlador_principal {
         } else if (usuario.getTipousuario().getID_Tipo() == null) {
             usuario.getTipousuario().setID_Tipo(1);
         }
-        
-        usuariosPendientes.put(usuario.getCorreo(),usuario);
+
+        usuariosPendientes.put(usuario.getCorreo(), usuario);
         return ResponseEntity.ok("");
     }
+
     @PostMapping("/verificar")
-    private ResponseEntity<?>  Verificar(@RequestBody Usuario datos){
+    private ResponseEntity<?> Verificar(@RequestBody Usuario datos) {
         Usuario pendiente1 = usuariosPendientes.get(datos.getCorreo());
         if (LocalDateTime.now().isAfter(pendiente1.getFechaCodigo().plusMinutes(5))) {
             pendiente1.setCodigo("*");
             return ResponseEntity.badRequest().body(Map.of("message", "El código ha vencido"));
         }
-        if (pendiente1.getCodigo().equals(datos.getCodigo())){
+        if (pendiente1.getCodigo().equals(datos.getCodigo())) {
             if (datos.getModo().equals("register")) {
                 usuarioRepository.save(pendiente1);
                 usuariosPendientes.remove(datos.getCorreo());
@@ -86,93 +89,101 @@ public class controlador_principal {
         }
         return ResponseEntity.badRequest().body(Map.of("message", "El codigo no coincide"));
     }
+
     @PostMapping("/reenviar")
-    private ResponseEntity<?> ReenviarCodigo (@RequestBody Usuario datos){
+    private ResponseEntity<?> ReenviarCodigo(@RequestBody Usuario datos) {
         Usuario pendiente2 = usuariosPendientes.get(datos.getCorreo());
         pendiente2.setCodigo(GenerarCodigo());
         pendiente2.setFechaCodigo(LocalDateTime.now());
         emailService.enviarCodigo(pendiente2.getCorreo(), pendiente2.getCodigo());
         return ResponseEntity.ok(Map.of("message", "reenviado"));
     }
-    @PostMapping("recuperar-password")
-    private ResponseEntity<?> VerificarCorreo(@RequestBody Usuario correo){
 
-        if (usuarioRepository.existsByCorreo(correo.getCorreo())){
-            usuariosPendientes.put(correo.getCorreo(),usuarioRepository.findByCorreo((correo.getCorreo())));
+    @PostMapping("recuperar-password")
+    private ResponseEntity<?> VerificarCorreo(@RequestBody Usuario correo) {
+
+        if (usuarioRepository.existsByCorreo(correo.getCorreo())) {
+            usuariosPendientes.put(correo.getCorreo(), usuarioRepository.findByCorreo((correo.getCorreo())));
             Usuario pendiente3 = usuariosPendientes.get(correo.getCorreo());
             pendiente3.setCodigo(GenerarCodigo());
             pendiente3.setFechaCodigo(LocalDateTime.now());
             emailService.enviarCodigo(pendiente3.getCorreo(), pendiente3.getCodigo());
             return ResponseEntity.ok(Map.of("message", "Correo verificado"));
-        }else{
+        } else {
             return ResponseEntity.badRequest().body(Map.of("message", "Correo no registrado"));
         }
     }
+
     @PostMapping("/cambiar-password")
-    private ResponseEntity<?> CambiarContraseña(@RequestBody Usuario datos){
-        System.out.println("a: "+datos.getCorreo());
+    private ResponseEntity<?> CambiarContraseña(@RequestBody Usuario datos) {
+        System.out.println("a: " + datos.getCorreo());
         Usuario pendiente4 = usuarioRepository.findByCorreo((datos.getCorreo()));
-        if (pendiente4!=null){
+        if (pendiente4 != null) {
             System.out.println("a");
-            if (datos.getModo().equals("recuperar")){
+            if (datos.getModo().equals("recuperar")) {
                 pendiente4.setContrasena(datos.getContrasena());
                 usuarioRepository.save(pendiente4);
                 usuariosPendientes.remove(datos.getCorreo());
                 return ResponseEntity.ok(Map.of("message", "Contraseña Actualizada"));
-            }if (datos.getModo().equals("cambiar")){
-               if (pendiente4.getContrasena().equals(datos.getContrasena())){
+            }
+            if (datos.getModo().equals("cambiar")) {
+                if (pendiente4.getContrasena().equals(datos.getContrasena())) {
                     pendiente4.setContrasena(datos.getCodigo());
                     usuarioRepository.save(pendiente4);
                     return ResponseEntity.ok(Map.of("message", "Contraseña Actualizada"));
                 }
             }
 
-        }else{
+        } else {
             return ResponseEntity.badRequest().body(Map.of("message", "usuario no encontrado"));
         }
         return ResponseEntity.badRequest().body(Map.of("message", "Contraseña actual incorrecta"));
     }
+
     @PostMapping("/login")
-    private ResponseEntity<?> login(@RequestBody Usuario respuesta){
+    private ResponseEntity<?> login(@RequestBody Usuario respuesta) {
         if (usuarioRepository.existsByCorreo(respuesta.getCorreo())) {
             Usuario pendiente3 = usuarioRepository.findByCorreo((respuesta.getCorreo()));
             Usuario instructor = pendiente3.getInstructor();
             System.out.println(instructor);
-            if (pendiente3.getContrasena().equals(respuesta.getContrasena())){
+            if (pendiente3.getContrasena().equals(respuesta.getContrasena())) {
                 usuariosPendientes.remove(respuesta.getCorreo());
                 Map<String, Object> responseMap = new HashMap<>();
                 responseMap.put("usuario", pendiente3);
                 responseMap.put("instructor", instructor);
                 return ResponseEntity.ok(responseMap);
 
-            }else{
+            } else {
                 return ResponseEntity.badRequest().body(Map.of("message", "Contraseña incorrecta"));
             }
         }
         return ResponseEntity.badRequest().body(Map.of("message", "El correo no se encuentra registrado"));
     }
+
     @PostMapping("/me")
-    private ResponseEntity<?> me(@RequestBody(required = false) Usuario respuesta){
-        System.out.println("a"+respuesta);
-        if (respuesta!=null) {
+    private ResponseEntity<?> me(@RequestBody(required = false) Usuario respuesta) {
+        System.out.println("a" + respuesta);
+        if (respuesta != null) {
             return ResponseEntity.ok(respuesta);
         }
         return ResponseEntity.badRequest().body(Map.of("message", "Error"));
     }
+
     @GetMapping("/academias")
-    private ResponseEntity<?> academiass(){
+    private ResponseEntity<?> academiass() {
         List<Academia> academias = academiaRepository.findAll();
-        if (academias!=null){
+        if (academias != null) {
             return ResponseEntity.ok(academias);
         }
         return ResponseEntity.badRequest().body(Map.of("message", "Error"));
     }
+
     @PostMapping("/instructores")
     private ResponseEntity<?> instructores(@RequestBody int idAcademia) {
 
         // AJUSTA "Instructor" según tu BD
         List<Usuario> instructores = usuarioRepository.findByAcademia_IDacademiaAndTipousuario_IDTipo(idAcademia, 2);
-        System.out.println("id academia"+idAcademia);
+        System.out.println("id academia" + idAcademia);
         System.out.println(instructores);
         if (instructores.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
@@ -180,10 +191,11 @@ public class controlador_principal {
 
         return ResponseEntity.ok(instructores);
     }
+
     @PutMapping("/perfil")
-    private ResponseEntity<?> actualizar_datos(@RequestBody Usuario datos){
-        System.out.println("a"+datos.getCorreo());
-        if(datos.getCorreo()==null){
+    private ResponseEntity<?> actualizar_datos(@RequestBody Usuario datos) {
+        System.out.println("a" + datos.getCorreo());
+        if (datos.getCorreo() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
         }
         return ResponseEntity.ok("perfecto");

@@ -8,7 +8,7 @@ import { Observable } from 'rxjs';
 export class ApiService {
   private apiUrl = 'http://localhost:8080/api';
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   getSaludo(): Observable<any> {
     return this.http.get(`${this.apiUrl}/saludo`);
@@ -27,7 +27,7 @@ export class ApiService {
   }
 
   registrarUsuario(usuario: any) {
-  return this.http.post(`${this.apiUrl}/registro`,usuario);
+    return this.http.post(`${this.apiUrl}/registro`, usuario);
   }
 
   solicitarRecuperacion(correo: string) {
@@ -46,7 +46,7 @@ export class ApiService {
   }
 
   cambiarPassword(data: any) {
-  return this.http.post(`${this.apiUrl}/cambiar-password`, data);
+    return this.http.post(`${this.apiUrl}/cambiar-password`, data);
   }
 
   // Actualizar datos de perfil (parcial)
@@ -62,12 +62,12 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/perfil/foto`, form);
   }
 
-  cargaracademias(): Observable<any[]>{
+  cargaracademias(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/academias`);
   }
 
-  cargarinstructor(academia : any): Observable<any[]>{
-    return this.http.post<any[]>(`${this.apiUrl}/cargar_instructores`, academia);
+  cargarinstructor(academia: any): Observable<any[]> {
+    return this.http.post<any[]>(`${this.apiUrl}/instructores`, academia);
   }
 
   crearCampeonato(payload: any) {

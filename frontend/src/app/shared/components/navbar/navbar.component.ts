@@ -7,6 +7,7 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { filter, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { delayRemaining } from '../../../core/utils/spinner-timing.util';
+import { extractUserRoles } from '../../../core/utils/user-type.util';
 
 @Component({
   selector: 'app-navbar',
@@ -52,9 +53,12 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.checkLoginStatus();
 
     // Cargar usuario cacheado (si existe) para poder armar /me correctamente.
+    // Cargar usuario cacheado (si existe) para poder armar /me correctamente.
     const rawUsuario = localStorage.getItem('usuario');
     try {
-      this.usuario = rawUsuario ? JSON.parse(rawUsuario) : null;
+      const parsed = rawUsuario ? JSON.parse(rawUsuario) : null;
+      // Si el backend devuelve { usuario: {...}, instructor: ... }, extraemos usuario
+      this.usuario = parsed?.usuario || parsed;
     } catch {
       this.usuario = null;
     }
@@ -85,9 +89,10 @@ export class NavbarComponent implements OnInit, OnDestroy {
     // Evita llamar /me sin body: el backend responde 400 si request == null.
     const correo = (sessionStorage.getItem('correo') || this.usuario?.correo || '').trim();
     const idDocumento = this.usuario?.idDocumento ?? this.usuario?.id_documento ?? null;
-    const meRequest = correo
-      ? { correo }
-      : (idDocumento != null ? { idDocumento } : null);
+
+    let meRequest = (this.usuario && Object.keys(this.usuario).length > 0)
+      ? this.usuario
+      : (correo ? { correo } : (idDocumento != null ? { idDocumento } : null));
 
     if (!meRequest) {
       this.loading = false;
@@ -136,22 +141,18 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.isLoggedIn = !!(token || this.username || correo);
 
     // Extract user type
-    if (this.usuario && this.usuario.tipousuario) {
-      // Debugging
-      console.log('Usuario received:', this.usuario);
-      console.log('Usuario Tipousuario:', this.usuario.tipousuario);
+    this.userType = null;
+    if (this.usuario) {
+      const roles = extractUserRoles(this.usuario);
+      console.log('Roles detected:', roles);
 
-      const tipo = this.usuario.tipousuario;
-      const rawType = tipo?.idTipo
-        ?? tipo?.ID_Tipo
-        ?? tipo?.id_Tipo
-        ?? tipo?.IDTipo
-        ?? tipo?.id
-        ?? (typeof tipo === 'number' ? tipo : null);
-
-      this.userType = rawType ? Number(rawType) : null;
-    } else {
-      this.userType = null;
+      if (roles.includes('administrador') || roles.includes('admin_proyecto')) {
+        this.userType = 3;
+      } else if (roles.includes('instructor')) {
+        this.userType = 2;
+      } else if (roles.includes('usuario')) {
+        this.userType = 1;
+      }
     }
     console.log('Detected User Type (Final):', this.userType, 'Is 2?', this.userType === 2);
 

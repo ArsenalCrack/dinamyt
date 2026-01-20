@@ -266,6 +266,30 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
         peso: [],
         genero: null
       }
+    },
+    {
+      id: 'salto-alto',
+      nombre: 'Salto alto',
+      activa: false,
+      expanded: false,
+      categorias: {
+        cinturon: [],
+        edad: [],
+        peso: [],
+        genero: null
+      }
+    },
+    {
+      id: 'salto-largo',
+      nombre: 'Salto largo',
+      activa: false,
+      expanded: false,
+      categorias: {
+        cinturon: [],
+        edad: [],
+        peso: [],
+        genero: null
+      }
     }
   ];
 
@@ -283,7 +307,7 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
     private api: ApiService,
     private scrollLock: ScrollLockService,
     private backNav: BackNavigationService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     // Inicializar 'pending' y banderas de categoría para todas las modalidades
@@ -735,8 +759,8 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
         return !cat.valor || (cat.valor || '').toString().trim() === '';
       } else {
         return !cat.desde || !cat.hasta ||
-               (cat.desde || '').toString().trim() === '' ||
-               (cat.hasta || '').toString().trim() === '';
+          (cat.desde || '').toString().trim() === '' ||
+          (cat.hasta || '').toString().trim() === '';
       }
     });
 

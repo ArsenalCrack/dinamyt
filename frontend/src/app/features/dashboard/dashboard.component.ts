@@ -25,7 +25,8 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit(): void {
     try {
-      this.usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+      const parsed = JSON.parse(localStorage.getItem('usuario') || '{}');
+      this.usuario = parsed?.usuario || parsed || {};
     } catch {
       this.usuario = {};
     }
@@ -64,8 +65,9 @@ export class DashboardComponent implements OnInit {
         // Default to Type 1 (Normal) if null/undefined
         let typeId = 1;
         if (u?.tipousuario) {
-          // Handle various potential casing for the ID (idTipo, ID_Tipo, id)
-          typeId = u.tipousuario.idTipo || u.tipousuario.ID_Tipo || u.tipousuario.id || 1;
+          // Handle various potential casing for the ID
+          const raw = u.tipousuario.idTipo || u.tipousuario.ID_Tipo || u.tipousuario.id_Tipo || u.tipousuario.IDTipo || u.tipousuario.id;
+          typeId = raw ? Number(raw) : 1;
         }
 
         if (typeId === 3) {

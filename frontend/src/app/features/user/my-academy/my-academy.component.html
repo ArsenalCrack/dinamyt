@@ -1,0 +1,71 @@
+<div class="profile-wrapper">
+    <div *ngIf="saving" class="loading-overlay">
+        <i class="fas fa-spinner fa-spin spinner-icon"></i>
+        <p class="loading-text">Guardando cambios...</p>
+    </div>
+
+    <div class="header-profile">
+        <a (click)="goBack()" class="btn-back" title="Volver atrás">
+            <i class="fas fa-arrow-left fa-lg"></i>
+        </a>
+        <h2>Mi Academia</h2>
+    </div>
+
+    <div class="avatar-section">
+        <div class="avatar"
+            [style.backgroundImage]="(logoPreview || logoUrl) ? 'url(' + (logoPreview || logoUrl) + ')' : 'none'">
+            <i *ngIf="!(logoPreview || logoUrl)" class="fas fa-university"></i>
+        </div>
+        <div class="avatar-info">
+            <p class="avatar-name">{{ academy.nombre || 'Nombre de Academia' }}</p>
+            <label class="btn-upload-photo">
+                <input type="file" accept="image/*" (change)="onLogoChange($event)" hidden>
+                <i class="fas fa-camera"></i>
+                Cambiar logo
+            </label>
+        </div>
+    </div>
+
+    <form (ngSubmit)="saveAcademy()">
+        <div class="profile-grid">
+            <!-- Datos básicos de la academia -->
+            <div class="field editable">
+                <label>Nombre de la Academia</label>
+                <input type="text" [(ngModel)]="academy.nombre" name="nombre" placeholder="Ej: Escuela Dinamyt"
+                    maxlength="100" required />
+            </div>
+
+            <div class="field editable">
+                <label>Dirección</label>
+                <input type="text" [(ngModel)]="academy.direccion" name="direccion" placeholder="Ej: Calle 123 #45-67"
+                    maxlength="150" />
+            </div>
+
+            <div class="field editable">
+                <label>Teléfono de Contacto</label>
+                <input type="tel" [(ngModel)]="academy.telefono" name="telefono" inputmode="numeric" pattern="^[0-9]*$"
+                    placeholder="Ej: 3001234567" maxlength="20" />
+            </div>
+
+            <div class="field editable">
+                <label>Red Social / Sitio Web</label>
+                <input type="url" [(ngModel)]="academy.url" name="url" placeholder="https://instagram.com/..."
+                    maxlength="200" />
+            </div>
+
+            <div class="field editable" style="grid-column: 1 / -1;">
+                <label>Descripción / Lema</label>
+                <textarea [(ngModel)]="academy.descripcion" name="descripcion"
+                    placeholder="Breve descripción de la academia..." maxlength="300"></textarea>
+            </div>
+
+        </div>
+
+        <div class="actions">
+            <button class="btn-primary" type="submit" [disabled]="saving">{{ saving ? 'Guardando...' : 'Guardar Datos'
+                }}</button>
+        </div>
+    </form>
+
+    <div *ngIf="message" class="alert" [class.success]="success">{{ message }}</div>
+</div>
