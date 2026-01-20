@@ -9,24 +9,25 @@
     <div class="navbar-content">
       <!-- Logo -->
       <a class="navbar-brand" routerLink="/">
-        <img src="assets/imgs/logoDHBlanco.png" alt="Logo Dinamyt" class="logo-img">
+        <img src="assets/imgs/logoDHBlanco-400w.png" alt="Logo Dinamyt" class="logo-img" width="400" decoding="async">
       </a>
 
       <!-- Toggle para móvil -->
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <button #navbarToggler class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+        aria-controls="navbarNav" aria-expanded="false" aria-label="Abrir/cerrar navegación">
         <span class="navbar-toggler-icon"></span>
       </button>
 
       <!-- Navegación -->
-      <div class="collapse navbar-collapse" id="navbarNav">
+      <div #navbarCollapse class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto align-items-center">
           <li class="nav-item">
-            <a class="nav-link" [routerLink]="isLoggedIn ? '/dashboard' : '/'" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+            <a class="nav-link" [routerLink]="isLoggedIn ? '/dashboard' : '/'" [class.active]="isPanelLinkActive()">
               {{ isLoggedIn ? 'Panel' : 'Inicio' }}
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/campeonatos" routerLinkActive="active">Campeonatos</a>
+            <a class="nav-link" routerLink="/campeonatos" [class.active]="isChampionshipsLinkActive()">Campeonatos</a>
           </li>
 
         </ul>
@@ -61,6 +62,10 @@
                   <button class="dropdown-item" disabled title="Próximamente">
                     <i class="fas fa-cog"></i>
                     <span>Configuración</span>
+                  </button>
+                  <button class="dropdown-item" *ngIf="userType === 2" (click)="goToMyAcademy()">
+                    <i class="fas fa-school"></i>
+                    <span>Mi Academia</span>
                   </button>
                   <div class="dropdown-divider"></div>
                   <button class="dropdown-item logout-item" (click)="logout()" [disabled]="loggingOut">

@@ -1,0 +1,15 @@
+User-agent: *
+Disallow: /login
+Disallow: /register
+Disallow: /recoverAccount
+Disallow: /dashboard
+Disallow: /perfil
+Disallow: /account/
+Disallow: /mis-campeonatos
+Disallow: /mis-estadisticas
+Disallow: /campeonatos/crear
+Disallow: /resetPassword
+Disallow: /verify
+Disallow: /404
+
+Sitemap: https://TU-DOMINIO_AQUI/sitemap.xml

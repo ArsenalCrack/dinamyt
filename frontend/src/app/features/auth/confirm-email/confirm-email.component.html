@@ -8,9 +8,16 @@
       <p class="loading-text">Enviando código...</p>
     </div>
 
-    <a (click)="volverAtras()" class="btn-back" title="Volver atrás">
-      <i class="fas fa-arrow-left fa-2x"></i>
-    </a>
+    <!-- Overlay de redirección -->
+    <div *ngIf="redirigiendo" class="loading-overlay">
+      <i class="fas fa-spinner fa-spin spinner-icon"></i>
+      <p class="loading-text">Redirigiendo a verificación...</p>
+    </div>
+
+    <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+      <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
+      <span class="visually-hidden">Volver atrás</span>
+    </button>
 
     <header class="header">
 
@@ -54,6 +61,7 @@
             name="email"
             [(ngModel)]="correo"
             #emailRef="ngModel"
+            autocomplete="email"
             required
             pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
             placeholder="ejemplo@correo.com"
@@ -71,7 +79,7 @@
       <button
         type="submit"
         class="btn-submit"
-        [disabled]="emailForm.invalid || cargando">
+        [disabled]="emailForm.invalid || cargando || redirigiendo">
         {{ cargando ? 'Enviando...' : 'Enviar Código' }}
       </button>
 

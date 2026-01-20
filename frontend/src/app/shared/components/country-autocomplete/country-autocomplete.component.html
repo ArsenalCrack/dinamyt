@@ -5,6 +5,9 @@
     type="text"
     class="search-input"
     [(ngModel)]="searchText"
+    [attr.name]="name"
+    [attr.id]="inputId"
+    [attr.aria-label]="ariaLabel || placeholder || 'Buscar país'"
     [placeholder]="placeholder"
     [disabled]="disabled"
     [class.input-error]="hasError"
@@ -14,10 +17,13 @@
     (keydown)="onKeydown($event)"
     autocomplete="off">
 
-  <span class="arrow"
-        [class.arrow-open]="isOpen"
-        (click)="toggleDropdown()"
-        (mousedown)="$event.preventDefault()"></span>
+  <button
+    type="button"
+    class="arrow"
+    [class.arrow-open]="isOpen"
+    [attr.aria-label]="(isOpen ? 'Cerrar' : 'Abrir') + ' lista de países'"
+    (click)="toggleDropdown()"
+    (mousedown)="$event.preventDefault()"></button>
 
   <ul class="options" *ngIf="isOpen && filteredPaises.length > 0" role="listbox" [ngStyle]="optionsStyle">
     <li *ngFor="let pais of filteredPaises; let i = index"

@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { User, UserRole } from '../../core/models/user.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -11,7 +12,7 @@ import { AuthService } from '../../core/services/auth.service';
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
   canCreate = false;
   nombreC: string | null = null;
   hasMyChampionships = false;
@@ -23,12 +24,24 @@ export class DashboardComponent {
   constructor(private apiService: ApiService, private auth: AuthService) { }
 
   ngOnInit(): void {
-    this.usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
-    // Obtener el username que contiene el nombreC del registro
+    try {
+      this.usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+    } catch {
+      this.usuario = {};
+    }
 
-    this.apiService.getCurrentUser(this.usuario).subscribe({
-      next: (u: any) => {
-        console.log("u",u.nombreC);
+    if (!this.usuario || Object.keys(this.usuario).length === 0) {
+      // If no user in local storage, try to see if session has data or just fail gracefully
+      console.warn('No user found in localStorage');
+      // Optionally redirect to login or handle as guest
+    }
+
+    // Ensure we send a valid object, even if empty, to avoid "Required request body is missing"
+    const payload = this.usuario || {};
+
+    this.apiService.getCurrentUser(payload).subscribe({
+      next: (u: User) => {
+        console.log("u", u.nombreC);
 
         // Priorizar nombreC del backend
         if (u?.nombreC) {
@@ -39,20 +52,29 @@ export class DashboardComponent {
         }
 
         // permission heuristics: backend may expose roles or explicit flags
-        const roles: string[] = u?.roles || u?.authorities || [];
+        // cast explicitly to any if checks are loose, or strictly use UserRole
+        const roles: any[] = u?.roles || u?.authorities || [];
         if (Array.isArray(roles) && roles.length) {
-          this.canCreate = roles.includes('ADMIN') || roles.includes('ROLE_ADMIN');
-        }
-        if (!this.canCreate) {
-          this.canCreate = !!u?.canCreateChampionship;
+          // Check for strings or objects if complex roles exist
+          const flatRoles = roles.map(r => typeof r === 'string' ? r : (r as any).authority || (r as any).name);
+          this.canCreate = flatRoles.includes('ADMIN') || flatRoles.includes('ROLE_ADMIN') || flatRoles.includes('administrador');
         }
 
-        // Permitir permisos temporales en desarrollo
-        if (!this.canCreate && this.auth.hasTemporaryPermissions()) {
-          const devRole = this.auth.getTemporaryRole();
-          this.canCreate = devRole === 'admin' || devRole === 'creator';
+        // Logic for User Types
+        // Default to Type 1 (Normal) if null/undefined
+        let typeId = 1;
+        if (u?.tipousuario) {
+          // Handle various potential casing for the ID (idTipo, ID_Tipo, id)
+          typeId = u.tipousuario.idTipo || u.tipousuario.ID_Tipo || u.tipousuario.id || 1;
+        }
+
+        if (typeId === 3) {
+          this.canCreate = true;
           this.hasMyChampionships = true;
-          console.log('✅ Permisos temporales activos:', devRole);
+        }
+
+        if (!this.canCreate) {
+          this.canCreate = !!u?.canCreateChampionship;
         }
 
         // Detect if user has created championships
@@ -72,19 +94,11 @@ export class DashboardComponent {
         // Keep defaults (hide create card)
         // Intentar calcular el estado con sessionStorage si falla la API
         this.computeProfileStatus(null);
-
-        // Permitir permisos temporales en desarrollo aunque falle API
-        if (this.auth.hasTemporaryPermissions()) {
-          const devRole = this.auth.getTemporaryRole();
-          this.canCreate = devRole === 'admin' || devRole === 'creator';
-          this.hasMyChampionships = true;
-          console.log('✅ Permisos temporales activos (sin API):', devRole);
-        }
       }
     });
   }
 
-  private computeProfileStatus(user: any | null): void {
+  private computeProfileStatus(user: User | null): void {
     const fields = [
       { key: 'nombreC', label: 'Nombre completo' },
       { key: 'idDocumento', label: 'Documento' },
@@ -109,6 +123,7 @@ export class DashboardComponent {
     };
 
     for (const f of fields) {
+      // safe access with casting to any since keys are dynamic strings
       const valFromUser = user ? (user as any)[f.key] : null;
       const fallbackKeys = sessionFallbackKeys[f.key] || [f.key];
       const valFromSession = fallbackKeys.map(k => sessionStorage.getItem(k)).find(v => v !== null);

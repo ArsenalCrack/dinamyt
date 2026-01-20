@@ -1,10 +1,12 @@
-import { Component, OnInit, HostListener, OnDestroy } from '@angular/core';
+import { Component, OnInit, HostListener, OnDestroy, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { filter, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
+import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 
 @Component({
   selector: 'app-navbar',
@@ -14,28 +16,50 @@ import { Subject } from 'rxjs';
   styleUrls: ['./navbar.component.scss']
 })
 export class NavbarComponent implements OnInit, OnDestroy {
+  @ViewChild('navbarCollapse', { read: ElementRef }) private navbarCollapseRef?: ElementRef<HTMLElement>;
+  @ViewChild('navbarToggler', { read: ElementRef }) private navbarTogglerRef?: ElementRef<HTMLButtonElement>;
+
   username: string | null = null;
   isLoggedIn = false;
   loading = true;
   loggingOut = false;
   showUserDropdown = false;
+  currentUrl = '';
+  userType: number | null = null;
   usuario: any;
   private destroy$ = new Subject<void>();
 
-  constructor(private api: ApiService, private router: Router, private auth: AuthService) {
+  constructor(
+    private api: ApiService,
+    private router: Router,
+    private auth: AuthService,
+    private scrollLock: ScrollLockService
+  ) {
     // Escuchar cambios de navegación para actualizar el estado
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd),
       takeUntil(this.destroy$)
     ).subscribe(() => {
+      this.currentUrl = this.router.url || '';
+      this.closeDropdown();
+      this.closeMobileNavbar();
       this.checkLoginStatus();
     });
   }
 
   ngOnInit(): void {
+    this.currentUrl = this.router.url || '';
     this.checkLoginStatus();
+
+    // Cargar usuario cacheado (si existe) para poder armar /me correctamente.
+    const rawUsuario = localStorage.getItem('usuario');
+    try {
+      this.usuario = rawUsuario ? JSON.parse(rawUsuario) : null;
+    } catch {
+      this.usuario = null;
+    }
+
     if (this.isLoggedIn) {
-      this.usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
       if (!this.username && this.usuario?.nombreC) {
         this.username = this.usuario.nombreC;
         sessionStorage.setItem('nombreC', this.usuario.nombreC);
@@ -58,25 +82,46 @@ export class NavbarComponent implements OnInit, OnDestroy {
       this.username = username || sessionStorage.getItem('nombreC') || this.usuario?.nombreC || null;
     });
 
-    this.api.getCurrentUser(this.usuario).subscribe({
-      next: (u: any) => {
+    // Evita llamar /me sin body: el backend responde 400 si request == null.
+    const correo = (sessionStorage.getItem('correo') || this.usuario?.correo || '').trim();
+    const idDocumento = this.usuario?.idDocumento ?? this.usuario?.id_documento ?? null;
+    const meRequest = correo
+      ? { correo }
+      : (idDocumento != null ? { idDocumento } : null);
+
+    if (!meRequest) {
+      this.loading = false;
+      return;
+    }
+
+    const startedAt = Date.now();
+
+    this.api.getCurrentUser(meRequest).subscribe({
+      next: async (u: any) => {
         const storedName = sessionStorage.getItem('nombreC');
         this.username = u?.nombreC || storedName || this.usuario?.nombreC || null;
         if (u?.nombreC && !storedName) {
           sessionStorage.setItem('nombreC', u.nombreC);
         }
+        // Actualizar usuario local para tener la data fresca, incluyendo tipousuario
+        this.usuario = u;
+        localStorage.setItem('usuario', JSON.stringify(u));
+        this.checkLoginStatus(); // Recalcular userType
         this.isLoggedIn = true;
         this.auth.setLoggedIn(true, this.username);
+
+        await delayRemaining(startedAt);
         this.loading = false;
       },
-      error: () => {
+      error: async () => {
+        await delayRemaining(startedAt);
         this.loading = false;
       }
     });
   }
 
-  private lockScroll() { document.body.style.overflow = 'hidden'; }
-  private unlockScroll() { document.body.style.overflow = ''; }
+  private lockScroll() { this.scrollLock.lock(); }
+  private unlockScroll() { this.scrollLock.unlock(); }
 
   ngOnDestroy(): void {
     this.unlockScroll();
@@ -89,7 +134,41 @@ export class NavbarComponent implements OnInit, OnDestroy {
     const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
     const correo = sessionStorage.getItem('correo');
     this.isLoggedIn = !!(token || this.username || correo);
+
+    // Extract user type
+    if (this.usuario && this.usuario.tipousuario) {
+      // Debugging
+      console.log('Usuario received:', this.usuario);
+      console.log('Usuario Tipousuario:', this.usuario.tipousuario);
+
+      const tipo = this.usuario.tipousuario;
+      const rawType = tipo?.idTipo
+        ?? tipo?.ID_Tipo
+        ?? tipo?.id_Tipo
+        ?? tipo?.IDTipo
+        ?? tipo?.id
+        ?? (typeof tipo === 'number' ? tipo : null);
+
+      this.userType = rawType ? Number(rawType) : null;
+    } else {
+      this.userType = null;
+    }
+    console.log('Detected User Type (Final):', this.userType, 'Is 2?', this.userType === 2);
+
     this.auth.setLoggedIn(this.isLoggedIn, this.username);
+  }
+
+  isPanelLinkActive(): boolean {
+    const url = (this.currentUrl || '').split('?')[0];
+    if (!this.isLoggedIn) {
+      return url === '' || url === '/';
+    }
+    return url.startsWith('/dashboard') || url.startsWith('/campeonatos/crear');
+  }
+
+  isChampionshipsLinkActive(): boolean {
+    const url = (this.currentUrl || '').split('?')[0];
+    return url.startsWith('/campeonatos') && !url.startsWith('/campeonatos/crear');
   }
 
   toggleUserDropdown(): void {
@@ -109,9 +188,38 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.showUserDropdown = false;
   }
 
+  private closeMobileNavbar(): void {
+    const collapseEl = this.navbarCollapseRef?.nativeElement;
+    if (!collapseEl) return;
+    if (!collapseEl.classList.contains('show')) return;
+
+    const win = window as any;
+    const bs = win?.bootstrap;
+
+    try {
+      if (bs?.Collapse?.getOrCreateInstance) {
+        const instance = bs.Collapse.getOrCreateInstance(collapseEl, { toggle: false });
+        instance.hide();
+      } else {
+        collapseEl.classList.remove('show');
+      }
+    } finally {
+      const togglerEl = this.navbarTogglerRef?.nativeElement;
+      if (togglerEl) {
+        togglerEl.classList.add('collapsed');
+        togglerEl.setAttribute('aria-expanded', 'false');
+      }
+    }
+  }
+
   goToProfile(): void {
     this.closeDropdown();
     this.router.navigate(['/perfil']);
+  }
+
+  goToMyAcademy(): void {
+    this.closeDropdown();
+    this.router.navigate(['/mi-academia']);
   }
 
   logout(): void {
@@ -139,3 +247,4 @@ export class NavbarComponent implements OnInit, OnDestroy {
     }, 500);
   }
 }
+

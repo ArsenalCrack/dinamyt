@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { Location } from '@angular/common';
+import { BackNavigationService } from '../../../core/services/back-navigation.service';
 
 @Component({
   selector: 'app-my-championships',
@@ -16,7 +17,11 @@ export class MyChampionshipsComponent implements OnInit {
   championships: any[] = [];
   filteredChampionships: any[] = [];
 
-  constructor(private router: Router, private location: Location) {}
+  constructor(
+    private router: Router,
+    private location: Location,
+    private backNav: BackNavigationService
+  ) {}
 
   ngOnInit(): void {
     // TODO: Conectar con API cuando esté disponible
@@ -64,7 +69,7 @@ export class MyChampionshipsComponent implements OnInit {
   }
 
   goBack(): void {
-    this.location.back();
+    this.backNav.backOr({ fallbackUrl: '/dashboard' });
   }
 
   editChampionship(id: number): void {

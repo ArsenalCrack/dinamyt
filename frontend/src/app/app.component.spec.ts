@@ -1,10 +1,20 @@
 import { TestBed } from '@angular/core/testing';
 import { AppComponent } from './app.component';
+import { ApiService } from './core/services/api.service';
+import { of } from 'rxjs';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent],
+      providers: [
+        {
+          provide: ApiService,
+          useValue: {
+            getSaludo: () => of({ mensaje: 'OK', estado: 'Online' }),
+          },
+        },
+      ],
     }).compileComponents();
   });
 
@@ -14,16 +24,18 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it(`should have the 'dinamyt-front' title`, () => {
+  it('should have default backend status values before init', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
-    expect(app.title).toEqual('dinamyt-front');
+    expect(app.mensajeBackend).toBe('Esperando conexión...');
+    expect(app.estadoBackend).toBe('Desconocido');
   });
 
-  it('should render title', () => {
+  it('should update backend status on init', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, dinamyt-front');
+    const app = fixture.componentInstance;
+    expect(app.mensajeBackend).toBe('OK');
+    expect(app.estadoBackend).toBe('Online');
   });
 });

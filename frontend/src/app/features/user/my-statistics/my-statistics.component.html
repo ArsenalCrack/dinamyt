@@ -1,0 +1,60 @@
+<div class="my-stats-container">
+  <div class="my-stats-card">
+    <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+      <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
+      <span class="visually-hidden">Volver atrás</span>
+    </button>
+
+    <header class="header">
+      <h1>Mis Estadísticas</h1>
+      <p class="subtitle">Revisa tus puntuaciones y posiciones en campeonatos donde has participado.</p>
+    </header>
+
+    <div class="search-section">
+      <input
+        type="text"
+        class="search-input"
+        id="my-stats-search"
+        name="searchMyStats"
+        aria-label="Buscar estadísticas"
+        placeholder="Buscar por campeonato, modalidad o categoría..."
+        [(ngModel)]="searchQuery"
+        (input)="onSearchChange()">
+      <i class="fas fa-search search-icon" aria-hidden="true"></i>
+    </div>
+
+    <div class="stats-list">
+      <ng-container *ngIf="filtered.length > 0; else noResults">
+        <div class="stat-item" *ngFor="let row of filtered">
+          <div class="item-header">
+            <div class="item-title">
+              <h3>{{ row.championship }}</h3>
+              <span class="pill">{{ row.modalidad }}</span>
+            </div>
+            <div class="item-meta">
+              <span class="meta"><i class="fas fa-calendar"></i> {{ row.fecha | date:'dd/MM/yyyy' }}</span>
+            </div>
+          </div>
+
+          <div class="item-details">
+            <div class="detail"><i class="fas fa-layer-group"></i> <span>{{ row.categoria }}</span></div>
+            <div class="detail"><i class="fas fa-star"></i> <span>{{ row.puntos }}</span></div>
+            <div class="detail"><i class="fas fa-trophy"></i> <span>#{{ row.posicion }}</span></div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-template #noResults>
+        <div class="no-results">
+          <i class="fas fa-inbox"></i>
+          <p>No encontramos estadísticas que coincidan con tu búsqueda.</p>
+        </div>
+      </ng-template>
+    </div>
+
+    <div class="note">
+      <i class="fas fa-info-circle"></i>
+      <span>Próximo paso: conectar este módulo con la API para traer resultados reales.</span>
+    </div>
+  </div>
+</div>

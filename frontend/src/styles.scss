@@ -1,7 +1,570 @@
 @import "bootstrap/scss/bootstrap";
 
-/* --- 1. IMPORTACIÓN DE FUENTES (Google Fonts) --- */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800&family=Roboto:wght@300;400;500&display=swap');
+/* Fuentes (locales) y iconos (local) para evitar stylesheets cross-origin */
+@import "@fontsource/montserrat/400.css";
+@import "@fontsource/montserrat/700.css";
+@import "@fontsource/montserrat/800.css";
+@import "@fontsource/roboto/300.css";
+@import "@fontsource/roboto/400.css";
+@import "@fontsource/roboto/500.css";
+@import "@fortawesome/fontawesome-free/css/all.min.css";
+
+/* A11y: muchos iconos eran <span> clicables; al convertirlos a <button> quitamos estilos nativos */
+button.btn-back,
+button.eye-icon,
+button.arrow {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+}
+
+button.eye-icon,
+button.arrow {
+    cursor: pointer;
+}
+
+/* Estilos base de Flatpickr (necesario para el calendario custom) */
+@import "flatpickr/dist/flatpickr.min.css";
+
+
+/* --- PERSONALIZACIÓN DEL CALENDARIO (Flatpickr) --- */
+.dinamyt-flatpickr-theme {
+    background: #fff;
+    border-radius: 16px; /* Más redondeado y moderno */
+    box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+    border: 0 solid transparent;
+    font-family: 'Montserrat', sans-serif;
+    padding: 12px;
+    width: min(360px, calc(100vw - 24px)); /* Suficiente para meses largos sin romper responsive */
+    z-index: 1200;
+
+    /* Tamaños base (5 filas) */
+    --fp-day-size: 34px;
+    --fp-day-gap: 4px;
+
+    /* Mantener el header y dropdown dentro del cuadro */
+    overflow: visible;
+
+    /* Separación visual entre el input y el popup (como los demás desplegables) */
+    &.open {
+        margin-top: 8px;
+    }
+
+    /* Ocultar flechitas por defecto para un look más limpio 'flotante' */
+    &::before, &::after {
+        display: none;
+    }
+
+    /* Cabecera del calendario (Mes y Año) */
+    .flatpickr-months {
+        background: transparent;
+        margin-bottom: 12px;
+        align-items: center;
+        overflow: visible !important;
+        position: relative;
+        isolation: isolate; /* asegura z-index consistente para flechas vs dropdown */
+        z-index: 50; /* el header (y su dropdown) siempre sobre los días */
+        display: grid !important;
+        grid-template-columns: 32px minmax(0, 1fr) 32px;
+        align-items: center;
+        gap: 8px;
+        padding: 0; /* un poquito más hacia los extremos */
+
+        .flatpickr-month {
+            background: transparent;
+            color: var(--color-principal);
+            fill: var(--color-principal);
+            height: 44px;
+            overflow: visible;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1 1 auto;
+            min-width: 0; /* permite que el centro encoja sin empujar flechas */
+        }
+
+        .flatpickr-prev-month, .flatpickr-next-month {
+            color: var(--color-principal);
+            fill: var(--color-principal);
+            height: 32px;
+            width: 32px;
+            padding: 8px;
+            /* A los extremos y centrado respecto a inputs */
+            position: relative !important; /* permite z-index sin salir del grid */
+            top: auto !important;
+            left: auto !important;
+            right: auto !important;
+            transform: none !important;
+            z-index: 5; /* siempre por encima del centro para que se vean/clicken */
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            background: transparent !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 !important;
+            justify-self: stretch;
+            opacity: 1;
+            visibility: visible;
+
+            &:hover {
+                background: var(--color-gris-claro);
+                color: var(--color-acento);
+                svg { fill: var(--color-acento); }
+            }
+
+            &:active {
+                transform: scale(0.98);
+            }
+
+            svg {
+                width: 14px;
+                height: 14px;
+                display: block;
+            }
+        }
+
+        .flatpickr-prev-month {
+            justify-self: start;
+            margin-left: -4px !important;
+        }
+        .flatpickr-next-month {
+            justify-self: end;
+            margin-right: -4px !important;
+        }
+
+        .flatpickr-current-month {
+            font-size: 1.1rem;
+            padding-top: 0;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            /* Evitar “borde rectangular” en el bloque del mes/año */
+            border: 0;
+            box-shadow: none;
+            background: transparent;
+
+            /* Flatpickr por defecto lo posiciona absolute; lo volvemos parte del flow para alinear bien */
+            position: static !important;
+            width: 100% !important;
+            left: auto !important;
+            transform: none !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            overflow: visible !important;
+            min-width: 0;
+
+            /* Desplegable de mes (select) */
+            .flatpickr-monthDropdown-months {
+                /* Se oculta porque usamos dropdown custom (evita flechas duplicadas del select nativo) */
+                &.dinamyt-fp-hidden-native {
+                    position: absolute !important;
+                    opacity: 0 !important;
+                    pointer-events: none !important;
+                    width: 1px !important;
+                    height: 1px !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    border: 0 !important;
+                }
+            }
+
+            /* Dropdown custom de mes (mismo look del CustomSelect) */
+            .dinamyt-fp-month-select {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+                justify-content: space-between;
+                min-width: 180px; /* Enero/Septiembre/Diciembre completos */
+                flex: 1 1 auto;
+                padding: 12px 40px 12px 16px;
+                border: 2px solid var(--color-borde);
+                border-radius: 10px;
+                background: #fff;
+                cursor: pointer;
+                user-select: none;
+                transition: all 0.3s ease;
+                height: 44px; /* Igualar altura con el input de año */
+                box-sizing: border-box;
+                z-index: 200; /* encima del grid de días */
+                max-width: 100%;
+            }
+
+            .dinamyt-fp-month-select:hover {
+                border-color: var(--color-acento);
+                box-shadow: 0 8px 20px rgba(214,0,0,0.08);
+            }
+
+            .dinamyt-fp-month-select.open {
+                border-color: var(--color-acento);
+                box-shadow: 0 8px 20px rgba(214,0,0,0.08);
+            }
+
+            .dinamyt-fp-month-label {
+                font-weight: 700;
+                color: var(--color-principal);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: clip;
+                font-size: 0.95rem;
+            }
+
+            .dinamyt-fp-month-arrow {
+                position: absolute;
+                right: 14px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 18px;
+                height: 10px;
+                background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'><path d='M1 1 L7 7 L13 1' stroke='%23666666' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+                background-repeat: no-repeat;
+                background-position: center;
+                transition: all 0.3s ease;
+            }
+
+            .dinamyt-fp-month-select:hover .dinamyt-fp-month-arrow,
+            .dinamyt-fp-month-select.open .dinamyt-fp-month-arrow {
+                background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'><path d='M1 1 L7 7 L13 1' stroke='%23D60000' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+            }
+
+            .dinamyt-fp-month-select.open .dinamyt-fp-month-arrow {
+                transform: translateY(-50%) rotate(180deg);
+            }
+
+            .dinamyt-fp-month-options {
+                /* Overlay dentro del cuadro: se superpone sobre los días */
+                position: absolute;
+                left: 0;
+                right: 0;
+                top: calc(100% + 8px);
+                background: #fff;
+                border-radius: 10px;
+                padding: 8px 6px;
+                box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+                z-index: 9999; /* siempre por encima del grid de días */
+                max-height: 220px;
+                overflow: auto;
+                overflow-x: hidden; /* sin scroll horizontal */
+                border: 2px solid rgba(214,0,0,0.06);
+
+                opacity: 0;
+                transform: translateY(-6px);
+                pointer-events: none;
+                transition: opacity 0.18s ease, transform 0.18s ease;
+                list-style: none;
+                margin: 0;
+                display: block;
+            }
+
+            .dinamyt-fp-month-select.open .dinamyt-fp-month-options {
+                opacity: 1;
+                transform: translateY(0);
+                pointer-events: auto;
+            }
+
+            .dinamyt-fp-month-option {
+                padding: 10px 14px;
+                border-radius: 8px;
+                margin: 4px 2px;
+                color: var(--color-principal);
+                cursor: pointer;
+                white-space: normal; /* mostrar mes completo (si toca, hace wrap) */
+                line-height: 1.2;
+            }
+
+            .dinamyt-fp-month-option:hover {
+                background: rgba(214,0,0,0.08);
+                color: var(--color-acento);
+            }
+
+            /* Año (input numérico) */
+            .numInputWrapper {
+                border: 1px solid var(--color-borde);
+                border-radius: 10px;
+                padding: 0 28px 0 8px;
+                background: #fff;
+                transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+                height: 44px; /* Igualar altura con mes */
+                display: inline-flex;
+                align-items: center;
+                box-sizing: border-box;
+                flex: 0 0 auto;
+                width: 96px !important; /* año completo sin cortar */
+                overflow: visible;
+
+                &:hover {
+                    background: var(--color-gris-claro);
+                }
+
+                &:focus-within {
+                    border-color: var(--color-acento);
+                    box-shadow: 0 0 0 4px rgba(214, 0, 0, 0.10);
+                }
+
+                input.cur-year {
+                    font-weight: 700;
+                    color: var(--color-principal);
+                    padding: 12px 6px;
+                    min-width: 5ch;
+                    width: 100%;
+                    text-align: center;
+                    line-height: 1;
+                    font-size: 0.95rem;
+                    caret-color: transparent;
+                }
+
+                span.arrowUp,
+                span.arrowDown {
+                    border: 0;
+                    border-radius: 8px;
+                    transition: background 0.2s;
+                    opacity: 1; /* siempre visible (mejor UX) */
+                    width: 28px;
+                    right: 0;
+                    background: transparent;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+
+                    &:hover {
+                        background: rgba(214, 0, 0, 0.08);
+                    }
+                }
+
+                /* Triángulos (flechas) con color del proyecto */
+                span.arrowUp:after {
+                    border-bottom-color: rgba(214, 0, 0, 0.85) !important;
+                    top: 50% !important;
+                    transform: translateY(-50%);
+                }
+                span.arrowDown:after {
+                    border-top-color: rgba(214, 0, 0, 0.85) !important;
+                    top: 50% !important;
+                    transform: translateY(-50%);
+                }
+            }
+
+            input.cur-year {
+                font-weight: 700;
+                color: var(--color-principal);
+            }
+             .cur-month {
+                font-weight: 700;
+                color: var(--color-principal);
+             }
+        }
+    }
+
+    /* Días de la semana (L, M, M, J...) */
+    .flatpickr-weekdays {
+        background: transparent;
+        margin-bottom: 8px;
+
+        .flatpickr-weekday {
+            color: #9aa0a6;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    }
+
+    .flatpickr-days {
+        width: 100% !important;
+        /* Forzar visualmente 5 filas: ocultar la 6ª semana completa */
+        overflow: hidden;
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Evitar que contenedores internos de flatpickr recorten overlays */
+    .flatpickr-innerContainer,
+    .flatpickr-rContainer {
+        overflow: visible !important;
+    }
+
+    .dayContainer {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+
+        /* Flatpickr renderiza siempre 6 filas (42 días). Aquí dejamos solo 5 filas completas (35 días)
+           sin mostrar "media fila" al final. */
+        display: flex;
+        flex-wrap: wrap;
+        row-gap: var(--fp-day-gap);
+        column-gap: 0;
+        height: calc((var(--fp-day-size) * 5) + (var(--fp-day-gap) * 4));
+        overflow: hidden;
+    }
+
+    /* Días individuales */
+    .flatpickr-day {
+        border-radius: 10px; /* Redondeado suave */
+        color: var(--color-principal);
+        font-weight: 500;
+        height: var(--fp-day-size);
+        line-height: var(--fp-day-size);
+        margin-top: 0;
+        border: 1px solid transparent; /* Evita saltos de layout */
+
+        /* Día Actual */
+        &.today {
+            border-color: transparent;
+            background: rgba(214, 0, 0, 0.08); /* Rojo muy tenúe */
+            color: var(--color-acento);
+            font-weight: 700;
+
+            &:hover {
+                background: rgba(214, 0, 0, 0.15);
+                color: var(--color-acento);
+            }
+        }
+
+        /* Día Seleccionado */
+        &.selected, &.startRange, &.endRange, &.selected.inRange, &.startRange.inRange, &.endRange.inRange, &.selected:focus, &.startRange:focus, &.endRange:focus {
+            background: var(--color-acento) !important;
+            border-color: var(--color-acento) !important;
+            color: #fff !important;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(214, 0, 0, 0.35); /* Sombra suave para resaltar */
+        }
+
+        /* Hover general */
+        &:hover {
+            background: rgba(214, 0, 0, 0.08);
+            border-color: rgba(214, 0, 0, 0.12);
+            color: var(--color-acento);
+        }
+
+        /* Días desactivados (por minDate/maxDate) */
+        &.flatpickr-disabled,
+        &.flatpickr-disabled:hover,
+        &.notAllowed,
+        &.notAllowed:hover {
+            color: rgba(57,57,57,0.25) !important;
+            background: transparent !important;
+            border-color: transparent !important;
+            cursor: not-allowed !important;
+            opacity: 0.55;
+        }
+
+        /* Días de otro mes (pero no necesariamente deshabilitados) */
+        &.prevMonthDay, &.nextMonthDay {
+            color: rgba(57,57,57,0.35);
+        }
+    }
+
+    /* Mejor UX en móvil: ancho fluido y tap targets cómodos */
+    @media (max-width: 420px) {
+        --fp-day-size: 36px;
+
+        width: min(320px, calc(100vw - 24px));
+        padding: 12px;
+
+        .flatpickr-current-month {
+            .dinamyt-fp-month-select {
+                min-width: 0;
+                padding: 10px 36px 10px 12px;
+            }
+
+            .dinamyt-fp-month-label {
+                text-overflow: ellipsis;
+            }
+
+            .numInputWrapper {
+                width: 84px !important;
+                padding: 0 26px 0 6px;
+            }
+        }
+
+        .flatpickr-months {
+            /* En responsive ocultamos flechas y dejamos el header centrado */
+            grid-template-columns: 1fr;
+            gap: 0;
+
+            .flatpickr-prev-month,
+            .flatpickr-next-month {
+                display: none !important;
+            }
+
+            .flatpickr-month {
+                justify-content: center;
+            }
+        }
+
+    }
+}
+
+/* Opción de mes deshabilitada (respeta minDate en "fecha fin") */
+.dinamyt-flatpickr-theme {
+    .dinamyt-fp-month-option.dinamyt-fp-month-option--disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .dinamyt-fp-month-option.dinamyt-fp-month-option--hidden {
+        display: none;
+    }
+}
+
+/* Meses que requieren 6 semanas: compactar para mantener altura visual de ~5 filas sin perder días */
+.dinamyt-flatpickr-theme.dinamyt-fp-compact-6w {
+    /* 6 filas deben caber en el alto visual de 5 filas (aprox.) */
+    --fp-day-size: 28px;
+    --fp-day-gap: 2px;
+
+    .flatpickr-weekdays {
+        margin-bottom: 6px;
+    }
+}
+
+/* Estilo para el input generado por Flatpickr (fuera del encapsulamiento de componentes) */
+.dinamyt-date-input {
+    width: 100%;
+    border: 1px solid var(--color-borde);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 1rem;
+    font-family: inherit;
+    color: var(--color-texto);
+    background: #fff;
+    transition: all 0.25s ease;
+    cursor: pointer;
+
+    &::placeholder {
+        color: #999;
+        opacity: 1;
+    }
+
+    &:hover {
+        border-color: #bbbbbb;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-acento);
+      box-shadow: 0 0 0 4px rgba(214, 0, 0, 0.1);
+    }
+
+    &[readonly] {
+        background-color: #fff; /* Evitar gris por defecto */
+        cursor: pointer;
+    }
+}
+
+
+/* --- 1. FUENTES --- */
+/* Las fuentes se cargan localmente vía @fontsource (ver imports al inicio del archivo). */
 
 /* --- 2. VARIABLES GLOBALES (Tus colores) --- */
 :root {
@@ -36,8 +599,11 @@ body {
     font-family: 'Montserrat', sans-serif;
     color: var(--color-principal);
     line-height: 1.6;
+    text-size-adjust: 100%;
     overflow-x: hidden;
 }
+
+th { text-align: start; }
 
 h1, h2, h3, h4 {
     font-family: 'Montserrat', sans-serif;
@@ -60,6 +626,7 @@ strong, b, h1, h2, h3, h4 { font-family: 'Montserrat', sans-serif; font-weight: 
 input, textarea, select {
     font-family: 'Montserrat', sans-serif;
 }
+
 
 ::placeholder { /* standard */
     font-family: 'Montserrat', sans-serif;

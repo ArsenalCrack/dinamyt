@@ -4,6 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { Location } from '@angular/common';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
+import { delayRemaining, DEFAULT_MIN_SPINNER_MS } from '../../../core/utils/spinner-timing.util';
+import { BackNavigationService } from '../../../core/services/back-navigation.service';
 
 @Component({
   selector: 'app-confirm-email',
@@ -20,34 +23,68 @@ export class ConfirmEmailComponent implements OnInit, AfterViewInit, OnDestroy {
   private api = inject(ApiService);
   private router = inject(Router);
   private location = inject(Location);
+  private scrollLock = inject(ScrollLockService);
+  private backNav = inject(BackNavigationService);
+
+  private modalLocked = false;
 
   correo: string = '';
   cargando: boolean = false;
+  redirigiendo: boolean = false;
   mensaje: string = '';
   exito: boolean = false;
 
-  private lockScroll() { document.body.style.overflow = 'hidden'; }
-  private unlockScroll() { document.body.style.overflow = ''; }
+  private readonly MSG_VISIBLE_MS = DEFAULT_MIN_SPINNER_MS;
+  private readonly REDIRECT_SPINNER_MS = DEFAULT_MIN_SPINNER_MS;
+  private redirectTimer: number | null = null;
+  private navigateTimer: number | null = null;
+
+  private clearTimers(): void {
+    if (this.redirectTimer !== null) {
+      window.clearTimeout(this.redirectTimer);
+      this.redirectTimer = null;
+    }
+    if (this.navigateTimer !== null) {
+      window.clearTimeout(this.navigateTimer);
+      this.navigateTimer = null;
+    }
+  }
+
+  private lockScroll() {
+    if (this.modalLocked) return;
+    this.scrollLock.lock();
+    this.modalLocked = true;
+  }
+
+  private unlockScroll() {
+    if (!this.modalLocked) return;
+    this.scrollLock.unlock();
+    this.modalLocked = false;
+  }
 
   closeMensaje() {
     this.mensaje = '';
+    this.unlockScroll();
   }
 
   volverAtras() {
-    this.location.back();
+    this.backNav.backOr({ fallbackUrl: '/' });
   }
 
   enviarCodigo() {
+    this.clearTimers();
     this.cargando = true;
+    this.redirigiendo = false;
     this.lockScroll();
     this.mensaje = '';
     this.exito = false;
+    const startedAt = Date.now();
 
     // Llamamos al servicio (Asegúrate de crear este método en api.service.ts)
     this.api.solicitarRecuperacion(this.correo).subscribe({
-      next: (res) => {
+      next: async (res) => {
+        await delayRemaining(startedAt);
         this.cargando = false;
-        this.unlockScroll();
         this.exito = true;
 
         // ¡CLAVE! Aquí guardamos el permiso para que el Guard deje entrar a /verify
@@ -59,14 +96,25 @@ export class ConfirmEmailComponent implements OnInit, AfterViewInit, OnDestroy {
 
         this.mensaje = 'Código enviado.';
 
-        // Redirigimos a la pantalla de poner el código
-        setTimeout(() => this.router.navigate(['/verify']), 1500);
-      },
-      error: (err) => {
-        this.cargando = false;
+        // Mostrar mensaje primero, luego spinner de redirección, y finalmente navegar
         this.unlockScroll();
+        this.redirectTimer = window.setTimeout(() => {
+          this.redirigiendo = true;
+          this.lockScroll();
+          this.navigateTimer = window.setTimeout(() => {
+            this.redirigiendo = false;
+            this.unlockScroll();
+            this.router.navigate(['/verify']);
+          }, this.REDIRECT_SPINNER_MS);
+        }, this.MSG_VISIBLE_MS);
+      },
+      error: async (err) => {
+        await delayRemaining(startedAt);
+        this.cargando = false;
+        this.redirigiendo = false;
         this.exito = false;
         this.mensaje = err.error?.message;
+        if (this.mensaje) this.lockScroll();
       }
     });
   }
@@ -88,6 +136,7 @@ export class ConfirmEmailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.clearTimers();
     this.unlockScroll();
   }
 }

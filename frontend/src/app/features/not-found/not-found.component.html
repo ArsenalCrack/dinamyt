@@ -1,0 +1,38 @@
+<main class="nf-hero" aria-labelledby="nf-title">
+  <div class="nf-card" role="region" aria-label="Página no encontrada">
+    <img
+      class="nf-logo"
+      src="assets/imgs/LogoDinamyt.png"
+      alt="Dinamyt"
+      loading="eager"
+      decoding="async"
+    />
+
+    <h1 id="nf-title" class="nf-code">404</h1>
+    <p class="nf-subtitle">La página que buscas no existe o la ruta es incorrecta.</p>
+
+    <div class="nf-actions">
+      <button type="button" class="btn-hero btn-primary" (click)="goHome()">Ir al inicio</button>
+
+      <button
+        *ngIf="isLoggedIn"
+        type="button"
+        class="btn-hero btn-outline-dark"
+        (click)="goDashboard()"
+      >
+        Ir al dashboard
+      </button>
+
+      <button
+        *ngIf="!isLoggedIn"
+        type="button"
+        class="btn-hero btn-outline-dark"
+        (click)="goLogin()"
+      >
+        Iniciar sesión
+      </button>
+    </div>
+
+    <p class="nf-hint">Vuelve atrás o revisa la dirección.</p>
+  </div>
+</main>

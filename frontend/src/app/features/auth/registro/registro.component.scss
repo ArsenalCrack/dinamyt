@@ -100,3 +100,11 @@
 	overscroll-behavior: contain;
 }
 
+/* Mostrar en mayúsculas (se guarda en mayúsculas al enviar) */
+input[name="nombres"],
+input[name="apellidos"],
+input[name="academiaOtra"],
+input[name="instructorOtro"] {
+	text-transform: uppercase;
+}
+

@@ -18,7 +18,12 @@
     "@angular/platform-browser": "^17.3.0",
     "@angular/platform-browser-dynamic": "^17.3.0",
     "@angular/router": "^17.3.0",
+    "@fontsource/montserrat": "^5.2.8",
+    "@fontsource/roboto": "^5.2.9",
+    "@fortawesome/fontawesome-free": "^7.1.0",
+    "@types/flatpickr": "^3.0.2",
     "bootstrap": "^5.3.8",
+    "flatpickr": "^4.6.13",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.14.3"

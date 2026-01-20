@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, Input, forwardRef } from '@angular/core';
+import { Component, ElementRef, HostListener, Input, OnInit, forwardRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -14,20 +14,40 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
     multi: true
   }]
 })
-export class CustomSelectComponent implements ControlValueAccessor {
+export class CustomSelectComponent implements ControlValueAccessor, OnInit {
+  private static nextId = 0;
+
   @Input() options: Array<{ value: any; label: string; disabled?: boolean }> = [];
   @Input() placeholder: string = '';
   @Input() disabled = false;
+  @Input() ariaLabel: string | null = null;
+  @Input() inputId: string | null = null;
+  @Input() name: string | null = null;
+  @Input() autocomplete: string | null = 'off';
 
   isOpen = false;
   focusedIndex = -1;
   value: any = null;
   optionsStyle: { [key: string]: any } = {};
 
+  private hasUserInteracted = false;
+
   private onChange: (_: any) => void = () => {};
   private onTouched: () => void = () => {};
 
   constructor(private host: ElementRef) {}
+
+  ngOnInit(): void {
+    if (!this.inputId) {
+      CustomSelectComponent.nextId += 1;
+      this.inputId = `dinamyt-custom-select-${CustomSelectComponent.nextId}`;
+    }
+
+    if (!this.name) {
+      const hostName = (this.host.nativeElement as HTMLElement).getAttribute('name');
+      this.name = hostName || this.inputId;
+    }
+  }
 
   writeValue(obj: any): void { this.value = obj; }
   registerOnChange(fn: any): void { this.onChange = fn; }
@@ -36,7 +56,13 @@ export class CustomSelectComponent implements ControlValueAccessor {
 
   toggle() {
     if (this.disabled) return;
-    this.isOpen = !this.isOpen;
+
+    const nextOpen = !this.isOpen;
+    if (nextOpen) this.hasUserInteracted = true;
+    // Si el usuario abre y vuelve a cerrar sin seleccionar, considerar el control "tocado"
+    if (this.isOpen && !nextOpen) this.onTouched();
+
+    this.isOpen = nextOpen;
     if (this.isOpen) {
       const idx = this.options.findIndex(o => this.compareValues(o.value, this.value));
       this.focusedIndex = idx >= 0 ? idx : 0;
@@ -48,6 +74,7 @@ export class CustomSelectComponent implements ControlValueAccessor {
     if (opt.disabled) return;
     this.value = opt.value;
     this.onChange(this.value);
+    this.hasUserInteracted = true;
     this.onTouched();
     this.close();
   }
@@ -67,9 +94,19 @@ export class CustomSelectComponent implements ControlValueAccessor {
 
   close() { this.isOpen = false; }
 
+  @HostListener('focusout')
+  onFocusOut() {
+    // No marcar como touched si el usuario nunca interactuó con el control.
+    if (!this.hasUserInteracted) return;
+    this.onTouched();
+  }
+
   @HostListener('document:click', ['$event.target'])
   onClickOutside(target: EventTarget | null) {
     if (target && !this.host.nativeElement.contains(target as Node)) {
+      // Si el dropdown estaba abierto, el usuario ya interactuó.
+      if (this.isOpen) this.hasUserInteracted = true;
+      if (this.hasUserInteracted) this.onTouched();
       this.close();
     }
   }

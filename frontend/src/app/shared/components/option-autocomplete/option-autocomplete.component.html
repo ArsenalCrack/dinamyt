@@ -3,6 +3,9 @@
     type="text"
     class="search-input"
     [(ngModel)]="searchText"
+    [attr.name]="name"
+    [attr.id]="inputId"
+    [attr.aria-label]="ariaLabel || placeholder || 'Buscar'"
     [placeholder]="placeholder"
     [disabled]="disabled"
     [class.input-error]="hasError"
@@ -12,11 +15,13 @@
     (keydown)="onKeydown($event)"
     autocomplete="off">
 
-  <span
+  <button
+    type="button"
     class="arrow"
     [class.arrow-open]="isOpen"
+    [attr.aria-label]="(isOpen ? 'Cerrar' : 'Abrir') + ' lista'"
     (click)="toggleDropdown()"
-    (mousedown)="$event.preventDefault()"></span>
+    (mousedown)="$event.preventDefault()"></button>
 
   <ul class="options" *ngIf="isOpen && filteredOptions.length > 0" role="listbox" [ngStyle]="optionsStyle">
     <li *ngFor="let opt of filteredOptions; let i = index"

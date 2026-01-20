@@ -6,19 +6,6 @@ import { inject } from '@angular/core';
 
 bootstrapApplication(AppComponent, appConfig)
   .then((appRef) => {
-    // Exponer AuthService globalmente para permisos temporales en desarrollo
-    const authService = appRef.injector.get(AuthService);
-    (window as any).grantDevPermissions = (role: string = 'admin') => {
-      authService.grantTemporaryPermissions(role);
-      console.log(`✅ Permisos "${role}" otorgados temporalmente. Recarga la página.`);
-    };
-    (window as any).revokeDevPermissions = () => {
-      authService.revokeTemporaryPermissions();
-      console.log(`❌ Permisos revocados. Recarga la página.`);
-    };
-    console.log('💡 Comandos disponibles:');
-    console.log('  grantDevPermissions("admin") - Otorga permisos de admin');
-    console.log('  grantDevPermissions("creator") - Otorga permisos de creador');
-    console.log('  revokeDevPermissions() - Revoca permisos temporales');
+    console.log('🚀 Application started successfully');
   })
   .catch((err) => console.error(err));

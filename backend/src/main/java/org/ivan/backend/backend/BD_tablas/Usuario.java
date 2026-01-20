@@ -40,6 +40,9 @@ public class Usuario {
     @Column(name = "numero_celular", length = 30)
     private String numeroCelular;
 
+    @Column(name = "instructor_independiente")
+    private Boolean instructorIndependiente;
+
     //relaciones con las tablas
     @ManyToOne
     @JoinColumn(name = "Instructor", referencedColumnName = "ID_documento")
@@ -145,6 +148,14 @@ public class Usuario {
         this.nacionalidad = nacionalidad;
     }
 
+    public Boolean getInstructorIndependiente() {
+        return instructorIndependiente;
+    }
+
+    public void setInstructorIndependiente(Boolean instructorIndependiente) {
+        this.instructorIndependiente = instructorIndependiente;
+    }
+
     public String getCinturonRango() {
         return cinturonRango;
     }
@@ -185,4 +196,3 @@ public class Usuario {
         this.idDocumento = idDocumento;
     }
 }
-

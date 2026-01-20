@@ -1,4 +1,5 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { CanActivateFn, Router, Routes } from '@angular/router';
 import { HomeComponent } from './features/home/home.component';
 import { LoginComponent, RegistroComponent, ConfirmEmailComponent, VerifyComponent, ResetPasswordComponent } from './features/auth/index';
 import { verificationGuard } from './core/guards/verification.guard';
@@ -13,10 +14,20 @@ export const routes: Routes = [
   { path: 'recoverAccount', component: ConfirmEmailComponent, canActivate: [guestGuard] },
   { path: 'register', component: RegistroComponent, canActivate: [guestGuard] },
 
+  {
+    path: '404',
+    loadComponent: () => import('./features/not-found/not-found.component').then(m => m.NotFoundComponent)
+  },
+
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
   {
     path: 'perfil',
     loadComponent: () => import('./features/user/profile/profile.component').then(m => m.ProfileComponent),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'mi-academia',
+    loadComponent: () => import('./features/user/my-academy/my-academy.component').then(m => m.MyAcademyComponent),
     canActivate: [authGuard]
   },
   {
@@ -27,6 +38,11 @@ export const routes: Routes = [
   {
     path: 'mis-campeonatos',
     loadComponent: () => import('./features/user/my-championships/my-championships.component').then(m => m.MyChampionshipsComponent),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'mis-estadisticas',
+    loadComponent: () => import('./features/user/my-statistics/my-statistics.component').then(m => m.MyStatisticsComponent),
     canActivate: [authGuard]
   },
   {
@@ -53,5 +69,5 @@ export const routes: Routes = [
   },
 
   // El comodín SIEMPRE va al final (es el "si nada de lo anterior funcionó")
-  { path: '**', redirectTo: '' }
+  { path: '**', redirectTo: '404' }
 ];

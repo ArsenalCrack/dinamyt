@@ -1,9 +1,10 @@
 <div class="login-container">
   <div class="login-card">
 
-    <a (click)="volverAtras()" class="btn-back" title="Volver atrás">
-      <i class="fas fa-arrow-left fa-2x"></i>
-    </a>
+    <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+      <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
+      <span class="visually-hidden">Volver atrás</span>
+    </button>
 
       <!-- Overlay de carga -->
       <div *ngIf="cargando" class="loading-overlay">
@@ -31,6 +32,7 @@
           id="email"
           name="email"
           [(ngModel)]="correo"
+          autocomplete="email"
           required
           placeholder="Ingresa tu correo registrado">
       </div>
@@ -44,12 +46,13 @@
             id="password"
             name="password"
             [(ngModel)]="contrasena"
+            autocomplete="current-password"
             required
             placeholder="Ingresa tu contraseña">
 
-          <span class="eye-icon" (click)="mostrarPass = !mostrarPass">
-            <i class="fas" [ngClass]="mostrarPass ? 'fa-eye-slash' : 'fa-eye'"></i>
-          </span>
+          <button type="button" class="eye-icon" (click)="mostrarPass = !mostrarPass" [attr.aria-label]="mostrarPass ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+            <i class="fas" [ngClass]="mostrarPass ? 'fa-eye-slash' : 'fa-eye'" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
 

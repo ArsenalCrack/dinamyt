@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
+import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 
 
 @Component({
@@ -16,6 +18,9 @@ export class VerifyComponent implements OnInit, OnDestroy {
 
   private api = inject(ApiService);
   private router = inject(Router);
+  private scrollLock = inject(ScrollLockService);
+
+  private modalLocked = false;
 
 
   // Variables del formulario
@@ -62,13 +67,22 @@ export class VerifyComponent implements OnInit, OnDestroy {
     this.startTimer();
   }
 
-  private lockScroll() { document.body.style.overflow = 'hidden'; }
-  private unlockScroll() { document.body.style.overflow = ''; }
+  private lockScroll() {
+    if (this.modalLocked) return;
+    this.scrollLock.lock();
+    this.modalLocked = true;
+  }
+
+  private unlockScroll() {
+    if (!this.modalLocked) return;
+    this.scrollLock.unlock();
+    this.modalLocked = false;
+  }
 
   verificar() {
     if (this.codigo.length !== 6) return;
     if (this.expired) {
-      this.mensaje = 'El código ha caducado. Solicita uno nuevo.';
+      this.mensaje = 'El código venció. Reenvía uno nuevo.';
       this.exito = false;
       return;
     }
@@ -77,38 +91,40 @@ export class VerifyComponent implements OnInit, OnDestroy {
     this.loadingText = 'Verificando...';
     this.lockScroll();
     this.mensaje = '';
+    const startedAt = Date.now();
     const datos = {
       codigo: this.codigo,
       correo: this.emailUsuario,
       modo: this.modo
     };
     this.api.verificarCodigo(datos).subscribe({
-      next: (rest: any) => {
+      next: async (rest: any) => {
         // mantener spinner mientras redirige
         this.cargando = true;
-        this.loadingText = 'Redirigiendo...';
+        this.loadingText = 'Abriendo...';
         this.exito = true;
-        this.mensaje = 'Código verificado correctamente. Redirigiendo...';
+        this.mensaje = 'Código verificado. Continuamos...';
 
-        setTimeout(() => {
-          this.unlockScroll();
-          if (this.modo === 'register') {
-            sessionStorage.removeItem('emailParaVerificar');
-            sessionStorage.removeItem('verifyMode');
-            sessionStorage.removeItem('verifyExpiresAt');
-            this.router.navigate(['/login']);
-          } else if (this.modo === 'recovery') {
-            sessionStorage.removeItem('verifyExpiresAt');
-            this.router.navigate(['/resetPassword']);
-          }
-        }, 2000);
-      },
-      error: (err) => {
-        this.cargando = false;
+        await delayRemaining(startedAt);
         this.unlockScroll();
+        if (this.modo === 'register') {
+          sessionStorage.removeItem('emailParaVerificar');
+          sessionStorage.removeItem('verifyMode');
+          sessionStorage.removeItem('verifyExpiresAt');
+          this.router.navigate(['/login']);
+        } else if (this.modo === 'recovery') {
+          sessionStorage.removeItem('verifyExpiresAt');
+          this.router.navigate(['/resetPassword']);
+        }
+      },
+      error: async (err) => {
         this.exito = false;
-        this.mensaje = err.error?.message || 'El código no coincide. Intenta nuevamente.';
+        this.mensaje = err.error?.message || 'Código incorrecto. Intenta de nuevo.';
         this.codeNotMatchModalVisible = true;
+        this.lockScroll();
+
+        await delayRemaining(startedAt);
+        this.cargando = false;
       }
     });
   }
@@ -119,13 +135,12 @@ export class VerifyComponent implements OnInit, OnDestroy {
     this.loadingText = 'Verificando...';
     this.lockScroll();
     this.mensaje = '';
+    const startedAt = Date.now();
 
     this.api.reenviarCodigo(this.emailUsuario).subscribe({
-      next: (res: any) => {
-        this.cargando = false;
-        this.unlockScroll();
+      next: async (res: any) => {
         this.exito = true; // Usamos true para mostrar mensaje en verde
-        this.mensaje = 'Nuevo código enviado. Revisa tu bandeja de entrada.';
+        this.mensaje = 'Enviamos un nuevo código. Revisa tu correo.';
         // actualizar expiración a 5 minutos desde ahora
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
@@ -135,12 +150,18 @@ export class VerifyComponent implements OnInit, OnDestroy {
         this.expiredHandled = false;
         this.expiredModalVisible = false;
         this.startTimer();
-      },
-      error: (err) => {
+
+        await delayRemaining(startedAt);
         this.cargando = false;
         this.unlockScroll();
+      },
+      error: async (err) => {
         this.exito = false;
-        this.mensaje = 'No se pudo reenviar el código. Intenta más tarde.';
+        this.mensaje = 'No pudimos reenviar el código. Intenta más tarde.';
+
+        await delayRemaining(startedAt);
+        this.cargando = false;
+        this.unlockScroll();
       }
     });
   }
@@ -184,6 +205,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
     this.expiredModalVisible = false;
     this.mensaje = 'El código ha caducado. Reenvía para obtener uno nuevo.';
     this.exito = false;
+    this.unlockScroll();
   }
 
   closeCodeNotMatchModal() {
@@ -191,6 +213,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
     this.codeNotMatchModalVisible = false;
     this.codigo = '';
     this.mensaje = '';
+    this.unlockScroll();
   }
 
   formatRemaining(): string {
@@ -199,6 +222,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
     const mm = Math.floor(sec / 60).toString().padStart(2, '0');
     const ss = (sec % 60).toString().padStart(2, '0');
     return `${mm}:${ss}`;
+    this.lockScroll();
   }
 
   ngOnDestroy(): void {

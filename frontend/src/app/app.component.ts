@@ -21,20 +21,19 @@ export class AppComponent implements OnInit {
 
   private api = inject(ApiService);
 
-  mensajeBackend: string = 'Esperando conexión...';
-  estadoBackend: string = 'Desconocido';
+  mensajeBackend: string = 'Conectando...';
+  estadoBackend: string = 'Sin verificar';
 
   constructor() {}
 
   ngOnInit() {
     this.api.getSaludo().subscribe({
       next: (datos) => {
-        this.mensajeBackend = datos.mensaje;
-        this.estadoBackend = datos.estado;
+        this.mensajeBackend = (datos as any)?.mensaje || 'Servidor en línea';
+        this.estadoBackend = (datos as any)?.estado || 'Online';
       },
       error: (error) => {
-        console.error('Error conectando:', error);
-        this.mensajeBackend = 'Error: El backend está apagado o bloqueado.';
+        this.mensajeBackend = 'No se puede conectar con el servidor.';
         this.estadoBackend = 'Offline';
       }
     });

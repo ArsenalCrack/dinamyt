@@ -3,6 +3,7 @@ package org.ivan.backend.backend.controladores;
 import org.ivan.backend.backend.BD_tablas.Academia;
 import org.ivan.backend.backend.EmailService;
 import org.ivan.backend.backend.BD_tablas.Usuario;
+import org.ivan.backend.backend.BD_tablas.Tipousuario;
 import org.ivan.backend.backend.repositorios.AcademiaRepository;
 import org.ivan.backend.backend.repositorios.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,18 @@ public class controlador_principal {
         emailService.enviarCodigo(usuario.getCorreo(), codigo);
         usuario.setCodigo(codigo);
         usuario.setFechaCodigo(LocalDateTime.now());
+        
+        // Asignar valores por defecto
+        usuario.setInstructorIndependiente(false);
+        
+        if (usuario.getTipousuario() == null) {
+            Tipousuario tipo = new Tipousuario();
+            tipo.setID_Tipo(1);
+            usuario.setTipousuario(tipo);
+        } else if (usuario.getTipousuario().getID_Tipo() == null) {
+            usuario.getTipousuario().setID_Tipo(1);
+        }
+        
         usuariosPendientes.put(usuario.getCorreo(),usuario);
         return ResponseEntity.ok("");
     }
@@ -130,7 +143,10 @@ public class controlador_principal {
             System.out.println(instructor);
             if (pendiente3.getContrasena().equals(respuesta.getContrasena())){
                 usuariosPendientes.remove(respuesta.getCorreo());
-                return ResponseEntity.ok(Map.of("usuario",pendiente3,"instructor",instructor));
+                Map<String, Object> responseMap = new HashMap<>();
+                responseMap.put("usuario", pendiente3);
+                responseMap.put("instructor", instructor);
+                return ResponseEntity.ok(responseMap);
 
             }else{
                 return ResponseEntity.badRequest().body(Map.of("message", "Contraseña incorrecta"));
@@ -139,7 +155,7 @@ public class controlador_principal {
         return ResponseEntity.badRequest().body(Map.of("message", "El correo no se encuentra registrado"));
     }
     @PostMapping("/me")
-    private ResponseEntity<?> me(@RequestBody Usuario respuesta){
+    private ResponseEntity<?> me(@RequestBody(required = false) Usuario respuesta){
         System.out.println("a"+respuesta);
         if (respuesta!=null) {
             return ResponseEntity.ok(respuesta);

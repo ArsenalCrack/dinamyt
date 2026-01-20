@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
+import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 
 @Component({
   selector: 'app-reset-password',
@@ -15,6 +17,7 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
 
   private api = inject(ApiService);
   private router = inject(Router);
+  private scrollLock = inject(ScrollLockService);
 
   // Variable del correo (recuperado de sesión)
   correo: string = '';
@@ -42,8 +45,8 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
     }
   }
 
-  private lockScroll() { document.body.style.overflow = 'hidden'; }
-  private unlockScroll() { document.body.style.overflow = ''; }
+  private lockScroll() { this.scrollLock.lock(); }
+  private unlockScroll() { this.scrollLock.unlock(); }
 
   cambiarPassword() {
     if (this.contrasena !== this.confirmPassword) {
@@ -54,6 +57,7 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
     this.cargando = true;
     this.mensaje = '';
     this.lockScroll();
+    const startedAt = Date.now();
 
     const payload = {
       correo: this.correo,
@@ -62,11 +66,12 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
     };
 
     this.api.cambiarPassword(payload).subscribe({
-      next: (res) => {
+      next: async (res) => {
+        await delayRemaining(startedAt);
         this.cargando = false;
         this.unlockScroll();
         this.exito = true;
-        this.mensaje = 'Contraseña actualizada correctamente.';
+        this.mensaje = 'Contraseña actualizada.';
 
         // LIMPIEZA: Usamos los nombres correctos de tus variables de sesión
         sessionStorage.removeItem('emailParaVerificar');
@@ -75,17 +80,18 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
         // Al login
         setTimeout(() => this.router.navigate(['/login']), 2000);
       },
-      error: (err) => {
+      error: async (err) => {
+        await delayRemaining(startedAt);
         this.cargando = false;
         this.unlockScroll();
         this.exito = false;
         const msgRaw = (err?.error?.message || err?.error?.error || '').toString().toLowerCase();
         if (msgRaw.includes('utilizada') || msgRaw.includes('reutilizada') || msgRaw.includes('usada') || msgRaw.includes('reused') || msgRaw.includes('already')) {
-          this.mensaje = 'Esta contraseña ya fue utilizada anteriormente. Por favor, elige una contraseña diferente.';
+          this.mensaje = 'Elige una contraseña que no hayas usado antes.';
         } else if (msgRaw.includes('deb') || msgRaw.includes('weak')) {
-          this.mensaje = 'La nueva contraseña no cumple los requisitos de seguridad.';
+          this.mensaje = 'La contraseña no cumple los requisitos.';
         } else {
-          this.mensaje = err.error?.message || 'Error al actualizar la contraseña.';
+          this.mensaje = err.error?.message || 'No pudimos actualizar la contraseña. Intenta de nuevo.';
         }
       }
     });

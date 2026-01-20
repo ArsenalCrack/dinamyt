@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, HostListener, Input, OnChanges, SimpleChanges, forwardRef } from '@angular/core';
+import { Component, ElementRef, HostListener, Input, OnChanges, OnInit, SimpleChanges, forwardRef } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 export type AutocompleteOption = { value: any; label: string; disabled?: boolean };
@@ -18,9 +18,14 @@ export type AutocompleteOption = { value: any; label: string; disabled?: boolean
     }
   ]
 })
-export class OptionAutocompleteComponent implements ControlValueAccessor, OnChanges {
+export class OptionAutocompleteComponent implements ControlValueAccessor, OnChanges, OnInit {
+  private static nextId = 0;
+
   @Input() options: AutocompleteOption[] = [];
   @Input() placeholder: string = '';
+  @Input() name: string | null = null;
+  @Input() inputId: string | null = null;
+  @Input() ariaLabel: string | null = null;
   @Input() disabled = false;
   @Input() hasError = false;
 
@@ -35,6 +40,16 @@ export class OptionAutocompleteComponent implements ControlValueAccessor, OnChan
   private onTouched: () => void = () => {};
 
   constructor(private host: ElementRef) {}
+
+  ngOnInit(): void {
+    if (!this.inputId) {
+      OptionAutocompleteComponent.nextId += 1;
+      this.inputId = `dinamyt-option-autocomplete-${OptionAutocompleteComponent.nextId}`;
+    }
+    if (!this.name) {
+      this.name = this.inputId;
+    }
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['options']) {

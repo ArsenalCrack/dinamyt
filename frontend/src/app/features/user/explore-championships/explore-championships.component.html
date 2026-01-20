@@ -1,22 +1,93 @@
 <div class="explore-championships-container">
   <div class="explore-championships-card">
-    <a (click)="goBack()" class="btn-back" title="Volver atrás">
-      <i class="fas fa-arrow-left fa-2x"></i>
-    </a>
-
     <header class="header">
-      <h1>Explorar Campeonatos</h1>
-      <p class="subtitle">Descubre campeonatos disponibles en la plataforma e inscríbete.</p>
+      <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+        <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
+        <span class="visually-hidden">Volver atrás</span>
+      </button>
+
+      <div class="header-text">
+        <h1>Explorar Campeonatos</h1>
+        <p class="subtitle">Descubre campeonatos disponibles en la plataforma e inscríbete.</p>
+      </div>
     </header>
 
     <div class="search-section">
       <input
         type="text"
         class="search-input"
-        placeholder="Buscar por nombre, ubicación u organizador..."
+        id="explore-championships-search"
+        name="searchExploreChampionships"
+        aria-label="Buscar campeonatos"
+        placeholder="Buscar por nombre o ubicación..."
         [(ngModel)]="searchQuery"
         (input)="onSearchChange()">
-      <i class="fas fa-search search-icon"></i>
+      <i class="fas fa-search search-icon" aria-hidden="true"></i>
+    </div>
+
+    <div class="filters-desktop" aria-label="Filtros">
+      <div class="filters" role="group" aria-label="Filtrar por estado">
+        <button type="button" class="filter-pill" [class.active]="statusFilter === 'TODOS'" (click)="setStatusFilter('TODOS')">
+          Todos
+        </button>
+        <button type="button" class="filter-pill" [class.active]="statusFilter === 'ACTIVO'" (click)="setStatusFilter('ACTIVO')">
+          Activos
+        </button>
+        <button type="button" class="filter-pill" [class.active]="statusFilter === 'PLANIFICADO'" (click)="setStatusFilter('PLANIFICADO')">
+          Planificados
+        </button>
+        <button type="button" class="filter-pill" [class.active]="statusFilter === 'TERMINADO'" (click)="setStatusFilter('TERMINADO')">
+          Terminados
+        </button>
+      </div>
+
+      <div class="filters" role="group" aria-label="Filtrar por privacidad">
+        <button type="button" class="filter-pill" [class.active]="privacyFilter === 'TODOS'" (click)="setPrivacyFilter('TODOS')">
+          Todos
+        </button>
+        <button type="button" class="filter-pill" [class.active]="privacyFilter === 'PUBLICO'" (click)="setPrivacyFilter('PUBLICO')">
+          Públicos
+        </button>
+        <button type="button" class="filter-pill" [class.active]="privacyFilter === 'PRIVADO'" (click)="setPrivacyFilter('PRIVADO')">
+          Privados
+        </button>
+      </div>
+    </div>
+
+    <div class="filters-mobile">
+      <div class="filter-field">
+        <label class="filters-label" for="explore-championships-status">Estado</label>
+        <app-custom-select
+          [options]="statusOptions"
+          placeholder="Selecciona un estado"
+          ariaLabel="Filtrar por estado"
+          inputId="explore-championships-status"
+          [ngModel]="statusFilter"
+          (ngModelChange)="setStatusFilterFromUi($event)">
+        </app-custom-select>
+      </div>
+
+      <div class="filter-field">
+        <label class="filters-label" for="explore-championships-privacy">Privacidad</label>
+        <app-custom-select
+          [options]="privacyOptions"
+          placeholder="Selecciona privacidad"
+          ariaLabel="Filtrar por privacidad"
+          inputId="explore-championships-privacy"
+          [ngModel]="privacyFilter"
+          (ngModelChange)="setPrivacyFilterFromUi($event)">
+        </app-custom-select>
+      </div>
+    </div>
+
+    <div *ngIf="cargando" class="loading">
+      <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+      <span>Cargando campeonatos...</span>
+    </div>
+
+    <div *ngIf="errorMessage" class="error">
+      <span>{{ errorMessage }}</span>
+      <button type="button" class="btn-retry" (click)="loadChampionships()">Reintentar</button>
     </div>
 
     <div class="championships-grid">
@@ -24,38 +95,51 @@
         <div class="championship-card" *ngFor="let championship of filteredChampionships">
           <div class="card-header">
             <h3>{{ championship.nombre }}</h3>
-            <span class="badge" [ngClass]="'badge-' + championship.estado.toLowerCase()">
-              {{ championship.estado }}
-            </span>
+
+            <div class="badges">
+              <span class="badge badge-privacy" [ngClass]="championship.esPublico ? 'badge-publico' : 'badge-privado'">
+                <i class="fas" [ngClass]="championship.esPublico ? 'fa-globe' : 'fa-lock'" aria-hidden="true"></i>
+                {{ championship.esPublico ? 'Público' : 'Privado' }}
+              </span>
+
+              <span class="badge" [ngClass]="'badge-' + championship.estadoLabel.toLowerCase()">
+                {{ championship.estadoLabel }}
+              </span>
+            </div>
           </div>
 
           <div class="card-body">
             <div class="info-row">
               <i class="fas fa-calendar-alt"></i>
-              <span>{{ championship.fecha | date: 'dd/MM/yyyy' }}</span>
+              <span>{{ championship.fechaInicio | date: 'dd/MM/yyyy' }}</span>
             </div>
             <div class="info-row">
               <i class="fas fa-map-marker-alt"></i>
               <span>{{ championship.ubicacion }}</span>
             </div>
             <div class="info-row">
-              <i class="fas fa-user-tie"></i>
-              <span>{{ championship.organizador }}</span>
+              <i class="fas fa-tag"></i>
+              <span>{{ championship.alcance || '—' }}</span>
             </div>
             <div class="info-row">
-              <i class="fas fa-tag"></i>
-              <span>{{ championship.categoria }}</span>
+              <i class="fas fa-user"></i>
+              <span>Creado por: {{ championship.creadoPor || '—' }}</span>
             </div>
 
             <div class="capacity-section">
               <div class="capacity-info">
                 <span class="capacity-label">Participantes:</span>
-                <span class="capacity-text">{{ championship.participantes }} / {{ championship.capacidad }}</span>
+                <span class="capacity-text">{{ championship.participantes }} / {{ championship.capacidad ?? '—' }}</span>
               </div>
               <div class="capacity-bar">
                 <div class="capacity-fill" [style.width.%]="getProgressPercentage(championship.participantes, championship.capacidad)"></div>
               </div>
-              <p class="available-slots">{{ getAvailableSlots(championship.participantes, championship.capacidad) }} espacios disponibles</p>
+              <p class="available-slots">
+                <ng-container *ngIf="getAvailableSlots(championship.participantes, championship.capacidad, championship.cuposDisponibles) !== null; else noCapacity">
+                  {{ getAvailableSlots(championship.participantes, championship.capacidad, championship.cuposDisponibles) }} espacios disponibles
+                </ng-container>
+                <ng-template #noCapacity>Sin cupo definido</ng-template>
+              </p>
             </div>
           </div>
 
@@ -65,7 +149,7 @@
               Ver detalles
             </button>
             <button class="btn-primary" (click)="registerChampionship(championship.id)"
-              [disabled]="getAvailableSlots(championship.participantes, championship.capacidad) === 0">
+              [disabled]="!championship.puedeInscribirse">
               <i class="fas fa-check"></i>
               Inscribirse
             </button>
@@ -96,6 +180,40 @@
           Iniciar Sesión
         </button>
         <button class="modal-action-secondary" (click)="closeLoginModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para código de acceso (campeonatos privados) -->
+  <div *ngIf="showAccessCodeModal" class="modal-overlay">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-label="Ingresar código de acceso">
+      <div class="modal-body">
+        <i class="fas fa-lock modal-icon" aria-hidden="true"></i>
+        <div class="modal-text">
+          Este campeonato es privado. Ingresa el código para validar tu inscripción.
+        </div>
+      </div>
+      <button class="modal-close" (click)="closeAccessCodeModal()" aria-label="Cerrar">✕</button>
+
+      <div class="modal-form">
+        <label class="modal-label" for="access-code">Código</label>
+        <input
+          id="access-code"
+          class="modal-input"
+          type="text"
+          autocomplete="off"
+          placeholder="Ej: A7K9Z2PQX1"
+          [(ngModel)]="accessCode"
+          [disabled]="accessCodeSubmitting">
+        <div *ngIf="accessCodeError" class="modal-error">{{ accessCodeError }}</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="modal-action-primary" (click)="submitAccessCode()" [disabled]="accessCodeSubmitting">
+          <i class="fas" [ngClass]="accessCodeSubmitting ? 'fa-spinner fa-spin' : 'fa-check'" aria-hidden="true"></i>
+          Validar código
+        </button>
+        <button class="modal-action-secondary" (click)="closeAccessCodeModal()" [disabled]="accessCodeSubmitting">Cancelar</button>
       </div>
     </div>
   </div>

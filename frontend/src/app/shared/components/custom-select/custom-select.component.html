@@ -1,6 +1,28 @@
-<div class="custom-select" [class.open]="isOpen" tabindex="0" (click)="toggle()" (keydown)="onKeydown($event)">
+<div
+  class="custom-select"
+  [class.open]="isOpen"
+  [class.disabled]="disabled"
+  [attr.id]="(inputId ? (inputId + '__host') : null)"
+  [attr.name]="name"
+  tabindex="0"
+  role="combobox"
+  aria-haspopup="listbox"
+  [attr.aria-expanded]="isOpen"
+  [attr.aria-label]="ariaLabel || null"
+  (click)="toggle()"
+  (keydown)="onKeydown($event)">
+  <input
+    class="custom-select-native"
+    type="text"
+    [attr.id]="inputId"
+    [attr.name]="name"
+    [attr.autocomplete]="autocomplete || 'off'"
+    [value]="value ?? ''"
+    tabindex="-1"
+    disabled
+    readonly>
   <div class="selected" [class.has-value]="value !== null && value !== undefined && value !== ''">{{ getLabel() || placeholder }}</div>
-  <div class="arrow" aria-hidden="true"></div>
+  <div class="arrow" aria-hidden="true" *ngIf="!disabled"></div>
   <ul class="options" *ngIf="isOpen" role="listbox" [ngStyle]="optionsStyle" (click)="$event.stopPropagation()">
     <li *ngFor="let opt of options; let i = index"
         role="option"

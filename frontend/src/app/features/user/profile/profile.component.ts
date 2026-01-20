@@ -223,7 +223,7 @@ export class ProfileComponent implements OnDestroy {
 
         // Si en sessionStorage hay un texto (academia personalizada), forzar modo 'otra'
         this.normalizeAcademiaFromStoredValue();
-        this.syncAcademiaSearchTextFromValue(); 
+        this.syncAcademiaSearchTextFromValue();
         console.log(this.user.Instructor);
         if (this.user.academia && this.user.academia !== 'otra') {
           this.cargarInstructores(this.user.academia);
@@ -247,7 +247,7 @@ export class ProfileComponent implements OnDestroy {
     return;
   }
 
-  this.api.cargarInstructor(id).subscribe({
+  this.api.cargarinstructor(id).subscribe({
     next: (u: any[]) => {
       this.instructores = (u || [])
         .map(i => {

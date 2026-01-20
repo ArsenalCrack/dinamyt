@@ -1,21 +1,30 @@
 .custom-select{position:relative;display:block;width:100%;cursor:pointer;font-family:Montserrat, sans-serif}
-.custom-select .selected{padding:12px 16px;border:2px solid var(--color-borde);border-radius:10px;background:#fff;color:#999;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:host{display:block;width:100%}
+:host(.ng-invalid.ng-touched) .custom-select .selected{border-color:#b71c1c;box-shadow:0 0 0 3px rgba(183,28,28,0.08)}
+.custom-select .selected{padding:12px 40px 12px 16px;border:2px solid var(--color-borde);border-radius:10px;background:#fff;color:#999;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .custom-select .selected.has-value{color:var(--color-principal)}
 .custom-select .arrow{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:18px;height:10px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'><path d='M1 1 L7 7 L13 1' stroke='%23666666' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:center;transition:all 0.3s ease;pointer-events:auto}
 .custom-select:hover .arrow{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'><path d='M1 1 L7 7 L13 1' stroke='%23D60000' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")}
 .custom-select.open .arrow{transform:translateY(-50%) rotate(180deg)}
 .custom-select.open .selected{border-color:var(--color-acento);box-shadow:0 8px 20px rgba(214,0,0,0.08)}
-.custom-select .options{position:fixed;background:#fff;border-radius:10px;padding:8px 6px;box-shadow:0 12px 30px rgba(0,0,0,0.08);z-index:120;max-height:240px;overflow:auto;border:2px solid rgba(214,0,0,0.06);min-width:160px;white-space:normal;box-sizing:border-box;max-width:calc(100vw - 32px)}
+.custom-select .options{position:fixed;background:#fff;border-radius:10px;padding:8px 6px;box-shadow:0 12px 30px rgba(0,0,0,0.08);z-index:1000;max-height:240px;overflow:auto;border:2px solid rgba(214,0,0,0.06);min-width:160px;white-space:normal;box-sizing:border-box;max-width:calc(100vw - 32px);margin:0}
 .custom-select .options li{list-style:none;padding:10px 14px;border-radius:8px;margin:4px 2px;color:var(--color-principal);cursor:pointer;white-space:normal}
 .custom-select .options li:hover, .custom-select .options li.focus{background:rgba(214,0,0,0.08);color:var(--color-acento)}
 .custom-select .options li.disabled{opacity:0.5;cursor:not-allowed}
 
+/* Input nativo invisible: permite label[for], id/name y autocomplete sin romper el UI */
+.custom-select .custom-select-native{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;left:0;top:0;border:0;padding:0;margin:0}
+
 /* Ensure dropdown doesn't push layout and can expand within viewport */
 .custom-select{min-width:0}
-.custom-select .options{left:auto;right:0}
+
+/* Disabled state: hide arrow, mute colors and disable pointer */
+.custom-select.disabled{cursor:not-allowed}
+.custom-select.disabled .selected{border-color: var(--color-borde); background:#f3f4f6; color:#6b7280}
+.custom-select.disabled .arrow{display:none}
 
 @media (max-width:520px){
-	.custom-select .options{max-width:calc(100vw - 40px);right:10px}
+	.custom-select .options{max-width:calc(100vw - 40px)}
 	/* Keep selected label on one line and use ellipsis to preserve horizontal layout */
 	.custom-select .selected{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }

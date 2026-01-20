@@ -7,6 +7,9 @@ import { Location } from '@angular/common';
 import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
 import { CountryAutocompleteComponent } from '../../../shared/components/country-autocomplete/country-autocomplete.component';
 import { PAISES } from '../../../core/models/paises';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
+import { delayRemaining } from '../../../core/utils/spinner-timing.util';
+import { BackNavigationService } from '../../../core/services/back-navigation.service';
 
 @Component({
   selector: 'app-registro',
@@ -21,6 +24,9 @@ export class RegistroComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private location = inject(Location);
   private cdr = inject(ChangeDetectorRef);
+  private scrollLock = inject(ScrollLockService);
+  private backNav = inject(BackNavigationService);
+  private modalScrollLocked = false;
 
 
   // VARIABLES PARA VISIBILIDAD DE CONTRASEÑA
@@ -39,7 +45,6 @@ export class RegistroComponent implements OnInit, OnDestroy {
   nombreC!: string;
   sexo: string = '';
   nacionalidad: string = '';
-  cinturon_rango: string | null = '';
   fechaNacimiento!: string;
   correo!: string;
   contrasena!: string;
@@ -50,21 +55,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
   instructorOtro: string = '';
   telefonoOpcional: string = '';
 
-  // Opciones para dropdowns
-  cinturones: Array<{ value: string | null; label: string }> = [
-    { value: null, label: 'Sin cinturón' },
-    { value: 'Blanco', label: 'Blanco' },
-    { value: 'Amarillo', label: 'Amarillo' },
-    { value: 'Naranja', label: 'Naranja' },
-    { value: 'Naranja/verde', label: 'Naranja/verde' },
-    { value: 'Verde', label: 'Verde' },
-    { value: 'Verde/azul', label: 'Verde/azul' },
-    { value: 'Azul', label: 'Azul' },
-    { value: 'Rojo', label: 'Rojo' },
-    { value: 'Marrón', label: 'Marrón' },
-    { value: 'Marrón/negro', label: 'Marrón/negro' },
-    { value: 'Negro', label: 'Negro' }
-  ];
+
 
   // Lista de países para el autocompletado
   paisesList: string[] = PAISES;
@@ -91,11 +82,31 @@ export class RegistroComponent implements OnInit, OnDestroy {
   @ViewChild('bannerResendBtn') bannerResendBtn?: ElementRef<HTMLButtonElement>;
 
   volverAtras() {
-    this.location.back();
+    this.backNav.backOr({ fallbackUrl: '/' });
   }
 
   closeMensaje() {
     this.Mensajes = '';
+    this.syncModalScrollLock();
+  }
+
+  ngDoCheck(): void {
+    this.syncModalScrollLock();
+  }
+
+  private syncModalScrollLock(): void {
+    const modalVisible = !!(this.Mensajes && !this.exito);
+
+    if (modalVisible && !this.modalScrollLocked) {
+      this.scrollLock.lock();
+      this.modalScrollLocked = true;
+      return;
+    }
+
+    if (!modalVisible && this.modalScrollLocked) {
+      this.scrollLock.unlock();
+      this.modalScrollLocked = false;
+    }
   }
 
   onDocumentoInput(event: Event) {
@@ -382,12 +393,6 @@ export class RegistroComponent implements OnInit, OnDestroy {
   }
 
   registrar() {
-    console.log('Valores de fecha:', {
-      dia: this.diaSeleccionado,
-      mes: this.mesSeleccionado,
-      anio: this.anioSeleccionado
-    });
-
     // VALIDACIÓN 1: Verificar que todos los campos de fecha estén completos
     if (!this.diaSeleccionado || !this.mesSeleccionado || !this.anioSeleccionado) {
       const faltantes = [];
@@ -432,9 +437,13 @@ export class RegistroComponent implements OnInit, OnDestroy {
     // Normalizar nombres/apellidos y validar longitud total (varchar(150))
     const nombresClean = (this.nombres || '').trim().replace(/\s+/g, ' ');
     const apellidosClean = (this.apellidos || '').trim().replace(/\s+/g, ' ');
-    this.nombres = nombresClean;
-    this.apellidos = apellidosClean;
-    this.nombreC = `${nombresClean} ${apellidosClean}`.trim().replace(/\s+/g, ' ');
+
+    // Guardar en mayúsculas (el usuario puede escribir en minúsculas)
+    const nombresUpper = nombresClean.toUpperCase();
+    const apellidosUpper = apellidosClean.toUpperCase();
+    this.nombres = nombresUpper;
+    this.apellidos = apellidosUpper;
+    this.nombreC = `${nombresUpper} ${apellidosUpper}`.trim().replace(/\s+/g, ' ');
 
     if (this.nombreC.length > 150) {
       this.Mensajes = 'El nombre completo supera los 150 caracteres permitidos. Ajusta nombres o apellidos.';
@@ -442,23 +451,18 @@ export class RegistroComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // VALIDACIÓN: Verificar que cinturon_rango esté seleccionado (permitir "Sin cinturón" como null)
-    if (this.cinturon_rango === '' || this.cinturon_rango === undefined) {
-      this.Mensajes = "Debes seleccionar un cinturón.";
-      this.exito = false;
-      return;
-    }
+    const academiaValRaw = this.academia === 'otra' ? this.academiaOtra?.trim() : this.academia?.trim() || undefined;
+    const instructorValRaw = this.instructor === 'otro' ? this.instructorOtro?.trim() : this.instructor?.trim() || undefined;
 
     const usuario = {
       idDocumento: Number(this.idDocumento),
       nombreC: this.nombreC,
       sexo: this.sexo,
       nacionalidad: this.nacionalidad,
-      academia: this.academia === 'otra' ? this.academiaOtra?.trim() : this.academia?.trim() || undefined,
-      instructor: this.instructor === 'otro' ? this.instructorOtro?.trim() : this.instructor?.trim() || undefined,
+      // Si academia/instructor vienen como texto libre, guardarlos en mayúsculas
+      academia: typeof academiaValRaw === 'string' ? academiaValRaw.toUpperCase() : academiaValRaw,
+      instructor: typeof instructorValRaw === 'string' ? instructorValRaw.toUpperCase() : instructorValRaw,
       telefonoOpcional: this.telefonoOpcional?.trim() || undefined,
-      // Enviamos con ambos nombres para compatibilidad con la BD
-      cinturonRango: this.cinturon_rango === '' ? null : this.cinturon_rango,
       fechaNacimiento: this.fechaNacimiento,
       correo: this.correo,
       contrasena: this.contrasena
@@ -469,11 +473,10 @@ export class RegistroComponent implements OnInit, OnDestroy {
     this.loadingText = 'Procesando... por favor espera';
     this.lockScroll();
     this.Mensajes = '';
-
-    console.log('Enviando usuario:', usuario);
+    const startedAt = Date.now();
 
     this.api.registrarUsuario(usuario).subscribe({
-      next: (res) => {
+      next: async (res) => {
         this.exito = true;
         this.loadingText = 'Verificando código...';
         this.Mensajes = '';
@@ -482,16 +485,16 @@ export class RegistroComponent implements OnInit, OnDestroy {
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
 
-        setTimeout(() => {
-          this.unlockScroll();
-          this.router.navigate(['/verify']);
-        }, 2000);
-      },
-      error: (err) => {
-        this.cargando = false;
+        await delayRemaining(startedAt);
         this.unlockScroll();
+        this.router.navigate(['/verify']);
+      },
+      error: async (err) => {
         this.exito = false;
         this.Mensajes = err.error?.message || 'Error al registrar.';
+        await delayRemaining(startedAt);
+        this.cargando = false;
+        this.unlockScroll();
       }
     });
   }
@@ -517,16 +520,19 @@ export class RegistroComponent implements OnInit, OnDestroy {
     }
     this.cargando = true;
     this.lockScroll();
+    const startedAt = Date.now();
     this.api.reenviarCodigo(this.correo).subscribe({
-      next: () => {
-        this.cargando = false;
-        this.unlockScroll();
+      next: async () => {
         this.showExpiredBanner = false;
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
+        await delayRemaining(startedAt);
+        this.cargando = false;
+        this.unlockScroll();
         this.router.navigate(['/verify']);
       },
-      error: () => {
+      error: async () => {
+        await delayRemaining(startedAt);
         this.cargando = false;
         this.unlockScroll();
         alert('No se pudo reenviar el código');
@@ -534,10 +540,14 @@ export class RegistroComponent implements OnInit, OnDestroy {
     });
   }
 
-  private lockScroll() { document.body.style.overflow = 'hidden'; }
-  private unlockScroll() { document.body.style.overflow = ''; }
+  private lockScroll() { this.scrollLock.lock(); }
+  private unlockScroll() { this.scrollLock.unlock(); }
 
   ngOnDestroy(): void {
+    if (this.modalScrollLocked) {
+      this.scrollLock.unlock();
+      this.modalScrollLocked = false;
+    }
     this.unlockScroll();
   }
 }

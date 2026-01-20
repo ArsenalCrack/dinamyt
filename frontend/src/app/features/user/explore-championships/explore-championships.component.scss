@@ -30,13 +30,18 @@
 }
 
 .btn-back {
-  position: absolute;
-  top: 30px;
-  left: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-principal);
   transition: all 0.3s ease;
   text-decoration: none;
   cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  width: fit-content;
 
   &:hover {
     color: var(--color-acento);
@@ -46,7 +51,15 @@
 
 .header {
   margin-bottom: 30px;
-  margin-left: 60px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+
+  .header-text {
+    min-width: 0;
+  }
 
   h1 {
     font-family: 'Montserrat', sans-serif;
@@ -63,10 +76,18 @@
   }
 }
 
+.filters-desktop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
 .search-section {
   position: relative;
   margin-bottom: 25px;
-  margin-left: 60px;
+  margin-left: 0;
 
   .search-input {
     width: 100%;
@@ -102,11 +123,125 @@
   }
 }
 
+.filters {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: 0;
+  margin-bottom: 0;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-borde);
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+  max-width: 100%;
+}
+
+.filters-mobile {
+  display: none;
+  margin-bottom: 18px;
+}
+
+.filters-label {
+  display: block;
+  margin: 0 0 6px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: var(--color-principal);
+  font-size: 0.9rem;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.filter-pill {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-principal);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(214, 0, 0, 0.06);
+    color: var(--color-acento);
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgba(214, 0, 0, 0.25);
+    outline-offset: 2px;
+  }
+}
+
+.filter-pill.active {
+  border-color: rgba(214, 0, 0, 0.35);
+  background: rgba(214, 0, 0, 0.10);
+  color: var(--color-acento);
+}
+
+.loading,
+.error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  margin-left: 0;
+  margin-bottom: 16px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.loading {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+}
+
+.error {
+  background: rgba(214, 0, 0, 0.06);
+  border: 1px solid rgba(214, 0, 0, 0.18);
+  color: #7f1d1d;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.btn-retry {
+  border: 2px solid var(--color-acento);
+  background: var(--color-acento);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 800;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--color-acento-hover);
+    border-color: var(--color-acento-hover);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
 .championships-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
-  margin-left: 60px;
+  margin-left: 0;
+  margin-top: 10px;
+  min-height: 260px;
 
   .championship-card {
     background: #fafafa;
@@ -142,6 +277,14 @@
         flex: 1;
       }
 
+      .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
       .badge {
         display: inline-block;
         padding: 4px 10px;
@@ -150,6 +293,22 @@
         font-weight: 600;
         font-family: 'Montserrat', sans-serif;
         white-space: nowrap;
+
+        &.badge-privacy {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        &.badge-publico {
+          background: rgba(52, 152, 219, 0.10);
+          color: #2c7fb8;
+        }
+
+        &.badge-privado {
+          background: rgba(214, 0, 0, 0.08);
+          color: var(--color-acento);
+        }
 
         &.badge-activo {
           background: rgba(46, 204, 113, 0.1);
@@ -161,7 +320,7 @@
           color: #3498db;
         }
 
-        &.badge-finalizado {
+        &.badge-terminado {
           background: rgba(155, 89, 182, 0.1);
           color: #9b59b6;
         }
@@ -290,13 +449,19 @@
   .no-results {
     grid-column: 1 / -1;
     text-align: center;
-    padding: 40px 20px;
+    padding: 48px 20px;
     color: var(--color-texto);
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    min-height: 220px;
 
     i {
       font-size: 3rem;
       color: #ddd;
-      margin-bottom: 15px;
       display: block;
     }
 
@@ -423,20 +588,51 @@
   }
 }
 
+.modal-form {
+  width: 100%;
+}
+
+.modal-label {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: var(--color-principal);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  outline: none;
+
+  &:focus {
+    border-color: rgba(214, 0, 0, 0.35);
+    box-shadow: 0 4px 10px rgba(214, 0, 0, 0.12);
+  }
+}
+
+.modal-error {
+  width: 100%;
+  margin-top: 8px;
+  color: #b71c1c;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
 @media (max-width: 768px) {
   .explore-championships-card {
     padding: 20px;
-  }
-
-  .btn-back {
-    top: 20px;
-    left: 20px;
-  }
-
-  .header,
-  .search-section,
-  .championships-grid {
-    margin-left: 50px;
   }
 
   .header h1 {
@@ -457,10 +653,18 @@
     padding: 15px;
   }
 
-  .header,
-  .search-section,
-  .championships-grid {
-    margin-left: 40px;
+  .filters {
+    display: none;
+  }
+
+  .filters-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .filters-mobile app-custom-select {
+    max-width: 100%;
   }
 
   .header h1 {

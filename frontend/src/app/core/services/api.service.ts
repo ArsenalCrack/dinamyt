@@ -18,6 +18,10 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/me`, user);
   }
 
+  setTempEmail(email: string) {
+    localStorage.setItem('temp_email', email);
+  }
+
   login(credentials: { correo: string; contrasena: string }) {
     return this.http.post(`${this.apiUrl}/login`, credentials);
   }
@@ -62,10 +66,19 @@ export class ApiService {
     return this.http.get<any[]>(`${this.apiUrl}/academias`);
   }
 
-cargarInstructor(idAcademia: number): Observable<any[]> {
-  return this.http.post<any[]>(
-    `${this.apiUrl}/instructores`,
-    idAcademia
-  );
-}
+  cargarinstructor(academia : any): Observable<any[]>{
+    return this.http.post<any[]>(`${this.apiUrl}/cargar_instructores`, academia);
+  }
+
+  crearCampeonato(payload: any) {
+    return this.http.post(`${this.apiUrl}/campeonatos`, payload);
+  }
+
+  getCampeonatos(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/campeonatos`);
+  }
+
+  validarCodigoCampeonato(id: number, codigo: string) {
+    return this.http.post(`${this.apiUrl}/campeonatos/${id}/validar-codigo`, { codigo });
+  }
 }

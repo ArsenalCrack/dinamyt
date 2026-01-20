@@ -18,7 +18,8 @@ export class FooterComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   estadoBackend: string = 'Comprobando...';
   isLoggedIn: boolean = false;
-  private subscription?: Subscription;
+  isAdminType3: boolean = false;
+  private subscription = new Subscription();
 
   ngOnInit() {
     this.api.getSaludo().subscribe({
@@ -27,12 +28,24 @@ export class FooterComponent implements OnInit, OnDestroy {
     });
 
     // Suscribirse al estado de autenticación
-    this.subscription = this.auth.isLoggedIn$.subscribe(
-      logged => this.isLoggedIn = logged
+    this.subscription.add(
+      this.auth.isLoggedIn$.subscribe(logged => {
+        this.isLoggedIn = logged;
+        if (!logged) this.isAdminType3 = false;
+      })
     );
+
+    this.subscription.add(
+      this.auth.roles$.subscribe(() => {
+        this.isAdminType3 = this.auth.isAdminType3();
+      })
+    );
+
+    // estado inicial
+    this.isAdminType3 = this.auth.isAdminType3();
   }
 
   ngOnDestroy() {
-    this.subscription?.unsubscribe();
+    this.subscription.unsubscribe();
   }
 }

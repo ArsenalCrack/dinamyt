@@ -1,4 +1,4 @@
-import { Component, Input, forwardRef, ElementRef, HostListener } from '@angular/core';
+import { Component, Input, forwardRef, ElementRef, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -14,9 +14,14 @@ import { FormsModule, ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/f
     multi: true
   }]
 })
-export class CountryAutocompleteComponent implements ControlValueAccessor {
+export class CountryAutocompleteComponent implements ControlValueAccessor, OnInit {
+  private static nextId = 0;
+
   @Input() paises: string[] = [];
   @Input() placeholder: string = 'Buscar país...';
+  @Input() name: string | null = null;
+  @Input() inputId: string | null = null;
+  @Input() ariaLabel: string | null = null;
   @Input() disabled = false;
   @Input() hasError = false;
 
@@ -32,6 +37,16 @@ export class CountryAutocompleteComponent implements ControlValueAccessor {
   private onTouched: () => void = () => {};
 
   constructor(private host: ElementRef) {}
+
+  ngOnInit(): void {
+    if (!this.inputId) {
+      CountryAutocompleteComponent.nextId += 1;
+      this.inputId = `dinamyt-country-autocomplete-${CountryAutocompleteComponent.nextId}`;
+    }
+    if (!this.name) {
+      this.name = this.inputId;
+    }
+  }
 
   writeValue(obj: any): void {
     this.value = obj || '';

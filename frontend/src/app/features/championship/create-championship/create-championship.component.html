@@ -1,7 +1,30 @@
 <div class="create-championship">
+  <div *ngIf="saving" class="loading-overlay" aria-live="polite" aria-busy="true">
+    <i class="fas fa-spinner fa-spin spinner-icon" aria-hidden="true"></i>
+    <p class="loading-text">{{ savingText }}</p>
+  </div>
+
+  <div *ngIf="showCreateConfirm" class="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirmar creación de campeonato">
+    <div class="confirm-card">
+      <h3>¿Seguro que deseas crear el campeonato?</h3>
+      <p class="confirm-subtitle" *ngIf="preflightCanCreate">Todo está completo. Puedes crear el campeonato ahora.</p>
+      <p class="confirm-subtitle" *ngIf="!preflightCanCreate">Aún faltan algunas cosas por completar:</p>
+
+      <ul class="confirm-list" *ngIf="!preflightCanCreate">
+        <li *ngFor="let item of preflightMissing">{{ item }}</li>
+      </ul>
+
+      <div class="confirm-actions">
+        <button type="button" class="btn-secondary" (click)="cancelCreateConfirm()">Seguir configurando</button>
+        <button type="button" class="btn-primary" [disabled]="!preflightCanCreate" (click)="confirmCreateNow()">Crear campeonato</button>
+      </div>
+    </div>
+  </div>
+
   <div class="page-card">
-    <button class="btn-back" type="button" (click)="goBack()" aria-label="Volver">
-      <i class="fas fa-arrow-left"></i>
+    <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+      <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
+      <span class="visually-hidden">Volver atrás</span>
     </button>
 
     <header class="page-header">
@@ -12,7 +35,7 @@
       </div>
     </header>
 
-    <form class="form-grid" (ngSubmit)="onSubmit()" novalidate>
+    <form #form="ngForm" class="form-grid" (ngSubmit)="onSubmit(form)" novalidate>
       <section class="card">
         <div class="card-header">
           <div>
@@ -22,31 +45,116 @@
         </div>
         <div class="card-body grid-2">
           <label class="field">
-            <span>Nombre del campeonato *</span>
-            <input type="text" [(ngModel)]="campeonato.nombre" name="nombre" placeholder="Ej: Copa Regional 2025" maxlength="50" required>
+            <span>Nombre *</span>
+            <input
+              type="text"
+              [(ngModel)]="campeonato.nombre"
+              (ngModelChange)="touchDraft()"
+              #nombreCtrl="ngModel"
+              name="nombre"
+              autocomplete="off"
+              placeholder="Ej: Open Dinamyt 2026"
+              minlength="3"
+              maxlength="50"
+              required>
+            <div *ngIf="nombreCtrl.invalid && (nombreCtrl.dirty || nombreCtrl.touched)" class="msg-error">
+              <small *ngIf="nombreCtrl.errors?.['required']">El nombre es obligatorio.</small>
+              <small *ngIf="nombreCtrl.errors?.['minlength']">Mínimo 3 caracteres.</small>
+            </div>
+            <div *ngIf="isNearCharLimit(campeonato.nombre, 50)" class="msg-warning"><small>Estás llegando al límite de 50 caracteres.</small></div>
+            <div *ngIf="isCharLimitReached(campeonato.nombre, 50)" class="msg-warning"><small>Límite máximo alcanzado (50 caracteres).</small></div>
           </label>
 
           <label class="field">
             <span>Ubicación / Sede *</span>
-            <input type="text" [(ngModel)]="campeonato.ubicacion" name="ubicacion" placeholder="Ej: Coliseo Mayor" maxlength="50" required>
+            <input
+              type="text"
+              [(ngModel)]="campeonato.ubicacion"
+              (ngModelChange)="touchDraft()"
+              #ubicacionCtrl="ngModel"
+              name="ubicacion"
+              autocomplete="off"
+              placeholder="Ej: Coliseo Mayor"
+              minlength="3"
+              maxlength="50"
+              required>
+
+            <div *ngIf="ubicacionCtrl.invalid && (ubicacionCtrl.dirty || ubicacionCtrl.touched)" class="msg-error">
+              <small *ngIf="ubicacionCtrl.errors?.['required']">La ubicación es obligatoria.</small>
+              <small *ngIf="ubicacionCtrl.errors?.['minlength']">Mínimo 3 caracteres.</small>
+            </div>
+            <div *ngIf="isNearCharLimit(campeonato.ubicacion, 50)" class="msg-warning"><small>Estás llegando al límite de 50 caracteres.</small></div>
+            <div *ngIf="isCharLimitReached(campeonato.ubicacion, 50)" class="msg-warning"><small>Límite máximo alcanzado (50 caracteres).</small></div>
           </label>
 
           <label class="field">
             <span>Fecha de inicio *</span>
-            <input type="date" [(ngModel)]="campeonato.fechaInicio" name="fechaInicio" [min]="minDate" required>
+            <input
+              id="campeonato-fecha-inicio"
+              type="text"
+              appFlatpickrDate
+              [(ngModel)]="campeonato.fechaInicio"
+              #fechaInicioCtrl="ngModel"
+              name="fechaInicio"
+              [fpMinDate]="minDate"
+              placeholder="Selecciona la fecha"
+              required
+              (change)="onFechaInicioChange()">
+            <div *ngIf="fechaInicioCtrl.invalid && (fechaInicioCtrl.dirty || fechaInicioCtrl.touched)" class="msg-error">
+              <small *ngIf="fechaInicioCtrl.errors?.['required']">La fecha de inicio es obligatoria.</small>
+            </div>
+            <div *ngIf="fechaInicioErrorMsg" class="msg-error"><small>{{ fechaInicioErrorMsg }}</small></div>
           </label>
 
           <label class="field">
             <span>Fecha de fin *</span>
-            <input type="date" [(ngModel)]="campeonato.fechaFin" name="fechaFin" [min]="campeonato.fechaInicio || minDate" required>
+            <input
+              id="campeonato-fecha-fin"
+              type="text"
+              appFlatpickrDate
+              [(ngModel)]="campeonato.fechaFin"
+              #fechaFinCtrl="ngModel"
+              name="fechaFin"
+              [fpMinDate]="campeonato.fechaInicio || minDate"
+              placeholder="Selecciona la fecha"
+              required
+              (change)="onFechaFinChange()">
+            <div *ngIf="fechaFinCtrl.invalid && (fechaFinCtrl.dirty || fechaFinCtrl.touched)" class="msg-error">
+              <small *ngIf="fechaFinCtrl.errors?.['required']">La fecha de fin es obligatoria.</small>
+            </div>
+            <div *ngIf="fechaFinErrorMsg" class="msg-error"><small>{{ fechaFinErrorMsg }}</small></div>
           </label>
 
-          <label class="field">
+          <div class="field">
             <span>Ámbito *</span>
-            <select [(ngModel)]="campeonato.alcance" name="alcance">
-              <option *ngFor="let opt of alcanceOptions" [value]="opt">{{ opt }}</option>
-            </select>
-          </label>
+            <app-custom-select
+              name="alcance"
+              [(ngModel)]="campeonato.alcance"
+              (ngModelChange)="touchDraft()"
+              #alcanceCtrl="ngModel"
+              [options]="alcanceOptions"
+              placeholder="Selecciona el ámbito"
+              required></app-custom-select>
+            <div *ngIf="alcanceCtrl.invalid && (alcanceCtrl.dirty || alcanceCtrl.touched)" class="msg-error">
+              <small>El ámbito es obligatorio.</small>
+            </div>
+          </div>
+
+          <div class="field">
+            <span>Privacidad *</span>
+            <app-custom-select
+              name="privacidad"
+              [(ngModel)]="privacy"
+              (ngModelChange)="touchDraft()"
+              #privacyCtrl="ngModel"
+              [options]="privacyOptions"
+              placeholder="Selecciona la privacidad"
+              required></app-custom-select>
+            <div *ngIf="privacyCtrl.invalid && (privacyCtrl.dirty || privacyCtrl.touched)" class="msg-error">
+              <small>La privacidad es obligatoria.</small>
+            </div>
+            <p class="hint" *ngIf="privacy === 'PUBLICO'">Cualquiera podrá ver el campeonato en Explorar.</p>
+          </div>
         </div>
       </section>
 
@@ -54,12 +162,12 @@
         <div class="card-header collapsible" (click)="tatamisExpanded = !tatamisExpanded">
           <div>
             <p class="eyebrow">Logística</p>
-            <h2>Configuración de áreas</h2>
+            <h2>Áreas y cupo</h2>
           </div>
           <i class="fas" [ngClass]="tatamisExpanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
         </div>
 
-        <div class="card-body" *ngIf="tatamisExpanded">
+        <div class="card-body grid-2" *ngIf="tatamisExpanded">
           <label class="field">
             <span>Número de áreas (Tatamis) *</span>
             <p class="hint">Máximo 12 áreas. Mínimo 1 área obligatoria.</p>
@@ -67,14 +175,48 @@
               type="text"
               inputmode="numeric"
               [(ngModel)]="campeonato.numTatamis"
+              #tatamisCtrl="ngModel"
               name="numTatamis"
               (input)="onDocumentoInput($event)"
               (blur)="limitarTatamis()"
               min="1"
               max="12"
+              required
               placeholder="1">
+            <div *ngIf="tatamisCtrl.invalid && (tatamisCtrl.dirty || tatamisCtrl.touched)" class="msg-error">
+              <small *ngIf="tatamisCtrl.errors?.['required']">El número de áreas es obligatorio.</small>
+            </div>
+
+            <p class="info-text">Áreas configuradas: <strong>{{ campeonato.numTatamis }}</strong></p>
           </label>
-          <p class="info-text">Áreas configuradas: <strong>{{ campeonato.numTatamis }}</strong></p>
+
+          <label class="field">
+            <span>Máximo de participantes *</span>
+            <p class="hint">Cupo total del evento. Mínimo 2 participantes.</p>
+            <input
+              type="text"
+              inputmode="numeric"
+              maxlength="5"
+              [(ngModel)]="campeonato.maxParticipantes"
+              #maxParticipantesCtrl="ngModel"
+              name="maxParticipantes"
+              (input)="onMaxParticipantesInput($event)"
+              (blur)="limitarMaxParticipantes()"
+              required
+              placeholder="Ej: 250">
+            <div *ngIf="maxParticipantesCtrl.invalid && (maxParticipantesCtrl.dirty || maxParticipantesCtrl.touched)" class="msg-error">
+              <small *ngIf="maxParticipantesCtrl.errors?.['required']">El máximo de participantes es obligatorio.</small>
+            </div>
+            <div *ngIf="(maxParticipantesCtrl.dirty || maxParticipantesCtrl.touched) && maxParticipantesNonNumeric" class="msg-warning">
+              <small>Solo se permiten números.</small>
+            </div>
+            <div *ngIf="(maxParticipantesCtrl.dirty || maxParticipantesCtrl.touched) && !maxParticipantesNonNumeric && maxParticipantesTooLow" class="msg-warning">
+              <small>El mínimo permitido es 2 competidores.</small>
+            </div>
+            <div *ngIf="(maxParticipantesCtrl.dirty || maxParticipantesCtrl.touched) && maxParticipantesLimitReached" class="msg-warning">
+              <small>Has alcanzado el límite de competidores (10000).</small>
+            </div>
+          </label>
         </div>
       </section>
 
@@ -88,80 +230,88 @@
         </div>
         <div class="card-body">
           <div class="modalidad" *ngFor="let mod of modalidades">
-            <div class="modalidad-head" (click)="toggleModalidad(mod.id)" tabindex="0">
+            <div class="modalidad-head" (click)="toggleModalidad(mod.id)" tabindex="0" [class.inactive]="!mod.activa">
               <div class="title-row">
                 <label class="switch" (click)="$event.stopPropagation()">
-                  <input type="checkbox" [(ngModel)]="mod.activa" name="{{mod.id}}-activa">
+                  <input type="checkbox" [(ngModel)]="mod.activa" name="{{mod.id}}-activa" [attr.aria-label]="'Activar modalidad ' + mod.nombre" (change)="onModalidadActivaChange(mod)">
                   <span class="slider"></span>
                 </label>
                 <h3>{{ mod.nombre }}</h3>
               </div>
-              <i class="fas" [ngClass]="mod.expanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              <i class="fas" *ngIf="mod.activa" [ngClass]="mod.expanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
             </div>
 
-            <div class="modalidad-body" *ngIf="mod.expanded">
+            <div class="modalidad-body" *ngIf="mod.expanded && mod.activa">
+              <div class="error-message" *ngIf="categoryError[mod.id + '-modalidad']">
+                <i class="fas fa-exclamation-circle"></i>
+                {{ categoryError[mod.id + '-modalidad'] }}
+              </div>
+
               <p class="section-label">Dividir competidores por:</p>
 
               <!-- Cinturón -->
               <div class="category-group">
                 <div class="category-toggle">
                   <label class="switch">
-                    <input type="checkbox" [checked]="mod.categorias.cinturon && mod.categorias.cinturon.length > 0" name="{{mod.id}}-cinturon" (change)="mod.categorias.cinturon = $any($event.target).checked ? [{ nombre: 'Cinturón 1', activa: true, tipo: 'individual' }] : []">
+                    <input type="checkbox" [checked]="isCategoryEnabled(mod, 'cinturon')" [disabled]="!mod.activa" name="{{mod.id}}-cinturon" aria-label="Activar categoría Cinturón / Nivel" (change)="toggleCategory(mod, 'cinturon', $any($event.target).checked)">
                     <span class="slider"></span>
                   </label>
                   <span>Cinturón / Nivel</span>
                 </div>
 
-                <div class="category-options" *ngIf="mod.categorias.cinturon && mod.categorias.cinturon.length > 0">
+                <div class="category-options" *ngIf="isCategoryEnabled(mod, 'cinturon')">
                   <p class="section-hint">Añade combinaciones de cinturones individuales y/o rangos.</p>
 
-                  <!-- Inputs de categoría -->
-                  <div class="categoria-inputs">
-                    <div class="categoria-item" *ngFor="let cat of mod.categorias.cinturon; let i = index">
-                      <div class="input-row" [class.input-rango]="cat.tipo === 'rango'">
-                        <select *ngIf="cat.tipo === 'individual'"
-                          [(ngModel)]="cat.valor"
-                          name="{{mod.id}}-cinturon-valor-{{i}}"
-                          class="input-field select-field">
-                          <option value="" disabled>Selecciona una opción</option>
-                          <option *ngFor="let c of cinturones" [value]="c.value">{{ c.label }}</option>
-                        </select>
+                  <div class="type-tabs">
+                    <button type="button" class="tab" [disabled]="!mod.activa" [class.active]="pending[mod.id].cinturon.tipo === 'individual'" (click)="setPendingType(mod, 'cinturon', 'individual')">Individual</button>
+                    <button type="button" class="tab" [disabled]="!mod.activa" [class.active]="pending[mod.id].cinturon.tipo === 'rango'" (click)="setPendingType(mod, 'cinturon', 'rango')">Rango</button>
+                  </div>
 
-                        <div *ngIf="cat.tipo === 'rango'" class="rango-inputs">
-                          <select [(ngModel)]="cat.desde"
-                            name="{{mod.id}}-cinturon-desde-{{i}}"
-                            class="input-field select-field">
-                            <option value="" disabled>Desde</option>
-                            <option *ngFor="let c of cinturones" [value]="c.value">{{ c.label }}</option>
-                          </select>
-                          <span class="rango-separator">a</span>
-                          <select [(ngModel)]="cat.hasta"
-                            name="{{mod.id}}-cinturon-hasta-{{i}}"
-                            class="input-field select-field">
-                            <option value="" disabled>Hasta</option>
-                            <option *ngFor="let c of cinturones" [value]="c.value">{{ c.label }}</option>
-                          </select>
-                        </div>
+                  <div class="add-row individual-row" *ngIf="pending[mod.id].cinturon.tipo === 'individual'">
+                    <div class="field-col">
+                      <app-custom-select
+                        name="{{mod.id}}-cinturon-pending"
+                        [(ngModel)]="pending[mod.id].cinturon.valor"
+                        [disabled]="!mod.activa"
+                        [options]="cinturones"
+                        placeholder="Selecciona un cinturón"></app-custom-select>
+                    </div>
+                    <button type="button" class="btn-add" [disabled]="!mod.activa" (click)="addCategoryFromPending(mod, 'cinturon')">Añadir</button>
+                  </div>
 
-                        <button type="button" class="btn-remove" (click)="removeCategoryItem(mod, 'cinturon', i)" aria-label="Eliminar">
-                          <i class="fas fa-trash"></i>
-                        </button>
-                      </div>
+                  <div class="add-row rango-row" *ngIf="pending[mod.id].cinturon.tipo === 'rango'">
+                    <div class="field-col">
+                      <app-custom-select
+                        name="{{mod.id}}-cinturon-desde"
+                        [(ngModel)]="pending[mod.id].cinturon.desde"
+                        [disabled]="!mod.activa"
+                        [options]="cinturones"
+                        placeholder="Desde"></app-custom-select>
+                    </div>
+                    <span class="rango-separator">a</span>
+                    <div class="field-col">
+                      <app-custom-select
+                        name="{{mod.id}}-cinturon-hasta"
+                        [(ngModel)]="pending[mod.id].cinturon.hasta"
+                        [disabled]="!mod.activa"
+                        [options]="cinturones"
+                        placeholder="Hasta"></app-custom-select>
+                    </div>
+                    <button type="button" class="btn-add" [disabled]="!mod.activa" (click)="addCategoryFromPending(mod, 'cinturon')">Añadir rango</button>
+                  </div>
+
+                  <div class="chips" *ngIf="mod.categorias.cinturon.length > 0">
+                    <div class="chip" *ngFor="let cat of mod.categorias.cinturon; let i = index">
+                      <span>{{ formatCategory(cat, 'cinturon') }}</span>
+                      <button type="button" class="chip-remove" (click)="removeCategoryItem(mod, 'cinturon', i)" aria-label="Eliminar">
+                        <i class="fas fa-times"></i>
+                      </button>
                     </div>
                   </div>
 
                   <div class="error-message" *ngIf="categoryError[mod.id + '-cinturon']">
                     <i class="fas fa-exclamation-circle"></i>
                     {{ categoryError[mod.id + '-cinturon'] }}
-                  </div>
-
-                  <div class="category-type-buttons">
-                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'cinturon', 'individual')">
-                      <i class="fas fa-plus"></i> Individual
-                    </button>
-                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'cinturon', 'rango')">
-                      <i class="fas fa-arrows-alt-h"></i> Rango
-                    </button>
                   </div>
 
                   <p class="info-small">Selecciona cinturones predefinidos del sistema.</p>
@@ -172,65 +322,77 @@
               <div class="category-group">
                 <div class="category-toggle">
                   <label class="switch">
-                    <input type="checkbox" [checked]="mod.categorias.edad && mod.categorias.edad.length > 0" name="{{mod.id}}-edad" (change)="mod.categorias.edad = $any($event.target).checked ? [{ nombre: 'Edad 1', activa: true, tipo: 'individual' }] : []">
+                    <input type="checkbox" [checked]="isCategoryEnabled(mod, 'edad')" [disabled]="!mod.activa" name="{{mod.id}}-edad" aria-label="Activar categoría Edad" (change)="toggleCategory(mod, 'edad', $any($event.target).checked)">
                     <span class="slider"></span>
                   </label>
                   <span>Edad</span>
                 </div>
 
-                <div class="category-options" *ngIf="mod.categorias.edad && mod.categorias.edad.length > 0">
+                <div class="category-options" *ngIf="isCategoryEnabled(mod, 'edad')">
                   <p class="section-hint">Añade edades únicas y/o rangos de edades.</p>
 
-                  <!-- Inputs de categoría -->
-                  <div class="categoria-inputs">
-                    <div class="categoria-item" *ngFor="let cat of mod.categorias.edad; let i = index">
-                      <div class="input-row" [class.input-rango]="cat.tipo === 'rango'">
-                        <input *ngIf="cat.tipo === 'individual'"
-                          type="number"
-                          [(ngModel)]="cat.valor"
-                          name="{{mod.id}}-edad-valor-{{i}}"
-                          placeholder="Ej: 25 años"
-                          max="100"
-                          (input)="limitarEdad($event)"
-                          class="input-field">
+                  <div class="type-tabs">
+                    <button type="button" class="tab" [disabled]="!mod.activa" [class.active]="pending[mod.id].edad.tipo === 'individual'" (click)="setPendingType(mod, 'edad', 'individual')">Individual</button>
+                    <button type="button" class="tab" [disabled]="!mod.activa" [class.active]="pending[mod.id].edad.tipo === 'rango'" (click)="setPendingType(mod, 'edad', 'rango')">Rango</button>
+                  </div>
 
-                        <div *ngIf="cat.tipo === 'rango'" class="rango-inputs">
-                          <input type="number"
-                            [(ngModel)]="cat.desde"
-                            name="{{mod.id}}-edad-desde-{{i}}"
-                            placeholder="Desde"
-                            max="100"
-                            (input)="limitarEdad($event)"
-                            class="input-field">
-                          <span class="rango-separator">a</span>
-                          <input type="number"
-                            [(ngModel)]="cat.hasta"
-                            name="{{mod.id}}-edad-hasta-{{i}}"
-                            placeholder="Hasta"
-                            max="100"
-                            (input)="limitarEdad($event)"
-                            class="input-field">
-                        </div>
+                  <div class="add-row individual-row" *ngIf="pending[mod.id].edad.tipo === 'individual'">
+                    <div class="field-col">
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        [(ngModel)]="pending[mod.id].edad.valor"
+                        name="{{mod.id}}-edad-pending"
+                        placeholder="Ej: 25"
+                        maxlength="3"
+                        (input)="limitarEdad($event)"
+                        [disabled]="!mod.activa"
+                        class="input-field">
+                    </div>
+                    <button type="button" class="btn-add" [disabled]="!mod.activa" (click)="addCategoryFromPending(mod, 'edad')">Añadir</button>
+                  </div>
 
-                        <button type="button" class="btn-remove" (click)="removeCategoryItem(mod, 'edad', i)" aria-label="Eliminar">
-                          <i class="fas fa-trash"></i>
-                        </button>
-                      </div>
+                  <div class="add-row rango-row" *ngIf="pending[mod.id].edad.tipo === 'rango'">
+                    <div class="field-col">
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        [(ngModel)]="pending[mod.id].edad.desde"
+                        name="{{mod.id}}-edad-desde"
+                        placeholder="Desde"
+                        maxlength="3"
+                        (input)="limitarEdad($event)"
+                        [disabled]="!mod.activa"
+                        class="input-field">
+                    </div>
+                    <span class="rango-separator">a</span>
+                    <div class="field-col">
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        [(ngModel)]="pending[mod.id].edad.hasta"
+                        name="{{mod.id}}-edad-hasta"
+                        placeholder="Hasta"
+                        maxlength="3"
+                        (input)="limitarEdad($event)"
+                        [disabled]="!mod.activa"
+                        class="input-field">
+                    </div>
+                    <button type="button" class="btn-add" [disabled]="!mod.activa" (click)="addCategoryFromPending(mod, 'edad')">Añadir rango</button>
+                  </div>
+
+                  <div class="chips" *ngIf="mod.categorias.edad.length > 0">
+                    <div class="chip" *ngFor="let cat of mod.categorias.edad; let i = index">
+                      <span>{{ formatCategory(cat, 'edad') }}</span>
+                      <button type="button" class="chip-remove" (click)="removeCategoryItem(mod, 'edad', i)" aria-label="Eliminar">
+                        <i class="fas fa-times"></i>
+                      </button>
                     </div>
                   </div>
 
                   <div class="error-message" *ngIf="categoryError[mod.id + '-edad']">
                     <i class="fas fa-exclamation-circle"></i>
                     {{ categoryError[mod.id + '-edad'] }}
-                  </div>
-
-                  <div class="category-type-buttons">
-                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'edad', 'individual')">
-                      <i class="fas fa-plus"></i> Edad única
-                    </button>
-                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'edad', 'rango')">
-                      <i class="fas fa-arrows-alt-h"></i> Rango de edades
-                    </button>
                   </div>
 
                   <p class="info-small">Máximo 100 años.</p>
@@ -241,65 +403,77 @@
               <div class="category-group">
                 <div class="category-toggle">
                   <label class="switch">
-                    <input type="checkbox" [checked]="mod.categorias.peso && mod.categorias.peso.length > 0" name="{{mod.id}}-peso" (change)="mod.categorias.peso = $any($event.target).checked ? [{ nombre: 'Peso 1', activa: true, tipo: 'individual' }] : []">
+                    <input type="checkbox" [checked]="isCategoryEnabled(mod, 'peso')" [disabled]="!mod.activa" name="{{mod.id}}-peso" aria-label="Activar categoría Peso" (change)="toggleCategory(mod, 'peso', $any($event.target).checked)">
                     <span class="slider"></span>
                   </label>
                   <span>Peso</span>
                 </div>
 
-                <div class="category-options" *ngIf="mod.categorias.peso && mod.categorias.peso.length > 0">
+                <div class="category-options" *ngIf="isCategoryEnabled(mod, 'peso')">
                   <p class="section-hint">Añade pesos únicos y/o rangos de peso.</p>
 
-                  <!-- Inputs de categoría -->
-                  <div class="categoria-inputs">
-                    <div class="categoria-item" *ngFor="let cat of mod.categorias.peso; let i = index">
-                      <div class="input-row" [class.input-rango]="cat.tipo === 'rango'">
-                        <input *ngIf="cat.tipo === 'individual'"
-                          type="text"
-                          [(ngModel)]="cat.valor"
-                          name="{{mod.id}}-peso-valor-{{i}}"
-                          placeholder="Ej: 065 kg"
-                          maxlength="3"
-                          (input)="limitarPeso($event)"
-                          class="input-field">
+                  <div class="type-tabs">
+                    <button type="button" class="tab" [disabled]="!mod.activa" [class.active]="pending[mod.id].peso.tipo === 'individual'" (click)="setPendingType(mod, 'peso', 'individual')">Individual</button>
+                    <button type="button" class="tab" [disabled]="!mod.activa" [class.active]="pending[mod.id].peso.tipo === 'rango'" (click)="setPendingType(mod, 'peso', 'rango')">Rango</button>
+                  </div>
 
-                        <div *ngIf="cat.tipo === 'rango'" class="rango-inputs">
-                          <input type="text"
-                            [(ngModel)]="cat.desde"
-                            name="{{mod.id}}-peso-desde-{{i}}"
-                            placeholder="Desde (kg)"
-                            maxlength="3"
-                            (input)="limitarPeso($event)"
-                            class="input-field">
-                          <span class="rango-separator">a</span>
-                          <input type="text"
-                            [(ngModel)]="cat.hasta"
-                            name="{{mod.id}}-peso-hasta-{{i}}"
-                            placeholder="Hasta (kg)"
-                            maxlength="3"
-                            (input)="limitarPeso($event)"
-                            class="input-field">
-                        </div>
+                  <div class="add-row individual-row" *ngIf="pending[mod.id].peso.tipo === 'individual'">
+                    <div class="field-col">
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        [(ngModel)]="pending[mod.id].peso.valor"
+                        name="{{mod.id}}-peso-pending"
+                        placeholder="Ej: 065"
+                        maxlength="3"
+                        (input)="limitarPeso($event)"
+                        [disabled]="!mod.activa"
+                        class="input-field">
+                    </div>
+                    <button type="button" class="btn-add" [disabled]="!mod.activa" (click)="addCategoryFromPending(mod, 'peso')">Añadir</button>
+                  </div>
 
-                        <button type="button" class="btn-remove" (click)="removeCategoryItem(mod, 'peso', i)" aria-label="Eliminar">
-                          <i class="fas fa-trash"></i>
-                        </button>
-                      </div>
+                  <div class="add-row rango-row" *ngIf="pending[mod.id].peso.tipo === 'rango'">
+                    <div class="field-col">
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        [(ngModel)]="pending[mod.id].peso.desde"
+                        name="{{mod.id}}-peso-desde"
+                        placeholder="Desde"
+                        maxlength="3"
+                        (input)="limitarPeso($event)"
+                        [disabled]="!mod.activa"
+                        class="input-field">
+                    </div>
+                    <span class="rango-separator">a</span>
+                    <div class="field-col">
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        [(ngModel)]="pending[mod.id].peso.hasta"
+                        name="{{mod.id}}-peso-hasta"
+                        placeholder="Hasta"
+                        maxlength="3"
+                        (input)="limitarPeso($event)"
+                        [disabled]="!mod.activa"
+                        class="input-field">
+                    </div>
+                    <button type="button" class="btn-add" [disabled]="!mod.activa" (click)="addCategoryFromPending(mod, 'peso')">Añadir rango</button>
+                  </div>
+
+                  <div class="chips" *ngIf="mod.categorias.peso.length > 0">
+                    <div class="chip" *ngFor="let cat of mod.categorias.peso; let i = index">
+                      <span>{{ formatCategory(cat, 'peso') }}</span>
+                      <button type="button" class="chip-remove" (click)="removeCategoryItem(mod, 'peso', i)" aria-label="Eliminar">
+                        <i class="fas fa-times"></i>
+                      </button>
                     </div>
                   </div>
 
                   <div class="error-message" *ngIf="categoryError[mod.id + '-peso']">
                     <i class="fas fa-exclamation-circle"></i>
                     {{ categoryError[mod.id + '-peso'] }}
-                  </div>
-
-                  <div class="category-type-buttons">
-                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'peso', 'individual')">
-                      <i class="fas fa-plus"></i> Peso único
-                    </button>
-                    <button type="button" class="btn-add-type" (click)="addCategoryItem(mod, 'peso', 'rango')">
-                      <i class="fas fa-arrows-alt-h"></i> Rango de peso
-                    </button>
                   </div>
 
                   <p class="info-small">Máximo 400 kg.</p>
@@ -310,19 +484,19 @@
               <div class="category-group">
                 <div class="category-toggle">
                   <label class="switch">
-                    <input type="checkbox" [checked]="mod.categorias.genero !== null" name="{{mod.id}}-genero" (change)="mod.categorias.genero = $any($event.target).checked ? 'individual' : null">
+                    <input type="checkbox" [checked]="mod.categorias.genero !== null" [disabled]="!mod.activa" name="{{mod.id}}-genero" aria-label="Activar categoría Género" (change)="onGeneroToggle(mod, $any($event.target).checked)">
                     <span class="slider"></span>
                   </label>
                   <span>Género</span>
                 </div>
-                <div class="category-options" *ngIf="mod.categorias.genero">
+                <div class="category-options" *ngIf="mod.activa && mod.categorias.genero">
                   <div class="radio-group">
                     <label class="radio-label">
-                      <input type="radio" name="{{mod.id}}-genero-type" value="individual" [checked]="mod.categorias.genero === 'individual'" (change)="mod.categorias.genero = 'individual'">
+                      <input type="radio" [disabled]="!mod.activa" name="{{mod.id}}-genero-type" value="individual" [checked]="mod.categorias.genero === 'individual'" (change)="setGeneroType(mod, 'individual')">
                       Individual (por género)
                     </label>
                     <label class="radio-label">
-                      <input type="radio" name="{{mod.id}}-genero-type" value="mixto" [checked]="mod.categorias.genero === 'mixto'" (change)="mod.categorias.genero = 'mixto'">
+                      <input type="radio" [disabled]="!mod.activa" name="{{mod.id}}-genero-type" value="mixto" [checked]="mod.categorias.genero === 'mixto'" (change)="setGeneroType(mod, 'mixto')">
                       Mixto (compiten juntos)
                     </label>
                   </div>
@@ -336,8 +510,8 @@
       <div class="form-actions">
         <button type="button" class="btn ghost" (click)="goBack()">Cancelar</button>
         <button type="submit" class="btn primary" [disabled]="saving">
-          <span *ngIf="!saving">Guardar borrador</span>
-          <span *ngIf="saving" class="loading">Guardando...</span>
+          <span *ngIf="!saving">Crear Campeonato</span>
+          <span *ngIf="saving" class="loading">Creando...</span>
         </button>
       </div>
 

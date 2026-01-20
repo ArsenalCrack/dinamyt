@@ -7,6 +7,10 @@ import { Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
+import { extractUserRoles } from '../../../core/utils/user-type.util';
+import { delayRemaining } from '../../../core/utils/spinner-timing.util';
+import { BackNavigationService } from '../../../core/services/back-navigation.service';
 
 @Component({
   selector: 'app-login',
@@ -21,6 +25,10 @@ export class LoginComponent implements OnDestroy {
   private router = inject(Router);
   private api = inject(ApiService);
   private auth = inject(AuthService);
+  private scrollLock = inject(ScrollLockService);
+  private backNav = inject(BackNavigationService);
+
+  private scrollLocked = false;
 
   mostrarPass: boolean = false;
   cargando: boolean = false;
@@ -30,39 +38,41 @@ export class LoginComponent implements OnDestroy {
   contrasena: string = '';
 
   volverAtras() {
-    this.location.back();
+    this.backNav.backOr({ fallbackUrl: '/' });
   }
 
-  private lockScroll() { document.body.style.overflow = 'hidden'; }
-  private unlockScroll() { document.body.style.overflow = ''; }
+  private lockScroll() {
+    if (this.scrollLocked) return;
+    this.scrollLock.lock();
+    this.scrollLocked = true;
+  }
+
+  private unlockScroll() {
+    if (!this.scrollLocked) return;
+    this.scrollLock.unlock();
+    this.scrollLocked = false;
+  }
 
   login() {
     this.errorMessage = null;
     this.cargando = true;
     this.lockScroll();
+    const startedAt = Date.now();
 
     this.api.login({ correo: this.correo, contrasena: this.contrasena }).subscribe({
-      next: (res: any) => {
-        localStorage.setItem('usuario', JSON.stringify(res.usuario));
-        console.log('Respuesta del backend:', res);
+      next: async (res: any) => {
+        localStorage.setItem('usuario', JSON.stringify(res));
 
         // Backend expected to return token and user info
         const token = res?.token || res?.accessToken || null;
         const user = res?.user || res?.usuario || res;
-        const instructorObj = res?.instructor.idDocumento;
-
-
-        console.log('Token extraído:', token);
-        console.log('Usuario extraído:', user);
 
         if (token) {
           sessionStorage.setItem('token', token);
-          console.log('Token guardado en sessionStorage');
         }
 
         // Guardar correo como identificador de sesión
         sessionStorage.setItem('correo', this.correo);
-        console.log('Correo guardado:', this.correo);
 
         if (user && typeof user === 'object') {
           const toSessionString = (val: any): string | null => {
@@ -73,11 +83,23 @@ export class LoginComponent implements OnDestroy {
             }
             if (typeof val === 'number' || typeof val === 'boolean') return String(val);
             if (typeof val === 'object') {
-              const id = (val as any)?.id;
+              const id =
+                (val as any)?.id ??
+                (val as any)?.ID_academia ??
+                (val as any)?.idAcademia ??
+                (val as any)?.id_academia ??
+                (val as any)?.idDocumento ??
+                (val as any)?.ID_documento ??
+                (val as any)?.id_documento;
               if (id !== null && id !== undefined) return String(id);
               const nombre = (val as any)?.nombre ?? (val as any)?.name;
               if (nombre !== null && nombre !== undefined) {
                 const s = String(nombre).trim();
+                return s ? s : null;
+              }
+              const nombreC = (val as any)?.nombreC;
+              if (nombreC !== null && nombreC !== undefined) {
+                const s = String(nombreC).trim();
                 return s ? s : null;
               }
             }
@@ -88,9 +110,11 @@ export class LoginComponent implements OnDestroy {
           const name = user?.nombreC || user?.username || user?.name || user?.nombre || null;
           if (name) {
             sessionStorage.setItem('nombreC', name);
-            console.log('Username guardado:', name);
             this.auth.setLoggedIn(true, name);
           }
+
+          const roles = extractUserRoles(user);
+          this.auth.setRoles(roles);
 
           // Guardar otros datos del usuario si están disponibles
           const idDocumento = toSessionString(user?.idDocumento);
@@ -114,65 +138,71 @@ export class LoginComponent implements OnDestroy {
           const numeroCelular = toSessionString(user?.numeroCelular);
           if (numeroCelular) sessionStorage.setItem('numeroCelular', numeroCelular);
 
+          const sinAcademia = Boolean((user as any)?.sinAcademia);
           const academia = toSessionString(user?.academia);
-          if (academia) sessionStorage.setItem('academia', academia);
+          if (sinAcademia) sessionStorage.setItem('academia', 'sin_academia');
+          else if (academia) sessionStorage.setItem('academia', academia);
           else sessionStorage.removeItem('academia');
 
-
-          console.log(instructorObj);
-          if (instructorObj) {
-            sessionStorage.setItem('Instructor', instructorObj);
-            sessionStorage.setItem('instructor', instructorObj);
+          const instructorIndependiente = Boolean((user as any)?.instructorIndependiente);
+          const instructor = toSessionString(user?.Instructor ?? user?.instructor);
+          if (instructorIndependiente) {
+            sessionStorage.setItem('Instructor', 'independiente');
+            sessionStorage.setItem('instructor', 'independiente');
+          } else if (instructor) {
+            sessionStorage.setItem('Instructor', instructor);
+            sessionStorage.setItem('instructor', instructor);
           } else {
             sessionStorage.removeItem('Instructor');
             sessionStorage.removeItem('instructor');
           }
         }
 
-        // Mantener el spinner visible por 2 segundos antes de navegar
-        console.log('Esperando 2 segundos antes de navegar...');
-        setTimeout(() => {
-          this.cargando = false;
-          this.unlockScroll();
-          console.log('Navegando a dashboard...');
-          this.router.navigate(['/dashboard']);
-        }, 2000);
-      },
-      error: (err: HttpErrorResponse) => {
-        console.error('Error en login:', err);
+        await delayRemaining(startedAt);
         this.cargando = false;
         this.unlockScroll();
+        this.router.navigate(['/dashboard']);
+      },
+      error: async (err: HttpErrorResponse) => {
+        // Mantener scroll bloqueado mientras se muestre el modal
 
         // Mensajes de error más específicos según el código de estado
         if (err.status === 401) {
           // 401 = No autorizado (credenciales incorrectas)
           const mensaje = err.error?.message || err.error?.error || '';
           if (mensaje.toLowerCase().includes('contraseña') || mensaje.toLowerCase().includes('password')) {
-            this.errorMessage = 'Contraseña incorrecta. Por favor verifica e intenta nuevamente.';
+            this.errorMessage = 'Contraseña incorrecta. Intenta de nuevo.';
           } else if (mensaje.toLowerCase().includes('correo') || mensaje.toLowerCase().includes('email')) {
-            this.errorMessage = 'El correo ingresado no está registrado.';
+            this.errorMessage = 'Este correo no está registrado.';
           } else {
-            this.errorMessage = 'Correo o contraseña incorrectos. Por favor verifica tus credenciales.';
+            this.errorMessage = 'Correo o contraseña incorrectos.';
           }
         } else if (err.status === 404) {
           // 404 = Usuario no encontrado
-          this.errorMessage = 'El correo ingresado no está registrado en el sistema.';
+          this.errorMessage = 'Este correo no está registrado.';
         } else if (err.status === 403) {
           // 403 = Cuenta bloqueada o no verificada
-          this.errorMessage = err.error?.message || 'Tu cuenta no está activa. Verifica tu correo electrónico.';
+          this.errorMessage = err.error?.message || 'Tu cuenta no está activa. Revisa tu correo.';
         } else if (err.status === 0) {
           // Sin conexión al servidor
-          this.errorMessage = 'No se pudo conectar con el servidor. Verifica tu conexión a internet.';
+          this.errorMessage = 'No se puede conectar con el servidor. Revisa tu conexión.';
         } else {
           // Otros errores
-          this.errorMessage = err.error?.message || err.error?.error || err.statusText || 'Error al iniciar sesión. Intenta nuevamente.';
+          this.errorMessage = err.error?.message || err.error?.error || err.statusText || 'No se pudo iniciar sesión. Intenta de nuevo.';
         }
+
+        await delayRemaining(startedAt);
+        this.cargando = false;
+
+        if (this.errorMessage) this.lockScroll();
+        else this.unlockScroll();
       }
     });
   }
 
   closeError() {
     this.errorMessage = null;
+    this.unlockScroll();
   }
 
   ngOnDestroy(): void {
