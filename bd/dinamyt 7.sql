@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 21-01-2026 a las 04:17:30
+-- Tiempo de generación: 21-01-2026 a las 19:53:24
 -- Versión del servidor: 10.4.32-MariaDB
--- Versión de PHP: 8.0.30
+-- Versión de PHP: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -70,7 +70,9 @@ CREATE TABLE `campeonato` (
 --
 
 INSERT INTO `campeonato` (`id_campeonato`, `nombre`, `ubicacion`, `alcance`, `num_tatamis`, `max_participantes`, `es_publico`, `creado_por`, `modalidades`, `fecha_inicio`, `fecha_fin`, `estado`, `participantes`, `puede_inscribirse`) VALUES
-(9, 'asd', 'asd', 'Regional', 12, 21, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"nombre\":\"\",\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Naranja/verde\"}],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-manos\",\"nombre\":\"Figura a manos libres\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"defensa-personal\",\"nombre\":\"Defensa personal\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-alto\",\"nombre\":\"Salto alto\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-largo\",\"nombre\":\"Salto largo\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}}]', NULL, NULL, 'BORRADOR', 0, 1);
+(9, 'asd', 'asd', 'Regional', 12, 21, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"nombre\":\"\",\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Naranja/verde\"}],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-manos\",\"nombre\":\"Figura a manos libres\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"defensa-personal\",\"nombre\":\"Defensa personal\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-alto\",\"nombre\":\"Salto alto\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-largo\",\"nombre\":\"Salto largo\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}}]', NULL, NULL, 'BORRADOR', 0, 1),
+(10, 'asdasd', 'ahi mismo', 'Nacional', 1, 2, 0, 43013, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"nombre\":\"\",\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Amarillo\"}],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-manos\",\"nombre\":\"Figura a manos libres\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"defensa-personal\",\"nombre\":\"Defensa personal\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-alto\",\"nombre\":\"Salto alto\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-largo\",\"nombre\":\"Salto largo\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}}]', NULL, NULL, 'BORRADOR', 0, 1),
+(11, 'Tercer Campeonato', 'Aqui mismo ya no', 'Binacional', 2, 100, 0, 43013, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-manos\",\"nombre\":\"Figura a manos libres\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"defensa-personal\",\"nombre\":\"Defensa personal\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-alto\",\"nombre\":\"Salto alto\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-largo\",\"nombre\":\"Salto largo\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"nombre\":\"\",\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Naranja\"}],\"edad\":[],\"peso\":[],\"genero\":null}}]', '2026-01-21', '2026-01-23', 'BORRADOR', 0, 1);
 
 -- --------------------------------------------------------
 
@@ -122,7 +124,9 @@ INSERT INTO `usuario` (`ID_documento`, `nombreC`, `sexo`, `fecha_nacimiento`, `c
 (0, 'Independiente', 'masculino', '2026-01-01', 'negro', 'colombia', 'nada', '1', '2', NULL, 0, 2),
 (1, 'Instructor 1', 'masculino', '2026-01-01', 'negro', 'colombia', 'a', NULL, '1', NULL, 1, 2),
 (2, 'instructor 2', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2, 2),
-(123456, 'Andres Gonzalez', 'Masculino', '2019-04-04', NULL, 'Colombia', 'andresivan0807@gmail.com', '1', NULL, 2, 2, 3);
+(43013, 'AMIR SARMIENTO', 'Masculino', '2020-04-02', 'Blanco', 'Colombia', 'amirsarmiento0430@gmail.com', 'Vm04300216*', '+570430', 0, 0, 3),
+(123456, 'Andres Gonzalez', 'Masculino', '2019-04-04', NULL, 'Colombia', 'andresivan0807@gmail.com', '1', NULL, 0, 0, 2),
+(7868776876, 'AMIR SARMIENTOQ', 'Masculino', '2019-04-03', NULL, 'Albania', 'amirdaniel0430@gmail.com', 'Vm04300216*', NULL, NULL, NULL, 4);
 
 --
 -- Índices para tablas volcadas
@@ -165,7 +169,7 @@ ALTER TABLE `usuario`
 -- AUTO_INCREMENT de la tabla `campeonato`
 --
 ALTER TABLE `campeonato`
-  MODIFY `id_campeonato` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id_campeonato` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- Restricciones para tablas volcadas
