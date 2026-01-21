@@ -1053,13 +1053,7 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
       numTatamis,
       maxParticipantes,
       ...(typeof esPublico === 'boolean' ? { esPublico } : {}),
-      creadoPor: (
-        sessionStorage.getItem('nombreC') ||
-        sessionStorage.getItem('correo') ||
-        sessionStorage.getItem('username') ||
-        sessionStorage.getItem('userName') ||
-        null
-      ),
+      creadoPor:sessionStorage.getItem('idDocumento'),
       modalidades: this.modalidades.map(({ expanded, ...rest }) => rest)
     };
 

@@ -1,15 +1,15 @@
 //echo por Andres Gonzalez 1077294332
 package org.ivan.backend.backend.controladores;
 
-import org.ivan.backend.backend.BD_tablas.Academia;
+import org.ivan.backend.backend.BD_tablas.*;
 import org.ivan.backend.backend.EmailService;
-import org.ivan.backend.backend.BD_tablas.Usuario;
-import org.ivan.backend.backend.BD_tablas.Tipousuario;
 import org.ivan.backend.backend.repositorios.AcademiaRepository;
+import org.ivan.backend.backend.repositorios.CampeonatoRepository;
 import org.ivan.backend.backend.repositorios.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -25,11 +25,13 @@ public class controlador_principal {
 
     private final UsuarioRepository usuarioRepository;
     private final AcademiaRepository academiaRepository;
+    private final CampeonatoRepository campeonatoRepository;
     private final Map<String, Usuario> usuariosPendientes = new HashMap<>();
 
-    public controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository) {
+    public controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository, CampeonatoRepository campeonatoRepository) {
         this.usuarioRepository = usuarioRepository;
         this.academiaRepository = academiaRepository;
+        this.campeonatoRepository= campeonatoRepository;
     }
 
     private String GenerarCodigo() {
@@ -194,11 +196,73 @@ public class controlador_principal {
 
     @PutMapping("/perfil")
     private ResponseEntity<?> actualizar_datos(@RequestBody Usuario datos) {
-        System.out.println("a" + datos.getCorreo());
         if (datos.getCorreo() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
         }
-        return ResponseEntity.ok("perfecto");
+        System.out.println(datos.getNumeroCelular()+"  "+datos.getCinturonRango());
+        Usuario usuario = usuarioRepository.findByCorreo(datos.getCorreo());
+        Usuario instructor = usuarioRepository.findById(Long.parseLong(datos.getModo())).orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
+        Academia academia = academiaRepository.findById(Integer.parseInt(datos.getModo())).orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
+        usuario.setCorreo(datos.getCorreo());
+        usuario.setNumeroCelular(datos.getNumeroCelular());
+        usuario.setCinturonRango(datos.getCinturonRango());
+        usuario.setAcademia(academia);
+        usuario.setInstructor(instructor);
+        usuarioRepository.save(usuario);
+        return ResponseEntity.ok(datos);
     }
+    @PostMapping("/campeonatos")
+    public ResponseEntity<?> crear(@RequestBody Map<String, Object> datos) {
+        try {
+            Campeonato campeonato = new Campeonato();
+
+            campeonato.setNombre((String) datos.get("nombre"));
+            campeonato.setUbicacion((String) datos.get("ubicacion"));
+            campeonato.setAlcance((String) datos.get("alcance"));
+
+            if (datos.get("numTatamis") != null) {
+                campeonato.setNumTatamis(
+                        Integer.parseInt(datos.get("numTatamis").toString())
+                );
+            }
+
+            if (datos.get("maxParticipantes") != null) {
+                campeonato.setMaxParticipantes(
+                        Integer.parseInt(datos.get("maxParticipantes").toString())
+                );
+            }
+
+            if (datos.get("esPublico") != null) {
+                campeonato.setEsPublico(
+                        Boolean.parseBoolean(datos.get("esPublico").toString())
+                );
+            }
+
+            campeonato.setCreadoPor(Long.parseLong(datos.get("creadoPor").toString()));
+
+            if (datos.get("modalidades") != null) {
+                ObjectMapper mapper = new ObjectMapper();
+                String modalidadesJson = mapper.writeValueAsString(datos.get("modalidades"));
+                campeonato.setModalidades(modalidadesJson);
+            }
+
+            campeonatoRepository.save(campeonato);
+
+            return ResponseEntity.ok(
+                    Map.of("message", "Campeonato creado correctamente")
+            );
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(
+                    Map.of("message", "Error al crear el campeonato")
+            );
+        }
+    }
+
+
+
+
+
 
 }
