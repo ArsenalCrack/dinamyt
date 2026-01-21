@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 21-01-2026 a las 03:20:26
+-- Tiempo de generación: 21-01-2026 a las 04:17:30
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.0.30
 
@@ -57,15 +57,20 @@ CREATE TABLE `campeonato` (
   `max_participantes` int(11) DEFAULT NULL,
   `es_publico` tinyint(1) DEFAULT NULL,
   `creado_por` bigint(20) DEFAULT NULL,
-  `modalidades` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`modalidades`))
+  `modalidades` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`modalidades`)),
+  `fecha_inicio` date DEFAULT NULL,
+  `fecha_fin` date DEFAULT NULL,
+  `estado` varchar(255) DEFAULT NULL,
+  `participantes` int(11) DEFAULT 0,
+  `puede_inscribirse` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `campeonato`
 --
 
-INSERT INTO `campeonato` (`id_campeonato`, `nombre`, `ubicacion`, `alcance`, `num_tatamis`, `max_participantes`, `es_publico`, `creado_por`, `modalidades`) VALUES
-(2, 'campeonato 1', 'tu casa', 'Regional', 12, 23, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"nombre\":\"\",\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Blanco\",\"hasta\":\"Amarillo\"}],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-manos\",\"nombre\":\"Figura a manos libres\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"defensa-personal\",\"nombre\":\"Defensa personal\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-alto\",\"nombre\":\"Salto alto\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-largo\",\"nombre\":\"Salto largo\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}}]');
+INSERT INTO `campeonato` (`id_campeonato`, `nombre`, `ubicacion`, `alcance`, `num_tatamis`, `max_participantes`, `es_publico`, `creado_por`, `modalidades`, `fecha_inicio`, `fecha_fin`, `estado`, `participantes`, `puede_inscribirse`) VALUES
+(9, 'asd', 'asd', 'Regional', 12, 21, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"nombre\":\"\",\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Naranja/verde\"}],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-manos\",\"nombre\":\"Figura a manos libres\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"defensa-personal\",\"nombre\":\"Defensa personal\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-alto\",\"nombre\":\"Salto alto\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-largo\",\"nombre\":\"Salto largo\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}}]', NULL, NULL, 'BORRADOR', 0, 1);
 
 -- --------------------------------------------------------
 
@@ -134,7 +139,7 @@ ALTER TABLE `academia`
 --
 ALTER TABLE `campeonato`
   ADD PRIMARY KEY (`id_campeonato`),
-  ADD UNIQUE KEY `creado_por` (`creado_por`);
+  ADD KEY `creado_por` (`creado_por`) USING BTREE;
 
 --
 -- Indices de la tabla `tipo_usuario`
@@ -160,7 +165,7 @@ ALTER TABLE `usuario`
 -- AUTO_INCREMENT de la tabla `campeonato`
 --
 ALTER TABLE `campeonato`
-  MODIFY `id_campeonato` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id_campeonato` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- Restricciones para tablas volcadas

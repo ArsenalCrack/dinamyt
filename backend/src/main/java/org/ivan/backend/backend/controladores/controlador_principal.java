@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -232,19 +233,31 @@ public class controlador_principal {
                 );
             }
 
-            if (datos.get("esPublico") != null) {
-                campeonato.setEsPublico(
-                        Boolean.parseBoolean(datos.get("esPublico").toString())
+
+            campeonato.setEsPublico(
+                    datos.get("esPublico") != null &&
+                            Boolean.parseBoolean(datos.get("esPublico").toString())
+            );
+
+
+            if (datos.get("creadoPor") != null) {
+                campeonato.setCreadoPor(
+                        Long.parseLong(datos.get("creadoPor").toString())
                 );
             }
 
-            campeonato.setCreadoPor(Long.parseLong(datos.get("creadoPor").toString()));
 
             if (datos.get("modalidades") != null) {
                 ObjectMapper mapper = new ObjectMapper();
                 String modalidadesJson = mapper.writeValueAsString(datos.get("modalidades"));
                 campeonato.setModalidades(modalidadesJson);
             }
+
+            campeonato.setParticipantes(0);
+            campeonato.setEstado("BORRADOR");
+            campeonato.setPuedeInscribirse(true);
+            //campeonato.setFechaInicio(LocalDate.parse(datos.get("FechaInicio").toString()));
+            //campeonato.setFecha_fin(LocalDate.parse(datos.get("fechaFin").toString()));
 
             campeonatoRepository.save(campeonato);
 
@@ -260,6 +273,11 @@ public class controlador_principal {
         }
     }
 
+    @GetMapping("/campeonatos")
+    private ResponseEntity<?> cargarcampeonatos(){
+        List<Campeonato> campeonatos = campeonatoRepository.findAll();
+        return ResponseEntity.ok(campeonatos);
+    }
 
 
 

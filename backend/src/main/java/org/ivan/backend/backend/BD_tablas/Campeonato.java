@@ -2,6 +2,8 @@ package org.ivan.backend.backend.BD_tablas;
 
 import jakarta.persistence.*;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "campeonato")
 public class Campeonato {
@@ -29,6 +31,28 @@ public class Campeonato {
 
     @Column(columnDefinition = "json")
     private String modalidades;
+
+    @Column(name = "fecha_inicio")
+    private LocalDate fechaInicio;
+
+    @Column(name = "fecha_fin")
+    private LocalDate fecha_fin;
+
+    @Column(name = "estado")
+    private String estado;
+
+    @Column(name = "participantes")
+    private Integer participantes;
+
+    @Column(name = "puede_inscribirse")
+    private Boolean puedeInscribirse;
+
+    @Transient
+    public Integer getCuposDisponibles() {
+        if (maxParticipantes == null || participantes == null) return null;
+        return maxParticipantes - participantes;
+    }
+
 
     // getters y setters
 
@@ -102,6 +126,46 @@ public class Campeonato {
 
     public void setModalidades(String modalidades) {
         this.modalidades = modalidades;
+    }
+
+    public LocalDate getFechaInicio() {
+        return fechaInicio;
+    }
+
+    public void setFechaInicio(LocalDate fechaInicio) {
+        this.fechaInicio = fechaInicio;
+    }
+
+    public String getEstado() {
+        return estado;
+    }
+
+    public void setEstado(String estado) {
+        this.estado = estado;
+    }
+
+    public Integer getParticipantes() {
+        return participantes;
+    }
+
+    public void setParticipantes(Integer participantes) {
+        this.participantes = participantes;
+    }
+
+    public Boolean getPuedeInscribirse() {
+        return puedeInscribirse;
+    }
+
+    public void setPuedeInscribirse(Boolean puedeInscribirse) {
+        this.puedeInscribirse = puedeInscribirse;
+    }
+
+    public LocalDate getFecha_fin() {
+        return fecha_fin;
+    }
+
+    public void setFecha_fin(LocalDate fecha_fin) {
+        this.fecha_fin = fecha_fin;
     }
 }
 
