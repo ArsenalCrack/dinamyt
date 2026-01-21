@@ -2,10 +2,7 @@
   <div class="login-card">
 
     <!-- Overlay de carga -->
-    <div *ngIf="cargando" class="loading-overlay">
-      <i class="fas fa-spinner fa-spin spinner-icon"></i>
-      <p class="loading-text">{{ loadingText }}</p>
-    </div>
+    <app-loading-spinner *ngIf="cargando" [message]="loadingText" [fixed]="true"></app-loading-spinner>
 
     <header class="header">
       <img src="assets/imgs/LogotipoNegroD.png" alt="Logo Dinamyt" class="logo-img">
@@ -50,42 +47,30 @@
       <div class="form-group text-center">
         <label for="codigoInput">Ingresa el Código</label>
 
-        <input
-          type="text"
-          id="codigoInput"
-          name="codigo"
-          [(ngModel)]="codigo"
-          #codeInput="ngModel"
-          required
-          maxlength="6"
-          pattern="[0-9]*"
-          inputmode="numeric"
-          placeholder="0 0 0 0 0 0"
-          class="input-otp"
+        <input type="text" id="codigoInput" name="codigo" [(ngModel)]="codigo" #codeInput="ngModel" required
+          maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="0 0 0 0 0 0" class="input-otp"
           autocomplete="one-time-code"
           [class.input-error]="codeInput.invalid && (codeInput.dirty || codeInput.touched)">
 
-          <div *ngIf="codeInput.invalid && (codeInput.dirty || codeInput.touched)" class="msg-error-center">
-            <small *ngIf="codeInput.errors?.['required']">El código es requerido.</small>
-            <small *ngIf="codeInput.errors?.['pattern']">Solo números.</small>
-          </div>
+        <div *ngIf="codeInput.invalid && (codeInput.dirty || codeInput.touched)" class="msg-error-center">
+          <small *ngIf="codeInput.errors?.['required']">El código es requerido.</small>
+          <small *ngIf="codeInput.errors?.['pattern']">Solo números.</small>
+        </div>
       </div>
 
-      <button
-        type="submit"
-        class="btn-submit"
-        [disabled]="verifyForm.invalid || codigo.length < 6 || cargando">
+      <button type="submit" class="btn-submit" [disabled]="verifyForm.invalid || codigo.length < 6 || cargando">
         {{ cargando ? 'Verificando...' : 'Verificar Cuenta' }}
       </button>
 
       <div class="login-footer">
         <p class="help-text no-border">
           ¿No recibiste el código?
-          <button type="button" class="link-reenviar" (click)="reenviarCodigo()" aria-label="Reenviar código">Reenviar código</button>
+          <button type="button" class="link-reenviar" (click)="reenviarCodigo()" aria-label="Reenviar código">Reenviar
+            código</button>
         </p>
       </div>
 
-        <div class="server-msg" *ngIf="mensaje" [ngClass]="{'success': exito, 'error': !exito}">
+      <div class="server-msg" *ngIf="mensaje" [ngClass]="{'success': exito, 'error': !exito}">
         <p>
           <i class="fas" [ngClass]="exito ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
           {{ mensaje }}

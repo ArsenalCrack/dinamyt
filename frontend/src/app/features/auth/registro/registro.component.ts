@@ -10,11 +10,12 @@ import { PAISES } from '../../../core/models/paises';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-registro',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, CountryAutocompleteComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, CountryAutocompleteComponent, LoadingSpinnerComponent],
   templateUrl: './registro.component.html',
   styleUrls: ['./registro.component.scss']
 })
@@ -417,9 +418,9 @@ export class RegistroComponent implements OnInit, OnDestroy {
 
     if (day > daysInMonth) {
       const mesesNombres = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
       this.Mensajes = `Fecha incorrecta: el día ${day} no existe en ${mesesNombres[month]}. ` +
-                      `Este mes solo tiene ${daysInMonth} días. Por favor cambia el día a un valor entre 1 y ${daysInMonth}.`;
+        `Este mes solo tiene ${daysInMonth} días. Por favor cambia el día a un valor entre 1 y ${daysInMonth}.`;
       this.exito = false;
       return;
     }
@@ -427,8 +428,8 @@ export class RegistroComponent implements OnInit, OnDestroy {
     // VALIDACIÓN 3: Verificar que la fecha construida sea válida
     const fechaTest = new Date(year, month - 1, day);
     if (fechaTest.getFullYear() !== year ||
-        fechaTest.getMonth() !== month - 1 ||
-        fechaTest.getDate() !== day) {
+      fechaTest.getMonth() !== month - 1 ||
+      fechaTest.getDate() !== day) {
       this.Mensajes = `La fecha ${day}/${month}/${year} no es válida. Por favor verifica los datos ingresados.`;
       this.exito = false;
       return;

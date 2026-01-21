@@ -29,10 +29,11 @@ public class controlador_principal {
     private final CampeonatoRepository campeonatoRepository;
     private final Map<String, Usuario> usuariosPendientes = new HashMap<>();
 
-    public controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository, CampeonatoRepository campeonatoRepository) {
+    public controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository,
+            CampeonatoRepository campeonatoRepository) {
         this.usuarioRepository = usuarioRepository;
         this.academiaRepository = academiaRepository;
-        this.campeonatoRepository= campeonatoRepository;
+        this.campeonatoRepository = campeonatoRepository;
     }
 
     private String GenerarCodigo() {
@@ -200,10 +201,12 @@ public class controlador_principal {
         if (datos.getCorreo() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
         }
-        System.out.println(datos.getNumeroCelular()+"  "+datos.getCinturonRango());
+        System.out.println(datos.getNumeroCelular() + "  " + datos.getCinturonRango());
         Usuario usuario = usuarioRepository.findByCorreo(datos.getCorreo());
-        Usuario instructor = usuarioRepository.findById(Long.parseLong(datos.getModo())).orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
-        Academia academia = academiaRepository.findById(Integer.parseInt(datos.getModo())).orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
+        Usuario instructor = usuarioRepository.findById(Long.parseLong(datos.getModo()))
+                .orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
+        Academia academia = academiaRepository.findById(Integer.parseInt(datos.getModo()))
+                .orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
         usuario.setCorreo(datos.getCorreo());
         usuario.setNumeroCelular(datos.getNumeroCelular());
         usuario.setCinturonRango(datos.getCinturonRango());
@@ -212,6 +215,7 @@ public class controlador_principal {
         usuarioRepository.save(usuario);
         return ResponseEntity.ok(datos);
     }
+
     @PostMapping("/campeonatos")
     public ResponseEntity<?> crear(@RequestBody Map<String, Object> datos) {
         try {
@@ -223,29 +227,22 @@ public class controlador_principal {
 
             if (datos.get("numTatamis") != null) {
                 campeonato.setNumTatamis(
-                        Integer.parseInt(datos.get("numTatamis").toString())
-                );
+                        Integer.parseInt(datos.get("numTatamis").toString()));
             }
 
             if (datos.get("maxParticipantes") != null) {
                 campeonato.setMaxParticipantes(
-                        Integer.parseInt(datos.get("maxParticipantes").toString())
-                );
+                        Integer.parseInt(datos.get("maxParticipantes").toString()));
             }
-
 
             campeonato.setEsPublico(
                     datos.get("esPublico") != null &&
-                            Boolean.parseBoolean(datos.get("esPublico").toString())
-            );
-
+                            Boolean.parseBoolean(datos.get("esPublico").toString()));
 
             if (datos.get("creadoPor") != null) {
                 campeonato.setCreadoPor(
-                        Long.parseLong(datos.get("creadoPor").toString())
-                );
+                        Long.parseLong(datos.get("creadoPor").toString()));
             }
-
 
             if (datos.get("modalidades") != null) {
                 ObjectMapper mapper = new ObjectMapper();
@@ -256,31 +253,29 @@ public class controlador_principal {
             campeonato.setParticipantes(0);
             campeonato.setEstado("BORRADOR");
             campeonato.setPuedeInscribirse(true);
-            //campeonato.setFechaInicio(LocalDate.parse(datos.get("FechaInicio").toString()));
-            //campeonato.setFecha_fin(LocalDate.parse(datos.get("fechaFin").toString()));
+            if (datos.get("fechaInicio") != null) {
+                campeonato.setFechaInicio(LocalDate.parse(datos.get("fechaInicio").toString()));
+            }
+            if (datos.get("fechaFin") != null) {
+                campeonato.setFecha_fin(LocalDate.parse(datos.get("fechaFin").toString()));
+            }
 
             campeonatoRepository.save(campeonato);
 
             return ResponseEntity.ok(
-                    Map.of("message", "Campeonato creado correctamente")
-            );
+                    Map.of("message", "Campeonato creado correctamente"));
 
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body(
-                    Map.of("message", "Error al crear el campeonato")
-            );
+                    Map.of("message", "Error al crear el campeonato"));
         }
     }
 
     @GetMapping("/campeonatos")
-    private ResponseEntity<?> cargarcampeonatos(){
+    private ResponseEntity<?> cargarcampeonatos() {
         List<Campeonato> campeonatos = campeonatoRepository.findAll();
         return ResponseEntity.ok(campeonatos);
     }
-
-
-
-
 
 }

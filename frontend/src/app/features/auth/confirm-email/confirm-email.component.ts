@@ -7,11 +7,12 @@ import { Location } from '@angular/common';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { delayRemaining, DEFAULT_MIN_SPINNER_MS } from '../../../core/utils/spinner-timing.util';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-confirm-email',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, LoadingSpinnerComponent],
   templateUrl: './confirm-email.component.html',
   styleUrls: ['./confirm-email.component.scss']
 })

@@ -1,9 +1,5 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark custom-navbar">
-  <!-- Overlay de carga al cerrar sesión -->
-  <div *ngIf="loggingOut" class="logout-overlay">
-    <i class="fas fa-spinner fa-spin spinner-icon"></i>
-    <p class="logout-text">Cerrando sesión...</p>
-  </div>
+  <app-loading-spinner *ngIf="loggingOut" message="Cerrando sesión..." [fixed]="true"></app-loading-spinner>
 
   <div class="container-fluid">
     <div class="navbar-content">
@@ -59,11 +55,15 @@
                     <i class="fas fa-user"></i>
                     <span>Mi Perfil</span>
                   </button>
+                  <button class="dropdown-item" *ngIf="userType === 3" (click)="goToMyChamps()">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Mis Campeonatos</span>
+                  </button>
                   <button class="dropdown-item" disabled title="Próximamente">
                     <i class="fas fa-cog"></i>
                     <span>Configuración</span>
                   </button>
-                  <button class="dropdown-item" *ngIf="userType === 2" (click)="goToMyAcademy()">
+                  <button class="dropdown-item" *ngIf="userType === 2 || userType === 4" (click)="goToMyAcademy()">
                     <i class="fas fa-school"></i>
                     <span>Mi Academia</span>
                   </button>

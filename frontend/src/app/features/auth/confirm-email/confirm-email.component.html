@@ -3,16 +3,11 @@
   <div class="login-card">
 
     <!-- Overlay de carga -->
-    <div *ngIf="cargando" class="loading-overlay">
-      <i class="fas fa-spinner fa-spin spinner-icon"></i>
-      <p class="loading-text">Enviando código...</p>
-    </div>
+    <app-loading-spinner *ngIf="cargando" message="Enviando código..." [fixed]="true"></app-loading-spinner>
 
     <!-- Overlay de redirección -->
-    <div *ngIf="redirigiendo" class="loading-overlay">
-      <i class="fas fa-spinner fa-spin spinner-icon"></i>
-      <p class="loading-text">Redirigiendo a verificación...</p>
-    </div>
+    <app-loading-spinner *ngIf="redirigiendo" message="Redirigiendo a verificación..."
+      [fixed]="true"></app-loading-spinner>
 
     <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
       <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
@@ -55,19 +50,11 @@
       <div class="form-group">
         <label for="email">Correo Electrónico</label>
         <div class="input-wrapper">
-          <input
-            type="email"
-            id="email"
-            name="email"
-            [(ngModel)]="correo"
-            #emailRef="ngModel"
-            autocomplete="email"
-            required
-            pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
-            placeholder="ejemplo@correo.com"
+          <input type="email" id="email" name="email" [(ngModel)]="correo" #emailRef="ngModel" autocomplete="email"
+            required pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$" placeholder="ejemplo@correo.com"
             [class.input-error]="emailRef.invalid && (emailRef.dirty || emailRef.touched)">
 
-            <i class="fas fa-envelope input-icon"></i>
+          <i class="fas fa-envelope input-icon"></i>
         </div>
 
         <div *ngIf="emailRef.invalid && (emailRef.dirty || emailRef.touched)" class="msg-error">
@@ -76,10 +63,7 @@
         </div>
       </div>
 
-      <button
-        type="submit"
-        class="btn-submit"
-        [disabled]="emailForm.invalid || cargando || redirigiendo">
+      <button type="submit" class="btn-submit" [disabled]="emailForm.invalid || cargando || redirigiendo">
         {{ cargando ? 'Enviando...' : 'Enviar Código' }}
       </button>
 

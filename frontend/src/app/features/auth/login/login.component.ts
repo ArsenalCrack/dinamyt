@@ -11,11 +11,12 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { extractUserRoles } from '../../../core/utils/user-type.util';
 import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, LoadingSpinnerComponent],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss']
 })

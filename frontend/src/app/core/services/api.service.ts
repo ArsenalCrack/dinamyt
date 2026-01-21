@@ -81,4 +81,8 @@ export class ApiService {
   validarCodigoCampeonato(id: number, codigo: string) {
     return this.http.post(`${this.apiUrl}/campeonatos/${id}/validar-codigo`, { codigo });
   }
+
+  getMisCampeonatos(userId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/campeonatos/mis/${userId}`);
+  }
 }

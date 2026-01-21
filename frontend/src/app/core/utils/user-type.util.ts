@@ -22,6 +22,10 @@ export function extractUserRoles(input: any): string[] {
       out.push('administrador');
       out.push('admin_proyecto');
     }
+    else if (id == 4) {
+      out.push('dueño');
+      out.push('instructor');
+    }
   }
 
   // 2) roleNames: ['usuario', 'administrador', ...]

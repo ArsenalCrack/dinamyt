@@ -8,11 +8,12 @@ import { filter, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 import { extractUserRoles } from '../../../core/utils/user-type.util';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, LoadingSpinnerComponent],
   templateUrl: './navbar.component.html',
   styleUrls: ['./navbar.component.scss']
 })
@@ -77,6 +78,18 @@ export class NavbarComponent implements OnInit, OnDestroy {
       if (!isLoggedIn) {
         this.username = null;
         this.usuario = null;
+        this.userType = null;
+      } else {
+        // Redirigir a checkLoginStatus para asegurar sincronización
+        this.checkLoginStatus();
+      }
+    });
+
+    this.auth.roles$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(roles => {
+      if (roles && roles.length > 0) {
+        this.checkLoginStatus();
       }
     });
 
@@ -101,8 +114,17 @@ export class NavbarComponent implements OnInit, OnDestroy {
 
     const startedAt = Date.now();
 
+    // Safety timeout to prevent infinite loading state
+    const timeout = setTimeout(() => {
+      if (this.loading) {
+        console.warn('Navbar user load timed out');
+        this.loading = false;
+      }
+    }, 5000);
+
     this.api.getCurrentUser(meRequest).subscribe({
       next: async (u: any) => {
+        clearTimeout(timeout);
         const storedName = sessionStorage.getItem('nombreC');
         this.username = u?.nombreC || storedName || this.usuario?.nombreC || null;
         if (u?.nombreC && !storedName) {
@@ -119,8 +141,12 @@ export class NavbarComponent implements OnInit, OnDestroy {
         this.loading = false;
       },
       error: async () => {
+        clearTimeout(timeout);
         await delayRemaining(startedAt);
+        console.warn('Error loading user in navbar');
         this.loading = false;
+        // Even on error, we might still be logged in via session
+        this.checkLoginStatus();
       }
     });
   }
@@ -135,6 +161,14 @@ export class NavbarComponent implements OnInit, OnDestroy {
   }
 
   checkLoginStatus(): void {
+    const rawUsuario = localStorage.getItem('usuario');
+    try {
+      const parsed = rawUsuario ? JSON.parse(rawUsuario) : null;
+      this.usuario = parsed?.usuario || parsed;
+    } catch {
+      this.usuario = null;
+    }
+
     this.username = sessionStorage.getItem('nombreC') || this.usuario?.nombreC || null;
     const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
     const correo = sessionStorage.getItem('correo');
@@ -148,6 +182,8 @@ export class NavbarComponent implements OnInit, OnDestroy {
 
       if (roles.includes('administrador') || roles.includes('admin_proyecto')) {
         this.userType = 3;
+      } else if (roles.includes('dueño')) {
+        this.userType = 4;
       } else if (roles.includes('instructor')) {
         this.userType = 2;
       } else if (roles.includes('usuario')) {
@@ -216,6 +252,11 @@ export class NavbarComponent implements OnInit, OnDestroy {
   goToProfile(): void {
     this.closeDropdown();
     this.router.navigate(['/perfil']);
+  }
+
+  goToMyChamps(): void {
+    this.closeDropdown();
+    this.router.navigate(['/mis-campeonatos']);
   }
 
   goToMyAcademy(): void {

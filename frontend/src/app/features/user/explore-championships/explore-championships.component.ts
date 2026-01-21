@@ -8,8 +8,9 @@ import { AuthService } from '../../../core/services/auth.service';
 import { ApiService } from '../../../core/services/api.service';
 import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
-type EstadoCampeonato = 'ACTIVO' | 'PLANIFICADO' | 'TERMINADO';
+type EstadoCampeonato = 'ACTIVO' | 'PLANIFICADO' | 'TERMINADO' | 'BORRADOR';
 type PrivacidadFiltro = 'TODOS' | 'PUBLICO' | 'PRIVADO';
 
 interface CampeonatoApiItem {
@@ -34,9 +35,10 @@ interface CampeonatoUiItem {
   ubicacion: string;
   alcance: string | null;
   creadoPor: string | null;
+  creadoPorNombre: string | null;
   esPublico: boolean;
   estadoKey: EstadoCampeonato;
-  estadoLabel: 'Activo' | 'Planificado' | 'Terminado';
+  estadoLabel: string;
   participantes: number;
   capacidad: number | null;
   cuposDisponibles: number | null;
@@ -46,7 +48,7 @@ interface CampeonatoUiItem {
 @Component({
   selector: 'app-explore-championships',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, LoadingSpinnerComponent],
   templateUrl: './explore-championships.component.html',
   styleUrls: ['./explore-championships.component.scss']
 })
@@ -90,7 +92,7 @@ export class ExploreChampionshipsComponent implements OnInit {
     private auth: AuthService,
     private api: ApiService,
     private backNav: BackNavigationService
-  ) {}
+  ) { }
 
   private lockModal(): void {
     if (this.modalLocked) return;
@@ -108,25 +110,41 @@ export class ExploreChampionshipsComponent implements OnInit {
     this.loadChampionships();
   }
 
-  private estadoLabel(estado: EstadoCampeonato): CampeonatoUiItem['estadoLabel'] {
+  private estadoLabel(estado: string): string {
     switch (estado) {
-      case 'ACTIVO':
-        return 'Activo';
-      case 'PLANIFICADO':
-        return 'Planificado';
-      case 'TERMINADO':
-        return 'Terminado';
+      case 'ACTIVO': return 'Activo';
+      case 'PLANIFICADO': return 'Planificado';
+      case 'TERMINADO': return 'Terminado';
+      case 'BORRADOR': return 'Borrador';
+      default: return estado;
     }
   }
 
-  private estadoRank(estado: EstadoCampeonato): number {
+  private calculateStatus(fechaInicio: string, fechaFin: string | undefined): EstadoCampeonato {
+    if (!fechaInicio) return 'BORRADOR';
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Comparar solo fechas (día)
+
+    const start = new Date(fechaInicio);
+    const startCompare = new Date(start);
+    startCompare.setHours(0, 0, 0, 0);
+
+    const end = fechaFin ? new Date(fechaFin) : new Date(start);
+    const endCompare = new Date(end);
+    endCompare.setHours(23, 59, 59, 999);
+
+    if (now < startCompare) return 'PLANIFICADO';
+    if (now > endCompare) return 'TERMINADO';
+    return 'ACTIVO';
+  }
+
+  private estadoRank(estado: string): number {
     switch (estado) {
-      case 'ACTIVO':
-        return 0;
-      case 'PLANIFICADO':
-        return 1;
-      case 'TERMINADO':
-        return 2;
+      case 'ACTIVO': return 0;
+      case 'PLANIFICADO': return 1;
+      case 'TERMINADO': return 2;
+      case 'BORRADOR': return 3;
+      default: return 99;
     }
   }
 
@@ -150,27 +168,36 @@ export class ExploreChampionshipsComponent implements OnInit {
     this.api.getCampeonatos().subscribe({
       next: (res: any) => {
         const items: CampeonatoApiItem[] = Array.isArray(res) ? res : [];
+        console.log('Campeonatos loaded:', items);
         this.championships = this.sortCampeonatos(
-          items.map((c) => ({
-            id: c.id,
-            nombre: c.nombre,
-            fechaInicio: c.fechaInicio,
-            ubicacion: c.ubicacion,
-            alcance: c.alcance ?? null,
-            creadoPor: (c.creadoPor ?? null),
-            esPublico: c.esPublico !== false,
-            estadoKey: c.estado,
-            estadoLabel: this.estadoLabel(c.estado),
-            participantes: c.participantes ?? 0,
-            capacidad: c.capacidad ?? null,
-            cuposDisponibles: c.cuposDisponibles ?? null,
-            puedeInscribirse: !!c.puedeInscribirse,
-          }))
+          items.map((c: any) => {
+            // Dynamic status calculation based on dates 
+            // (Ignoring the backend "BORRADOR" if dates exist)
+            const calculatedStatus = this.calculateStatus(c.fechaInicio, c.fecha_fin);
+
+            return {
+              id: c.idCampeonato ?? c.id,
+              nombre: c.nombre,
+              fechaInicio: c.fechaInicio,
+              ubicacion: c.ubicacion,
+              alcance: c.alcance ?? null,
+              creadoPor: c.creadoPor ? String(c.creadoPor) : null,
+              creadoPorNombre: c.creadoPorNombre || (c.creadoPor ? `Organizador (ID: ${c.creadoPor})` : 'Desconocido'),
+              esPublico: c.esPublico !== false,
+              estadoKey: calculatedStatus,
+              estadoLabel: this.estadoLabel(calculatedStatus),
+              participantes: c.participantes ?? 0,
+              capacidad: c.maxParticipantes ?? c.capacidad,
+              cuposDisponibles: c.cuposDisponibles ?? null,
+              puedeInscribirse: !!c.puedeInscribirse,
+            };
+          })
         );
         this.applyFilters();
         this.cargando = false;
       },
-      error: () => {
+      error: (err) => {
+        console.error('Error loading championships:', err);
         this.cargando = false;
         this.errorMessage = 'No pudimos cargar los campeonatos. Intenta de nuevo.';
         this.championships = [];

@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { Location } from '@angular/common';
 import { ApiService } from '../../../core/services/api.service';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-change-password',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, LoadingSpinnerComponent],
   templateUrl: './change-password.component.html',
   styleUrls: ['./change-password.component.scss']
 })
@@ -24,7 +25,7 @@ export class ChangePasswordComponent implements OnDestroy {
   mostrarNueva = false;
   mostrarConfirm = false;
 
-  constructor(private api: ApiService, private router: Router, private location: Location) {}
+  constructor(private api: ApiService, private router: Router, private location: Location) { }
 
   goBack(): void {
     this.location.back();

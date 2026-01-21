@@ -9,6 +9,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { delayRemaining, DEFAULT_MIN_SPINNER_MS } from '../../../core/utils/spinner-timing.util';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 interface CategoriaConfig {
   nombre: string;
@@ -54,7 +55,7 @@ interface PendingCategory {
 @Component({
   selector: 'app-create-championship',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, FlatpickrDateDirective],
+  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, FlatpickrDateDirective, LoadingSpinnerComponent],
   templateUrl: './create-championship.component.html',
   styleUrls: ['./create-championship.component.scss']
 })
@@ -293,7 +294,7 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
     }
   ];
 
-  tatamisExpanded = false;
+  tatamisExpanded = true;
   saving = false;
   message: string | null = null;
   success = false;
@@ -1053,7 +1054,7 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
       numTatamis,
       maxParticipantes,
       ...(typeof esPublico === 'boolean' ? { esPublico } : {}),
-      creadoPor:sessionStorage.getItem('idDocumento'),
+      creadoPor: sessionStorage.getItem('idDocumento'),
       modalidades: this.modalidades.map(({ expanded, ...rest }) => rest)
     };
 

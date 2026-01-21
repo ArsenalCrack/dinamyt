@@ -5,11 +5,12 @@ import { Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { delayRemaining } from '../../../core/utils/spinner-timing.util';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-reset-password',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, LoadingSpinnerComponent],
   templateUrl: './reset-password.component.html',
   styleUrls: ['./reset-password.component.scss']
 })

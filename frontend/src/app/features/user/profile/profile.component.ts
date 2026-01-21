@@ -5,11 +5,13 @@ import { RouterModule, Router } from '@angular/router';
 import { Location } from '@angular/common';
 import { ApiService } from '../../../core/services/api.service';
 import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, LoadingSpinnerComponent],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.scss']
 })
@@ -46,7 +48,7 @@ export class ProfileComponent implements OnDestroy {
     'Italia': '+39'
   };
 
-  user = {
+  usuario = {
     nombreC: sessionStorage.getItem('nombreC') || '',
     correo: sessionStorage.getItem('correo') || '',
     idDocumento: sessionStorage.getItem('idDocumento') || '',
@@ -65,8 +67,7 @@ export class ProfileComponent implements OnDestroy {
   // Opciones para dropdowns
   academias: Array<{ value: string | null; label: string }> = [];
   instructores: Array<{ value: string | null; label: string }> = [];
-  cinturones: Array<{ value: string | null; label: string }> = [
-    { value: null, label: 'Sin cinturón' },
+  private static readonly CINTURONES_BASE = [
     { value: 'Blanco', label: 'Blanco' },
     { value: 'Amarillo', label: 'Amarillo' },
     { value: 'Naranja', label: 'Naranja' },
@@ -79,6 +80,18 @@ export class ProfileComponent implements OnDestroy {
     { value: 'Marrón/negro', label: 'Marrón/negro' },
     { value: 'Negro', label: 'Negro' }
   ];
+
+  get cinturonOptions(): Array<{ value: string | null; label: string }> {
+    const current = this.usuario.cinturon_rango;
+    // Si ya tiene un cinturón (no es null ni 'Sin cinturón'), no mostramos la opción 'Sin cinturón'
+    if (current && current !== 'Sin cinturón') {
+      return ProfileComponent.CINTURONES_BASE;
+    }
+    return [
+      { value: null, label: 'Sin cinturón' },
+      ...ProfileComponent.CINTURONES_BASE
+    ];
+  }
 
   academiaOtra: string = '';
   instructorOtro: string = '';
@@ -121,10 +134,10 @@ export class ProfileComponent implements OnDestroy {
   private initTelefono(): void {
     this.phoneCodeOptions = this.buildPhoneCodeOptions();
 
-    const raw = String(this.user.numero_celular || '').trim();
+    const raw = String(this.usuario.numero_celular || '').trim();
     const parts = this.extractTelefonoParts(raw);
     this.telefonoCodigo = parts.code;
-    this.user.numero_celular = parts.number;
+    this.usuario.numero_celular = parts.number;
   }
 
   private buildPhoneCodeOptions(): Array<{ value: string | null; label: string }> {
@@ -142,7 +155,7 @@ export class ProfileComponent implements OnDestroy {
   }
 
   private defaultPhoneCodeFromNacionalidad(): string {
-    const country = (this.user.nacionalidad || '').trim();
+    const country = (this.usuario.nacionalidad || '').trim();
     return this.PHONE_CODE_BY_COUNTRY[country] || '';
   }
 
@@ -180,7 +193,7 @@ export class ProfileComponent implements OnDestroy {
       target.value = value;
     }
 
-    this.user.correo = value;
+    this.usuario.correo = value;
 
     if (value.length === maxLength) {
       this.correoLimitMsg = `Has alcanzado el límite máximo de ${maxLength} caracteres.`;
@@ -195,7 +208,7 @@ export class ProfileComponent implements OnDestroy {
   onTelefonoInput(event: Event): void {
     const input = event.target as HTMLInputElement;
     const digits = (input.value || '').replace(/\D/g, '').slice(0, this.MAX_PHONE_LEN);
-    this.user.numero_celular = digits;
+    this.usuario.numero_celular = digits;
     if (input.value !== digits) input.value = digits;
   }
 
@@ -224,9 +237,9 @@ export class ProfileComponent implements OnDestroy {
         // Si en sessionStorage hay un texto (academia personalizada), forzar modo 'otra'
         this.normalizeAcademiaFromStoredValue();
         this.syncAcademiaSearchTextFromValue();
-        console.log(this.user.Instructor);
-        if (this.user.academia && this.user.academia !== 'otra') {
-          this.cargarInstructores(this.user.academia);
+        console.log(this.usuario.Instructor);
+        if (this.usuario.academia && this.usuario.academia !== 'otra') {
+          this.cargarInstructores(this.usuario.academia);
         }
       },
       error: (err) => {
@@ -238,49 +251,49 @@ export class ProfileComponent implements OnDestroy {
   }
 
   cargarInstructores(idAcademia: string | number | null): void {
-  const id = Number(idAcademia);
-  // Validaciones
-  if (!idAcademia || idAcademia === 'otra' || isNaN(id)) {
-    this.instructores = [];
-    this.normalizeInstructorFromStoredValue();
-    this.syncInstructorSearchTextFromValue();
-    return;
-  }
-
-  this.api.cargarinstructor(id).subscribe({
-    next: (u: any[]) => {
-      this.instructores = (u || [])
-        .map(i => {
-          const rawId = i?.idDocumento ?? i?.ID_documento ?? i?.id_documento ?? i?.id;
-          const rawNombre = i?.nombreC ?? i?.nombre ?? i?.name;
-
-          return {
-            value: rawId != null ? String(rawId) : null,
-            label: rawNombre != null ? String(rawNombre) : ''
-          };
-        })
-        .filter(i => i.label);
-
+    const id = Number(idAcademia);
+    // Validaciones
+    if (!idAcademia || idAcademia === 'otra' || isNaN(id)) {
+      this.instructores = [];
       this.normalizeInstructorFromStoredValue();
       this.syncInstructorSearchTextFromValue();
-    },
-    error: err => {
-      console.error(err);
-      this.instructores = [];
-      this.syncInstructorSearchTextFromValue();
+      return;
     }
-  });
-}
+
+    this.api.cargarinstructor(id).subscribe({
+      next: (u: any[]) => {
+        this.instructores = (u || [])
+          .map(i => {
+            const rawId = i?.idDocumento ?? i?.ID_documento ?? i?.id_documento ?? i?.id;
+            const rawNombre = i?.nombreC ?? i?.nombre ?? i?.name;
+
+            return {
+              value: rawId != null ? String(rawId) : null,
+              label: rawNombre != null ? String(rawNombre) : ''
+            };
+          })
+          .filter(i => i.label);
+
+        this.normalizeInstructorFromStoredValue();
+        this.syncInstructorSearchTextFromValue();
+      },
+      error: err => {
+        console.error(err);
+        this.instructores = [];
+        this.syncInstructorSearchTextFromValue();
+      }
+    });
+  }
 
 
   private normalizeAcademiaFromStoredValue() {
-    const current = this.user.academia;
+    const current = this.usuario.academia;
     if (!current || current === 'otra') return;
 
     // Valor corrupto en sessionStorage (p.ej. guardado como objeto)
     if (String(current).trim() === '[object Object]') {
       sessionStorage.removeItem('academia');
-      this.user.academia = null;
+      this.usuario.academia = null;
       this.academiaOtra = '';
       return;
     }
@@ -294,23 +307,23 @@ export class ProfileComponent implements OnDestroy {
     // 2) Si viene guardado como nombre, resolver al id correspondiente
     const matchByLabel = this.academias.find(a => a.label.trim().toLowerCase() === currentStr.toLowerCase());
     if (matchByLabel?.value) {
-      this.user.academia = matchByLabel.value;
+      this.usuario.academia = matchByLabel.value;
       return;
     }
 
     // 3) Si no coincide, tratarlo como texto libre
     this.academiaOtra = currentStr.slice(0, 50);
-    this.user.academia = 'otra';
+    this.usuario.academia = 'otra';
   }
 
   private normalizeInstructorFromStoredValue() {
-    const current = this.user.Instructor;
+    const current = this.usuario.Instructor;
     if (!current || current === 'otro') return;
 
     if (String(current).trim() === '[object Object]') {
       sessionStorage.removeItem('Instructor');
       sessionStorage.removeItem('instructor');
-      this.user.Instructor = null;
+      this.usuario.Instructor = null;
       this.instructorOtro = '';
       return;
     }
@@ -324,22 +337,22 @@ export class ProfileComponent implements OnDestroy {
     // 2) Si viene guardado como nombre, resolver al id correspondiente
     const matchByLabel = this.instructores.find(i => i.label.trim().toLowerCase() === currentStr.toLowerCase());
     if (matchByLabel?.value) {
-      this.user.Instructor = matchByLabel.value;
+      this.usuario.Instructor = matchByLabel.value;
       return;
     }
 
     // 3) Si no coincide, tratarlo como texto libre
     this.instructorOtro = currentStr.slice(0, 50);
-    this.user.Instructor = 'otro';
+    this.usuario.Instructor = 'otro';
   }
 
   // Opciones con valores nulos para UX consistente
   get academiaOptions(): Array<{ value: string | null; label: string }> {
-    return [...this.academias, { value: 'otra', label: 'Otra' }];
+    return [...this.academias];
   }
 
   get instructorOptions(): Array<{ value: string | null; label: string }> {
-    return [...this.instructores, { value: 'otro', label: 'Otro' }];
+    return [...this.instructores];
   }
 
   private compareValues(a: any, b: any): boolean {
@@ -355,12 +368,12 @@ export class ProfileComponent implements OnDestroy {
 
   private syncAcademiaSearchTextFromValue(): void {
     if (this.academiaIsOpen) return;
-    this.academiaSearchText = this.findLabelByValue(this.academiaOptions, this.user.academia);
+    this.academiaSearchText = this.findLabelByValue(this.academiaOptions, this.usuario.academia);
   }
 
   private syncInstructorSearchTextFromValue(): void {
     if (this.instructorIsOpen) return;
-    this.instructorSearchText = this.findLabelByValue(this.instructorOptions, this.user.Instructor);
+    this.instructorSearchText = this.findLabelByValue(this.instructorOptions, this.usuario.Instructor);
   }
 
   private positionAcademiaOptions() {
@@ -453,31 +466,31 @@ export class ProfileComponent implements OnDestroy {
     this.location.back();
   }
 
-onAcademiaChange(value: string | null): void {
+  onAcademiaChange(value: string | null): void {
 
-  // Guardar academia (ID o 'otra')
-  this.user.academia = value;
+    // Guardar academia (ID o 'otra')
+    this.usuario.academia = value;
 
-  // Reset instructor
-  this.user.Instructor = null;
-  this.instructores = [];
+    // Reset instructor
+    this.usuario.Instructor = null;
+    this.instructores = [];
 
-  if (value === 'otra' || !value) {
-    this.academiaOtra = '';
+    if (value === 'otra' || !value) {
+      this.academiaOtra = '';
+      this.syncAcademiaSearchTextFromValue();
+      return;
+    }
+
+    // Cargar instructores usando el ID
+    this.cargarInstructores(value);
+
     this.syncAcademiaSearchTextFromValue();
-    return;
   }
-
-  // Cargar instructores usando el ID
-  this.cargarInstructores(value);
-
-  this.syncAcademiaSearchTextFromValue();
-}
 
 
   onInstructorChange(value: any): void {
-    this.user.Instructor = value;
-    if (this.user.Instructor !== 'otro') {
+    this.usuario.Instructor = value;
+    if (this.usuario.Instructor !== 'otro') {
       this.instructorOtro = '';
     }
     this.syncInstructorSearchTextFromValue();
@@ -713,76 +726,100 @@ onAcademiaChange(value: string | null): void {
     this.message = null;
     this.saving = true;
     this.lockScroll();
-    const cinturonValue = this.user.cinturon_rango === null ? null : this.user.cinturon_rango?.trim() || null;
+    const cinturonValue = this.usuario.cinturon_rango === null ? null : this.usuario.cinturon_rango?.trim() || null;
 
     let academiaValue: any = null;
-    if (this.user.academia === 'otra') {
+    if (this.usuario.academia === 'otra') {
       academiaValue = this.academiaOtra?.trim().slice(0, 50) || null;
-    } else if (this.user.academia) {
-      academiaValue = typeof this.user.academia === 'string' ? this.user.academia.trim() : String(this.user.academia);
+    } else if (this.usuario.academia) {
+      academiaValue = typeof this.usuario.academia === 'string' ? this.usuario.academia.trim() : String(this.usuario.academia);
     }
 
     let instructorValue: any = null;
-    if (this.user.Instructor === 'otro') {
+    if (this.usuario.Instructor === 'otro') {
       instructorValue = this.instructorOtro?.trim().slice(0, 50) || null;
-    } else if (this.user.Instructor) {
-      instructorValue = typeof this.user.Instructor === 'string' ? this.user.Instructor.trim() : String(this.user.Instructor);
+    } else if (this.usuario.Instructor) {
+      instructorValue = typeof this.usuario.Instructor === 'string' ? this.usuario.Instructor.trim() : String(this.usuario.Instructor);
     }
 
-    const emailValue = this.user.correo?.trim().slice(0, this.MAX_EMAIL_LEN) || '';
-    const phoneDigits = (this.user.numero_celular || '').replace(/\D/g, '');
+    const emailValue = (this.usuario.correo || '').trim().slice(0, this.MAX_EMAIL_LEN);
+
+    // Validación de correo real
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailValue || !emailRegex.test(emailValue)) {
+      this.success = false;
+      this.message = 'Por favor, ingresa un correo electrónico válido.';
+      this.saving = false;
+      this.unlockScroll();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const phoneDigits = (this.usuario.numero_celular || '').replace(/\D/g, '');
     const phoneFull = ((this.telefonoCodigo || '') + phoneDigits).slice(0, this.MAX_PHONE_LEN);
 
     const payload: any = {
       correo: emailValue,
-      numero_celular: phoneFull,
-      cinturon_rango: cinturonValue,
-      codigo: academiaValue,
-      modo: instructorValue
+      numeroCelular: phoneFull,
+      cinturonRango: cinturonValue,
+      codigo: academiaValue, // Used as academia ID
+      modo: instructorValue  // Used as instructor ID
     };
+
+    const startedAt = Date.now();
     this.api.updateProfile(payload).subscribe({
-      next: (u: any) => {
-        // Persistir en sessionStorage si el backend devuelve los valores actualizados
+      next: async (u: any) => {
+        // Persistir en sessionStorage
         if (payload.correo) sessionStorage.setItem('correo', payload.correo);
-        if (payload.numero_celular !== undefined) {
-          if (!payload.numero_celular) {
+
+        if (payload.numeroCelular !== undefined) {
+          if (!payload.numeroCelular) {
             sessionStorage.removeItem('numero_celular');
             sessionStorage.removeItem('numeroCelular');
           } else {
-            sessionStorage.setItem('numero_celular', payload.numero_celular);
-            sessionStorage.setItem('numeroCelular', payload.numero_celular);
+            sessionStorage.setItem('numero_celular', payload.numeroCelular);
+            sessionStorage.setItem('numeroCelular', payload.numeroCelular);
           }
         }
-        if (payload.cinturon_rango !== undefined) {
-          if (payload.cinturon_rango === null) {
+
+        if (payload.cinturonRango !== undefined) {
+          if (payload.cinturonRango === null) {
             sessionStorage.removeItem('cinturon_rango');
             sessionStorage.removeItem('cinturonRango');
           } else {
-            sessionStorage.setItem('cinturon_rango', payload.cinturon_rango);
-            sessionStorage.setItem('cinturonRango', payload.cinturon_rango);
+            sessionStorage.setItem('cinturon_rango', payload.cinturonRango);
+            sessionStorage.setItem('cinturonRango', payload.cinturonRango);
           }
         }
-        if (payload.academia !== undefined) {
-          if (!payload.academia) sessionStorage.removeItem('academia');
-          else sessionStorage.setItem('academia', payload.academia);
+
+        // 'codigo' is the academia ID here
+        if (payload.codigo !== undefined) {
+          if (!payload.codigo) sessionStorage.removeItem('academia');
+          else sessionStorage.setItem('academia', payload.codigo);
         }
-        if (payload.Instructor !== undefined) {
-          if (!payload.Instructor) {
+
+        // 'modo' is the instructor ID here
+        if (payload.modo !== undefined) {
+          if (!payload.modo) {
             sessionStorage.removeItem('Instructor');
             sessionStorage.removeItem('instructor');
           } else {
-            sessionStorage.setItem('Instructor', payload.Instructor);
-            sessionStorage.setItem('instructor', payload.Instructor);
+            sessionStorage.setItem('Instructor', payload.modo);
+            sessionStorage.setItem('instructor', payload.modo);
           }
         }
         this.success = true;
         this.message = 'Perfil actualizado.';
+
+        await delayRemaining(startedAt);
         this.saving = false;
         this.unlockScroll();
       },
-      error: (err) => {
+      error: async (err) => {
         this.success = false;
         this.message = err?.error?.message || 'No se pudo actualizar el perfil.';
+
+        await delayRemaining(startedAt);
         this.saving = false;
         this.unlockScroll();
       }

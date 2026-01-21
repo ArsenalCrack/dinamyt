@@ -1,10 +1,7 @@
 <div class="registro-wrapper">
   <div class="container">
 
-    <div *ngIf="cargando" class="loading-overlay">
-      <i class="fas fa-spinner fa-spin spinner-icon"></i>
-      <p class="loading-text">{{ loadingText }}</p>
-    </div>
+    <app-loading-spinner *ngIf="cargando" [message]="loadingText" [fixed]="true"></app-loading-spinner>
 
     <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
       <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
@@ -30,7 +27,8 @@
     <div *ngIf="Mensajes && !exito" class="modal-overlay">
       <div class="modal-box">
         <div class="modal-body">
-          <i class="fas" [ngClass]="exito ? 'fa-check-circle modal-icon success' : 'fa-exclamation-circle modal-icon error'"></i>
+          <i class="fas"
+            [ngClass]="exito ? 'fa-check-circle modal-icon success' : 'fa-exclamation-circle modal-icon error'"></i>
           <div class="modal-text">{{ Mensajes }}</div>
         </div>
         <button *ngIf="!exito" class="modal-close" (click)="closeMensaje()" aria-label="Cerrar">✕</button>
@@ -42,20 +40,9 @@
 
       <div class="form-group">
         <label for="registro-idDocumento">Número de documento</label>
-        <input
-          type="text"
-          inputmode="numeric"
-          id="registro-idDocumento"
-          name="idDocumento"
-          [(ngModel)]="idDocumento"
-          #doc="ngModel"
-          autocomplete="username"
-          required
-          minlength="6"
-          maxlength="20"
-          pattern="^[0-9]+$"
-          (input)="onDocumentoInput($event)"
-          placeholder="Ej: 1090..."
+        <input type="text" inputmode="numeric" id="registro-idDocumento" name="idDocumento" [(ngModel)]="idDocumento"
+          #doc="ngModel" autocomplete="username" required minlength="6" maxlength="20" pattern="^[0-9]+$"
+          (input)="onDocumentoInput($event)" placeholder="Ej: 1090..."
           [class.input-error]="doc.invalid && (doc.dirty || doc.touched)">
 
         <div *ngIf="doc.invalid && (doc.dirty || doc.touched)" class="msg-error">
@@ -67,19 +54,9 @@
 
       <div class="form-group">
         <label for="registro-nombres">Nombres</label>
-        <input
-          type="text"
-          id="registro-nombres"
-          name="nombres"
-          [(ngModel)]="nombres"
-          #nom="ngModel"
-          autocomplete="given-name"
-          required
-          minlength="3"
-          maxlength="40"
-          pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+"
-          (input)="onNombreInput('nombres', $event)"
-          placeholder="Tus nombres"
+        <input type="text" id="registro-nombres" name="nombres" [(ngModel)]="nombres" #nom="ngModel"
+          autocomplete="given-name" required minlength="3" maxlength="40" pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+"
+          (input)="onNombreInput('nombres', $event)" placeholder="Tus nombres"
           [class.input-error]="nom.invalid && (nom.dirty || nom.touched)">
 
         <div *ngIf="nom.invalid && (nom.dirty || nom.touched)" class="msg-error">
@@ -95,19 +72,9 @@
 
       <div class="form-group">
         <label for="registro-apellidos">Apellidos</label>
-        <input
-          type="text"
-          id="registro-apellidos"
-          name="apellidos"
-          [(ngModel)]="apellidos"
-          #ape="ngModel"
-          autocomplete="family-name"
-          required
-          minlength="3"
-          maxlength="40"
-          pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+"
-          (input)="onNombreInput('apellidos', $event)"
-          placeholder="Tus apellidos"
+        <input type="text" id="registro-apellidos" name="apellidos" [(ngModel)]="apellidos" #ape="ngModel"
+          autocomplete="family-name" required minlength="3" maxlength="40" pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+"
+          (input)="onNombreInput('apellidos', $event)" placeholder="Tus apellidos"
           [class.input-error]="ape.invalid && (ape.dirty || ape.touched)">
 
         <div *ngIf="ape.invalid && (ape.dirty || ape.touched)" class="msg-error">
@@ -125,45 +92,30 @@
         <label for="registro-fecha-dia">Fecha de Nacimiento</label>
         <div class="date-selects">
           <div class="small-col">
-            <app-custom-select
-              inputId="registro-fecha-dia"
-              name="diaSeleccionado"
-              [(ngModel)]="diaSeleccionado"
-              #diaCtrl="ngModel"
-              (ngModelChange)="onDiaChange($event)"
-              [options]="diasOptions"
-              placeholder="Día">
+            <app-custom-select inputId="registro-fecha-dia" name="diaSeleccionado" [(ngModel)]="diaSeleccionado"
+              #diaCtrl="ngModel" (ngModelChange)="onDiaChange($event)" [options]="diasOptions" placeholder="Día">
             </app-custom-select>
           </div>
           <div class="small-col month-col">
-            <app-custom-select
-              inputId="registro-fecha-mes"
-              name="mesSeleccionado"
-              [(ngModel)]="mesSeleccionado"
-              #mesCtrl="ngModel"
-              (ngModelChange)="onMesChange($event)"
-              [options]="mesesOptions"
-              placeholder="Mes">
+            <app-custom-select inputId="registro-fecha-mes" name="mesSeleccionado" [(ngModel)]="mesSeleccionado"
+              #mesCtrl="ngModel" (ngModelChange)="onMesChange($event)" [options]="mesesOptions" placeholder="Mes">
             </app-custom-select>
           </div>
           <div class="large-col year-col">
-            <app-custom-select
-              inputId="registro-fecha-anio"
-              name="anioSeleccionado"
-              [(ngModel)]="anioSeleccionado"
-              #anioCtrl="ngModel"
-              (ngModelChange)="onAnioChange($event)"
-              [options]="aniosOptions"
-              placeholder="Año">
+            <app-custom-select inputId="registro-fecha-anio" name="anioSeleccionado" [(ngModel)]="anioSeleccionado"
+              #anioCtrl="ngModel" (ngModelChange)="onAnioChange($event)" [options]="aniosOptions" placeholder="Año">
             </app-custom-select>
           </div>
         </div>
 
-        <div *ngIf="!fechaNacimiento && !diaSeleccionado && !mesSeleccionado && !anioSeleccionado && (diaCtrl.touched || mesCtrl.touched || anioCtrl.touched) && !fechaErrorMsg" class="msg-error">
+        <div
+          *ngIf="!fechaNacimiento && !diaSeleccionado && !mesSeleccionado && !anioSeleccionado && (diaCtrl.touched || mesCtrl.touched || anioCtrl.touched) && !fechaErrorMsg"
+          class="msg-error">
           <small>La fecha de nacimiento es obligatoria.</small>
         </div>
 
-        <div *ngIf="!fechaNacimiento && (diaSeleccionado || mesSeleccionado || anioSeleccionado) && !fechaErrorMsg" class="msg-error">
+        <div *ngIf="!fechaNacimiento && (diaSeleccionado || mesSeleccionado || anioSeleccionado) && !fechaErrorMsg"
+          class="msg-error">
           <small>La fecha está incompleta.</small>
         </div>
         <div *ngIf="fechaErrorMsg" class="msg-error">
@@ -173,17 +125,10 @@
 
       <div class="form-group">
         <label for="registro-sexo">Sexo</label>
-        <app-custom-select
-          inputId="registro-sexo"
-          name="sexo"
-          [(ngModel)]="sexo"
-          #sex="ngModel"
-          required
-          [options]="[
+        <app-custom-select inputId="registro-sexo" name="sexo" [(ngModel)]="sexo" #sex="ngModel" required [options]="[
             { value: 'Femenino', label: 'Femenino' },
             { value: 'Masculino', label: 'Masculino' }
-          ]"
-          placeholder="Seleccione el sexo">
+          ]" placeholder="Seleccione el sexo">
         </app-custom-select>
         <div *ngIf="sex.invalid && sex.touched" class="msg-error">
           <small>Debes seleccionar una opción.</small>
@@ -192,14 +137,8 @@
 
       <div class="form-group">
         <label for="registro-nacionalidad">Nacionalidad</label>
-        <app-country-autocomplete
-          inputId="registro-nacionalidad"
-          name="nacionalidad"
-          [(ngModel)]="nacionalidad"
-          #nac="ngModel"
-          required
-          [paises]="paisesList"
-          [hasError]="!!(nac.invalid && (nac.dirty || nac.touched))"
+        <app-country-autocomplete inputId="registro-nacionalidad" name="nacionalidad" [(ngModel)]="nacionalidad"
+          #nac="ngModel" required [paises]="paisesList" [hasError]="!!(nac.invalid && (nac.dirty || nac.touched))"
           placeholder="Escribe o selecciona tu país">
         </app-country-autocomplete>
         <div *ngIf="nac.invalid && (nac.dirty || nac.touched)" class="msg-error">
@@ -209,18 +148,9 @@
 
       <div class="form-group">
         <label for="registro-correo">Correo</label>
-        <input
-          type="email"
-          id="registro-correo"
-          name="correo"
-          [(ngModel)]="correo"
-          #emailRef="ngModel"
-          autocomplete="email"
-          required
-          maxlength="40"
-          pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
-          (input)="onCorreoInput($event)"
-          placeholder="tucorreo@email.com"
+        <input type="email" id="registro-correo" name="correo" [(ngModel)]="correo" #emailRef="ngModel"
+          autocomplete="email" required maxlength="40" pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
+          (input)="onCorreoInput($event)" placeholder="tucorreo@email.com"
           [class.input-error]="emailRef.invalid && (emailRef.dirty || emailRef.touched)">
 
         <div *ngIf="emailRef.invalid && (emailRef.dirty || emailRef.touched)" class="msg-error">
@@ -236,20 +166,13 @@
       <div class="form-group">
         <label for="registro-contrasena">Contraseña</label>
         <div class="password-wrapper">
-          <input
-            [type]="mostrarPass ? 'text' : 'password'"
-            id="registro-contrasena"
-            name="contrasena"
-            [(ngModel)]="contrasena"
-            #pass="ngModel"
-            autocomplete="new-password"
-            required
-            minlength="8"
-            pattern="(?=.*[!@#$%^&*]).{8,}"
-            placeholder="Mín. 8 caracteres y 1 símbolo (!@#$)"
+          <input [type]="mostrarPass ? 'text' : 'password'" id="registro-contrasena" name="contrasena"
+            [(ngModel)]="contrasena" #pass="ngModel" autocomplete="new-password" required minlength="8"
+            pattern="(?=.*[!@#$%^&*]).{8,}" placeholder="Mín. 8 caracteres y 1 símbolo (!@#$)"
             [class.input-error]="pass.invalid && (pass.dirty || pass.touched)">
 
-          <button type="button" class="eye-icon" (click)="mostrarPass = !mostrarPass" [attr.aria-label]="mostrarPass ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+          <button type="button" class="eye-icon" (click)="mostrarPass = !mostrarPass"
+            [attr.aria-label]="mostrarPass ? 'Ocultar contraseña' : 'Mostrar contraseña'">
             <i class="fas" [ngClass]="mostrarPass ? 'fa-eye-slash' : 'fa-eye'" aria-hidden="true"></i>
           </button>
         </div>
@@ -264,18 +187,13 @@
       <div class="form-group">
         <label for="registro-confirmPassword">Confirmar contraseña</label>
         <div class="password-wrapper">
-          <input
-            [type]="mostrarConfirmPass ? 'text' : 'password'"
-            id="registro-confirmPassword"
-            name="confirmPassword"
-            [(ngModel)]="confirmPassword"
-            #confirm="ngModel"
-            autocomplete="new-password"
-            required
+          <input [type]="mostrarConfirmPass ? 'text' : 'password'" id="registro-confirmPassword" name="confirmPassword"
+            [(ngModel)]="confirmPassword" #confirm="ngModel" autocomplete="new-password" required
             placeholder="Repite tu contraseña"
             [class.input-error]="(confirm.invalid || confirm.value !== contrasena) && (confirm.dirty || confirm.touched)">
 
-          <button type="button" class="eye-icon" (click)="mostrarConfirmPass = !mostrarConfirmPass" [attr.aria-label]="mostrarConfirmPass ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+          <button type="button" class="eye-icon" (click)="mostrarConfirmPass = !mostrarConfirmPass"
+            [attr.aria-label]="mostrarConfirmPass ? 'Ocultar contraseña' : 'Mostrar contraseña'">
             <i class="fas" [ngClass]="mostrarConfirmPass ? 'fa-eye-slash' : 'fa-eye'" aria-hidden="true"></i>
           </button>
         </div>
@@ -285,9 +203,7 @@
         </div>
       </div>
 
-      <button
-        type="submit"
-        class="btn-submit"
+      <button type="submit" class="btn-submit"
         [disabled]="registroForm.invalid || (contrasena !== confirmPassword) || cargando">
         {{ cargando ? 'Registrando...' : 'Registrar' }}
       </button>
