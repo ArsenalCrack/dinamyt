@@ -182,7 +182,7 @@ export class ExploreChampionshipsComponent implements OnInit {
               ubicacion: c.ubicacion,
               alcance: c.alcance ?? null,
               creadoPor: c.creadoPor ? String(c.creadoPor) : null,
-              creadoPorNombre: c.creadoPorNombre || (c.creadoPor ? `Organizador (ID: ${c.creadoPor})` : 'Desconocido'),
+              creadoPorNombre: c.creadoPorNombre || (c.nombreCreador ? `${c.nombreCreador}` : 'Desconocido'),
               esPublico: c.esPublico !== false,
               estadoKey: calculatedStatus,
               estadoLabel: this.estadoLabel(calculatedStatus),

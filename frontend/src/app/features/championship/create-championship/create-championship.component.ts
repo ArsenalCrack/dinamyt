@@ -1055,6 +1055,7 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
       maxParticipantes,
       ...(typeof esPublico === 'boolean' ? { esPublico } : {}),
       creadoPor: sessionStorage.getItem('idDocumento'),
+      NombreCreador: sessionStorage.getItem("nombreC"),
       modalidades: this.modalidades.map(({ expanded, ...rest }) => rest)
     };
 

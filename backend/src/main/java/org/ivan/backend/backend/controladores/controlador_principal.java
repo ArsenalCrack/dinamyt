@@ -238,10 +238,15 @@ public class controlador_principal {
             campeonato.setEsPublico(
                     datos.get("esPublico") != null &&
                             Boolean.parseBoolean(datos.get("esPublico").toString()));
+            if (campeonato.getEsPublico()){
+            }else{
+                campeonato.setCodigo(GenerarCodigo());
+            }
 
             if (datos.get("creadoPor") != null) {
                 campeonato.setCreadoPor(
                         Long.parseLong(datos.get("creadoPor").toString()));
+                campeonato.setNombreCreador(datos.get("NombreCreador").toString());
             }
 
             if (datos.get("modalidades") != null) {
@@ -277,5 +282,17 @@ public class controlador_principal {
         List<Campeonato> campeonatos = campeonatoRepository.findAll();
         return ResponseEntity.ok(campeonatos);
     }
+
+    @GetMapping("/campeonatos/mis/{userId}")
+    public ResponseEntity<?> cargarCampeonatosMios(
+            @PathVariable String userId) {
+
+        List<Campeonato> campeonatos =
+                campeonatoRepository.findByCreadoPor(Long.parseLong(userId));
+
+        System.out.println("campeonatos: " + campeonatos);
+        return ResponseEntity.ok(campeonatos);
+    }
+
 
 }

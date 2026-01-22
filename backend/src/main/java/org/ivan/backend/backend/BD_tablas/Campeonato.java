@@ -47,14 +47,45 @@ public class Campeonato {
     @Column(name = "puede_inscribirse")
     private Boolean puedeInscribirse;
 
+    @Column(name = "nombre_creador")
+    private String nombre_creador;
+
+    @Column(name = "Codigo")
+    private String Codigo;
+
     @Transient
     public Integer getCuposDisponibles() {
         if (maxParticipantes == null || participantes == null) return null;
         return maxParticipantes - participantes;
     }
 
-
     // getters y setters
+
+
+    public String getNombre_creador() {
+        return nombre_creador;
+    }
+
+    public void setNombre_creador(String nombre_creador) {
+        this.nombre_creador = nombre_creador;
+    }
+
+    public String getCodigo() {
+        return Codigo;
+    }
+
+    public void setCodigo(String codigo) {
+        Codigo = codigo;
+    }
+
+    public String getNombreCreador() {
+        return nombre_creador;
+    }
+
+    public void setNombreCreador(String nombreCreador) {
+        nombre_creador = nombreCreador;
+    }
+
 
     public Long getIdCampeonato() {
         return idCampeonato;
