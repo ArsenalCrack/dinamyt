@@ -53,6 +53,9 @@ public class Campeonato {
     @Column(name = "Codigo")
     private String Codigo;
 
+    @Column(name = "visible")
+    boolean visible;
+    //No perteneciente a la BD
     @Transient
     public Integer getCuposDisponibles() {
         if (maxParticipantes == null || participantes == null)
@@ -61,6 +64,15 @@ public class Campeonato {
     }
 
     // getters y setters
+
+
+    public boolean isVisible() {
+        return visible;
+    }
+
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
 
     public String getNombre_creador() {
         return nombre_creador;

@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api") // 1. Cambiamos la ruta base a "/api"
@@ -220,7 +221,7 @@ public class controlador_principal {
     public ResponseEntity<?> crear(@RequestBody Map<String, Object> datos) {
         try {
             Campeonato campeonato = new Campeonato();
-
+            campeonato.setVisible(true);
             campeonato.setNombre((String) datos.get("nombre"));
             campeonato.setUbicacion((String) datos.get("ubicacion"));
             campeonato.setAlcance((String) datos.get("alcance"));
@@ -250,10 +251,10 @@ public class controlador_principal {
             }
 
             if (datos.get("modalidades") != null) {
-                ObjectMapper mapper = new ObjectMapper();
-                String modalidadesJson = mapper.writeValueAsString(datos.get("modalidades"));
+                String modalidadesJson = JsonCleaner.limpiarDesdeObject(datos.get("modalidades"));
                 campeonato.setModalidades(modalidadesJson);
             }
+
 
             campeonato.setParticipantes(0);
             campeonato.setEstado("BORRADOR");
@@ -279,7 +280,7 @@ public class controlador_principal {
 
     @GetMapping("/campeonatos")
     private ResponseEntity<?> cargarcampeonatos() {
-        List<Campeonato> campeonatos = campeonatoRepository.findAll();
+        List<Campeonato> campeonatos = campeonatoRepository.findByVisibleTrue();
         return ResponseEntity.ok(campeonatos);
     }
 
@@ -291,6 +292,16 @@ public class controlador_principal {
 
         System.out.println("campeonatos: " + campeonatos);
         return ResponseEntity.ok(campeonatos);
+    }
+
+    @GetMapping("/campeonatos/{id}")
+    public ResponseEntity<?> cargarCampeonatoporid(
+            @PathVariable String id) {
+
+        Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(id)).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));;
+
+        System.out.println("campeonatos: " + campeonato.getNombre());
+        return ResponseEntity.ok(campeonato);
     }
 
 }

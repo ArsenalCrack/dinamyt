@@ -80,8 +80,8 @@ export class ChampionshipDetailsComponent implements OnInit {
         this.loading = true;
         this.api.getCampeonatoById(this.id!).subscribe({
             next: (data) => {
+                console.log(data);
                 this.campeonato = data;
-                this.mockParticipantes();
                 this.extractFilters();
                 this.applyFilters();
 
@@ -102,45 +102,8 @@ export class ChampionshipDetailsComponent implements OnInit {
             },
             error: (err) => {
                 console.error('Error loading championship details:', err);
-                this.loadMockData();
             }
         });
-    }
-
-    loadMockData(): void {
-        this.campeonato = {
-            id: this.id,
-            nombre: 'Gran Torneo de Verano 2026',
-            fechaInicio: '2026-07-20',
-            fechaFin: '2026-07-22',
-            ubicacion: 'Coliseo El Campín, Bogotá',
-            alcance: 'Nacional',
-            numTatamis: 4,
-            maxParticipantes: 500,
-            esPublico: true,
-            privacidad: 'PUBLICO',
-            estado: 'PLANIFICADO',
-            creadoPorNombre: 'Admin Dinamyt'
-        };
-        this.jueces = [
-            { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png' },
-            { id: 102, nombre: 'María García', avatar: 'assets/avatar-2.png' }
-        ];
-        this.mockParticipantes();
-        this.extractFilters();
-        this.applyFilters();
-        this.loading = false;
-    }
-
-    mockParticipantes(): void {
-        this.participantes = [
-            { id: 1, nombre: 'Juan Pérez', academia: 'Dragón Dorado', modalidad: 'Combates', cinturon: 'Negro', peso: '75kg', edad: 'Adulto', genero: 'Masculino' },
-            { id: 2, nombre: 'María García', academia: 'Tigre Blanco', modalidad: 'Figura a manos libres', cinturon: 'Rojo', peso: '55kg', edad: 'Juvenil', genero: 'Femenino' },
-            { id: 3, nombre: 'Carlos Ruiz', academia: 'Dragón Dorado', modalidad: 'Combates', cinturon: 'Azul', peso: '45kg', edad: 'Infantil', genero: 'Masculino' },
-            { id: 4, nombre: 'Ana López', academia: 'Fénix TKD', modalidad: 'Figuras con armas', cinturon: 'Negro', peso: '60kg', edad: 'Adulto', genero: 'Femenino' },
-            { id: 5, nombre: 'Pedro Sánchez', academia: 'Lobo Solitario', modalidad: 'Combates', cinturon: 'Amarillo', peso: '65kg', edad: 'Juvenil', genero: 'Masculino' },
-            { id: 6, nombre: 'Sofía Martínez', academia: 'Tigre Blanco', modalidad: 'Figura a manos libres', cinturon: 'Verde', peso: '50kg', edad: 'Juvenil', genero: 'Femenino' },
-        ];
     }
 
     extractFilters(): void {
