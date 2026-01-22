@@ -1,0 +1,228 @@
+<div class="edit-container">
+    <div class="edit-card">
+        <header class="header">
+            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+                <i class="fas fa-arrow-left fa-2x"></i>
+            </button>
+            <div class="header-text">
+                <h1>Editar Campeonato</h1>
+                <p class="subtitle">Modifica la información y configuración de tu torneo.</p>
+            </div>
+        </header>
+
+        <app-loading-spinner *ngIf="loading" message="Cargando configuración..."></app-loading-spinner>
+
+        <form *ngIf="!loading && campeonato" (ngSubmit)="saveChanges()" #editForm="ngForm">
+            <!-- Info Básica -->
+            <section class="form-section">
+                <div class="section-header">
+                    <i class="fas fa-edit"></i>
+                    <h3>Información Básica</h3>
+                </div>
+
+                <div class="input-group">
+                    <label>Nombre del Campeonato</label>
+                    <input type="text" [(ngModel)]="campeonato.nombre" name="nombre" required
+                        placeholder="Ej: Open Dinamyt 2026">
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label>Ubicación / Lugar</label>
+                        <input type="text" [(ngModel)]="campeonato.ubicacion" name="ubicacion" required
+                            placeholder="Ciudad, Estadio, etc.">
+                    </div>
+                    <div class="input-group">
+                        <label>Alcance</label>
+                        <app-custom-select [options]="alcanceOptions" [(ngModel)]="campeonato.alcance"
+                            name="alcance"></app-custom-select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label>Fecha Inicio</label>
+                        <input type="text" appFlatpickrDate [(ngModel)]="campeonato.fechaInicio" name="fechaInicio"
+                            class="date-input" required placeholder="Selecciona la fecha">
+                    </div>
+                    <div class="input-group">
+                        <label>Fecha Fin</label>
+                        <input type="text" appFlatpickrDate [(ngModel)]="campeonato.fechaFin" name="fechaFin"
+                            class="date-input" required placeholder="Selecciona la fecha">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configuración -->
+            <section class="form-section">
+                <div class="section-header">
+                    <i class="fas fa-cog"></i>
+                    <h3>Configuración de Torneo</h3>
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label>Número de Tatamis</label>
+                        <input type="number" [(ngModel)]="campeonato.numTatamis" name="numTatamis"
+                            (input)="onTatamisInput($event)" min="1" max="12">
+                    </div>
+                    <div class="input-group">
+                        <label>Límite Participantes</label>
+                        <input type="number" [(ngModel)]="campeonato.maxParticipantes" name="maxParticipantes"
+                            placeholder="Ilimitado">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Privacidad</label>
+                    <app-custom-select [options]="privacyOptions" [(ngModel)]="privacy"
+                        name="privacy"></app-custom-select>
+                    <p class="hint" *ngIf="privacy === 'PRIVADO'">* Los usuarios necesitarán un código para inscribirse.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Modalidades -->
+            <section class="form-section">
+                <div class="section-header">
+                    <i class="fas fa-trophy"></i>
+                    <h3>Modalidades y Categorías</h3>
+                </div>
+
+                <div class="modalidades-list">
+                    <div class="modalidad-item" *ngFor="let mod of modalidades" [class.active]="mod.activa">
+                        <div class="mod-header" (click)="toggleModalidad(mod)">
+                            <div class="mod-main">
+                                <input type="checkbox" [(ngModel)]="mod.activa" [name]="mod.id + '_act'"
+                                    (change)="onModalidadChange(mod)" (click)="$event.stopPropagation()">
+                                <span class="mod-name">{{ mod.nombre }}</span>
+                            </div>
+                            <i class="fas" [ngClass]="mod.expanded ? 'fa-chevron-up' : 'fa-chevron-down'"
+                                *ngIf="mod.activa"></i>
+                        </div>
+
+                        <div class="mod-body" *ngIf="mod.activa && mod.expanded">
+                            <!-- Categorías de la modalidad -->
+                            <div class="cat-group">
+                                <div class="cat-header">
+                                    <label><input type="checkbox"
+                                            (change)="toggleCategory(mod, 'cinturon', $any($event.target).checked)"
+                                            [checked]="isCategoryEnabled(mod, 'cinturon')"> Filtrar por Cinturón</label>
+                                </div>
+                                <div class="cat-config" *ngIf="isCategoryEnabled(mod, 'cinturon')">
+                                    <div class="add-row">
+                                        <select [(ngModel)]="pending[mod.id].cinturon.valor"
+                                            [name]="mod.id + '_cint_val'">
+                                            <option value="">Selecciona...</option>
+                                            <option *ngFor="let c of cinturones" [value]="c.value">{{ c.label }}
+                                            </option>
+                                        </select>
+                                        <button type="button" (click)="addCategoryFromPending(mod, 'cinturon')"
+                                            class="btn-add">Añadir</button>
+                                    </div>
+                                    <div class="tags">
+                                        <span class="tag" *ngFor="let cat of mod.categorias.cinturon; let i = index">
+                                            {{ formatCategory(cat, 'cinturon') }}
+                                            <i class="fas fa-times" (click)="removeCategory(mod, 'cinturon', i)"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Edad -->
+                            <div class="cat-group">
+                                <div class="cat-header">
+                                    <label><input type="checkbox"
+                                            (change)="toggleCategory(mod, 'edad', $any($event.target).checked)"
+                                            [checked]="isCategoryEnabled(mod, 'edad')"> Filtrar por Edad</label>
+                                </div>
+                                <div class="cat-config" *ngIf="isCategoryEnabled(mod, 'edad')">
+                                    <div class="add-row">
+                                        <input type="number" placeholder="Desde"
+                                            [(ngModel)]="pending[mod.id].edad.desde" [name]="mod.id + '_edad_d'">
+                                        <input type="number" placeholder="Hasta"
+                                            [(ngModel)]="pending[mod.id].edad.hasta" [name]="mod.id + '_edad_h'">
+                                        <button type="button" (click)="addCategoryFromPending(mod, 'edad')"
+                                            class="btn-add">Añadir Rango</button>
+                                    </div>
+                                    <div class="tags">
+                                        <span class="tag" *ngFor="let cat of mod.categorias.edad; let i = index">
+                                            {{ cat.desde }} - {{ cat.hasta }} años
+                                            <i class="fas fa-times" (click)="removeCategory(mod, 'edad', i)"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gestión de Jueces -->
+            <section class="config-section">
+                <div class="section-header">
+                    <i class="fas fa-gavel"></i>
+                    <h3>Gestión de Jueces</h3>
+                </div>
+                <div class="section-content">
+                    <p class="section-description">Busca y añade jueces por su ID de usuario.</p>
+
+                    <div class="judge-search-container">
+                        <div class="search-input-group">
+                            <input type="text" [(ngModel)]="judgeSearchQuery" name="judgeSearch"
+                                placeholder="Ingresa el ID del juez..." (keyup.enter)="searchJudge()">
+                            <button type="button" class="btn-search" (click)="searchJudge()"
+                                [disabled]="searchingJudge || !judgeSearchQuery">
+                                <i class="fas" [ngClass]="searchingJudge ? 'fa-spinner fa-spin' : 'fa-search'"></i>
+                            </button>
+                        </div>
+
+                        <div *ngIf="searchError" class="search-error">
+                            <i class="fas fa-exclamation-circle"></i> {{ searchError }}
+                        </div>
+
+                        <!-- Juez Encontrado -->
+                        <div *ngIf="foundJudge" class="found-judge-card">
+                            <div class="judge-info">
+                                <img [src]="foundJudge.avatar || 'assets/default-avatar.png'" alt="Avatar">
+                                <div class="judge-details">
+                                    <span class="judge-name">{{ foundJudge.nombre || foundJudge.username }}</span>
+                                    <span class="judge-id">ID: {{ foundJudge.id }}</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-add-judge" (click)="addJudge()">
+                                <i class="fas fa-plus"></i> Añadir
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Jueces Añadidos -->
+                    <div class="judges-list" *ngIf="jueces.length > 0">
+                        <h4>Jueces Asignados ({{ jueces.length }})</h4>
+                        <div class="judges-grid">
+                            <div class="judge-item" *ngFor="let juez of jueces">
+                                <img [src]="juez.avatar || 'assets/default-avatar.png'" alt="Avatar">
+                                <span class="judge-name">{{ juez.nombre }}</span>
+                                <button type="button" class="btn-remove-judge" (click)="removeJudge(juez.id)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" (click)="goBack()">Cancelar</button>
+                <button type="submit" class="btn-submit" [disabled]="saving || !editForm.form.valid">
+                    <i class="fas" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+                    {{ saving ? 'Guardando...' : 'Guardar Cambios' }}
+                </button>
+            </div>
+
+            <div *ngIf="message" class="alert" [class.alert-success]="success" [class.alert-error]="!success">
+                {{ message }}
+            </div>
+        </form>
+    </div>
+</div>

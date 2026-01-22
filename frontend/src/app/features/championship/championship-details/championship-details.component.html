@@ -1,0 +1,187 @@
+<div class="details-container">
+    <div class="details-card">
+        <header class="header">
+            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+                <i class="fas fa-arrow-left fa-2x"></i>
+            </button>
+            <div class="header-text">
+                <h1>Detalles del Campeonato</h1>
+                <p class="subtitle" *ngIf="campeonato">{{ campeonato.nombre }}</p>
+            </div>
+            <div class="header-actions" *ngIf="campeonato">
+                <button class="btn-edit" (click)="editChampionship()">
+                    <i class="fas fa-edit"></i> Editar
+                </button>
+            </div>
+        </header>
+
+        <app-loading-spinner *ngIf="loading" message="Cargando información..."></app-loading-spinner>
+
+        <div *ngIf="error" class="error-msg">
+            <i class="fas fa-exclamation-circle"></i>
+            <p>{{ error }}</p>
+            <button (click)="loadData()">Reintentar</button>
+        </div>
+
+        <div *ngIf="!loading && campeonato" class="content">
+            <!-- Info General -->
+            <section class="section info-section">
+                <div class="section-header">
+                    <i class="fas fa-info-circle"></i>
+                    <h3>Información General</h3>
+                </div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label">Ubicación</span>
+                        <span class="value">{{ campeonato.ubicacion }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Fecha Inicio</span>
+                        <span class="value">{{ campeonato.fechaInicio | date: 'fullDate': 'es' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Fecha Fin</span>
+                        <span class="value">{{ campeonato.fechaFin | date: 'fullDate': 'es' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Alcance</span>
+                        <span class="value">{{ campeonato.alcance }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Tatamis</span>
+                        <span class="value">{{ campeonato.numTatamis }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Capacidad Máxima</span>
+                        <span class="value">{{ campeonato.maxParticipantes || 'Ilimitada' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Estado</span>
+                        <span class="badge" [ngClass]="'badge-' + (campeonato.estado || 'planificado').toLowerCase()">
+                            {{ campeonato.estado || 'Planificado' }}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Privacidad</span>
+                        <span class="badge" [ngClass]="campeonato.esPublico ? 'badge-publico' : 'badge-privado'">
+                            {{ campeonato.esPublico ? 'Público' : 'Privado' }}
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Jueces -->
+            <section class="section judges-section">
+                <div class="section-header">
+                    <i class="fas fa-gavel"></i>
+                    <h3>Jueces del Campeonato</h3>
+                    <span class="count">{{ jueces.length }}</span>
+                </div>
+
+                <div class="judges-grid">
+                    <div class="judge-card" *ngFor="let juez of jueces">
+                        <img [src]="juez.avatar || 'assets/default-avatar.png'" alt="Avatar">
+                        <div class="judge-info">
+                            <span class="judge-name">{{ juez.nombre }}</span>
+                            <span class="judge-role">Juez Certificado</span>
+                        </div>
+                    </div>
+                    <div *ngIf="jueces.length === 0" class="no-judges">
+                        Todavía no se han asignado jueces a este campeonato.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Participantes -->
+            <section class="section participants-section">
+                <div class="section-header">
+                    <i class="fas fa-users"></i>
+                    <h3>Participantes Inscritos</h3>
+                    <span class="count">{{ participantes.length }}</span>
+                </div>
+
+                <div class="filters-bar">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+                            placeholder="Buscar por nombre o academia...">
+                    </div>
+
+                    <div class="filters-grid">
+                        <div class="select-box">
+                            <label>Modalidad</label>
+                            <select [(ngModel)]="modalidadFilter" (change)="applyFilters()">
+                                <option value="TODAS">Todas</option>
+                                <option *ngFor="let m of modalidades" [value]="m">{{ m }}</option>
+                            </select>
+                        </div>
+
+                        <div class="select-box">
+                            <label>Cinturón</label>
+                            <select [(ngModel)]="cinturonFilter" (change)="applyFilters()">
+                                <option value="TODAS">Todos</option>
+                                <option *ngFor="let c of cinturones" [value]="c">{{ c }}</option>
+                            </select>
+                        </div>
+
+                        <div class="select-box">
+                            <label>Peso</label>
+                            <select [(ngModel)]="pesoFilter" (change)="applyFilters()">
+                                <option value="TODAS">Todos</option>
+                                <option *ngFor="let p of pesos" [value]="p">{{ p }}</option>
+                            </select>
+                        </div>
+
+                        <div class="select-box">
+                            <label>Edad</label>
+                            <select [(ngModel)]="edadFilter" (change)="applyFilters()">
+                                <option value="TODAS">Todas</option>
+                                <option *ngFor="let e of edades" [value]="e">{{ e }}</option>
+                            </select>
+                        </div>
+
+                        <div class="select-box">
+                            <label>Género</label>
+                            <select [(ngModel)]="generoFilter" (change)="applyFilters()">
+                                <option value="TODAS">Todos</option>
+                                <option *ngFor="let g of generos" [value]="g">{{ g }}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="participants-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Academia</th>
+                                <th>Modalidad</th>
+                                <th>Cinturón</th>
+                                <th>Peso</th>
+                                <th>Edad</th>
+                                <th>Género</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let p of filteredParticipantes">
+                                <td class="name-cell">{{ p.nombre }}</td>
+                                <td>{{ p.academia }}</td>
+                                <td>{{ p.modalidad }}</td>
+                                <td><span class="tag-belt">{{ p.cinturon }}</span></td>
+                                <td>{{ p.peso }}</td>
+                                <td>{{ p.edad }}</td>
+                                <td>{{ p.genero }}</td>
+                            </tr>
+                            <tr *ngIf="filteredParticipantes.length === 0">
+                                <td colspan="7" class="empty-table">
+                                    No se encontraron participantes con los filtros seleccionados.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>

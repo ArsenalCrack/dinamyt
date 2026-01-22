@@ -26,7 +26,7 @@
   width: 100%;
   max-width: 1200px;
   text-align: left;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
 }
 
 .btn-back {
@@ -104,7 +104,7 @@
       border-color: var(--color-acento);
       background: #fff;
       outline: none;
-      box-shadow: 0 4px 10px rgba(214,0,0,0.12);
+      box-shadow: 0 4px 10px rgba(214, 0, 0, 0.12);
     }
 
     &::placeholder {
@@ -256,7 +256,7 @@
     &:hover {
       background: #fff;
       border-color: var(--color-acento);
-      box-shadow: 0 8px 20px rgba(214,0,0,0.1);
+      box-shadow: 0 8px 20px rgba(214, 0, 0, 0.1);
       transform: translateY(-3px);
     }
 
@@ -442,6 +442,24 @@
             transform: scale(1.02);
           }
         }
+
+        &.btn-delete {
+          flex: 0;
+          min-width: 44px;
+          background: rgba(214, 0, 0, 0.08);
+          color: var(--color-acento);
+          border: 1px solid rgba(214, 0, 0, 0.2);
+          padding: 10px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+
+          &:hover {
+            background: var(--color-acento);
+            color: #fff;
+            transform: scale(1.05);
+          }
+        }
       }
     }
   }
@@ -479,7 +497,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0, 0, 0, 0.45);
   z-index: 2500;
 }
 
@@ -491,7 +509,7 @@
   max-width: 92%;
   width: 100%;
   max-width: 500px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -681,5 +699,80 @@
 
   .modal-box {
     padding: 1.2rem 1.4rem;
+  }
+}
+
+.delete-modal {
+  text-align: center;
+  align-items: center;
+
+  .warning-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(214, 0, 0, 0.1);
+    color: var(--color-acento);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    margin-top: 0;
+    color: var(--color-principal);
+  }
+
+  p {
+    color: var(--color-texto);
+    font-size: 0.95rem;
+  }
+}
+
+.modal-actions-delete {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-top: 1.5rem;
+
+  button {
+    flex: 1;
+    padding: 0.8rem;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-cancel {
+    background: #eee;
+    color: #444;
+    border: none;
+
+    &:hover {
+      background: #e0e0e0;
+    }
+  }
+
+  .btn-confirm-delete {
+    background: var(--color-acento);
+    color: #fff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    &:hover:not(:disabled) {
+      background: var(--color-acento-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(214, 0, 0, 0.2);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
   }
 }

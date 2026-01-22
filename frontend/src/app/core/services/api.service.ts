@@ -85,4 +85,25 @@ export class ApiService {
   getMisCampeonatos(userId: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/campeonatos/mis/${userId}`);
   }
+
+  getCampeonatoById(id: string | number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/campeonatos/${id}`);
+  }
+
+  updateCampeonato(id: string | number, payload: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/campeonatos/${id}`, payload);
+  }
+
+  deleteCampeonato(id: string | number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/campeonatos/${id}`);
+  }
+
+  // Judge management
+  searchUserById(id: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/usuarios/search/${id}`);
+  }
+
+  getJuecesByCampeonato(campeonatoId: string | number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/campeonatos/${campeonatoId}/jueces`);
+  }
 }

@@ -238,8 +238,8 @@ public class controlador_principal {
             campeonato.setEsPublico(
                     datos.get("esPublico") != null &&
                             Boolean.parseBoolean(datos.get("esPublico").toString()));
-            if (campeonato.getEsPublico()){
-            }else{
+            if (campeonato.getEsPublico()) {
+            } else {
                 campeonato.setCodigo(GenerarCodigo());
             }
 
@@ -287,12 +287,10 @@ public class controlador_principal {
     public ResponseEntity<?> cargarCampeonatosMios(
             @PathVariable String userId) {
 
-        List<Campeonato> campeonatos =
-                campeonatoRepository.findByCreadoPor(Long.parseLong(userId));
+        List<Campeonato> campeonatos = campeonatoRepository.findByCreadoPor(Long.parseLong(userId));
 
         System.out.println("campeonatos: " + campeonatos);
         return ResponseEntity.ok(campeonatos);
     }
-
 
 }

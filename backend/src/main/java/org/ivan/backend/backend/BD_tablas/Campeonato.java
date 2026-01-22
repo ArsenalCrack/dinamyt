@@ -55,12 +55,12 @@ public class Campeonato {
 
     @Transient
     public Integer getCuposDisponibles() {
-        if (maxParticipantes == null || participantes == null) return null;
+        if (maxParticipantes == null || participantes == null)
+            return null;
         return maxParticipantes - participantes;
     }
 
     // getters y setters
-
 
     public String getNombre_creador() {
         return nombre_creador;
@@ -85,7 +85,6 @@ public class Campeonato {
     public void setNombreCreador(String nombreCreador) {
         nombre_creador = nombreCreador;
     }
-
 
     public Long getIdCampeonato() {
         return idCampeonato;
@@ -199,4 +198,3 @@ public class Campeonato {
         this.fecha_fin = fecha_fin;
     }
 }
-

@@ -45,7 +45,8 @@ export class NavbarComponent implements OnInit, OnDestroy {
       this.currentUrl = this.router.url || '';
       this.closeDropdown();
       this.closeMobileNavbar();
-      this.checkLoginStatus();
+      // No need to update AuthService on every navigation, just update local state
+      this.updateLocalStatus();
     });
   }
 
@@ -80,8 +81,8 @@ export class NavbarComponent implements OnInit, OnDestroy {
         this.usuario = null;
         this.userType = null;
       } else {
-        // Redirigir a checkLoginStatus para asegurar sincronización
-        this.checkLoginStatus();
+        // Just update local state, don't ping AuthService back
+        this.updateLocalStatus(false);
       }
     });
 
@@ -89,7 +90,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     ).subscribe(roles => {
       if (roles && roles.length > 0) {
-        this.checkLoginStatus();
+        this.updateLocalStatus(false);
       }
     });
 
@@ -125,17 +126,24 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.api.getCurrentUser(meRequest).subscribe({
       next: async (u: any) => {
         clearTimeout(timeout);
-        const storedName = sessionStorage.getItem('nombreC');
-        this.username = u?.nombreC || storedName || this.usuario?.nombreC || null;
-        if (u?.nombreC && !storedName) {
-          sessionStorage.setItem('nombreC', u.nombreC);
-        }
+
         // Actualizar usuario local para tener la data fresca, incluyendo tipousuario
         this.usuario = u;
         localStorage.setItem('usuario', JSON.stringify(u));
-        this.checkLoginStatus(); // Recalcular userType
+
+        const storedName = sessionStorage.getItem('nombreC');
+        const nameToUse = u?.nombreC || storedName || this.usuario?.nombreC || null;
+        this.username = nameToUse;
+
+        if (u?.nombreC && !storedName) {
+          sessionStorage.setItem('nombreC', u.nombreC);
+        }
+
         this.isLoggedIn = true;
         this.auth.setLoggedIn(true, this.username);
+
+        // Recalcular userType localmente sin volver a llamar a AuthService
+        this.updateLocalStatus(false);
 
         await delayRemaining(startedAt);
         this.loading = false;
@@ -145,8 +153,8 @@ export class NavbarComponent implements OnInit, OnDestroy {
         await delayRemaining(startedAt);
         console.warn('Error loading user in navbar');
         this.loading = false;
-        // Even on error, we might still be logged in via session
-        this.checkLoginStatus();
+        // Even on error, we update local state from whatever we have
+        this.updateLocalStatus(false);
       }
     });
   }
@@ -160,7 +168,19 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  /**
+   * Alias de conveniencia para mantener compatibilidad si otros componentes lo usan,
+   * pero por defecto sincroniza con AuthService.
+   */
   checkLoginStatus(): void {
+    this.updateLocalStatus(true);
+  }
+
+  /**
+   * Lee el estado de almacenamiento local y actualiza las propiedades del componente.
+   * @param notifyAuthService Si se debe notificar al AuthService de los cambios encontrados.
+   */
+  updateLocalStatus(notifyAuthService: boolean = false): void {
     const rawUsuario = localStorage.getItem('usuario');
     try {
       const parsed = rawUsuario ? JSON.parse(rawUsuario) : null;
@@ -192,7 +212,9 @@ export class NavbarComponent implements OnInit, OnDestroy {
     }
     console.log('Detected User Type (Final):', this.userType, 'Is 2?', this.userType === 2);
 
-    this.auth.setLoggedIn(this.isLoggedIn, this.username);
+    if (notifyAuthService) {
+      this.auth.setLoggedIn(this.isLoggedIn, this.username);
+    }
   }
 
   isPanelLinkActive(): boolean {

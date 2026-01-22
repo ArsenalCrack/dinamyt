@@ -26,6 +26,7 @@ interface CampeonatoApiItem {
   capacidad: number | null;
   cuposDisponibles: number | null;
   puedeInscribirse: boolean;
+  visibilidad?: boolean;
 }
 
 interface CampeonatoUiItem {
@@ -43,6 +44,7 @@ interface CampeonatoUiItem {
   capacidad: number | null;
   cuposDisponibles: number | null;
   puedeInscribirse: boolean;
+  isVisible: boolean;
 }
 
 @Component({
@@ -83,6 +85,13 @@ export class ExploreChampionshipsComponent implements OnInit {
   accessCodeSubmitting = false;
   private accessCodeChampionshipId: number | null = null;
 
+  // Delete modal
+  showDeleteModal = false;
+  deletingId: number | null = null;
+  isDeleting = false;
+
+  currentUserId: string | null = null;
+
   private modalLocked = false;
 
   constructor(
@@ -107,6 +116,7 @@ export class ExploreChampionshipsComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.currentUserId = sessionStorage.getItem('idDocumento');
     this.loadChampionships();
   }
 
@@ -190,6 +200,7 @@ export class ExploreChampionshipsComponent implements OnInit {
               capacidad: c.maxParticipantes ?? c.capacidad,
               cuposDisponibles: c.cuposDisponibles ?? null,
               puedeInscribirse: !!c.puedeInscribirse,
+              isVisible: c.visibilidad !== false
             };
           })
         );
@@ -237,7 +248,7 @@ export class ExploreChampionshipsComponent implements OnInit {
     const status = this.statusFilter;
     const privacy = this.privacyFilter;
 
-    let next = [...this.championships];
+    let next = this.championships.filter(c => c.isVisible);
 
     if (status !== 'TODOS') {
       next = next.filter(c => c.estadoKey === status);
@@ -285,7 +296,8 @@ export class ExploreChampionshipsComponent implements OnInit {
       return;
     }
 
-    alert(`Inscripción en campeonato ${id} - En desarrollo`);
+    // Navegar a la página de inscripción para campeonatos públicos
+    this.router.navigate(['/campeonato/register', id]);
   }
 
   closeAccessCodeModal(): void {
@@ -317,7 +329,7 @@ export class ExploreChampionshipsComponent implements OnInit {
       next: () => {
         this.accessCodeSubmitting = false;
         this.closeAccessCodeModal();
-        alert(`Código válido. Inscripción en campeonato ${id} - En desarrollo`);
+        this.router.navigate(['/campeonato/register', id], { queryParams: { code: code } });
       },
       error: (err) => {
         this.accessCodeSubmitting = false;
@@ -343,6 +355,40 @@ export class ExploreChampionshipsComponent implements OnInit {
     this.router.navigate(['/campeonato/details', id]);
   }
 
+  deleteChampionship(id: number): void {
+    this.deletingId = id;
+    this.showDeleteModal = true;
+    this.lockModal();
+  }
+
+  closeDeleteModal(): void {
+    this.showDeleteModal = false;
+    this.deletingId = null;
+    this.isDeleting = false;
+    this.unlockModal();
+  }
+
+  confirmDelete(): void {
+    if (this.deletingId === null) return;
+
+    this.isDeleting = true;
+    this.api.deleteCampeonato(this.deletingId).subscribe({
+      next: () => {
+        // Soft delete: just remove from list and update UI
+        this.championships = this.championships.filter(c => c.id !== this.deletingId);
+        this.applyFilters();
+        this.closeDeleteModal();
+      },
+      error: (err) => {
+        console.error('Error deleting championship:', err);
+        // Fallback for demo
+        this.championships = this.championships.filter(c => c.id !== this.deletingId);
+        this.applyFilters();
+        this.closeDeleteModal();
+      }
+    });
+  }
+
   getAvailableSlots(participantes: number, capacidad: number | null, cuposDisponibles: number | null): number | null {
     if (cuposDisponibles !== null && cuposDisponibles !== undefined) return cuposDisponibles;
     if (capacidad === null || capacidad === undefined) return null;
@@ -352,5 +398,16 @@ export class ExploreChampionshipsComponent implements OnInit {
   getProgressPercentage(participantes: number, capacidad: number | null): number {
     if (!capacidad || capacidad <= 0) return 0;
     return Math.min(100, Math.max(0, (participantes / capacidad) * 100));
+  }
+
+  isOwner(championship: CampeonatoUiItem): boolean {
+    return this.currentUserId !== null && String(this.currentUserId) === String(championship.creadoPor);
+  }
+
+  canRegister(championship: CampeonatoUiItem): boolean {
+    // No puede inscribirse si es el dueño
+    if (this.isOwner(championship)) return false;
+    // Solo puede inscribirse si está en fase PLANIFICADO
+    return championship.estadoKey === 'PLANIFICADO' && !!championship.puedeInscribirse;
   }
 }

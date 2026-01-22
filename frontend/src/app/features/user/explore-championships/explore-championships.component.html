@@ -142,8 +142,8 @@
               <i class="fas fa-eye"></i>
               Ver detalles
             </button>
-            <button class="btn-primary" (click)="registerChampionship(championship.id)"
-              [disabled]="!championship.puedeInscribirse">
+            <button *ngIf="canRegister(championship)" class="btn-primary"
+              (click)="registerChampionship(championship.id)" [disabled]="!championship.puedeInscribirse">
               <i class="fas fa-check"></i>
               Inscribirse
             </button>
@@ -203,6 +203,26 @@
         </button>
         <button class="modal-action-secondary" (click)="closeAccessCodeModal()"
           [disabled]="accessCodeSubmitting">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de eliminación -->
+  <div class="modal-overlay" *ngIf="showDeleteModal">
+    <div class="modal-box delete-modal">
+      <div class="modal-header">
+        <div class="warning-icon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3>¿Eliminar Campeonato?</h3>
+        <p>Esta acción no se puede deshacer. El campeonato dejará de ser visible para todos los usuarios.</p>
+      </div>
+      <div class="modal-actions-delete">
+        <button class="btn-cancel" (click)="closeDeleteModal()" [disabled]="isDeleting">Cancelar</button>
+        <button class="btn-confirm-delete" (click)="confirmDelete()" [disabled]="isDeleting">
+          <i class="fas" [ngClass]="isDeleting ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
+          {{ isDeleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+        </button>
       </div>
     </div>
   </div>

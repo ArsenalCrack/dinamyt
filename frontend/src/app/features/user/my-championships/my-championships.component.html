@@ -78,4 +78,25 @@
       </ng-template>
     </div>
   </div>
+
+  <!-- Modal de eliminación -->
+  <div *ngIf="showDeleteModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-body">
+        <i class="fas fa-exclamation-triangle warning-icon"></i>
+        <div class="modal-text">
+          <h3>¿Eliminar campeonato?</h3>
+          <p>Esta acción no se puede deshacer. Todos los datos de inscripción y resultados se perderán permanentemente.
+          </p>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" (click)="closeDeleteModal()" [disabled]="isDeleting">Cancelar</button>
+        <button class="btn-delete" (click)="confirmDelete()" [disabled]="isDeleting">
+          <i class="fas" [ngClass]="isDeleting ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
+          {{ isDeleting ? 'Eliminando...' : 'Sí, eliminar' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

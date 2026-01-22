@@ -12,12 +12,20 @@ export class AuthService {
   readonly roles$ = this._roles.asObservable();
 
   setLoggedIn(isLoggedIn: boolean, username: string | null = null) {
-    this._isLoggedIn.next(isLoggedIn);
-    if (username !== undefined) {
+    if (this._isLoggedIn.value === isLoggedIn && (username === undefined || this._username.value === username)) {
+      return;
+    }
+
+    if (this._isLoggedIn.value !== isLoggedIn) {
+      this._isLoggedIn.next(isLoggedIn);
+    }
+
+    if (username !== undefined && this._username.value !== username) {
       this._username.next(username);
-    } else if (!isLoggedIn) {
+    } else if (!isLoggedIn && this._username.value !== null) {
       this._username.next(null);
     }
+
     if (!isLoggedIn) {
       this.setRoles([]);
     }
@@ -26,7 +34,13 @@ export class AuthService {
   setRoles(roles: string[]): void {
     const normalized = Array.from(
       new Set((roles || []).map(r => String(r || '').trim().toLowerCase()).filter(Boolean))
-    );
+    ).sort(); // Sort to ensure consistent comparison
+
+    const currentRoles = [...this._roles.value].sort();
+
+    if (JSON.stringify(normalized) === JSON.stringify(currentRoles)) {
+      return;
+    }
 
     if (normalized.length === 0) {
       sessionStorage.removeItem('roles');
