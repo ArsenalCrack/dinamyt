@@ -56,8 +56,7 @@ export const routes: Routes = [
   },
   {
     path: 'campeonato/details/:id',
-    loadComponent: () => import('./features/championship/championship-details/championship-details.component').then(m => m.ChampionshipDetailsComponent),
-    canActivate: [authGuard]
+    loadComponent: () => import('./features/championship/championship-details/championship-details.component').then(m => m.ChampionshipDetailsComponent)
   },
   {
     path: 'campeonato/edit/:id',

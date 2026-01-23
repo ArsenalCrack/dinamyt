@@ -132,15 +132,26 @@ export class ExploreChampionshipsComponent implements OnInit {
 
   private calculateStatus(fechaInicio: string, fechaFin: string | undefined): EstadoCampeonato {
     if (!fechaInicio) return 'BORRADOR';
-    const now = new Date();
-    now.setHours(0, 0, 0, 0); // Comparar solo fechas (día)
 
-    const start = new Date(fechaInicio);
-    const startCompare = new Date(start);
+    // Obtener fecha actual en medianoche local para comparar solo días
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    // Función auxiliar para parsear YYYY-MM-DD como fecha local
+    const parseLocalDate = (dateStr: string): Date => {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split('T')[0].split('-');
+      if (parts.length === 3) {
+        // new Date(year, monthIndex, day) crea una fecha en hora local
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+      return new Date(dateStr);
+    };
+
+    const startCompare = parseLocalDate(fechaInicio);
     startCompare.setHours(0, 0, 0, 0);
 
-    const end = fechaFin ? new Date(fechaFin) : new Date(start);
-    const endCompare = new Date(end);
+    const endCompare = fechaFin ? parseLocalDate(fechaFin) : new Date(startCompare);
     endCompare.setHours(23, 59, 59, 999);
 
     if (now < startCompare) return 'PLANIFICADO';
@@ -307,6 +318,25 @@ export class ExploreChampionshipsComponent implements OnInit {
     this.accessCodeSubmitting = false;
     this.accessCodeChampionshipId = null;
     this.unlockModal();
+  }
+
+  onAccessCodeChange(value: string): void {
+    // Sanitiza el valor para que solo queden números (útil para pegar texto)
+    this.accessCode = value.replace(/[^0-9]/g, '');
+  }
+
+  onAccessCodeKeyDown(event: KeyboardEvent): void {
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'];
+
+    // Permitir teclas de control
+    if (allowedKeys.includes(event.key)) {
+      return;
+    }
+
+    // Bloquear si NO es un número (evita letras, puntos, comas, etc.)
+    if (!/^[0-9]$/.test(event.key)) {
+      event.preventDefault();
+    }
   }
 
   submitAccessCode(): void {

@@ -193,6 +193,23 @@
     color: var(--color-acento);
     font-size: 0.85rem;
     font-weight: 600;
+
+    &.spaced-alert {
+        margin-top: 1rem;
+        padding-top: 0.5rem;
+    }
+}
+
+.field-error-msg {
+    color: var(--color-acento); // Assuming acento is red-ish, typically used for errors in this theme
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    font-weight: 600;
+}
+
+.input-error {
+    border-color: var(--color-acento) !important;
+    background-color: rgba(214, 0, 0, 0.02);
 }
 
 .input-group {

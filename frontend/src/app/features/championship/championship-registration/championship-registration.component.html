@@ -5,8 +5,9 @@
                 <i class="fas fa-arrow-left fa-2x"></i>
             </button>
             <div class="header-text">
-                <h1>Inscripción al Campeonato</h1>
-                <p class="subtitle" *ngIf="campeonato">{{ campeonato.nombre }}</p>
+                <h1 *ngIf="campeonato">{{ campeonato.nombre }}</h1>
+                <h1 *ngIf="!campeonato">Cargando...</h1>
+                <p class="subtitle">Inscripción al Campeonato</p>
             </div>
         </header>
 
@@ -36,11 +37,11 @@
                                     <span class="modalidad-label">{{ m.label }}</span>
                                 </div>
                             </div>
-                            <small class="helper-text" *ngIf="registrationData.modalidades.length === 0">
+                            <small class="helper-text spaced-alert" *ngIf="registrationData.modalidades.length === 0">
                                 * Selecciona al menos una opción
                             </small>
                         </div>
-                        <div class="input-group">
+                        <div class="input-group" *ngIf="isFieldRequired('cinturon')">
                             <label>Confirma tu Cinturón</label>
                             <app-custom-select [options]="beltOptions" [ngModel]="registrationData.cinturon"
                                 (ngModelChange)="registrationData.cinturon = $event" name="cinturon"
@@ -49,11 +50,15 @@
                         </div>
                     </div>
 
-                    <div class="row">
+                    <div class="row" *ngIf="isFieldRequired('peso')">
                         <div class="input-group">
                             <label>Peso Actual (kg)</label>
-                            <input type="number" name="peso" [(ngModel)]="registrationData.peso" required
-                                placeholder="Ej: 75">
+                            <input type="text" name="peso" [ngModel]="registrationData.peso" required
+                                placeholder="Ej: 75" inputmode="numeric" maxlength="3" (input)="validateWeight($event)"
+                                [class.input-error]="weightError">
+                            <div *ngIf="weightError" class="field-error-msg">
+                                <small>{{ weightError }}</small>
+                            </div>
                         </div>
                     </div>
                 </section>

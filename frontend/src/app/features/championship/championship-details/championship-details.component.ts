@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { FormsModule } from '@angular/forms';
 
 interface Participante {
@@ -35,6 +36,10 @@ export class ChampionshipDetailsComponent implements OnInit {
     campeonato: any = null;
     loading = true;
     error: string | null = null;
+    currentUserId: string | null = null;
+    copied = false;
+    showDeleteModal = false;
+    isDeleting = false;
 
     // Jueces
     jueces: Juez[] = [];
@@ -63,10 +68,12 @@ export class ChampionshipDetailsComponent implements OnInit {
         private route: ActivatedRoute,
         private api: ApiService,
         private router: Router,
-        private backNav: BackNavigationService
+        private backNav: BackNavigationService,
+        private scrollLock: ScrollLockService
     ) { }
 
     ngOnInit(): void {
+        this.currentUserId = sessionStorage.getItem('idDocumento');
         this.id = this.route.snapshot.paramMap.get('id');
         if (this.id) {
             this.loadData();
@@ -82,6 +89,12 @@ export class ChampionshipDetailsComponent implements OnInit {
             next: (data) => {
                 console.log(data);
                 this.campeonato = data;
+
+                // Calcular estado real basado en fechas
+                if (this.campeonato) {
+                    this.campeonato.estadoReal = this.calculateStatus(this.campeonato.fechaInicio, this.campeonato.fecha_fin);
+                }
+
                 this.extractFilters();
                 this.applyFilters();
 
@@ -130,10 +143,80 @@ export class ChampionshipDetailsComponent implements OnInit {
     }
 
     goBack(): void {
-        this.backNav.backOr({ fallbackUrl: '/mis-campeonatos' });
+        const fallback = this.isOwner() ? '/mis-campeonatos' : '/campeonatos';
+        this.backNav.backOr({ fallbackUrl: fallback });
     }
 
     editChampionship(): void {
         this.router.navigate(['/campeonato/edit', this.id]);
+    }
+
+    private calculateStatus(fechaInicio: string, fechaFin: string | undefined): string {
+        if (!fechaInicio) return 'PLANIFICADO';
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        const parseLocalDate = (dateStr: string): Date => {
+            if (!dateStr) return new Date();
+            const parts = dateStr.split('T')[0].split('-');
+            if (parts.length === 3) {
+                return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            }
+            return new Date(dateStr);
+        };
+
+        const startCompare = parseLocalDate(fechaInicio);
+        startCompare.setHours(0, 0, 0, 0);
+
+        const endCompare = fechaFin ? parseLocalDate(fechaFin) : new Date(startCompare);
+        endCompare.setHours(23, 59, 59, 999);
+
+        if (now < startCompare) return 'PLANIFICADO';
+        if (now > endCompare) return 'TERMINADO';
+        return 'ACTIVO';
+    }
+
+    isOwner(): boolean {
+        if (!this.campeonato || !this.currentUserId) return false;
+        return String(this.campeonato.creadoPor) === String(this.currentUserId);
+    }
+
+    copyCode(): void {
+        const codeToCopy = this.campeonato?.Codigo || this.campeonato?.codigo;
+        if (!codeToCopy) return;
+
+        navigator.clipboard.writeText(codeToCopy).then(() => {
+            this.copied = true;
+            setTimeout(() => this.copied = false, 2000);
+        });
+    }
+
+    deleteChampionship(): void {
+        this.showDeleteModal = true;
+        this.scrollLock.lock();
+    }
+
+    closeDeleteModal(): void {
+        this.showDeleteModal = false;
+        this.isDeleting = false;
+        this.scrollLock.unlock();
+    }
+
+    confirmDelete(): void {
+        if (!this.id) return;
+        this.isDeleting = true;
+        this.api.deleteCampeonato(this.id).subscribe({
+            next: () => {
+                this.closeDeleteModal();
+                this.router.navigate(['/mis-campeonatos']);
+            },
+            error: (err) => {
+                console.error('Error deleting championship:', err);
+                this.isDeleting = false;
+                // Fallback for safety
+                this.router.navigate(['/mis-campeonatos']);
+            }
+        });
     }
 }

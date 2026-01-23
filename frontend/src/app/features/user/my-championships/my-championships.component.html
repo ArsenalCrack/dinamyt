@@ -33,19 +33,20 @@
               <span class="badge" [ngClass]="'badge-' + championship.estado.toLowerCase()">
                 {{ championship.estadoLabel }}
               </span>
+              <span class="badge" [ngClass]="championship.esPublico ? 'badge-publico' : 'badge-privado'">
+                <i class="fas" [ngClass]="championship.esPublico ? 'fa-globe' : 'fa-lock'"></i>
+                {{ championship.esPublico ? 'Público' : 'Privado' }}
+              </span>
             </div>
             <div class="item-actions">
-              <button class="btn-action" (click)="viewDetails(championship.id)" title="Ver detalles"
-                aria-label="Ver detalles">
+              <button class="btn-action" (click)="viewDetails(championship.id)" title="Ver detalles">
                 <i class="fas fa-eye" aria-hidden="true"></i>
+                <span>Detalles</span>
               </button>
-              <button class="btn-action" (click)="editChampionship(championship.id)" title="Editar"
-                aria-label="Editar campeonato">
+              <button class="btn-action" *ngIf="championship.estado !== 'TERMINADO'"
+                (click)="editChampionship(championship.id)" title="Editar">
                 <i class="fas fa-edit" aria-hidden="true"></i>
-              </button>
-              <button class="btn-action btn-danger" (click)="deleteChampionship(championship.id)" title="Eliminar"
-                aria-label="Eliminar campeonato">
-                <i class="fas fa-trash" aria-hidden="true"></i>
+                <span>Editar</span>
               </button>
             </div>
           </div>
@@ -57,6 +58,17 @@
             <div class="detail">
               <i class="fas fa-map-marker-alt"></i>
               <span>{{ championship.ubicacion }}</span>
+            </div>
+            <div class="detail" *ngIf="!championship.esPublico">
+              <i class="fas fa-lock"></i>
+              <div class="access-code-box">
+                <span class="code-text">CÓDIGO:</span>
+                <span class="code-value">{{ championship.Codigo }}</span>
+                <button class="btn-copy-code" (click)="copyCode(championship.id, championship.Codigo)"
+                  [class.copied]="copiedId === championship.id">
+                  <i class="fas" [ngClass]="copiedId === championship.id ? 'fa-check' : 'fa-copy'"></i>
+                </button>
+              </div>
             </div>
             <div class="detail">
               <i class="fas fa-users"></i>
@@ -83,7 +95,9 @@
   <div *ngIf="showDeleteModal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-body">
-        <i class="fas fa-exclamation-triangle warning-icon"></i>
+        <div class="icon-container">
+          <i class="fas fa-exclamation-triangle warning-icon"></i>
+        </div>
         <div class="modal-text">
           <h3>¿Eliminar campeonato?</h3>
           <p>Esta acción no se puede deshacer. Todos los datos de inscripción y resultados se perderán permanentemente.

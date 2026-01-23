@@ -184,15 +184,16 @@
       <div class="modal-body">
         <i class="fas fa-lock modal-icon" aria-hidden="true"></i>
         <div class="modal-text">
-          Este campeonato es privado. Ingresa el código para validar tu inscripción.
+          Este campeonato es privado. Ingresa el código para continuar tu inscripción.
         </div>
       </div>
       <button class="modal-close" (click)="closeAccessCodeModal()" aria-label="Cerrar">✕</button>
 
       <div class="modal-form">
         <label class="modal-label" for="access-code">Código</label>
-        <input id="access-code" class="modal-input" type="text" autocomplete="off" placeholder="Ej: A7K9Z2PQX1"
-          [(ngModel)]="accessCode" [disabled]="accessCodeSubmitting">
+        <input id="access-code" class="modal-input" type="text" autocomplete="off" placeholder="Ej: 000000"
+          [ngModel]="accessCode" (ngModelChange)="onAccessCodeChange($event)" (keydown)="onAccessCodeKeyDown($event)"
+          [disabled]="accessCodeSubmitting" inputmode="numeric">
         <div *ngIf="accessCodeError" class="modal-error">{{ accessCodeError }}</div>
       </div>
 

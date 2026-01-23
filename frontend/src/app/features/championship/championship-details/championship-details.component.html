@@ -1,19 +1,47 @@
 <div class="details-container">
     <div class="details-card">
         <header class="header">
-            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
-                <i class="fas fa-arrow-left fa-2x"></i>
-            </button>
-            <div class="header-text">
-                <h1>Detalles del Campeonato</h1>
-                <p class="subtitle" *ngIf="campeonato">{{ campeonato.nombre }}</p>
+            <div class="header-main-info">
+                <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="header-text">
+                    <span class="context-label">Detalles del Campeonato</span>
+                    <h1 class="main-title" *ngIf="campeonato">{{ campeonato.nombre }}</h1>
+                </div>
             </div>
-            <div class="header-actions" *ngIf="campeonato">
-                <button class="btn-edit" (click)="editChampionship()">
+            <div class="header-actions" *ngIf="campeonato && isOwner()">
+                <button class="btn-edit" *ngIf="campeonato.estadoReal !== 'TERMINADO'" (click)="editChampionship()">
                     <i class="fas fa-edit"></i> Editar
+                </button>
+                <button class="btn-delete-header" (click)="deleteChampionship()">
+                    <i class="fas fa-trash"></i> Eliminar
                 </button>
             </div>
         </header>
+
+        <!-- Modal de eliminación -->
+        <div class="modal-overlay" *ngIf="showDeleteModal">
+            <div class="modal-box delete-modal">
+                <div class="modal-header">
+                    <div class="icon-container">
+                        <i class="fas fa-exclamation-triangle warning-icon"></i>
+                    </div>
+                    <div class="text-content">
+                        <h3>¿Eliminar Campeonato?</h3>
+                        <p>Esta acción no se puede deshacer. El campeonato dejará de ser visible para todos los
+                            usuarios.</p>
+                    </div>
+                </div>
+                <div class="modal-actions-delete">
+                    <button class="btn-cancel" (click)="closeDeleteModal()" [disabled]="isDeleting">Cancelar</button>
+                    <button class="btn-confirm-delete" (click)="confirmDelete()" [disabled]="isDeleting">
+                        <i class="fas" [ngClass]="isDeleting ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
+                        {{ isDeleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <app-loading-spinner *ngIf="loading" message="Cargando información..."></app-loading-spinner>
 
@@ -27,8 +55,21 @@
             <!-- Info General -->
             <section class="section info-section">
                 <div class="section-header">
-                    <i class="fas fa-info-circle"></i>
-                    <h3>Información General</h3>
+                    <div class="header-main">
+                        <i class="fas fa-info-circle"></i>
+                        <h3>Información General</h3>
+                    </div>
+
+                    <div class="access-code-container" *ngIf="!campeonato.esPublico && isOwner()">
+                        <span class="code-label">CÓDIGO DE ACCESO:</span>
+                        <div class="code-wrapper" title="Haga clic para copiar">
+                            <span class="code-value">{{ campeonato.Codigo }}</span>
+                            <button class="btn-copy" (click)="copyCode()" [class.copied]="copied">
+                                <i class="fas" [ngClass]="copied ? 'fa-check' : 'fa-copy'"></i>
+                                <span>{{ copied ? '¡Copiado!' : 'Copiar' }}</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="info-grid">
                     <div class="info-item">
@@ -37,11 +78,11 @@
                     </div>
                     <div class="info-item">
                         <span class="label">Fecha Inicio</span>
-                        <span class="value">{{ campeonato.fechaInicio | date: 'dd/MM/yyyy' }}</span>
+                        <span class="value">{{ campeonato.fechaInicio | date: 'fullDate' }}</span>
                     </div>
                     <div class="info-item">
                         <span class="label">Fecha Fin</span>
-                        <span class="value">{{ campeonato.fecha_fin | date: 'dd/MM/yyyy' }}</span>
+                        <span class="value">{{ campeonato.fecha_fin | date: 'fullDate' }}</span>
                     </div>
                     <div class="info-item">
                         <span class="label">Alcance</span>
@@ -57,13 +98,15 @@
                     </div>
                     <div class="info-item">
                         <span class="label">Estado</span>
-                        <span class="badge" [ngClass]="'badge-' + (campeonato.estado || 'planificado').toLowerCase()">
-                            {{ campeonato.estado || 'Planificado' }}
+                        <span class="value badge-status"
+                            [ngClass]="(campeonato.estadoReal || 'PLANIFICADO').toLowerCase()">
+                            {{ (campeonato.estadoReal || 'Planificado') | titlecase }}
                         </span>
                     </div>
                     <div class="info-item">
                         <span class="label">Privacidad</span>
-                        <span class="badge" [ngClass]="campeonato.esPublico ? 'fa-globe' : 'fa-lock'">
+                        <span class="value badge-status" [ngClass]="campeonato.esPublico ? 'publico' : 'privado'">
+                            <i class="fas" [ngClass]="campeonato.esPublico ? 'fa-globe' : 'fa-lock'"></i>
                             {{ campeonato.esPublico ? 'Público' : 'Privado' }}
                         </span>
                     </div>

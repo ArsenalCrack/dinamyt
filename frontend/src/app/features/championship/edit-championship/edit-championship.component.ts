@@ -89,13 +89,25 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
     jueces: any[] = [];
     judgeSearchQuery: string = '';
     searchingJudge = false;
-    searchError: string | null = null;
+    judgeSearchError: string | null = null;
     foundJudge: any = null;
+
+    // User/Athlete Invitation Validation
+    invitedUsers: any[] = [];
+    userSearchQuery: string = '';
+    searchingUser = false;
+    userSearchError: string | null = null;
+    foundUser: any = null;
 
     // Logic flags for UI
     categoryEnabled: Record<string, Record<string, boolean>> = {};
     pending: Record<string, any> = {};
     categoryError: Record<string, string> = {};
+
+    // Date Logic
+    minDate: string = '';
+    fechaInicioErrorMsg: string | null = null;
+    fechaFinErrorMsg: string | null = null;
 
     constructor(
         private route: ActivatedRoute,
@@ -103,7 +115,45 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         private router: Router,
         private backNav: BackNavigationService,
         private scrollLock: ScrollLockService
-    ) { }
+    ) {
+        this.minDate = this.getTodayDate();
+    }
+
+    private getTodayDate(): string {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    private parseDate(value: string): Date | null {
+        const v = (value || '').trim();
+        if (!v) return null;
+        const dt = new Date(`${v}T00:00:00`);
+        return Number.isNaN(dt.getTime()) ? null : dt;
+    }
+
+    onFechaInicioChange(): void {
+        this.fechaInicioErrorMsg = null;
+        this.fechaFinErrorMsg = null;
+        // If start date changes, check if end date is now invalid (before into new start)
+        const start = this.parseDate(this.campeonato.fechaInicio);
+        const end = this.parseDate(this.campeonato.fechaFin);
+
+        if (start && end && end < start) {
+            // Clear end date or warn? Usually clear or warn. 
+            // "que fecha fin se actualice y acomode mostrando los días habiles apartir de la fecha de inicio"
+            // The [fpMinDate] binding in HTML will handle the pickle constraints, 
+            // but we should validate current value too.
+            this.campeonato.fechaFin = '';
+        }
+    }
+
+    onFechaFinChange(): void {
+        this.fechaInicioErrorMsg = null;
+        this.fechaFinErrorMsg = null;
+    }
 
     ngOnInit(): void {
         this.id = this.route.snapshot.paramMap.get('id');
@@ -122,8 +172,8 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
             this.categoryEnabled[m.id] = { cinturon: false, edad: false, peso: false };
             this.pending[m.id] = {
                 cinturon: { tipo: 'individual', valor: '', desde: '', hasta: '' },
-                edad: { tipo: 'individual', valor: '', desde: '', hasta: '' },
-                peso: { tipo: 'individual', valor: '', desde: '', hasta: '' }
+                edad: { tipo: 'rango', valor: '', desde: '', hasta: '' },
+                peso: { tipo: 'rango', valor: '', desde: '', hasta: '' }
             };
         });
     }
@@ -134,9 +184,32 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
             next: (data) => {
                 this.campeonato = data;
                 this.privacy = data.esPublico ? 'PUBLICO' : 'PRIVADO';
-                // Map modalidades if backends provides them
+
+                // Parse modalities
                 if (data.modalidades) {
-                    // Mapping logic here
+                    let parsedMods: any[] = [];
+                    try {
+                        parsedMods = typeof data.modalidades === 'string' ? JSON.parse(data.modalidades) : data.modalidades;
+                    } catch (e) { console.error('Error parsing mods', e); }
+
+                    if (Array.isArray(parsedMods)) {
+                        parsedMods.forEach(backendMod => {
+                            const localMod = this.modalidades.find(m => m.id === backendMod.id || m.nombre === backendMod.nombre);
+                            if (localMod) {
+                                localMod.activa = true;
+                                localMod.expanded = true;
+                                // Map categories
+                                if (backendMod.categorias) {
+                                    localMod.categorias = backendMod.categorias;
+
+                                    // Set enabled flags
+                                    if (localMod.categorias.cinturon?.length > 0) this.categoryEnabled[localMod.id]['cinturon'] = true;
+                                    if (localMod.categorias.edad?.length > 0) this.categoryEnabled[localMod.id]['edad'] = true;
+                                    if (localMod.categorias.peso?.length > 0) this.categoryEnabled[localMod.id]['peso'] = true;
+                                }
+                            }
+                        });
+                    }
                 }
 
                 // Fetch judges
@@ -145,11 +218,8 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                         this.jueces = jueces || [];
                     },
                     error: () => {
-                        // Mock judges for demo
-                        this.jueces = [
-                            { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png' },
-                            { id: 102, nombre: 'María García', avatar: 'assets/avatar-2.png' }
-                        ];
+                        // Fallback for demo
+                        this.jueces = [];
                     }
                 });
 
@@ -166,10 +236,12 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                     numTatamis: 4,
                     maxParticipantes: 500
                 };
+
+                // Demo judges
                 this.jueces = [
-                    { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png' },
-                    { id: 102, nombre: 'María García', avatar: 'assets/avatar-2.png' }
+                    { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png' }
                 ];
+
                 this.loading = false;
             }
         });
@@ -188,8 +260,13 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
             const payload = {
                 ...this.campeonato,
                 esPublico: this.privacy === 'PUBLICO',
-                modalidades: this.modalidades.filter(m => m.activa),
-                jueces: this.jueces // Sending the full judge list
+                modalidades: this.modalidades.filter(m => m.activa).map(m => ({
+                    id: m.id,
+                    nombre: m.nombre,
+                    categorias: m.categorias
+                })),
+                jueces: this.jueces,
+                invitedUsers: this.invitedUsers
             };
 
             await this.api.updateCampeonato(this.id!, payload).toPromise();
@@ -200,7 +277,6 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
             setTimeout(() => this.router.navigate(['/mis-campeonatos']), 2000);
         } catch (err) {
             console.error('Error saving changes:', err);
-            // Simulate success for demo since backend might not exist
             await delayRemaining(startedAt);
             this.success = true;
             this.message = 'Campeonato actualizado exitosamente (Modo Demo).';
@@ -210,9 +286,10 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         }
     }
 
-    // --- Logic copied from Create Component for consistency ---
+    // --- Config Logic ---
 
     toggleModalidad(mod: ModalidadConfig): void {
+        // Toggle expansion independently of activation if active
         if (mod.activa) {
             mod.expanded = !mod.expanded;
         }
@@ -232,22 +309,41 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
 
     toggleCategory(mod: ModalidadConfig, key: string, enabled: boolean): void {
         this.categoryEnabled[mod.id][key] = enabled;
+        if (enabled) {
+            // Reset pending state to clean
+            const p = this.pending[mod.id][key];
+            p.valor = ''; p.desde = ''; p.hasta = '';
+        }
     }
 
-    addCategoryFromPending(mod: ModalidadConfig, key: string): void {
+    addCategoryFromPending(mod: ModalidadConfig, key: string, forcedType?: 'individual' | 'rango'): void {
         const p = this.pending[mod.id][key];
+        // If type is forced by the button (like 'Añadir Rango'), use it, otherwise use pending type
+        const type = forcedType || p.tipo || 'individual';
+
         const cat: CategoriaConfig = {
             nombre: '',
             activa: true,
-            tipo: p.tipo,
+            tipo: type,
             valor: p.valor,
             desde: p.desde,
             hasta: p.hasta
         };
 
-        // Simple validation
-        if (p.tipo === 'individual' && !p.valor) return;
-        if (p.tipo === 'rango' && (!p.desde || !p.hasta)) return;
+        // Validation
+        if (key === 'cinturon') {
+            if (!p.valor) return; // Cant add empty belt
+            cat.tipo = 'individual'; // Belt handled as individual in this simplified UI
+            cat.valor = p.valor;
+        } else {
+            // Edad / Peso (Rango)
+            if (!p.desde || !p.hasta) return;
+            if (parseFloat(p.desde) >= parseFloat(p.hasta)) {
+                // Invalid range
+                alert('El valor "desde" debe ser menor que "hasta".');
+                return;
+            }
+        }
 
         (mod.categorias as any)[key].push(cat);
 
@@ -260,59 +356,116 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
     }
 
     formatCategory(cat: CategoriaConfig, key: string): string {
-        if (cat.tipo === 'individual') return cat.valor!;
-        return `${cat.desde} a ${cat.hasta}`;
+        const unit = key === 'edad' ? ' años' : key === 'peso' ? ' kg' : '';
+        if (cat.tipo === 'individual') return `${cat.valor}${unit}`;
+        return `${cat.desde} - ${cat.hasta}${unit}`;
     }
 
     onTatamisInput(event: any): void {
         const val = event.target.value.replace(/\D/g, '');
-        this.campeonato.numTatamis = Math.min(12, Math.max(1, parseInt(val) || 1));
+        const num = parseInt(val);
+        if (val === '') {
+            this.campeonato.numTatamis = null;
+            return;
+        }
+        this.campeonato.numTatamis = Math.min(12, Math.max(1, num || 1));
+        event.target.value = this.campeonato.numTatamis;
+    }
+
+    onMaxParticipantesInput(event: any): void {
+        const val = event.target.value.replace(/\D/g, '');
+        this.campeonato.maxParticipantes = val ? parseInt(val) : null;
+        event.target.value = val;
+    }
+
+    validateNumericField(event: any): void {
+        event.target.value = event.target.value.replace(/\D/g, '');
     }
 
     // --- Judge Methods ---
     searchJudge(): void {
-        const query = this.judgeSearchQuery.trim();
-        if (!query) return;
-
-        this.searchingJudge = true;
-        this.searchError = null;
-        this.foundJudge = null;
-
-        this.api.searchUserById(query).subscribe({
-            next: (user) => {
-                if (user) {
-                    this.foundJudge = user;
-                } else {
-                    this.searchError = 'No se encontró ningún usuario con ese ID.';
-                }
-                this.searchingJudge = false;
-            },
-            error: () => {
-                this.searchError = 'Error al buscar el usuario.';
-                this.searchingJudge = false;
-            }
-        });
+        this.performUserSearch(this.judgeSearchQuery, 'judge');
     }
 
     addJudge(): void {
         if (!this.foundJudge) return;
-
         if (this.jueces.find(j => j.id === this.foundJudge.id)) {
-            this.searchError = 'Este juez ya ha sido agregado.';
+            this.judgeSearchError = 'Este juez ya ha sido agregado.';
             return;
         }
-
         this.jueces.push({
             id: this.foundJudge.id,
             nombre: this.foundJudge.nombre || this.foundJudge.username,
             avatar: this.foundJudge.avatar || 'assets/default-avatar.png'
         });
-
         this.foundJudge = null;
         this.judgeSearchQuery = '';
     }
 
     removeJudge(id: any): void {
         this.jueces = this.jueces.filter(j => j.id !== id);
+    }
+
+    // --- User Invitation Methods ---
+    searchUser(): void {
+        this.performUserSearch(this.userSearchQuery, 'user');
+    }
+
+    addInvitedUser(): void {
+        if (!this.foundUser) return;
+        if (this.invitedUsers.find(u => u.id === this.foundUser.id)) {
+            this.userSearchError = 'Este usuario ya ha sido invitado.';
+            return;
+        }
+        this.invitedUsers.push({
+            id: this.foundUser.id,
+            nombre: this.foundUser.nombre || this.foundUser.username,
+            avatar: this.foundUser.avatar || 'assets/default-avatar.png'
+        });
+        this.foundUser = null;
+        this.userSearchQuery = '';
+    }
+
+    removeInvitedUser(id: any): void {
+        this.invitedUsers = this.invitedUsers.filter(u => u.id !== id);
+    }
+
+    private performUserSearch(query: string, type: 'judge' | 'user'): void {
+        const q = query.trim();
+        if (!q) return;
+
+        if (type === 'judge') {
+            this.searchingJudge = true;
+            this.judgeSearchError = null;
+            this.foundJudge = null;
+        } else {
+            this.searchingUser = true;
+            this.userSearchError = null;
+            this.foundUser = null;
+        }
+
+        this.api.searchUserById(q).subscribe({
+            next: (user) => {
+                if (type === 'judge') {
+                    this.searchingJudge = false;
+                    if (user) this.foundJudge = user;
+                    else this.judgeSearchError = 'Usuario no encontrado.';
+                } else {
+                    this.searchingUser = false;
+                    if (user) this.foundUser = user;
+                    else this.userSearchError = 'Usuario no encontrado.';
+                }
+            },
+            error: () => {
+                const msg = 'Error al buscar.';
+                if (type === 'judge') {
+                    this.searchingJudge = false;
+                    this.judgeSearchError = msg;
+                } else {
+                    this.searchingUser = false;
+                    this.userSearchError = msg;
+                }
+            }
+        });
     }
 }

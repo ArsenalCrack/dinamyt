@@ -1,7 +1,11 @@
-import { ApplicationConfig } from '@angular/core';
+import { ApplicationConfig, LOCALE_ID } from '@angular/core';
 import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { routes } from './app.routes';
 import { provideHttpClient } from '@angular/common/http';
+import localeEs from '@angular/common/locales/es';
+import { registerLocaleData } from '@angular/common';
+
+registerLocaleData(localeEs);
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -13,6 +17,7 @@ export const appConfig: ApplicationConfig = {
         anchorScrolling: 'enabled'            // Opcional: permite navegar a anclas #id
       })
     ),
-    provideHttpClient()
+    provideHttpClient(),
+    { provide: LOCALE_ID, useValue: 'es' }
   ]
 };

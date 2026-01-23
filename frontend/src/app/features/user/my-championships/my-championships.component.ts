@@ -6,6 +6,7 @@ import { Location } from '@angular/common';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
 import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 
 @Component({
   selector: 'app-my-championships',
@@ -25,12 +26,14 @@ export class MyChampionshipsComponent implements OnInit {
   showDeleteModal = false;
   deletingId: number | null = null;
   isDeleting = false;
+  copiedId: number | null = null;
 
   constructor(
     private router: Router,
     private location: Location,
     private backNav: BackNavigationService,
-    private api: ApiService
+    private api: ApiService,
+    private scrollLock: ScrollLockService
   ) { }
 
   ngOnInit(): void {
@@ -59,7 +62,9 @@ export class MyChampionshipsComponent implements OnInit {
             ubicacion: c.ubicacion,
             participantes: c.participantes ?? 0,
             estado: status,
-            estadoLabel: this.getEstadoLabel(status)
+            estadoLabel: this.getEstadoLabel(status),
+            Codigo: c.Codigo,
+            esPublico: c.esPublico !== false
           };
         });
         this.applyFilters();
@@ -81,16 +86,24 @@ export class MyChampionshipsComponent implements OnInit {
   }
 
   private calculateStatus(fechaInicio: string, fechaFin: string | undefined): string {
-    if (!fechaInicio) return 'BORRADOR';
+    if (!fechaInicio) return 'PLANIFICADO';
+
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
-    const start = new Date(fechaInicio);
-    const startCompare = new Date(start);
+    const parseLocalDate = (dateStr: string): Date => {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split('T')[0].split('-');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+      return new Date(dateStr);
+    };
+
+    const startCompare = parseLocalDate(fechaInicio);
     startCompare.setHours(0, 0, 0, 0);
 
-    const end = fechaFin ? new Date(fechaFin) : new Date(start);
-    const endCompare = new Date(end);
+    const endCompare = fechaFin ? parseLocalDate(fechaFin) : new Date(startCompare);
     endCompare.setHours(23, 59, 59, 999);
 
     if (now < startCompare) return 'PLANIFICADO';
@@ -138,12 +151,14 @@ export class MyChampionshipsComponent implements OnInit {
   deleteChampionship(id: number): void {
     this.deletingId = id;
     this.showDeleteModal = true;
+    this.scrollLock.lock();
   }
 
   closeDeleteModal(): void {
     this.showDeleteModal = false;
     this.deletingId = null;
     this.isDeleting = false;
+    this.scrollLock.unlock();
   }
 
   confirmDelete(): void {
@@ -163,6 +178,14 @@ export class MyChampionshipsComponent implements OnInit {
         this.onSearchChange();
         this.closeDeleteModal();
       }
+    });
+  }
+
+  copyCode(id: number, code: string): void {
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      this.copiedId = id;
+      setTimeout(() => this.copiedId = null, 2000);
     });
   }
 }
