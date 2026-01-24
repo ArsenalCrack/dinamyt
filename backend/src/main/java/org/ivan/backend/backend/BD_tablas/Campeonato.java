@@ -55,6 +55,10 @@ public class Campeonato {
 
     @Column(name = "visible")
     boolean visible;
+
+    @Column(name = "secciones")
+    String secciones;
+
     //No perteneciente a la BD
     @Transient
     public Integer getCuposDisponibles() {
@@ -65,6 +69,14 @@ public class Campeonato {
 
     // getters y setters
 
+
+    public String getSecciones() {
+        return secciones;
+    }
+
+    public void setSecciones(String secciones) {
+        this.secciones = secciones;
+    }
 
     public boolean isVisible() {
         return visible;

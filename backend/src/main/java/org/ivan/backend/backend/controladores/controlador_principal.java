@@ -1,22 +1,29 @@
 //echo por Andres Gonzalez 1077294332
 package org.ivan.backend.backend.controladores;
 
+
 import org.ivan.backend.backend.BD_tablas.*;
 import org.ivan.backend.backend.EmailService;
 import org.ivan.backend.backend.repositorios.AcademiaRepository;
 import org.ivan.backend.backend.repositorios.CampeonatoRepository;
 import org.ivan.backend.backend.repositorios.UsuarioRepository;
+import org.ivan.backend.backend.secciones.ArbolBuilder;
+import org.ivan.backend.backend.secciones.ArbolCampeonato;
+
+import org.ivan.backend.backend.secciones.NodoArbol;
+import org.ivan.backend.backend.secciones.TipoNodo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.ObjectMapper;
+
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+
 
 @RestController
 @RequestMapping("/api") // 1. Cambiamos la ruta base a "/api"
@@ -36,6 +43,8 @@ public class controlador_principal {
         this.academiaRepository = academiaRepository;
         this.campeonatoRepository = campeonatoRepository;
     }
+
+
 
     private String GenerarCodigo() {
         return String.valueOf((int) (Math.random() * 900000) + 100000);
@@ -167,7 +176,6 @@ public class controlador_principal {
 
     @PostMapping("/me")
     private ResponseEntity<?> me(@RequestBody(required = false) Usuario respuesta) {
-        System.out.println("a" + respuesta);
         if (respuesta != null) {
             return ResponseEntity.ok(respuesta);
         }
@@ -202,7 +210,6 @@ public class controlador_principal {
         if (datos.getCorreo() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
         }
-        System.out.println(datos.getNumeroCelular() + "  " + datos.getCinturonRango());
         Usuario usuario = usuarioRepository.findByCorreo(datos.getCorreo());
         Usuario instructor = usuarioRepository.findById(Long.parseLong(datos.getModo()))
                 .orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
@@ -253,6 +260,17 @@ public class controlador_principal {
             if (datos.get("modalidades") != null) {
                 String modalidadesJson = JsonCleaner.limpiarDesdeObject(datos.get("modalidades"));
                 campeonato.setModalidades(modalidadesJson);
+                //creamos las secciones de una
+                ArbolCampeonato arbol = new ArbolCampeonato();
+                ArbolBuilder builder = new ArbolBuilder();
+
+                builder.construir(arbol,JsonCleaner.convertir(campeonato.getModalidades()));
+
+                // 2. Obtener secciones
+                List<Map<String, String>> resultado = arbol.obtenerSeccionesDetalladas();
+                ObjectMapper mapper = new ObjectMapper();
+                campeonato.setSecciones(mapper.writeValueAsString(resultado));
+                System.out.println(resultado);
             }
 
 
@@ -273,8 +291,7 @@ public class controlador_principal {
 
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body(
-                    Map.of("message", "Error al crear el campeonato"));
+            return ResponseEntity.status(500).body(Map.of("message", "Error al crear el campeonato"));
         }
     }
 
@@ -298,10 +315,21 @@ public class controlador_principal {
     public ResponseEntity<?> cargarCampeonatoporid(
             @PathVariable String id) {
 
-        Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(id)).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));;
+        Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(id)).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
 
         System.out.println("campeonatos: " + campeonato.getNombre());
         return ResponseEntity.ok(campeonato);
+    }
+    @PostMapping("/campeonatos/{id}/validar-codigo")
+    public ResponseEntity<?> validar_codigo_campeonato(@PathVariable int id,@RequestBody Map<String, Object> codigo) {
+
+        Campeonato campeonato=campeonatoRepository.findById(id).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+        System.out.println(campeonato.getCodigo());
+        System.out.println(codigo);
+        if (campeonato.getCodigo().equals(codigo.get("codigo"))){
+            return ResponseEntity.ok(campeonato);
+        }
+        return ResponseEntity.status(500).body(Map.of("message", "Codigo incorrecto"));
     }
 
 }

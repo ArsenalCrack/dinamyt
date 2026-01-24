@@ -1,11 +1,14 @@
 package org.ivan.backend.backend.controladores;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.ivan.backend.backend.secciones.ModalidadDTO;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 public class JsonCleaner {
@@ -68,5 +71,16 @@ public class JsonCleaner {
 
 
         return node;
+    }
+    public static List<ModalidadDTO> convertir(String json) {
+        try {
+            return mapper.readValue(
+                    json,
+                    new TypeReference<List<ModalidadDTO>>() {}
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+            return List.of();
+        }
     }
 }
