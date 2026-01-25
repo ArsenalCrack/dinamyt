@@ -6,6 +6,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
 import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 
 @Component({
     selector: 'app-championship-registration',
@@ -60,7 +61,8 @@ export class ChampionshipRegistrationComponent implements OnInit {
         private route: ActivatedRoute,
         private router: Router,
         private api: ApiService,
-        private backNav: BackNavigationService
+        private backNav: BackNavigationService,
+        private scrollLock: ScrollLockService
     ) { }
 
     ngOnInit(): void {
@@ -245,6 +247,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
                 if (!this.currentUser.cinturon || this.currentUser.cinturon === 'null') {
                     // Show custom Alert Logic instead of setting this.message
                     this.showProfileAlert = true;
+                    this.scrollLock.lock();
                     this.success = false;
                     return; // Don't add
                 }
@@ -260,10 +263,12 @@ export class ChampionshipRegistrationComponent implements OnInit {
 
     closeProfileAlert(): void {
         this.showProfileAlert = false;
+        this.scrollLock.unlock();
     }
 
     goToProfile(): void {
         this.showProfileAlert = false;
+        this.scrollLock.unlock();
         this.router.navigate(['/perfil']);
     }
 
