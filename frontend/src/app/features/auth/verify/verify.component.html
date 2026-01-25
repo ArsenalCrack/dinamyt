@@ -49,7 +49,7 @@
 
         <input type="text" id="codigoInput" name="codigo" [(ngModel)]="codigo" #codeInput="ngModel" required
           maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="0 0 0 0 0 0" class="input-otp"
-          autocomplete="one-time-code"
+          autocomplete="one-time-code" (input)="validateNumberInput($event)"
           [class.input-error]="codeInput.invalid && (codeInput.dirty || codeInput.touched)">
 
         <div *ngIf="codeInput.invalid && (codeInput.dirty || codeInput.touched)" class="msg-error-center">

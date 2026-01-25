@@ -193,7 +193,7 @@
         <label class="modal-label" for="access-code">Código</label>
         <input id="access-code" class="modal-input" type="text" autocomplete="off" placeholder="Ej: 000000"
           [ngModel]="accessCode" (ngModelChange)="onAccessCodeChange($event)" (keydown)="onAccessCodeKeyDown($event)"
-          [disabled]="accessCodeSubmitting" inputmode="numeric">
+          (paste)="onAccessCodePaste($event)" maxlength="6" [disabled]="accessCodeSubmitting" inputmode="numeric">
         <div *ngIf="accessCodeError" class="modal-error">{{ accessCodeError }}</div>
       </div>
 

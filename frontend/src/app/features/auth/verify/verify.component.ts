@@ -217,6 +217,23 @@ export class VerifyComponent implements OnInit, OnDestroy {
     this.unlockScroll();
   }
 
+  validateNumberInput(event: any) {
+    const input = event.target as HTMLInputElement;
+    let value = input.value;
+
+    // Remove non-numeric characters
+    value = value.replace(/[^0-9]/g, '');
+
+    // Limit to 6 characters
+    if (value.length > 6) {
+      value = value.substring(0, 6);
+    }
+
+    // Update input and model
+    input.value = value;
+    this.codigo = value;
+  }
+
   formatRemaining(): string {
     const total = Math.max(0, this.remainingMs);
     const sec = Math.floor(total / 1000);

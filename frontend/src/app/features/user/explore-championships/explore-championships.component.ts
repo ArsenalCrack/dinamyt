@@ -321,14 +321,31 @@ export class ExploreChampionshipsComponent implements OnInit {
   }
 
   onAccessCodeChange(value: string): void {
-    // Sanitiza el valor para que solo queden números (útil para pegar texto)
-    this.accessCode = value.replace(/[^0-9]/g, '');
+    // Sanitiza el valor para que solo queden números
+    let clean = value.replace(/[^0-9]/g, '');
+    if (clean.length > 6) {
+      clean = clean.substring(0, 6);
+    }
+    this.accessCode = clean;
+  }
+
+  onAccessCodePaste(event: ClipboardEvent): void {
+    event.preventDefault();
+    const clipboardData = event.clipboardData || (window as any).clipboardData;
+    const pastedText = clipboardData.getData('text');
+    const cleanPaste = pastedText.replace(/[^0-9]/g, '').slice(0, 6);
+    this.accessCode = cleanPaste;
   }
 
   onAccessCodeKeyDown(event: KeyboardEvent): void {
-    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'];
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Home', 'End'];
 
-    // Permitir teclas de control
+    // Permitir combinaciones con Ctrl o Meta (Mac) para Copiar/Pegar/Cortar/Seleccionar
+    if (event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    // Permitir teclas de navegación y control básicas
     if (allowedKeys.includes(event.key)) {
       return;
     }

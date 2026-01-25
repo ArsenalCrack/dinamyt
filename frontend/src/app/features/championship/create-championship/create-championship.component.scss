@@ -25,15 +25,23 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,0.8);
+  background: rgba(255, 255, 255, 0.8);
   z-index: 2600;
   overflow: hidden;
   touch-action: none;
   overscroll-behavior: contain;
 }
 
-.spinner-icon { font-size: 2rem; color: var(--color-acento); margin-bottom: 10px; }
-.loading-text { font-weight: 700; color: var(--color-principal); }
+.spinner-icon {
+  font-size: 2rem;
+  color: var(--color-acento);
+  margin-bottom: 10px;
+}
+
+.loading-text {
+  font-weight: 700;
+  color: var(--color-principal);
+}
 
 .confirm-overlay {
   position: fixed;
@@ -194,8 +202,8 @@
 }
 
 /* En campos estándar, alinear el texto del mensaje con el texto del input */
-.field > .msg-error,
-.field > .msg-warning {
+.field>.msg-error,
+.field>.msg-warning {
   padding-left: 16px;
 }
 
@@ -332,12 +340,17 @@
   background: #fff;
   transition: border-color 0.2s, box-shadow 0.2s;
   font-family: inherit;
-  }
-  .field-col {
-    flex: 1 1 45%;
-    min-width: 140px;
-  }
-  .rango-separator { margin: 0 4px; line-height: 1; }
+}
+
+.field-col {
+  flex: 1 1 45%;
+  min-width: 140px;
+}
+
+.rango-separator {
+  margin: 0 4px;
+  line-height: 1;
+}
 
 .char-meta {
   display: flex;
@@ -651,11 +664,11 @@
   border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background-color: var(--color-acento);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(20px);
 }
 
@@ -942,9 +955,20 @@ input:checked + .slider:before {
     grid-template-columns: 1fr;
   }
 
-  .switch { width: 36px; height: 20px; }
-  .slider:before { width: 16px; height: 16px; }
-  input:checked + .slider:before { transform: translateX(16px); }
+  .switch {
+    width: 36px;
+    height: 20px;
+  }
+
+  .slider:before {
+    width: 16px;
+    height: 16px;
+  }
+
+  input:checked+.slider:before {
+    transform: translateX(16px);
+  }
+
   .modalidad-head {
     align-items: start;
   }
@@ -976,15 +1000,39 @@ input:checked + .slider:before {
 }
 
 @media (max-width: 480px) {
-  .switch { width: 30px; height: 16px; }
-  .slider:before { width: 12px; height: 12px; left: 2px; bottom: 2px; }
-  input:checked + .slider:before { transform: translateX(14px); }
+  .switch {
+    width: 30px;
+    height: 16px;
+  }
+
+  .slider:before {
+    width: 12px;
+    height: 12px;
+    left: 2px;
+    bottom: 2px;
+  }
+
+  input:checked+.slider:before {
+    transform: translateX(14px);
+  }
 }
 
 @media (max-width: 360px) {
-  .switch { width: 26px; height: 14px; }
-  .slider:before { width: 10px; height: 10px; left: 2px; bottom: 2px; }
-  input:checked + .slider:before { transform: translateX(12px); }
+  .switch {
+    width: 26px;
+    height: 14px;
+  }
+
+  .slider:before {
+    width: 10px;
+    height: 10px;
+    left: 2px;
+    bottom: 2px;
+  }
+
+  input:checked+.slider:before {
+    transform: translateX(12px);
+  }
 }
 
 /* Evitar min-width grandes que generan huecos en responsivo */
@@ -996,4 +1044,66 @@ input:checked + .slider:before {
 /* Mejorar separación con flecha en custom-select de cinturón */
 .category-group .add-row app-custom-select .custom-select .selected {
   padding-right: 44px;
+}
+
+// Import suggestions styles
+.import-suggestions {
+  margin-bottom: 12px;
+}
+
+.import-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.import-label {
+  font-size: 0.85rem;
+  color: #475569;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  i {
+    color: var(--color-acento);
+  }
+}
+
+.import-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-chip-import {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: var(--color-texto);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: var(--color-principal);
+    transform: translateY(-1px);
+  }
+
+  &::before {
+    content: '+';
+    font-size: 1.1em;
+    color: var(--color-acento);
+  }
 }

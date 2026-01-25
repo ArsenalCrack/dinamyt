@@ -18,7 +18,36 @@
                 <i class="fas fa-key"></i> Has accedido con un código de invitación privado.
             </div>
 
-            <form (ngSubmit)="submitRegistration()" #regForm="ngForm">
+            <!-- Profile Alert Modal -->
+            <div *ngIf="showProfileAlert" class="modal-overlay">
+                <div class="modal-box">
+                    <div class="modal-body">
+                        <i class="fas fa-user-edit modal-icon warning"></i>
+                        <div class="modal-text">
+                            <h3>Perfil Incompleto</h3>
+                            <p>Tu perfil no tiene un cinturón registrado. Actualiza tu perfil para inscribirte en esta
+                                modalidad.</p>
+                        </div>
+                    </div>
+                    <button class="modal-close" (click)="closeProfileAlert()">✕</button>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-primary" (click)="goToProfile()">Ir al perfil</button>
+                        <button type="button" class="btn-secondary" (click)="closeProfileAlert()">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- No Modalities Warning -->
+            <div *ngIf="noModalitiesAvailable" class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <strong>No hay modalidades disponibles.</strong>
+                    <p>No cumples con los requisitos de edad o cinturón para ninguna de las modalidades de este
+                        campeonato.</p>
+                </div>
+            </div>
+
+            <form (ngSubmit)="submitRegistration()" #regForm="ngForm" *ngIf="!noModalitiesAvailable">
                 <section class="form-section">
                     <div class="section-header">
                         <i class="fas fa-trophy"></i>
@@ -41,17 +70,11 @@
                                 * Selecciona al menos una opción
                             </small>
                         </div>
-                        <div class="input-group" *ngIf="isFieldRequired('cinturon')">
-                            <label>Confirma tu Cinturón</label>
-                            <app-custom-select [options]="beltOptions" [ngModel]="registrationData.cinturon"
-                                (ngModelChange)="registrationData.cinturon = $event" name="cinturon"
-                                placeholder="Selecciona tu cinturón">
-                            </app-custom-select>
-                        </div>
                     </div>
+                    <!-- Belt selection removed as it comes from user profile -->
 
                     <div class="row" *ngIf="isFieldRequired('peso')">
-                        <div class="input-group">
+                        <div class="weight-input-group">
                             <label>Peso Actual (kg)</label>
                             <input type="text" name="peso" [ngModel]="registrationData.peso" required
                                 placeholder="Ej: 75" inputmode="numeric" maxlength="3" (input)="validateWeight($event)"

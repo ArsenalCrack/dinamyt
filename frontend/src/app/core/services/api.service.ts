@@ -70,6 +70,10 @@ export class ApiService {
     return this.http.post<any[]>(`${this.apiUrl}/instructores`, academia);
   }
 
+  getCinturones(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/cinturones`);
+  }
+
   crearCampeonato(payload: any) {
     return this.http.post(`${this.apiUrl}/campeonatos`, payload);
   }

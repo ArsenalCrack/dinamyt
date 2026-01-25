@@ -569,6 +569,47 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
     this.pending[mod.id][key].hasta = '';
   }
 
+  getSourcesForCategory(currentModId: string, key: CategoryKey): { id: string, nombre: string, count: number }[] {
+    return this.modalidades
+      .filter(m => m.id !== currentModId && m.activa && m.categorias[key] && m.categorias[key].length > 0)
+      .map(m => ({
+        id: m.id,
+        nombre: m.nombre,
+        count: m.categorias[key].length
+      }));
+  }
+
+  importCategoryData(sourceModId: string, targetMod: ModalidadConfig, key: CategoryKey): void {
+    const sourceMod = this.modalidades.find(m => m.id === sourceModId);
+    if (!sourceMod) return;
+
+    const sourceItems = sourceMod.categorias[key] || [];
+    // Deep copy items to avoid reference issues
+    const copiedItems = sourceItems.map(item => ({ ...item })); // Shallow copy of object is enough if props are primitives
+
+    // Combine with current items, avoiding exact duplicates if any
+    const currentItems = targetMod.categorias[key] || [];
+
+    // Simple strategy: just append (user can clean up) or careful merge.
+    // Let's filter out exact duplicates to be nice.
+    const nonDuplicates = copiedItems.filter(newItem => {
+      // Check if newItem already exists in currentItems
+      // This is a basic equality check for our config structure
+      return !currentItems.some(existing =>
+        existing.tipo === newItem.tipo &&
+        existing.valor === newItem.valor &&
+        existing.desde === newItem.desde &&
+        existing.hasta === newItem.hasta
+      );
+    });
+
+    targetMod.categorias[key] = [...currentItems, ...nonDuplicates];
+
+    // Clear error if any
+    delete this.categoryError[`${targetMod.id}-${key}`];
+    delete this.categoryError[`${targetMod.id}-modalidad`];
+  }
+
   formatCategory(cat: CategoriaConfig, key: CategoryKey): string {
     const unit = key === 'edad' ? ' años' : key === 'peso' ? ' kg' : '';
     if (cat.tipo === 'individual') {
