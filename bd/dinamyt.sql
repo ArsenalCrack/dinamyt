@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 21-01-2026 a las 21:20:03
+-- Tiempo de generación: 25-01-2026 a las 03:16:46
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.0.30
 
@@ -62,15 +62,32 @@ CREATE TABLE `campeonato` (
   `fecha_fin` date DEFAULT NULL,
   `estado` varchar(255) DEFAULT NULL,
   `participantes` int(11) DEFAULT 0,
-  `puede_inscribirse` tinyint(1) DEFAULT 1
+  `puede_inscribirse` tinyint(1) DEFAULT 1,
+  `codigo` varchar(255) DEFAULT NULL,
+  `nombre_creador` varchar(255) DEFAULT NULL,
+  `visible` tinyint(1) DEFAULT NULL,
+  `secciones` longtext DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `campeonato`
 --
 
-INSERT INTO `campeonato` (`id_campeonato`, `nombre`, `ubicacion`, `alcance`, `num_tatamis`, `max_participantes`, `es_publico`, `creado_por`, `modalidades`, `fecha_inicio`, `fecha_fin`, `estado`, `participantes`, `puede_inscribirse`) VALUES
-(9, 'asd', 'asd', 'Regional', 12, 21, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"nombre\":\"\",\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Naranja/verde\"}],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"figura-manos\",\"nombre\":\"Figura a manos libres\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"defensa-personal\",\"nombre\":\"Defensa personal\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-alto\",\"nombre\":\"Salto alto\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}},{\"id\":\"salto-largo\",\"nombre\":\"Salto largo\",\"activa\":false,\"categorias\":{\"cinturon\":[],\"edad\":[],\"peso\":[],\"genero\":null}}]', NULL, NULL, 'BORRADOR', 0, 1);
+INSERT INTO `campeonato` (`id_campeonato`, `nombre`, `ubicacion`, `alcance`, `num_tatamis`, `max_participantes`, `es_publico`, `creado_por`, `modalidades`, `fecha_inicio`, `fecha_fin`, `estado`, `participantes`, `puede_inscribirse`, `codigo`, `nombre_creador`, `visible`, `secciones`) VALUES
+(33, 'prueba 1', 'dsa', 'Regional', 11, 431, 0, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Blanco\"}],\"edad\":[{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"21\"}],\"genero\":\"individual\"}}]', '2026-01-27', '2026-01-29', 'BORRADOR', 0, 1, '787054', 'Andres Gonzalez', 1, '[{\"PESO\":\"SIN_PESO\",\"EDAD\":\"21\",\"CINTURON\":\"Blanco\",\"GENERO\":\"Hombre\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-HOMBRE-BLANCO-21-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"EDAD\":\"21\",\"CINTURON\":\"Blanco\",\"GENERO\":\"Mujer\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MUJER-BLANCO-21-SIN_PESO\"}]');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `inscripciones`
+--
+
+CREATE TABLE `inscripciones` (
+  `idinscripcion` int(11) NOT NULL,
+  `idusuario` int(11) NOT NULL,
+  `idcampeonato` int(11) NOT NULL,
+  `organizado` varchar(300) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -122,7 +139,9 @@ INSERT INTO `usuario` (`ID_documento`, `nombreC`, `sexo`, `fecha_nacimiento`, `c
 (0, 'Independiente', 'masculino', '2026-01-01', 'negro', 'colombia', 'nada', '1', '2', NULL, 0, 2),
 (1, 'Instructor 1', 'masculino', '2026-01-01', 'negro', 'colombia', 'a', NULL, '1', NULL, 1, 2),
 (2, 'instructor 2', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2, 2),
-(123456, 'Andres Gonzalez', 'Masculino', '2019-04-04', NULL, 'Colombia', 'andresivan0807@gmail.com', '1', NULL, 2, 2, 3);
+(43013, 'AMIR SARMIENTO', 'Masculino', '2020-04-02', 'Blanco', 'Colombia', 'amirsarmiento0430@gmail.com', '1', '+570430', 0, 0, 3),
+(123456, 'Andres Gonzalez', 'Masculino', '2019-04-04', 'Negro', 'Colombia', 'andresivan0807@gmail.com', '1', '+573243100882', 0, 0, 3),
+(7868776876, 'AMIR SARMIENTOQ', 'Masculino', '2019-04-03', 'Blanco', 'Albania', 'amirdaniel0430@gmail.com', '1', '+13', 1, 1, 4);
 
 --
 -- Índices para tablas volcadas
@@ -140,6 +159,13 @@ ALTER TABLE `academia`
 ALTER TABLE `campeonato`
   ADD PRIMARY KEY (`id_campeonato`),
   ADD KEY `creado_por` (`creado_por`) USING BTREE;
+
+--
+-- Indices de la tabla `inscripciones`
+--
+ALTER TABLE `inscripciones`
+  ADD PRIMARY KEY (`idinscripcion`),
+  ADD UNIQUE KEY `idusuario` (`idusuario`,`idcampeonato`);
 
 --
 -- Indices de la tabla `tipo_usuario`
@@ -165,7 +191,13 @@ ALTER TABLE `usuario`
 -- AUTO_INCREMENT de la tabla `campeonato`
 --
 ALTER TABLE `campeonato`
-  MODIFY `id_campeonato` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id_campeonato` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+
+--
+-- AUTO_INCREMENT de la tabla `inscripciones`
+--
+ALTER TABLE `inscripciones`
+  MODIFY `idinscripcion` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- Restricciones para tablas volcadas

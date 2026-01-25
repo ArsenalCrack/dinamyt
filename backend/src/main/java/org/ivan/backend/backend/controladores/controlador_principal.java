@@ -260,6 +260,7 @@ public class controlador_principal {
             if (datos.get("modalidades") != null) {
                 String modalidadesJson = JsonCleaner.limpiarDesdeObject(datos.get("modalidades"));
                 campeonato.setModalidades(modalidadesJson);
+
                 //creamos las secciones de una
                 ArbolCampeonato arbol = new ArbolCampeonato();
                 ArbolBuilder builder = new ArbolBuilder();
