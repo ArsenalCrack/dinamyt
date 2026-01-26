@@ -15,7 +15,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Usuario findByTipousuario(Tipousuario tipo);
 
-    List<Usuario> findByAcademia_IDacademiaAndTipousuario_IDTipo(int IDacademia, int IDTipo);
+    List<Usuario> findByAcademia_IDacademiaAndTipousuario_IDTipoAndIdDocumentoNot(int IDacademia, int IDTipo, Long idInstructorExcluir);
 
 
 }

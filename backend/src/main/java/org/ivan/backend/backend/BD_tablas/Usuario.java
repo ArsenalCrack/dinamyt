@@ -31,6 +31,9 @@ public class Usuario {
     @Column(name = "Nacionalidad", length = 20)
     private String nacionalidad;
 
+    @Column(name = "ciudad", length = 100)
+    private String ciudad;
+
     @Column(name = "Correo", length = 120)
     private String correo;
 
@@ -64,6 +67,14 @@ public class Usuario {
     @Transient
     private String modo;
     // ===== GETTERS & SETTERS =====
+
+    public String getCiudad() {
+        return ciudad;
+    }
+
+    public void setCiudad(String ciudad) {
+        this.ciudad = ciudad;
+    }
 
     public Tipousuario getTipousuario() {
         return tipousuario;

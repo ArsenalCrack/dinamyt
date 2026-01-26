@@ -37,7 +37,7 @@ public class controlador_principal {
     private final CampeonatoRepository campeonatoRepository;
     private final Map<String, Usuario> usuariosPendientes = new HashMap<>();
 
-    public controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository,
+    private controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository,
             CampeonatoRepository campeonatoRepository) {
         this.usuarioRepository = usuarioRepository;
         this.academiaRepository = academiaRepository;
@@ -51,7 +51,7 @@ public class controlador_principal {
     }
 
     @GetMapping("/saludo") // 2. Ahora sí responde en "/saludo"
-    public Map<String, String> Prueba() {
+    private Map<String, String> Prueba() {
         // 3. Devolvemos un JSON estructurado, no un texto suelto
         Map<String, String> respuesta = new HashMap<>();
         respuesta.put("estado", "Online");
@@ -60,7 +60,7 @@ public class controlador_principal {
     }
 
     @PostMapping("/registro")
-    public ResponseEntity<?> Crear(@RequestBody Usuario usuario) {
+    private ResponseEntity<?> Crear(@RequestBody Usuario usuario) {
 
         String codigo = GenerarCodigo();
 
@@ -192,12 +192,9 @@ public class controlador_principal {
     }
 
     @PostMapping("/instructores")
-    private ResponseEntity<?> instructores(@RequestBody int idAcademia) {
-
+    private ResponseEntity<?> instructores(@RequestParam int academia,@RequestParam String idInstructor) {
         // AJUSTA "Instructor" según tu BD
-        List<Usuario> instructores = usuarioRepository.findByAcademia_IDacademiaAndTipousuario_IDTipo(idAcademia, 2);
-        System.out.println("id academia" + idAcademia);
-        System.out.println(instructores);
+        List<Usuario> instructores = usuarioRepository.findByAcademia_IDacademiaAndTipousuario_IDTipoAndIdDocumentoNot(academia, 2, Long.parseLong(idInstructor));
         if (instructores.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
         }
@@ -210,27 +207,33 @@ public class controlador_principal {
         if (datos.getCorreo() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
         }
+        if (datos.getModo() == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Instructorno no selecionado"));
+        }
         Usuario usuario = usuarioRepository.findByCorreo(datos.getCorreo());
         Usuario instructor = usuarioRepository.findById(Long.parseLong(datos.getModo()))
                 .orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
-        Academia academia = academiaRepository.findById(Integer.parseInt(datos.getModo()))
-                .orElseThrow(() -> new RuntimeException("Instructor no encontrado"));
+        Academia academia = academiaRepository.findById(Integer.parseInt(datos.getCodigo()))
+                .orElseThrow(() -> new RuntimeException("Academia no encontrado"));
         usuario.setCorreo(datos.getCorreo());
         usuario.setNumeroCelular(datos.getNumeroCelular());
         usuario.setCinturonRango(datos.getCinturonRango());
         usuario.setAcademia(academia);
         usuario.setInstructor(instructor);
+        usuario.setCiudad(datos.getCiudad());
         usuarioRepository.save(usuario);
         return ResponseEntity.ok(datos);
     }
 
     @PostMapping("/campeonatos")
-    public ResponseEntity<?> crear(@RequestBody Map<String, Object> datos) {
+    private ResponseEntity<?> crear(@RequestBody Map<String, Object> datos) {
         try {
             Campeonato campeonato = new Campeonato();
             campeonato.setVisible(true);
             campeonato.setNombre((String) datos.get("nombre"));
             campeonato.setUbicacion((String) datos.get("ubicacion"));
+            campeonato.setPais((String) datos.get("pais"));
+            campeonato.setCiudad((String) datos.get("ciudad"));
             campeonato.setAlcance((String) datos.get("alcance"));
 
             if (datos.get("numTatamis") != null) {
@@ -303,7 +306,7 @@ public class controlador_principal {
     }
 
     @GetMapping("/campeonatos/mis/{userId}")
-    public ResponseEntity<?> cargarCampeonatosMios(
+    private ResponseEntity<?> cargarCampeonatosMios(
             @PathVariable String userId) {
 
         List<Campeonato> campeonatos = campeonatoRepository.findByCreadoPor(Long.parseLong(userId));
@@ -313,7 +316,7 @@ public class controlador_principal {
     }
 
     @GetMapping("/campeonatos/{id}")
-    public ResponseEntity<?> cargarCampeonatoporid(
+    private ResponseEntity<?> cargarCampeonatoporid(
             @PathVariable String id) {
 
         Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(id)).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
@@ -322,7 +325,7 @@ public class controlador_principal {
         return ResponseEntity.ok(campeonato);
     }
     @PostMapping("/campeonatos/{id}/validar-codigo")
-    public ResponseEntity<?> validar_codigo_campeonato(@PathVariable int id,@RequestBody Map<String, Object> codigo) {
+    private ResponseEntity<?> validar_codigo_campeonato(@PathVariable int id,@RequestBody Map<String, Object> codigo) {
 
         Campeonato campeonato=campeonatoRepository.findById(id).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
         System.out.println(campeonato.getCodigo());
@@ -331,6 +334,14 @@ public class controlador_principal {
             return ResponseEntity.ok(campeonato);
         }
         return ResponseEntity.status(500).body(Map.of("message", "Codigo incorrecto"));
+    }
+
+    @DeleteMapping("/campeonatos/{id}")
+    private ResponseEntity<?> elimiar_campeonato(@PathVariable int id){
+        Campeonato campeonato= campeonatoRepository.findById(id).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+        campeonato.setVisible(false);
+        campeonatoRepository.save(campeonato);
+        return ResponseEntity.badRequest().body(Map.of("message", "No se a podido eliminar el campeonato"));
     }
 
 }

@@ -304,7 +304,7 @@ export class ProfileComponent implements OnDestroy {
       return;
     }
 
-    this.api.cargarinstructor(id).subscribe({
+    this.api.cargarinstructor(id,sessionStorage.getItem('idDocumento') || '').subscribe({
       next: (u: any[]) => {
         this.instructores = (u || [])
           .map(i => {

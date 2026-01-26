@@ -15,6 +15,8 @@ public class Campeonato {
 
     private String nombre;
     private String ubicacion;
+    private String pais;
+    private String ciudad;
     private String alcance;
 
     @Column(name = "num_tatamis")
@@ -56,8 +58,8 @@ public class Campeonato {
     @Column(name = "visible")
     boolean visible;
 
-    @Column(name = "secciones")
-    String secciones;
+    @Column(name = "secciones", columnDefinition = "TEXT")
+    private String secciones;
 
     //No perteneciente a la BD
     @Transient
@@ -69,6 +71,22 @@ public class Campeonato {
 
     // getters y setters
 
+
+    public String getPais() {
+        return pais;
+    }
+
+    public void setPais(String pais) {
+        this.pais = pais;
+    }
+
+    public String getCiudad() {
+        return ciudad;
+    }
+
+    public void setCiudad(String ciudad) {
+        this.ciudad = ciudad;
+    }
 
     public String getSecciones() {
         return secciones;

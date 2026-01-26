@@ -66,9 +66,10 @@ export class ApiService {
     return this.http.get<any[]>(`${this.apiUrl}/academias`);
   }
 
-  cargarinstructor(academia: any): Observable<any[]> {
-    return this.http.post<any[]>(`${this.apiUrl}/instructores`, academia);
+  cargarinstructor(academia: number, idInstructor: string): Observable<any[]> {
+    return this.http.post<any[]>(`${this.apiUrl}/instructores?academia=${academia}&idInstructor=${idInstructor}`,null);
   }
+
 
   getCinturones(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/cinturones`);
