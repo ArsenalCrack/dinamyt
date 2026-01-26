@@ -14,14 +14,30 @@
         </div>
     </header>
 
-    <div class="search-section">
+    <div class="search-section" id="inscriptions-search-anchor">
         <i class="fas fa-search"></i>
         <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
             placeholder="Buscar por nombre o documento...">
     </div>
 
+    <!-- Tabs Navigation -->
+    <nav class="tabs-nav">
+        <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setActiveTab('PENDIENTE')">
+            <i class="fas fa-clock"></i>
+            <span>Pendientes</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setActiveTab('ACEPTADO')">
+            <i class="fas fa-check-circle"></i>
+            <span>Aceptados</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setActiveTab('RECHAZADO')">
+            <i class="fas fa-times-circle"></i>
+            <span>Rechazados</span>
+        </button>
+    </nav>
+
     <div class="inscriptions-list">
-        <div class="inscription-card" *ngFor="let item of filteredInscriptions" [class.expanded]="item.expanded"
+        <div class="inscription-card" *ngFor="let item of paginatedInscriptions" [class.expanded]="item.expanded"
             [class.rejected]="item.estado === 'RECHAZADO'">
             <div class="card-summary" (click)="toggleDetails(item.id)">
                 <div class="user-avatar">
@@ -90,7 +106,14 @@
                     </button>
                 </div>
 
-                <div class="status-message" *ngIf="item.estado === 'ACEPTADO'">
+                <!-- Action for Accepted: Delete -->
+                <div class="actions-row" *ngIf="item.estado === 'ACEPTADO'">
+                    <button class="btn-delete" (click)="confirmDelete(item.id)">
+                        <i class="fas fa-trash"></i> Eliminar Competidor
+                    </button>
+                </div>
+
+                <div class="status-message" *ngIf="item.estado === 'ACEPTADO' && false">
                     <i class="fas fa-check-circle"></i> Competidor Aceptado
                 </div>
                 <div class="status-message rejected" *ngIf="item.estado === 'RECHAZADO'">
@@ -101,7 +124,18 @@
 
         <div class="empty-state" *ngIf="filteredInscriptions.length === 0">
             <i class="fas fa-clipboard-list"></i>
-            <p>No hay inscripciones pendientes que coincidan con tu búsqueda.</p>
+            <p>No hay inscripciones en esta sección.</p>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="pagination-controls" *ngIf="totalPages > 1">
+            <button class="btn-page nav" (click)="prevPage()" [disabled]="currentPage === 1">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <span class="page-count">{{ currentPage }} / {{ totalPages }}</span>
+            <button class="btn-page nav" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                <i class="fas fa-chevron-right"></i>
+            </button>
         </div>
     </div>
 </div>
@@ -120,6 +154,25 @@
             <button class="btn-cancel" (click)="closeRejectModal()">Cancelar</button>
             <button class="btn-confirm-reject" (click)="finalizeReject()">
                 Sí, Rechazar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Eliminación (Accepted) -->
+<div class="modal-overlay" *ngIf="deleteModalOpen">
+    <div class="modal-box">
+        <div class="modal-header">
+            <i class="fas fa-trash-alt warning-icon" style="color: #c0392b;"></i>
+            <h3>¿Eliminar Competidor?</h3>
+        </div>
+        <p class="modal-desc">
+            El competidor será eliminado de la lista de aceptados. Esta acción es irreversible.
+        </p>
+        <div class="modal-actions">
+            <button class="btn-cancel" (click)="closeDeleteModal()">Cancelar</button>
+            <button class="btn-confirm-delete" (click)="finalizeDelete()">
+                Sí, Eliminar
             </button>
         </div>
     </div>

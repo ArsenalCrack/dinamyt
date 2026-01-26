@@ -747,11 +747,19 @@
 
   .filters-mobile {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 12px;
   }
 
+  .filter-field {
+    flex: 1 1 140px;
+    /* Wraps if smaller than 140px, divides space otherwise */
+    min-width: 0;
+  }
+
   .filters-mobile app-custom-select {
+    width: 100%;
     max-width: 100%;
   }
 

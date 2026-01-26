@@ -148,8 +148,12 @@ export class MyChampionshipsComponent implements OnInit {
     this.router.navigate(['/campeonato/edit', id]);
   }
 
+  goToPanel(id: number): void {
+    this.router.navigate(['/campeonato/panel', id]);
+  }
+
   viewDetails(id: number): void {
-    this.router.navigate(['/campeonato/details', id]);
+    this.goToPanel(id);
   }
 
   deleteChampionship(id: number): void {

@@ -35,6 +35,8 @@ export class ChampionshipInscriptionsComponent implements OnInit {
   championshipId: string | null = null;
   searchQuery: string = '';
 
+  activeTab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
+
   // Mock Data
   inscriptions: Inscripcion[] = [
     {
@@ -69,7 +71,7 @@ export class ChampionshipInscriptionsComponent implements OnInit {
       instructor: 'Coach Pedro',
       correo: 'ana.lopez@email.com',
       telefono: '+57 310 987 6543',
-      estado: 'PENDIENTE'
+      estado: 'ACEPTADO'
     },
     {
       id: 3,
@@ -86,7 +88,41 @@ export class ChampionshipInscriptionsComponent implements OnInit {
       instructor: 'Profesor X',
       correo: 'juan.perez@email.com',
       telefono: '+57 320 111 2233',
+      estado: 'RECHAZADO'
+    },
+    {
+      id: 4,
+      nombre: 'Luisa Fernanda',
+      edad: 19,
+      sexo: 'Femenino',
+      peso: '50kg',
+      documentoId: '1022334455',
+      academia: 'Unity',
+      nacionalidad: 'Colombiana',
+      ciudad: 'Cali',
+      modalidades: ['Kata'],
+      cinturon: 'Azul',
+      instructor: 'Sensei Ryu',
+      correo: 'luisa.fer@email.com',
+      telefono: '+57 315 555 6677',
       estado: 'PENDIENTE'
+    },
+    {
+      id: 5,
+      nombre: 'Pedro Pascal',
+      edad: 35,
+      sexo: 'Masculino',
+      peso: '75kg',
+      documentoId: '1011223344',
+      academia: 'Beskar Gym',
+      nacionalidad: 'Chilena',
+      ciudad: 'Santiago',
+      modalidades: ['Combates'],
+      cinturon: 'Negro',
+      instructor: 'Mando',
+      correo: 'pedro.p@email.com',
+      telefono: '+56 9 1234 5678',
+      estado: 'ACEPTADO'
     }
   ];
 
@@ -96,8 +132,17 @@ export class ChampionshipInscriptionsComponent implements OnInit {
   rejectModalOpen = false;
   rejectTargetId: number | null = null;
 
+  deleteModalOpen = false;
+  deleteTargetId: number | null = null;
+
   toastVisible = false;
   toastMessage = '';
+
+  // Pagination
+  currentPage: number = 1;
+  itemsPerPage: number = 5;
+  totalPages: number = 1;
+  paginatedInscriptions: Inscripcion[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -109,6 +154,11 @@ export class ChampionshipInscriptionsComponent implements OnInit {
 
   ngOnInit(): void {
     this.championshipId = this.route.snapshot.paramMap.get('id');
+    this.applyFilters();
+  }
+
+  setActiveTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
+    this.activeTab = tab;
     this.applyFilters();
   }
 
@@ -126,20 +176,57 @@ export class ChampionshipInscriptionsComponent implements OnInit {
 
   applyFilters(): void {
     const q = this.searchQuery.toLowerCase().trim();
-    this.filteredInscriptions = this.inscriptions.filter(i =>
-      i.estado === 'PENDIENTE' && // Show only pending initially? User said "see all", but Accept/Reject implies pending management. Let's show all but maybe pending first. 
-      // Re-reading: "ver todas las inscripciones". But buttons only make sense for pending. 
-      // Let's filter text first.
-      (i.nombre.toLowerCase().includes(q) || i.documentoId.includes(q))
-    );
+    this.filteredInscriptions = this.inscriptions.filter(i => {
+      // Filter by tab status
+      const matchesTab = i.estado === this.activeTab;
+      // Filter by search
+      const matchesSearch = (i.nombre.toLowerCase().includes(q) || i.documentoId.includes(q));
+
+      return matchesTab && matchesSearch;
+    });
+
+    // Reset pagination
+    this.currentPage = 1;
+    this.updatePagination();
+  }
+
+  updatePagination(): void {
+    this.totalPages = Math.ceil(this.filteredInscriptions.length / this.itemsPerPage) || 1;
+    if (this.currentPage > this.totalPages) this.currentPage = 1;
+
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    this.paginatedInscriptions = this.filteredInscriptions.slice(startIndex, endIndex);
+  }
+
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.updatePagination();
+      this.scrollToTop();
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+      this.updatePagination();
+      this.scrollToTop();
+    }
+  }
+
+  private scrollToTop(): void {
+    const element = document.getElementById('inscriptions-search-anchor');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   acceptInscription(inscription: Inscripcion): void {
     // Mock logic
     inscription.estado = 'ACEPTADO';
     this.showToast(`El competidor ${inscription.nombre} ha sido aceptado con éxito.`);
-    // Optional: hide or move to bottom? 
-    // For now just update state.
+    this.applyFilters(); // Re-run filters to remove from pending view
   }
 
   confirmReject(id: number): void {
@@ -160,9 +247,35 @@ export class ChampionshipInscriptionsComponent implements OnInit {
       if (item) {
         item.estado = 'RECHAZADO';
         this.showToast(`La inscripción de ${item.nombre} ha sido rechazada.`);
+        this.applyFilters();
       }
     }
     this.closeRejectModal();
+  }
+
+  // Delete / Remove functionality for Accepted
+  confirmDelete(id: number): void {
+    this.deleteTargetId = id;
+    this.deleteModalOpen = true;
+    this.scrollLock.lock();
+  }
+
+  closeDeleteModal(): void {
+    this.deleteModalOpen = false;
+    this.deleteTargetId = null;
+    this.scrollLock.unlock();
+  }
+
+  finalizeDelete(): void {
+    if (this.deleteTargetId) {
+      // For mock purposes, we'll remove it from the list completely 
+      // OR set it back to rejected? User said "eliminar".
+      // Let's remove it from array for now.
+      this.inscriptions = this.inscriptions.filter(i => i.id !== this.deleteTargetId);
+      this.showToast('El competidor ha sido eliminado del campeonato.');
+      this.applyFilters();
+    }
+    this.closeDeleteModal();
   }
 
   showToast(msg: string): void {

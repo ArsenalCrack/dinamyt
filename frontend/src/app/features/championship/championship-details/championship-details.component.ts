@@ -25,6 +25,10 @@ interface Juez {
     id: number;
     nombre: string;
     avatar: string;
+    rol?: string; // 'Central', 'Mesa', etc.
+    categoria?: string; // 'A', 'B', 'Internacional'
+    pais?: string;
+    ciudad?: string;
 }
 
 @Component({
@@ -46,6 +50,12 @@ export class ChampionshipDetailsComponent implements OnInit {
 
     // Jueces
     jueces: Juez[] = [];
+    filteredJueces: Juez[] = [];
+    paginatedJueces: Juez[] = [];
+    juecesPage: number = 1;
+    juecesPerPage: number = 6;
+    totalJuecesPages: number = 1;
+    juezSearchQuery: string = '';
 
     // Participantes
     participantes: Participante[] = [];
@@ -100,9 +110,16 @@ export class ChampionshipDetailsComponent implements OnInit {
     showMobileActions = false;
 
     // Section states
+    activeTab: 'info' | 'participants' | 'results' = 'info';
     isInfoExpanded = true;
-    isJudgesExpanded = false;
+    isJudgesExpanded = true;
     isParticipantsExpanded = true;
+
+    // Pagination
+    currentPage: number = 1;
+    itemsPerPage: number = 10;
+    totalPages: number = 1;
+    paginatedParticipantes: Participante[] = [];
 
     constructor(
         private route: ActivatedRoute,
@@ -158,12 +175,19 @@ export class ChampionshipDetailsComponent implements OnInit {
                 this.api.getJuecesByCampeonato(this.id!).subscribe({
                     next: (jueces) => {
                         this.jueces = jueces || [];
+                        this.filterJueces();
                     },
                     error: () => {
                         this.jueces = [
-                            { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png' },
-                            { id: 102, nombre: 'María García', avatar: 'assets/avatar-2.png' }
+                            { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png', rol: 'Juez Central', categoria: 'A', pais: 'Colombia', ciudad: 'Bogotá' },
+                            { id: 102, nombre: 'María García', avatar: 'assets/avatar-2.png', rol: 'Juez de Mesa', categoria: 'B', pais: 'Brasil', ciudad: 'Sao Paulo' },
+                            { id: 103, nombre: 'Carlos Silva', avatar: 'assets/avatar-3.png', rol: 'Arbitro', categoria: 'Internacional', pais: 'México', ciudad: 'CDMX' },
+                            { id: 104, nombre: 'Ana Torres', avatar: 'assets/avatar-4.png', rol: 'Juez Lateral', categoria: 'C', pais: 'Colombia', ciudad: 'Cali' },
+                            { id: 105, nombre: 'Pedro Diaz', avatar: 'assets/avatar-5.png', rol: 'Juez Central', categoria: 'A', pais: 'Chile', ciudad: 'Santiago' },
+                            { id: 106, nombre: 'Lucia Mendez', avatar: 'assets/avatar-6.png', rol: 'Juez de Mesa', categoria: 'B', pais: 'Argentina', ciudad: 'Buenos Aires' },
+                            { id: 107, nombre: 'Roberto Gomez', avatar: 'assets/avatar-7.png', rol: 'Arbitro', categoria: 'A', pais: 'Colombia', ciudad: 'Medellín' }
                         ];
+                        this.filterJueces();
                     }
                 });
 
@@ -177,13 +201,20 @@ export class ChampionshipDetailsComponent implements OnInit {
     }
 
     private mockParticipantes(): void {
-        // Generate some ghost data
-        this.participantes = [
+        // Generate some ghost data - Generate MORE for pagination testing if needed or keep mock
+        // Helper to generate duplicates for volume
+        const base = [
             { id: 1, nombre: 'Carlos Ruiz', academia: 'Cobra Kai', modalidad: 'Combates', cinturon: 'Azul', peso: '70kg', edad: '22', genero: 'Masculino', pais: 'Colombia', ciudad: 'Bogotá' },
             { id: 2, nombre: 'Diana Prince', academia: 'Themyscira Gym', modalidad: 'Defensa personal', cinturon: 'Negro', peso: '60kg', edad: '28', genero: 'Femenino', pais: 'Colombia', ciudad: 'Medellín' },
             { id: 3, nombre: 'Miguel Diaz', academia: 'Eagle Fang', modalidad: 'Combates', cinturon: 'Blanco', peso: '65kg', edad: '17', genero: 'Masculino', pais: 'México', ciudad: 'Monterrey' },
             { id: 4, nombre: 'Samantha LaRusso', academia: 'Miyagi-Do', modalidad: 'Kata', cinturon: 'Verde', peso: '55kg', edad: '17', genero: 'Femenino', pais: 'EE.UU.', ciudad: 'Los Angeles' }
         ];
+
+        // Multiply data for demo purposes
+        this.participantes = [];
+        for (let i = 0; i < 50; i++) {
+            this.participantes.push(...base.map(p => ({ ...p, id: p.id + (i * 10), nombre: p.nombre + ' ' + (i + 1) })));
+        }
     }
 
     extractAvailableOptions(): void {
@@ -285,6 +316,68 @@ export class ChampionshipDetailsComponent implements OnInit {
 
         this.filteredParticipantes = result;
         this.filteredCount = result.length;
+
+        // Reset pagination
+        this.currentPage = 1;
+        this.updatePagination();
+    }
+
+    updatePagination(): void {
+        this.totalPages = Math.ceil(this.filteredParticipantes.length / this.itemsPerPage) || 1;
+        if (this.currentPage > this.totalPages) this.currentPage = 1;
+
+        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+        const endIndex = startIndex + this.itemsPerPage;
+        this.paginatedParticipantes = this.filteredParticipantes.slice(startIndex, endIndex);
+    }
+
+    nextPage(): void {
+        if (this.currentPage < this.totalPages) {
+            this.currentPage++;
+            this.updatePagination();
+            this.scrollToTopList();
+        }
+    }
+
+    prevPage(): void {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.updatePagination();
+            this.scrollToTopList();
+        }
+    }
+
+    goToPage(page: number): void {
+        if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
+            this.currentPage = page;
+            this.updatePagination();
+            this.scrollToTopList();
+        }
+    }
+
+    getPageNumbers(): number[] {
+        const total = this.totalPages;
+        const current = this.currentPage;
+        let start = Math.max(1, current - 2);
+        let end = Math.min(total, current + 2);
+
+        if (total <= 5) {
+            start = 1;
+            end = total;
+        }
+
+        const pages = [];
+        for (let i = start; i <= end; i++) {
+            pages.push(i);
+        }
+        return pages;
+    }
+
+    private scrollToTopList() {
+        const element = document.getElementById('participants-list-anchor');
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 
     sendInvitations(): void {
@@ -380,6 +473,14 @@ export class ChampionshipDetailsComponent implements OnInit {
         });
     }
 
+    toggleSection(section: 'info' | 'judges' | 'participants'): void {
+        switch (section) {
+            case 'info': this.isInfoExpanded = !this.isInfoExpanded; break;
+            case 'judges': this.isJudgesExpanded = !this.isJudgesExpanded; break;
+            case 'participants': this.isParticipantsExpanded = !this.isParticipantsExpanded; break;
+        }
+    }
+
     toggleMobileFilters(): void {
         this.showMobileFilters = !this.showMobileFilters;
     }
@@ -388,11 +489,57 @@ export class ChampionshipDetailsComponent implements OnInit {
         this.showMobileActions = !this.showMobileActions;
     }
 
-    toggleSection(section: 'info' | 'judges' | 'participants'): void {
-        switch (section) {
-            case 'info': this.isInfoExpanded = !this.isInfoExpanded; break;
-            case 'judges': this.isJudgesExpanded = !this.isJudgesExpanded; break;
-            case 'participants': this.isParticipantsExpanded = !this.isParticipantsExpanded; break;
+    setActiveTab(tab: 'info' | 'participants' | 'results'): void {
+        this.activeTab = tab;
+    }
+
+    filterJueces(): void {
+        const query = this.juezSearchQuery.toLowerCase().trim();
+        this.filteredJueces = this.jueces.filter(j =>
+            !query || j.nombre.toLowerCase().includes(query) ||
+            (j.rol && j.rol.toLowerCase().includes(query)) ||
+            (j.categoria && j.categoria.toLowerCase().includes(query))
+        );
+        this.juecesPage = 1;
+        this.updateJuecesPagination();
+    }
+
+    updateJuecesPagination(): void {
+        this.totalJuecesPages = Math.ceil(this.filteredJueces.length / this.juecesPerPage) || 1;
+        if (this.juecesPage > this.totalJuecesPages) this.juecesPage = 1;
+
+        const startIndex = (this.juecesPage - 1) * this.juecesPerPage;
+        const endIndex = startIndex + this.juecesPerPage;
+        this.paginatedJueces = this.filteredJueces.slice(startIndex, endIndex);
+    }
+
+    prevJuecesPage(): void {
+        if (this.juecesPage > 1) {
+            this.juecesPage--;
+            this.updateJuecesPagination();
+            this.scrollToJudgesSearch();
+        }
+    }
+
+    nextJuecesPage(): void {
+        if (this.juecesPage < this.totalJuecesPages) {
+            this.juecesPage++;
+            this.updateJuecesPagination();
+            this.scrollToJudgesSearch();
+        }
+    }
+
+    private scrollToJudgesSearch() {
+        // Prevent scroll on desktop (width > 768px)
+        if (window.innerWidth > 768) {
+            return;
+        }
+
+        // Scroll to the section header instead of the search box
+        const element = document.getElementById('judges-section-anchor');
+        if (element) {
+            // Use a slight offset if possible, otherwise scrollIntoView is standard
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }
 }

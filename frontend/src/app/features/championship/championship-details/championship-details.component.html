@@ -11,47 +11,7 @@
                         <h1 class="main-title" *ngIf="campeonato">{{ campeonato.nombre }}</h1>
                     </div>
 
-                    <div class="header-actions" *ngIf="campeonato && isOwner()">
-                        <!-- Primary Action Always Visible but icon only on mobile if space constrained, but Start is crucial so we keep full -->
-                        <button class="btn-start" *ngIf="campeonato.estadoReal === 'PLANIFICADO'"
-                            (click)="startChampionship()" title="Iniciar">
-                            <i class="fas fa-play"></i> <span class="d-none d-md-inline">Iniciar</span>
-                        </button>
 
-                        <!-- Desktop Actions -->
-                        <div class="desktop-actions d-none d-md-flex">
-                            <button class="btn-invitations" (click)="sendInvitations()">
-                                <i class="fas fa-paper-plane"></i> Invitaciones
-                            </button>
-                            <button class="btn-inscriptions" (click)="viewInscriptions()">
-                                <i class="fas fa-users-cog"></i> Inscripciones
-                            </button>
-                            <button class="btn-edit" *ngIf="campeonato.estadoReal !== 'TERMINADO'"
-                                (click)="editChampionship()">
-                                <i class="fas fa-edit"></i> Editar
-                            </button>
-                            <button class="btn-delete-header" (click)="deleteChampionship()">
-                                <i class="fas fa-trash"></i> Eliminar
-                            </button>
-                        </div>
-
-                        <!-- Mobile Actions (Icon Only) -->
-                        <div class="mobile-actions d-flex d-md-none">
-                            <button class="btn-icon-mobile" (click)="sendInvitations()" title="Invitaciones">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                            <button class="btn-icon-mobile" (click)="viewInscriptions()" title="Inscripciones">
-                                <i class="fas fa-users-cog"></i>
-                            </button>
-                            <button class="btn-icon-mobile" *ngIf="campeonato.estadoReal !== 'TERMINADO'"
-                                (click)="editChampionship()" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn-icon-mobile delete" (click)="deleteChampionship()" title="Eliminar">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </header>
@@ -88,236 +48,352 @@
         </div>
 
         <div *ngIf="!loading && campeonato" class="content">
-            <!-- Info General -->
-            <section class="section info-section">
-                <div class="section-header">
-                    <div class="header-main">
-                        <i class="fas fa-info-circle"></i>
-                        <h3>Información General</h3>
-                    </div>
 
-                    <div class="access-code-container" *ngIf="!campeonato.esPublico && isOwner()">
-                        <span class="code-label">CÓDIGO DE ACCESO:</span>
-                        <div class="code-wrapper" title="Haga clic para copiar">
-                            <span class="code-value">{{ campeonato.Codigo }}</span>
-                            <button class="btn-copy" (click)="copyCode()" [class.copied]="copied">
-                                <i class="fas" [ngClass]="copied ? 'fa-check' : 'fa-copy'"></i>
-                                <span>{{ copied ? '¡Copiado!' : 'Copiar' }}</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="label">Ubicación</span>
-                        <span class="value">
-                            <ng-container *ngIf="campeonato.ciudad">{{ campeonato.ciudad }}, </ng-container>
-                            <ng-container *ngIf="campeonato.pais">{{ campeonato.pais }} - </ng-container>
-                            {{ campeonato.ubicacion }}
-                        </span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Fecha Inicio</span>
-                        <span class="value">{{ campeonato.fechaInicio | date: 'fullDate' }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Fecha Fin</span>
-                        <span class="value">{{ campeonato.fecha_fin | date: 'fullDate' }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Alcance</span>
-                        <span class="value">{{ campeonato.alcance }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Tatamis</span>
-                        <span class="value">{{ campeonato.numTatamis }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Capacidad Máxima</span>
-                        <span class="value">{{ campeonato.maxParticipantes || 'Ilimitada' }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Estado</span>
-                        <span class="value badge-status"
-                            [ngClass]="(campeonato.estadoReal || 'PLANIFICADO').toLowerCase()">
-                            {{ (campeonato.estadoReal || 'Planificado') | titlecase }}
-                        </span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Privacidad</span>
-                        <span class="value badge-status" [ngClass]="campeonato.esPublico ? 'publico' : 'privado'">
-                            <i class="fas" [ngClass]="campeonato.esPublico ? 'fa-globe' : 'fa-lock'"></i>
-                            {{ campeonato.esPublico ? 'Público' : 'Privado' }}
-                        </span>
-                    </div>
-                </div>
-            </section>
+            <!-- Navbar Tabs -->
+            <nav class="details-tabs">
+                <button class="tab-btn" [class.active]="activeTab === 'info'" (click)="setActiveTab('info')">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Información</span>
+                </button>
+                <button class="tab-btn" [class.active]="activeTab === 'participants'"
+                    (click)="setActiveTab('participants')">
+                    <i class="fas fa-users"></i>
+                    <span>Inscritos</span>
+                </button>
+                <button class="tab-btn" [class.active]="activeTab === 'results'" (click)="setActiveTab('results')">
+                    <i class="fas fa-trophy"></i>
+                    <span>Resultados</span>
+                </button>
+            </nav>
 
-            <!-- Jueces -->
-            <section class="section judges-section" [class.collapsed]="!isJudgesExpanded">
-                <div class="section-header clickable" (click)="toggleSection('judges')">
-                    <div class="header-main">
-                        <i class="fas fa-gavel"></i>
-                        <h3>Panel de Jueces</h3>
-                        <span class="count">{{ jueces.length }}</span>
-                    </div>
-                    <i class="fas fa-chevron-down toggle-icon" [class.rotated]="isJudgesExpanded"></i>
-                </div>
+            <div class="tab-content">
 
-                <div class="judges-container" *ngIf="isJudgesExpanded">
-                    <div class="judges-grid compact-grid">
-                        <div class="judge-card" *ngFor="let juez of jueces">
-                            <div class="judge-avatar">
-                                <i class="fas fa-user"></i>
+                <!-- TAB: Información General -->
+                <ng-container *ngIf="activeTab === 'info'">
+                    <!-- Info General -->
+                    <section class="section info-section" [class.collapsed]="!isInfoExpanded">
+                        <div class="section-header clickable" (click)="toggleSection('info')">
+                            <div class="header-main">
+                                <i class="fas fa-info-circle"></i>
+                                <h3>Información General</h3>
                             </div>
-                            <div class="judge-info">
-                                <span class="judge-name">{{ juez.nombre }}</span>
-                                <span class="judge-role">Juez Certificado</span>
+
+                            <div class="access-code-container" *ngIf="!campeonato.esPublico && isOwner()"
+                                (click)="$event.stopPropagation()">
+                                <span class="code-label">CÓDIGO DE ACCESO:</span>
+                                <div class="code-wrapper" title="Haga clic para copiar">
+                                    <span class="code-value">{{ campeonato.Codigo }}</span>
+                                    <button class="btn-copy" (click)="copyCode(); $event.stopPropagation()"
+                                        [class.copied]="copied">
+                                        <i class="fas" [ngClass]="copied ? 'fa-check' : 'fa-copy'"></i>
+                                        <span>{{ copied ? '¡Copiado!' : 'Copiar' }}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <i class="fas fa-chevron-down toggle-icon" [class.rotated]="isInfoExpanded"></i>
+                        </div>
+                        <div class="info-grid" *ngIf="isInfoExpanded">
+                            <div class="info-item">
+                                <span class="label">Ubicación</span>
+                                <span class="value">
+                                    <ng-container *ngIf="campeonato.ciudad">{{ campeonato.ciudad }}, </ng-container>
+                                    <ng-container *ngIf="campeonato.pais">{{ campeonato.pais }} - </ng-container>
+                                    {{ campeonato.ubicacion }}
+                                </span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Fecha Inicio</span>
+                                <span class="value">{{ campeonato.fechaInicio | date: 'fullDate' }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Fecha Fin</span>
+                                <span class="value">{{ campeonato.fecha_fin | date: 'fullDate' }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Alcance</span>
+                                <span class="value">{{ campeonato.alcance }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Tatamis</span>
+                                <span class="value">{{ campeonato.numTatamis }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Capacidad Máxima</span>
+                                <span class="value">{{ campeonato.maxParticipantes || 'Ilimitada' }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Estado</span>
+                                <span class="value badge-status"
+                                    [ngClass]="(campeonato.estadoReal || 'PLANIFICADO').toLowerCase()">
+                                    {{ (campeonato.estadoReal || 'Planificado') | titlecase }}
+                                </span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Privacidad</span>
+                                <span class="value badge-status"
+                                    [ngClass]="campeonato.esPublico ? 'publico' : 'privado'">
+                                    <i class="fas" [ngClass]="campeonato.esPublico ? 'fa-globe' : 'fa-lock'"></i>
+                                    {{ campeonato.esPublico ? 'Público' : 'Privado' }}
+                                </span>
                             </div>
                         </div>
-                        <div *ngIf="jueces.length === 0" class="no-judges">
-                            Todavía no se han asignado jueces a este campeonato.
-                        </div>
-                    </div>
-                </div>
-            </section>
+                    </section>
 
-            <!-- Participantes -->
-            <section class="section participants-section" [class.collapsed]="!isParticipantsExpanded">
-                <div class="section-header clickable" (click)="toggleSection('participants')">
-                    <div class="header-main">
-                        <i class="fas fa-users"></i>
-                        <h3>Participantes Inscritos</h3>
-                        <span class="count">{{ participantes.length }}</span>
-                    </div>
-                    <i class="fas fa-chevron-down toggle-icon" [class.rotated]="isParticipantsExpanded"></i>
-                </div>
-
-                <div class="participants-content" *ngIf="isParticipantsExpanded">
-                    <div class="filters-bar detailed-filters">
-                        <div class="filter-row results-meta">
-                            <span class="results-count"><strong>{{ filteredCount }}</strong> resultados
-                                encontrados</span>
+                    <!-- Jueces -->
+                    <section class="section judges-section" id="judges-section-anchor"
+                        [class.collapsed]="!isJudgesExpanded">
+                        <div class="section-header clickable" (click)="toggleSection('judges')">
+                            <div class="header-main">
+                                <i class="fas fa-gavel"></i>
+                                <h3>Listado de Jueces</h3>
+                                <span class="count">{{ jueces.length }}</span>
+                            </div>
+                            <i class="fas fa-chevron-down toggle-icon" [class.rotated]="isJudgesExpanded"></i>
                         </div>
 
-                        <div class="filter-row primary-controls">
-                            <div class="search-box">
+                        <div class="judges-container" *ngIf="isJudgesExpanded">
+                            <div class="judges-search" id="judges-search-anchor" *ngIf="jueces.length > 0">
                                 <i class="fas fa-search"></i>
-                                <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
-                                    placeholder="Buscar por nombre, academia o ciudad...">
+                                <input type="text" [(ngModel)]="juezSearchQuery" (input)="filterJueces()"
+                                    placeholder="Buscar juez...">
                             </div>
 
-                            <div class="sort-box">
-                                <label>Ordenar por:</label>
-                                <app-custom-select [options]="sortOptions" [(ngModel)]="currentSort"
-                                    (ngModelChange)="applyFilters()"
-                                    [placeholder]="'Seleccionar...'"></app-custom-select>
-                            </div>
-
-                            <button type="button" class="btn-filter-toggle" (click)="toggleMobileFilters()"
-                                [class.active]="showMobileFilters">
-                                <i class="fas fa-sliders-h"></i>
-                            </button>
-                        </div>
-
-                        <div class="filter-row secondary-controls" [class.mobile-visible]="showMobileFilters">
-                            <div class="select-box">
-                                <label>Modalidad</label>
-                                <app-custom-select [options]="modalidadesOptions" [(ngModel)]="modalidadFilter"
-                                    (ngModelChange)="onModalityChange()"></app-custom-select>
-                            </div>
-
-                            <div class="select-box" *ngIf="filtersVisible.cinturon">
-                                <label>Cinturón</label>
-                                <app-custom-select [options]="cinturonesOptions" [(ngModel)]="cinturonFilter"
-                                    (ngModelChange)="applyFilters()"></app-custom-select>
-                            </div>
-
-                            <div class="select-box" *ngIf="filtersVisible.peso">
-                                <label>Peso</label>
-                                <app-custom-select [options]="pesosOptions" [(ngModel)]="pesoFilter"
-                                    (ngModelChange)="applyFilters()"></app-custom-select>
-                            </div>
-
-                            <div class="select-box" *ngIf="filtersVisible.edad">
-                                <label>Edad</label>
-                                <app-custom-select [options]="edadesOptions" [(ngModel)]="edadFilter"
-                                    (ngModelChange)="applyFilters()"></app-custom-select>
-                            </div>
-
-                            <div class="select-box" *ngIf="filtersVisible.genero">
-                                <label>Género</label>
-                                <app-custom-select [options]="generosOptions" [(ngModel)]="generoFilter"
-                                    (ngModelChange)="applyFilters()"></app-custom-select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="table-wrapper d-none d-md-block">
-                        <table class="participants-table">
-                            <thead>
-                                <tr>
-                                    <th>Nombre</th>
-                                    <th>Academia</th>
-                                    <th>Ubicación</th>
-                                    <th>Modalidad</th>
-                                    <th>Cinturón</th>
-                                    <th>Peso</th>
-                                    <th>Edad</th>
-                                    <th>Género</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr *ngFor="let p of filteredParticipantes">
-                                    <td class="name-cell">{{ p.nombre }}</td>
-                                    <td>{{ p.academia }}</td>
-                                    <td>
-                                        <div class="location-cell">
-                                            <span *ngIf="p.ciudad">{{ p.ciudad }}</span>
-                                            <small *ngIf="p.pais" class="country-label">{{ p.pais }}</small>
+                            <div class="judges-grid compact-grid">
+                                <div class="judge-card detailed" *ngFor="let juez of paginatedJueces">
+                                    <div class="judge-avatar">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    <div class="judge-info">
+                                        <div class="top-row">
+                                            <span class="judge-name">{{ juez.nombre }}</span>
+                                            <span class="judge-badge-cat" *ngIf="juez.categoria">Cat. {{ juez.categoria
+                                                }}</span>
                                         </div>
-                                    </td>
-                                    <td>{{ p.modalidad }}</td>
-                                    <td><span class="tag-belt">{{ p.cinturon }}</span></td>
-                                    <td>{{ p.peso }}</td>
-                                    <td>{{ p.edad }}</td>
-                                    <td>{{ p.genero }}</td>
-                                </tr>
-                                <tr *ngIf="filteredParticipantes.length === 0">
-                                    <td colspan="8" class="empty-table">
-                                        No se encontraron participantes con los filtros seleccionados.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                                        <span class="judge-role">{{ juez.rol || 'Juez Certificado' }}</span>
+                                        <span class="judge-loc" *ngIf="juez.ciudad || juez.pais">
+                                            <i class="fas fa-map-marker-alt"></i> {{ juez.ciudad }}{{ juez.pais ? ', ' +
+                                            juez.pais : '' }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div *ngIf="filteredJueces.length === 0" class="no-judges">
+                                    No se encontraron jueces.
+                                </div>
+                            </div>
 
-                    <!-- Mobile Card View -->
-                    <div class="mobile-participants-list d-md-none">
-                        <div class="participant-card" *ngFor="let p of filteredParticipantes">
-                            <div class="card-header-row">
-                                <span class="p-name">{{ p.nombre }}</span>
-                                <span class="tag-belt">{{ p.cinturon }}</span>
-                            </div>
-                            <div class="card-detail-row">
-                                <span class="p-academia"><i class="fas fa-university"></i> {{ p.academia }}</span>
-                            </div>
-                            <div class="card-tags-row">
-                                <span class="tag-info modal" *ngIf="p.modalidad !== 'TODAS'">{{ p.modalidad }}</span>
-                                <span class="tag-info">{{ p.peso }}</span>
-                                <span class="tag-info">{{ p.edad }} años</span>
-                                <span class="tag-info">{{ p.genero }}</span>
-                            </div>
-                            <div class="card-loc-row" *ngIf="p.ciudad || p.pais">
-                                <i class="fas fa-map-marker-alt"></i> {{ p.ciudad }} {{ p.pais ? ' - ' + p.pais : '' }}
+                            <!-- Judges Pagination -->
+                            <div class="pagination-controls mini" *ngIf="totalJuecesPages > 1">
+                                <button class="btn-page nav" (click)="prevJuecesPage()" [disabled]="juecesPage === 1">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <span class="page-count">{{ juecesPage }} / {{ totalJuecesPages }}</span>
+                                <button class="btn-page nav" (click)="nextJuecesPage()"
+                                    [disabled]="juecesPage === totalJuecesPages">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
                             </div>
                         </div>
-                        <div *ngIf="filteredParticipantes.length === 0" class="empty-table">
-                            No se encontraron participantes.
+                    </section>
+                </ng-container>
+
+                <!-- TAB: Participantes -->
+                <ng-container *ngIf="activeTab === 'participants'">
+                    <section class="section participants-section" id="participants-list-anchor">
+                        <div class="section-header">
+                            <div class="header-main">
+                                <i class="fas fa-users"></i>
+                                <h3>Participantes Inscritos</h3>
+                                <span class="count">{{ participantes.length }}</span>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            </section>
+
+                        <div class="participants-content">
+                            <!-- Filters (kept as is) -->
+                            <div class="filters-bar detailed-filters">
+                                <div class="filter-row results-meta">
+                                    <span class="results-count"><strong>{{ filteredCount }}</strong> resultados
+                                        encontrados</span>
+                                </div>
+
+                                <div class="filter-row primary-controls">
+                                    <div class="search-box">
+                                        <i class="fas fa-search"></i>
+                                        <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+                                            placeholder="Buscar por nombre, academia o ciudad...">
+                                    </div>
+
+                                    <div class="sort-box">
+                                        <label>Ordenar por:</label>
+                                        <app-custom-select [options]="sortOptions" [(ngModel)]="currentSort"
+                                            (ngModelChange)="applyFilters()"
+                                            [placeholder]="'Seleccionar...'"></app-custom-select>
+                                    </div>
+
+                                    <button type="button" class="btn-filter-toggle" (click)="toggleMobileFilters()"
+                                        [class.active]="showMobileFilters">
+                                        <i class="fas fa-sliders-h"></i>
+                                    </button>
+                                </div>
+
+                                <div class="filter-row secondary-controls" [class.mobile-visible]="showMobileFilters">
+                                    <!-- Mobile Sort -->
+                                    <div class="sort-box d-md-none">
+                                        <label>Ordenar por:</label>
+                                        <app-custom-select [options]="sortOptions" [(ngModel)]="currentSort"
+                                            (ngModelChange)="applyFilters()"
+                                            [placeholder]="'Seleccionar...'"></app-custom-select>
+                                    </div>
+
+                                    <div class="select-box">
+                                        <label>Modalidad</label>
+                                        <app-custom-select [options]="modalidadesOptions" [(ngModel)]="modalidadFilter"
+                                            (ngModelChange)="onModalityChange()"></app-custom-select>
+                                    </div>
+
+                                    <div class="select-box" *ngIf="filtersVisible.cinturon">
+                                        <label>Cinturón</label>
+                                        <app-custom-select [options]="cinturonesOptions" [(ngModel)]="cinturonFilter"
+                                            (ngModelChange)="applyFilters()"></app-custom-select>
+                                    </div>
+
+                                    <div class="select-box" *ngIf="filtersVisible.peso">
+                                        <label>Peso</label>
+                                        <app-custom-select [options]="pesosOptions" [(ngModel)]="pesoFilter"
+                                            (ngModelChange)="applyFilters()"></app-custom-select>
+                                    </div>
+
+                                    <div class="select-box" *ngIf="filtersVisible.edad">
+                                        <label>Edad</label>
+                                        <app-custom-select [options]="edadesOptions" [(ngModel)]="edadFilter"
+                                            (ngModelChange)="applyFilters()"></app-custom-select>
+                                    </div>
+
+                                    <div class="select-box" *ngIf="filtersVisible.genero">
+                                        <label>Género</label>
+                                        <app-custom-select [options]="generosOptions" [(ngModel)]="generoFilter"
+                                            (ngModelChange)="applyFilters()"></app-custom-select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Table View -->
+                            <div class="table-wrapper d-none d-md-block">
+                                <table class="participants-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Academia</th>
+                                            <th>Ubicación</th>
+                                            <th>Modalidad</th>
+                                            <th>Cinturón</th>
+                                            <th>Peso</th>
+                                            <th>Edad</th>
+                                            <th>Género</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Updated to paginatedParticipantes -->
+                                        <tr *ngFor="let p of paginatedParticipantes">
+                                            <td class="name-cell">{{ p.nombre }}</td>
+                                            <td>{{ p.academia }}</td>
+                                            <td>
+                                                <div class="location-cell">
+                                                    <span *ngIf="p.ciudad">{{ p.ciudad }}</span>
+                                                    <small *ngIf="p.pais" class="country-label">{{ p.pais }}</small>
+                                                </div>
+                                            </td>
+                                            <td>{{ p.modalidad }}</td>
+                                            <td><span class="tag-belt">{{ p.cinturon }}</span></td>
+                                            <td>{{ p.peso }}</td>
+                                            <td>{{ p.edad }}</td>
+                                            <td>{{ p.genero }}</td>
+                                        </tr>
+                                        <tr *ngIf="paginatedParticipantes.length === 0">
+                                            <td colspan="8" class="empty-table">
+                                                No se encontraron participantes con los filtros seleccionados.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Mobile Card View -->
+                            <div class="mobile-participants-list d-md-none">
+                                <!-- Updated to paginatedParticipantes -->
+                                <div class="participant-card" *ngFor="let p of paginatedParticipantes">
+                                    <div class="card-header-row">
+                                        <span class="p-name">{{ p.nombre }}</span>
+                                        <span class="tag-belt">{{ p.cinturon }}</span>
+                                    </div>
+                                    <div class="card-detail-row">
+                                        <span class="p-academia"><i class="fas fa-university"></i> {{ p.academia
+                                            }}</span>
+                                    </div>
+                                    <div class="card-tags-row">
+                                        <span class="tag-info modal" *ngIf="p.modalidad !== 'TODAS'">{{ p.modalidad
+                                            }}</span>
+                                        <span class="tag-info">{{ p.peso }}</span>
+                                        <span class="tag-info">{{ p.edad }} años</span>
+                                        <span class="tag-info">{{ p.genero }}</span>
+                                    </div>
+                                    <div class="card-loc-row" *ngIf="p.ciudad || p.pais">
+                                        <i class="fas fa-map-marker-alt"></i> {{ p.ciudad }} {{ p.pais ? ' - ' + p.pais
+                                        : '' }}
+                                    </div>
+                                </div>
+                                <div *ngIf="paginatedParticipantes.length === 0" class="empty-table">
+                                    No se encontraron participantes.
+                                </div>
+                            </div>
+
+                            <!-- Pagination Controls -->
+                            <div class="pagination-controls"
+                                *ngIf="totalPages > 1 && !loading && filteredParticipantes.length > 0">
+                                <button class="btn-page nav" (click)="prevPage()" [disabled]="currentPage === 1"
+                                    aria-label="Anterior">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+
+                                <div class="pages-list">
+                                    <button *ngFor="let p of getPageNumbers()" class="btn-page number"
+                                        [class.active]="p === currentPage" (click)="goToPage(p)">
+                                        {{ p }}
+                                    </button>
+                                </div>
+
+                                <button class="btn-page nav" (click)="nextPage()"
+                                    [disabled]="currentPage === totalPages" aria-label="Siguiente">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+
+                        </div>
+                    </section>
+                </ng-container>
+
+                <!-- TAB: Resultados -->
+                <ng-container *ngIf="activeTab === 'results'">
+                    <section class="section results-section">
+                        <div class="results-placeholder">
+                            <div class="illustration">
+                                <i class="fas fa-trophy"></i>
+                            </div>
+                            <h3>Resultados del Campeonato</h3>
+                            <p *ngIf="campeonato.estadoReal !== 'TERMINADO'">
+                                Los resultados y puntuaciones estarán disponibles cuando el campeonato finalice.
+                            </p>
+                            <p *ngIf="campeonato.estadoReal === 'TERMINADO'">
+                                Visualiza aquí las tablas de puntuación, ganadores y estadísticas del evento.
+                            </p>
+                            <!-- Future Placeholder for real results table -->
+                            <div class="btn-placeholder" *ngIf="campeonato.estadoReal === 'TERMINADO'">
+                                <button class="btn-primary">Ver Tabla General</button>
+                            </div>
+                        </div>
+                    </section>
+                </ng-container>
+            </div>
         </div>
     </div>
 </div>

@@ -64,6 +64,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    path: 'campeonato/panel/:id',
+    loadComponent: () => import('./features/championship/championship-panel/championship-panel.component').then(m => m.ChampionshipPanelComponent),
+    canActivate: [authGuard]
+  },
+  {
     path: 'campeonato/register/:id',
     loadComponent: () => import('./features/championship/championship-registration/championship-registration.component').then(m => m.ChampionshipRegistrationComponent),
     canActivate: [authGuard]
@@ -71,6 +76,11 @@ export const routes: Routes = [
   {
     path: 'campeonato/inscriptions/:id',
     loadComponent: () => import('./features/championship/championship-inscriptions/championship-inscriptions.component').then(m => m.ChampionshipInscriptionsComponent),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'campeonato/invitations/:id',
+    loadComponent: () => import('./features/championship/championship-invitations/championship-invitations.component').then(m => m.ChampionshipInvitationsComponent),
     canActivate: [authGuard]
   },
 
