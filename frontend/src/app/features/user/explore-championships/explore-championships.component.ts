@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { Location } from '@angular/common';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -18,6 +18,8 @@ interface CampeonatoApiItem {
   nombre: string;
   fechaInicio: string;
   ubicacion: string;
+  pais?: string;
+  ciudad?: string;
   alcance: string | null;
   creadoPor?: string | null;
   esPublico?: boolean;
@@ -34,6 +36,8 @@ interface CampeonatoUiItem {
   nombre: string;
   fechaInicio: string;
   ubicacion: string;
+  pais?: string;
+  ciudad?: string;
   alcance: string | null;
   creadoPor: string | null;
   creadoPorNombre: string | null;
@@ -55,12 +59,20 @@ interface CampeonatoUiItem {
   styleUrls: ['./explore-championships.component.scss']
 })
 export class ExploreChampionshipsComponent implements OnInit {
+  // ... (properties remain)
   searchQuery: string = '';
   championships: CampeonatoUiItem[] = [];
   filteredChampionships: CampeonatoUiItem[] = [];
+  paginatedChampionships: CampeonatoUiItem[] = [];
+
+  // Pagination
+  currentPage: number = 1;
+  itemsPerPage: number = 6;
+  totalPages: number = 1;
 
   statusFilter: 'TODOS' | EstadoCampeonato = 'TODOS';
   privacyFilter: PrivacidadFiltro = 'TODOS';
+  dateSort: 'MAS_RECIENTE' | 'MAS_ANTIGUO' = 'MAS_RECIENTE';
 
   readonly statusOptions: Array<{ value: 'TODOS' | EstadoCampeonato; label: string }> = [
     { value: 'TODOS', label: 'Todos' },
@@ -75,6 +87,11 @@ export class ExploreChampionshipsComponent implements OnInit {
     { value: 'PRIVADO', label: 'Privados' },
   ];
 
+  readonly dateSortOptions: Array<{ value: 'MAS_RECIENTE' | 'MAS_ANTIGUO'; label: string }> = [
+    { value: 'MAS_RECIENTE', label: 'Más reciente' },
+    { value: 'MAS_ANTIGUO', label: 'Más antiguo' },
+  ];
+
   cargando = false;
   errorMessage: string | null = null;
   showLoginModal: boolean = false;
@@ -83,7 +100,7 @@ export class ExploreChampionshipsComponent implements OnInit {
   accessCode = '';
   accessCodeError: string | null = null;
   accessCodeSubmitting = false;
-  private accessCodeChampionshipId: number | null = null;
+  accessCodeChampionshipId: number | null = null;
 
   // Delete modal
   showDeleteModal = false;
@@ -91,11 +108,14 @@ export class ExploreChampionshipsComponent implements OnInit {
   isDeleting = false;
 
   currentUserId: string | null = null;
+  showMobileFilters = false;
 
   private modalLocked = false;
+  private pendingRegistrationId: number | null = null;
 
   constructor(
     private router: Router,
+    private route: ActivatedRoute,
     private location: Location,
     private scrollLock: ScrollLockService,
     private auth: AuthService,
@@ -113,6 +133,10 @@ export class ExploreChampionshipsComponent implements OnInit {
     if (!this.modalLocked) return;
     this.scrollLock.unlock();
     this.modalLocked = false;
+  }
+
+  toggleMobileFilters(): void {
+    this.showMobileFilters = !this.showMobileFilters;
   }
 
   ngOnInit(): void {
@@ -171,13 +195,19 @@ export class ExploreChampionshipsComponent implements OnInit {
 
   private sortCampeonatos(list: CampeonatoUiItem[]): CampeonatoUiItem[] {
     return [...list].sort((a, b) => {
-      const ra = this.estadoRank(a.estadoKey);
-      const rb = this.estadoRank(b.estadoKey);
-      if (ra !== rb) return ra - rb;
-      // por fecha de inicio
       const da = new Date(a.fechaInicio).getTime();
       const db = new Date(b.fechaInicio).getTime();
-      if (!Number.isNaN(da) && !Number.isNaN(db) && da !== db) return da - db;
+
+      let dateComparison = 0;
+      if (!Number.isNaN(da) && !Number.isNaN(db)) {
+        if (this.dateSort === 'MAS_RECIENTE') {
+          dateComparison = db - da;
+        } else {
+          dateComparison = da - db;
+        }
+      }
+
+      if (dateComparison !== 0) return dateComparison;
       return (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
     });
   }
@@ -190,33 +220,57 @@ export class ExploreChampionshipsComponent implements OnInit {
       next: (res: any) => {
         const items: CampeonatoApiItem[] = Array.isArray(res) ? res : [];
         console.log('Campeonatos loaded:', items);
-        this.championships = this.sortCampeonatos(
-          items.map((c: any) => {
-            // Dynamic status calculation based on dates 
-            // (Ignoring the backend "BORRADOR" if dates exist)
-            const calculatedStatus = this.calculateStatus(c.fechaInicio, c.fecha_fin);
 
-            return {
-              id: c.idCampeonato ?? c.id,
-              nombre: c.nombre,
-              fechaInicio: c.fechaInicio,
-              ubicacion: c.ubicacion,
-              alcance: c.alcance ?? null,
-              creadoPor: c.creadoPor ? String(c.creadoPor) : null,
-              creadoPorNombre: c.creadoPorNombre || (c.nombreCreador ? `${c.nombreCreador}` : 'Desconocido'),
-              esPublico: c.esPublico !== false,
-              estadoKey: calculatedStatus,
-              estadoLabel: this.estadoLabel(calculatedStatus),
-              participantes: c.participantes ?? 0,
-              capacidad: c.maxParticipantes ?? c.capacidad,
-              cuposDisponibles: c.cuposDisponibles ?? null,
-              puedeInscribirse: !!c.puedeInscribirse,
-              isVisible: c.visibilidad !== false
-            };
-          })
-        );
+        // Map items
+        this.championships = items.map((c: any) => {
+          // Dynamic status calculation based on dates 
+          // (Ignoring the backend "BORRADOR" if dates exist)
+          const calculatedStatus = this.calculateStatus(c.fechaInicio, c.fecha_fin);
+
+          return {
+            id: c.idCampeonato ?? c.id,
+            nombre: c.nombre,
+            fechaInicio: c.fechaInicio,
+            ubicacion: c.ubicacion,
+            pais: c.pais || 'Colombia', // Ghost data
+            ciudad: c.ciudad || 'Bogotá', // Ghost data
+            alcance: c.alcance ?? null,
+            creadoPor: c.creadoPor ? String(c.creadoPor) : null,
+            creadoPorNombre: c.creadoPorNombre || (c.nombreCreador ? `${c.nombreCreador}` : 'Desconocido'),
+            esPublico: c.esPublico !== false,
+            estadoKey: calculatedStatus,
+            estadoLabel: this.estadoLabel(calculatedStatus),
+            participantes: c.participantes ?? 0,
+            capacidad: c.maxParticipantes ?? c.capacidad,
+            cuposDisponibles: c.cuposDisponibles ?? null,
+            puedeInscribirse: !!c.puedeInscribirse,
+            isVisible: c.visibilidad !== false
+          };
+        });
+
         this.applyFilters();
         this.cargando = false;
+
+        // Auto-action handling
+        const pendingId = this.route.snapshot.queryParams['autoRegister'];
+        if (pendingId) {
+          // Clear query param to avoid re-triggering on refresh
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { autoRegister: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true
+          });
+
+          const idNum = Number(pendingId);
+          if (!isNaN(idNum)) {
+            // We need to wait a tick or ensure view is ready? 
+            // Logic is safe to call immediately as data is loaded.
+            setTimeout(() => {
+              this.registerChampionship(idNum);
+            }, 100);
+          }
+        }
       },
       error: (err) => {
         console.error('Error loading championships:', err);
@@ -224,16 +278,19 @@ export class ExploreChampionshipsComponent implements OnInit {
         this.errorMessage = 'No pudimos cargar los campeonatos. Intenta de nuevo.';
         this.championships = [];
         this.filteredChampionships = [];
+        this.paginatedChampionships = [];
       }
     });
   }
 
   onSearchChange(): void {
+    this.currentPage = 1; // Reset to first page on new search
     this.applyFilters();
   }
 
   setStatusFilter(value: 'TODOS' | EstadoCampeonato): void {
     this.statusFilter = value;
+    this.currentPage = 1;
     this.applyFilters();
   }
 
@@ -245,6 +302,7 @@ export class ExploreChampionshipsComponent implements OnInit {
 
   setPrivacyFilter(value: PrivacidadFiltro): void {
     this.privacyFilter = value;
+    this.currentPage = 1;
     this.applyFilters();
   }
 
@@ -252,6 +310,23 @@ export class ExploreChampionshipsComponent implements OnInit {
     const allowed: PrivacidadFiltro[] = ['TODOS', 'PUBLICO', 'PRIVADO'];
     const next = allowed.includes(value as PrivacidadFiltro) ? (value as PrivacidadFiltro) : 'TODOS';
     this.setPrivacyFilter(next);
+  }
+
+  setDateSort(value: 'MAS_RECIENTE' | 'MAS_ANTIGUO'): void {
+    this.dateSort = value;
+    // Don't reset page? User requested "filters don't delete if page changes", 
+    // but usually sorting re-orders everything so page 2 might become page 1 content.
+    // "que los filtros no se borren si llego a cambiar de paginación" -> means pagination state shouldn't clear filters.
+    // BUT changing a filter usually rests pagination to 1 to avoid being out of bounds.
+    // I will reset page to 1 because the data order changes completely.
+    this.currentPage = 1;
+    this.applyFilters();
+  }
+
+  setDateSortFromUi(value: string): void {
+    const allowed: Array<'MAS_RECIENTE' | 'MAS_ANTIGUO'> = ['MAS_RECIENTE', 'MAS_ANTIGUO'];
+    const next = (allowed as string[]).includes(value) ? (value as any) : 'MAS_RECIENTE';
+    this.setDateSort(next);
   }
 
   private applyFilters(): void {
@@ -277,7 +352,71 @@ export class ExploreChampionshipsComponent implements OnInit {
       );
     }
 
+    // Sort
     this.filteredChampionships = this.sortCampeonatos(next);
+
+    // Calculate Pagination
+    this.totalPages = Math.ceil(this.filteredChampionships.length / this.itemsPerPage) || 1;
+
+    // Adjust current page if out of bounds (e.g. filter reduced results)
+    if (this.currentPage > this.totalPages) {
+      this.currentPage = 1;
+    }
+
+    this.updatePagination();
+  }
+
+  private updatePagination(): void {
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    this.paginatedChampionships = this.filteredChampionships.slice(startIndex, endIndex);
+  }
+
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.updatePagination();
+      // Optional: Scroll to top of grid?
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+      this.updatePagination();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
+      this.currentPage = page;
+      this.updatePagination();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  getPageNumbers(): number[] {
+    // Simple range for now, or could be smarter (1, ... 4, 5, 6 ... 10)
+    // Since max items is not huge likely, lets just show all or limit to 5
+    const total = this.totalPages;
+    const current = this.currentPage;
+
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+
+    // Complex pagination logic (1, 2, ..., 5, 6, 7, ..., 10) - simplified for 5 visible
+    // Let's just standard simple sliding window
+    let start = Math.max(1, current - 2);
+    let end = Math.min(total, current + 2);
+
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
   }
 
   goBack(): void {
@@ -290,6 +429,7 @@ export class ExploreChampionshipsComponent implements OnInit {
   registerChampionship(id: number): void {
     // Verificar si el usuario está logueado (criterio centralizado)
     if (!this.auth.isLoggedIn()) {
+      this.pendingRegistrationId = id;
       this.showLoginModal = true;
       this.lockModal();
       return;
@@ -394,6 +534,12 @@ export class ExploreChampionshipsComponent implements OnInit {
   goToLogin(): void {
     this.showLoginModal = false;
     this.unlockModal();
+
+    if (this.pendingRegistrationId) {
+      this.auth.redirectUrl = `/campeonatos?autoRegister=${this.pendingRegistrationId}`;
+      this.pendingRegistrationId = null;
+    }
+
     this.router.navigate(['/login']);
   }
 

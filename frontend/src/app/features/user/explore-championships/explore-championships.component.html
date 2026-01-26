@@ -13,10 +13,19 @@
     </header>
 
     <div class="search-section">
-      <input type="text" class="search-input" id="explore-championships-search" name="searchExploreChampionships"
-        aria-label="Buscar campeonatos" placeholder="Buscar por nombre o ubicación..." [(ngModel)]="searchQuery"
-        (input)="onSearchChange()">
-      <i class="fas fa-search search-icon" aria-hidden="true"></i>
+      <div class="search-row">
+        <div class="search-input-wrapper">
+          <input type="text" class="search-input" id="explore-championships-search" name="searchExploreChampionships"
+            aria-label="Buscar campeonatos" placeholder="Buscar por nombre o ubicación..." [(ngModel)]="searchQuery"
+            (input)="onSearchChange()">
+          <i class="fas fa-search search-icon" aria-hidden="true"></i>
+        </div>
+
+        <button type="button" class="btn-filter-toggle" (click)="toggleMobileFilters()"
+          [class.active]="showMobileFilters" aria-label="Mostrar filtros">
+          <i class="fas fa-sliders-h"></i>
+        </button>
+      </div>
     </div>
 
     <div class="filters-desktop" aria-label="Filtros">
@@ -53,9 +62,20 @@
           Privados
         </button>
       </div>
+
+      <div class="filters" role="group" aria-label="Ordenar por fecha">
+        <button type="button" class="filter-pill" [class.active]="dateSort === 'MAS_RECIENTE'"
+          (click)="setDateSort('MAS_RECIENTE')">
+          Más reciente
+        </button>
+        <button type="button" class="filter-pill" [class.active]="dateSort === 'MAS_ANTIGUO'"
+          (click)="setDateSort('MAS_ANTIGUO')">
+          Más antiguo
+        </button>
+      </div>
     </div>
 
-    <div class="filters-mobile">
+    <div class="filters-mobile" *ngIf="showMobileFilters">
       <div class="filter-field">
         <label class="filters-label" for="explore-championships-status">Estado</label>
         <app-custom-select [options]="statusOptions" placeholder="Selecciona un estado" ariaLabel="Filtrar por estado"
@@ -71,6 +91,13 @@
           (ngModelChange)="setPrivacyFilterFromUi($event)">
         </app-custom-select>
       </div>
+
+      <div class="filter-field">
+        <label class="filters-label" for="explore-championships-date">Orden</label>
+        <app-custom-select [options]="dateSortOptions" placeholder="Selecciona orden" ariaLabel="Ordenar por fecha"
+          inputId="explore-championships-date" [ngModel]="dateSort" (ngModelChange)="setDateSortFromUi($event)">
+        </app-custom-select>
+      </div>
     </div>
 
     <app-loading-spinner *ngIf="cargando" message="Cargando campeonatos..." [fixed]="false"></app-loading-spinner>
@@ -82,7 +109,7 @@
 
     <div class="championships-grid">
       <ng-container *ngIf="filteredChampionships.length > 0; else noResults">
-        <div class="championship-card" *ngFor="let championship of filteredChampionships">
+        <div class="championship-card" *ngFor="let championship of paginatedChampionships">
           <div class="card-header">
             <h3>{{ championship.nombre }}</h3>
 
@@ -105,7 +132,11 @@
             </div>
             <div class="info-row">
               <i class="fas fa-map-marker-alt"></i>
-              <span>{{ championship.ubicacion }}</span>
+              <span>
+                <ng-container *ngIf="championship.ciudad">{{ championship.ciudad }}, </ng-container>
+                <ng-container *ngIf="championship.pais">{{ championship.pais }} - </ng-container>
+                {{ championship.ubicacion }}
+              </span>
             </div>
             <div class="info-row">
               <i class="fas fa-tag"></i>
@@ -157,6 +188,24 @@
           <p>No encontramos campeonatos que coincidan con tu búsqueda.</p>
         </div>
       </ng-template>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="pagination-controls" *ngIf="totalPages > 1 && !cargando && filteredChampionships.length > 0">
+      <button class="btn-page nav" (click)="prevPage()" [disabled]="currentPage === 1" aria-label="Anterior">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+
+      <div class="pages-list">
+        <button *ngFor="let p of getPageNumbers()" class="btn-page number" [class.active]="p === currentPage"
+          (click)="goToPage(p)">
+          {{ p }}
+        </button>
+      </div>
+
+      <button class="btn-page nav" (click)="nextPage()" [disabled]="currentPage === totalPages" aria-label="Siguiente">
+        <i class="fas fa-chevron-right"></i>
+      </button>
     </div>
   </div>
 

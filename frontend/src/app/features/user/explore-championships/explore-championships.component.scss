@@ -92,6 +92,18 @@
   margin-bottom: 25px;
   margin-left: 0;
 
+  .search-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .search-input-wrapper {
+    position: relative;
+    flex: 1;
+    width: 100%;
+  }
+
   .search-input {
     width: 100%;
     max-width: 500px;
@@ -123,6 +135,12 @@
     color: #aaa;
     font-size: 0.9rem;
     pointer-events: none;
+  }
+
+  /* Filter Toggle Button (Desktop hidden typically, but we use it for mobile logic) */
+  .btn-filter-toggle {
+    display: none;
+    /* Hidden on desktop by default as we have pills */
   }
 }
 
@@ -660,8 +678,57 @@
     font-size: 1.5rem;
   }
 
-  .search-section .search-input {
-    max-width: 100%;
+  .search-section {
+    .search-input {
+      max-width: 100%;
+    }
+
+    .btn-filter-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      border: 1px solid var(--color-borde);
+      background: #fff;
+      color: var(--color-texto);
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+
+      &.active {
+        background: var(--color-acento);
+        color: #fff;
+        border-color: var(--color-acento);
+      }
+    }
+  }
+
+  /* Filters Mobile Container Animation */
+  .filters-mobile {
+    margin-top: -10px;
+    /* Pull closer to search */
+    padding: 15px;
+    background: #fff;
+    border: 1px solid var(--color-borde);
+    border-radius: 16px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    animation: slideDown 0.3s ease-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .championships-grid {
@@ -749,12 +816,13 @@
   }
 
   .btn-cancel {
-    background: #eee;
-    color: #444;
+    background: #444;
+    /* Dark Grey as requested */
+    color: #fff;
     border: none;
 
     &:hover {
-      background: #e0e0e0;
+      background: #2a2a2a;
     }
   }
 
@@ -776,6 +844,81 @@
     &:disabled {
       opacity: 0.7;
       cursor: not-allowed;
+    }
+  }
+}
+
+/* Pagination Controls */
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-borde);
+
+  .pages-list {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .btn-page {
+    border: none;
+    background: #fff;
+    color: var(--color-principal);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border: 1px solid var(--color-borde);
+
+    &:hover:not(:disabled) {
+      border-color: var(--color-acento);
+      color: var(--color-acento);
+      transform: translateY(-2px);
+    }
+
+    &.active {
+      background: var(--color-acento);
+      color: #fff;
+      border-color: var(--color-acento);
+      box-shadow: 0 4px 12px rgba(214, 0, 0, 0.25);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border-color: #eee;
+    }
+
+    &.nav {
+      width: auto;
+      padding: 0 15px;
+
+      i {
+        font-size: 0.9rem;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .pagination-controls {
+    gap: 10px;
+
+    .btn-page {
+      width: 36px;
+      height: 36px;
+      font-size: 0.9rem;
     }
   }
 }

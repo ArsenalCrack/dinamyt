@@ -10,6 +10,8 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { delayRemaining, DEFAULT_MIN_SPINNER_MS } from '../../../core/utils/spinner-timing.util';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+import { CountryAutocompleteComponent } from '../../../shared/components/country-autocomplete/country-autocomplete.component';
+import { LocationService } from '../../../core/services/location.service';
 
 interface CategoriaConfig {
   nombre: string;
@@ -37,7 +39,9 @@ interface CampeonatoForm {
   nombre: string;
   fechaInicio: string;
   fechaFin: string;
-  ubicacion: string;
+  pais: string;
+  ciudad: string;
+  ubicacion: string; // Direccion/Sede
   alcance: string;
   numTatamis: number;
   maxParticipantes: number | null;
@@ -55,7 +59,7 @@ interface PendingCategory {
 @Component({
   selector: 'app-create-championship',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, FlatpickrDateDirective, LoadingSpinnerComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, CountryAutocompleteComponent, FlatpickrDateDirective, LoadingSpinnerComponent],
   templateUrl: './create-championship.component.html',
   styleUrls: ['./create-championship.component.scss']
 })
@@ -76,6 +80,7 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
   maxParticipantesTooLow = false;
 
   showCreateConfirm = false;
+  showCancelConfirm = false;
   preflightMissing: string[] = [];
   preflightCanCreate = false;
 
@@ -83,11 +88,18 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
     nombre: '',
     fechaInicio: '',
     fechaFin: '',
+    pais: '',
+    ciudad: '',
     ubicacion: '',
     alcance: '',
     numTatamis: 1,
     maxParticipantes: null
   };
+
+  paisesList: string[] = [];
+  ciudadesList: string[] = [];
+  paisMaxLength = 50;
+  ciudadMaxLength = 50;
 
   alcanceOptions = [
     { value: 'Regional', label: 'Regional' },
@@ -307,10 +319,18 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
     private router: Router,
     private api: ApiService,
     private scrollLock: ScrollLockService,
-    private backNav: BackNavigationService
+    private backNav: BackNavigationService,
+    private locationService: LocationService
   ) { }
 
   ngOnInit(): void {
+    // Cargar países desde el servicio
+    this.paisesList = this.locationService.getAllCountries().map(c => c.name).sort();
+
+    if (this.paisesList.length > 0) {
+      this.paisMaxLength = this.paisesList.reduce((max, p) => Math.max(max, p.length), 0);
+    }
+
     // Inicializar 'pending' y banderas de categoría para todas las modalidades
     this.modalidades.forEach(mod => {
       this.ensurePending(mod);
@@ -319,6 +339,26 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
 
     this.loadDraft();
     this.draftIntervalId = window.setInterval(() => this.saveDraft(), 1000);
+  }
+
+  onPaisChange(): void {
+    this.campeonato.ciudad = '';
+    this.ciudadesList = [];
+
+    if (this.campeonato.pais) {
+      const country = this.locationService.getCountryByName(this.campeonato.pais);
+      if (country) {
+        this.ciudadesList = this.locationService.getCitiesByCountryCode(country.isoCode)
+          .map(c => c.name)
+          .sort();
+      }
+    }
+
+    if (this.ciudadesList.length > 0) {
+      this.ciudadMaxLength = this.ciudadesList.reduce((max, c) => Math.max(max, c.length), 0);
+    } else {
+      this.ciudadMaxLength = 50;
+    }
   }
 
   ngOnDestroy(): void {
@@ -1097,7 +1137,13 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
       ...(typeof esPublico === 'boolean' ? { esPublico } : {}),
       creadoPor: sessionStorage.getItem('idDocumento'),
       NombreCreador: sessionStorage.getItem("nombreC"),
-      modalidades: this.modalidades.map(({ expanded, ...rest }) => rest)
+      modalidades: this.modalidades.map(({ expanded, ...rest }) => ({
+        ...rest,
+        categorias: {
+          ...rest.categorias,
+          genero: rest.activa && rest.categorias.genero === null ? 'mixto' : rest.categorias.genero
+        }
+      }))
     };
 
     this.saving = true;
@@ -1135,6 +1181,26 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
       }
     });
   }
+
+  // --- Cancel Flow ---
+
+  onCancelClick(): void {
+    this.showCancelConfirm = true;
+    this.scrollLock.lock();
+  }
+
+  cancelCancelConfirm(): void {
+    this.showCancelConfirm = false;
+    this.scrollLock.unlock();
+  }
+
+  confirmCancel(): void {
+    this.showCancelConfirm = false;
+    this.scrollLock.unlock();
+    this.clearDraft();
+    this.router.navigate(['/dashboard']);
+  }
+
 
   goBack(): void {
     this.backNav.backOr({

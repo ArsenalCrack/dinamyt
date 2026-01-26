@@ -1,36 +1,18 @@
 <div class="country-autocomplete" [class.has-error]="hasError">
   <i class="fas fa-globe icon-left"></i>
 
-  <input
-    type="text"
-    class="search-input"
-    [(ngModel)]="searchText"
-    [attr.name]="name"
-    [attr.id]="inputId"
-    [attr.aria-label]="ariaLabel || placeholder || 'Buscar país'"
-    [placeholder]="placeholder"
-    [disabled]="disabled"
-    [class.input-error]="hasError"
-    (input)="onInputChange()"
-    (focus)="onInputFocus()"
-    (blur)="onInputBlur()"
-    (keydown)="onKeydown($event)"
-    autocomplete="off">
+  <input type="text" class="search-input" [(ngModel)]="searchText" [attr.name]="name" [attr.id]="inputId"
+    [attr.aria-label]="ariaLabel || placeholder || 'Buscar país'" [placeholder]="placeholder" [disabled]="disabled"
+    [class.input-error]="hasError" (input)="onInputChange()" (focus)="onInputFocus()" (blur)="onInputBlur()"
+    (keydown)="onKeydown($event)" [attr.maxlength]="maxLength" autocomplete="off">
 
-  <button
-    type="button"
-    class="arrow"
-    [class.arrow-open]="isOpen"
-    [attr.aria-label]="(isOpen ? 'Cerrar' : 'Abrir') + ' lista de países'"
-    (click)="toggleDropdown()"
+  <button type="button" class="arrow" [class.arrow-open]="isOpen"
+    [attr.aria-label]="(isOpen ? 'Cerrar' : 'Abrir') + ' lista de países'" (click)="toggleDropdown()"
     (mousedown)="$event.preventDefault()"></button>
 
   <ul class="options" *ngIf="isOpen && filteredPaises.length > 0" role="listbox" [ngStyle]="optionsStyle">
-    <li *ngFor="let pais of filteredPaises; let i = index"
-        role="option"
-        [class.focus]="i === focusedIndex"
-        (click)="selectPais(pais)"
-        (mouseenter)="focusedIndex = i">
+    <li *ngFor="let pais of filteredPaises; let i = index" role="option" [class.focus]="i === focusedIndex"
+      (click)="selectPais(pais)" (mouseenter)="focusedIndex = i">
       {{ pais }}
     </li>
   </ul>

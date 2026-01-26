@@ -26,7 +26,7 @@ export class FlatpickrDateDirective implements OnInit, OnChanges, OnDestroy {
     private readonly elementRef: ElementRef<HTMLInputElement>,
     private readonly zone: NgZone,
     private readonly ngControl: NgControl
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     const input = this.elementRef.nativeElement;
@@ -211,9 +211,38 @@ export class FlatpickrDateDirective implements OnInit, OnChanges, OnDestroy {
       }
     };
 
+    // Establecer fecha inicial si ya existe en el control o input
+    const initialValue = this.ngControl.value || input.value;
+    if (initialValue) {
+      options.defaultDate = initialValue;
+    }
+
     this.zone.runOutsideAngular(() => {
       this.instance = flatpickr(input, options);
     });
+
+    // Suscribirse a cambios externos del modelo (ej: cargar borrador)
+    if (this.ngControl.control) {
+      this.ngControl.control.valueChanges.subscribe((val) => {
+        // Evitar bucle infinito si el cambio vino del propio flatpickr
+        if (this.instance && val) {
+          const currentDate = this.instance.selectedDates[0];
+          const newDate = this.instance.parseDate(val, 'Y-m-d');
+          // Solo actualizar si la fecha es distinta (ignorando hora)
+          if (
+            !currentDate ||
+            (newDate &&
+              (currentDate.getFullYear() !== newDate.getFullYear() ||
+                currentDate.getMonth() !== newDate.getMonth() ||
+                currentDate.getDate() !== newDate.getDate()))
+          ) {
+            this.instance.setDate(val, false); // false = no disparar onChange
+          }
+        } else if (this.instance && !val) {
+          this.instance.clear(false);
+        }
+      });
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -257,7 +286,7 @@ export class FlatpickrDateDirective implements OnInit, OnChanges, OnDestroy {
     const container = instance.calendarContainer;
     const currentMonth = container.querySelector<HTMLElement>('.flatpickr-current-month');
     const nativeSelect = container.querySelector<HTMLSelectElement>('.flatpickr-monthDropdown-months');
-    if (!currentMonth || !nativeSelect) return () => {};
+    if (!currentMonth || !nativeSelect) return () => { };
 
     // Ocultar el select nativo
     nativeSelect.classList.add('dinamyt-fp-hidden-native');

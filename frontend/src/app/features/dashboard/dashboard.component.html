@@ -110,4 +110,28 @@
 
 
 
+
+  <!-- Modal de alerta de perfil incompleto (solo primera vez) -->
+  <div *ngIf="showProfileAlert" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="icon-container">
+          <i class="fas fa-clipboard-check welcome-icon"></i>
+        </div>
+        <div class="text-content">
+          <h3>¡Bienvenido!</h3>
+          <p>Para aprovechar al máximo la plataforma e inscribirte en campeonatos, por favor completa la información
+            faltante en tu perfil.</p>
+        </div>
+      </div>
+      <div class="modal-actions-alert">
+        <button class="btn-cancel" (click)="closeProfileAlert()">Más tarde</button>
+        <button class="btn-confirm-alert" (click)="goToProfile()">
+          <i class="fas fa-user-edit"></i>
+          Completar Perfil
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>

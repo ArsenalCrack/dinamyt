@@ -159,10 +159,22 @@ export class LoginComponent implements OnDestroy {
           }
         }
 
+        if (sessionStorage.getItem('justVerified')) {
+          sessionStorage.removeItem('justVerified');
+          sessionStorage.setItem('showWelcomeProfileAlert', 'true');
+        }
+
         await delayRemaining(startedAt);
         this.cargando = false;
         this.unlockScroll();
-        this.router.navigate(['/dashboard']);
+
+        const redirect = this.auth.redirectUrl;
+        if (redirect) {
+          this.auth.redirectUrl = null;
+          this.router.navigateByUrl(redirect);
+        } else {
+          this.router.navigate(['/dashboard']);
+        }
       },
       error: async (err: HttpErrorResponse) => {
         // Mantener scroll bloqueado mientras se muestre el modal

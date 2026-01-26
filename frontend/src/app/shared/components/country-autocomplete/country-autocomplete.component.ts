@@ -24,6 +24,7 @@ export class CountryAutocompleteComponent implements ControlValueAccessor, OnIni
   @Input() ariaLabel: string | null = null;
   @Input() disabled = false;
   @Input() hasError = false;
+  @Input() maxLength: number | null = null;
 
   searchText: string = '';
   isOpen = false;
@@ -33,10 +34,10 @@ export class CountryAutocompleteComponent implements ControlValueAccessor, OnIni
   optionsStyle: { [key: string]: any } = {};
   touched = false;
 
-  private onChange: (_: any) => void = () => {};
-  private onTouched: () => void = () => {};
+  private onChange: (_: any) => void = () => { };
+  private onTouched: () => void = () => { };
 
-  constructor(private host: ElementRef) {}
+  constructor(private host: ElementRef) { }
 
   ngOnInit(): void {
     if (!this.inputId) {

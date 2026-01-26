@@ -41,6 +41,11 @@ export class VerifyComponent implements OnInit, OnDestroy {
   private timerHandle: any = null;
   private expiredHandled: boolean = false;
   codeNotMatchModalVisible: boolean = false;
+  // Resend Cooldown
+  resendExpiresAt: number | null = null;
+  resendRemainingSeconds: number = 0;
+  private resendTimerHandle: any = null;
+
   ngOnInit() {
     this.emailUsuario = sessionStorage.getItem('emailParaVerificar') || '';
 
@@ -55,19 +60,31 @@ export class VerifyComponent implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
     }
 
-    // Cargar expiración desde sessionStorage (si existe)
+    // Cargar expiración del CÓDIGO desde sessionStorage
     const exp = sessionStorage.getItem('verifyExpiresAt');
     if (exp) {
       this.expiresAt = Number(exp);
     } else {
-      // Si no existe, crear una expiración por seguridad
       this.expiresAt = Date.now() + 5 * 60 * 1000;
       sessionStorage.setItem('verifyExpiresAt', String(this.expiresAt));
+    }
+
+    // Cargar cooldown de REENVÍO desde localStorage
+    const resendExp = localStorage.getItem('verifyResendExpiresAt');
+    if (resendExp) {
+      const t = Number(resendExp);
+      if (t > Date.now()) {
+        this.resendExpiresAt = t;
+        this.startResendTimer();
+      } else {
+        localStorage.removeItem('verifyResendExpiresAt');
+      }
     }
 
     this.startTimer();
   }
 
+  // ... (lockScroll/unlockScroll methods remain here, but I need to make sure I don't overwrite them or misplace braces)
   private lockScroll() {
     if (this.modalLocked) return;
     this.scrollLock.lock();
@@ -106,12 +123,17 @@ export class VerifyComponent implements OnInit, OnDestroy {
         this.exito = true;
         this.mensaje = 'Código verificado. Continuamos...';
 
+        // Limpiar cooldown al verificar exitosamente (opcional, pero limpio)
+        localStorage.removeItem('verifyResendExpiresAt');
+
         await delayRemaining(startedAt);
         this.unlockScroll();
         if (this.modo === 'register') {
           sessionStorage.removeItem('emailParaVerificar');
           sessionStorage.removeItem('verifyMode');
           sessionStorage.removeItem('verifyExpiresAt');
+          // Indicar que acaba de verificar para mostrar modal en dashboard
+          sessionStorage.setItem('justVerified', 'true');
           this.router.navigate(['/login']);
         } else if (this.modo === 'recovery') {
           sessionStorage.removeItem('verifyExpiresAt');
@@ -132,25 +154,32 @@ export class VerifyComponent implements OnInit, OnDestroy {
 
 
   reenviarCodigo() {
+    if (this.resendRemainingSeconds > 0) return;
+
     this.cargando = true;
-    this.loadingText = 'Verificando...';
+    this.loadingText = 'Enviando...';
     this.lockScroll();
     this.mensaje = '';
     const startedAt = Date.now();
 
     this.api.reenviarCodigo(this.emailUsuario).subscribe({
       next: async (res: any) => {
-        this.exito = true; // Usamos true para mostrar mensaje en verde
+        this.exito = true;
         this.mensaje = 'Enviamos un nuevo código. Revisa tu correo.';
-        // actualizar expiración a 5 minutos desde ahora
+
+        // 1. Resetear expiración del código (5 mins)
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
         this.expiresAt = expires;
-        // Resetear estado de expiración para permitir manejar nuevas caducidades
         this.expired = false;
         this.expiredHandled = false;
         this.expiredModalVisible = false;
         this.startTimer();
+
+        // 2. Iniciar cooldown de reenvío (1 min)
+        this.resendExpiresAt = Date.now() + 60 * 1000;
+        localStorage.setItem('verifyResendExpiresAt', String(this.resendExpiresAt));
+        this.startResendTimer();
 
         await delayRemaining(startedAt);
         this.cargando = false;
@@ -165,6 +194,27 @@ export class VerifyComponent implements OnInit, OnDestroy {
         this.unlockScroll();
       }
     });
+  }
+
+  startResendTimer() {
+    if (this.resendTimerHandle) clearInterval(this.resendTimerHandle);
+    this.updateResendRemaining();
+    this.resendTimerHandle = setInterval(() => this.updateResendRemaining(), 1000);
+  }
+
+  updateResendRemaining() {
+    if (!this.resendExpiresAt) {
+      this.resendRemainingSeconds = 0;
+      return;
+    }
+    const diff = Math.ceil((this.resendExpiresAt - Date.now()) / 1000);
+    this.resendRemainingSeconds = diff > 0 ? diff : 0;
+
+    if (this.resendRemainingSeconds <= 0 && this.resendTimerHandle) {
+      clearInterval(this.resendTimerHandle);
+      this.resendTimerHandle = null;
+      localStorage.removeItem('verifyResendExpiresAt');
+    }
   }
 
   startTimer() {
@@ -248,6 +298,10 @@ export class VerifyComponent implements OnInit, OnDestroy {
     if (this.timerHandle) {
       clearInterval(this.timerHandle);
       this.timerHandle = null;
+    }
+    if (this.resendTimerHandle) {
+      clearInterval(this.resendTimerHandle);
+      this.resendTimerHandle = null;
     }
   }
 }

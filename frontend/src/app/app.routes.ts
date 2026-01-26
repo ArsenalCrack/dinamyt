@@ -68,6 +68,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/championship/championship-registration/championship-registration.component').then(m => m.ChampionshipRegistrationComponent),
     canActivate: [authGuard]
   },
+  {
+    path: 'campeonato/inscriptions/:id',
+    loadComponent: () => import('./features/championship/championship-inscriptions/championship-inscriptions.component').then(m => m.ChampionshipInscriptionsComponent),
+    canActivate: [authGuard]
+  },
 
 
   {

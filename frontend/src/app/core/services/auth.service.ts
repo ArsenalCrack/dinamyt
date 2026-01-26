@@ -11,6 +11,16 @@ export class AuthService {
   readonly isLoggedIn$ = this._isLoggedIn.asObservable();
   readonly roles$ = this._roles.asObservable();
 
+  private _redirectUrl: string | null = null;
+
+  get redirectUrl(): string | null {
+    return this._redirectUrl;
+  }
+
+  set redirectUrl(url: string | null) {
+    this._redirectUrl = url;
+  }
+
   setLoggedIn(isLoggedIn: boolean, username: string | null = null) {
     if (this._isLoggedIn.value === isLoggedIn && (username === undefined || this._username.value === username)) {
       return;

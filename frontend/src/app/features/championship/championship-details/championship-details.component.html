@@ -5,18 +5,54 @@
                 <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
                     <i class="fas fa-arrow-left"></i>
                 </button>
-                <div class="header-text">
-                    <span class="context-label">Detalles del Campeonato</span>
-                    <h1 class="main-title" *ngIf="campeonato">{{ campeonato.nombre }}</h1>
+                <div class="header-content-col">
+                    <div class="header-text">
+                        <span class="context-label">Detalles del Campeonato</span>
+                        <h1 class="main-title" *ngIf="campeonato">{{ campeonato.nombre }}</h1>
+                    </div>
+
+                    <div class="header-actions" *ngIf="campeonato && isOwner()">
+                        <!-- Primary Action Always Visible but icon only on mobile if space constrained, but Start is crucial so we keep full -->
+                        <button class="btn-start" *ngIf="campeonato.estadoReal === 'PLANIFICADO'"
+                            (click)="startChampionship()" title="Iniciar">
+                            <i class="fas fa-play"></i> <span class="d-none d-md-inline">Iniciar</span>
+                        </button>
+
+                        <!-- Desktop Actions -->
+                        <div class="desktop-actions d-none d-md-flex">
+                            <button class="btn-invitations" (click)="sendInvitations()">
+                                <i class="fas fa-paper-plane"></i> Invitaciones
+                            </button>
+                            <button class="btn-inscriptions" (click)="viewInscriptions()">
+                                <i class="fas fa-users-cog"></i> Inscripciones
+                            </button>
+                            <button class="btn-edit" *ngIf="campeonato.estadoReal !== 'TERMINADO'"
+                                (click)="editChampionship()">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <button class="btn-delete-header" (click)="deleteChampionship()">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
+                        </div>
+
+                        <!-- Mobile Actions (Icon Only) -->
+                        <div class="mobile-actions d-flex d-md-none">
+                            <button class="btn-icon-mobile" (click)="sendInvitations()" title="Invitaciones">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button class="btn-icon-mobile" (click)="viewInscriptions()" title="Inscripciones">
+                                <i class="fas fa-users-cog"></i>
+                            </button>
+                            <button class="btn-icon-mobile" *ngIf="campeonato.estadoReal !== 'TERMINADO'"
+                                (click)="editChampionship()" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-icon-mobile delete" (click)="deleteChampionship()" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="header-actions" *ngIf="campeonato && isOwner()">
-                <button class="btn-edit" *ngIf="campeonato.estadoReal !== 'TERMINADO'" (click)="editChampionship()">
-                    <i class="fas fa-edit"></i> Editar
-                </button>
-                <button class="btn-delete-header" (click)="deleteChampionship()">
-                    <i class="fas fa-trash"></i> Eliminar
-                </button>
             </div>
         </header>
 
@@ -74,7 +110,11 @@
                 <div class="info-grid">
                     <div class="info-item">
                         <span class="label">Ubicación</span>
-                        <span class="value">{{ campeonato.ubicacion }}</span>
+                        <span class="value">
+                            <ng-container *ngIf="campeonato.ciudad">{{ campeonato.ciudad }}, </ng-container>
+                            <ng-container *ngIf="campeonato.pais">{{ campeonato.pais }} - </ng-container>
+                            {{ campeonato.ubicacion }}
+                        </span>
                     </div>
                     <div class="info-item">
                         <span class="label">Fecha Inicio</span>
@@ -114,115 +154,168 @@
             </section>
 
             <!-- Jueces -->
-            <section class="section judges-section">
-                <div class="section-header">
-                    <i class="fas fa-gavel"></i>
-                    <h3>Jueces del Campeonato</h3>
-                    <span class="count">{{ jueces.length }}</span>
+            <section class="section judges-section" [class.collapsed]="!isJudgesExpanded">
+                <div class="section-header clickable" (click)="toggleSection('judges')">
+                    <div class="header-main">
+                        <i class="fas fa-gavel"></i>
+                        <h3>Panel de Jueces</h3>
+                        <span class="count">{{ jueces.length }}</span>
+                    </div>
+                    <i class="fas fa-chevron-down toggle-icon" [class.rotated]="isJudgesExpanded"></i>
                 </div>
 
-                <div class="judges-grid">
-                    <div class="judge-card" *ngFor="let juez of jueces">
-                        <img [src]="juez.avatar || 'assets/default-avatar.png'" alt="Avatar">
-                        <div class="judge-info">
-                            <span class="judge-name">{{ juez.nombre }}</span>
-                            <span class="judge-role">Juez Certificado</span>
+                <div class="judges-container" *ngIf="isJudgesExpanded">
+                    <div class="judges-grid compact-grid">
+                        <div class="judge-card" *ngFor="let juez of jueces">
+                            <div class="judge-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="judge-info">
+                                <span class="judge-name">{{ juez.nombre }}</span>
+                                <span class="judge-role">Juez Certificado</span>
+                            </div>
                         </div>
-                    </div>
-                    <div *ngIf="jueces.length === 0" class="no-judges">
-                        Todavía no se han asignado jueces a este campeonato.
+                        <div *ngIf="jueces.length === 0" class="no-judges">
+                            Todavía no se han asignado jueces a este campeonato.
+                        </div>
                     </div>
                 </div>
             </section>
 
             <!-- Participantes -->
-            <section class="section participants-section">
-                <div class="section-header">
-                    <i class="fas fa-users"></i>
-                    <h3>Participantes Inscritos</h3>
-                    <span class="count">{{ participantes.length }}</span>
+            <section class="section participants-section" [class.collapsed]="!isParticipantsExpanded">
+                <div class="section-header clickable" (click)="toggleSection('participants')">
+                    <div class="header-main">
+                        <i class="fas fa-users"></i>
+                        <h3>Participantes Inscritos</h3>
+                        <span class="count">{{ participantes.length }}</span>
+                    </div>
+                    <i class="fas fa-chevron-down toggle-icon" [class.rotated]="isParticipantsExpanded"></i>
                 </div>
 
-                <div class="filters-bar">
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
-                            placeholder="Buscar por nombre o academia...">
+                <div class="participants-content" *ngIf="isParticipantsExpanded">
+                    <div class="filters-bar detailed-filters">
+                        <div class="filter-row results-meta">
+                            <span class="results-count"><strong>{{ filteredCount }}</strong> resultados
+                                encontrados</span>
+                        </div>
+
+                        <div class="filter-row primary-controls">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+                                    placeholder="Buscar por nombre, academia o ciudad...">
+                            </div>
+
+                            <div class="sort-box">
+                                <label>Ordenar por:</label>
+                                <app-custom-select [options]="sortOptions" [(ngModel)]="currentSort"
+                                    (ngModelChange)="applyFilters()"
+                                    [placeholder]="'Seleccionar...'"></app-custom-select>
+                            </div>
+
+                            <button type="button" class="btn-filter-toggle" (click)="toggleMobileFilters()"
+                                [class.active]="showMobileFilters">
+                                <i class="fas fa-sliders-h"></i>
+                            </button>
+                        </div>
+
+                        <div class="filter-row secondary-controls" [class.mobile-visible]="showMobileFilters">
+                            <div class="select-box">
+                                <label>Modalidad</label>
+                                <app-custom-select [options]="modalidadesOptions" [(ngModel)]="modalidadFilter"
+                                    (ngModelChange)="onModalityChange()"></app-custom-select>
+                            </div>
+
+                            <div class="select-box" *ngIf="filtersVisible.cinturon">
+                                <label>Cinturón</label>
+                                <app-custom-select [options]="cinturonesOptions" [(ngModel)]="cinturonFilter"
+                                    (ngModelChange)="applyFilters()"></app-custom-select>
+                            </div>
+
+                            <div class="select-box" *ngIf="filtersVisible.peso">
+                                <label>Peso</label>
+                                <app-custom-select [options]="pesosOptions" [(ngModel)]="pesoFilter"
+                                    (ngModelChange)="applyFilters()"></app-custom-select>
+                            </div>
+
+                            <div class="select-box" *ngIf="filtersVisible.edad">
+                                <label>Edad</label>
+                                <app-custom-select [options]="edadesOptions" [(ngModel)]="edadFilter"
+                                    (ngModelChange)="applyFilters()"></app-custom-select>
+                            </div>
+
+                            <div class="select-box" *ngIf="filtersVisible.genero">
+                                <label>Género</label>
+                                <app-custom-select [options]="generosOptions" [(ngModel)]="generoFilter"
+                                    (ngModelChange)="applyFilters()"></app-custom-select>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="filters-grid">
-                        <div class="select-box">
-                            <label>Modalidad</label>
-                            <select [(ngModel)]="modalidadFilter" (change)="applyFilters()">
-                                <option value="TODAS">Todas</option>
-                                <option *ngFor="let m of modalidades" [value]="m">{{ m }}</option>
-                            </select>
-                        </div>
+                    <div class="table-wrapper d-none d-md-block">
+                        <table class="participants-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Academia</th>
+                                    <th>Ubicación</th>
+                                    <th>Modalidad</th>
+                                    <th>Cinturón</th>
+                                    <th>Peso</th>
+                                    <th>Edad</th>
+                                    <th>Género</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let p of filteredParticipantes">
+                                    <td class="name-cell">{{ p.nombre }}</td>
+                                    <td>{{ p.academia }}</td>
+                                    <td>
+                                        <div class="location-cell">
+                                            <span *ngIf="p.ciudad">{{ p.ciudad }}</span>
+                                            <small *ngIf="p.pais" class="country-label">{{ p.pais }}</small>
+                                        </div>
+                                    </td>
+                                    <td>{{ p.modalidad }}</td>
+                                    <td><span class="tag-belt">{{ p.cinturon }}</span></td>
+                                    <td>{{ p.peso }}</td>
+                                    <td>{{ p.edad }}</td>
+                                    <td>{{ p.genero }}</td>
+                                </tr>
+                                <tr *ngIf="filteredParticipantes.length === 0">
+                                    <td colspan="8" class="empty-table">
+                                        No se encontraron participantes con los filtros seleccionados.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-                        <div class="select-box">
-                            <label>Cinturón</label>
-                            <select [(ngModel)]="cinturonFilter" (change)="applyFilters()">
-                                <option value="TODAS">Todos</option>
-                                <option *ngFor="let c of cinturones" [value]="c">{{ c }}</option>
-                            </select>
+                    <!-- Mobile Card View -->
+                    <div class="mobile-participants-list d-md-none">
+                        <div class="participant-card" *ngFor="let p of filteredParticipantes">
+                            <div class="card-header-row">
+                                <span class="p-name">{{ p.nombre }}</span>
+                                <span class="tag-belt">{{ p.cinturon }}</span>
+                            </div>
+                            <div class="card-detail-row">
+                                <span class="p-academia"><i class="fas fa-university"></i> {{ p.academia }}</span>
+                            </div>
+                            <div class="card-tags-row">
+                                <span class="tag-info modal" *ngIf="p.modalidad !== 'TODAS'">{{ p.modalidad }}</span>
+                                <span class="tag-info">{{ p.peso }}</span>
+                                <span class="tag-info">{{ p.edad }} años</span>
+                                <span class="tag-info">{{ p.genero }}</span>
+                            </div>
+                            <div class="card-loc-row" *ngIf="p.ciudad || p.pais">
+                                <i class="fas fa-map-marker-alt"></i> {{ p.ciudad }} {{ p.pais ? ' - ' + p.pais : '' }}
+                            </div>
                         </div>
-
-                        <div class="select-box">
-                            <label>Peso</label>
-                            <select [(ngModel)]="pesoFilter" (change)="applyFilters()">
-                                <option value="TODAS">Todos</option>
-                                <option *ngFor="let p of pesos" [value]="p">{{ p }}</option>
-                            </select>
-                        </div>
-
-                        <div class="select-box">
-                            <label>Edad</label>
-                            <select [(ngModel)]="edadFilter" (change)="applyFilters()">
-                                <option value="TODAS">Todas</option>
-                                <option *ngFor="let e of edades" [value]="e">{{ e }}</option>
-                            </select>
-                        </div>
-
-                        <div class="select-box">
-                            <label>Género</label>
-                            <select [(ngModel)]="generoFilter" (change)="applyFilters()">
-                                <option value="TODAS">Todos</option>
-                                <option *ngFor="let g of generos" [value]="g">{{ g }}</option>
-                            </select>
+                        <div *ngIf="filteredParticipantes.length === 0" class="empty-table">
+                            No se encontraron participantes.
                         </div>
                     </div>
-                </div>
-
-                <div class="table-wrapper">
-                    <table class="participants-table">
-                        <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Academia</th>
-                                <th>Modalidad</th>
-                                <th>Cinturón</th>
-                                <th>Peso</th>
-                                <th>Edad</th>
-                                <th>Género</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr *ngFor="let p of filteredParticipantes">
-                                <td class="name-cell">{{ p.nombre }}</td>
-                                <td>{{ p.academia }}</td>
-                                <td>{{ p.modalidad }}</td>
-                                <td><span class="tag-belt">{{ p.cinturon }}</span></td>
-                                <td>{{ p.peso }}</td>
-                                <td>{{ p.edad }}</td>
-                                <td>{{ p.genero }}</td>
-                            </tr>
-                            <tr *ngIf="filteredParticipantes.length === 0">
-                                <td colspan="7" class="empty-table">
-                                    No se encontraron participantes con los filtros seleccionados.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
                 </div>
             </section>
         </div>

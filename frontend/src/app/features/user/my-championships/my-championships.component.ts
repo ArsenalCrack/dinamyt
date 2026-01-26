@@ -60,6 +60,8 @@ export class MyChampionshipsComponent implements OnInit {
             fecha: c.fechaInicio,
             fechaFin: c.fecha_fin,
             ubicacion: c.ubicacion,
+            pais: c.pais || 'Colombia', // Ghost data
+            ciudad: c.ciudad || 'Bogotá', // Ghost data
             participantes: c.participantes ?? 0,
             estado: status,
             estadoLabel: this.getEstadoLabel(status),
@@ -127,7 +129,9 @@ export class MyChampionshipsComponent implements OnInit {
       const query = this.searchQuery.toLowerCase();
       this.filteredChampionships = this.championships.filter(c =>
         c.nombre.toLowerCase().includes(query) ||
-        c.ubicacion.toLowerCase().includes(query)
+        (c.ubicacion || '').toLowerCase().includes(query) ||
+        (c.ciudad || '').toLowerCase().includes(query) ||
+        (c.pais || '').toLowerCase().includes(query)
       );
     }
   }

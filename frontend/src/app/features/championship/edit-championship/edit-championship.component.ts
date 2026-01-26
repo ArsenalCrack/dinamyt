@@ -10,9 +10,13 @@ import { BackNavigationService } from '../../../core/services/back-navigation.se
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 
-// Reusing types from create component (conceptually)
+// Reusing types from create component
+import { CountryAutocompleteComponent } from '../../../shared/components/country-autocomplete/country-autocomplete.component';
+import { LocationService } from '../../../core/services/location.service';
+
+// Reusing types from create component
 interface CategoriaConfig {
-    nombre: string;
+    nombre?: string; // Optional in edit context if we rely on values
     activa: boolean;
     tipo: 'individual' | 'rango';
     valor?: string;
@@ -36,7 +40,7 @@ interface ModalidadConfig {
 @Component({
     selector: 'app-edit-championship',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, FlatpickrDateDirective, LoadingSpinnerComponent],
+    imports: [CommonModule, FormsModule, RouterModule, CustomSelectComponent, CountryAutocompleteComponent, FlatpickrDateDirective, LoadingSpinnerComponent],
     templateUrl: './edit-championship.component.html',
     styleUrls: ['./edit-championship.component.scss']
 })
@@ -51,6 +55,8 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         nombre: '',
         fechaInicio: '',
         fechaFin: '',
+        pais: '',
+        ciudad: '',
         ubicacion: '',
         alcance: 'Nacional',
         numTatamis: 1,
@@ -85,20 +91,6 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         { value: 'Verde', label: 'Verde' }, { value: 'Azul', label: 'Azul' }, { value: 'Rojo', label: 'Rojo' }, { value: 'Marrón', label: 'Marrón' }, { value: 'Negro', label: 'Negro' }
     ];
 
-    // Judge Management
-    jueces: any[] = [];
-    judgeSearchQuery: string = '';
-    searchingJudge = false;
-    judgeSearchError: string | null = null;
-    foundJudge: any = null;
-
-    // User/Athlete Invitation Validation
-    invitedUsers: any[] = [];
-    userSearchQuery: string = '';
-    searchingUser = false;
-    userSearchError: string | null = null;
-    foundUser: any = null;
-
     // Logic flags for UI
     categoryEnabled: Record<string, Record<string, boolean>> = {};
     pending: Record<string, any> = {};
@@ -106,15 +98,24 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
 
     // Date Logic
     minDate: string = '';
-    fechaInicioErrorMsg: string | null = null;
-    fechaFinErrorMsg: string | null = null;
+
+    // Validation flags for inputs
+    maxParticipantesLimitReached = false;
+    maxParticipantesNonNumeric = false;
+    maxParticipantesTooLow = false;
+
+    paisesList: string[] = [];
+    ciudadesList: string[] = [];
+    paisMaxLength = 50;
+    ciudadMaxLength = 50;
 
     constructor(
         private route: ActivatedRoute,
         private api: ApiService,
         private router: Router,
         private backNav: BackNavigationService,
-        private scrollLock: ScrollLockService
+        private scrollLock: ScrollLockService,
+        private locationService: LocationService
     ) {
         this.minDate = this.getTodayDate();
     }
@@ -127,37 +128,44 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         return `${yyyy}-${mm}-${dd}`;
     }
 
-    private parseDate(value: string): Date | null {
-        const v = (value || '').trim();
-        if (!v) return null;
-        const dt = new Date(`${v}T00:00:00`);
-        return Number.isNaN(dt.getTime()) ? null : dt;
+    onFechaInicioChange(): void {
+        // No auto-clear end date unless strictly invalid, but UI binding helps.
+        // We can ensure minDate for end date updates dynamically in template.
     }
 
-    onFechaInicioChange(): void {
-        this.fechaInicioErrorMsg = null;
-        this.fechaFinErrorMsg = null;
-        // If start date changes, check if end date is now invalid (before into new start)
-        const start = this.parseDate(this.campeonato.fechaInicio);
-        const end = this.parseDate(this.campeonato.fechaFin);
+    onPaisChange(): void {
+        this.campeonato.ciudad = '';
+        this.ciudadesList = [];
+        if (this.campeonato.pais) {
+            const country = this.locationService.getCountryByName(this.campeonato.pais);
+            if (country) {
+                this.ciudadesList = this.locationService.getCitiesByCountryCode(country.isoCode)
+                    .map(c => c.name)
+                    .sort();
+            }
+        }
 
-        if (start && end && end < start) {
-            // Clear end date or warn? Usually clear or warn. 
-            // "que fecha fin se actualice y acomode mostrando los días habiles apartir de la fecha de inicio"
-            // The [fpMinDate] binding in HTML will handle the pickle constraints, 
-            // but we should validate current value too.
-            this.campeonato.fechaFin = '';
+        if (this.ciudadesList.length > 0) {
+            this.ciudadMaxLength = this.ciudadesList.reduce((max, c) => Math.max(max, c.length), 0);
+        } else {
+            this.ciudadMaxLength = 50;
         }
     }
 
     onFechaFinChange(): void {
-        this.fechaInicioErrorMsg = null;
-        this.fechaFinErrorMsg = null;
+        // Placeholder
     }
 
     ngOnInit(): void {
         this.id = this.route.snapshot.paramMap.get('id');
         this.initFlags();
+
+        this.paisesList = this.locationService.getAllCountries().map(c => c.name).sort();
+
+        if (this.paisesList.length > 0) {
+            this.paisMaxLength = this.paisesList.reduce((max, p) => Math.max(max, p.length), 0);
+        }
+
         if (this.id) {
             this.loadData();
         }
@@ -172,8 +180,8 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
             this.categoryEnabled[m.id] = { cinturon: false, edad: false, peso: false };
             this.pending[m.id] = {
                 cinturon: { tipo: 'individual', valor: '', desde: '', hasta: '' },
-                edad: { tipo: 'rango', valor: '', desde: '', hasta: '' },
-                peso: { tipo: 'rango', valor: '', desde: '', hasta: '' }
+                edad: { tipo: 'individual', valor: '', desde: '', hasta: '' },
+                peso: { tipo: 'individual', valor: '', desde: '', hasta: '' }
             };
         });
     }
@@ -183,6 +191,17 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         this.api.getCampeonatoById(this.id!).subscribe({
             next: (data) => {
                 this.campeonato = data;
+
+                if (this.campeonato.pais) {
+                    const country = this.locationService.getCountryByName(this.campeonato.pais);
+                    if (country) {
+                        this.ciudadesList = this.locationService.getCitiesByCountryCode(country.isoCode)
+                            .map(c => c.name)
+                            .sort();
+                        this.ciudadMaxLength = this.ciudadesList.length > 0 ? this.ciudadesList.reduce((max, c) => Math.max(max, c.length), 0) : 50;
+                    }
+                }
+
                 this.privacy = data.esPublico ? 'PUBLICO' : 'PRIVADO';
 
                 // Parse modalities
@@ -194,7 +213,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
 
                     if (Array.isArray(parsedMods)) {
                         parsedMods.forEach(backendMod => {
-                            const localMod = this.modalidades.find(m => m.id === backendMod.id || m.nombre === backendMod.nombre);
+                            const localMod = this.modalidades.find(m => m.id === backendMod.id);
                             if (localMod) {
                                 localMod.activa = true;
                                 localMod.expanded = true;
@@ -211,18 +230,6 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                         });
                     }
                 }
-
-                // Fetch judges
-                this.api.getJuecesByCampeonato(this.id!).subscribe({
-                    next: (jueces) => {
-                        this.jueces = jueces || [];
-                    },
-                    error: () => {
-                        // Fallback for demo
-                        this.jueces = [];
-                    }
-                });
-
                 this.loading = false;
             },
             error: () => {
@@ -236,12 +243,6 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                     numTatamis: 4,
                     maxParticipantes: 500
                 };
-
-                // Demo judges
-                this.jueces = [
-                    { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png' }
-                ];
-
                 this.loading = false;
             }
         });
@@ -264,9 +265,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                     id: m.id,
                     nombre: m.nombre,
                     categorias: m.categorias
-                })),
-                jueces: this.jueces,
-                invitedUsers: this.invitedUsers
+                }))
             };
 
             await this.api.updateCampeonato(this.id!, payload).toPromise();
@@ -289,7 +288,6 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
     // --- Config Logic ---
 
     toggleModalidad(mod: ModalidadConfig): void {
-        // Toggle expansion independently of activation if active
         if (mod.activa) {
             mod.expanded = !mod.expanded;
         }
@@ -298,6 +296,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
     onModalidadChange(mod: ModalidadConfig): void {
         if (!mod.activa) {
             mod.expanded = false;
+            // Reset state when deactivated if desired, or keep it. 
         } else {
             mod.expanded = true;
         }
@@ -313,35 +312,46 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
             // Reset pending state to clean
             const p = this.pending[mod.id][key];
             p.valor = ''; p.desde = ''; p.hasta = '';
+        } else {
+            // Optional: Clear categories if disabled? usually Create component does this.
+            // (mod.categorias as any)[key] = []; 
         }
     }
 
-    addCategoryFromPending(mod: ModalidadConfig, key: string, forcedType?: 'individual' | 'rango'): void {
+    setPendingType(mod: ModalidadConfig, key: string, type: 'individual' | 'rango'): void {
+        this.pending[mod.id][key].tipo = type;
+        // clear values
+        this.pending[mod.id][key].valor = '';
+        this.pending[mod.id][key].desde = '';
+        this.pending[mod.id][key].hasta = '';
+    }
+
+    addCategoryFromPending(mod: ModalidadConfig, key: string): void {
         const p = this.pending[mod.id][key];
-        // If type is forced by the button (like 'Añadir Rango'), use it, otherwise use pending type
-        const type = forcedType || p.tipo || 'individual';
+        const type = p.tipo || 'individual';
 
         const cat: CategoriaConfig = {
-            nombre: '',
             activa: true,
             tipo: type,
-            valor: p.valor,
-            desde: p.desde,
-            hasta: p.hasta
+            valor: type === 'individual' ? p.valor : undefined,
+            desde: type === 'rango' ? p.desde : undefined,
+            hasta: type === 'rango' ? p.hasta : undefined
         };
 
-        // Validation
-        if (key === 'cinturon') {
-            if (!p.valor) return; // Cant add empty belt
-            cat.tipo = 'individual'; // Belt handled as individual in this simplified UI
-            cat.valor = p.valor;
-        } else {
-            // Edad / Peso (Rango)
-            if (!p.desde || !p.hasta) return;
-            if (parseFloat(p.desde) >= parseFloat(p.hasta)) {
-                // Invalid range
-                alert('El valor "desde" debe ser menor que "hasta".');
-                return;
+        // Validation based on CreateChampionship logic
+        if (type === 'individual' && !p.valor) return;
+        if (type === 'rango' && (!p.desde || !p.hasta)) return;
+
+        if (type === 'rango') {
+            if (key === 'cinturon') {
+                // Belt logic (simple string comparison for now or index based if we brought over logic)
+                if (p.desde === p.hasta) return;
+            } else {
+                // Numeric logic
+                if (parseFloat(p.desde) >= parseFloat(p.hasta)) {
+                    alert('Desde debe ser menor que Hasta');
+                    return;
+                }
             }
         }
 
@@ -361,6 +371,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         return `${cat.desde} - ${cat.hasta}${unit}`;
     }
 
+    // --- Validation Helpers (from Create) ---
     onTatamisInput(event: any): void {
         const val = event.target.value.replace(/\D/g, '');
         const num = parseInt(val);
@@ -372,100 +383,55 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         event.target.value = this.campeonato.numTatamis;
     }
 
-    onMaxParticipantesInput(event: any): void {
-        const val = event.target.value.replace(/\D/g, '');
-        this.campeonato.maxParticipantes = val ? parseInt(val) : null;
-        event.target.value = val;
+    onMaxParticipantesInput(event: Event): void {
+        const target = event.target as HTMLInputElement;
+        const raw = target.value || '';
+
+        this.maxParticipantesNonNumeric = /\D/.test(raw);
+
+        let digitsOnly = raw.replace(/\D+/g, '');
+        const wasTruncated = digitsOnly.length > 5;
+        digitsOnly = digitsOnly.slice(0, 5);
+
+        if (!digitsOnly) {
+            target.value = '';
+            this.campeonato.maxParticipantes = null;
+            this.maxParticipantesLimitReached = false;
+            this.maxParticipantesNonNumeric = false;
+            this.maxParticipantesTooLow = false;
+            return;
+        }
+
+        let value = parseInt(digitsOnly, 10);
+        if (!Number.isFinite(value)) {
+            target.value = '';
+            this.campeonato.maxParticipantes = null;
+            this.maxParticipantesLimitReached = false;
+            return;
+        }
+
+        let clamped = false;
+        if (value > 10000) {
+            value = 10000;
+            clamped = true;
+        }
+
+        this.maxParticipantesLimitReached = clamped || wasTruncated;
+        this.maxParticipantesTooLow = value < 2;
+
+        target.value = String(value);
+        this.campeonato.maxParticipantes = value;
     }
 
     validateNumericField(event: any): void {
         event.target.value = event.target.value.replace(/\D/g, '');
     }
 
-    // --- Judge Methods ---
-    searchJudge(): void {
-        this.performUserSearch(this.judgeSearchQuery, 'judge');
+    onGeneroToggle(mod: ModalidadConfig, enabled: boolean): void {
+        mod.categorias.genero = enabled ? 'individual' : null;
     }
 
-    addJudge(): void {
-        if (!this.foundJudge) return;
-        if (this.jueces.find(j => j.id === this.foundJudge.id)) {
-            this.judgeSearchError = 'Este juez ya ha sido agregado.';
-            return;
-        }
-        this.jueces.push({
-            id: this.foundJudge.id,
-            nombre: this.foundJudge.nombre || this.foundJudge.username,
-            avatar: this.foundJudge.avatar || 'assets/default-avatar.png'
-        });
-        this.foundJudge = null;
-        this.judgeSearchQuery = '';
-    }
-
-    removeJudge(id: any): void {
-        this.jueces = this.jueces.filter(j => j.id !== id);
-    }
-
-    // --- User Invitation Methods ---
-    searchUser(): void {
-        this.performUserSearch(this.userSearchQuery, 'user');
-    }
-
-    addInvitedUser(): void {
-        if (!this.foundUser) return;
-        if (this.invitedUsers.find(u => u.id === this.foundUser.id)) {
-            this.userSearchError = 'Este usuario ya ha sido invitado.';
-            return;
-        }
-        this.invitedUsers.push({
-            id: this.foundUser.id,
-            nombre: this.foundUser.nombre || this.foundUser.username,
-            avatar: this.foundUser.avatar || 'assets/default-avatar.png'
-        });
-        this.foundUser = null;
-        this.userSearchQuery = '';
-    }
-
-    removeInvitedUser(id: any): void {
-        this.invitedUsers = this.invitedUsers.filter(u => u.id !== id);
-    }
-
-    private performUserSearch(query: string, type: 'judge' | 'user'): void {
-        const q = query.trim();
-        if (!q) return;
-
-        if (type === 'judge') {
-            this.searchingJudge = true;
-            this.judgeSearchError = null;
-            this.foundJudge = null;
-        } else {
-            this.searchingUser = true;
-            this.userSearchError = null;
-            this.foundUser = null;
-        }
-
-        this.api.searchUserById(q).subscribe({
-            next: (user) => {
-                if (type === 'judge') {
-                    this.searchingJudge = false;
-                    if (user) this.foundJudge = user;
-                    else this.judgeSearchError = 'Usuario no encontrado.';
-                } else {
-                    this.searchingUser = false;
-                    if (user) this.foundUser = user;
-                    else this.userSearchError = 'Usuario no encontrado.';
-                }
-            },
-            error: () => {
-                const msg = 'Error al buscar.';
-                if (type === 'judge') {
-                    this.searchingJudge = false;
-                    this.judgeSearchError = msg;
-                } else {
-                    this.searchingUser = false;
-                    this.userSearchError = msg;
-                }
-            }
-        });
+    setGeneroType(mod: ModalidadConfig, value: 'individual' | 'mixto'): void {
+        mod.categorias.genero = value;
     }
 }

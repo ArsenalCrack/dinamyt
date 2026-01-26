@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { NavbarComponent } from './shared/components/navbar/navbar.component';
 import { FooterComponent } from './shared/components/footer/footer.component';
+import { ScrollToTopComponent } from './shared/components/scroll-to-top/scroll-to-top.component';
 import { ApiService } from './core/services/api.service';
 
 @Component({
@@ -12,7 +13,8 @@ import { ApiService } from './core/services/api.service';
     RouterOutlet,
     CommonModule,
     NavbarComponent,
-    FooterComponent
+    FooterComponent,
+    ScrollToTopComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
@@ -24,7 +26,7 @@ export class AppComponent implements OnInit {
   mensajeBackend: string = 'Conectando...';
   estadoBackend: string = 'Sin verificar';
 
-  constructor() {}
+  constructor() { }
 
   ngOnInit() {
     this.api.getSaludo().subscribe({

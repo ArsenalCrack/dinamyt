@@ -40,10 +40,16 @@
 
       <div class="form-group">
         <label for="registro-idDocumento">Número de documento</label>
-        <input type="text" inputmode="numeric" id="registro-idDocumento" name="idDocumento" [(ngModel)]="idDocumento"
-          #doc="ngModel" autocomplete="username" required minlength="6" maxlength="20" pattern="^[0-9]+$"
-          (input)="onDocumentoInput($event)" placeholder="Ej: 1090..."
-          [class.input-error]="doc.invalid && (doc.dirty || doc.touched)">
+
+        <div class="input-tooltip-wrapper">
+          <input type="text" inputmode="numeric" id="registro-idDocumento" name="idDocumento" [(ngModel)]="idDocumento"
+            #doc="ngModel" autocomplete="off" required minlength="6" maxlength="20" pattern="^[0-9]+$"
+            (input)="onDocumentoInput($event)" placeholder="Ej: 1090..."
+            [class.input-error]="doc.invalid && (doc.dirty || doc.touched)">
+          <div class="custom-tooltip">
+            <i class="fas fa-id-card"></i> Ingresa tu número de identificación (solo números)
+          </div>
+        </div>
 
         <div *ngIf="doc.invalid && (doc.dirty || doc.touched)" class="msg-error">
           <small *ngIf="doc.errors?.['required']">El documento es obligatorio.</small>
@@ -139,7 +145,7 @@
         <label for="registro-nacionalidad">Nacionalidad</label>
         <app-country-autocomplete inputId="registro-nacionalidad" name="nacionalidad" [(ngModel)]="nacionalidad"
           #nac="ngModel" required [paises]="paisesList" [hasError]="!!(nac.invalid && (nac.dirty || nac.touched))"
-          placeholder="Escribe o selecciona tu país">
+          [maxLength]="nacionalidadMaxLength" placeholder="Escribe o selecciona tu país">
         </app-country-autocomplete>
         <div *ngIf="nac.invalid && (nac.dirty || nac.touched)" class="msg-error">
           <small>Debes seleccionar un país de la lista.</small>

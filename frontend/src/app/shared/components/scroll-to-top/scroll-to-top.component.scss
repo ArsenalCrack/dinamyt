@@ -1,0 +1,50 @@
+.scroll-to-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 45px;
+    height: 45px;
+    background-color: var(--color-acento, #D60000);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    /* Rectangulito con bordes suaves */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: 0 4px 15px rgba(214, 0, 0, 0.3);
+
+    &.show {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    &:hover {
+        background-color: var(--color-acento-hover, #b10000);
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(214, 0, 0, 0.4);
+    }
+
+    i {
+        font-size: 1.2rem;
+    }
+}
+
+/* Ajustes para móviles */
+@media (max-width: 768px) {
+    .scroll-to-top {
+        bottom: 20px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        /* Mantener la forma rectangular */
+    }
+}

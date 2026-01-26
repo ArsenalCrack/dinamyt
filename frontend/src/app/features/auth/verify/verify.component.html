@@ -65,8 +65,10 @@
       <div class="login-footer">
         <p class="help-text no-border">
           ¿No recibiste el código?
-          <button type="button" class="link-reenviar" (click)="reenviarCodigo()" aria-label="Reenviar código">Reenviar
-            código</button>
+          <button type="button" class="link-reenviar" (click)="reenviarCodigo()"
+            [disabled]="resendRemainingSeconds > 0 || cargando" aria-label="Reenviar código">
+            {{ resendRemainingSeconds > 0 ? 'Reenviar código (' + resendRemainingSeconds + 's)' : 'Reenviar código' }}
+          </button>
         </p>
       </div>
 

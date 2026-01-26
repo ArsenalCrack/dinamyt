@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { User, UserRole } from '../../core/models/user.model';
+import { ScrollLockService } from '../../core/services/scroll-lock.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -21,7 +22,15 @@ export class DashboardComponent implements OnInit {
   missingFields: string[] = [];
   usuario: any;
 
-  constructor(private apiService: ApiService, private auth: AuthService) { }
+  // Modal welcome
+  showProfileAlert = false;
+
+  constructor(
+    private apiService: ApiService,
+    private auth: AuthService,
+    private router: Router,
+    private scrollLock: ScrollLockService
+  ) { }
 
   ngOnInit(): void {
     try {
@@ -91,6 +100,16 @@ export class DashboardComponent implements OnInit {
 
         // Calcular progreso de perfil con base en datos del proyecto
         this.computeProfileStatus(u);
+
+        // Check for welcome profile alert
+        if (sessionStorage.getItem('showWelcomeProfileAlert')) {
+          sessionStorage.removeItem('showWelcomeProfileAlert');
+          // Only show if completion < 100 to avoid annoying users who somehow have complete profiles
+          if (this.profileCompletion < 100) {
+            this.showProfileAlert = true;
+            this.scrollLock.lock();
+          }
+        }
       },
       error: () => {
         // Keep defaults (hide create card)
@@ -98,6 +117,17 @@ export class DashboardComponent implements OnInit {
         this.computeProfileStatus(null);
       }
     });
+  }
+
+  closeProfileAlert(): void {
+    this.showProfileAlert = false;
+    this.scrollLock.unlock();
+  }
+
+  goToProfile(): void {
+    this.showProfileAlert = false;
+    this.scrollLock.unlock();
+    this.router.navigate(['/perfil']);
   }
 
   private computeProfileStatus(user: User | null): void {

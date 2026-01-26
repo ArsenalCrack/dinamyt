@@ -20,6 +20,17 @@
     </div>
   </div>
 
+  <div *ngIf="showCancelConfirm" class="confirm-overlay" role="dialog" aria-modal="true" aria-label="Cancelar creación">
+    <div class="confirm-card">
+      <h3>¿Cancelar creación?</h3>
+      <p class="confirm-subtitle">Se perderán todos los datos ingresados y el formulario se reiniciará.</p>
+      <div class="confirm-actions">
+        <button type="button" class="btn-secondary" (click)="cancelCancelConfirm()">Volver al formulario</button>
+        <button type="button" class="btn-primary danger" (click)="confirmCancel()">Sí, cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="page-card">
     <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
       <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
@@ -58,20 +69,51 @@
                 (50 caracteres).</small></div>
           </label>
 
+          <div class="field">
+            <span>País *</span>
+            <app-country-autocomplete name="pais" [(ngModel)]="campeonato.pais"
+              (ngModelChange)="onPaisChange(); touchDraft()" #paisCtrl="ngModel" [paises]="paisesList"
+              [maxLength]="paisMaxLength" [hasError]="!!(paisCtrl.invalid && (paisCtrl.dirty || paisCtrl.touched))"
+              placeholder="Selecciona el país" required>
+            </app-country-autocomplete>
+            <div *ngIf="paisCtrl.invalid && (paisCtrl.dirty || paisCtrl.touched)" class="msg-error">
+              <small>El país es obligatorio.</small>
+            </div>
+            <div *ngIf="isCharLimitReached(campeonato.pais, paisMaxLength)" class="msg-warning">
+              <small>Límite máximo alcanzado.</small>
+            </div>
+          </div>
+
+          <div class="field">
+            <span>Ciudad *</span>
+            <app-country-autocomplete name="ciudad" [(ngModel)]="campeonato.ciudad" (ngModelChange)="touchDraft()"
+              #ciudadCtrl="ngModel" [paises]="ciudadesList" [maxLength]="ciudadMaxLength"
+              [hasError]="!!(ciudadCtrl.invalid && (ciudadCtrl.dirty || ciudadCtrl.touched))"
+              [disabled]="!campeonato.pais" placeholder="Selecciona la ciudad" required>
+            </app-country-autocomplete>
+            <div *ngIf="ciudadCtrl.invalid && (ciudadCtrl.dirty || ciudadCtrl.touched)" class="msg-error">
+              <small>La ciudad es obligatoria.</small>
+            </div>
+            <div *ngIf="isCharLimitReached(campeonato.ciudad, ciudadMaxLength)" class="msg-warning">
+              <small>Límite máximo alcanzado.</small>
+            </div>
+          </div>
+
           <label class="field">
-            <span>Ubicación / Sede *</span>
+            <span>Dirección / Sede (Estadio, Coliseo...) *</span>
             <input type="text" [(ngModel)]="campeonato.ubicacion" (ngModelChange)="touchDraft()"
               #ubicacionCtrl="ngModel" name="ubicacion" autocomplete="off" placeholder="Ej: Coliseo Mayor" minlength="3"
-              maxlength="50" required>
+              maxlength="100" required>
 
             <div *ngIf="ubicacionCtrl.invalid && (ubicacionCtrl.dirty || ubicacionCtrl.touched)" class="msg-error">
-              <small *ngIf="ubicacionCtrl.errors?.['required']">La ubicación es obligatoria.</small>
+              <small *ngIf="ubicacionCtrl.errors?.['required']">La sede es obligatoria.</small>
               <small *ngIf="ubicacionCtrl.errors?.['minlength']">Mínimo 3 caracteres.</small>
             </div>
-            <div *ngIf="isNearCharLimit(campeonato.ubicacion, 50)" class="msg-warning"><small>Estás llegando al límite
-                de 50 caracteres.</small></div>
-            <div *ngIf="isCharLimitReached(campeonato.ubicacion, 50)" class="msg-warning"><small>Límite máximo alcanzado
-                (50 caracteres).</small></div>
+            <div *ngIf="isNearCharLimit(campeonato.ubicacion, 100)" class="msg-warning"><small>Estás llegando al límite
+                de 100 caracteres.</small></div>
+            <div *ngIf="isCharLimitReached(campeonato.ubicacion, 100)" class="msg-warning"><small>Límite máximo
+                alcanzado
+                (100 caracteres).</small></div>
           </label>
 
           <label class="field">
@@ -133,9 +175,16 @@
           <label class="field">
             <span>Número de áreas (Tatamis) *</span>
             <p class="hint">Máximo 12 áreas. Mínimo 1 área obligatoria.</p>
-            <input type="text" inputmode="numeric" [(ngModel)]="campeonato.numTatamis" #tatamisCtrl="ngModel"
-              name="numTatamis" (input)="onDocumentoInput($event)" (blur)="limitarTatamis()" min="1" max="12" required
-              placeholder="1">
+
+            <div class="input-tooltip-wrapper">
+              <input type="text" inputmode="numeric" [(ngModel)]="campeonato.numTatamis" #tatamisCtrl="ngModel"
+                name="numTatamis" (input)="onDocumentoInput($event)" (blur)="limitarTatamis()" min="1" max="12" required
+                placeholder="1" autocomplete="off">
+              <div class="custom-tooltip">
+                <i class="fas fa-info-circle"></i> Ingresa el número de áreas (1-12)
+              </div>
+            </div>
+
             <div *ngIf="tatamisCtrl.invalid && (tatamisCtrl.dirty || tatamisCtrl.touched)" class="msg-error">
               <small *ngIf="tatamisCtrl.errors?.['required']">El número de áreas es obligatorio.</small>
             </div>
@@ -146,9 +195,16 @@
           <label class="field">
             <span>Máximo de participantes *</span>
             <p class="hint">Cupo total del evento. Mínimo 2 participantes.</p>
-            <input type="text" inputmode="numeric" maxlength="5" [(ngModel)]="campeonato.maxParticipantes"
-              #maxParticipantesCtrl="ngModel" name="maxParticipantes" (input)="onMaxParticipantesInput($event)"
-              (blur)="limitarMaxParticipantes()" required placeholder="Ej: 250">
+
+            <div class="input-tooltip-wrapper">
+              <input type="text" inputmode="numeric" maxlength="5" [(ngModel)]="campeonato.maxParticipantes"
+                #maxParticipantesCtrl="ngModel" name="maxParticipantes" (input)="onMaxParticipantesInput($event)"
+                (blur)="limitarMaxParticipantes()" required placeholder="Ej: 250" autocomplete="off">
+              <div class="custom-tooltip">
+                <i class="fas fa-users"></i> Ingresa la capacidad máxima del evento
+              </div>
+            </div>
+
             <div *ngIf="maxParticipantesCtrl.invalid && (maxParticipantesCtrl.dirty || maxParticipantesCtrl.touched)"
               class="msg-error">
               <small *ngIf="maxParticipantesCtrl.errors?.['required']">El máximo de participantes es
@@ -480,7 +536,7 @@
       </section>
 
       <div class="form-actions">
-        <button type="button" class="btn ghost" (click)="goBack()">Cancelar</button>
+        <button type="button" class="btn ghost" (click)="onCancelClick()">Cancelar</button>
         <button type="submit" class="btn primary" [disabled]="saving">
           <span *ngIf="!saving">Crear Campeonato</span>
           <span *ngIf="saving" class="loading">Creando...</span>

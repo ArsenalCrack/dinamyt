@@ -32,12 +32,14 @@ button.arrow {
 /* --- PERSONALIZACIÓN DEL CALENDARIO (Flatpickr) --- */
 .dinamyt-flatpickr-theme {
     background: #fff;
-    border-radius: 16px; /* Más redondeado y moderno */
-    box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+    border-radius: 16px;
+    /* Más redondeado y moderno */
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
     border: 0 solid transparent;
     font-family: 'Montserrat', sans-serif;
     padding: 12px;
-    width: min(360px, calc(100vw - 24px)); /* Suficiente para meses largos sin romper responsive */
+    width: min(360px, calc(100vw - 24px));
+    /* Suficiente para meses largos sin romper responsive */
     z-index: 1200;
 
     /* Tamaños base (5 filas) */
@@ -53,7 +55,8 @@ button.arrow {
     }
 
     /* Ocultar flechitas por defecto para un look más limpio 'flotante' */
-    &::before, &::after {
+    &::before,
+    &::after {
         display: none;
     }
 
@@ -64,13 +67,16 @@ button.arrow {
         align-items: center;
         overflow: visible !important;
         position: relative;
-        isolation: isolate; /* asegura z-index consistente para flechas vs dropdown */
-        z-index: 50; /* el header (y su dropdown) siempre sobre los días */
+        isolation: isolate;
+        /* asegura z-index consistente para flechas vs dropdown */
+        z-index: 50;
+        /* el header (y su dropdown) siempre sobre los días */
         display: grid !important;
         grid-template-columns: 32px minmax(0, 1fr) 32px;
         align-items: center;
         gap: 8px;
-        padding: 0; /* un poquito más hacia los extremos */
+        padding: 0;
+        /* un poquito más hacia los extremos */
 
         .flatpickr-month {
             background: transparent;
@@ -84,22 +90,26 @@ button.arrow {
             align-items: center;
             justify-content: center;
             flex: 1 1 auto;
-            min-width: 0; /* permite que el centro encoja sin empujar flechas */
+            min-width: 0;
+            /* permite que el centro encoja sin empujar flechas */
         }
 
-        .flatpickr-prev-month, .flatpickr-next-month {
+        .flatpickr-prev-month,
+        .flatpickr-next-month {
             color: var(--color-principal);
             fill: var(--color-principal);
             height: 32px;
             width: 32px;
             padding: 8px;
             /* A los extremos y centrado respecto a inputs */
-            position: relative !important; /* permite z-index sin salir del grid */
+            position: relative !important;
+            /* permite z-index sin salir del grid */
             top: auto !important;
             left: auto !important;
             right: auto !important;
             transform: none !important;
-            z-index: 5; /* siempre por encima del centro para que se vean/clicken */
+            z-index: 5;
+            /* siempre por encima del centro para que se vean/clicken */
             border-radius: 10px;
             transition: all 0.2s ease;
             background: transparent !important;
@@ -114,7 +124,10 @@ button.arrow {
             &:hover {
                 background: var(--color-gris-claro);
                 color: var(--color-acento);
-                svg { fill: var(--color-acento); }
+
+                svg {
+                    fill: var(--color-acento);
+                }
             }
 
             &:active {
@@ -132,6 +145,7 @@ button.arrow {
             justify-self: start;
             margin-left: -4px !important;
         }
+
         .flatpickr-next-month {
             justify-self: end;
             margin-right: -4px !important;
@@ -164,6 +178,7 @@ button.arrow {
 
             /* Desplegable de mes (select) */
             .flatpickr-monthDropdown-months {
+
                 /* Se oculta porque usamos dropdown custom (evita flechas duplicadas del select nativo) */
                 &.dinamyt-fp-hidden-native {
                     position: absolute !important;
@@ -183,7 +198,8 @@ button.arrow {
                 display: inline-flex;
                 align-items: center;
                 justify-content: space-between;
-                min-width: 180px; /* Enero/Septiembre/Diciembre completos */
+                min-width: 180px;
+                /* Enero/Septiembre/Diciembre completos */
                 flex: 1 1 auto;
                 padding: 12px 40px 12px 16px;
                 border: 2px solid var(--color-borde);
@@ -192,20 +208,22 @@ button.arrow {
                 cursor: pointer;
                 user-select: none;
                 transition: all 0.3s ease;
-                height: 44px; /* Igualar altura con el input de año */
+                height: 44px;
+                /* Igualar altura con el input de año */
                 box-sizing: border-box;
-                z-index: 200; /* encima del grid de días */
+                z-index: 200;
+                /* encima del grid de días */
                 max-width: 100%;
             }
 
             .dinamyt-fp-month-select:hover {
                 border-color: var(--color-acento);
-                box-shadow: 0 8px 20px rgba(214,0,0,0.08);
+                box-shadow: 0 8px 20px rgba(214, 0, 0, 0.08);
             }
 
             .dinamyt-fp-month-select.open {
                 border-color: var(--color-acento);
-                box-shadow: 0 8px 20px rgba(214,0,0,0.08);
+                box-shadow: 0 8px 20px rgba(214, 0, 0, 0.08);
             }
 
             .dinamyt-fp-month-label {
@@ -248,12 +266,14 @@ button.arrow {
                 background: #fff;
                 border-radius: 10px;
                 padding: 8px 6px;
-                box-shadow: 0 12px 30px rgba(0,0,0,0.08);
-                z-index: 9999; /* siempre por encima del grid de días */
+                box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+                z-index: 9999;
+                /* siempre por encima del grid de días */
                 max-height: 220px;
                 overflow: auto;
-                overflow-x: hidden; /* sin scroll horizontal */
-                border: 2px solid rgba(214,0,0,0.06);
+                overflow-x: hidden;
+                /* sin scroll horizontal */
+                border: 2px solid rgba(214, 0, 0, 0.06);
 
                 opacity: 0;
                 transform: translateY(-6px);
@@ -276,12 +296,13 @@ button.arrow {
                 margin: 4px 2px;
                 color: var(--color-principal);
                 cursor: pointer;
-                white-space: normal; /* mostrar mes completo (si toca, hace wrap) */
+                white-space: normal;
+                /* mostrar mes completo (si toca, hace wrap) */
                 line-height: 1.2;
             }
 
             .dinamyt-fp-month-option:hover {
-                background: rgba(214,0,0,0.08);
+                background: rgba(214, 0, 0, 0.08);
                 color: var(--color-acento);
             }
 
@@ -292,12 +313,14 @@ button.arrow {
                 padding: 0 28px 0 8px;
                 background: #fff;
                 transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-                height: 44px; /* Igualar altura con mes */
+                height: 44px;
+                /* Igualar altura con mes */
                 display: inline-flex;
                 align-items: center;
                 box-sizing: border-box;
                 flex: 0 0 auto;
-                width: 96px !important; /* año completo sin cortar */
+                width: 96px !important;
+                /* año completo sin cortar */
                 overflow: visible;
 
                 &:hover {
@@ -326,7 +349,8 @@ button.arrow {
                     border: 0;
                     border-radius: 8px;
                     transition: background 0.2s;
-                    opacity: 1; /* siempre visible (mejor UX) */
+                    opacity: 1;
+                    /* siempre visible (mejor UX) */
                     width: 28px;
                     right: 0;
                     background: transparent;
@@ -345,6 +369,7 @@ button.arrow {
                     top: 50% !important;
                     transform: translateY(-50%);
                 }
+
                 span.arrowDown:after {
                     border-top-color: rgba(214, 0, 0, 0.85) !important;
                     top: 50% !important;
@@ -356,10 +381,11 @@ button.arrow {
                 font-weight: 700;
                 color: var(--color-principal);
             }
-             .cur-month {
+
+            .cur-month {
                 font-weight: 700;
                 color: var(--color-principal);
-             }
+            }
         }
     }
 
@@ -408,18 +434,21 @@ button.arrow {
 
     /* Días individuales */
     .flatpickr-day {
-        border-radius: 10px; /* Redondeado suave */
+        border-radius: 10px;
+        /* Redondeado suave */
         color: var(--color-principal);
         font-weight: 500;
         height: var(--fp-day-size);
         line-height: var(--fp-day-size);
         margin-top: 0;
-        border: 1px solid transparent; /* Evita saltos de layout */
+        border: 1px solid transparent;
+        /* Evita saltos de layout */
 
         /* Día Actual */
         &.today {
             border-color: transparent;
-            background: rgba(214, 0, 0, 0.08); /* Rojo muy tenúe */
+            background: rgba(214, 0, 0, 0.08);
+            /* Rojo muy tenúe */
             color: var(--color-acento);
             font-weight: 700;
 
@@ -430,12 +459,21 @@ button.arrow {
         }
 
         /* Día Seleccionado */
-        &.selected, &.startRange, &.endRange, &.selected.inRange, &.startRange.inRange, &.endRange.inRange, &.selected:focus, &.startRange:focus, &.endRange:focus {
+        &.selected,
+        &.startRange,
+        &.endRange,
+        &.selected.inRange,
+        &.startRange.inRange,
+        &.endRange.inRange,
+        &.selected:focus,
+        &.startRange:focus,
+        &.endRange:focus {
             background: var(--color-acento) !important;
             border-color: var(--color-acento) !important;
             color: #fff !important;
             font-weight: 600;
-            box-shadow: 0 4px 12px rgba(214, 0, 0, 0.35); /* Sombra suave para resaltar */
+            box-shadow: 0 4px 12px rgba(214, 0, 0, 0.35);
+            /* Sombra suave para resaltar */
         }
 
         /* Hover general */
@@ -450,7 +488,7 @@ button.arrow {
         &.flatpickr-disabled:hover,
         &.notAllowed,
         &.notAllowed:hover {
-            color: rgba(57,57,57,0.25) !important;
+            color: rgba(57, 57, 57, 0.25) !important;
             background: transparent !important;
             border-color: transparent !important;
             cursor: not-allowed !important;
@@ -458,8 +496,9 @@ button.arrow {
         }
 
         /* Días de otro mes (pero no necesariamente deshabilitados) */
-        &.prevMonthDay, &.nextMonthDay {
-            color: rgba(57,57,57,0.35);
+        &.prevMonthDay,
+        &.nextMonthDay {
+            color: rgba(57, 57, 57, 0.35);
         }
     }
 
@@ -551,13 +590,14 @@ button.arrow {
     }
 
     &:focus {
-      outline: none;
-      border-color: var(--color-acento);
-      box-shadow: 0 0 0 4px rgba(214, 0, 0, 0.1);
+        outline: none;
+        border-color: var(--color-acento);
+        box-shadow: 0 0 0 4px rgba(214, 0, 0, 0.1);
     }
 
     &[readonly] {
-        background-color: #fff; /* Evitar gris por defecto */
+        background-color: #fff;
+        /* Evitar gris por defecto */
         cursor: pointer;
     }
 }
@@ -572,7 +612,8 @@ button.arrow {
     --color-texto: #555555;
     --color-fondo: #ffffff;
     --color-gris-claro: #f4f6f8;
-    --color-acento: #D60000;          /* Rojo vibrante */
+    --color-acento: #D60000;
+    /* Rojo vibrante */
     --color-acento-hover: #a30000;
     --color-card: #ffffff;
     --color-borde: #e0e0e0;
@@ -592,49 +633,84 @@ button.arrow {
     box-sizing: border-box;
 }
 
+/* --- SAFE AREA & MOBILE OPTIMIZATIONS --- */
+:root {
+    /* Safe Area Variables with fallbacks */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+}
+
 body {
     margin: 0;
     padding: 0;
+    /* Use safe areas for global padding ONLY if the layout requires it globally. 
+     Usually better to apply this to specific fixed containers like headers/footers. */
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
     background: var(--color-fondo);
     font-family: 'Montserrat', sans-serif;
     color: var(--color-principal);
     line-height: 1.6;
     text-size-adjust: 100%;
     overflow-x: hidden;
+    /* Smooth scrolling for iOS */
+    -webkit-overflow-scrolling: touch;
 }
 
-th { text-align: start; }
+/* Ensure inputs don't zoom on focus in iOS by enforcing 16px font size on mobile */
+@media (max-width: 768px) {
 
-h1, h2, h3, h4 {
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 700;
-    margin-top: 0;
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
 }
 
-/* Los estilos de componentes deben ser encapsulados vía `styleUrls` en cada componente. */
-
-/* Textos secundarios globales: aplicar tipografía del proyecto (Montserrat) y peso normal */
-p, small, label, span, li, a:not(.btn):not(.btn-action-horizontal):not(.btn-action):not(.btn-primary):not(.btn-secondary):not(.btn-link), .muted, .secondary {
-    font-family: 'Montserrat', sans-serif;
-    /* color: var(--color-texto); */
+/* Rounded corners standardization */
+.card,
+.modal-box,
+.my-championships-card,
+.explore-championships-card {
+    border-radius: 20px;
+    /* Modern, softer corners */
 }
 
-/* Mantener que los elementos con énfasis sigan usando peso alto (strong, b, .bold) */
-strong, b, h1, h2, h3, h4 { font-family: 'Montserrat', sans-serif; font-weight: 700; }
-
-/* Force project typography on input placeholders and form controls */
-input, textarea, select {
-    font-family: 'Montserrat', sans-serif;
+/* Ensure sticky elements respect safe areas */
+.navbar,
+.header-fixed {
+    padding-top: Max(10px, var(--safe-top));
 }
 
+/* Footer bottom padding adjustment */
+app-footer,
+.footer {
+    padding-bottom: Max(20px, var(--safe-bottom));
+}
 
-::placeholder { /* standard */
-    font-family: 'Montserrat', sans-serif;
-    color: rgba(26,26,26,0.45);
+/* Input focus states - standardized */
+:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
 }
-:-ms-input-placeholder { /* IE 10+ */
-    font-family: 'Montserrat', sans-serif;
+
+/* Global scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
 }
-::-ms-input-placeholder { /* Edge */
-    font-family: 'Montserrat', sans-serif;
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
 }

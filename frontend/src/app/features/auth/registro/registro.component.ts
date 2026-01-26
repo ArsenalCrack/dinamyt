@@ -6,7 +6,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { Location } from '@angular/common';
 import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
 import { CountryAutocompleteComponent } from '../../../shared/components/country-autocomplete/country-autocomplete.component';
-import { PAISES } from '../../../core/models/paises';
+import { LocationService } from '../../../core/services/location.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { delayRemaining } from '../../../core/utils/spinner-timing.util';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
@@ -27,6 +27,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
   private cdr = inject(ChangeDetectorRef);
   private scrollLock = inject(ScrollLockService);
   private backNav = inject(BackNavigationService);
+  private locationService = inject(LocationService);
   private modalScrollLocked = false;
 
 
@@ -59,7 +60,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
 
 
   // Lista de países para el autocompletado
-  paisesList: string[] = PAISES;
+  paisesList: string[] = [];
   // Component-bound selects for custom date picker
   diasOptions: Array<{ value: string; label: string }> = [];
   mesesOptions: Array<{ value: string; label: string }> = [];
@@ -77,6 +78,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
   nombresMaxLength = 40;
   apellidosMaxLength = 40;
   correoMaxLength = 40;
+  nacionalidadMaxLength = 50; // Fallback default
   nombresLimitMsg: string = '';
   apellidosLimitMsg: string = '';
   correoLimitMsg: string = '';
@@ -177,6 +179,12 @@ export class RegistroComponent implements OnInit, OnDestroy {
     this.calcularFechaMaxima();
     this.calcularFechaMinima();
     this.generarOpcionesFecha();
+
+    this.paisesList = this.locationService.getAllCountries().map(c => c.name).sort();
+
+    if (this.paisesList.length > 0) {
+      this.nacionalidadMaxLength = this.paisesList.reduce((max, p) => Math.max(max, p.length), 0);
+    }
     const flag = sessionStorage.getItem('verifyExpiredRedirect');
     if (flag === 'register') {
       this.showExpiredBanner = true;

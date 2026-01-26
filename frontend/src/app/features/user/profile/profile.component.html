@@ -41,6 +41,12 @@
 
       <!-- Editables -->
       <div class="field editable">
+        <label>Ciudad</label>
+        <app-country-autocomplete name="ciudad" [(ngModel)]="usuario.ciudad" [paises]="ciudadesList"
+          [maxLength]="ciudadMaxLength" placeholder="Selecciona tu ciudad">
+        </app-country-autocomplete>
+      </div>
+      <div class="field editable">
         <label>Correo</label>
         <input type="email" [(ngModel)]="usuario.correo" name="correo" maxlength="40" (input)="onCorreoInput($event)" />
         <div *ngIf="correoLimitMsg" class="msg-warning">
