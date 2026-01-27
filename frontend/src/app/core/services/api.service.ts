@@ -67,7 +67,7 @@ export class ApiService {
   }
 
   cargarinstructor(academia: number, idInstructor: string): Observable<any[]> {
-    return this.http.post<any[]>(`${this.apiUrl}/instructores?academia=${academia}&idInstructor=${idInstructor}`,null);
+    return this.http.post<any[]>(`${this.apiUrl}/instructores?academia=${academia}&idInstructor=${idInstructor}`, null);
   }
 
 
@@ -104,8 +104,8 @@ export class ApiService {
   }
 
   // Judge management
-  searchUserById(id: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/usuarios/search/${id}`);
+  searchUsers(query: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/usuarios/search/${query}`);
   }
 
   getJuecesByCampeonato(campeonatoId: string | number): Observable<any[]> {

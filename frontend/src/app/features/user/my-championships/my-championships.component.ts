@@ -66,9 +66,15 @@ export class MyChampionshipsComponent implements OnInit {
             estado: status,
             estadoLabel: this.getEstadoLabel(status),
             Codigo: c.Codigo,
-            esPublico: c.esPublico !== false
+            esPublico: c.esPublico !== false,
+            isVisible: (
+              c.visible !== 0 && c.visible !== '0' && c.visible !== false &&
+              c.Visible !== 0 && c.Visible !== '0' && c.Visible !== false &&
+              c.visibilidad !== 0 && c.visibilidad !== '0' && c.visibilidad !== false &&
+              c.Visibilidad !== 0 && c.Visibilidad !== '0' && c.Visibilidad !== false
+            )
           };
-        });
+        }).filter(c => c.isVisible);
         this.applyFilters();
         this.cargando = false;
       },

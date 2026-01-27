@@ -201,9 +201,9 @@ export class ExploreChampionshipsComponent implements OnInit {
       let dateComparison = 0;
       if (!Number.isNaN(da) && !Number.isNaN(db)) {
         if (this.dateSort === 'MAS_RECIENTE') {
-          dateComparison = db - da;
-        } else {
           dateComparison = da - db;
+        } else {
+          dateComparison = db - da;
         }
       }
 
@@ -244,7 +244,12 @@ export class ExploreChampionshipsComponent implements OnInit {
             capacidad: c.maxParticipantes ?? c.capacidad,
             cuposDisponibles: c.cuposDisponibles ?? null,
             puedeInscribirse: !!c.puedeInscribirse,
-            isVisible: c.visibilidad !== false
+            isVisible: (
+              c.visible !== 0 && c.visible !== '0' && c.visible !== false &&
+              c.Visible !== 0 && c.Visible !== '0' && c.Visible !== false &&
+              c.visibilidad !== 0 && c.visibilidad !== '0' && c.visibilidad !== false &&
+              c.Visibilidad !== 0 && c.Visibilidad !== '0' && c.Visibilidad !== false
+            )
           };
         });
 

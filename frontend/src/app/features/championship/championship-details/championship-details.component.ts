@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { NavigationHistoryService } from '../../../core/services/navigation-history.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { FormsModule } from '@angular/forms';
 
@@ -38,7 +39,7 @@ interface Juez {
     templateUrl: './championship-details.component.html',
     styleUrls: ['./championship-details.component.scss']
 })
-export class ChampionshipDetailsComponent implements OnInit {
+export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     id: string | null = null;
     campeonato: any = null;
     loading = true;
@@ -126,6 +127,7 @@ export class ChampionshipDetailsComponent implements OnInit {
         private api: ApiService,
         private router: Router,
         private backNav: BackNavigationService,
+        private navHistory: NavigationHistoryService,
         private scrollLock: ScrollLockService
     ) { }
 
@@ -146,6 +148,20 @@ export class ChampionshipDetailsComponent implements OnInit {
             next: (data) => {
                 console.log(data);
                 this.campeonato = data;
+
+                // Check visibility access
+                // User requirement: if visible/visibilidad is 0, user cannot access via URL
+                const isVisible = (
+                    data.visible !== 0 && data.visible !== '0' && data.visible !== false &&
+                    data.Visible !== 0 && data.Visible !== '0' && data.Visible !== false &&
+                    data.visibilidad !== 0 && data.visibilidad !== '0' && data.visibilidad !== false &&
+                    data.Visibilidad !== 0 && data.Visibilidad !== '0' && data.Visibilidad !== false
+                );
+                if (!isVisible) {
+                    this.router.navigate(['/campeonatos']); // Redirect if not visible
+                    this.scrollLock.unlock(); // Ensure lock is released if it was somehow set
+                    return;
+                }
 
                 // Parse Modalities Config
                 try {
@@ -462,15 +478,22 @@ export class ChampionshipDetailsComponent implements OnInit {
         this.api.deleteCampeonato(this.id).subscribe({
             next: () => {
                 this.closeDeleteModal();
+                this.navHistory.removeLastUrl(); // Remove current 'details' page from history
                 this.router.navigate(['/mis-campeonatos']);
             },
             error: (err) => {
                 console.error('Error deleting championship:', err);
                 this.isDeleting = false;
-                // Fallback for safety
+                this.closeDeleteModal();
+                // Fallback
+                this.navHistory.removeLastUrl(); // Remove even on fallback/error if we leave
                 this.router.navigate(['/mis-campeonatos']);
             }
         });
+    }
+
+    ngOnDestroy(): void {
+        this.scrollLock.unlock();
     }
 
     toggleSection(section: 'info' | 'judges' | 'participants'): void {

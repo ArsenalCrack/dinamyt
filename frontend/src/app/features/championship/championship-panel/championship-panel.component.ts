@@ -1,10 +1,11 @@
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { NavigationHistoryService } from '../../../core/services/navigation-history.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 
 @Component({
@@ -14,7 +15,7 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
     templateUrl: './championship-panel.component.html',
     styleUrls: ['./championship-panel.component.scss']
 })
-export class ChampionshipPanelComponent implements OnInit {
+export class ChampionshipPanelComponent implements OnInit, OnDestroy {
     id: string | null = null;
     campeonato: any = null;
     loading = true;
@@ -31,6 +32,7 @@ export class ChampionshipPanelComponent implements OnInit {
         private api: ApiService,
         private router: Router,
         private backNav: BackNavigationService,
+        private navHistory: NavigationHistoryService,
         private scrollLock: ScrollLockService
     ) { }
 
@@ -51,6 +53,19 @@ export class ChampionshipPanelComponent implements OnInit {
         this.api.getCampeonatoById(this.id!).subscribe({
             next: (data) => {
                 this.campeonato = data;
+
+                // Security Check: Visibility (Deleted/Hidden)
+                const isVisible = (
+                    data.visible !== 0 && data.visible !== '0' && data.visible !== false &&
+                    data.Visible !== 0 && data.Visible !== '0' && data.Visible !== false &&
+                    data.visibilidad !== 0 && data.visibilidad !== '0' && data.visibilidad !== false &&
+                    data.Visibilidad !== 0 && data.Visibilidad !== '0' && data.Visibilidad !== false
+                );
+
+                if (!isVisible) {
+                    this.router.navigate(['/mis-campeonatos']);
+                    return;
+                }
 
                 // Validate Ownership
                 if (!this.isOwner()) {
@@ -159,14 +174,20 @@ export class ChampionshipPanelComponent implements OnInit {
         this.api.deleteCampeonato(this.id).subscribe({
             next: () => {
                 this.closeDeleteModal();
+                this.navHistory.removeLastUrl(); // Clean history
                 this.router.navigate(['/mis-campeonatos']);
             },
             error: (err) => {
                 console.error('Error deleting:', err);
                 this.isDeleting = false;
-                // Fallback
+                this.closeDeleteModal(); // Unlock scroll even on error
+                this.navHistory.removeLastUrl(); // Clean history even on fallback
                 this.router.navigate(['/mis-campeonatos']);
             }
         });
+    }
+
+    ngOnDestroy(): void {
+        this.scrollLock.unlock();
     }
 }

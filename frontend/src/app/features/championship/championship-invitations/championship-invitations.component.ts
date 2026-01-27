@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule, Location } from '@angular/common'; // Import Location
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { ApiService } from '../../../core/services/api.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 
 interface Invitacion {
@@ -60,6 +61,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private location: Location,
+    private api: ApiService,
     private scrollLock: ScrollLockService
   ) { }
 
@@ -182,14 +184,20 @@ export class ChampionshipInvitationsComponent implements OnInit {
       return;
     }
 
-    // Mock Search Results
-    const q = this.inviteSearchQuery.toLowerCase();
-    // Simulate finding random users roughly matching query
-    this.availableUsers = [
-      { id: '1005550001', nombre: 'Usuario Test 1', email: 'test1@example.com', avatar: '' },
-      { id: '1005550002', nombre: 'Usuario Test 2', email: 'test2@example.com', avatar: '' },
-      { id: '1005550003', nombre: 'Wanda Maximoff', email: 'wanda@magic.com', avatar: '' }
-    ].filter(u => u.nombre.toLowerCase().includes(q) || u.email.includes(q));
+    this.api.searchUsers(this.inviteSearchQuery).subscribe({
+      next: (users) => {
+        this.availableUsers = (users || []).map(u => ({
+          id: u.ID_documento || u.documento || u.id,
+          nombre: u.nombreC || u.nombre,
+          email: u.correo || u.email || 'Sin correo visible',
+          avatar: u.avatar || 'assets/default-avatar.png'
+        }));
+      },
+      error: (err) => {
+        console.error('Error finding users:', err);
+        this.availableUsers = [];
+      }
+    });
   }
 
   selectUser(user: any): void {
