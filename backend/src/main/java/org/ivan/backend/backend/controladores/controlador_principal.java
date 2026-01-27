@@ -343,5 +343,79 @@ public class controlador_principal {
         campeonatoRepository.save(campeonato);
         return ResponseEntity.badRequest().body(Map.of("message", "No se a podido eliminar el campeonato"));
     }
+    @PutMapping("/campeonatos/{id}")
+    public ResponseEntity<?> actualizarCampeonato(@PathVariable int id,@RequestBody Map<String, Object> datos) {
+        try {
+            Campeonato campeonato = campeonatoRepository.findById(id).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+            campeonato.setVisible(true);
+            campeonato.setNombre((String) datos.get("nombre"));
+            campeonato.setUbicacion((String) datos.get("ubicacion"));
+            campeonato.setPais((String) datos.get("pais"));
+            campeonato.setCiudad((String) datos.get("ciudad"));
+            campeonato.setAlcance((String) datos.get("alcance"));
+
+            if (datos.get("numTatamis") != null) {
+                campeonato.setNumTatamis(
+                        Integer.parseInt(datos.get("numTatamis").toString()));
+            }
+
+            if (datos.get("maxParticipantes") != null) {
+                campeonato.setMaxParticipantes(
+                        Integer.parseInt(datos.get("maxParticipantes").toString()));
+            }
+
+            campeonato.setEsPublico(
+                    datos.get("esPublico") != null &&
+                            Boolean.parseBoolean(datos.get("esPublico").toString()));
+            if (campeonato.getEsPublico()) {
+            } else {
+                campeonato.setCodigo(GenerarCodigo());
+            }
+
+            if (datos.get("creadoPor") != null) {
+                campeonato.setCreadoPor(
+                        Long.parseLong(datos.get("creadoPor").toString()));
+                campeonato.setNombreCreador(datos.get("NombreCreador").toString());
+            }
+
+            if (datos.get("modalidades") != null) {
+                String modalidadesJson = JsonCleaner.limpiarDesdeObject(datos.get("modalidades"));
+                campeonato.setModalidades(modalidadesJson);
+
+                //creamos las secciones de una
+                ArbolCampeonato arbol = new ArbolCampeonato();
+                ArbolBuilder builder = new ArbolBuilder();
+
+                builder.construir(arbol,JsonCleaner.convertir(campeonato.getModalidades()));
+
+                // 2. Obtener secciones
+                List<Map<String, String>> resultado = arbol.obtenerSeccionesDetalladas();
+                ObjectMapper mapper = new ObjectMapper();
+                campeonato.setSecciones(mapper.writeValueAsString(resultado));
+                System.out.println(resultado);
+            }
+
+
+            campeonato.setParticipantes(0);
+            campeonato.setEstado("BORRADOR");
+            campeonato.setPuedeInscribirse(true);
+            if (datos.get("fechaInicio") != null) {
+                campeonato.setFechaInicio(LocalDate.parse(datos.get("fechaInicio").toString()));
+            }
+            if (datos.get("fechaFin") != null) {
+                campeonato.setFecha_fin(LocalDate.parse(datos.get("fechaFin").toString()));
+            }
+
+            campeonatoRepository.save(campeonato);
+
+            return ResponseEntity.ok(
+                    Map.of("message", "Campeonato creado correctamente"));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Error al crear el campeonato"));
+        }
+    }
+
 
 }

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 27-01-2026 a las 00:01:15
+-- Tiempo de generación: 27-01-2026 a las 22:25:54
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.0.30
 
@@ -62,6 +62,7 @@ CREATE TABLE `campeonato` (
   `modalidades` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`modalidades`)),
   `fecha_inicio` date DEFAULT NULL,
   `fecha_fin` date DEFAULT NULL,
+  `fecha_creacion` datetime NOT NULL DEFAULT current_timestamp(),
   `estado` varchar(255) DEFAULT NULL,
   `participantes` int(11) DEFAULT 0,
   `puede_inscribirse` tinyint(1) DEFAULT 1,
@@ -75,10 +76,11 @@ CREATE TABLE `campeonato` (
 -- Volcado de datos para la tabla `campeonato`
 --
 
-INSERT INTO `campeonato` (`id_campeonato`, `nombre`, `ubicacion`, `pais`, `ciudad`, `alcance`, `num_tatamis`, `max_participantes`, `es_publico`, `creado_por`, `modalidades`, `fecha_inicio`, `fecha_fin`, `estado`, `participantes`, `puede_inscribirse`, `codigo`, `nombre_creador`, `visible`, `secciones`) VALUES
-(33, 'prueba 1', 'dsa', NULL, NULL, 'Regional', 11, 431, 0, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Blanco\"}],\"edad\":[{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"21\"}],\"genero\":\"individual\"}}]', '2026-01-27', '2026-01-29', 'BORRADOR', 0, 1, '787054', 'Andres Gonzalez', 0, '[{\"PESO\":\"SIN_PESO\",\"EDAD\":\"21\",\"CINTURON\":\"Blanco\",\"GENERO\":\"Hombre\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-HOMBRE-BLANCO-21-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"EDAD\":\"21\",\"CINTURON\":\"Blanco\",\"GENERO\":\"Mujer\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MUJER-BLANCO-21-SIN_PESO\"}]'),
-(35, 'campeonato 1', 'calle 12 #43-81-1', 'Colombia', 'Abejorral', 'Regional', 12, 200, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Blanco\",\"hasta\":\"Amarillo\"}],\"genero\":\"mixto\"}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Blanco\",\"hasta\":\"Amarillo\"}],\"genero\":\"mixto\"}}]', '2026-01-29', '2026-01-31', 'BORRADOR', 0, 1, NULL, 'Andres Gonzalez', 0, '[{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Blanco-Amarillo\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-BLANCO-AMARILLO-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Blanco-Amarillo\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Figura con armas\",\"RAIZ\":\"Campeonato\",\"ID\":\"FIGURA_CON_ARMAS-MIXTO-BLANCO-AMARILLO-NULL-SIN_PESO\"}]'),
-(36, 'prueba de inscripcion', 'calle 12 #43-81-1', 'Afghanistan', 'Andkhoy', 'Regional', 11, 400, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Blanco\",\"hasta\":\"Amarillo\"},{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Naranja\",\"hasta\":\"Naranja/verde\"},{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Verde\",\"hasta\":\"Verde/azul\"},{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Azul\",\"hasta\":\"Rojo\"},{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Marrón\",\"hasta\":\"Marrón/negro\"},{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Negro\"}],\"genero\":\"mixto\"}}]', '2026-01-29', '2026-01-31', 'BORRADOR', 0, 1, NULL, 'Andres Gonzalez', 1, '[{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Blanco-Amarillo\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-BLANCO-AMARILLO-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Naranja-Naranja/verde\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-NARANJA-NARANJA/VERDE-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Verde-Verde/azul\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-VERDE-VERDE/AZUL-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Azul-Rojo\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-AZUL-ROJO-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Marrón-Marrón/negro\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-MARRÓN-MARRÓN/NEGRO-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Negro\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-NEGRO-NULL-SIN_PESO\"}]');
+INSERT INTO `campeonato` (`id_campeonato`, `nombre`, `ubicacion`, `pais`, `ciudad`, `alcance`, `num_tatamis`, `max_participantes`, `es_publico`, `creado_por`, `modalidades`, `fecha_inicio`, `fecha_fin`, `fecha_creacion`, `estado`, `participantes`, `puede_inscribirse`, `codigo`, `nombre_creador`, `visible`, `secciones`) VALUES
+(33, 'prueba 1', 'dsa', NULL, NULL, 'Regional', 11, 431, 0, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Blanco\"}],\"edad\":[{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"21\"}],\"genero\":\"individual\"}}]', '2026-01-27', '2026-01-29', '2026-01-27 16:11:50', 'BORRADOR', 0, 1, '787054', 'Andres Gonzalez', 0, '[{\"PESO\":\"SIN_PESO\",\"EDAD\":\"21\",\"CINTURON\":\"Blanco\",\"GENERO\":\"Hombre\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-HOMBRE-BLANCO-21-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"EDAD\":\"21\",\"CINTURON\":\"Blanco\",\"GENERO\":\"Mujer\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MUJER-BLANCO-21-SIN_PESO\"}]'),
+(35, 'campeonato 1', 'calle 12 #43-81-1', 'Colombia', 'Abejorral', 'Regional', 12, 200, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Blanco\",\"hasta\":\"Amarillo\"}],\"genero\":\"mixto\"}},{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Blanco\",\"hasta\":\"Amarillo\"}],\"genero\":\"mixto\"}}]', '2026-01-29', '2026-01-31', '2026-01-27 16:11:50', 'BORRADOR', 0, 1, NULL, 'Andres Gonzalez', 0, '[{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Blanco-Amarillo\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-BLANCO-AMARILLO-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Blanco-Amarillo\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Figura con armas\",\"RAIZ\":\"Campeonato\",\"ID\":\"FIGURA_CON_ARMAS-MIXTO-BLANCO-AMARILLO-NULL-SIN_PESO\"}]'),
+(36, 'prueba de edicion', 'calle 12 #43-81-1', 'Afghanistan', 'Andkhoy', 'Regional', 1, 2, 1, 123456, '[{\"id\":\"figura-armas\",\"nombre\":\"Figura con armas\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Blanco\"},{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Amarillo\"},{\"activa\":true,\"tipo\":\"individual\",\"valor\":\"Naranja\"}],\"genero\":\"mixto\"}}]', '2026-01-29', '2026-01-31', '2026-01-27 16:11:50', 'BORRADOR', 0, 1, NULL, 'Andres Gonzalez', 1, '[{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Blanco\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Figura con armas\",\"RAIZ\":\"Campeonato\",\"ID\":\"FIGURA_CON_ARMAS-MIXTO-BLANCO-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Amarillo\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Figura con armas\",\"RAIZ\":\"Campeonato\",\"ID\":\"FIGURA_CON_ARMAS-MIXTO-AMARILLO-NULL-SIN_PESO\"},{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Naranja\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Figura con armas\",\"RAIZ\":\"Campeonato\",\"ID\":\"FIGURA_CON_ARMAS-MIXTO-NARANJA-NULL-SIN_PESO\"}]'),
+(37, 'prueba de creacion con la fecha de creacion', '213', 'Colombia', 'Abrego', 'Nacional', 12, 32, 1, 123456, '[{\"id\":\"combates\",\"nombre\":\"Combates\",\"activa\":true,\"categorias\":{\"cinturon\":[{\"activa\":true,\"tipo\":\"rango\",\"desde\":\"Blanco\",\"hasta\":\"Negro\"}],\"genero\":\"mixto\"}}]', '2026-02-07', '2026-02-23', '2026-01-27 16:13:43', 'BORRADOR', 0, 1, NULL, 'Andres Gonzalez', 1, '[{\"PESO\":\"SIN_PESO\",\"CINTURON\":\"Blanco-Negro\",\"GENERO\":\"Mixto\",\"MODALIDAD\":\"Combates\",\"RAIZ\":\"Campeonato\",\"ID\":\"COMBATES-MIXTO-BLANCO-NEGRO-NULL-SIN_PESO\"}]');
 
 -- --------------------------------------------------------
 
@@ -169,7 +171,7 @@ CREATE TABLE `usuario` (
 
 INSERT INTO `usuario` (`ID_documento`, `nombreC`, `sexo`, `fecha_nacimiento`, `cinturon_rango`, `Nacionalidad`, `ciudad`, `Correo`, `Contraseña`, `numero_celular`, `Instructor`, `academia`, `tipo_usuario`) VALUES
 (0, 'Independiente', 'masculino', '2026-01-01', 'Negro', 'colombia', NULL, 'nada@gmail.com', '1', '2', NULL, 0, 2),
-(1, 'Instructor 1', 'masculino', '2026-01-01', 'Negro', 'colombia', '', 'a@gmail.com', '1', '+571', 4, 1, 2),
+(1, 'Instructor 1', 'masculino', '2026-01-01', 'Blanco', 'colombia', '', 'a@gmail.com', '1', '+571', 4, 1, 2),
 (2, 'instructor 2', 'Masculino', '2019-04-04', 'Negro', 'colombia', 'Cúcuta', 'e@gmail.com', '1', '2', NULL, 2, 2),
 (4, 'Instructor 2', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 2),
 (43013, 'AMIR SARMIENTO', 'Masculino', '2020-04-02', 'Blanco', 'Colombia', NULL, 'amirsarmiento0430@gmail.com', '1', '+570430', 0, 0, 3),
@@ -233,7 +235,7 @@ ALTER TABLE `usuario`
 -- AUTO_INCREMENT de la tabla `campeonato`
 --
 ALTER TABLE `campeonato`
-  MODIFY `id_campeonato` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id_campeonato` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=38;
 
 --
 -- AUTO_INCREMENT de la tabla `inscripciones`
