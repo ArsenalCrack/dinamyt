@@ -235,6 +235,17 @@
     border-color: var(--color-borde);
 }
 
+.inscriptions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 40px;
+
+    @media (max-width: 992px) {
+        grid-template-columns: 1fr;
+    }
+}
+
 .horizontal-card {
     background: var(--color-card);
     border-radius: 15px;
@@ -247,7 +258,7 @@
     justify-content: space-between;
     gap: 25px;
     width: 100%;
-    margin-bottom: 30px;
+    margin-bottom: 0;
 
     &:hover {
         transform: translateY(-3px);

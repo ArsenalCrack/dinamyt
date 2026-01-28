@@ -1,0 +1,56 @@
+- Building...
+
+Initial chunk files   | Names                               |  Raw size | Estimated transfer size
+chunk-P2A4N6MO.js     | -                                   |   7.89 MB |                 1.65 MB
+styles-QXFREQ5Y.css   | styles                              | 341.52 kB |                44.31 kB
+chunk-A5CFZARL.js     | -                                   | 180.19 kB |                50.76 kB
+main-M4XUH6I6.js      | main                                | 179.20 kB |                25.71 kB
+chunk-3B5B55XF.js     | -                                   |  83.33 kB |                20.85 kB
+scripts-SQ7W6IC7.js   | scripts                             |  78.53 kB |                21.12 kB
+polyfills-FFHMD2TL.js | polyfills                           |  33.71 kB |                11.02 kB
+chunk-DBEUC7NN.js     | -                                   |  32.89 kB |                 6.81 kB
+chunk-SWHFFNYX.js     | -                                   |   8.76 kB |                 2.72 kB
+chunk-RZVUSJAQ.js     | -                                   |   3.23 kB |               812 bytes
+chunk-DAJ4M2FY.js     | -                                   |   3.04 kB |                 1.07 kB
+chunk-YRF7BPT7.js     | -                                   |   2.17 kB |               737 bytes
+chunk-62AXLAJG.js     | -                                   |   1.31 kB |               516 bytes
+chunk-7GOVVBCC.js     | -                                   | 829 bytes |               829 bytes
+
+                      | Initial total                       |   8.81 MB |                 1.83 MB
+
+Lazy chunk files      | Names                               |  Raw size | Estimated transfer size
+chunk-NCTUIBQU.js     | create-championship-component       |  73.61 kB |                14.13 kB
+chunk-K33QDVD7.js     | championship-details-component      |  68.26 kB |                11.55 kB
+chunk-73CGDELJ.js     | edit-championship-component         |  66.78 kB |                12.61 kB
+chunk-HH4VNV5M.js     | -                                   |  60.94 kB |                15.71 kB
+chunk-WQWL7KP5.js     | explore-championships-component     |  43.08 kB |                 8.72 kB
+chunk-3RJV5HKW.js     | championship-invitations-component  |  31.24 kB |                 6.33 kB
+chunk-Y6GQNNCZ.js     | academy-component                   |  30.59 kB |                 5.90 kB
+chunk-WWVI7WW7.js     | championship-inscriptions-component |  24.48 kB |                 5.50 kB
+chunk-UDVHFXJ6.js     | championship-registration-component |  23.07 kB |                 5.79 kB
+chunk-GF25V5N6.js     | my-championships-component          |  23.00 kB |                 5.03 kB
+chunk-66VWHJ33.js     | profile-component                   |  21.72 kB |                 5.33 kB
+chunk-56NNNW3K.js     | championship-panel-component        |  20.65 kB |                 4.49 kB
+chunk-EOMYDROY.js     | change-password-component           |  18.35 kB |                 4.28 kB
+chunk-CXTJ7HBU.js     | my-invitations-component            |  17.64 kB |                 3.93 kB
+chunk-HXFS3JTN.js     | my-inscriptions-component           |  16.19 kB |                 3.78 kB
+...and 2 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation failed. [41.751 seconds]
+
+Ôû▓ [WARNING] bundle initial exceeded maximum budget. Budget 2.00 MB was not met by 6.81 MB with a total of 8.81 MB.
+
+
+Ôû▓ [WARNING] Module 'flatpickr/dist/l10n/es' used by 'src/app/shared/directives/flatpickr-date.directive.ts' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.io/guide/build#configuring-commonjs-dependencies
+
+
+Ôû▓ [WARNING] 1 rules skipped due to selector errors:
+  .form-floating>~label -> Did not expect successive traversals.
+
+
+X [ERROR] bundle initial exceeded maximum budget. Budget 4.00 MB was not met by 4.81 MB with a total of 8.81 MB.
+
+

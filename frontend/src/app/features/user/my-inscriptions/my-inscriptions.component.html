@@ -1,0 +1,111 @@
+<div class="inscriptions-container">
+    <header class="header">
+        <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <div class="header-content">
+            <h1>Mis Inscripciones</h1>
+            <p>Historial y estado de tus registros en campeonatos</p>
+        </div>
+    </header>
+
+    <!-- Tabs Navigation -->
+    <nav class="tabs-nav">
+        <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setTab('PENDIENTE')">
+            <i class="fas fa-clock"></i>
+            <span>Pendientes</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setTab('ACEPTADO')">
+            <i class="fas fa-check-circle"></i>
+            <span>Aceptadas</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setTab('RECHAZADO')">
+            <i class="fas fa-times-circle"></i>
+            <span>Rechazadas</span>
+        </button>
+    </nav>
+
+    <app-loading-spinner *ngIf="loading" message="Cargando inscripciones..."></app-loading-spinner>
+
+    <div class="inscriptions-list" *ngIf="!loading">
+        <div class="empty-state" *ngIf="filteredInscriptions.length === 0">
+            <i class="fas fa-clipboard-list"></i>
+            <p>No tienes inscripciones {{ getStatusLabel(activeTab) | lowercase }}s.</p>
+        </div>
+
+        <div class="inscription-card" *ngFor="let item of filteredInscriptions"
+            [class.rejected]="item.estado === 'RECHAZADO'">
+            <div class="card-summary">
+                <div class="user-avatar">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="user-main-info">
+                    <h3>{{ item.campeonatoNombre || 'Campeonato' }}</h3>
+                    <div class="meta-row">
+                        <span class="meta-text" *ngIf="item.fecha">{{ item.fecha | date:'mediumDate' }}</span>
+                        <!-- Display some details if available -->
+                        <span class="badge-belt" *ngIf="item.cinturon">{{ item.cinturon }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-details">
+                <div class="details-grid">
+                    <div class="detail-item full-width" *ngIf="item.modalidades && item.modalidades.length > 0">
+                        <label>Modalidades Inscritas</label>
+                        <div class="modalities-list">
+                            <span class="modality-tag" *ngFor="let mod of item.modalidades">{{ mod }}</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-item" *ngIf="item.peso">
+                        <label>Peso Registrado</label>
+                        <span>{{ item.peso }}kg</span>
+                    </div>
+
+                    <div class="detail-item" *ngIf="item.categoria">
+                        <label>Categoría</label>
+                        <span>{{ item.categoria }}</span>
+                    </div>
+
+                    <!-- Only if rejected -->
+                    <div class="detail-item full-width" *ngIf="item.estado === 'RECHAZADO' && item.motivoRechazo">
+                        <div class="status-message rejected">
+                            <i class="fas fa-times-circle"></i> Motivo: {{ item.motivoRechazo }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions-row">
+                    <button class="btn-reject" (click)="requestDelete(item.id)">
+                        <i class="fas fa-trash-alt"></i> {{ item.estado === 'PENDIENTE' ? 'Cancelar Solicitud' :
+                        'Eliminar Registro' }}
+                    </button>
+                </div>
+
+                <div class="status-message" *ngIf="item.estado === 'ACEPTADO'">
+                    <i class="fas fa-check-circle"></i> Inscripción Aceptada
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-overlay" *ngIf="showDeleteModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <i class="fas fa-trash-alt warning-icon"></i>
+            <h3>¿Eliminar Inscripción?</h3>
+        </div>
+        <p class="modal-desc">
+            Estás a punto de eliminar este registro de tu historial. Esta acción no se puede deshacer.
+        </p>
+        <div class="modal-actions">
+            <button class="btn-cancel" (click)="cancelDelete()">Cancelar</button>
+            <button class="btn-confirm-reject" (click)="confirmDelete()">
+                {{ deleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+            </button>
+        </div>
+    </div>
+</div>

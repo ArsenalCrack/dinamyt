@@ -1,0 +1,107 @@
+- Building...
+
+Application bundle generation failed. [15.146 seconds]
+
+X [ERROR] NG8002: Can't bind to 'small' since it isn't a known property of 'app-loading-spinner'.
+1. If 'app-loading-spinner' is an Angular component and it has 'small' input, then verify that it is included in the '@Component.imports' of this component.
+2. If 'app-loading-spinner' is a Web Component then add 'CUSTOM_ELEMENTS_SCHEMA' to the '@Component.schemas' of this component to suppress this message.
+3. To allow any property add 'NO_ERRORS_SCHEMA' to the '@Component.schemas' of this component. [plugin angular-compiler]
+
+    src/app/features/academy/components/academy-create/academy-create.component.html:47:56:
+      47 Ôöé ...ading-spinner *ngIf="saving" [small]="true"></app-loading-spinner>
+         ÔòÁ                                 ~~~~~~~~~~~~~~
+
+  Error occurs in the template of component AcademyCreateComponent.
+
+    src/app/features/academy/components/academy-create/academy-create.component.ts:11:17:
+      11 Ôöé     templateUrl: './academy-create.component.html',
+         ÔòÁ                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] NG8002: Can't bind to 'value' since it isn't a known property of 'app-custom-select'.
+1. If 'app-custom-select' is an Angular component and it has 'value' input, then verify that it is included in the '@Component.imports' of this component.
+2. If 'app-custom-select' is a Web Component then add 'CUSTOM_ELEMENTS_SCHEMA' to the '@Component.schemas' of this component to suppress this message.
+3. To allow any property add 'NO_ERRORS_SCHEMA' to the '@Component.schemas' of this component. [plugin angular-compiler]
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.html:8:58:
+      8 Ôöé ...ustom-select [options]="academyOptions" [value]="selectedAcademyId"
+        ÔòÁ                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  Error occurs in the template of component AcademyRegistrationComponent.
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.ts:12:17:
+      12 Ôöé     templateUrl: './academy-registration.component.html',
+         ÔòÁ                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] NG5: Argument of type 'Event' is not assignable to parameter of type 'string'. [plugin angular-compiler]
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.html:9:85:
+      9 Ôöé ...="Selecciona una academia" (valueChange)="onAcademyChange($event)">
+        ÔòÁ                                                              ~~~~~~
+
+  Error occurs in the template of component AcademyRegistrationComponent.
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.ts:12:17:
+      12 Ôöé     templateUrl: './academy-registration.component.html',
+         ÔòÁ                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] NG8002: Can't bind to 'value' since it isn't a known property of 'app-custom-select'.
+1. If 'app-custom-select' is an Angular component and it has 'value' input, then verify that it is included in the '@Component.imports' of this component.
+2. If 'app-custom-select' is a Web Component then add 'CUSTOM_ELEMENTS_SCHEMA' to the '@Component.schemas' of this component to suppress this message.
+3. To allow any property add 'NO_ERRORS_SCHEMA' to the '@Component.schemas' of this component. [plugin angular-compiler]
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.html:15:61:
+      15 Ôöé ...elect [options]="instructorOptions" [value]="selectedInstructorId"
+         ÔòÁ                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  Error occurs in the template of component AcademyRegistrationComponent.
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.ts:12:17:
+      12 Ôöé     templateUrl: './academy-registration.component.html',
+         ÔòÁ                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] NG2: Type 'Event' is not assignable to type 'string'. [plugin angular-compiler]
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.html:17:31:
+      17 Ôöé                 (valueChange)="selectedInstructorId = $event">
+         ÔòÁ                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  Error occurs in the template of component AcademyRegistrationComponent.
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.ts:12:17:
+      12 Ôöé     templateUrl: './academy-registration.component.html',
+         ÔòÁ                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] NG8002: Can't bind to 'small' since it isn't a known property of 'app-loading-spinner'.
+1. If 'app-loading-spinner' is an Angular component and it has 'small' input, then verify that it is included in the '@Component.imports' of this component.
+2. If 'app-loading-spinner' is a Web Component then add 'CUSTOM_ELEMENTS_SCHEMA' to the '@Component.schemas' of this component to suppress this message.
+3. To allow any property add 'NO_ERRORS_SCHEMA' to the '@Component.schemas' of this component. [plugin angular-compiler]
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.html:29:56:
+      29 Ôöé ...g-spinner *ngIf="submitting" [small]="true"></app-loading-spinner>
+         ÔòÁ                                 ~~~~~~~~~~~~~~
+
+  Error occurs in the template of component AcademyRegistrationComponent.
+
+    src/app/features/academy/components/academy-registration/academy-registration.component.ts:12:17:
+      12 Ôöé     templateUrl: './academy-registration.component.html',
+         ÔòÁ                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] NG9: Property 'goBack' does not exist on type 'ProfileComponent'. [plugin angular-compiler]
+
+    src/app/features/user/profile/profile.component.html:5:16:
+      5 Ôöé     <a (click)="goBack()" class="btn-back" title="Volver atr├ís">
+        ÔòÁ                 ~~~~~~
+
+  Error occurs in the template of component ProfileComponent.
+
+    src/app/features/user/profile/profile.component.ts:17:15:
+      17 Ôöé   templateUrl: './profile.component.html',
+         ÔòÁ                ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+

@@ -8,6 +8,29 @@
         <img src="assets/imgs/logoDHBlanco-400w.png" alt="Logo Dinamyt" class="logo-img" width="400" decoding="async">
       </a>
 
+      <!-- Mobile Notification Bell (Visible only on < lg screens) -->
+      <div class="mobile-notification-wrapper d-lg-none" *ngIf="isLoggedIn">
+        <button class="notification-btn" (click)="toggleNotifications()" [class.active]="showNotifications">
+          <i class="fas fa-bell"></i>
+        </button>
+
+        <div class="notification-dropdown mobile-dropdown" *ngIf="showNotifications" (click)="$event.stopPropagation()">
+          <div class="notif-header">
+            <h4>Notificaciones</h4>
+            <button class="mark-read">Marcar leídas</button>
+          </div>
+          <div class="notif-body">
+            <div class="notif-empty">
+              <i class="fas fa-bell-slash"></i>
+              <p>No tienes nuevas notificaciones</p>
+            </div>
+          </div>
+          <div class="notif-footer">
+            <a routerLink="/mis-invitaciones" (click)="closeNotifications()">Ver todas las invitaciones</a>
+          </div>
+        </div>
+      </div>
+
       <!-- Toggle para móvil -->
       <button #navbarToggler class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
         aria-controls="navbarNav" aria-expanded="false" aria-label="Abrir/cerrar navegación">
@@ -63,15 +86,40 @@
                     <i class="fas fa-cog"></i>
                     <span>Configuración</span>
                   </button>
-                  <button class="dropdown-item" *ngIf="userType === 2 || userType === 4" (click)="goToMyAcademy()">
-                    <i class="fas fa-school"></i>
-                    <span>Mi Academia</span>
-                  </button>
+
                   <div class="dropdown-divider"></div>
                   <button class="dropdown-item logout-item" (click)="logout()" [disabled]="loggingOut">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Cerrar Sesión</span>
                   </button>
+                </div>
+              </div>
+
+              <!-- Notification Bell (Desktop) -->
+              <div class="notification-wrapper d-none d-lg-block">
+                <button class="notification-btn" (click)="toggleNotifications()" [class.active]="showNotifications"
+                  title="Notificaciones">
+                  <i class="fas fa-bell"></i>
+                  <!-- Indicador de no leídas (demo) -->
+                  <!-- <span class="notification-badge"></span> -->
+                </button>
+
+                <!-- Notification Dropdown -->
+                <div class="notification-dropdown" *ngIf="showNotifications" (click)="$event.stopPropagation()">
+                  <div class="notif-header">
+                    <h4>Notificaciones</h4>
+                    <button class="mark-read">Marcar leídas</button>
+                  </div>
+                  <div class="notif-body">
+                    <!-- Empty State for now or simple "No nuevas notificaciones" -->
+                    <div class="notif-empty">
+                      <i class="fas fa-bell-slash"></i>
+                      <p>No tienes nuevas notificaciones</p>
+                    </div>
+                  </div>
+                  <div class="notif-footer">
+                    <a routerLink="/mis-invitaciones" (click)="closeNotifications()">Ver todas las invitaciones</a>
+                  </div>
                 </div>
               </div>
             </ng-template>

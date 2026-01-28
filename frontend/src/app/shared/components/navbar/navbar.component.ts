@@ -26,6 +26,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
   loading = true;
   loggingOut = false;
   showUserDropdown = false;
+  showNotifications = false;
   currentUrl = '';
   userType: number | null = null;
   usuario: any;
@@ -44,6 +45,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
     ).subscribe(() => {
       this.currentUrl = this.router.url || '';
       this.closeDropdown();
+      this.closeNotifications();
       this.closeMobileNavbar();
       // No need to update AuthService on every navigation, just update local state
       this.updateLocalStatus();
@@ -231,20 +233,40 @@ export class NavbarComponent implements OnInit, OnDestroy {
   }
 
   toggleUserDropdown(): void {
+    if (this.showNotifications) this.showNotifications = false;
     this.showUserDropdown = !this.showUserDropdown;
+  }
+
+  toggleNotifications(): void {
+    if (this.showUserDropdown) this.showUserDropdown = false;
+    this.showNotifications = !this.showNotifications;
   }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
-    const clickedInside = target.closest('.user-menu-wrapper');
-    if (!clickedInside && this.showUserDropdown) {
+
+    // Close User Dropdown
+    const clickedInsideUser = target.closest('.user-menu-wrapper');
+    if (!clickedInsideUser && this.showUserDropdown) {
       this.closeDropdown();
+    }
+
+    // Close Notification Dropdown
+    const clickedInsideNotif = target.closest('.notification-wrapper');
+    const clickedInsideMobileNotif = target.closest('.mobile-notification-wrapper');
+
+    if (!clickedInsideNotif && !clickedInsideMobileNotif && this.showNotifications) {
+      this.closeNotifications();
     }
   }
 
   closeDropdown(): void {
     this.showUserDropdown = false;
+  }
+
+  closeNotifications(): void {
+    this.showNotifications = false;
   }
 
   private closeMobileNavbar(): void {
@@ -281,10 +303,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.router.navigate(['/mis-campeonatos']);
   }
 
-  goToMyAcademy(): void {
-    this.closeDropdown();
-    this.router.navigate(['/mi-academia']);
-  }
+
 
   logout(): void {
     this.closeDropdown();

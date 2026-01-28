@@ -371,7 +371,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
         const payload: any = {
             idUsuario: this.currentUser.id, // ID User
             campeonatoId: this.id,          // ID Championship
-            codigoAcceso: this.code,
+            codigo: this.code,
             modalidades: this.registrationData.modalidades,
         };
 

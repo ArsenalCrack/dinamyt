@@ -76,68 +76,7 @@
         </app-custom-select>
         <p *ngIf="usuario.cinturon_rango === ''" class="no-seleccionado">No seleccionado</p>
       </div>
-      <div class="field editable">
-        <label>Academia</label>
-        <div class="profile-autocomplete" #academiaAutocomplete>
-          <input type="text" class="search-input" [(ngModel)]="academiaSearchText" [ngModelOptions]="{standalone:true}"
-            placeholder="Escribe o selecciona tu academia" maxlength="50" (input)="onAcademiaInputChange()"
-            (focus)="onAcademiaInputFocus()" (blur)="onAcademiaInputBlur()" (keydown)="onAcademiaKeydown($event)"
-            autocomplete="off" />
 
-          <span class="arrow" [class.arrow-open]="academiaIsOpen" (click)="toggleAcademiaDropdown()"
-            (mousedown)="$event.preventDefault()"></span>
-
-          <ul class="options" *ngIf="academiaIsOpen && academiaFilteredOptions.length > 0" role="listbox"
-            [ngStyle]="academiaOptionsStyle">
-            <li *ngFor="let opt of academiaFilteredOptions; let i = index" role="option"
-              [class.focus]="i === academiaFocusedIndex" (click)="selectAcademia(opt)"
-              (mouseenter)="academiaFocusedIndex = i">
-              {{ opt.label }}
-            </li>
-          </ul>
-
-          <div class="no-results" *ngIf="academiaIsOpen && academiaFilteredOptions.length === 0"
-            [ngStyle]="academiaOptionsStyle">
-            No se encontraron academias
-          </div>
-        </div>
-        <div *ngIf="academiaLimitMsg" class="msg-warning">
-          <small>{{ academiaLimitMsg }}</small>
-        </div>
-
-        <p *ngIf="usuario.academia === ''" class="no-seleccionado">No seleccionado</p>
-      </div>
-      <div class="field editable">
-        <label>Instructor</label>
-        <div class="profile-autocomplete" #instructorAutocomplete>
-          <input type="text" class="search-input" [(ngModel)]="instructorSearchText"
-            [ngModelOptions]="{standalone:true}" placeholder="Escribe o selecciona tu instructor" maxlength="50"
-            (input)="onInstructorInputChange()" (focus)="onInstructorInputFocus()" (blur)="onInstructorInputBlur()"
-            (keydown)="onInstructorKeydown($event)" autocomplete="off" />
-
-          <span class="arrow" [class.arrow-open]="instructorIsOpen" (click)="toggleInstructorDropdown()"
-            (mousedown)="$event.preventDefault()"></span>
-
-          <ul class="options" *ngIf="instructorIsOpen && instructorFilteredOptions.length > 0" role="listbox"
-            [ngStyle]="instructorOptionsStyle">
-            <li *ngFor="let opt of instructorFilteredOptions; let i = index" role="option"
-              [class.focus]="i === instructorFocusedIndex" (click)="selectInstructor(opt)"
-              (mouseenter)="instructorFocusedIndex = i">
-              {{ opt.label }}
-            </li>
-          </ul>
-
-          <div class="no-results" *ngIf="instructorIsOpen && instructorFilteredOptions.length === 0"
-            [ngStyle]="instructorOptionsStyle">
-            No se encontraron instructores
-          </div>
-        </div>
-        <div *ngIf="instructorLimitMsg" class="msg-warning">
-          <small>{{ instructorLimitMsg }}</small>
-        </div>
-
-        <p *ngIf="usuario.Instructor === ''" class="no-seleccionado">No seleccionado</p>
-      </div>
     </div>
 
     <div class="actions">

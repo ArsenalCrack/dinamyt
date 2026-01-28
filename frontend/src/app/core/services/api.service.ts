@@ -99,6 +99,53 @@ export class ApiService {
     return this.http.put(`${this.apiUrl}/campeonatos/${id}`, payload);
   }
 
+  // --- Módulo Academia ---
+
+  // Registro de estudiante/instructor en una academia existente
+  registrarseEnAcademia(payload: { idAcademia: string, idInstructor: string, userId: string }) {
+    return this.http.post(`${this.apiUrl}/academia/unirse`, payload);
+  }
+
+  // Creación de nueva academia (Dueño)
+  crearAcademia(payload: any) {
+    return this.http.post(`${this.apiUrl}/academia/crear`, payload);
+  }
+
+  // Obtener detalles de mi academia (para todos los roles)
+  getMiAcademia(userId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/academia/mi-academia/${userId}`);
+  }
+
+  // Gestión de dueño (Mi Dashboard)
+  getDetallesAcademiaOwner(userId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/academia/owner-dashboard/${userId}`);
+  }
+
+  // Aceptar/Rechazar inscripciones
+  gestionarInscripcion(idSolicitud: string, estado: 'aceptado' | 'rechazado') {
+    return this.http.post(`${this.apiUrl}/academia/solicitudes/${idSolicitud}`, { estado });
+  }
+
+  // Obtener listas de miembros
+  getMiembrosAcademia(idAcademia: string, tipo: 'estudiantes' | 'instructores') {
+    return this.http.get<any[]>(`${this.apiUrl}/academia/${idAcademia}/${tipo}`);
+  }
+
+  // Obtener solicitudes de inscripción (pendientes)
+  getInscripcionesAcademia(idAcademia: string) {
+    return this.http.get<any[]>(`${this.apiUrl}/academia/${idAcademia}/solicitudes`);
+  }
+
+  // Eliminar miembro
+  eliminarMiembro(idAcademia: string, idUsuario: string) {
+    return this.http.delete(`${this.apiUrl}/academia/${idAcademia}/miembros/${idUsuario}`);
+  }
+
+  // Actualizar academia
+  updateAcademia(idAcademia: string, payload: any) {
+    return this.http.put(`${this.apiUrl}/academia/${idAcademia}`, payload);
+  }
+
   deleteCampeonato(id: string | number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/campeonatos/${id}`);
   }
@@ -110,5 +157,26 @@ export class ApiService {
 
   getJuecesByCampeonato(campeonatoId: string | number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/campeonatos/${campeonatoId}/jueces`);
+  }
+
+  inscribirUsuarioCampeonato(payload: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/inscripciones`, payload);
+  }
+
+  getMisInscripciones(userId: string | number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/inscripciones/usuario/${userId}`);
+  }
+
+  eliminarInscripcion(inscriptionId: string | number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/inscripciones/${inscriptionId}`);
+  }
+
+  getMisInvitaciones(userId: string | number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/invitaciones/usuario/${userId}`);
+  }
+
+  // responderInvitacion: estado can be 'ACEPTADO', 'RECHAZADO', 'CANCELADO'
+  responderInvitacion(invitationId: string | number, estado: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/invitaciones/${invitationId}`, { estado });
   }
 }

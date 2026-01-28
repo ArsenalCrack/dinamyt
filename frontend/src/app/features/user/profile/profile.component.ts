@@ -32,9 +32,7 @@ export class ProfileComponent implements OnDestroy {
     cinturon_rango: sessionStorage.getItem('cinturon_rango') ?? sessionStorage.getItem('cinturonRango') ?? null,
     nacionalidad: sessionStorage.getItem('nacionalidad') || '',
     ciudad: sessionStorage.getItem('ciudad') || '',
-    numero_celular: (sessionStorage.getItem('numero_celular') ?? sessionStorage.getItem('numeroCelular')) || '',
-    academia: this.parseStoredValue(sessionStorage.getItem('academia'), ['academia']),
-    Instructor: this.parseStoredValue(sessionStorage.getItem('Instructor') ?? sessionStorage.getItem('instructor'), ['Instructor', 'instructor'])
+    numero_celular: (sessionStorage.getItem('numero_celular') ?? sessionStorage.getItem('numeroCelular')) || ''
   };
 
   ciudadesList: string[] = [];
@@ -44,8 +42,6 @@ export class ProfileComponent implements OnDestroy {
   phoneCodeOptions: Array<{ value: string | null; label: string }> = [];
 
   // Opciones para dropdowns
-  academias: Array<{ value: string | null; label: string }> = [];
-  instructores: Array<{ value: string | null; label: string }> = [];
   private static readonly CINTURONES_BASE = [
     { value: 'Blanco', label: 'Blanco' },
     { value: 'Amarillo', label: 'Amarillo' },
@@ -72,31 +68,7 @@ export class ProfileComponent implements OnDestroy {
     ];
   }
 
-  academiaOtra: string = '';
-  instructorOtro: string = '';
-
   correoLimitMsg = '';
-
-  academiaLimitMsg = '';
-  instructorLimitMsg = '';
-  academiaOtraLimitMsg = '';
-  instructorOtroLimitMsg = '';
-
-  // Autocomplete (academia)
-  @ViewChild('academiaAutocomplete', { static: false }) academiaAutocomplete?: ElementRef<HTMLElement>;
-  academiaSearchText = '';
-  academiaIsOpen = false;
-  academiaFocusedIndex = -1;
-  academiaFilteredOptions: Array<{ value: string | null; label: string }> = [];
-  academiaOptionsStyle: { [key: string]: any } = {};
-
-  // Autocomplete (instructor)
-  @ViewChild('instructorAutocomplete', { static: false }) instructorAutocomplete?: ElementRef<HTMLElement>;
-  instructorSearchText = '';
-  instructorIsOpen = false;
-  instructorFocusedIndex = -1;
-  instructorFilteredOptions: Array<{ value: string | null; label: string }> = [];
-  instructorOptionsStyle: { [key: string]: any } = {};
 
   fotoPreview: string | null = null;
   fotoFile: File | null = null;
@@ -114,7 +86,6 @@ export class ProfileComponent implements OnDestroy {
     this.initLocationData();
     this.initTelefono();
     this.initCiudad();
-    this.cargarAcademias();
   }
 
   private initLocationData() {
@@ -268,462 +239,7 @@ export class ProfileComponent implements OnDestroy {
     return v;
   }
 
-  cargarAcademias() {
-    this.api.cargaracademias().subscribe({
-      next: (u: any[]) => {
-        this.academias = (u || []).map(a => {
-          const rawId = a?.ID_academia ?? a?.id_academia ?? a?.idAcademia ?? a?.id;
-          const rawNombre = a?.nombre ?? a?.name;
-          return {
-            value: rawId !== null && rawId !== undefined ? String(rawId) : null,
-            label: rawNombre !== null && rawNombre !== undefined ? String(rawNombre) : ''
-          };
-        }).filter(a => a.label);
-
-        // Si en sessionStorage hay un texto (academia personalizada), forzar modo 'otra'
-        this.normalizeAcademiaFromStoredValue();
-        this.syncAcademiaSearchTextFromValue();
-        console.log(this.usuario.Instructor);
-        if (this.usuario.academia && this.usuario.academia !== 'otra') {
-          this.cargarInstructores(this.usuario.academia);
-        }
-      },
-      error: (err) => {
-        console.log(err);
-      }
-    })
-  }
-
-  cargarInstructores(idAcademia: string | number | null): void {
-    const id = Number(idAcademia);
-    // Validaciones
-    if (!idAcademia || idAcademia === 'otra' || isNaN(id)) {
-      this.instructores = [];
-      this.normalizeInstructorFromStoredValue();
-      this.syncInstructorSearchTextFromValue();
-      return;
-    }
-
-    this.api.cargarinstructor(id,sessionStorage.getItem('idDocumento') || '').subscribe({
-      next: (u: any[]) => {
-        this.instructores = (u || [])
-          .map(i => {
-            const rawId = i?.idDocumento ?? i?.ID_documento ?? i?.id_documento ?? i?.id;
-            const rawNombre = i?.nombreC ?? i?.nombre ?? i?.name;
-
-            return {
-              value: rawId != null ? String(rawId) : null,
-              label: rawNombre != null ? String(rawNombre) : ''
-            };
-          })
-          .filter(i => i.label);
-
-        this.normalizeInstructorFromStoredValue();
-        this.syncInstructorSearchTextFromValue();
-      },
-      error: err => {
-        console.error(err);
-        this.instructores = [];
-        this.syncInstructorSearchTextFromValue();
-      }
-    });
-  }
-
-
-  private normalizeAcademiaFromStoredValue() {
-    const current = this.usuario.academia;
-    if (!current || current === 'otra') return;
-
-    // Valor corrupto en sessionStorage (p.ej. guardado como objeto)
-    if (String(current).trim() === '[object Object]') {
-      sessionStorage.removeItem('academia');
-      this.usuario.academia = null;
-      this.academiaOtra = '';
-      return;
-    }
-
-    const currentStr = String(current).trim();
-
-    // 1) Si coincide con algún id, ok
-    const matchById = this.academias.some(a => a.value === currentStr);
-    if (matchById) return;
-
-    // 2) Si viene guardado como nombre, resolver al id correspondiente
-    const matchByLabel = this.academias.find(a => a.label.trim().toLowerCase() === currentStr.toLowerCase());
-    if (matchByLabel?.value) {
-      this.usuario.academia = matchByLabel.value;
-      return;
-    }
-
-    // 3) Si no coincide, tratarlo como texto libre
-    this.academiaOtra = currentStr.slice(0, 50);
-    this.usuario.academia = 'otra';
-  }
-
-  private normalizeInstructorFromStoredValue() {
-    const current = this.usuario.Instructor;
-    if (!current || current === 'otro') return;
-
-    if (String(current).trim() === '[object Object]') {
-      sessionStorage.removeItem('Instructor');
-      sessionStorage.removeItem('instructor');
-      this.usuario.Instructor = null;
-      this.instructorOtro = '';
-      return;
-    }
-
-    const currentStr = String(current).trim();
-
-    // 1) Si coincide con algún id, ok
-    const matchById = this.instructores.some(i => i.value === currentStr);
-    if (matchById) return;
-
-    // 2) Si viene guardado como nombre, resolver al id correspondiente
-    const matchByLabel = this.instructores.find(i => i.label.trim().toLowerCase() === currentStr.toLowerCase());
-    if (matchByLabel?.value) {
-      this.usuario.Instructor = matchByLabel.value;
-      return;
-    }
-
-    // 3) Si no coincide, tratarlo como texto libre
-    this.instructorOtro = currentStr.slice(0, 50);
-    this.usuario.Instructor = 'otro';
-  }
-
-  // Opciones con valores nulos para UX consistente
-  get academiaOptions(): Array<{ value: string | null; label: string }> {
-    return [...this.academias];
-  }
-
-  get instructorOptions(): Array<{ value: string | null; label: string }> {
-    return [...this.instructores];
-  }
-
-  private compareValues(a: any, b: any): boolean {
-    if (a === b) return true;
-    if (a === null || a === undefined || b === null || b === undefined) return a === b;
-    return String(a) === String(b);
-  }
-
-  private findLabelByValue(options: Array<{ value: string | null; label: string }>, value: any): string {
-    const match = options.find(o => this.compareValues(o.value, value));
-    return match?.label ?? '';
-  }
-
-  private syncAcademiaSearchTextFromValue(): void {
-    if (this.academiaIsOpen) return;
-    this.academiaSearchText = this.findLabelByValue(this.academiaOptions, this.usuario.academia);
-  }
-
-  private syncInstructorSearchTextFromValue(): void {
-    if (this.instructorIsOpen) return;
-    this.instructorSearchText = this.findLabelByValue(this.instructorOptions, this.usuario.Instructor);
-  }
-
-  private positionAcademiaOptions() {
-    try {
-      const el = this.academiaAutocomplete?.nativeElement;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-
-      const margin = 16;
-      const preferredWidth = Math.max(rect.width, 200);
-      const maxWidth = Math.min(preferredWidth, vw - margin * 2);
-
-      let left = rect.left;
-      if (left + maxWidth + margin > vw) left = Math.max(margin, vw - maxWidth - margin);
-      if (left < margin) left = margin;
-
-      const spaceBelow = vh - rect.bottom - margin;
-      const spaceAbove = rect.top - margin;
-      const maxHeight = 240;
-      const gap = 8;
-
-      let top: number | null = null;
-      let bottom: number | null = null;
-      if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-        top = rect.bottom + gap;
-      } else {
-        bottom = vh - (rect.top - gap);
-      }
-
-      const style: any = {
-        position: 'fixed',
-        left: `${left}px`,
-        width: `${maxWidth}px`,
-        'max-height': `${maxHeight}px`,
-        overflow: 'auto'
-      };
-      if (top !== null) style.top = `${top}px`; else style.bottom = `${bottom}px`;
-      this.academiaOptionsStyle = style;
-    } catch {
-      this.academiaOptionsStyle = {};
-    }
-  }
-
-  private positionInstructorOptions() {
-    try {
-      const el = this.instructorAutocomplete?.nativeElement;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-
-      const margin = 16;
-      const preferredWidth = Math.max(rect.width, 200);
-      const maxWidth = Math.min(preferredWidth, vw - margin * 2);
-
-      let left = rect.left;
-      if (left + maxWidth + margin > vw) left = Math.max(margin, vw - maxWidth - margin);
-      if (left < margin) left = margin;
-
-      const spaceBelow = vh - rect.bottom - margin;
-      const spaceAbove = rect.top - margin;
-      const maxHeight = 240;
-      const gap = 8;
-
-      let top: number | null = null;
-      let bottom: number | null = null;
-      if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-        top = rect.bottom + gap;
-      } else {
-        bottom = vh - (rect.top - gap);
-      }
-
-      const style: any = {
-        position: 'fixed',
-        left: `${left}px`,
-        width: `${maxWidth}px`,
-        'max-height': `${maxHeight}px`,
-        overflow: 'auto'
-      };
-      if (top !== null) style.top = `${top}px`; else style.bottom = `${bottom}px`;
-      this.instructorOptionsStyle = style;
-    } catch {
-      this.instructorOptionsStyle = {};
-    }
-  }
-
-  goBack(): void {
-    this.location.back();
-  }
-
-  onAcademiaChange(value: string | null): void {
-
-    // Guardar academia (ID o 'otra')
-    this.usuario.academia = value;
-
-    // Reset instructor
-    this.usuario.Instructor = null;
-    this.instructores = [];
-
-    if (value === 'otra' || !value) {
-      this.academiaOtra = '';
-      this.syncAcademiaSearchTextFromValue();
-      return;
-    }
-
-    // Cargar instructores usando el ID
-    this.cargarInstructores(value);
-
-    this.syncAcademiaSearchTextFromValue();
-  }
-
-
-  onInstructorChange(value: any): void {
-    this.usuario.Instructor = value;
-    if (this.usuario.Instructor !== 'otro') {
-      this.instructorOtro = '';
-    }
-    this.syncInstructorSearchTextFromValue();
-  }
-
-  // ==== UI handlers: Academia autocomplete (inline) ====
-  onAcademiaInputChange() {
-    if (this.academiaSearchText?.length > 50) this.academiaSearchText = this.academiaSearchText.slice(0, 50);
-    this.academiaLimitMsg = this.academiaSearchText?.length >= 50 ? 'Máximo 50 caracteres.' : '';
-
-    const search = this.academiaSearchText.toLowerCase().trim();
-    const options = this.academiaOptions;
-    this.academiaFilteredOptions = !search
-      ? [...options]
-      : options.filter(o => o.label.toLowerCase().includes(search));
-
-    this.academiaIsOpen = true;
-    this.academiaFocusedIndex = this.academiaFilteredOptions.length > 0 ? 0 : -1;
-    this.positionAcademiaOptions();
-  }
-
-  onAcademiaInputFocus() {
-    this.academiaFilteredOptions = [...this.academiaOptions];
-    this.academiaIsOpen = true;
-    this.academiaFocusedIndex = this.academiaFilteredOptions.length > 0 ? 0 : -1;
-    this.positionAcademiaOptions();
-  }
-
-  toggleAcademiaDropdown() {
-    if (this.academiaIsOpen) {
-      this.academiaIsOpen = false;
-      return;
-    }
-    this.academiaFilteredOptions = [...this.academiaOptions];
-    this.academiaIsOpen = true;
-    this.academiaFocusedIndex = this.academiaFilteredOptions.length > 0 ? 0 : -1;
-    this.positionAcademiaOptions();
-  }
-
-  selectAcademia(option: { value: string | null; label: string }) {
-    this.academiaSearchText = option.label;
-    this.onAcademiaChange(option.value);
-    this.academiaIsOpen = false;
-  }
-
-  onAcademiaInputBlur() {
-    // Si el texto no coincide con una opción válida, restaurar el valor seleccionado
-    const exactMatch = this.academiaOptions.some(o => o.label === this.academiaSearchText);
-    if (this.academiaSearchText && !exactMatch) {
-      this.syncAcademiaSearchTextFromValue();
-    }
-  }
-
-  onAcademiaKeydown(event: KeyboardEvent) {
-    if (!this.academiaIsOpen) {
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        this.onAcademiaInputFocus();
-      }
-      return;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      this.academiaFocusedIndex = Math.min(this.academiaFocusedIndex + 1, this.academiaFilteredOptions.length - 1);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      this.academiaFocusedIndex = Math.max(this.academiaFocusedIndex - 1, 0);
-    } else if (event.key === 'Enter') {
-      event.preventDefault();
-      const opt = this.academiaFilteredOptions[this.academiaFocusedIndex];
-      if (opt) this.selectAcademia(opt);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      this.academiaIsOpen = false;
-      this.syncAcademiaSearchTextFromValue();
-    }
-  }
-
-  // ==== UI handlers: Instructor autocomplete (inline) ====
-  onInstructorInputChange() {
-    if (this.instructorSearchText?.length > 50) this.instructorSearchText = this.instructorSearchText.slice(0, 50);
-    this.instructorLimitMsg = this.instructorSearchText?.length >= 50 ? 'Máximo 50 caracteres.' : '';
-
-    const search = this.instructorSearchText.toLowerCase().trim();
-    const options = this.instructorOptions;
-    this.instructorFilteredOptions = !search
-      ? [...options]
-      : options.filter(o => o.label.toLowerCase().includes(search));
-
-    this.instructorIsOpen = true;
-    this.instructorFocusedIndex = this.instructorFilteredOptions.length > 0 ? 0 : -1;
-    this.positionInstructorOptions();
-  }
-
-  onInstructorInputFocus() {
-    this.instructorFilteredOptions = [...this.instructorOptions];
-    this.instructorIsOpen = true;
-    this.instructorFocusedIndex = this.instructorFilteredOptions.length > 0 ? 0 : -1;
-    this.positionInstructorOptions();
-  }
-
-  toggleInstructorDropdown() {
-    if (this.instructorIsOpen) {
-      this.instructorIsOpen = false;
-      return;
-    }
-    this.instructorFilteredOptions = [...this.instructorOptions];
-    this.instructorIsOpen = true;
-    this.instructorFocusedIndex = this.instructorFilteredOptions.length > 0 ? 0 : -1;
-    this.positionInstructorOptions();
-  }
-
-  selectInstructor(option: { value: string | null; label: string }) {
-    this.instructorSearchText = option.label;
-    this.onInstructorChange(option.value);
-    this.instructorIsOpen = false;
-  }
-
-  onInstructorInputBlur() {
-    const exactMatch = this.instructorOptions.some(o => o.label === this.instructorSearchText);
-    if (this.instructorSearchText && !exactMatch) {
-      this.syncInstructorSearchTextFromValue();
-    }
-  }
-
-  onInstructorKeydown(event: KeyboardEvent) {
-    if (!this.instructorIsOpen) {
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        this.onInstructorInputFocus();
-      }
-      return;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      this.instructorFocusedIndex = Math.min(this.instructorFocusedIndex + 1, this.instructorFilteredOptions.length - 1);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      this.instructorFocusedIndex = Math.max(this.instructorFocusedIndex - 1, 0);
-    } else if (event.key === 'Enter') {
-      event.preventDefault();
-      const opt = this.instructorFilteredOptions[this.instructorFocusedIndex];
-      if (opt) this.selectInstructor(opt);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      this.instructorIsOpen = false;
-      this.syncInstructorSearchTextFromValue();
-    }
-  }
-
-  onAcademiaOtraInput() {
-    if (this.academiaOtra?.length > 50) this.academiaOtra = this.academiaOtra.slice(0, 50);
-    this.academiaOtraLimitMsg = this.academiaOtra?.length >= 50 ? 'Máximo 50 caracteres.' : '';
-  }
-
-  onInstructorOtroInput() {
-    if (this.instructorOtro?.length > 50) this.instructorOtro = this.instructorOtro.slice(0, 50);
-    this.instructorOtroLimitMsg = this.instructorOtro?.length >= 50 ? 'Máximo 50 caracteres.' : '';
-  }
-
-  @HostListener('document:click', ['$event.target'])
-  onClickOutside(target: EventTarget | null) {
-    if (!target) return;
-    const node = target as Node;
-
-    if (this.academiaIsOpen && this.academiaAutocomplete && !this.academiaAutocomplete.nativeElement.contains(node)) {
-      this.academiaIsOpen = false;
-      this.syncAcademiaSearchTextFromValue();
-    }
-
-    if (this.instructorIsOpen && this.instructorAutocomplete && !this.instructorAutocomplete.nativeElement.contains(node)) {
-      this.instructorIsOpen = false;
-      this.syncInstructorSearchTextFromValue();
-    }
-  }
-
-  @HostListener('window:resize')
-  onWindowResize() {
-    if (this.academiaIsOpen) this.positionAcademiaOptions();
-    if (this.instructorIsOpen) this.positionInstructorOptions();
-  }
-
-  @HostListener('window:scroll')
-  onWindowScroll() {
-    if (this.academiaIsOpen) this.positionAcademiaOptions();
-    if (this.instructorIsOpen) this.positionInstructorOptions();
-  }
+  // Note: Removed Academy/Instructor loading/handling methods
 
   onFileChange(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -766,25 +282,13 @@ export class ProfileComponent implements OnDestroy {
     });
   }
 
+
+
   saveProfile() {
     this.message = null;
     this.saving = true;
     this.lockScroll();
     const cinturonValue = this.usuario.cinturon_rango === null ? null : this.usuario.cinturon_rango?.trim() || null;
-
-    let academiaValue: any = null;
-    if (this.usuario.academia === 'otra') {
-      academiaValue = this.academiaOtra?.trim().slice(0, 50) || null;
-    } else if (this.usuario.academia) {
-      academiaValue = typeof this.usuario.academia === 'string' ? this.usuario.academia.trim() : String(this.usuario.academia);
-    }
-
-    let instructorValue: any = null;
-    if (this.usuario.Instructor === 'otro') {
-      instructorValue = this.instructorOtro?.trim().slice(0, 50) || null;
-    } else if (this.usuario.Instructor) {
-      instructorValue = typeof this.usuario.Instructor === 'string' ? this.usuario.Instructor.trim() : String(this.usuario.Instructor);
-    }
 
     const emailValue = (this.usuario.correo || '').trim().slice(0, this.MAX_EMAIL_LEN);
 
@@ -804,28 +308,38 @@ export class ProfileComponent implements OnDestroy {
 
     const payload: any = {
       correo: emailValue,
-      numeroCelular: phoneFull,
+      numeroCelular: phoneDigits, // Sending digits mostly, or full? Current code built full but maybe API expects just digits or full. Logic at line 347 built phoneFull. But payload sent phoneLength?
+      // Wait, original code: 
+      // const phoneDigits = ...
+      // const phoneFull = ...
+      // payload: { numeroCelular: phoneFull ... }
+      // I will keep phoneFull logic.
+      numero_celular: phoneDigits, // Keeping compatibility if needed
+      codigo_pais: this.telefonoCodigo,
       ciudad: this.usuario.ciudad,
+      nacionalidad: this.usuario.nacionalidad,
       cinturonRango: cinturonValue,
-      codigo: academiaValue, // Used as academia ID
-      modo: instructorValue  // Used as instructor ID
+      // Removed academia/instructor fields
     };
 
+    // Use phoneFull for the main field if that's what backend expects or previous code did.
+    // Previous code: `numeroCelular: phoneFull`
+    payload.numeroCelular = phoneFull;
+
+
     const startedAt = Date.now();
+    // Using updateProfile based on previous code view
     this.api.updateProfile(payload).subscribe({
       next: async (u: any) => {
         // Persistir en sessionStorage
         if (payload.correo) sessionStorage.setItem('correo', payload.correo);
         if (payload.ciudad !== undefined) sessionStorage.setItem('ciudad', payload.ciudad || '');
+        sessionStorage.setItem('nacionalidad', payload.nacionalidad || '');
 
         if (payload.numeroCelular !== undefined) {
-          if (!payload.numeroCelular) {
-            sessionStorage.removeItem('numero_celular');
-            sessionStorage.removeItem('numeroCelular');
-          } else {
-            sessionStorage.setItem('numero_celular', payload.numeroCelular);
-            sessionStorage.setItem('numeroCelular', payload.numeroCelular);
-          }
+          sessionStorage.setItem('numero_celular', phoneDigits); // Store digits usually in session for inputs
+          sessionStorage.setItem('numeroCelular', phoneDigits);
+          // Store Country Code? Maybe separate.
         }
 
         if (payload.cinturonRango !== undefined) {
@@ -838,22 +352,6 @@ export class ProfileComponent implements OnDestroy {
           }
         }
 
-        // 'codigo' is the academia ID here
-        if (payload.codigo !== undefined) {
-          if (!payload.codigo) sessionStorage.removeItem('academia');
-          else sessionStorage.setItem('academia', payload.codigo);
-        }
-
-        // 'modo' is the instructor ID here
-        if (payload.modo !== undefined) {
-          if (!payload.modo) {
-            sessionStorage.removeItem('Instructor');
-            sessionStorage.removeItem('instructor');
-          } else {
-            sessionStorage.setItem('Instructor', payload.modo);
-            sessionStorage.setItem('instructor', payload.modo);
-          }
-        }
         this.success = true;
         this.message = 'Perfil actualizado.';
 
@@ -874,6 +372,10 @@ export class ProfileComponent implements OnDestroy {
 
   goChangePassword() {
     this.router.navigate(['/account/password']);
+  }
+
+  goBack(): void {
+    this.location.back();
   }
 
   ngOnDestroy(): void {

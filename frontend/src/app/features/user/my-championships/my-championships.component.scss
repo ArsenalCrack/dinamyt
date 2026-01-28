@@ -9,13 +9,14 @@
 }
 
 .my-championships-container {
-  min-height: 100vh;
+  min-height: calc(100vh - 140px);
+  /* Adjust based on navbar + footer rough height */
   background-color: var(--color-fondo);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  margin-top: 20px;
+  padding: 2rem;
+  /* Removed margin-top to avoid pushing it down too much */
 }
 
 .my-championships-card {
@@ -340,6 +341,13 @@
 }
 
 @media (max-width: 768px) {
+  .my-championships-container {
+    align-items: flex-start;
+    padding: 10px;
+    margin-top: 0;
+    min-height: auto;
+  }
+
   .my-championships-card {
     padding: 20px;
   }

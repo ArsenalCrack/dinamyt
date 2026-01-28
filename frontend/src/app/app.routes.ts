@@ -25,11 +25,7 @@ export const routes: Routes = [
     loadComponent: () => import('./features/user/profile/profile.component').then(m => m.ProfileComponent),
     canActivate: [authGuard]
   },
-  {
-    path: 'mi-academia',
-    loadComponent: () => import('./features/user/my-academy/my-academy.component').then(m => m.MyAcademyComponent),
-    canActivate: [authGuard]
-  },
+
   {
     path: 'account/password',
     loadComponent: () => import('./features/user/change-password/change-password.component').then(m => m.ChangePasswordComponent),
@@ -43,6 +39,16 @@ export const routes: Routes = [
   {
     path: 'mis-estadisticas',
     loadComponent: () => import('./features/user/my-statistics/my-statistics.component').then(m => m.MyStatisticsComponent),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'mis-inscripciones',
+    loadComponent: () => import('./features/user/my-inscriptions/my-inscriptions.component').then(m => m.MyInscriptionsComponent),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'mis-invitaciones',
+    loadComponent: () => import('./features/user/my-invitations/my-invitations.component').then(m => m.MyInvitationsComponent),
     canActivate: [authGuard]
   },
   {
