@@ -32,7 +32,7 @@ export class ProfileComponent implements OnDestroy {
     cinturon_rango: sessionStorage.getItem('cinturon_rango') ?? sessionStorage.getItem('cinturonRango') ?? null,
     nacionalidad: sessionStorage.getItem('nacionalidad') || '',
     ciudad: sessionStorage.getItem('ciudad') || '',
-    numero_celular: (sessionStorage.getItem('numero_celular') ?? sessionStorage.getItem('numeroCelular')) || ''
+    numero_celular: (sessionStorage.getItem('numero_celular') ?? sessionStorage.getItem('numeroCelular')) || '',
   };
 
   ciudadesList: string[] = [];
@@ -308,22 +308,15 @@ export class ProfileComponent implements OnDestroy {
 
     const payload: any = {
       correo: emailValue,
-      numeroCelular: phoneDigits, // Sending digits mostly, or full? Current code built full but maybe API expects just digits or full. Logic at line 347 built phoneFull. But payload sent phoneLength?
-      // Wait, original code: 
-      // const phoneDigits = ...
-      // const phoneFull = ...
-      // payload: { numeroCelular: phoneFull ... }
-      // I will keep phoneFull logic.
+      numeroCelular: phoneFull, // Use the full phone number with code
       numero_celular: phoneDigits, // Keeping compatibility if needed
       codigo_pais: this.telefonoCodigo,
       ciudad: this.usuario.ciudad,
-      nacionalidad: this.usuario.nacionalidad,
+      nacionalidad: this.usuario.nacionalidad, // Always send nationality
       cinturonRango: cinturonValue,
       // Removed academia/instructor fields
     };
 
-    // Use phoneFull for the main field if that's what backend expects or previous code did.
-    // Previous code: `numeroCelular: phoneFull`
     payload.numeroCelular = phoneFull;
 
 

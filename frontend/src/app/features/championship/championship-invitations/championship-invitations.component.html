@@ -1,6 +1,6 @@
 <div class="invitations-container">
-    <div class="toast-notification" *ngIf="toastVisible">
-        <i class="fas fa-check-circle"></i>
+    <div class="toast-notification" *ngIf="toastVisible" [class.error]="toastIsError">
+        <i class="fas" [ngClass]="toastIsError ? 'fa-exclamation-circle' : 'fa-check-circle'"></i>
         <span>{{ toastMessage }}</span>
     </div>
 
@@ -166,7 +166,10 @@
                         </div>
                         <div class="user-details">
                             <span class="name">{{ user.nombre }}</span>
-                            <span class="email">{{ user.email }}</span>
+                            <div class="meta-info">
+                                <span class="id-doc">{{ user.id }}</span>
+                                <span class="email">{{ user.email }}</span>
+                            </div>
                         </div>
                         <i class="fas fa-plus action-icon"></i>
                     </div>
@@ -192,12 +195,8 @@
                 <!-- Role Selector for Judge -->
                 <div class="role-selector" *ngIf="activeSection === 'JUEZ'">
                     <label>Rol Asignado</label>
-                    <select [(ngModel)]="selectedJudgeRole">
-                        <option value="Juez Central">Juez Central</option>
-                        <option value="Juez de Mesa">Juez de Mesa</option>
-                        <option value="Juez Auxiliar">Juez Auxiliar</option>
-                        <option value="Arbitro">Árbitro</option>
-                    </select>
+                    <app-custom-select [options]="judgeRoleOptions" [(ngModel)]="selectedJudgeRole"
+                        placeholder="Selecciona un rol"></app-custom-select>
                 </div>
             </div>
         </div>

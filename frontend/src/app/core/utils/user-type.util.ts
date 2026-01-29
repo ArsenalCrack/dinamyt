@@ -13,9 +13,25 @@ export function extractUserRoles(input: any): string[] {
   const out: string[] = [];
 
   // 1) tipousuario (ID -> Role Mapping)
-  const tipo = usuario?.tipousuario;
+  let tipo = input.tipo_usuario || input.tipousuario || usuario?.tipo_usuario || usuario?.tipousuario;
+
+  // Fallback: Check sessionStorage if not found in object
+  if (!tipo) {
+    try {
+      tipo = sessionStorage.getItem('tipo_usuario') || sessionStorage.getItem('tipousuario');
+    } catch (e) { /* ignore if no storage */ }
+  }
+
   if (tipo) {
-    const id = tipo.idTipo || tipo.ID_Tipo || tipo.id_Tipo || tipo.IDTipo || tipo.id || (typeof tipo === 'number' ? tipo : null);
+    // If it's just a number or string number
+    let id = null;
+    if (typeof tipo === 'number' || (typeof tipo === 'string' && !isNaN(Number(tipo)))) {
+      id = Number(tipo);
+    } else {
+      // Object?
+      id = tipo.idTipo || tipo.ID_Tipo || tipo.id_Tipo || tipo.IDTipo || tipo.id;
+    }
+
     if (id == 1) out.push('usuario');
     else if (id == 2) out.push('instructor');
     else if (id == 3) {

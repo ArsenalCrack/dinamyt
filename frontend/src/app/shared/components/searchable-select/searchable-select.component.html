@@ -1,0 +1,20 @@
+<div class="country-autocomplete" [class.has-error]="touched && !value">
+    <!-- Using same class as country-autocomplete for style reuse or copy styles -->
+    <i class="fas fa-search icon-left"></i>
+
+    <input type="text" class="search-input" [attr.id]="inputId" [attr.name]="name" [placeholder]="placeholder"
+        [(ngModel)]="searchText" (input)="onInputChange()" (focus)="onInputFocus()" (blur)="onInputBlur()"
+        [disabled]="disabled" autocomplete="off">
+
+    <div class="arrow" [class.arrow-open]="isOpen" (click)="toggleDropdown()"></div>
+
+    <ul class="options" *ngIf="isOpen" [ngStyle]="optionsStyle">
+        <li *ngFor="let opt of filteredOptions; let i = index" [class.focus]="i === focusedIndex"
+            (click)="selectOption(opt)" (mouseenter)="focusedIndex = i">
+            {{ opt.label }}
+        </li>
+        <li *ngIf="filteredOptions.length === 0" class="no-results">
+            No se encontraron resultados
+        </li>
+    </ul>
+</div>

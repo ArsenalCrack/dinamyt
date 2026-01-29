@@ -1,129 +1,113 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Observable, BehaviorSubject, of } from 'rxjs';
+import { tap } from 'rxjs/operators';
 
-@Injectable({ providedIn: 'root' })
+@Injectable({
+  providedIn: 'root'
+})
 export class AuthService {
-  private _username = new BehaviorSubject<string | null>(this.readUsername());
-  private _isLoggedIn = new BehaviorSubject<boolean>(this.computeLoggedIn());
-  private _roles = new BehaviorSubject<string[]>(this.readRoles());
+  private apiUrl = 'http://localhost:8080/api';
 
-  readonly username$ = this._username.asObservable();
-  readonly isLoggedIn$ = this._isLoggedIn.asObservable();
-  readonly roles$ = this._roles.asObservable();
+  // State Management
+  private isLoggedInSubject = new BehaviorSubject<boolean>(false);
+  public isLoggedIn$ = this.isLoggedInSubject.asObservable();
 
-  private _redirectUrl: string | null = null;
+  private usernameSubject = new BehaviorSubject<string | null>(null);
+  public username$ = this.usernameSubject.asObservable();
 
-  get redirectUrl(): string | null {
-    return this._redirectUrl;
+  private rolesSubject = new BehaviorSubject<string[]>([]);
+  public roles$ = this.rolesSubject.asObservable();
+
+  public redirectUrl: string | null = null;
+
+  constructor(private http: HttpClient) {
+    this.checkLoginStatus();
   }
 
-  set redirectUrl(url: string | null) {
-    this._redirectUrl = url;
-  }
+  // --- API Methods ---
 
-  setLoggedIn(isLoggedIn: boolean, username: string | null = null) {
-    if (this._isLoggedIn.value === isLoggedIn && (username === undefined || this._username.value === username)) {
-      return;
-    }
-
-    if (this._isLoggedIn.value !== isLoggedIn) {
-      this._isLoggedIn.next(isLoggedIn);
-    }
-
-    if (username !== undefined && this._username.value !== username) {
-      this._username.next(username);
-    } else if (!isLoggedIn && this._username.value !== null) {
-      this._username.next(null);
-    }
-
-    if (!isLoggedIn) {
-      this.setRoles([]);
-    }
-  }
-
-  setRoles(roles: string[]): void {
-    const normalized = Array.from(
-      new Set((roles || []).map(r => String(r || '').trim().toLowerCase()).filter(Boolean))
-    ).sort(); // Sort to ensure consistent comparison
-
-    const currentRoles = [...this._roles.value].sort();
-
-    if (JSON.stringify(normalized) === JSON.stringify(currentRoles)) {
-      return;
-    }
-
-    if (normalized.length === 0) {
-      sessionStorage.removeItem('roles');
-      this._roles.next([]);
-      return;
-    }
-
-    sessionStorage.setItem('roles', JSON.stringify(normalized));
-    this._roles.next(normalized);
-  }
-
-  getRoles(): string[] {
-    return this.readRoles();
-  }
-
-  hasRole(role: string): boolean {
-    const r = String(role || '').trim().toLowerCase();
-    if (!r) return false;
-    return this.getRoles().includes(r);
-  }
-
-  refreshFromSession() {
-    const nextUsername = this.readUsername();
-    const nextLoggedIn = this.computeLoggedIn();
-    const nextRoles = this.readRoles();
-
-    // Evitar bucles infinitos: solo emitir si el valor realmente cambió.
-    if (this._username.value !== nextUsername) {
-      this._username.next(nextUsername);
-    }
-    if (this._isLoggedIn.value !== nextLoggedIn) {
-      this._isLoggedIn.next(nextLoggedIn);
-    }
-    // Comparación simple por JSON para evitar loops
-    if (JSON.stringify(this._roles.value) !== JSON.stringify(nextRoles)) {
-      this._roles.next(nextRoles);
-    }
-  }
-
-  isLoggedIn(): boolean {
-    // No emitir aquí para evitar loops si algún subscriber consulta el estado en su propio next().
-    return this.computeLoggedIn();
-  }
-
-  isAdminType3(): boolean {
-    // "Admin" para gestión de campeonatos: administrador o admin_proyecto
-    return this.hasRole('administrador') || this.hasRole('admin_proyecto');
-  }
-
-  private readUsername(): string | null {
-    return (
-      sessionStorage.getItem('username') ||
-      sessionStorage.getItem('userName') ||
-      null
+  login(credentials: { correo: string; contrasena: string }) {
+    return this.http.post(`${this.apiUrl}/login`, credentials).pipe(
+      tap((res: any) => {
+        if (res && res.usuario) {
+          this.setLoggedIn(true, res.usuario.nombre || res.usuario.correo);
+          // Store roles if available, or update later
+        }
+      })
     );
   }
 
-  private readRoles(): string[] {
-    const raw = sessionStorage.getItem('roles');
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return Array.from(new Set(parsed.map(r => String(r || '').trim().toLowerCase()).filter(Boolean)));
-    } catch {
-      return [];
-    }
+  registrarUsuario(usuario: any) {
+    return this.http.post(`${this.apiUrl}/registro`, usuario);
   }
 
-  private computeLoggedIn(): boolean {
-    const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
-    const correo = sessionStorage.getItem('correo');
-    const username = this.readUsername();
-    return !!(token || username || correo);
+  solicitarRecuperacion(correo: string) {
+    return this.http.post(`${this.apiUrl}/recuperar-password`, { correo });
+  }
+
+  verificarCodigo(datos: any) {
+    return this.http.post(`${this.apiUrl}/verificar`, datos);
+  }
+
+  reenviarCodigo(correo: string) {
+    return this.http.post(`${this.apiUrl}/reenviar`, { correo });
+  }
+
+  cambiarPassword(data: any) {
+    return this.http.post(`${this.apiUrl}/cambiar-password`, data);
+  }
+
+  // --- State Helpers ---
+
+  isLoggedIn(): boolean {
+    return this.isLoggedInSubject.value;
+  }
+
+  isAdminType3(): boolean {
+    // Check current roles
+    const roles = this.rolesSubject.value;
+    if (roles.includes('administrador') || roles.includes('admin_proyecto')) return true;
+
+    // Fallback to session storage if roles not loaded yet but type is stored
+    const sessType = sessionStorage.getItem('tipo_usuario');
+    return sessType === '3';
+  }
+
+  // --- State Management Methods ---
+
+  setRoles(roles: string[]) {
+    this.rolesSubject.next(roles);
+  }
+
+  refreshFromSession() {
+    this.checkLoginStatus();
+  }
+
+  setLoggedIn(status: boolean, username: string | null, roles: string[] = []) {
+    this.isLoggedInSubject.next(status);
+    this.usernameSubject.next(username);
+    this.rolesSubject.next(roles);
+  }
+
+  checkLoginStatus() {
+    // Basic check from storage - can be refined
+    const idDoc = sessionStorage.getItem('ID_documento') || sessionStorage.getItem('idDocumento');
+    const storedUser = localStorage.getItem('usuario');
+
+    if (idDoc || storedUser) {
+      this.isLoggedInSubject.next(true);
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser);
+          const user = parsed.usuario || parsed;
+          this.usernameSubject.next(user.nombreC || user.nombre || user.correo);
+          // Roles would need to be extracted or passed, for now empty
+        } catch (e) { }
+      }
+    } else {
+      this.isLoggedInSubject.next(false);
+      this.usernameSubject.next(null);
+    }
   }
 }

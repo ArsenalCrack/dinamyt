@@ -792,3 +792,27 @@
         }
     }
 }
+
+/* Toast Error */
+.toast-notification.error {
+    background: #e74c3c;
+    box-shadow: 0 10px 30px rgba(231, 76, 60, 0.4);
+}
+
+/* User Selection details */
+.user-details {
+    .meta-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        
+        .id-doc {
+            font-size: 0.75rem;
+            color: #666;
+            background: #f0f0f0;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            width: fit-content;
+        }
+    }
+}

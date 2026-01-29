@@ -3,6 +3,7 @@ import { CommonModule, Location } from '@angular/common'; // Import Location
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
+import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 
 interface Invitacion {
@@ -20,12 +21,18 @@ interface Invitacion {
 @Component({
   selector: 'app-championship-invitations',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, CustomSelectComponent],
   templateUrl: './championship-invitations.component.html',
   styleUrls: ['./championship-invitations.component.scss']
 })
 export class ChampionshipInvitationsComponent implements OnInit {
   championshipId: string | null = null;
+
+  judgeRoleOptions = [
+    { value: 'Juez Central', label: 'Juez Central' },
+    { value: 'Juez de Mesa', label: 'Juez de Mesa' },
+    { value: 'Juez', label: 'Juez' }
+  ];
 
   // States
   activeSection: 'COMPETIDOR' | 'JUEZ' = 'COMPETIDOR';
@@ -55,6 +62,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
   cancelTargetId: number | null = null;
 
   toastVisible = false;
+  toastIsError = false;
   toastMessage = '';
 
   constructor(
@@ -181,17 +189,19 @@ export class ChampionshipInvitationsComponent implements OnInit {
   searchUsers(): void {
     if (!this.inviteSearchQuery.trim()) {
       this.availableUsers = [];
-      return; 
+      return;
     }
 
-    this.api.searchUsers(this.inviteSearchQuery,sessionStorage.getItem('idDocumento') || '').subscribe({
+    this.api.searchUsers(this.inviteSearchQuery, sessionStorage.getItem('idDocumento') || '').subscribe({
       next: (users) => {
-        this.availableUsers = (users || []).map(u => ({
-          id: u.ID_documento || u.documento || u.id,
-          nombre: u.nombreC || u.nombre,
-          email: u.correo || u.email || 'Sin correo visible',
-          avatar: u.avatar || 'assets/default-avatar.png'
-        }));
+        this.availableUsers = (users || [])
+          .filter(u => (u.ID_documento || u.documento || u.id) != '0')
+          .map(u => ({
+            id: u.ID_documento || u.documento || u.id,
+            nombre: u.nombreC || u.nombre,
+            email: u.correo || u.email || 'Sin correo visible',
+            avatar: u.avatar || 'assets/default-avatar.png'
+          }));
       },
       error: (err) => {
         console.error('Error finding users:', err);
@@ -215,30 +225,53 @@ export class ChampionshipInvitationsComponent implements OnInit {
 
     this.sendingInvitation = true;
 
-    // Simulate API call
-    setTimeout(() => {
-      const newInvitation: Invitacion = {
-        id: Math.floor(Math.random() * 10000),
-        documento: this.selectedUser.id,
-        nombre: this.selectedUser.nombre,
-        email: this.selectedUser.email,
-        avatar: this.selectedUser.avatar,
-        tipo: this.activeSection,
-        estado: 'PENDIENTE',
-        fechaEnvio: new Date().toISOString().split('T')[0],
-        rol: this.activeSection === 'JUEZ' ? this.selectedJudgeRole : undefined
-      };
+    // Determine ID_tipo
+    let idTipo = 5; // Default Competidor
+    if (this.activeSection === 'JUEZ') {
+      switch (this.selectedJudgeRole) {
+        case 'Juez Central': idTipo = 6; break;
+        case 'Juez de Mesa': idTipo = 7; break;
+        case 'Juez': idTipo = 8; break;
+        default: idTipo = 8;
+      }
+    }
 
-      this.invitations.unshift(newInvitation); // Add to top
+    const payload = {
+      id_usuario: this.selectedUser.id,
+      id_campeonato: this.championshipId || '',
+      id_tipo: idTipo
+    };
 
-      this.sendingInvitation = false;
-      this.closeInviteModal();
-      this.showToast(`Invitación enviada a ${newInvitation.nombre}`);
+    this.api.enviarInvitacion(payload).subscribe({
+      next: (res) => {
+        const newInvitation: Invitacion = {
+          id: res.id || Math.floor(Math.random() * 10000), // Use ID from response if available
+          documento: this.selectedUser.id,
+          nombre: this.selectedUser.nombre,
+          email: this.selectedUser.email,
+          avatar: this.selectedUser.avatar,
+          tipo: this.activeSection,
+          estado: 'PENDIENTE',
+          fechaEnvio: new Date().toISOString().split('T')[0],
+          rol: this.activeSection === 'JUEZ' ? this.selectedJudgeRole : undefined
+        };
 
-      // Switch to "Pending" tab so user sees it
-      this.setActiveTab('PENDIENTE');
-      this.applyFilters();
-    }, 1000);
+        this.invitations.unshift(newInvitation); // Add to top
+        this.sendingInvitation = false;
+        this.closeInviteModal();
+        this.showToast(`Invitación enviada a ${newInvitation.nombre}`);
+
+        // Switch to "Pending" tab so user sees it
+        this.setActiveTab('PENDIENTE');
+        this.applyFilters();
+      },
+      error: (err) => {
+        console.error('Error enviando invitación', err);
+        this.sendingInvitation = false;
+        // Don't close modal on error so user can retry
+        this.showToast(err.error?.message || 'No se ha enviado con exito', true);
+      }
+    });
   }
 
   // Cancel / Delete Invitation Logic
@@ -269,8 +302,9 @@ export class ChampionshipInvitationsComponent implements OnInit {
     this.closeCancelModal();
   }
 
-  showToast(msg: string): void {
+  showToast(msg: string, isError: boolean = false): void {
     this.toastMessage = msg;
+    this.toastIsError = isError;
     this.toastVisible = true;
     setTimeout(() => {
       this.toastVisible = false;

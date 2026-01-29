@@ -89,6 +89,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/championship/championship-invitations/championship-invitations.component').then(m => m.ChampionshipInvitationsComponent),
     canActivate: [authGuard]
   },
+  {
+    path: 'mi-academia',
+    loadComponent: () => import('./features/academy/components/my-academy/my-academy.component').then(m => m.MyAcademyComponent),
+    canActivate: [authGuard]
+  },
 
 
   {

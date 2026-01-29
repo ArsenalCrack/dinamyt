@@ -35,11 +35,9 @@
       <div class="field disabled"><label>Sexo</label>
         <p>{{ usuario.sexo || '—' }}</p>
       </div>
-      <div class="field editable">
+      <div class="field disabled">
         <label>Nacionalidad</label>
-        <app-country-autocomplete name="nacionalidad" [(ngModel)]="usuario.nacionalidad"
-          (ngModelChange)="onCountryChange()" [paises]="paisesList" placeholder="Selecciona tu país">
-        </app-country-autocomplete>
+        <div class="input-fake disabled">{{ usuario.nacionalidad || '—' }}</div>
       </div>
 
       <!-- Editables -->

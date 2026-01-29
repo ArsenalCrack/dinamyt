@@ -78,6 +78,10 @@
                     <i class="fas fa-user"></i>
                     <span>Mi Perfil</span>
                   </button>
+                  <button class="dropdown-item" routerLink="/mi-academia" (click)="closeDropdown()">
+                    <i class="fas fa-university"></i>
+                    <span>Mi Academia</span>
+                  </button>
                   <button class="dropdown-item" *ngIf="userType === 3" (click)="goToMyChamps()">
                     <i class="fas fa-calendar-alt"></i>
                     <span>Mis Campeonatos</span>

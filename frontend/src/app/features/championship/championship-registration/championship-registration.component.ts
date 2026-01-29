@@ -405,14 +405,22 @@ export class ChampionshipRegistrationComponent implements OnInit {
         console.log('Submitting payload:', payload);
 
         // Simulated API call
-        setTimeout(() => {
-            this.success = true;
-            this.message = 'Inscripción realizada exitosamente.';
-            this.submitting = false;
-            setTimeout(() => {
-                this.router.navigate(['/campeonatos']);
-            }, 2000);
-        }, 1500);
+        this.api.inscribirUsuarioCampeonato(payload).subscribe({
+            next: (res) => {
+                this.success = true;
+                this.message = 'Inscripción realizada exitosamente.';
+                this.submitting = false;
+                setTimeout(() => {
+                    this.router.navigate(['/campeonatos']);
+                }, 2000);
+            },
+            error: (err) => {
+                console.error('Error inscribiendo usuario', err);
+                this.success = false;
+                this.message = err.error?.message || 'Hubo un error al realizar la inscripción.';
+                this.submitting = false;
+            }
+        });
     }
 
     goBack(): void {
