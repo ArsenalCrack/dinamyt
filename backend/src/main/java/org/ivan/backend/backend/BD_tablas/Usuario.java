@@ -56,6 +56,9 @@ public class Usuario {
     @JoinColumn(name = "TipoUsuario", referencedColumnName = "ID_Tipo")
     private Tipousuario tipousuario;
 
+    @Column(name = "estado")
+    private boolean estado;
+
 
     // ===== CAMPOS TRANSIENTES =====
     @Transient
@@ -67,6 +70,14 @@ public class Usuario {
     @Transient
     private String modo;
     // ===== GETTERS & SETTERS =====
+
+    public boolean isEstado() {
+        return estado;
+    }
+
+    public void setEstado(boolean estado) {
+        this.estado = estado;
+    }
 
     public String getCiudad() {
         return ciudad;

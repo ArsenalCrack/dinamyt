@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 27-01-2026 a las 22:25:54
+-- Tiempo de generación: 29-01-2026 a las 01:06:36
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.0.30
 
@@ -162,21 +162,22 @@ CREATE TABLE `usuario` (
   `numero_celular` varchar(30) DEFAULT NULL,
   `Instructor` bigint(20) DEFAULT NULL,
   `academia` int(11) DEFAULT NULL,
-  `tipo_usuario` int(11) DEFAULT NULL
+  `tipo_usuario` int(11) DEFAULT NULL,
+  `estado` tinyint(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `usuario`
 --
 
-INSERT INTO `usuario` (`ID_documento`, `nombreC`, `sexo`, `fecha_nacimiento`, `cinturon_rango`, `Nacionalidad`, `ciudad`, `Correo`, `Contraseña`, `numero_celular`, `Instructor`, `academia`, `tipo_usuario`) VALUES
-(0, 'Independiente', 'masculino', '2026-01-01', 'Negro', 'colombia', NULL, 'nada@gmail.com', '1', '2', NULL, 0, 2),
-(1, 'Instructor 1', 'masculino', '2026-01-01', 'Blanco', 'colombia', '', 'a@gmail.com', '1', '+571', 4, 1, 2),
-(2, 'instructor 2', 'Masculino', '2019-04-04', 'Negro', 'colombia', 'Cúcuta', 'e@gmail.com', '1', '2', NULL, 2, 2),
-(4, 'Instructor 2', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 2),
-(43013, 'AMIR SARMIENTO', 'Masculino', '2020-04-02', 'Blanco', 'Colombia', NULL, 'amirsarmiento0430@gmail.com', '1', '+570430', 0, 0, 3),
-(123456, 'Andres Gonzalez', 'Masculino', '2019-04-04', 'Negro', 'Colombia', 'Cúcuta', 'andresivan0807@gmail.com', '1', '+573243100882', 0, 0, 3),
-(7868776876, 'AMIR SARMIENTOQ', 'Masculino', '2019-04-03', 'Blanco', 'Albania', NULL, 'amirdaniel0430@gmail.com', '1', '+13', 1, 1, 4);
+INSERT INTO `usuario` (`ID_documento`, `nombreC`, `sexo`, `fecha_nacimiento`, `cinturon_rango`, `Nacionalidad`, `ciudad`, `Correo`, `Contraseña`, `numero_celular`, `Instructor`, `academia`, `tipo_usuario`, `estado`) VALUES
+(0, 'Independiente', 'masculino', '2026-01-01', 'Negro', 'colombia', NULL, 'nada@gmail.com', '1', '2', NULL, 0, 2, 0),
+(1, 'Instructor 1', 'masculino', '2026-01-01', 'Blanco', 'colombia', '', 'a@gmail.com', '1', '+571', 4, 1, 2, 1),
+(2, 'instructor 2', 'Masculino', '2019-04-04', 'Negro', 'colombia', 'Cúcuta', 'e@gmail.com', '1', '2', NULL, 2, 2, 1),
+(4, 'Instructor 2', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 2, 1),
+(43013, 'AMIR SARMIENTO', 'Masculino', '2020-04-02', 'Blanco', 'Colombia', NULL, 'amirsarmiento0430@gmail.com', '1', '+570430', 0, 0, 3, 1),
+(123456, 'Andres Gonzalez', 'Masculino', '2019-04-04', 'Negro', 'Colombia', 'Cúcuta', 'andresivan0807@gmail.com', '1', '+573243100882', 0, 0, 3, 1),
+(7868776876, 'AMIR SARMIENTOQ', 'Masculino', '2019-04-03', 'Blanco', 'Albania', NULL, 'amirdaniel0430@gmail.com', '1', '+13', 1, 1, 4, 1);
 
 --
 -- Índices para tablas volcadas
@@ -207,9 +208,9 @@ ALTER TABLE `estado`
 --
 ALTER TABLE `inscripciones`
   ADD PRIMARY KEY (`idinscripcion`),
-  ADD UNIQUE KEY `idusuario` (`idusuario`,`idcampeonato`),
-  ADD UNIQUE KEY `estado` (`estado`),
-  ADD KEY `idcampeonato` (`idcampeonato`);
+  ADD KEY `idusuario` (`idusuario`,`idcampeonato`) USING BTREE,
+  ADD KEY `estado` (`estado`) USING BTREE,
+  ADD KEY `idcampeonato` (`idcampeonato`) USING BTREE;
 
 --
 -- Indices de la tabla `tipo_usuario`
@@ -225,7 +226,8 @@ ALTER TABLE `usuario`
   ADD KEY `idx_instructor` (`Instructor`),
   ADD KEY `idx_academia` (`academia`),
   ADD KEY `fk_usuario_tipo` (`tipo_usuario`),
-  ADD KEY `academia` (`academia`) USING BTREE;
+  ADD KEY `academia` (`academia`) USING BTREE,
+  ADD KEY `estado` (`estado`);
 
 --
 -- AUTO_INCREMENT de las tablas volcadas
@@ -274,7 +276,8 @@ ALTER TABLE `inscripciones`
 ALTER TABLE `usuario`
   ADD CONSTRAINT `fk_usuario_academia` FOREIGN KEY (`academia`) REFERENCES `academia` (`ID_academia`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_usuario_instructor` FOREIGN KEY (`Instructor`) REFERENCES `usuario` (`ID_documento`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_usuario_tipo` FOREIGN KEY (`tipo_usuario`) REFERENCES `tipo_usuario` (`ID_Tipo`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_usuario_tipo` FOREIGN KEY (`tipo_usuario`) REFERENCES `tipo_usuario` (`ID_Tipo`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `usuario_ibfk_1` FOREIGN KEY (`estado`) REFERENCES `estado` (`idvisible`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

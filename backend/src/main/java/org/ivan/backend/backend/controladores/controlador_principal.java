@@ -130,10 +130,8 @@ public class controlador_principal {
 
     @PostMapping("/cambiar-password")
     private ResponseEntity<?> CambiarContraseña(@RequestBody Usuario datos) {
-        System.out.println("a: " + datos.getCorreo());
         Usuario pendiente4 = usuarioRepository.findByCorreo((datos.getCorreo()));
         if (pendiente4 != null) {
-            System.out.println("a");
             if (datos.getModo().equals("recuperar")) {
                 pendiente4.setContrasena(datos.getContrasena());
                 usuarioRepository.save(pendiente4);
@@ -159,7 +157,6 @@ public class controlador_principal {
         if (usuarioRepository.existsByCorreo(respuesta.getCorreo())) {
             Usuario pendiente3 = usuarioRepository.findByCorreo((respuesta.getCorreo()));
             Usuario instructor = pendiente3.getInstructor();
-            System.out.println(instructor);
             if (pendiente3.getContrasena().equals(respuesta.getContrasena())) {
                 usuariosPendientes.remove(respuesta.getCorreo());
                 Map<String, Object> responseMap = new HashMap<>();
@@ -274,7 +271,6 @@ public class controlador_principal {
                 List<Map<String, String>> resultado = arbol.obtenerSeccionesDetalladas();
                 ObjectMapper mapper = new ObjectMapper();
                 campeonato.setSecciones(mapper.writeValueAsString(resultado));
-                System.out.println(resultado);
             }
 
 
@@ -310,8 +306,6 @@ public class controlador_principal {
             @PathVariable String userId) {
 
         List<Campeonato> campeonatos = campeonatoRepository.findByCreadoPor(Long.parseLong(userId));
-
-        System.out.println("campeonatos: " + campeonatos);
         return ResponseEntity.ok(campeonatos);
     }
 
@@ -320,16 +314,12 @@ public class controlador_principal {
             @PathVariable String id) {
 
         Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(id)).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
-
-        System.out.println("campeonatos: " + campeonato.getNombre());
         return ResponseEntity.ok(campeonato);
     }
     @PostMapping("/campeonatos/{id}/validar-codigo")
     private ResponseEntity<?> validar_codigo_campeonato(@PathVariable int id,@RequestBody Map<String, Object> codigo) {
 
         Campeonato campeonato=campeonatoRepository.findById(id).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
-        System.out.println(campeonato.getCodigo());
-        System.out.println(codigo);
         if (campeonato.getCodigo().equals(codigo.get("codigo"))){
             return ResponseEntity.ok(campeonato);
         }
@@ -344,7 +334,7 @@ public class controlador_principal {
         return ResponseEntity.badRequest().body(Map.of("message", "No se a podido eliminar el campeonato"));
     }
     @PutMapping("/campeonatos/{id}")
-    public ResponseEntity<?> actualizarCampeonato(@PathVariable int id,@RequestBody Map<String, Object> datos) {
+    private ResponseEntity<?> actualizarCampeonato(@PathVariable int id,@RequestBody Map<String, Object> datos) {
         try {
             Campeonato campeonato = campeonatoRepository.findById(id).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
             campeonato.setVisible(true);
@@ -367,11 +357,6 @@ public class controlador_principal {
             campeonato.setEsPublico(
                     datos.get("esPublico") != null &&
                             Boolean.parseBoolean(datos.get("esPublico").toString()));
-            if (campeonato.getEsPublico()) {
-            } else {
-                campeonato.setCodigo(GenerarCodigo());
-            }
-
             if (datos.get("creadoPor") != null) {
                 campeonato.setCreadoPor(
                         Long.parseLong(datos.get("creadoPor").toString()));
@@ -392,7 +377,6 @@ public class controlador_principal {
                 List<Map<String, String>> resultado = arbol.obtenerSeccionesDetalladas();
                 ObjectMapper mapper = new ObjectMapper();
                 campeonato.setSecciones(mapper.writeValueAsString(resultado));
-                System.out.println(resultado);
             }
 
 
@@ -415,6 +399,14 @@ public class controlador_principal {
             e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("message", "Error al crear el campeonato"));
         }
+    }
+    @GetMapping("/usuarios/search/{query}")
+    private ResponseEntity<?> buscarUsuarios(@PathVariable String query,@RequestParam String excluirId){
+        List<Usuario> usuarios = usuarioRepository.findByNombreCContainingIgnoreCaseAndEstadoAndIdDocumentoNot(query,true,Long.parseLong(excluirId));
+        if (usuarios!=null){
+            return ResponseEntity.ok(usuarios);
+        }
+        return ResponseEntity.status(500).body(Map.of("message", "Usuario no encontrado"));
     }
 
 

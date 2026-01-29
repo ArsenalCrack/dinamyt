@@ -56,7 +56,7 @@ public class Campeonato {
     private String Codigo;
 
     @Column(name = "visible")
-    boolean visible;
+    private boolean visible;
 
     @Column(name = "secciones", columnDefinition = "TEXT")
     private String secciones;

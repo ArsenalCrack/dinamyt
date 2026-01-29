@@ -150,10 +150,12 @@ export class ApiService {
     return this.http.delete(`${this.apiUrl}/campeonatos/${id}`);
   }
 
-  // Judge management
-  searchUsers(query: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/usuarios/search/${query}`);
+    // Judge management
+  searchUsers(query: string, excluirId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/usuarios/search/${query}`, {params: {excluirId}
+    });
   }
+
 
   getJuecesByCampeonato(campeonatoId: string | number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/campeonatos/${campeonatoId}/jueces`);

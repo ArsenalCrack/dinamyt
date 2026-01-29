@@ -181,10 +181,10 @@ export class ChampionshipInvitationsComponent implements OnInit {
   searchUsers(): void {
     if (!this.inviteSearchQuery.trim()) {
       this.availableUsers = [];
-      return;
+      return; 
     }
 
-    this.api.searchUsers(this.inviteSearchQuery).subscribe({
+    this.api.searchUsers(this.inviteSearchQuery,sessionStorage.getItem('idDocumento') || '').subscribe({
       next: (users) => {
         this.availableUsers = (users || []).map(u => ({
           id: u.ID_documento || u.documento || u.id,
