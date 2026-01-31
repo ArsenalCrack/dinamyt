@@ -51,11 +51,12 @@ public class ArbolCampeonato {
                 seccion.get("MODALIDAD"),
                 seccion.get("GENERO"),
                 seccion.get("CINTURON"),
-                seccion.get("EDAD"),
-                seccion.get("PESO")
+                "edad(" + seccion.get("EDAD") + ")",
+                "peso(" + seccion.get("PESO") + ")"
         ).toUpperCase().replace(" ", "_");
 
         seccion.put("ID", id);
+
 
         return seccion;
     }

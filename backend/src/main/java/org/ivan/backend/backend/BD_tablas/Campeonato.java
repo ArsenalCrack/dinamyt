@@ -61,6 +61,9 @@ public class Campeonato {
     @Column(name = "secciones", columnDefinition = "TEXT")
     private String secciones;
 
+    @Column(name = "seccionesActivas", columnDefinition = "TEXT")
+    private  String seccionesActivas;
+
     //No perteneciente a la BD
     @Transient
     public Integer getCuposDisponibles() {
@@ -71,6 +74,14 @@ public class Campeonato {
 
     // getters y setters
 
+
+    public String getSeccionesActivas() {
+        return seccionesActivas;
+    }
+
+    public void setSeccionesActivas(String seccionesActivas) {
+        this.seccionesActivas = seccionesActivas;
+    }
 
     public String getPais() {
         return pais;

@@ -25,7 +25,7 @@ public class ArbolBuilder {
         if ("mixto".equalsIgnoreCase(m.categorias.genero)) {
             generos = List.of("Mixto");
         } else {
-            generos = List.of("Hombre", "Mujer");
+            generos = List.of("Masculino", "Femenino");
         }
 
         for (String g : generos) {

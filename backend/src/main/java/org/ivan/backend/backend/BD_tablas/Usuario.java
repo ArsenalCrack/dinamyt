@@ -4,6 +4,7 @@ package org.ivan.backend.backend.BD_tablas;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 
 
 @Entity
@@ -205,5 +206,13 @@ public class Usuario {
 
     public void setIdDocumento(Long idDocumento) {
         this.idDocumento = idDocumento;
+    }
+
+    public int calcularEdad(String fechaNacimiento) {
+
+        LocalDate nacimiento = LocalDate.parse(fechaNacimiento);
+        LocalDate hoy = LocalDate.now();
+
+        return Period.between(nacimiento, hoy).getYears();
     }
 }
