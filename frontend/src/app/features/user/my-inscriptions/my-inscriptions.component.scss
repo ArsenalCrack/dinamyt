@@ -429,3 +429,172 @@
         }
     }
 }
+
+/* Card Summary Clickable */
+.card-summary {
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+        background-color: #fafafa;
+
+        .toggle-icon i {
+            color: var(--color-acento);
+            transform: scale(1.1);
+        }
+    }
+
+    .toggle-icon {
+        margin-left: auto;
+
+        i {
+            font-size: 1.1rem;
+            color: #ddd;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+            &.fa-chevron-up {
+                color: var(--color-acento);
+                transform: rotate(180deg);
+            }
+        }
+    }
+}
+
+/* Accordion Animation */
+.card-details-wrapper {
+    animation: slideDown 0.3s ease-out forwards;
+    transform-origin: top;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Detailed Sections (Redesigned) */
+.sections-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+
+    .section-main-title {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 800;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 0.5rem;
+    }
+}
+
+.section-card {
+    background: #fff;
+    padding: 0;
+
+    /* Separator between multiple modalities if needed, or just standard */
+    &:not(:last-child) {
+        border-bottom: 1px dashed #eee;
+        padding-bottom: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+
+        .modality-title {
+            font-weight: 800;
+            color: var(--color-principal);
+            font-size: 1.15rem;
+            text-transform: uppercase;
+            /* Uppercase requested */
+        }
+
+        .gender-badge {
+            background: #f1f3f5;
+            /* Neutral gray */
+            color: #495057;
+            padding: 0.25rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid #dee2e6;
+        }
+    }
+
+    /* Vertical Specs Layout (Label above Value) */
+    .section-specs-grid {
+        display: flex;
+        gap: 2rem;
+        flex-wrap: wrap;
+
+        .spec-column {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            min-width: 80px;
+
+            .spec-label {
+                font-size: 0.7rem;
+                color: #bbb;
+                text-transform: uppercase;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+            }
+
+            .spec-value {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                font-size: 1rem;
+                font-weight: 600;
+                color: #444;
+
+                i {
+                    font-size: 1.1rem;
+                    color: var(--color-acento);
+                    /* Or specific colors per icon */
+                    width: 20px;
+                    text-align: center;
+                }
+            }
+        }
+    }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 576px) {
+    .section-card {
+        .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+
+            .modality-title {
+                font-size: 1rem;
+            }
+        }
+
+        .section-specs-grid {
+            gap: 1.5rem;
+
+            .spec-column .spec-value {
+                font-size: 0.9rem;
+            }
+        }
+    }
+}

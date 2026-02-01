@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
@@ -187,6 +187,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
     saving = false;
     message: string | null = null;
     success = false;
+    canceled = false;
     categoryError: { [key: string]: string } = {};
     pending: Record<string, Record<CategoryKey, PendingCategory>> = {};
     categoryEnabled: Record<string, Record<CategoryKey, boolean>> = {};
@@ -270,11 +271,12 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                                     // Deep merge or replace logic
                                     localMod.categorias = backendMod.categorias;
 
-                                    // If gender was string "mixto" or "individual", ensure it's set
                                     if (localMod.categorias.genero === undefined) localMod.categorias.genero = null;
 
-                                    // Set enabled flags
                                     this.ensureCategoryFlags(localMod);
+                                    this.ensurePending(localMod); // Ensure pending is set
+
+                                    // Properly sync switches with data
                                     if (localMod.categorias.cinturon?.length > 0) this.categoryEnabled[localMod.id]['cinturon'] = true;
                                     if (localMod.categorias.edad?.length > 0) this.categoryEnabled[localMod.id]['edad'] = true;
                                     if (localMod.categorias.peso?.length > 0) this.categoryEnabled[localMod.id]['peso'] = true;
@@ -283,6 +285,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                         });
                     }
                 }
+                this.restoreDraft();
                 this.loading = false;
             },
             error: (err) => {
@@ -363,8 +366,73 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         delete this.categoryError[`${mod.id}-modalidad`];
 
         this.categoryEnabled[mod.id][key] = enabled;
-        if (!enabled) mod.categorias[key] = [];
+        // Previously cleared data here. Now PRESERVED as per user request.
+        // Data is only filtered out during submission.
         this.pending[mod.id][key] = { tipo: 'individual', valor: '', desde: '', hasta: '' };
+    }
+
+    // --- Submit Logic (Saving) ---
+
+    onSubmit(form?: NgForm): void {
+        if (form?.form) form.form.markAllAsTouched();
+
+        const preflight = this.preflightValidate();
+        this.preflightMissing = preflight.missing;
+        this.preflightCanCreate = preflight.ok;
+        this.showCreateConfirm = true; // Shows save confirmation
+        this.scrollLock.lock();
+    }
+
+    private preflightValidate(): { ok: boolean; missing: string[] } {
+        const missing: string[] = [];
+        const nombre = (this.campeonato.nombre || '').trim();
+        if (!nombre || nombre.length < 3) missing.push('Nombre del campeonato (mínimo 3 caracteres)');
+
+        if (!this.campeonato.fechaInicio) missing.push('Fecha de Inicio');
+        if (!this.campeonato.fechaFin) missing.push('Fecha de Finalización');
+        if (this.fechaFinErrorMsg) missing.push('Rango de fechas inválido (Fin antes de Inicio)');
+
+        if (!this.campeonato.pais) missing.push('País');
+        if (!this.campeonato.ciudad) missing.push('Ciudad');
+        if (!this.campeonato.ubicacion || this.campeonato.ubicacion.length < 3) missing.push('Sede / Ubicación');
+        if (!this.campeonato.alcance) missing.push('Alcance');
+        if (this.campeonato.maxParticipantes === null || this.campeonato.maxParticipantes === undefined || String(this.campeonato.maxParticipantes).trim() === '') {
+            missing.push('Número máximo de participantes');
+        }
+
+        // Modalities Validation
+        const activeMods = this.modalidades.filter(m => m.activa);
+        if (activeMods.length === 0) {
+            missing.push('Debes activar al menos una modalidad de competencia.');
+        } else {
+            activeMods.forEach(mod => {
+                const flags = this.categoryEnabled[mod.id];
+                const hasDivision =
+                    (flags && flags['cinturon']) ||
+                    (flags && flags['edad']) ||
+                    (flags && flags['peso']) ||
+                    (mod.categorias.genero === 'individual');
+
+                if (!hasDivision) {
+                    missing.push(`Modalidad "${mod.nombre}": Activa al menos un criterio de división (Cinturón, Edad, Peso o Género).`);
+                } else {
+                    // Check if enabled criteria actually have values
+                    if (flags) {
+                        if (flags['cinturon'] && (!mod.categorias.cinturon || mod.categorias.cinturon.length === 0)) {
+                            missing.push(`Modalidad "${mod.nombre}": Categoría Cinturón activada pero sin valores.`);
+                        }
+                        if (flags['edad'] && (!mod.categorias.edad || mod.categorias.edad.length === 0)) {
+                            missing.push(`Modalidad "${mod.nombre}": Categoría Edad activada pero sin valores.`);
+                        }
+                        if (flags['peso'] && (!mod.categorias.peso || mod.categorias.peso.length === 0)) {
+                            missing.push(`Modalidad "${mod.nombre}": Categoría Peso activada pero sin valores.`);
+                        }
+                    }
+                }
+            });
+        }
+
+        return { ok: missing.length === 0, missing };
     }
 
     setPendingType(mod: ModalidadConfig, key: CategoryKey, tipo: 'individual' | 'rango'): void {
@@ -552,16 +620,11 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
     }
 
     onModalidadActivaChange(mod: ModalidadConfig): void {
+        // When deactivating, we just collapse. Data is preserved.
+        // Flags in categoryEnabled are also preserved so when reactivated, 
+        // the switches (and data) reappear as they were.
         if (!mod.activa) {
             mod.expanded = false;
-            this.ensureCategoryFlags(mod);
-            this.categoryEnabled[mod.id].cinturon = false;
-            this.categoryEnabled[mod.id].edad = false;
-            this.categoryEnabled[mod.id].peso = false;
-            mod.categorias.cinturon = [];
-            mod.categorias.edad = [];
-            mod.categorias.peso = [];
-            mod.categorias.genero = null;
         } else {
             mod.expanded = true;
         }
@@ -640,24 +703,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
 
     // --- Submit Logic (Saving) ---
 
-    onSubmit(form?: NgForm): void {
-        if (form?.form) form.form.markAllAsTouched();
 
-        const preflight = this.preflightValidate();
-        this.preflightMissing = preflight.missing;
-        this.preflightCanCreate = preflight.ok;
-        this.showCreateConfirm = true; // Shows save confirmation
-        this.scrollLock.lock();
-    }
-
-    private preflightValidate(): { ok: boolean; missing: string[] } {
-        const missing: string[] = [];
-        const nombre = (this.campeonato.nombre || '').trim();
-        if (!nombre || nombre.length < 3) missing.push('Nombre (mínimo 3 caracteres)');
-        // ... basic validation similar to create
-        // We trust pre-existing data mostly but good to validate edits
-        return { ok: missing.length === 0, missing };
-    }
 
     cancelCreateConfirm(): void {
         this.showCreateConfirm = false;
@@ -681,13 +727,23 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         const payload = {
             ...this.campeonato,
             esPublico,
-            modalidades: this.modalidades.map(({ expanded, ...rest }) => ({
-                ...rest,
-                categorias: {
-                    ...rest.categorias,
-                    genero: rest.activa && rest.categorias.genero === null ? 'mixto' : rest.categorias.genero
-                }
-            }))
+            modalidades: this.modalidades.map((mod) => {
+                // Determine expanded/active state and filter categories based on Enabled flags
+                const flags = this.categoryEnabled[mod.id] || { cinturon: false, edad: false, peso: false };
+
+                return {
+                    id: mod.id,
+                    nombre: mod.nombre,
+                    activa: mod.activa,
+                    categorias: {
+                        // Only send categories if they are ENABLED in the UI
+                        cinturon: mod.activa && flags.cinturon ? mod.categorias.cinturon : [],
+                        edad: mod.activa && flags.edad ? mod.categorias.edad : [],
+                        peso: mod.activa && flags.peso ? mod.categorias.peso : [],
+                        genero: mod.activa && mod.categorias.genero === null ? 'mixto' : mod.categorias.genero
+                    }
+                };
+            })
         };
 
         this.api.updateCampeonato(this.id!, payload).subscribe({
@@ -697,6 +753,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                 await delayRemaining(startedAt, DEFAULT_MIN_SPINNER_MS);
                 this.saving = false;
                 this.scrollLock.unlock();
+                this.clearDraft();
                 this.router.navigate(['/mis-campeonatos'], { replaceUrl: true });
             },
             error: async (err) => {
@@ -720,6 +777,8 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
     }
 
     confirmCancel(): void {
+        this.canceled = true;
+        this.clearDraft();
         this.showCancelConfirm = false;
         this.scrollLock.unlock();
         this.goBack();
@@ -729,7 +788,62 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         this.backNav.backOr({ fallbackUrl: '/mis-campeonatos' });
     }
 
+    @HostListener('window:beforeunload')
     ngOnDestroy(): void {
         this.scrollLock.unlock();
+        if (!this.success && !this.canceled) {
+            this.saveDraft();
+        }
+    }
+
+    // --- Draft Logic ---
+
+    saveDraft(): void {
+        if (!this.id) return;
+        try {
+            const draft = {
+                campeonato: this.campeonato,
+                modalidades: this.modalidades,
+                categoryEnabled: this.categoryEnabled,
+                privacy: this.privacy,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(`draft_champ_${this.id}`, JSON.stringify(draft));
+        } catch (e) {
+            console.error('Error saving draft', e);
+        }
+    }
+
+    restoreDraft(): void {
+        if (!this.id) return;
+        const raw = localStorage.getItem(`draft_champ_${this.id}`);
+        if (!raw) return;
+        try {
+            const draft = JSON.parse(raw);
+
+            // Basic validity check (optional: check timestamp > updated_at from backend?)
+            // For now, always trust draft if exists.
+
+            if (draft.campeonato) this.campeonato = { ...this.campeonato, ...draft.campeonato };
+            if (draft.modalidades) this.modalidades = draft.modalidades;
+            if (draft.categoryEnabled) this.categoryEnabled = draft.categoryEnabled;
+            if (draft.privacy) this.privacy = draft.privacy;
+
+            // Re-trigger side effects
+            if (this.campeonato.pais) this.onPaisChange();
+            // Restore city specifically as onPaisChange clears it
+            if (draft.campeonato && draft.campeonato.ciudad) {
+                this.campeonato.ciudad = draft.campeonato.ciudad;
+            }
+
+            this.message = 'Se han restaurado tus cambios no guardados.';
+        } catch (e) {
+            console.error('Error restoring draft', e);
+        }
+    }
+
+    clearDraft(): void {
+        if (!this.id) return;
+        localStorage.removeItem(`draft_champ_${this.id}`);
     }
 }

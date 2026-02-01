@@ -1,11 +1,9 @@
 package org.ivan.backend.backend.BD_tablas;
 
-
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
-
 
 @Entity
 @Table(name = "usuario")
@@ -44,7 +42,7 @@ public class Usuario {
     @Column(name = "numero_celular", length = 30)
     private String numeroCelular;
 
-    //relaciones con las tablas
+    // relaciones con las tablas
     @ManyToOne
     @JoinColumn(name = "Instructor", referencedColumnName = "ID_documento")
     private Usuario Instructor;
@@ -58,8 +56,7 @@ public class Usuario {
     private Tipousuario tipousuario;
 
     @Column(name = "estado")
-    private boolean estado;
-
+    private Integer estado;
 
     // ===== CAMPOS TRANSIENTES =====
     @Transient
@@ -72,11 +69,11 @@ public class Usuario {
     private String modo;
     // ===== GETTERS & SETTERS =====
 
-    public boolean isEstado() {
+    public Integer getEstado() {
         return estado;
     }
 
-    public void setEstado(boolean estado) {
+    public void setEstado(Integer estado) {
         this.estado = estado;
     }
 

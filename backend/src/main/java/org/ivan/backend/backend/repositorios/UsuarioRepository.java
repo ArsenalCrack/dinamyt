@@ -14,12 +14,10 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     boolean existsByTipousuario(Tipousuario tipo);
 
-    List<Usuario> findByAcademia_IDacademiaAndTipousuario_IDTipoAndIdDocumentoNot(int IDacademia, int IDTipo, Long idInstructorExcluir);
+    List<Usuario> findByAcademia_IDacademiaAndTipousuario_IDTipoAndIdDocumentoNot(int IDacademia, int IDTipo,
+            Long idInstructorExcluir);
 
-    List<Usuario> findByNombreCContainingIgnoreCaseAndEstadoAndIdDocumentoNot(String nombre,boolean estado,Long idExcluir);
-
-
+    List<Usuario> findByNombreCContainingIgnoreCaseAndEstadoAndIdDocumentoNot(String nombre, Integer estado,
+            Long idExcluir);
 
 }
-
-

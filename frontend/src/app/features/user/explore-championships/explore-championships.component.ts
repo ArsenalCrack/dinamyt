@@ -219,7 +219,7 @@ export class ExploreChampionshipsComponent implements OnInit {
     this.api.getCampeonatos().subscribe({
       next: (res: any) => {
         const items: CampeonatoApiItem[] = Array.isArray(res) ? res : [];
-        console.log('Campeonatos loaded:', items);
+
 
         // Map items
         this.championships = items.map((c: any) => {
@@ -232,8 +232,8 @@ export class ExploreChampionshipsComponent implements OnInit {
             nombre: c.nombre,
             fechaInicio: c.fechaInicio,
             ubicacion: c.ubicacion,
-            pais: c.pais || 'Colombia', // Ghost data
-            ciudad: c.ciudad || 'Bogotá', // Ghost data
+            pais: c.pais || null,
+            ciudad: c.ciudad || null,
             alcance: c.alcance ?? null,
             creadoPor: c.creadoPor ? String(c.creadoPor) : null,
             creadoPorNombre: c.creadoPorNombre || (c.nombreCreador ? `${c.nombreCreador}` : 'Desconocido'),
@@ -579,10 +579,9 @@ export class ExploreChampionshipsComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error deleting championship:', err);
-        // Fallback for demo
-        this.championships = this.championships.filter(c => c.id !== this.deletingId);
-        this.applyFilters();
-        this.closeDeleteModal();
+        this.isDeleting = false;
+        this.closeDeleteModal(); // Close anyway, maybe show alert
+
       }
     });
   }

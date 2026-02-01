@@ -8,4 +8,6 @@ import java.util.Optional;
 
 public interface InscripcionRepository extends JpaRepository<Inscripciones, Integer> {
     Optional<Inscripciones> findByUsuarioAndCampeonato(Long usuario, Long campeonato);
+
+    java.util.List<Inscripciones> findByUsuario(Long usuario);
 }

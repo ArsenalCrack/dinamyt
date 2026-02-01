@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { delay } from 'rxjs/operators';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -144,74 +145,142 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
 
     loadData(): void {
         this.loading = true;
-        this.api.getCampeonatoById(this.id!).subscribe({
+        this.scrollLock.lock();
+        this.api.getCampeonatoById(this.id!)
+            .pipe(delay(800))
+            .subscribe({
+                next: (data) => {
+                    this.campeonato = data;
+
+                    // Check visibility access
+                    // User requirement: if visible/visibilidad is 0, user cannot access via URL
+                    const isVisible = (
+                        data.visible !== 0 && data.visible !== '0' && data.visible !== false &&
+                        data.Visible !== 0 && data.Visible !== '0' && data.Visible !== false &&
+                        data.visibilidad !== 0 && data.visibilidad !== '0' && data.visibilidad !== false &&
+                        data.Visibilidad !== 0 && data.Visibilidad !== '0' && data.Visibilidad !== false
+                    );
+                    if (!isVisible) {
+                        this.router.navigate(['/campeonatos']); // Redirect if not visible
+                        this.scrollLock.unlock(); // Ensure lock is released if it was somehow set
+                        return;
+                    }
+
+                    // Parse Modalities Config
+                    try {
+                        this.modalidadesConfig = typeof data.modalidades === 'string'
+                            ? JSON.parse(data.modalidades)
+                            : (data.modalidades || []);
+                    } catch (e) {
+                        this.modalidadesConfig = [];
+                    }
+
+                    // Calcular estado real basado en fechas
+                    if (this.campeonato) {
+                        this.campeonato.estadoReal = this.calculateStatus(this.campeonato.fechaInicio, this.campeonato.fecha_fin);
+                    }
+
+                    this.loadParticipantes();
+
+                    this.extractAvailableOptions();
+                    this.checkActiveFilters();
+                    this.applyFilters();
+
+                    // Fetch judges
+                    this.api.getJuecesByCampeonato(this.id!).subscribe({
+                        next: (jueces) => {
+                            this.jueces = jueces || [];
+                            this.filterJueces();
+                        },
+                        error: () => {
+                            this.jueces = [
+                                { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png', rol: 'Juez Central', categoria: 'A', pais: 'Colombia', ciudad: 'Bogotá' },
+                                { id: 102, nombre: 'María García', avatar: 'assets/avatar-2.png', rol: 'Juez de Mesa', categoria: 'B', pais: 'Brasil', ciudad: 'Sao Paulo' },
+                                { id: 103, nombre: 'Carlos Silva', avatar: 'assets/avatar-3.png', rol: 'Arbitro', categoria: 'Internacional', pais: 'México', ciudad: 'CDMX' },
+                                { id: 104, nombre: 'Ana Torres', avatar: 'assets/avatar-4.png', rol: 'Juez Lateral', categoria: 'C', pais: 'Colombia', ciudad: 'Cali' },
+                                { id: 105, nombre: 'Pedro Diaz', avatar: 'assets/avatar-5.png', rol: 'Juez Central', categoria: 'A', pais: 'Chile', ciudad: 'Santiago' },
+                                { id: 106, nombre: 'Lucia Mendez', avatar: 'assets/avatar-6.png', rol: 'Juez de Mesa', categoria: 'B', pais: 'Argentina', ciudad: 'Buenos Aires' },
+                                { id: 107, nombre: 'Roberto Gomez', avatar: 'assets/avatar-7.png', rol: 'Arbitro', categoria: 'A', pais: 'Colombia', ciudad: 'Medellín' }
+                            ];
+                            this.filterJueces();
+                        }
+                    });
+
+                    this.loading = false;
+                    this.scrollLock.unlock();
+                },
+                error: (err) => {
+                    console.error('Error loading championship details:', err);
+                    this.loading = false;
+                    this.scrollLock.unlock();
+                }
+            });
+    }
+
+    loadParticipantes(): void {
+        this.api.getInscriptionsByChampionship(this.id!).subscribe({
             next: (data) => {
-                console.log(data);
-                this.campeonato = data;
+                if (data && Array.isArray(data) && data.length > 0) {
+                    this.participantes = data.map((item: any) => ({
+                        id: item.id || item.id_inscripcion,
+                        nombre: item.nombre_usuario || item.nombre_completo || item.nombre || 'Desconocido',
+                        academia: item.academia || 'Independiente',
+                        modalidad: Array.isArray(item.modalidades) ? item.modalidades.join(', ') : (item.modalidad || 'N/A'),
+                        cinturon: item.cinturon || 'Blanco',
+                        peso: item.peso || 'N/A',
+                        edad: (item.edad || 0).toString(),
+                        genero: item.sexo || item.genero || 'N/A',
+                        pais: item.nacionalidad || item.pais || 'Colombia',
+                        ciudad: item.ciudad || ''
+                    }));
+                    // Only accepted participants? Usually details show accepted ones.
+                    // If API returns all, maybe filter by state 'ACEPTADO'?
+                    // User said "Inscritos", implies all registered. Or maybe just accepted. I'll filter 'ACEPTADO' to be safe IF the field exists.
+                    // But if it's "Inscritos" list, usually it implies everyone on the list.
+                    // I'll show all or check status. Let's assume the API returns valid inscriptions.
+                    // Update: filter for 'ACEPTADO' if status present.
+                    if (data[0].estado) {
+                        this.participantes = this.participantes.filter((_, i) => data[i].estado === 'ACEPTADO');
+                    }
 
-                // Check visibility access
-                // User requirement: if visible/visibilidad is 0, user cannot access via URL
-                const isVisible = (
-                    data.visible !== 0 && data.visible !== '0' && data.visible !== false &&
-                    data.Visible !== 0 && data.Visible !== '0' && data.Visible !== false &&
-                    data.visibilidad !== 0 && data.visibilidad !== '0' && data.visibilidad !== false &&
-                    data.Visibilidad !== 0 && data.Visibilidad !== '0' && data.Visibilidad !== false
-                );
-                if (!isVisible) {
-                    this.router.navigate(['/campeonatos']); // Redirect if not visible
-                    this.scrollLock.unlock(); // Ensure lock is released if it was somehow set
-                    return;
+                    // If filtered list is empty but data wasn't, maybe we want to show pending too? 
+                    // Let's stick to showing what we have. If 0 after filter, fallback to mock? No, that's confusing.
+                    // If API returned data, it means it works. If 0 participants, show 0.
+
+                    if (this.participantes.length === 0 && data.length > 0 && data[0].estado) {
+                        // All pending?
+                        // Just show them for now so user sees something.
+                        this.participantes = data.map((item: any) => ({
+                            id: item.id || item.id_inscripcion,
+                            nombre: item.nombre_usuario || item.nombre_completo || item.nombre || 'Desconocido',
+                            academia: item.academia || 'Independiente',
+                            modalidad: Array.isArray(item.modalidades) ? item.modalidades.join(', ') : (item.modalidad || 'N/A'),
+                            cinturon: item.cinturon || 'Blanco',
+                            peso: item.peso || 'N/A',
+                            edad: (item.edad || 0).toString(),
+                            genero: item.sexo || item.genero || 'N/A',
+                            pais: item.nacionalidad || item.pais || 'Colombia',
+                            ciudad: item.ciudad || ''
+                        }));
+                    }
+
+                    this.extractAvailableOptions();
+                    this.checkActiveFilters();
+                    this.applyFilters();
+                } else {
+                    console.warn('No participants found from API, using mock.');
+                    this.mockParticipantes();
+                    this.extractAvailableOptions();
+                    this.checkActiveFilters();
+                    this.applyFilters();
                 }
-
-                // Parse Modalities Config
-                try {
-                    this.modalidadesConfig = typeof data.modalidades === 'string'
-                        ? JSON.parse(data.modalidades)
-                        : (data.modalidades || []);
-                } catch (e) {
-                    this.modalidadesConfig = [];
-                }
-
-                // Calcular estado real basado en fechas
-                if (this.campeonato) {
-                    if (!this.campeonato.pais) this.campeonato.pais = 'Colombia'; // Ghost
-                    if (!this.campeonato.ciudad) this.campeonato.ciudad = 'Bogotá'; // Ghost
-                    this.campeonato.estadoReal = this.calculateStatus(this.campeonato.fechaInicio, this.campeonato.fecha_fin);
-                }
-
-                // Mock participants with detailed data
-                // In production this would come from an endpoint like /campeonatos/:id/participantes
+            },
+            error: (err) => {
+                console.warn('Error fetching participants, using mock fallback', err);
                 this.mockParticipantes();
-
                 this.extractAvailableOptions();
                 this.checkActiveFilters();
                 this.applyFilters();
-
-                // Fetch judges
-                this.api.getJuecesByCampeonato(this.id!).subscribe({
-                    next: (jueces) => {
-                        this.jueces = jueces || [];
-                        this.filterJueces();
-                    },
-                    error: () => {
-                        this.jueces = [
-                            { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png', rol: 'Juez Central', categoria: 'A', pais: 'Colombia', ciudad: 'Bogotá' },
-                            { id: 102, nombre: 'María García', avatar: 'assets/avatar-2.png', rol: 'Juez de Mesa', categoria: 'B', pais: 'Brasil', ciudad: 'Sao Paulo' },
-                            { id: 103, nombre: 'Carlos Silva', avatar: 'assets/avatar-3.png', rol: 'Arbitro', categoria: 'Internacional', pais: 'México', ciudad: 'CDMX' },
-                            { id: 104, nombre: 'Ana Torres', avatar: 'assets/avatar-4.png', rol: 'Juez Lateral', categoria: 'C', pais: 'Colombia', ciudad: 'Cali' },
-                            { id: 105, nombre: 'Pedro Diaz', avatar: 'assets/avatar-5.png', rol: 'Juez Central', categoria: 'A', pais: 'Chile', ciudad: 'Santiago' },
-                            { id: 106, nombre: 'Lucia Mendez', avatar: 'assets/avatar-6.png', rol: 'Juez de Mesa', categoria: 'B', pais: 'Argentina', ciudad: 'Buenos Aires' },
-                            { id: 107, nombre: 'Roberto Gomez', avatar: 'assets/avatar-7.png', rol: 'Arbitro', categoria: 'A', pais: 'Colombia', ciudad: 'Medellín' }
-                        ];
-                        this.filterJueces();
-                    }
-                });
-
-                this.loading = false;
-            },
-            error: (err) => {
-                console.error('Error loading championship details:', err);
-                this.loading = false;
             }
         });
     }

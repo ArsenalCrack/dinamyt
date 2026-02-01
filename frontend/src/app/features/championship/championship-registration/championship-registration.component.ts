@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { delay } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
@@ -20,6 +21,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
     code: string = '';
     campeonato: any = null;
     loading = true;
+    loadingMessage = 'Cargando información del torneo...';
     submitting = false;
     message: string | null = null;
     success = false;
@@ -118,33 +120,36 @@ export class ChampionshipRegistrationComponent implements OnInit {
         return age;
     }
 
+    registeredModalities: string[] = [];
+
+    // ...
+
     loadChampionship(): void {
         this.loading = true;
         this.api.getCampeonatoById(this.id!).subscribe({
             next: (data) => {
                 this.campeonato = data;
-                // Map modalities from campeonato if available
                 if (data.modalidades) {
                     try {
                         const parsed = typeof data.modalidades === 'string' ? JSON.parse(data.modalidades) : data.modalidades;
                         if (Array.isArray(parsed)) {
                             this.fullModalities = parsed;
-                            this.filterAvailableModalities();
+                            // Check existing inscriptions before filtering
+                            this.loadExistingInscriptions();
                         } else {
-                            // Fallback if not an array
                             throw new Error('Modalidades is not an array');
                         }
                     } catch (e) {
                         console.error('Error parsing modalidades', e);
                         this.fallbackModalities();
+                        this.loading = false;
                     }
                 } else {
                     this.fallbackModalities();
+                    this.loading = false;
                 }
-                this.loading = false;
             },
             error: () => {
-                // Mock for demo
                 this.campeonato = {
                     nombre: 'Gran Torneo de Verano 2026',
                     ubicacion: 'Coliseo El Campín, Bogotá'
@@ -155,38 +160,99 @@ export class ChampionshipRegistrationComponent implements OnInit {
         });
     }
 
+    loadExistingInscriptions(): void {
+        if (!this.currentUser.id) {
+            this.filterAvailableModalities();
+            this.loading = false;
+            return;
+        }
+
+        this.api.getMisInscripciones(this.currentUser.id).subscribe({
+            next: (data: any[]) => {
+                const currentChampInscriptions = data.filter(i =>
+                    i.campeonatoId == this.id || (i.campeonato && i.campeonato.idCampeonato == this.id)
+                );
+
+                this.registeredModalities = [];
+                currentChampInscriptions.forEach(ins => {
+                    if (ins.seccionesDetalles) {
+                        ins.seccionesDetalles.forEach((sec: any) => {
+                            if (sec.MODALIDAD) this.registeredModalities.push(sec.MODALIDAD);
+                            if (sec.modalidad) this.registeredModalities.push(sec.modalidad); // fallback
+                        });
+                    }
+                });
+
+                this.filterAvailableModalities();
+                this.loading = false;
+            },
+            error: (err) => {
+                console.error('Error loading existing inscriptions', err);
+                this.filterAvailableModalities(); // Continue anyway
+                this.loading = false;
+            }
+        });
+    }
+
+    unavailableMessage: string = '';
+
     filterAvailableModalities(): void {
         const userBelt = this.currentUser.cinturon;
-        // Age calculation relative to Championship Start Date
         const targetDate = this.campeonato?.fechaInicio;
         const userAge = this.getAge(this.currentUser.fechaNacimiento, targetDate);
         const userGender = this.currentUser.sexo;
 
-        // Filter logic: Only keep modalities where the user fits the requirements
+        let alreadyRegisteredCount = 0;
+        let ageMismatchCount = 0;
+        let beltMismatchCount = 0;
+        let genderMismatchCount = 0;
+        let totalCount = this.fullModalities.length;
+
         const validIds = this.fullModalities.filter(mod => {
-            // Check Age Requirements (Strict: if missing age, hide)
-            if (mod.categorias && mod.categorias.edad && mod.categorias.edad.length > 0) {
-                if (userAge === null || isNaN(userAge)) return false; // Missing age -> Hide
-                const matchesAnyAge = mod.categorias.edad.some((cat: any) => this.matchesAge(cat, userAge));
-                if (!matchesAnyAge) return false; // Mismatch age -> Hide
+            const modName = mod.nombre || mod.id;
+
+            // Filter out already registered modalities
+            if (this.registeredModalities.includes(modName)) {
+                alreadyRegisteredCount++;
+                return false;
             }
 
-            // Check Belt Requirements - STRICT FILTERING IF DATA EXISTS
-            if (mod.categorias && mod.categorias.cinturon && mod.categorias.cinturon.length > 0) {
-                // Only hide if user HAS a belt but it doesn't match available options
-                // If user has NO belt, we show it so they can click and get the "Profile Incomplete" alert
+            let matchesRequirement = true;
+
+            // Check Age Requirements
+            if (mod.categorias && mod.categorias.edad && mod.categorias.edad.length > 0) {
+                if (userAge === null || isNaN(userAge)) {
+                    ageMismatchCount++;
+                    matchesRequirement = false;
+                } else {
+                    const matchesAnyAge = mod.categorias.edad.some((cat: any) => this.matchesAge(cat, userAge));
+                    if (!matchesAnyAge) {
+                        ageMismatchCount++;
+                        matchesRequirement = false;
+                    }
+                }
+            }
+
+            // Check Belt Requirements
+            if (matchesRequirement && mod.categorias && mod.categorias.cinturon && mod.categorias.cinturon.length > 0) {
                 if (userBelt && userBelt !== 'null') {
                     const matchesAnyBelt = mod.categorias.cinturon.some((cat: any) => this.matchesBelt(cat, userBelt));
-                    if (!matchesAnyBelt) return false;
+                    if (!matchesAnyBelt) {
+                        beltMismatchCount++;
+                        matchesRequirement = false;
+                    }
                 }
             }
 
             // Check Gender Requirements
-            if (mod.categorias && mod.categorias.genero === 'individual') {
-                if (!userGender) return false;
+            if (matchesRequirement && mod.categorias && mod.categorias.genero === 'individual') {
+                if (!userGender) {
+                    genderMismatchCount++;
+                    matchesRequirement = false;
+                }
             }
 
-            return true;
+            return matchesRequirement;
         }).map(m => m.nombre || m.id);
 
         this.modalidadOptions = this.fullModalities
@@ -197,6 +263,25 @@ export class ChampionshipRegistrationComponent implements OnInit {
             }));
 
         this.noModalitiesAvailable = this.modalidadOptions.length === 0;
+
+        if (this.noModalitiesAvailable) {
+            if (alreadyRegisteredCount === totalCount) {
+                this.unavailableMessage = "Ya estás inscrito en todas las modalidades disponibles de este campeonato.";
+            } else if (alreadyRegisteredCount > 0) {
+                this.unavailableMessage = "Ya estás inscrito en algunas modalidades y no cumples los requisitos para las restantes.";
+            } else {
+                // Not registered in any, but all filtered
+                if (ageMismatchCount > 0 && beltMismatchCount === 0 && genderMismatchCount === 0) {
+                    this.unavailableMessage = "Tu edad no cumple con los requisitos de ninguna categoría disponible.";
+                } else if (beltMismatchCount > 0 && ageMismatchCount === 0 && genderMismatchCount === 0) {
+                    this.unavailableMessage = "Tu rango de cinturón no cumple con los requisitos de ninguna categoría disponible.";
+                } else if (genderMismatchCount > 0) {
+                    this.unavailableMessage = "Falta información de género en tu perfil para verificar requisitos.";
+                } else {
+                    this.unavailableMessage = "No cumples con los requisitos (Edad, Cinturón o Género) para las modalidades de este campeonato.";
+                }
+            }
+        }
     }
 
     matchesBelt(category: any, userBelt: string): boolean {
@@ -405,22 +490,34 @@ export class ChampionshipRegistrationComponent implements OnInit {
         console.log('Submitting payload:', payload);
 
         // Simulated API call
-        this.api.inscribirUsuarioCampeonato(payload).subscribe({
-            next: (res) => {
-                this.success = true;
-                this.message = 'Inscripción realizada exitosamente.';
-                this.submitting = false;
-                setTimeout(() => {
-                    this.router.navigate(['/campeonatos']);
-                }, 2000);
-            },
-            error: (err) => {
-                console.error('Error inscribiendo usuario', err);
-                this.success = false;
-                this.message = err.error?.message || 'Hubo un error al realizar la inscripción.';
-                this.submitting = false;
-            }
-        });
+        // Simulated API call with delay and spinner
+        this.loadingMessage = 'Procesando inscripción...';
+        this.loading = true;
+        this.scrollLock.lock();
+
+        this.api.inscribirUsuarioCampeonato(payload)
+            .pipe(delay(2000))
+            .subscribe({
+                next: (res) => {
+                    this.success = true;
+                    this.message = 'Inscripción realizada exitosamente.';
+                    // Stay loading until redirect or for a moment
+                    setTimeout(() => {
+                        this.loading = false;
+                        this.scrollLock.unlock();
+                        this.router.navigate(['/campeonatos']);
+                    }, 500);
+                },
+                error: (err) => {
+                    console.error('Error inscribiendo usuario', err);
+                    this.success = false;
+                    this.message = err.error?.message || 'Hubo un error al realizar la inscripción.';
+                    this.submitting = false;
+                    // Turn off full screen spinner to show error
+                    this.loading = false;
+                    this.scrollLock.unlock();
+                }
+            });
     }
 
     goBack(): void {

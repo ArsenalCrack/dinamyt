@@ -200,7 +200,6 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.userType = null;
     if (this.usuario) {
       const roles = extractUserRoles(this.usuario);
-      console.log('Roles detected:', roles);
 
       if (roles.includes('administrador') || roles.includes('admin_proyecto')) {
         this.userType = 3;
@@ -212,7 +211,6 @@ export class NavbarComponent implements OnInit, OnDestroy {
         this.userType = 1;
       }
     }
-    console.log('Detected User Type (Final):', this.userType, 'Is 2?', this.userType === 2);
 
     if (notifyAuthService) {
       this.auth.setLoggedIn(this.isLoggedIn, this.username);

@@ -1,9 +1,11 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule, Location } from '@angular/common'; // Import Location
+import { delay } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
+import { ApiService } from '../../../core/services/api.service';
 
 interface Inscripcion {
   id: number;
@@ -24,10 +26,12 @@ interface Inscripcion {
   expanded?: boolean; // UI state
 }
 
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+
 @Component({
   selector: 'app-championship-inscriptions',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LoadingSpinnerComponent],
   templateUrl: './championship-inscriptions.component.html',
   styleUrls: ['./championship-inscriptions.component.scss']
 })
@@ -130,6 +134,7 @@ export class ChampionshipInscriptionsComponent implements OnInit {
 
   // Logic states
   rejectModalOpen = false;
+  loading = false; // Added loading state
   rejectTargetId: number | null = null;
 
   deleteModalOpen = false;
@@ -149,12 +154,60 @@ export class ChampionshipInscriptionsComponent implements OnInit {
     private router: Router,
     private backNav: BackNavigationService,
     private scrollLock: ScrollLockService,
-    private location: Location
+    private location: Location,
+    private api: ApiService
   ) { }
 
   ngOnInit(): void {
     this.championshipId = this.route.snapshot.paramMap.get('id');
-    this.applyFilters();
+    if (this.championshipId) {
+      this.loadInscriptions();
+    } else {
+      this.applyFilters();
+    }
+  }
+
+  loadInscriptions(): void {
+    if (!this.championshipId) return;
+    this.loading = true;
+    this.scrollLock.lock();
+
+    this.api.getInscriptionsByChampionship(this.championshipId)
+      .pipe(delay(1000))
+      .subscribe({
+        next: (data) => {
+          if (data && Array.isArray(data)) {
+            this.inscriptions = data.map((item: any) => ({
+              id: item.id || item.id_inscripcion,
+              nombre: item.nombre_usuario || item.nombre_completo || item.nombre || 'Desconocido',
+              edad: item.edad || 0,
+              sexo: item.sexo || 'N/A',
+              peso: item.peso || '0kg',
+              documentoId: item.documento || item.documentoId || 'Sin Doc',
+              academia: item.academia || 'Independiente',
+              nacionalidad: item.nacionalidad || 'Colombia',
+              ciudad: item.ciudad || 'Bogotá',
+              modalidades: item.modalidades || [],
+              cinturon: item.cinturon || 'Blanco',
+              instructor: item.instructor || 'Indefinido',
+              correo: item.correo || '',
+              telefono: item.telefono || '',
+              estado: item.estado || 'PENDIENTE',
+              expanded: false
+            }));
+            this.applyFilters();
+          }
+          this.loading = false;
+          this.scrollLock.unlock();
+        },
+        error: (err) => {
+          console.warn('API de inscripciones no disponible, usando mocks.', err);
+          // Keep mocks
+          this.loading = false;
+          this.scrollLock.unlock();
+          this.applyFilters();
+        }
+      });
   }
 
   setActiveTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {

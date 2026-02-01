@@ -90,6 +90,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    path: 'campeonato/live/:id',
+    loadComponent: () => import('./features/championship/live-tournament/live-tournament.component').then(m => m.LiveTournamentComponent),
+    canActivate: [authGuard]
+  },
+  {
     path: 'mi-academia',
     loadComponent: () => import('./features/academy/components/my-academy/my-academy.component').then(m => m.MyAcademyComponent),
     canActivate: [authGuard]

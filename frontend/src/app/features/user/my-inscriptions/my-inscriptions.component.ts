@@ -1,9 +1,11 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
+import { delay } from 'rxjs/operators';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
+import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 
 @Component({
   selector: 'app-my-inscriptions',
@@ -25,7 +27,8 @@ export class MyInscriptionsComponent implements OnInit {
   constructor(
     private api: ApiService,
     private backNav: BackNavigationService,
-    private location: Location
+    private location: Location,
+    private scrollLock: ScrollLockService
   ) { }
 
   ngOnInit(): void {
@@ -33,26 +36,50 @@ export class MyInscriptionsComponent implements OnInit {
   }
 
   loadInscriptions(): void {
-    const userId = sessionStorage.getItem('ID_documento'); // Use correct session key
+    const userId = sessionStorage.getItem('idDocumento');
     if (!userId) {
+      console.warn('No User ID found in session');
       this.loading = false;
       return;
     }
 
     this.loading = true;
-    this.api.getMisInscripciones(userId).subscribe({
-      next: (data) => {
-        this.inscriptions = data || [];
-        this.applyFilter();
-        this.loading = false;
-      },
-      error: (err) => {
-        console.error('Error fetching inscriptions', err);
-        this.inscriptions = [];
-        this.applyFilter();
-        this.loading = false;
-      }
-    });
+    this.scrollLock.lock();
+    this.api.getMisInscripciones(userId)
+      .pipe(delay(1000))
+      .subscribe({
+        next: (data: any[]) => {
+          this.inscriptions = data.map(item => ({
+            ...item,
+            id: item.idInscripcion,
+            estado: this.mapStatus(item.estado),
+            expanded: false // Default collapsed
+          })) || [];
+          this.applyFilter();
+          this.loading = false;
+          this.scrollLock.unlock();
+        },
+        error: (err) => {
+          console.error('Error fetching inscriptions', err);
+          this.inscriptions = [];
+          this.applyFilter();
+          this.loading = false;
+          this.scrollLock.unlock();
+        }
+      });
+  }
+
+  toggleDetails(item: any): void {
+    item.expanded = !item.expanded;
+  }
+
+  mapStatus(status: number): string {
+    switch (status) {
+      case 3: return 'ACEPTADO';
+      case 2: return 'PENDIENTE';
+      case 4: return 'RECHAZADO';
+      default: return 'PENDIENTE';
+    }
   }
 
   setTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {

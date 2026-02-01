@@ -134,10 +134,7 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
 
     // Action Methods
     startChampionship(): void {
-        if (confirm('¿Estás seguro de iniciar el campeonato? Esto cambiará el estado a EN CURSO.')) {
-            // Here you would call the API to update status, for now just ui update
-            this.campeonato.estadoReal = 'ACTIVO'; // Or whatever logic implies running
-        }
+        this.router.navigate(['/campeonato/live', this.id]);
     }
 
     sendInvitations(): void {

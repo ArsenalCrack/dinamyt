@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule, Location } from '@angular/common'; // Import Location
+import { delay } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
@@ -18,10 +19,12 @@ interface Invitacion {
   fechaEnvio: string;
 }
 
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+
 @Component({
   selector: 'app-championship-invitations',
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, CustomSelectComponent, LoadingSpinnerComponent],
   templateUrl: './championship-invitations.component.html',
   styleUrls: ['./championship-invitations.component.scss']
 })
@@ -54,8 +57,9 @@ export class ChampionshipInvitationsComponent implements OnInit {
   inviteSearchQuery = '';
   availableUsers: any[] = []; // Mock users found
   selectedUser: any | null = null;
-  selectedJudgeRole: string = 'Juez Central';
+  selectedJudgeRole: string = 'Juez';
   sendingInvitation = false;
+  loading = false;
 
   // Modal States
   cancelModalOpen = false;
@@ -75,8 +79,51 @@ export class ChampionshipInvitationsComponent implements OnInit {
 
   ngOnInit(): void {
     this.championshipId = this.route.snapshot.paramMap.get('id');
-    this.mockData(); // Load initial data
-    this.applyFilters();
+    if (this.championshipId) {
+      this.loadInvitations();
+    } else {
+      this.mockData();
+      this.applyFilters();
+    }
+  }
+
+  loadInvitations(): void {
+    if (!this.championshipId) return;
+    this.loading = true;
+    this.scrollLock.lock();
+
+    this.api.getInvitationsByChampionship(this.championshipId)
+      .pipe(delay(1000))
+      .subscribe({
+        next: (data) => {
+          if (data && Array.isArray(data)) {
+            this.invitations = data.map((item: any) => ({
+              id: item.id || item.id_invitacion,
+              documento: item.documento || item.documentoId || '0',
+              nombre: item.nombre_completo || item.nombre || 'Usuario',
+              email: item.email || item.correo || '',
+              avatar: item.avatar || '',
+              rol: item.rol,
+              estado: item.estado || 'PENDIENTE',
+              tipo: item.id_tipo === 5 ? 'COMPETIDOR' : 'JUEZ', // Basic inference
+              fechaEnvio: item.fecha_envio || new Date().toISOString()
+            }));
+            this.applyFilters();
+          } else {
+            this.mockData();
+            this.applyFilters();
+          }
+          this.loading = false;
+          this.scrollLock.unlock();
+        },
+        error: (err) => {
+          console.warn('API de invitaciones no disponible, usando mocks.', err);
+          this.mockData();
+          this.applyFilters();
+          this.loading = false;
+          this.scrollLock.unlock();
+        }
+      });
   }
 
   mockData(): void {
@@ -178,7 +225,8 @@ export class ChampionshipInvitationsComponent implements OnInit {
     this.inviteSearchQuery = '';
     this.availableUsers = [];
     this.selectedUser = null;
-    this.selectedJudgeRole = 'Juez Central';
+    this.selectedUser = null;
+    this.selectedJudgeRole = 'Juez';
   }
 
   closeInviteModal(): void {

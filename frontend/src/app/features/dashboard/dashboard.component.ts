@@ -51,7 +51,7 @@ export class DashboardComponent implements OnInit {
 
     this.apiService.getCurrentUser(payload).subscribe({
       next: (u: User) => {
-        console.log("u", u.nombreC);
+
 
         // Priorizar nombreC del backend
         if (u?.nombreC) {

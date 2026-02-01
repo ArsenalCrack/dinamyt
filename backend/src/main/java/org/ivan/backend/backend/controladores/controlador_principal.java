@@ -37,7 +37,7 @@ public class controlador_principal {
     private final Map<String, Usuario> usuariosPendientes = new HashMap<>();
 
     private controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository,
-            CampeonatoRepository campeonatoRepository,InscripcionRepository inscripcionRepository) {
+            CampeonatoRepository campeonatoRepository, InscripcionRepository inscripcionRepository) {
         this.usuarioRepository = usuarioRepository;
         this.academiaRepository = academiaRepository;
         this.campeonatoRepository = campeonatoRepository;
@@ -187,13 +187,19 @@ public class controlador_principal {
     }
 
     @PostMapping("/instructores")
-    private ResponseEntity<?> instructores(@RequestParam int academia, @RequestParam String idInstructor) {
-        // AJUSTA "Instructor" según tu BD
-        List<Usuario> instructores = usuarioRepository.findByAcademia_IDacademiaAndTipousuario_IDTipoAndIdDocumentoNot(
-                academia, 2, Long.parseLong(idInstructor));
-        if (instructores.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Sin instructores"));
+    private ResponseEntity<?> instructores(@RequestParam int academia,
+            @RequestParam(required = false, defaultValue = "0") String idInstructor) {
+        long idExcluir = 0;
+        try {
+            if (idInstructor != null && !idInstructor.trim().isEmpty()) {
+                idExcluir = Long.parseLong(idInstructor);
+            }
+        } catch (NumberFormatException e) {
+            idExcluir = 0;
         }
+
+        List<Usuario> instructores = usuarioRepository.findByAcademia_IDacademiaAndTipousuario_IDTipoAndIdDocumentoNot(
+                academia, 2, idExcluir);
 
         return ResponseEntity.ok(instructores);
     }
@@ -416,7 +422,7 @@ public class controlador_principal {
     @GetMapping("/usuarios/search/{query}")
     private ResponseEntity<?> buscarUsuarios(@PathVariable String query, @RequestParam String excluirId) {
         List<Usuario> usuarios = usuarioRepository.findByNombreCContainingIgnoreCaseAndEstadoAndIdDocumentoNot(query,
-                true, Long.parseLong(excluirId));
+                1, Long.parseLong(excluirId));
         if (usuarios != null) {
             return ResponseEntity.ok(usuarios);
         }
@@ -427,12 +433,12 @@ public class controlador_principal {
     private ResponseEntity<?> inscribirse(@RequestBody Map<String, Object> datos) throws Exception {
 
         Campeonato campeonato = campeonatoRepository.findById(
-                Integer.parseInt(datos.get("campeonatoId").toString())
-        ).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+                Integer.parseInt(datos.get("campeonatoId").toString()))
+                .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
 
         Usuario usuario = usuarioRepository.findById(
-                Long.parseLong(datos.get("idUsuario").toString())
-        ).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                Long.parseLong(datos.get("idUsuario").toString()))
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         Integer peso = datos.get("peso") != null ? Integer.parseInt(datos.get("peso").toString()) : null;
 
@@ -445,8 +451,7 @@ public class controlador_principal {
                 usuario.calcularEdad(usuario.getFechaNacimiento().toString()),
                 peso,
                 usuario.getCinturonRango(),
-                usuario.getSexo()
-        );
+                usuario.getSexo());
 
         if (seccionesAsignadas == null || seccionesAsignadas.isEmpty()) {
             return ResponseEntity.status(500).body(Map.of("message", "Sección adecuada no encontrada"));
@@ -462,8 +467,8 @@ public class controlador_principal {
         if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
             actualesCampeonato = objectMapper.readValue(
                     campeonato.getSeccionesActivas(),
-                    new TypeReference<List<String>>() {}
-            );
+                    new TypeReference<List<String>>() {
+                    });
         }
         for (String id : nuevasIds) {
             if (!actualesCampeonato.contains(id)) {
@@ -483,8 +488,8 @@ public class controlador_principal {
         if (inscripcion.getSecciones() != null && !inscripcion.getSecciones().isEmpty()) {
             seccionesActuales = objectMapper.readValue(
                     inscripcion.getSecciones(),
-                    new TypeReference<List<String>>() {}
-            );
+                    new TypeReference<List<String>>() {
+                    });
         }
 
         // Agregar solo nuevas secciones que no tenía antes
@@ -507,8 +512,67 @@ public class controlador_principal {
 
         return ResponseEntity.ok(Map.of(
                 "campeonato", campeonato,
-                "inscripcion", inscripcion
-        ));
+                "inscripcion", inscripcion));
+    }
+
+    @GetMapping("/inscripciones/usuario/{id}")
+    private ResponseEntity<?> getMisInscripciones(@PathVariable Long id) {
+        try {
+            List<Inscripciones> inscripciones = inscripcionRepository.findByUsuario(id);
+            List<Map<String, Object>> response = new ArrayList<>();
+            ObjectMapper mapper = new ObjectMapper();
+
+            for (Inscripciones inscripcion : inscripciones) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("idInscripcion", inscripcion.getIdInscripcion());
+                item.put("estado", inscripcion.isEstado());
+                item.put("fechaInscripcion", inscripcion.getFechaInscripcion());
+
+                // Obtener Campeonato
+                Campeonato camp = campeonatoRepository.findById(inscripcion.getCampeonato().intValue())
+                        .orElse(null);
+
+                if (camp != null) {
+                    item.put("campeonatoNombre", camp.getNombre());
+                    item.put("campeonatoId", camp.getIdCampeonato());
+                    item.put("ubicacion", camp.getUbicacion());
+
+                    // Procesar secciones
+                    List<String> misSeccionesIds = new ArrayList<>();
+                    if (inscripcion.getSecciones() != null) {
+                        misSeccionesIds = mapper.readValue(inscripcion.getSecciones(),
+                                new TypeReference<List<String>>() {
+                                });
+                    }
+
+                    List<Map<String, String>> detallesSecciones = new ArrayList<>();
+                    if (camp.getSecciones() != null) {
+                        List<Map<String, String>> todasLasSecciones = mapper.readValue(camp.getSecciones(),
+                                new TypeReference<List<Map<String, String>>>() {
+                                });
+
+                        // Filtrar
+                        List<String> finalMisSeccionesIds = misSeccionesIds;
+                        detallesSecciones = todasLasSecciones.stream()
+                                .filter(s -> finalMisSeccionesIds.contains(s.get("ID"))) // Asegurar que el ID coincida
+                                                                                         // con la clave usada en el
+                                                                                         // JSON
+                                .toList();
+                    }
+                    item.put("seccionesDetalles", detallesSecciones);
+                } else {
+                    item.put("campeonatoNombre", "Campeonato no encontrado");
+                }
+
+                response.add(item);
+            }
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Error al obtener inscripciones"));
+        }
     }
 
 }

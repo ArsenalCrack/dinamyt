@@ -1,4 +1,5 @@
 <div class="invitations-container">
+    <app-loading-spinner *ngIf="loading" [message]="'Cargando invitaciones...'" [fixed]="true"></app-loading-spinner>
     <div class="toast-notification" *ngIf="toastVisible" [class.error]="toastIsError">
         <i class="fas" [ngClass]="toastIsError ? 'fa-exclamation-circle' : 'fa-check-circle'"></i>
         <span>{{ toastMessage }}</span>

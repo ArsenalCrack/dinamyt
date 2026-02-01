@@ -1,0 +1,161 @@
+<div class="live-container">
+    <app-loading-spinner *ngIf="loading" message="Inicializando panel..." [fixed]="true"></app-loading-spinner>
+    <header class="live-header">
+        <div class="header-left">
+            <span class="live-badge">
+                <span class="dot"></span> EN VIVO
+            </span>
+            <div class="title-group">
+                <h1>{{ championshipName }}</h1>
+                <span class="subtitle">Panel de Control de Tatamis</span>
+            </div>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-item active">
+                <i class="fas fa-th-large"></i>
+                <div class="stat-info">
+                    <span class="value">{{ tatamis.length }}</span>
+                    <span class="label">Tatamis</span>
+                </div>
+            </div>
+            <div class="stat-item pending">
+                <i class="fas fa-clock"></i>
+                <div class="stat-info">
+                    <span class="value">{{ sectionsQueue.length }}</span>
+                    <span class="label">Pendientes</span>
+                </div>
+            </div>
+            <div class="stat-item finished">
+                <i class="fas fa-clipboard-check"></i>
+                <div class="stat-info">
+                    <span class="value">{{ finishedSections.length }}</span>
+                    <span class="label">Finalizadas</span>
+                </div>
+            </div>
+            <div class="stat-item total">
+                <i class="fas fa-list"></i>
+                <div class="stat-info">
+                    <span class="value">{{ totalSections }}</span>
+                    <span class="label">Total</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button (click)="exit()" class="btn-exit">
+                <i class="fas fa-sign-out-alt"></i> Salir
+            </button>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <!-- Sidebar: Queue & History -->
+        <aside class="side-panel">
+            <div class="panel-section queue">
+                <header>
+                    <h3><i class="fas fa-random"></i> Cola de Espera</h3>
+                    <span class="count">{{ sectionsQueue.length }}</span>
+                </header>
+                <div class="queue-list custom-scrollbar">
+                    <div class="queue-item" *ngFor="let section of sectionsQueue; let i = index">
+                        <div class="queue-pos">{{ i + 1 }}</div>
+                        <div class="queue-info">
+                            <h4>{{ section.name }}</h4>
+                            <span class="queue-meta">{{ section.category }}</span>
+                        </div>
+                    </div>
+                    <div class="empty-state" *ngIf="sectionsQueue.length === 0">
+                        <i class="fas fa-check"></i>
+                        <p>No hay secciones en cola</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section history">
+                <header>
+                    <h3><i class="fas fa-history"></i> Recientes</h3>
+                </header>
+                <div class="history-list custom-scrollbar">
+                    <div class="history-item" *ngFor="let section of finishedSections.slice(0, 5)">
+                        <span class="check-icon"><i class="fas fa-check"></i></span>
+                        <div class="history-info">
+                            <h4>{{ section.name }}</h4>
+                            <span class="history-meta">Tatami #{{ section.tatamiId }}</span>
+                        </div>
+                    </div>
+                    <div class="empty-state" *ngIf="finishedSections.length === 0">
+                        <p>Aún no hay secciones finalizadas</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main: Tatamis Grid -->
+        <main class="tatamis-grid custom-scrollbar">
+            <div class="tatami-card" *ngFor="let tatami of tatamis" [class.status-busy]="tatami.status === 'BUSY'"
+                [class.status-running]="tatami.currentSection?.status === 'RUNNING'"
+                [class.status-free]="tatami.status === 'FREE'">
+
+                <div class="tatami-header">
+                    <div class="tatami-id">
+                        <i class="fas fa-square"></i> {{ tatami.name }}
+                    </div>
+                    <div class="status-badge">
+                        <span class="status-dot"></span>
+                        {{ tatami.currentSection?.status === 'RUNNING' ? 'EN CURSO' : (tatami.status === 'BUSY' ?
+                        'ASIGNADO' : 'LIBRE') }}
+                    </div>
+                </div>
+
+                <div class="tatami-content">
+                    <ng-container *ngIf="tatami.currentSection; else freeState">
+                        <div class="section-card">
+                            <div class="section-badge">{{ tatami.currentSection.category }}</div>
+                            <h3 class="section-title">{{ tatami.currentSection.name }}</h3>
+
+                            <div class="competitors-section">
+                                <div class="comp-header">
+                                    <i class="fas fa-users"></i> {{ tatami.currentSection.competitors.length }}
+                                    Competidores
+                                </div>
+                                <div class="comp-list">
+                                    <span *ngFor="let comp of tatami.currentSection.competitors.slice(0, 3)"
+                                        class="comp-pill">
+                                        {{ comp.name }}
+                                    </span>
+                                    <span *ngIf="tatami.currentSection.competitors.length > 3" class="comp-pill more">
+                                        +{{ tatami.currentSection.competitors.length - 3 }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tatami-actions">
+                            <button *ngIf="tatami.currentSection.status === 'READY'" class="btn-action start"
+                                (click)="startSection(tatami)">
+                                <span class="icon"><i class="fas fa-play"></i></span>
+                                <span class="text">INICIAR SECCIÓN</span>
+                            </button>
+
+                            <button *ngIf="tatami.currentSection.status === 'RUNNING'" class="btn-action finish"
+                                (click)="finishSection(tatami)">
+                                <span class="icon"><i class="fas fa-stop"></i></span>
+                                <span class="text">FINALIZAR</span>
+                            </button>
+                        </div>
+                    </ng-container>
+
+                    <ng-template #freeState>
+                        <div class="free-state-content">
+                            <div class="pulse-ring"></div>
+                            <i class="fas fa-coffee"></i>
+                            <p>Esperando asignación</p>
+                            <span class="sub-text">Tatami disponible</span>
+                        </div>
+                    </ng-template>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>

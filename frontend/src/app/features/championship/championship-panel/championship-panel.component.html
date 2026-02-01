@@ -47,15 +47,15 @@
             <!-- Actions Grid -->
             <div class="actions-grid">
 
-                <!-- Quick Start Action (Highlighted) -->
-                <button class="action-card primary" *ngIf="campeonato.estadoReal === 'PLANIFICADO'"
+                <!-- Live Management Action (Highlighted) -->
+                <button class="action-card primary" *ngIf="campeonato.estadoReal !== 'TERMINADO'"
                     (click)="startChampionship()">
                     <div class="icon-wrapper">
-                        <i class="fas fa-play"></i>
+                        <i class="fas fa-desktop"></i>
                     </div>
                     <div class="action-info">
-                        <h3>Iniciar Campeonato</h3>
-                        <p>Cambiar estado a En Curso</p>
+                        <h3>Panel en Vivo</h3>
+                        <p>Gestionar tatamis y secciones</p>
                     </div>
                 </button>
 

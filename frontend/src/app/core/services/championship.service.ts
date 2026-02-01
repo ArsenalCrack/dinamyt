@@ -42,6 +42,7 @@ export class ChampionshipService {
         return this.http.delete(`${this.apiUrl}/campeonatos/${id}`);
     }
 
+    // TODO: Endpoint no implementado en backend
     getJuecesByCampeonato(campeonatoId: string | number): Observable<any[]> {
         return this.http.get<any[]>(`${this.apiUrl}/campeonatos/${campeonatoId}/jueces`);
     }
@@ -54,19 +55,38 @@ export class ChampionshipService {
         return this.http.get<any[]>(`${this.apiUrl}/inscripciones/usuario/${userId}`);
     }
 
+    // TODO: Endpoint no implementado en backend
     eliminarInscripcion(inscriptionId: string | number): Observable<any> {
         return this.http.delete(`${this.apiUrl}/inscripciones/${inscriptionId}`);
     }
 
+    // TODO: Endpoint no implementado en backend
     getMisInvitaciones(userId: string | number): Observable<any[]> {
         return this.http.get<any[]>(`${this.apiUrl}/invitaciones/usuario/${userId}`);
     }
 
+    // TODO: Endpoint no implementado en backend
     responderInvitacion(invitationId: string | number, estado: string): Observable<any> {
         return this.http.put(`${this.apiUrl}/invitaciones/${invitationId}`, { estado });
     }
 
+    // TODO: Endpoint no implementado en backend
     enviarInvitacion(payload: { id_usuario: string, id_campeonato: string, id_tipo: number }): Observable<any> {
         return this.http.post(`${this.apiUrl}/invitaciones/enviar`, payload);
+    }
+
+    // TODO: Endpoint no implementado en backend
+    getLiveManagement(id: string | number): Observable<any> {
+        return this.http.get(`${this.apiUrl}/campeonatos/${id}/live-management`);
+    }
+
+    // TODO: Endpoint no implementado en backend
+    getInscriptionsByChampionship(id: string | number): Observable<any[]> {
+        return this.http.get<any[]>(`${this.apiUrl}/campeonatos/${id}/inscripciones`);
+    }
+
+    // TODO: Endpoint no implementado en backend
+    getInvitationsByChampionship(id: string | number): Observable<any[]> {
+        return this.http.get<any[]>(`${this.apiUrl}/campeonatos/${id}/invitaciones`);
     }
 }

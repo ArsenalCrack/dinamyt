@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { delay } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
@@ -9,6 +10,7 @@ import { extractUserRoles } from '../../../../core/utils/user-type.util';
 import { CountryAutocompleteComponent } from '../../../../shared/components/country-autocomplete/country-autocomplete.component';
 import { LocationService } from '../../../../core/services/location.service';
 import { SearchableSelectComponent } from '../../../../shared/components/searchable-select/searchable-select.component';
+import { ScrollLockService } from '../../../../core/services/scroll-lock.service';
 
 @Component({
     selector: 'app-my-academy',
@@ -54,7 +56,8 @@ export class MyAcademyComponent implements OnInit {
     constructor(
         private api: ApiService,
         private router: Router,
-        private locationService: LocationService
+        private locationService: LocationService,
+        private scrollLock: ScrollLockService
     ) { }
 
     ngOnInit(): void {
@@ -87,6 +90,7 @@ export class MyAcademyComponent implements OnInit {
 
     loadUser() {
         this.loading = true;
+        this.scrollLock.lock();
 
         // 1. Try to load from LocalStorage first (Source of Truth for Navbar)
         const storedUser = localStorage.getItem('usuario');
@@ -102,6 +106,7 @@ export class MyAcademyComponent implements OnInit {
                 if (this.userType !== 0) {
                     this.checkAcademyStatus(this.user);
                     this.loading = false;
+                    this.scrollLock.unlock();
                 }
             } catch (e) { console.error('Error parsing stored user', e); }
         }
@@ -109,49 +114,57 @@ export class MyAcademyComponent implements OnInit {
         const idDoc = sessionStorage.getItem('ID_documento') || sessionStorage.getItem('idDocumento');
         const tipoUsuario = sessionStorage.getItem('tipo_usuario');
 
-        this.api.getCurrentUser({ ID_documento: idDoc, tipo_usuario: tipoUsuario }).subscribe({
-            next: (u: any) => {
-                // If API returns a valid object with ID (not just empty echo), update
-                // But if API is just echoing inputs and missing fields, ignore it or merge carefully
-                // The echo problem: u might be { ID_documento: "...", tipo_usuario: "..." } but missing 'academia', 'instructor' fields
+        this.api.getCurrentUser({ ID_documento: idDoc, tipo_usuario: tipoUsuario })
+            .pipe(delay(1000))
+            .subscribe({
+                next: (u: any) => {
+                    // If API returns a valid object with ID (not just empty echo), update
+                    // But if API is just echoing inputs and missing fields, ignore it or merge carefully
+                    // The echo problem: u might be { ID_documento: "...", tipo_usuario: "..." } but missing 'academia', 'instructor' fields
 
-                // Simple heuristic: if u has 'academia' (even if null) it's likely a real DB object. 
-                // If u only has what we sent, it's an echo.
-                // Check if API returned a valid object vs an echo
-                // Echo often lacks 'academia' or 'instructor' whole objects, BUT might contain 'tipo_usuario'
-                const isEcho = !('academia' in u) && !('instructor' in u);
+                    // Simple heuristic: if u has 'academia' (even if null) it's likely a real DB object. 
+                    // If u only has what we sent, it's an echo.
+                    // Check if API returned a valid object vs an echo
+                    // Echo often lacks 'academia' or 'instructor' whole objects, BUT might contain 'tipo_usuario'
+                    const isEcho = !('academia' in u) && !('instructor' in u);
 
-                if (!isEcho) {
-                    this.user = u;
-                    const roles = extractUserRoles(u);
-                    this.setUserTypeFromRoles(roles);
-                    this.checkAcademyStatus(u);
-                } else {
-                    console.warn('API returned potential echo. Response:', u);
-                    // Even if it is an echo, it might hold the correct 'tipo_usuario' we just sent.
-                    // If local storage is stale (Type 1) but this response clearly says Type 4, trust this response for the TYPE at least.
-
-                    const roles = extractUserRoles(u);
-                    if (roles.length > 0) {
-                        this.setUserTypeFromRoles(roles); // FORCE update type from API response
-                    }
-
-                    if (!this.user) {
-                        this.user = u; // Use this as fallback user object if nothing local
+                    if (!isEcho) {
+                        this.user = u;
+                        const roles = extractUserRoles(u);
+                        this.setUserTypeFromRoles(roles);
                         this.checkAcademyStatus(u);
                     } else {
-                        // We have local user, re-check status with POTENTIALLY UPDATED type
-                        this.checkAcademyStatus(this.user);
+                        console.warn('API returned potential echo. Response:', u);
+                        // Even if it is an echo, it might hold the correct 'tipo_usuario' we just sent.
+                        // If local storage is stale (Type 1) but this response clearly says Type 4, trust this response for the TYPE at least.
+
+                        const roles = extractUserRoles(u);
+                        if (roles.length > 0) {
+                            this.setUserTypeFromRoles(roles); // FORCE update type from API response
+                        }
+
+                        if (!this.user) {
+                            this.user = u; // Use this as fallback user object if nothing local
+                            this.checkAcademyStatus(u);
+                        } else {
+                            // We have local user, re-check status with POTENTIALLY UPDATED type
+                            this.checkAcademyStatus(this.user);
+                        }
+                    }
+                    if (this.loading) {
+                        this.loading = false;
+                        this.scrollLock.unlock();
+                    }
+                },
+                error: (err) => {
+                    console.error(err);
+                    if (!this.user) this.message = "Error cargando perfil.";
+                    if (this.loading) {
+                        this.loading = false;
+                        this.scrollLock.unlock();
                     }
                 }
-                this.loading = false;
-            },
-            error: (err) => {
-                console.error(err);
-                if (!this.user) this.message = "Error cargando perfil.";
-                this.loading = false;
-            }
-        });
+            });
     }
 
     setUserTypeFromRoles(roles: string[]) {

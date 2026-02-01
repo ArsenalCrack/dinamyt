@@ -70,5 +70,8 @@ export class ApiService {
   getMisInvitaciones(userId: string | number) { return this.championship.getMisInvitaciones(userId); }
   responderInvitacion(invitationId: string | number, estado: string) { return this.championship.responderInvitacion(invitationId, estado); }
   enviarInvitacion(payload: any) { return this.championship.enviarInvitacion(payload); }
+  getLiveManagement(id: string | number) { return this.championship.getLiveManagement(id); }
+  getInscriptionsByChampionship(id: string | number) { return this.championship.getInscriptionsByChampionship(id); }
+  getInvitationsByChampionship(id: string | number) { return this.championship.getInvitationsByChampionship(id); }
 
 }

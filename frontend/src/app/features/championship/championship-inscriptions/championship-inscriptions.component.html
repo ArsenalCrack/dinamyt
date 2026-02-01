@@ -1,4 +1,5 @@
 <div class="inscriptions-container">
+    <app-loading-spinner *ngIf="loading" [message]="'Cargando inscripciones...'" [fixed]="true"></app-loading-spinner>
     <div class="toast-notification" *ngIf="toastVisible">
         <i class="fas fa-check-circle"></i>
         <span>{{ toastMessage }}</span>
