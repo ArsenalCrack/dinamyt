@@ -206,3 +206,58 @@
     /* Expand when form is visible */
     transition: max-width 0.3s ease;
 }
+
+/* Responsive Adjustments */
+@media (max-width: 600px) {
+    .my-academy-container {
+        padding: 1rem;
+        align-items: flex-start;
+        /* Align top on mobile */
+    }
+
+    .content-card {
+        padding: 1.5rem;
+        border-radius: 16px;
+
+        h1 {
+            font-size: 1.6rem;
+            margin-bottom: 1.5rem;
+        }
+    }
+
+    .icon-lg {
+        font-size: 3rem;
+    }
+
+    .btn-create,
+    .btn-join {
+        font-size: 1rem;
+        padding: 0.9rem;
+    }
+
+    .create-form-section {
+        padding: 1rem;
+
+        .form-header {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: flex-start;
+            margin-bottom: 1.5rem;
+
+            h2 {
+                font-size: 1.3rem;
+            }
+
+            .btn-cancel {
+                width: 100%;
+                text-align: center;
+                padding: 0.8rem;
+            }
+        }
+    }
+
+    .profile-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}

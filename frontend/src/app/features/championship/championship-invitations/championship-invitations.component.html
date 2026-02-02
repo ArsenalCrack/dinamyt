@@ -5,117 +5,119 @@
         <span>{{ toastMessage }}</span>
     </div>
 
-    <!-- Header -->
-    <header class="header">
-        <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
-            <i class="fas fa-arrow-left"></i>
-        </button>
-        <div class="header-content">
-            <h1>Gestión de Invitaciones</h1>
-            <p>Administra las invitaciones para competidores y jueces</p>
+    <div class="page-card">
+        <!-- Header -->
+        <header class="header">
+            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div class="header-content">
+                <h1>Gestión de Invitaciones</h1>
+                <p>Administra las invitaciones para competidores y jueces</p>
+            </div>
+            <button class="btn-invite-new" (click)="openInviteModal()">
+                <i class="fas fa-paper-plane"></i>
+                <span>Invitar {{ activeSection === 'JUEZ' ? 'Juez' : 'Competidor' }}</span>
+            </button>
+        </header>
+
+        <!-- Section Switcher (Competitors vs Judges) -->
+        <div class="section-switcher">
+            <button class="switch-btn" [class.active]="activeSection === 'COMPETIDOR'"
+                (click)="setActiveSection('COMPETIDOR')">
+                <i class="fas fa-user-ninja"></i> Competidores
+            </button>
+            <button class="switch-btn" [class.active]="activeSection === 'JUEZ'" (click)="setActiveSection('JUEZ')">
+                <i class="fas fa-gavel"></i> Jueces
+            </button>
         </div>
-        <button class="btn-invite-new" (click)="openInviteModal()">
-            <i class="fas fa-paper-plane"></i>
-            <span>Invitar {{ activeSection === 'JUEZ' ? 'Juez' : 'Competidor' }}</span>
-        </button>
-    </header>
 
-    <!-- Section Switcher (Competitors vs Judges) -->
-    <div class="section-switcher">
-        <button class="switch-btn" [class.active]="activeSection === 'COMPETIDOR'"
-            (click)="setActiveSection('COMPETIDOR')">
-            <i class="fas fa-user-ninja"></i> Competidores
-        </button>
-        <button class="switch-btn" [class.active]="activeSection === 'JUEZ'" (click)="setActiveSection('JUEZ')">
-            <i class="fas fa-gavel"></i> Jueces
-        </button>
-    </div>
+        <!-- Search Bar -->
+        <div class="search-section" id="invitations-top-anchor">
+            <i class="fas fa-search"></i>
+            <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+                placeholder="Buscar por nombre, documento o email...">
+        </div>
 
-    <!-- Search Bar -->
-    <div class="search-section" id="invitations-top-anchor">
-        <i class="fas fa-search"></i>
-        <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
-            placeholder="Buscar por nombre, documento o email...">
-    </div>
+        <!-- Status Tabs -->
+        <nav class="tabs-nav">
+            <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setActiveTab('PENDIENTE')">
+                <i class="fas fa-clock"></i>
+                <span>Pendientes</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setActiveTab('ACEPTADO')">
+                <i class="fas fa-check-circle"></i>
+                <span>Aceptados</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setActiveTab('RECHAZADO')">
+                <i class="fas fa-times-circle"></i>
+                <span>Rechazados</span>
+            </button>
+        </nav>
 
-    <!-- Status Tabs -->
-    <nav class="tabs-nav">
-        <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setActiveTab('PENDIENTE')">
-            <i class="fas fa-clock"></i>
-            <span>Pendientes</span>
-        </button>
-        <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setActiveTab('ACEPTADO')">
-            <i class="fas fa-check-circle"></i>
-            <span>Aceptados</span>
-        </button>
-        <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setActiveTab('RECHAZADO')">
-            <i class="fas fa-times-circle"></i>
-            <span>Rechazados</span>
-        </button>
-    </nav>
+        <!-- Invitations List -->
+        <div class="invitations-list">
+            <div class="invitation-card" *ngFor="let item of paginatedInvitations">
+                <div class="card-content">
+                    <div class="user-avatar" [class.judge]="item.tipo === 'JUEZ'">
+                        <i class="fas" [ngClass]="item.tipo === 'JUEZ' ? 'fa-gavel' : 'fa-user'"></i>
+                    </div>
 
-    <!-- Invitations List -->
-    <div class="invitations-list">
-        <div class="invitation-card" *ngFor="let item of paginatedInvitations">
-            <div class="card-content">
-                <div class="user-avatar" [class.judge]="item.tipo === 'JUEZ'">
-                    <i class="fas" [ngClass]="item.tipo === 'JUEZ' ? 'fa-gavel' : 'fa-user'"></i>
+                    <div class="user-info">
+                        <div class="top-row">
+                            <h3>{{ item.nombre }}</h3>
+                            <span class="id-badge">{{ item.documento }}</span>
+                        </div>
+
+                        <div class="meta-row">
+                            <span class="email-text">{{ item.email }}</span>
+                        </div>
+
+                        <div class="role-badge" *ngIf="item.tipo === 'JUEZ' && item.rol">
+                            {{ item.rol }}
+                        </div>
+
+                        <div class="date-info">
+                            Enviada: {{ item.fechaEnvio }}
+                        </div>
+                    </div>
                 </div>
 
-                <div class="user-info">
-                    <div class="top-row">
-                        <h3>{{ item.nombre }}</h3>
-                        <span class="id-badge">{{ item.documento }}</span>
-                    </div>
+                <!-- Actions -->
+                <div class="card-actions">
+                    <!-- Delete Action (Pending or Accepted) -->
+                    <button class="btn-cancel" *ngIf="item.estado !== 'RECHAZADO'" (click)="confirmCancel(item.id)"
+                        [title]="item.estado === 'PENDIENTE' ? 'Cancelar invitación' : 'Eliminar de la lista'">
+                        <i class="fas" [ngClass]="item.estado === 'PENDIENTE' ? 'fa-times' : 'fa-trash'"></i>
+                        <span>{{ item.estado === 'PENDIENTE' ? 'Cancelar' : 'Eliminar' }}</span>
+                    </button>
 
-                    <div class="meta-row">
-                        <span class="email-text">{{ item.email }}</span>
+                    <div class="status-indicator" *ngIf="item.estado === 'RECHAZADO'">
+                        <i class="fas fa-ban"></i> Rechazada
                     </div>
-
-                    <div class="role-badge" *ngIf="item.tipo === 'JUEZ' && item.rol">
-                        {{ item.rol }}
-                    </div>
-
-                    <div class="date-info">
-                        Enviada: {{ item.fechaEnvio }}
+                    <div class="status-indicator accepted" *ngIf="item.estado === 'ACEPTADO' && false">
+                        <!-- Optional visual indicator if we want, but tab implies context -->
+                        <i class="fas fa-check"></i>
                     </div>
                 </div>
             </div>
 
-            <!-- Actions -->
-            <div class="card-actions">
-                <!-- Delete Action (Pending or Accepted) -->
-                <button class="btn-cancel" *ngIf="item.estado !== 'RECHAZADO'" (click)="confirmCancel(item.id)"
-                    [title]="item.estado === 'PENDIENTE' ? 'Cancelar invitación' : 'Eliminar de la lista'">
-                    <i class="fas" [ngClass]="item.estado === 'PENDIENTE' ? 'fa-times' : 'fa-trash'"></i>
-                    <span>{{ item.estado === 'PENDIENTE' ? 'Cancelar' : 'Eliminar' }}</span>
+            <!-- Empty State -->
+            <div class="empty-state" *ngIf="filteredInvitations.length === 0">
+                <i class="fas fa-envelope-open-text"></i>
+                <p>No se encontraron invitaciones en esta sección.</p>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div class="pagination-controls" *ngIf="totalPages > 1">
+                <button class="btn-page" (click)="prevPage()" [disabled]="currentPage === 1">
+                    <i class="fas fa-chevron-left"></i>
                 </button>
-
-                <div class="status-indicator" *ngIf="item.estado === 'RECHAZADO'">
-                    <i class="fas fa-ban"></i> Rechazada
-                </div>
-                <div class="status-indicator accepted" *ngIf="item.estado === 'ACEPTADO' && false">
-                    <!-- Optional visual indicator if we want, but tab implies context -->
-                    <i class="fas fa-check"></i>
-                </div>
+                <span class="page-count">{{ currentPage }} / {{ totalPages }}</span>
+                <button class="btn-page" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
             </div>
-        </div>
-
-        <!-- Empty State -->
-        <div class="empty-state" *ngIf="filteredInvitations.length === 0">
-            <i class="fas fa-envelope-open-text"></i>
-            <p>No se encontraron invitaciones en esta sección.</p>
-        </div>
-
-        <!-- Pagination Controls -->
-        <div class="pagination-controls" *ngIf="totalPages > 1">
-            <button class="btn-page" (click)="prevPage()" [disabled]="currentPage === 1">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <span class="page-count">{{ currentPage }} / {{ totalPages }}</span>
-            <button class="btn-page" (click)="nextPage()" [disabled]="currentPage === totalPages">
-                <i class="fas fa-chevron-right"></i>
-            </button>
         </div>
     </div>
 </div>

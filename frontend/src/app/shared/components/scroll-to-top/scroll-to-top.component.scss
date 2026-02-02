@@ -40,8 +40,9 @@
 /* Ajustes para móviles */
 @media (max-width: 768px) {
     .scroll-to-top {
-        bottom: 20px;
-        right: 20px;
+        bottom: 25px;
+        right: 25px;
+        /* Adjusting to avoid screen edge cut-off */
         width: 40px;
         height: 40px;
         border-radius: 8px;

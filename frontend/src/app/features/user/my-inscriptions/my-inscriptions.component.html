@@ -1,115 +1,118 @@
 <div class="inscriptions-container">
-    <header class="header">
-        <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
-            <i class="fas fa-arrow-left"></i>
-        </button>
-        <div class="header-content">
-            <h1>Mis Inscripciones</h1>
-            <p>Historial y estado de tus registros en campeonatos</p>
-        </div>
-    </header>
+    <div class="page-card">
+        <header class="header">
+            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div class="header-content">
+                <h1>Mis Inscripciones</h1>
+                <p>Historial y estado de tus registros en campeonatos</p>
+            </div>
+        </header>
 
-    <!-- Tabs Navigation -->
-    <nav class="tabs-nav">
-        <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setTab('PENDIENTE')">
-            <i class="fas fa-clock"></i>
-            <span>Pendientes</span>
-        </button>
-        <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setTab('ACEPTADO')">
-            <i class="fas fa-check-circle"></i>
-            <span>Aceptadas</span>
-        </button>
-        <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setTab('RECHAZADO')">
-            <i class="fas fa-times-circle"></i>
-            <span>Rechazadas</span>
-        </button>
-    </nav>
+        <!-- Tabs Navigation -->
+        <nav class="tabs-nav">
+            <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setTab('PENDIENTE')">
+                <i class="fas fa-clock"></i>
+                <span>Pendientes</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setTab('ACEPTADO')">
+                <i class="fas fa-check-circle"></i>
+                <span>Aceptadas</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setTab('RECHAZADO')">
+                <i class="fas fa-times-circle"></i>
+                <span>Rechazadas</span>
+            </button>
+        </nav>
 
-    <app-loading-spinner *ngIf="loading" message="Cargando inscripciones..."></app-loading-spinner>
+        <app-loading-spinner *ngIf="loading" message="Cargando inscripciones..."></app-loading-spinner>
 
-    <div class="inscriptions-list" *ngIf="!loading">
-        <div class="empty-state" *ngIf="filteredInscriptions.length === 0">
-            <i class="fas fa-clipboard-list"></i>
-            <p>No tienes inscripciones {{ getStatusLabel(activeTab) | lowercase }}s.</p>
-        </div>
-
-        <div class="inscription-card" *ngFor="let item of filteredInscriptions"
-            [class.rejected]="item.estado === 'RECHAZADO'" [class.expanded]="item.expanded">
-
-            <!-- Clickable Header for Accordion -->
-            <div class="card-summary" (click)="toggleDetails(item)">
-                <div class="user-avatar">
-                    <i class="fas fa-trophy"></i>
-                </div>
-                <div class="user-main-info">
-                    <h3>{{ item.campeonatoNombre || 'Campeonato' }}</h3>
-                    <div class="meta-row">
-                        <span class="meta-text" *ngIf="item.fechaInscripcion">{{ item.fechaInscripcion |
-                            date:'mediumDate' }}</span>
-                    </div>
-                </div>
-                <div class="toggle-icon">
-                    <i class="fas" [class.fa-chevron-down]="!item.expanded" [class.fa-chevron-up]="item.expanded"></i>
-                </div>
+        <div class="inscriptions-list" *ngIf="!loading">
+            <div class="empty-state" *ngIf="filteredInscriptions.length === 0">
+                <i class="fas fa-clipboard-list"></i>
+                <p>No tienes inscripciones {{ getStatusLabel(activeTab) | lowercase }}s.</p>
             </div>
 
-            <!-- Expandable Content -->
-            <div class="card-details-wrapper" *ngIf="item.expanded">
-                <div class="card-details">
-                    <div class="sections-container"
-                        *ngIf="item.seccionesDetalles && item.seccionesDetalles.length > 0; else noDetails">
-                        <h4 class="section-main-title">Modalidades inscritas</h4>
-                        <div class="section-card" *ngFor="let section of item.seccionesDetalles">
-                            <div class="section-header">
-                                <span class="modality-title">{{ section.MODALIDAD }}</span>
-                                <span class="gender-badge">{{ section.GENERO || 'Mixto' }}</span>
-                            </div>
-                            <div class="section-specs-grid">
-                                <div class="spec-column" *ngIf="section.CINTURON">
-                                    <span class="spec-label">Cinturón</span>
-                                    <div class="spec-value">
-                                        <i class="fas fa-certificate"></i>
-                                        <span>{{ section.CINTURON }}</span>
-                                    </div>
+            <div class="inscription-card" *ngFor="let item of filteredInscriptions"
+                [class.rejected]="item.estado === 'RECHAZADO'" [class.expanded]="item.expanded">
+
+                <!-- Clickable Header for Accordion -->
+                <div class="card-summary" (click)="toggleDetails(item)">
+                    <div class="user-avatar">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                    <div class="user-main-info">
+                        <h3>{{ item.campeonatoNombre || 'Campeonato' }}</h3>
+                        <div class="meta-row">
+                            <span class="meta-text" *ngIf="item.fechaInscripcion">{{ item.fechaInscripcion |
+                                date:'mediumDate' }}</span>
+                        </div>
+                    </div>
+                    <div class="toggle-icon">
+                        <i class="fas" [class.fa-chevron-down]="!item.expanded"
+                            [class.fa-chevron-up]="item.expanded"></i>
+                    </div>
+                </div>
+
+                <!-- Expandable Content -->
+                <div class="card-details-wrapper" *ngIf="item.expanded">
+                    <div class="card-details">
+                        <div class="sections-container"
+                            *ngIf="item.seccionesDetalles && item.seccionesDetalles.length > 0; else noDetails">
+                            <h4 class="section-main-title">Modalidades inscritas</h4>
+                            <div class="section-card" *ngFor="let section of item.seccionesDetalles">
+                                <div class="section-header">
+                                    <span class="modality-title">{{ section.MODALIDAD }}</span>
+                                    <span class="gender-badge">{{ section.GENERO || 'Mixto' }}</span>
                                 </div>
-                                <div class="spec-column" *ngIf="section.EDAD">
-                                    <span class="spec-label">Edad</span>
-                                    <div class="spec-value">
-                                        <i class="fas fa-calendar-alt"></i>
-                                        <span>{{ section.EDAD }} Años</span>
+                                <div class="section-specs-grid">
+                                    <div class="spec-column" *ngIf="section.CINTURON">
+                                        <span class="spec-label">Cinturón</span>
+                                        <div class="spec-value">
+                                            <i class="fas fa-certificate"></i>
+                                            <span>{{ section.CINTURON }}</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="spec-column" *ngIf="section.PESO">
-                                    <span class="spec-label">Peso</span>
-                                    <div class="spec-value">
-                                        <i class="fas fa-weight"></i>
-                                        <span>{{ section.PESO }} Kg</span>
+                                    <div class="spec-column" *ngIf="section.EDAD">
+                                        <span class="spec-label">Edad</span>
+                                        <div class="spec-value">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            <span>{{ section.EDAD }} Años</span>
+                                        </div>
+                                    </div>
+                                    <div class="spec-column" *ngIf="section.PESO">
+                                        <span class="spec-label">Peso</span>
+                                        <div class="spec-value">
+                                            <i class="fas fa-weight"></i>
+                                            <span>{{ section.PESO }} Kg</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <ng-template #noDetails>
-                        <!-- Fallback for legacy or parsing error -->
-                        <div class="details-grid">
-                            <div class="detail-item full-width" *ngIf="item.modalidades">
-                                <label>Modalidades</label>
-                                <div class="modalities-list">
-                                    <span class="modality-tag" *ngFor="let mod of item.modalidades">{{ mod }}</span>
+                        <ng-template #noDetails>
+                            <!-- Fallback for legacy or parsing error -->
+                            <div class="details-grid">
+                                <div class="detail-item full-width" *ngIf="item.modalidades">
+                                    <label>Modalidades</label>
+                                    <div class="modalities-list">
+                                        <span class="modality-tag" *ngFor="let mod of item.modalidades">{{ mod }}</span>
+                                    </div>
                                 </div>
                             </div>
+                        </ng-template>
+
+                        <div class="actions-row">
+                            <button class="btn-reject" (click)="requestDelete(item.id); $event.stopPropagation()">
+                                <i class="fas fa-trash-alt"></i> {{ item.estado === 'PENDIENTE' ? 'Cancelar Solicitud' :
+                                'Eliminar Registro' }}
+                            </button>
                         </div>
-                    </ng-template>
 
-                    <div class="actions-row">
-                        <button class="btn-reject" (click)="requestDelete(item.id); $event.stopPropagation()">
-                            <i class="fas fa-trash-alt"></i> {{ item.estado === 'PENDIENTE' ? 'Cancelar Solicitud' :
-                            'Eliminar Registro' }}
-                        </button>
-                    </div>
-
-                    <div class="status-message" *ngIf="item.estado === 'ACEPTADO'">
-                        <i class="fas fa-check-circle"></i> Inscripción Aceptada
+                        <div class="status-message" *ngIf="item.estado === 'ACEPTADO'">
+                            <i class="fas fa-check-circle"></i> Inscripción Aceptada
+                        </div>
                     </div>
                 </div>
             </div>

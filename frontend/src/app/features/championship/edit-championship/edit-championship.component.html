@@ -36,14 +36,12 @@
     </div>
 
     <div class="page-card" *ngIf="!loading">
-        <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
-            <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
-            <span class="visually-hidden">Volver atrás</span>
-        </button>
-
         <header class="page-header">
+            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+                <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
+                <span class="visually-hidden">Volver atrás</span>
+            </button>
             <div>
-                <p class="eyebrow">Administración</p>
                 <h1>Editar campeonato</h1>
                 <p class="subtitle">Modifica la información general y la configuración de modalidades.</p>
             </div>

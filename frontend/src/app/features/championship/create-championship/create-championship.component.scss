@@ -149,26 +149,31 @@
 }
 
 .btn-back {
-  position: absolute;
-  top: 30px;
-  left: 30px;
+  background: transparent;
+  border: none;
   color: var(--color-principal);
-  transition: all 0.3s ease;
-  text-decoration: none;
   cursor: pointer;
+  transition: all 0.3s ease;
+  width: auto;
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  padding: 0;
+  flex-shrink: 0;
 
   &:hover {
     color: var(--color-acento);
-    transform: translateX(-5px) scale(1.1);
+    transform: translateX(-5px);
   }
 }
 
 .page-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
-  padding-left: 60px;
+  /* padding-left removed */
   margin-bottom: 20px;
 
   h1 {
@@ -944,19 +949,26 @@ input:checked+.slider:before {
 
 @media (max-width: 768px) {
   .page-card {
-    padding: 22px;
+    padding: 2rem;
+    /* Standardized */
   }
 
   .page-header {
-    padding-left: 0;
-    flex-direction: column;
+    flex-direction: row;
+    /* Keep row direction */
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.8rem;
+    /* Standardized */
   }
 
   .btn-back {
-    position: relative;
-    top: 0;
-    left: 0;
-    margin-bottom: 10px;
+    /* Reset any specific mobile overrides if necessary, or just let base styles apply */
+    margin-bottom: 0;
+    display: none;
   }
 
   .grid-2 {

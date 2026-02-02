@@ -1,88 +1,91 @@
 <div class="profile-wrapper">
   <app-loading-spinner *ngIf="saving" message="Guardando cambios..." [fixed]="true"></app-loading-spinner>
-
-  <div class="header-profile">
-    <a (click)="goBack()" class="btn-back" title="Volver atrás">
-      <i class="fas fa-arrow-left fa-lg"></i>
-    </a>
-    <h2>Mi Perfil</h2>
-  </div>
-
-  <div class="avatar-section">
-    <div class="avatar"
-      [style.backgroundImage]="(fotoPreview || fotoUrl) ? 'url(' + (fotoPreview || fotoUrl) + ')' : 'none'">
-      <i *ngIf="!(fotoPreview || fotoUrl)" class="fas fa-user"></i>
+  <div class="page-card">
+    <div class="header-profile">
+      <a (click)="goBack()" class="btn-back" title="Volver atrás">
+        <i class="fas fa-arrow-left fa-lg"></i>
+      </a>
+      <h2>Mi Perfil</h2>
     </div>
-    <div class="avatar-info">
-      <p class="avatar-name">{{ usuario.nombreC || '—' }}</p>
-      <label class="btn-upload-photo">
-        <input type="file" accept="image/*" (change)="onFileChange($event)" hidden>
-        <i class="fas fa-camera"></i>
-        Cambiar foto
-      </label>
+
+    <div class="avatar-section">
+      <div class="avatar"
+        [style.backgroundImage]="(fotoPreview || fotoUrl) ? 'url(' + (fotoPreview || fotoUrl) + ')' : 'none'">
+        <i *ngIf="!(fotoPreview || fotoUrl)" class="fas fa-user"></i>
+      </div>
+      <div class="avatar-info">
+        <p class="avatar-name">{{ usuario.nombreC || '—' }}</p>
+        <label class="btn-upload-photo">
+          <input type="file" accept="image/*" (change)="onFileChange($event)" hidden>
+          <i class="fas fa-camera"></i>
+          Cambiar foto
+        </label>
+      </div>
     </div>
-  </div>
 
-  <form (ngSubmit)="saveProfile()">
-    <div class="profile-grid">
-      <!-- Bloqueados -->
-      <div class="field disabled"><label>Documento</label>
-        <p>{{ usuario.idDocumento || '—' }}</p>
-      </div>
-      <div class="field disabled"><label>Fecha de nacimiento</label>
-        <p>{{ usuario.fechaNacimiento || '—' }}</p>
-      </div>
-      <div class="field disabled"><label>Sexo</label>
-        <p>{{ usuario.sexo || '—' }}</p>
-      </div>
-      <div class="field disabled">
-        <label>Nacionalidad</label>
-        <div class="input-fake disabled">{{ usuario.nacionalidad || '—' }}</div>
-      </div>
-
-      <!-- Editables -->
-      <div class="field editable">
-        <label>Ciudad</label>
-        <app-country-autocomplete name="ciudad" [(ngModel)]="usuario.ciudad" [paises]="ciudadesList"
-          [maxLength]="ciudadMaxLength" placeholder="Selecciona tu ciudad">
-        </app-country-autocomplete>
-      </div>
-      <div class="field editable">
-        <label>Correo</label>
-        <input type="email" [(ngModel)]="usuario.correo" name="correo" maxlength="40" (input)="onCorreoInput($event)" />
-        <div *ngIf="correoLimitMsg" class="msg-warning">
-          <small>{{ correoLimitMsg }}</small>
+    <form (ngSubmit)="saveProfile()">
+      <div class="profile-grid">
+        <!-- Bloqueados -->
+        <div class="field disabled"><label>Documento</label>
+          <p>{{ usuario.idDocumento || '—' }}</p>
         </div>
-      </div>
-      <div class="field editable">
-        <label>Teléfono</label>
-        <div class="phone-row">
-          <div class="phone-code">
-            <app-custom-select name="telefonoCodigo" [(ngModel)]="telefonoCodigo" [options]="phoneCodeOptions"
-              placeholder="Prefijo">
-            </app-custom-select>
+        <div class="field disabled"><label>Fecha de nacimiento</label>
+          <p>{{ usuario.fechaNacimiento || '—' }}</p>
+        </div>
+        <div class="field disabled"><label>Sexo</label>
+          <p>{{ usuario.sexo || '—' }}</p>
+        </div>
+        <div class="field disabled">
+          <label>Nacionalidad</label>
+          <div class="input-fake disabled">{{ usuario.nacionalidad || '—' }}</div>
+        </div>
+
+        <!-- Editables -->
+        <div class="field editable">
+          <label>Ciudad</label>
+          <app-country-autocomplete name="ciudad" [(ngModel)]="usuario.ciudad" [paises]="ciudadesList"
+            [maxLength]="ciudadMaxLength" placeholder="Selecciona tu ciudad">
+          </app-country-autocomplete>
+        </div>
+        <div class="field editable">
+          <label>Correo</label>
+          <input type="email" [(ngModel)]="usuario.correo" name="correo" maxlength="40"
+            (input)="onCorreoInput($event)" />
+          <div *ngIf="correoLimitMsg" class="msg-warning">
+            <small>{{ correoLimitMsg }}</small>
           </div>
-          <input type="tel" class="phone-number" [(ngModel)]="usuario.numero_celular" name="numero_celular"
-            inputmode="numeric" pattern="^[0-9]*$" maxlength="20" (input)="onTelefonoInput($event)"
-            placeholder="Número" />
         </div>
+        <div class="field editable">
+          <label>Teléfono</label>
+          <div class="phone-row">
+            <div class="phone-code">
+              <app-custom-select name="telefonoCodigo" [(ngModel)]="telefonoCodigo" [options]="phoneCodeOptions"
+                placeholder="Prefijo">
+              </app-custom-select>
+            </div>
+            <input type="tel" class="phone-number" [(ngModel)]="usuario.numero_celular" name="numero_celular"
+              inputmode="numeric" pattern="^[0-9]*$" maxlength="20" (input)="onTelefonoInput($event)"
+              placeholder="Número" />
+          </div>
+        </div>
+        <div class="field editable">
+          <label>Cinturón/Rango</label>
+          <app-custom-select name="cinturon_rango" [(ngModel)]="usuario.cinturon_rango" [options]="cinturonOptions"
+            placeholder="Selecciona tu cinturón">
+          </app-custom-select>
+          <p *ngIf="usuario.cinturon_rango === ''" class="no-seleccionado">No seleccionado</p>
+        </div>
+
       </div>
-      <div class="field editable">
-        <label>Cinturón/Rango</label>
-        <app-custom-select name="cinturon_rango" [(ngModel)]="usuario.cinturon_rango" [options]="cinturonOptions"
-          placeholder="Selecciona tu cinturón">
-        </app-custom-select>
-        <p *ngIf="usuario.cinturon_rango === ''" class="no-seleccionado">No seleccionado</p>
+
+      <div class="actions">
+        <button class="btn-primary" type="submit" [disabled]="saving">{{ saving ? 'Guardando...' : 'Guardar
+          cambios'
+          }}</button>
+        <button class="btn-secondary" type="button" (click)="goChangePassword()">Cambiar contraseña</button>
       </div>
+    </form>
 
-    </div>
-
-    <div class="actions">
-      <button class="btn-primary" type="submit" [disabled]="saving">{{ saving ? 'Guardando...' : 'Guardar cambios'
-        }}</button>
-      <button class="btn-secondary" type="button" (click)="goChangePassword()">Cambiar contraseña</button>
-    </div>
-  </form>
-
-  <div *ngIf="message" class="alert" [class.success]="success">{{ message }}</div>
+    <div *ngIf="message" class="alert" [class.success]="success">{{ message }}</div>
+  </div>
 </div>

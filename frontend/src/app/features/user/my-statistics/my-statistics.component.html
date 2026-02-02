@@ -1,24 +1,19 @@
 <div class="my-stats-container">
   <div class="my-stats-card">
-    <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
-      <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
-      <span class="visually-hidden">Volver atrás</span>
-    </button>
-
     <header class="header">
-      <h1>Mis Estadísticas</h1>
-      <p class="subtitle">Revisa tus puntuaciones y posiciones en campeonatos donde has participado.</p>
+      <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+        <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
+        <span class="visually-hidden">Volver atrás</span>
+      </button>
+      <div>
+        <h1>Mis Estadísticas</h1>
+        <p class="subtitle">Revisa tus puntuaciones y posiciones en campeonatos donde has participado.</p>
+      </div>
     </header>
 
     <div class="search-section">
-      <input
-        type="text"
-        class="search-input"
-        id="my-stats-search"
-        name="searchMyStats"
-        aria-label="Buscar estadísticas"
-        placeholder="Buscar por campeonato, modalidad o categoría..."
-        [(ngModel)]="searchQuery"
+      <input type="text" class="search-input" id="my-stats-search" name="searchMyStats" aria-label="Buscar estadísticas"
+        placeholder="Buscar por campeonato, modalidad o categoría..." [(ngModel)]="searchQuery"
         (input)="onSearchChange()">
       <i class="fas fa-search search-icon" aria-hidden="true"></i>
     </div>

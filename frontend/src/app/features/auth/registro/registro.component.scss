@@ -13,6 +13,18 @@
 	justify-content: center;
 	background: rgba(0, 0, 0, 0.45);
 	z-index: 2000;
+	max-width: 100vw;
+	/* Prevent overflow */
+	box-sizing: border-box;
+}
+
+.registro-wrapper {
+	overflow-x: hidden;
+	/* Fix horizontal scrollbar on wrapper level */
+	width: 100%;
+	margin: 0;
+	padding: 20px;
+	box-sizing: border-box;
 }
 
 .modal-box {
@@ -106,22 +118,21 @@
 	width: 100%;
 }
 
-/* Desktop: dar más espacio al día y al mes, mantener distancia consistente con otros inputs */
+/* Desktop: distribuir equitativo para ver placeholders */
 .date-selects .small-col {
-	flex: 1 1 0;
-	min-width: 56px;
+	flex: 1;
+	min-width: 0;
 }
 
-/* día: crece para usar espacio disponible */
 .date-selects .month-col {
-	flex: 1.4 1 0;
-	min-width: 100px;
+	flex: 1;
+	min-width: 0;
 }
 
 /* mes: un poco más ancho para nombres */
 .date-selects .year-col {
-	flex: 0.9 1 0;
-	min-width: 70px;
+	flex: 1;
+	min-width: 0;
 }
 
 /* año: algo más pequeño */
@@ -131,30 +142,23 @@
 	.date-selects {
 		flex-direction: row;
 		gap: 8px;
-		overflow-x: hidden;
+		/* Ensure equitable distribution */
 	}
 
-	.date-selects .small-col {
-		flex: 0 1 26%;
-		min-width: 40px;
-	}
-
-	.date-selects .month-col {
-		flex: 0 1 48%;
-		min-width: 70px;
-	}
-
+	.date-selects .small-col,
+	.date-selects .month-col,
 	.date-selects .year-col {
-		flex: 0 1 26%;
-		min-width: 48px;
+		flex: 1;
+		min-width: 0;
 	}
 
 	.date-selects .custom-select .selected {
 		font-size: 0.92rem;
-		padding: 8px 10px;
+		padding: 8px 6px;
 		white-space: nowrap;
 		text-overflow: ellipsis;
-		overflow: hidden
+		overflow: hidden;
+		text-align: center;
 	}
 }
 

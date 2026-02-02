@@ -14,7 +14,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 2rem;
+  /* Standardized */
   margin-top: 20px;
 }
 
@@ -26,34 +27,44 @@
   width: 100%;
   max-width: 1000px;
   text-align: left;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
 }
 
 .btn-back {
-  position: absolute;
-  top: 30px;
-  left: 30px;
+  background: transparent;
+  border: none;
   color: var(--color-principal);
-  transition: all 0.3s ease;
-  text-decoration: none;
   cursor: pointer;
+  transition: all 0.3s ease;
+  width: auto;
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  padding: 0;
+  flex-shrink: 0;
 
   &:hover {
     color: var(--color-acento);
-    transform: translateX(-5px) scale(1.1);
+    transform: translateX(-5px);
   }
 }
 
 .header {
-  margin-bottom: 20px;
-  margin-left: 60px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 25px;
+  margin-left: 0;
+  /* Removed margin-left */
 
   h1 {
     font-family: 'Montserrat', sans-serif;
     font-weight: 700;
     font-size: 1.8rem;
     color: var(--color-principal);
-    margin: 0 0 8px 0;
+    margin: 4px 0 6px 0;
   }
 
   .subtitle {
@@ -66,7 +77,8 @@
 .search-section {
   position: relative;
   margin-bottom: 25px;
-  margin-left: 60px;
+  margin-left: 0;
+  /* Removed margin-left */
 
   .search-input {
     width: 100%;
@@ -83,7 +95,7 @@
       border-color: var(--color-acento);
       background: #fff;
       outline: none;
-      box-shadow: 0 4px 10px rgba(214,0,0,0.12);
+      box-shadow: 0 4px 10px rgba(214, 0, 0, 0.12);
     }
 
     &::placeholder {
@@ -103,7 +115,8 @@
 }
 
 .stats-list {
-  margin-left: 60px;
+  margin-left: 0;
+  /* Removed margin-left */
 
   .stat-item {
     background: #fafafa;
@@ -116,7 +129,7 @@
     &:hover {
       background: #fff;
       border-color: var(--color-acento);
-      box-shadow: 0 5px 15px rgba(214,0,0,0.1);
+      box-shadow: 0 5px 15px rgba(214, 0, 0, 0.1);
     }
 
     .item-header {
@@ -204,7 +217,8 @@
 }
 
 .note {
-  margin-left: 60px;
+  margin-left: 0;
+  /* Removed margin-left */
   margin-top: 10px;
   display: flex;
   align-items: center;
@@ -226,19 +240,28 @@
   }
 
   .btn-back {
-    top: 20px;
-    left: 20px;
+    /* Reset specific overrides if any */
+    margin-bottom: 0;
+    display: none;
   }
 
   .header,
   .search-section,
   .stats-list,
   .note {
-    margin-left: 50px;
+    margin-left: 0;
+  }
+
+  .header {
+    flex-direction: row;
+    /* Keep row direction */
+    align-items: center;
+    gap: 1rem;
   }
 
   .header h1 {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
+    /* Standardized */
   }
 
   .search-section .search-input {

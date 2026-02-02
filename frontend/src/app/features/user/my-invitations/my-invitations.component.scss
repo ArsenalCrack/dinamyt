@@ -1,9 +1,30 @@
 .inscriptions-container {
-    padding: 2rem;
-    max-width: 800px;
-    margin: 0 auto;
+    padding: 32px 16px;
+    display: flex;
+    justify-content: center;
     min-height: 100vh;
     background: var(--color-fondo);
+}
+
+.page-card {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.08);
+}
+
+.page-card {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    /* Kept 800px */
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.08);
 }
 
 .header {
@@ -34,6 +55,7 @@
             font-size: 1.8rem;
             margin: 0;
             color: var(--color-principal);
+            font-weight: 700;
         }
 
         p {
@@ -408,6 +430,14 @@
 }
 
 @media (max-width: 768px) {
+    .inscriptions-container {
+        padding: 16px;
+    }
+
+    .page-card {
+        padding: 2rem;
+    }
+
     .tabs-nav {
         gap: 0;
         justify-content: space-between;
@@ -444,5 +474,9 @@
             width: 100%;
             max-width: none;
         }
+    }
+
+    .header .btn-back {
+        display: none;
     }
 }

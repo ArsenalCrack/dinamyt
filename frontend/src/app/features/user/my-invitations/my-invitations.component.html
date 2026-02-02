@@ -1,89 +1,91 @@
 <div class="inscriptions-container">
-    <header class="header">
-        <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
-            <i class="fas fa-arrow-left"></i>
-        </button>
-        <div class="header-content">
-            <h1>Mis Invitaciones</h1>
-            <p>Gestiona las invitaciones a campeonatos</p>
-        </div>
-    </header>
+    <div class="page-card">
+        <header class="header">
+            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div class="header-content">
+                <h1>Mis Invitaciones</h1>
+                <p>Gestiona las invitaciones a campeonatos</p>
+            </div>
+        </header>
 
-    <!-- Tabs Navigation -->
-    <nav class="tabs-nav">
-        <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setTab('PENDIENTE')">
-            <i class="fas fa-clock"></i>
-            <span>Pendientes</span>
-        </button>
-        <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setTab('ACEPTADO')">
-            <i class="fas fa-check-circle"></i>
-            <span>Aceptadas</span>
-        </button>
-        <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setTab('RECHAZADO')">
-            <i class="fas fa-times-circle"></i>
-            <span>Rechazadas</span>
-        </button>
-    </nav>
+        <!-- Tabs Navigation -->
+        <nav class="tabs-nav">
+            <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setTab('PENDIENTE')">
+                <i class="fas fa-clock"></i>
+                <span>Pendientes</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setTab('ACEPTADO')">
+                <i class="fas fa-check-circle"></i>
+                <span>Aceptadas</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setTab('RECHAZADO')">
+                <i class="fas fa-times-circle"></i>
+                <span>Rechazadas</span>
+            </button>
+        </nav>
 
-    <app-loading-spinner *ngIf="loading" message="Cargando invitaciones..."></app-loading-spinner>
+        <app-loading-spinner *ngIf="loading" message="Cargando invitaciones..."></app-loading-spinner>
 
-    <div class="inscriptions-list" *ngIf="!loading">
-        <div class="empty-state" *ngIf="filteredInvitations.length === 0">
-            <i class="fas fa-envelope-open"></i>
-            <p>No tienes invitaciones {{ getStatusLabel(activeTab) | lowercase }}s.</p>
-        </div>
-
-        <div class="inscription-card" *ngFor="let item of filteredInvitations"
-            [class.rejected]="item.estado === 'RECHAZADO'">
-            <div class="card-summary">
-                <div class="user-avatar">
-                    <!-- Icon based on Role if available -->
-                    <i class="fas" [ngClass]="item.rol === 'Juez' ? 'fa-gavel' : 'fa-user-ninja'"></i>
-                </div>
-                <div class="user-main-info">
-                    <h3>{{ item.campeonatoNombre || 'Campeonato' }}</h3>
-                    <div class="meta-row">
-                        <span class="meta-text" *ngIf="item.fecha">{{ item.fecha | date:'mediumDate' }}</span>
-                        <span class="badge-belt" *ngIf="item.rol">{{ item.rol }}</span>
-                    </div>
-                </div>
+        <div class="inscriptions-list" *ngIf="!loading">
+            <div class="empty-state" *ngIf="filteredInvitations.length === 0">
+                <i class="fas fa-envelope-open"></i>
+                <p>No tienes invitaciones {{ getStatusLabel(activeTab) | lowercase }}s.</p>
             </div>
 
-            <div class="card-details">
-                <div class="details-grid">
-                    <div class="detail-item full-width" *ngIf="item.mensaje">
-                        <label>Mensaje</label>
-                        <span>{{ item.mensaje }}</span>
+            <div class="inscription-card" *ngFor="let item of filteredInvitations"
+                [class.rejected]="item.estado === 'RECHAZADO'">
+                <div class="card-summary">
+                    <div class="user-avatar">
+                        <!-- Icon based on Role if available -->
+                        <i class="fas" [ngClass]="item.rol === 'Juez' ? 'fa-gavel' : 'fa-user-ninja'"></i>
                     </div>
-
-                    <div class="detail-item full-width" *ngIf="item.estado === 'RECHAZADO'">
-                        <div class="status-message rejected">
-                            <i class="fas fa-times-circle"></i> Has rechazado esta invitación.
+                    <div class="user-main-info">
+                        <h3>{{ item.campeonatoNombre || 'Campeonato' }}</h3>
+                        <div class="meta-row">
+                            <span class="meta-text" *ngIf="item.fecha">{{ item.fecha | date:'mediumDate' }}</span>
+                            <span class="badge-belt" *ngIf="item.rol">{{ item.rol }}</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="actions-row">
-                    <!-- Pending Actions -->
-                    <ng-container *ngIf="item.estado === 'PENDIENTE'">
-                        <button class="btn-reject" (click)="confirmReject(item.id)">
-                            <i class="fas fa-times"></i> Rechazar
-                        </button>
-                        <button class="btn-primary" (click)="acceptInvitation(item.id)">
-                            <i class="fas fa-check"></i> Aceptar
-                        </button>
-                    </ng-container>
+                <div class="card-details">
+                    <div class="details-grid">
+                        <div class="detail-item full-width" *ngIf="item.mensaje">
+                            <label>Mensaje</label>
+                            <span>{{ item.mensaje }}</span>
+                        </div>
 
-                    <!-- Accepted Actions -->
-                    <ng-container *ngIf="item.estado === 'ACEPTADO'">
-                        <button class="btn-delete" (click)="confirmCancel(item.id)">
-                            <i class="fas fa-ban"></i> Cancelar Invitación
-                        </button>
-                    </ng-container>
-                </div>
+                        <div class="detail-item full-width" *ngIf="item.estado === 'RECHAZADO'">
+                            <div class="status-message rejected">
+                                <i class="fas fa-times-circle"></i> Has rechazado esta invitación.
+                            </div>
+                        </div>
+                    </div>
 
-                <div class="status-message" *ngIf="item.estado === 'ACEPTADO'">
-                    <i class="fas fa-check-circle"></i> Invitación Aceptada
+                    <div class="actions-row">
+                        <!-- Pending Actions -->
+                        <ng-container *ngIf="item.estado === 'PENDIENTE'">
+                            <button class="btn-reject" (click)="confirmReject(item.id)">
+                                <i class="fas fa-times"></i> Rechazar
+                            </button>
+                            <button class="btn-primary" (click)="acceptInvitation(item.id)">
+                                <i class="fas fa-check"></i> Aceptar
+                            </button>
+                        </ng-container>
+
+                        <!-- Accepted Actions -->
+                        <ng-container *ngIf="item.estado === 'ACEPTADO'">
+                            <button class="btn-delete" (click)="confirmCancel(item.id)">
+                                <i class="fas fa-ban"></i> Cancelar Invitación
+                            </button>
+                        </ng-container>
+                    </div>
+
+                    <div class="status-message" *ngIf="item.estado === 'ACEPTADO'">
+                        <i class="fas fa-check-circle"></i> Invitación Aceptada
+                    </div>
                 </div>
             </div>
         </div>

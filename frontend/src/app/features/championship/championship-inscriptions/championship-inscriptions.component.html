@@ -5,138 +5,140 @@
         <span>{{ toastMessage }}</span>
     </div>
 
-    <header class="header">
-        <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
-            <i class="fas fa-arrow-left"></i>
-        </button>
-        <div class="header-content">
-            <h1>Inscripciones</h1>
-            <p>Gestiona los competidores pendientes por aprobar</p>
-        </div>
-    </header>
-
-    <div class="search-section" id="inscriptions-search-anchor">
-        <i class="fas fa-search"></i>
-        <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
-            placeholder="Buscar por nombre o documento...">
-    </div>
-
-    <!-- Tabs Navigation -->
-    <nav class="tabs-nav">
-        <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setActiveTab('PENDIENTE')">
-            <i class="fas fa-clock"></i>
-            <span>Pendientes</span>
-        </button>
-        <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setActiveTab('ACEPTADO')">
-            <i class="fas fa-check-circle"></i>
-            <span>Aceptados</span>
-        </button>
-        <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setActiveTab('RECHAZADO')">
-            <i class="fas fa-times-circle"></i>
-            <span>Rechazados</span>
-        </button>
-    </nav>
-
-    <div class="inscriptions-list">
-        <div class="inscription-card" *ngFor="let item of paginatedInscriptions" [class.expanded]="item.expanded"
-            [class.rejected]="item.estado === 'RECHAZADO'">
-            <div class="card-summary" (click)="toggleDetails(item.id)">
-                <div class="user-avatar">
-                    <i class="fas fa-user"></i>
-                </div>
-                <div class="user-main-info">
-                    <h3>{{ item.nombre }}</h3>
-                    <div class="meta-row">
-                        <span class="badge-belt">{{ item.cinturon }}</span>
-                        <span class="meta-text">{{ item.peso }} • {{ item.edad }} años</span>
-                    </div>
-                </div>
-                <div class="expand-icon">
-                    <i class="fas" [ngClass]="item.expanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                </div>
+    <div class="page-card">
+        <header class="header">
+            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div class="header-content">
+                <h1>Inscripciones</h1>
+                <p>Gestiona los competidores pendientes por aprobar</p>
             </div>
+        </header>
 
-            <div class="card-details" *ngIf="item.expanded">
-                <div class="details-grid">
-                    <div class="detail-item">
-                        <label>Documento ID</label>
-                        <span>{{ item.documentoId }}</span>
+        <div class="search-section" id="inscriptions-search-anchor">
+            <i class="fas fa-search"></i>
+            <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+                placeholder="Buscar por nombre o documento...">
+        </div>
+
+        <!-- Tabs Navigation -->
+        <nav class="tabs-nav">
+            <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setActiveTab('PENDIENTE')">
+                <i class="fas fa-clock"></i>
+                <span>Pendientes</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setActiveTab('ACEPTADO')">
+                <i class="fas fa-check-circle"></i>
+                <span>Aceptados</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setActiveTab('RECHAZADO')">
+                <i class="fas fa-times-circle"></i>
+                <span>Rechazados</span>
+            </button>
+        </nav>
+
+        <div class="inscriptions-list">
+            <div class="inscription-card" *ngFor="let item of paginatedInscriptions" [class.expanded]="item.expanded"
+                [class.rejected]="item.estado === 'RECHAZADO'">
+                <div class="card-summary" (click)="toggleDetails(item.id)">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
                     </div>
-                    <div class="detail-item">
-                        <label>Sexo</label>
-                        <span>{{ item.sexo }}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>Nacionalidad</label>
-                        <span>{{ item.nacionalidad }}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>Academia</label>
-                        <span>{{ item.academia }}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>Ciudad</label>
-                        <span>{{ item.ciudad }}</span>
-                    </div>
-                    <div class="detail-item full-width">
-                        <label>Modalidades Inscritas</label>
-                        <div class="modalities-list">
-                            <span class="modality-tag" *ngFor="let mod of item.modalidades">{{ mod }}</span>
+                    <div class="user-main-info">
+                        <h3>{{ item.nombre }}</h3>
+                        <div class="meta-row">
+                            <span class="badge-belt">{{ item.cinturon }}</span>
+                            <span class="meta-text">{{ item.peso }} • {{ item.edad }} años</span>
                         </div>
                     </div>
-                    <div class="detail-item">
-                        <label>Instructor</label>
-                        <span>{{ item.instructor }}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>Teléfono</label>
-                        <span>{{ item.telefono }}</span>
-                    </div>
-                    <div class="detail-item full-width">
-                        <label>Correo Electrónico</label>
-                        <span>{{ item.correo }}</span>
+                    <div class="expand-icon">
+                        <i class="fas" [ngClass]="item.expanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
                     </div>
                 </div>
 
-                <div class="actions-row" *ngIf="item.estado === 'PENDIENTE'">
-                    <button class="btn-reject" (click)="confirmReject(item.id)">
-                        <i class="fas fa-times"></i> Rechazar
-                    </button>
-                    <button class="btn-accept" (click)="acceptInscription(item)">
-                        <i class="fas fa-check"></i> Aceptar
-                    </button>
-                </div>
+                <div class="card-details" *ngIf="item.expanded">
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <label>Documento ID</label>
+                            <span>{{ item.documentoId }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Sexo</label>
+                            <span>{{ item.sexo }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Nacionalidad</label>
+                            <span>{{ item.nacionalidad }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Academia</label>
+                            <span>{{ item.academia }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Ciudad</label>
+                            <span>{{ item.ciudad }}</span>
+                        </div>
+                        <div class="detail-item full-width">
+                            <label>Modalidades Inscritas</label>
+                            <div class="modalities-list">
+                                <span class="modality-tag" *ngFor="let mod of item.modalidades">{{ mod }}</span>
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Instructor</label>
+                            <span>{{ item.instructor }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Teléfono</label>
+                            <span>{{ item.telefono }}</span>
+                        </div>
+                        <div class="detail-item full-width">
+                            <label>Correo Electrónico</label>
+                            <span>{{ item.correo }}</span>
+                        </div>
+                    </div>
 
-                <!-- Action for Accepted: Delete -->
-                <div class="actions-row" *ngIf="item.estado === 'ACEPTADO'">
-                    <button class="btn-delete" (click)="confirmDelete(item.id)">
-                        <i class="fas fa-trash"></i> Eliminar Competidor
-                    </button>
-                </div>
+                    <div class="actions-row" *ngIf="item.estado === 'PENDIENTE'">
+                        <button class="btn-reject" (click)="confirmReject(item.id)">
+                            <i class="fas fa-times"></i> Rechazar
+                        </button>
+                        <button class="btn-accept" (click)="acceptInscription(item)">
+                            <i class="fas fa-check"></i> Aceptar
+                        </button>
+                    </div>
 
-                <div class="status-message" *ngIf="item.estado === 'ACEPTADO' && false">
-                    <i class="fas fa-check-circle"></i> Competidor Aceptado
-                </div>
-                <div class="status-message rejected" *ngIf="item.estado === 'RECHAZADO'">
-                    <i class="fas fa-times-circle"></i> Inscripción Rechazada
+                    <!-- Action for Accepted: Delete -->
+                    <div class="actions-row" *ngIf="item.estado === 'ACEPTADO'">
+                        <button class="btn-delete" (click)="confirmDelete(item.id)">
+                            <i class="fas fa-trash"></i> Eliminar Competidor
+                        </button>
+                    </div>
+
+                    <div class="status-message" *ngIf="item.estado === 'ACEPTADO' && false">
+                        <i class="fas fa-check-circle"></i> Competidor Aceptado
+                    </div>
+                    <div class="status-message rejected" *ngIf="item.estado === 'RECHAZADO'">
+                        <i class="fas fa-times-circle"></i> Inscripción Rechazada
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="empty-state" *ngIf="filteredInscriptions.length === 0">
-            <i class="fas fa-clipboard-list"></i>
-            <p>No hay inscripciones en esta sección.</p>
-        </div>
+            <div class="empty-state" *ngIf="filteredInscriptions.length === 0">
+                <i class="fas fa-clipboard-list"></i>
+                <p>No hay inscripciones en esta sección.</p>
+            </div>
 
-        <!-- Pagination Controls -->
-        <div class="pagination-controls" *ngIf="totalPages > 1">
-            <button class="btn-page nav" (click)="prevPage()" [disabled]="currentPage === 1">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <span class="page-count">{{ currentPage }} / {{ totalPages }}</span>
-            <button class="btn-page nav" (click)="nextPage()" [disabled]="currentPage === totalPages">
-                <i class="fas fa-chevron-right"></i>
-            </button>
+            <!-- Pagination Controls -->
+            <div class="pagination-controls" *ngIf="totalPages > 1">
+                <button class="btn-page nav" (click)="prevPage()" [disabled]="currentPage === 1">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="page-count">{{ currentPage }} / {{ totalPages }}</span>
+                <button class="btn-page nav" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
         </div>
     </div>
 </div>

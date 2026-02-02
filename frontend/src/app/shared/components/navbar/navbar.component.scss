@@ -505,6 +505,8 @@
         flex-direction: column;
         gap: 0;
         width: 100%;
+        margin-right: 0;
+        /* Fix extra space */
     }
 
     .nav-link {
@@ -526,7 +528,8 @@
     .user-actions {
         width: 100%;
         margin-top: 15px;
-        padding: 0 10px;
+        padding: 0;
+        /* Remove padding causing overflow/gap */
         box-sizing: border-box;
         justify-content: flex-end;
         flex-direction: row-reverse;
@@ -552,13 +555,16 @@
 
     .user-trigger {
         width: 100%;
-        justify-content: flex-start;
+        justify-content: center;
+        /* Centered content */
         /* Align text left inside button */
         max-width: 100%;
         flex-wrap: nowrap;
         min-width: 0;
         padding: 10px 15px;
         gap: 10px;
+        box-sizing: border-box;
+        /* Ensure padding doesn't overflow */
     }
 
     .mobile-notification-wrapper {

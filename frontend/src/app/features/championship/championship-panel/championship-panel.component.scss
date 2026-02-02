@@ -13,7 +13,8 @@
     background-color: var(--color-fondo);
     display: flex;
     justify-content: center;
-    padding: 2rem 1rem;
+    padding: 2rem;
+    /* Standardized */
 }
 
 .panel-card {
@@ -69,7 +70,7 @@
         color: var(--color-principal);
         width: 44px;
         height: 44px;
-        border-radius: 12px;
+        border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -487,12 +488,18 @@
 /* Responsiveness */
 @media (max-width: 768px) {
     .header {
-        flex-direction: column;
+        flex-direction: row;
         gap: 1rem;
-        align-items: flex-start;
+        align-items: center;
+
+        .header-text h1 {
+            font-size: 1.8rem;
+            /* Standardized */
+        }
 
         .btn-back {
             margin-top: 0;
+            display: none;
         }
     }
 
