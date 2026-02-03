@@ -28,9 +28,8 @@ export class UserService {
         return this.http.post(`${this.apiUrl}/perfil/foto`, form);
     }
 
-    searchUsers(query: string, excluirId: string): Observable<any[]> {
-        return this.http.get<any[]>(`${this.apiUrl}/usuarios/search/${query}`, {
-            params: { excluirId }
-        });
+    searchUsers(query: string,excluirId: string,idCampeonato: string): Observable<any[]> {
+        return this.http.get<any[]>(`${this.apiUrl}/usuarios/search/${query}`, {params: {excluirId,idCampeonato}});
     }
+
 }

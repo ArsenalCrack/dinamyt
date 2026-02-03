@@ -32,10 +32,20 @@ public class Inscripciones {
     @Column(name = "fecha_inscripcion")
     private LocalDateTime fechaInscripcion;
 
-    @Column(name = "estado")
+    @Column(name = "estado", columnDefinition = "TINYINT")
     private Integer estado;
+    
+    @Column(name="invitado")
+    private boolean invitado;
+    
+    public boolean isInvitado() {
+        return invitado;
+    }
 
     // ===== GETTERS & SETTERS =====
+    public void setInvitado(boolean invitado) {    
+        this.invitado = invitado;
+    }
 
     public Long getIdInscripcion() {
         return idInscripcion;

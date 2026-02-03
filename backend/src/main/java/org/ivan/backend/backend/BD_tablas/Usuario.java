@@ -55,7 +55,7 @@ public class Usuario {
     @JoinColumn(name = "TipoUsuario", referencedColumnName = "ID_Tipo")
     private Tipousuario tipousuario;
 
-    @Column(name = "estado")
+    @Column(name = "estado", columnDefinition = "TINYINT")
     private Integer estado;
 
     // ===== CAMPOS TRANSIENTES =====

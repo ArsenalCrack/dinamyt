@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api") // 1. Cambiamos la ruta base a "/api"
@@ -79,7 +81,10 @@ public class controlador_principal {
         } else if (usuario.getTipousuario().getID_Tipo() == null) {
             usuario.getTipousuario().setID_Tipo(1);
         }
-
+        Academia academia = academiaRepository.findById(0).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+        Usuario instructor = usuarioRepository.findById(0L).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+        usuario.setInstructor(instructor);
+        usuario.setAcademia(academia);
         usuariosPendientes.put(usuario.getCorreo(), usuario);
         return ResponseEntity.ok("");
     }
@@ -420,9 +425,9 @@ public class controlador_principal {
     }
 
     @GetMapping("/usuarios/search/{query}")
-    private ResponseEntity<?> buscarUsuarios(@PathVariable String query, @RequestParam String excluirId) {
-        List<Usuario> usuarios = usuarioRepository.findByNombreCContainingIgnoreCaseAndEstadoAndIdDocumentoNot(query,
-                1, Long.parseLong(excluirId));
+    private ResponseEntity<?> buscarUsuarios(@PathVariable String query, @RequestParam String excluirId,@RequestParam Long idCampeonato) {
+        List<Usuario> usuarios = usuarioRepository.findUsuariosDisponiblesPorCampeonato(query,
+                1, Long.parseLong(excluirId),idCampeonato);
         if (usuarios != null) {
             return ResponseEntity.ok(usuarios);
         }
@@ -439,7 +444,6 @@ public class controlador_principal {
         Usuario usuario = usuarioRepository.findById(
                 Long.parseLong(datos.get("idUsuario").toString()))
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
         Integer peso = datos.get("peso") != null ? Integer.parseInt(datos.get("peso").toString()) : null;
 
         @SuppressWarnings("unchecked")
@@ -574,5 +578,93 @@ public class controlador_principal {
             return ResponseEntity.status(500).body(Map.of("message", "Error al obtener inscripciones"));
         }
     }
+
+    @PostMapping("/invitaciones/enviar")
+    private ResponseEntity<?> enviarinvitacion(@RequestBody Map<String, Object> datos){
+        Inscripciones inscripcion = inscripcionRepository
+                .findByUsuarioAndCampeonato(Long.valueOf(datos.get("id_usuario").toString()), Long.valueOf(datos.get("id_campeonato").toString()))
+                .orElseGet(Inscripciones::new);
+        System.out.println(datos.get("id_usuario") +" "+" "+ datos.get("id_campeonato")+" "+ datos.get("id_tipo"));
+        Long idUsuario = Long.valueOf(datos.get("id_usuario").toString());
+
+        if (!usuarioRepository.existsById(idUsuario)) {
+            return ResponseEntity.status(404)
+                    .body(Map.of("message", "Usuario no existe"));
+        }
+
+        inscripcion.setUsuario(idUsuario);
+
+        Integer idCampeonato = Integer.valueOf(datos.get("id_campeonato").toString());
+
+        if (!campeonatoRepository.existsById(idCampeonato)) {
+            return ResponseEntity.status(404)
+                    .body(Map.of("message", "Campeonato no existe"));
+        }
+
+        inscripcion.setCampeonato(Long.valueOf(idCampeonato));
+
+        inscripcion.setTipousuario(
+                Integer.valueOf(datos.get("id_tipo").toString())
+        );
+
+        inscripcion.setEstado(2);
+        inscripcion.setInvitado(true);
+        if (inscripcion.getFechaInscripcion() == null) {
+            inscripcion.setFechaInscripcion(LocalDateTime.now());
+        }
+        inscripcionRepository.save(inscripcion);
+
+        return ResponseEntity.ok(Map.of("message", "Inscripción creada"));
+
+    }
+    
+    @GetMapping("/invitaciones/usuario/{userId}")
+    private ResponseEntity<?> ObInvitaciones(@PathVariable Long userId){
+        List<Inscripciones> inscripciones = inscripcionRepository.findByUsuarioAndInvitadoTrue(userId);
+        if (inscripciones!=null) {
+            return ResponseEntity.ok(inscripciones);
+        }
+        
+        return ResponseEntity.status(404).body(Map.of("message", "Sin invitaciones"));
+    }
+    
+    @GetMapping("/campeonatos/{id}/inscripciones")
+    private ResponseEntity<?> obinscripcionesmicampeonato(@PathVariable Long id) {
+
+    List<UsuarioInscripcionDTO> resultado = new ArrayList<>();
+
+    List<Inscripciones> inscripciones = inscripcionRepository.findByCampeonato(id);
+
+    for (Inscripciones ins : inscripciones) {
+
+        Usuario u = usuarioRepository.findById(ins.getUsuario()).orElse(null);
+        if (u == null) continue;
+
+        UsuarioInscripcionDTO dto = new UsuarioInscripcionDTO();
+
+        // ===== DATOS DEL USUARIO =====
+        dto.setIdDocumento(u.getIdDocumento());
+        dto.setNombreC(u.getNombreC());
+        dto.setSexo(u.getSexo());
+        dto.setFechaNacimiento(u.getFechaNacimiento());
+        dto.setCinturonRango(u.getCinturonRango());
+        dto.setNacionalidad(u.getNacionalidad());
+        dto.setCiudad(u.getCiudad());
+        dto.setCorreo(u.getCorreo());
+        dto.setNumeroCelular(u.getNumeroCelular());
+
+        // ===== ESTADO DE LA INSCRIPCIÓN =====
+        dto.setEstado(ins.isEstado());
+
+        resultado.add(dto);
+
+        // ===== PRINT =====
+        System.out.println("Usuario: " + u.getNombreC());
+        System.out.println("Estado inscripción: " + ins.isEstado());
+        System.out.println("----------------------");
+    }
+
+    return ResponseEntity.ok(resultado);
+}
 
 }

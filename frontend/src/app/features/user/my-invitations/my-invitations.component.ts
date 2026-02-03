@@ -33,75 +33,39 @@ export class MyInvitationsComponent implements OnInit {
   ngOnInit(): void {
     this.loadInvitations();
   }
-
-  loadInvitations(): void {
-    const userId = sessionStorage.getItem('idDocumento');
-    if (!userId) {
-      this.loading = false;
-      return;
-    }
-
-    this.loading = true;
-    this.api.getMisInvitaciones(userId).subscribe({
-      next: (data) => {
-        this.invitations = data;
-        this.applyFilter();
-        this.loading = false;
-      },
-      error: (err) => {
-        console.error('Error fetching invitations', err);
-        // Fallback Mock Data
-        /*
-        this.invitations = [
-             {
-                id: 1,
-                campeonatoNombre: 'Torneo Invitacional Elite',
-                fecha: '2026-05-15',
-                rol: 'Juez',
-                estado: 'PENDIENTE',
-                mensaje: 'Te invitamos a ser juez principal.'
-            },
-            {
-                id: 2,
-                campeonatoNombre: 'Copa Regional',
-                fecha: '2026-02-10',
-                rol: 'Competidor',
-                estado: 'ACEPTADO',
-                mensaje: 'Invitación especial.'
-            }
-        ];
-        this.applyFilter();
-        */
-        this.loading = false;
-      }
-    });
-
-    // Temp Mock for visual confirmation if backend is not ready
-    /*
-    setTimeout(() => {
-        this.invitations = [
-             {
-                id: 1,
-                campeonatoNombre: 'Torneo Invitacional Elite 2026',
-                fecha: '2026-05-15',
-                rol: 'Juez',
-                estado: 'PENDIENTE',
-                mensaje: 'Te invitamos a formar parte de nuestro panel de jueces.'
-            },
-            {
-                id: 2,
-                campeonatoNombre: 'Gran Prix Internacional',
-                fecha: '2026-06-20',
-                rol: 'Competidor',
-                estado: 'ACEPTADO',
-                mensaje: 'Has sido seleccionado para competir.'
-            }
-        ];
-        this.applyFilter();
-        this.loading = false;
-    }, 1000);
-    */
+  mapEstado(estado: number): 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' {
+  switch (estado) {
+    case 3: return 'ACEPTADO';
+    case 4: return 'RECHAZADO';
+    default: return 'PENDIENTE';
   }
+}
+
+
+loadInvitations(): void {
+  const userId = sessionStorage.getItem('idDocumento');
+  if (!userId) {
+    this.loading = false;
+    return;
+  }
+
+  this.loading = true;
+  this.api.getMisInvitaciones(userId).subscribe({
+    next: (data) => {
+      this.invitations = data.map((i: any) => ({
+        ...i,
+        estadoTexto: this.mapEstado(i.estado)
+      }));
+
+      this.applyFilter();
+      this.loading = false;
+    },
+    error: (err) => {
+      console.error('Error fetching invitations', err);
+      this.loading = false;
+    }
+  });
+}
 
   setTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
     this.activeTab = tab;
@@ -109,8 +73,10 @@ export class MyInvitationsComponent implements OnInit {
   }
 
   applyFilter(): void {
-    this.filteredInvitations = this.invitations.filter(i => i.estado === this.activeTab);
-  }
+    this.filteredInvitations =
+    this.invitations.filter(i => i.estadoTexto === this.activeTab);
+}
+
 
   goBack(): void {
     this.backNav.backOr({ fallbackUrl: '/dashboard' });

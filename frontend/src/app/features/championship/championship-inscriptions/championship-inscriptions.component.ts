@@ -176,6 +176,7 @@ export class ChampionshipInscriptionsComponent implements OnInit {
       .pipe(delay(1000))
       .subscribe({
         next: (data) => {
+          console.log(data);
           if (data && Array.isArray(data)) {
             this.inscriptions = data.map((item: any) => ({
               id: item.id || item.id_inscripcion,

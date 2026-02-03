@@ -7,6 +7,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.ivan.backend.backend.BD_tablas.Usuario;
+import org.ivan.backend.backend.repositorios.InscripcionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 
 public class Inscripcion {
 

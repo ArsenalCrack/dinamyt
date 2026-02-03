@@ -240,12 +240,12 @@ export class ChampionshipInvitationsComponent implements OnInit {
       return;
     }
 
-    this.api.searchUsers(this.inviteSearchQuery, sessionStorage.getItem('idDocumento') || '').subscribe({
+    this.api.searchUsers(this.inviteSearchQuery,sessionStorage.getItem('idDocumento') || '',this.championshipId || '').subscribe({
       next: (users) => {
         this.availableUsers = (users || [])
-          .filter(u => (u.ID_documento || u.documento || u.id) != '0')
+          .filter(u => (u.idDocumento || u.documento || u.id) != '0')
           .map(u => ({
-            id: u.ID_documento || u.documento || u.id,
+            id: u.idDocumento || u.documento || u.id,
             nombre: u.nombreC || u.nombre,
             email: u.correo || u.email || 'Sin correo visible',
             avatar: u.avatar || 'assets/default-avatar.png'

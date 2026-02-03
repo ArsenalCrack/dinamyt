@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 31-01-2026 a las 03:08:42
+-- Tiempo de generación: 03-02-2026 a las 03:38:06
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.0.30
 
@@ -121,16 +121,21 @@ CREATE TABLE `inscripciones` (
   `secciones` longtext DEFAULT NULL,
   `tipousuario` int(11) DEFAULT NULL,
   `estado` tinyint(4) DEFAULT 2,
-  `fecha_inscripcion` datetime(6) DEFAULT current_timestamp(6)
+  `fecha_inscripcion` datetime(6) DEFAULT current_timestamp(6),
+  `invitado` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `inscripciones`
 --
 
-INSERT INTO `inscripciones` (`idinscripcion`, `idusuario`, `idcampeonato`, `secciones`, `tipousuario`, `estado`, `fecha_inscripcion`) VALUES
-(1, 1, 40, '[\"COMBATES-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"FIGURA_A_MANOS_LIBRES-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"FIGURA_CON_ARMAS-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\"]', 5, 2, '2026-01-30 20:49:44.000000'),
-(2, 0, 40, '[\"SALTO_LARGO-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"COMBATES-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"SALTO_ALTO-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"FIGURA_CON_ARMAS-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\"]', 5, 2, '2026-01-30 21:07:03.000000');
+INSERT INTO `inscripciones` (`idinscripcion`, `idusuario`, `idcampeonato`, `secciones`, `tipousuario`, `estado`, `fecha_inscripcion`, `invitado`) VALUES
+(1, 1, 40, '[\"COMBATES-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"FIGURA_A_MANOS_LIBRES-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"FIGURA_CON_ARMAS-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\"]', 5, 2, '2026-01-30 20:49:44.000000', 0),
+(2, 0, 40, '[\"SALTO_LARGO-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"COMBATES-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"SALTO_ALTO-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\",\"FIGURA_CON_ARMAS-MASCULINO-BLANCO-NARANJA-EDAD(4-12)-PESO(10-20)\"]', 5, 2, '2026-01-30 21:07:03.000000', 0),
+(9, 43013, 40, NULL, 8, 2, NULL, 1),
+(10, 7868776876, 40, NULL, 5, 2, NULL, 1),
+(11, 2, 40, NULL, 5, 2, NULL, 1),
+(12, 43013, 39, NULL, 7, 2, '2026-02-02 20:50:17.000000', 1);
 
 -- --------------------------------------------------------
 
@@ -259,7 +264,7 @@ ALTER TABLE `campeonato`
 -- AUTO_INCREMENT de la tabla `inscripciones`
 --
 ALTER TABLE `inscripciones`
-  MODIFY `idinscripcion` bigint(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `idinscripcion` bigint(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT de la tabla `tipo_usuario`
