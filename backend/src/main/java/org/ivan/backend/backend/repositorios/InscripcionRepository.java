@@ -9,12 +9,18 @@ import java.util.Optional;
 
 public interface InscripcionRepository extends JpaRepository<Inscripciones, Integer> {
     Optional<Inscripciones> findByUsuarioAndCampeonato(Long usuario, Long campeonato);
+    
+    Optional<Inscripciones> findByUsuarioAndCampeonatoAndVisibleTrue(Long usuario, Long campeonato);
 
-    List<Inscripciones> findByUsuario(Long usuario);
+    List<Inscripciones> findByUsuarioAndVisibleTrueAndInvitadoFalse(Long usuario);
     
-    boolean existsByUsuario(Long usuario);
+    List<Inscripciones> findByUsuarioAndVisibleTrueAndInvitadoTrue(Long usuario);
     
-    List<Inscripciones> findByUsuarioAndInvitadoTrue(Long usuario);
+    boolean existsByUsuarioAndVisibleTrue(Long usuario);
     
-    List<Inscripciones>findByCampeonato(Long campeonato);
+    List<Inscripciones> findByUsuarioAndInvitadoTrueAndVisibleTrue(Long usuario);
+    
+    List<Inscripciones>findByCampeonatoAndTipousuarioAndVisibleTrue(Long campeonato,Integer tipousuario);
+    
+    List<Inscripciones> findByCampeonatoAndTipousuarioInAndEstadoAndVisibleTrue(Long campeonato, List<Integer> tipos,Integer estado);
 }

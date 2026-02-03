@@ -5,11 +5,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import java.util.Arrays;
 import org.ivan.backend.backend.secciones.ModalidadDTO;
 
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class JsonCleaner {
 
@@ -82,5 +87,54 @@ public class JsonCleaner {
             e.printStackTrace();
             return List.of();
         }
+    }
+    
+    public static List<String> embellecerModalidades(String rawString) {
+        if (rawString == null || rawString.isEmpty() || rawString.equals("[]")) {
+            return new ArrayList<>();
+        }
+
+        // 1. Limpieza inicial del string JSON
+        // Quitamos los corchetes [ ] y las comillas "
+        String limpio = rawString.replace("[", "").replace("]", "").replace("\"", "");
+
+        // 2. Separamos por la coma para obtener cada modalidad individual
+        String[] modalidadesIndividuales = limpio.split(",");
+
+        return Arrays.stream(modalidadesIndividuales)
+            .map(String::trim) // Quitamos espacios accidentales
+            .map(mod -> {
+                // --- Tu lógica original de procesamiento ---
+                String[] partes = mod.split("-");
+                if (partes.length == 0) return "";
+
+                // Nombre principal
+                String nombre = partes[0].replace("_", " ").toLowerCase();
+                if (nombre.length() > 0) {
+                    nombre = nombre.substring(0, 1).toUpperCase() + nombre.substring(1);
+                }
+
+                // Regex para Edad y Peso
+                String edad = extraerValor(mod, "EDAD");
+                String peso = extraerValor(mod, "PESO");
+
+                // Rangos de cinturón
+                String rangos = (partes.length >= 4) ? partes[2] + "/" + partes[3] : "N/A";
+
+                // Construcción del String
+                StringBuilder sb = new StringBuilder(nombre);
+                sb.append(" (").append(rangos).append(")");
+                if (!edad.isEmpty()) sb.append(" - Edad: ").append(edad);
+                if (!peso.isEmpty()) sb.append(" - Peso: ").append(peso).append("kg");
+
+                return sb.toString();
+            })
+            .collect(Collectors.toList());
+    }
+
+    private static String extraerValor(String texto, String campo) {
+        Pattern pattern = Pattern.compile(campo + "\\((.*?)\\)");
+        Matcher matcher = pattern.matcher(texto);
+        return matcher.find() ? matcher.group(1) : "";
     }
 }

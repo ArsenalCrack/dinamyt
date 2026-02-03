@@ -218,73 +218,53 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     }
 
     loadParticipantes(): void {
-        this.api.getInscriptionsByChampionship(this.id!).subscribe({
+        this.api.getInscriptionsByChampionship(this.id!).subscribe({ 
             next: (data) => {
                 if (data && Array.isArray(data) && data.length > 0) {
-                    this.participantes = data.map((item: any) => ({
-                        id: item.id || item.id_inscripcion,
-                        nombre: item.nombre_usuario || item.nombre_completo || item.nombre || 'Desconocido',
-                        academia: item.academia || 'Independiente',
-                        modalidad: Array.isArray(item.modalidades) ? item.modalidades.join(', ') : (item.modalidad || 'N/A'),
-                        cinturon: item.cinturon || 'Blanco',
-                        peso: item.peso || 'N/A',
-                        edad: (item.edad || 0).toString(),
-                        genero: item.sexo || item.genero || 'N/A',
-                        pais: item.nacionalidad || item.pais || 'Colombia',
-                        ciudad: item.ciudad || ''
-                    }));
-                    // Only accepted participants? Usually details show accepted ones.
-                    // If API returns all, maybe filter by state 'ACEPTADO'?
-                    // User said "Inscritos", implies all registered. Or maybe just accepted. I'll filter 'ACEPTADO' to be safe IF the field exists.
-                    // But if it's "Inscritos" list, usually it implies everyone on the list.
-                    // I'll show all or check status. Let's assume the API returns valid inscriptions.
-                    // Update: filter for 'ACEPTADO' if status present.
-                    if (data[0].estado) {
-                        this.participantes = this.participantes.filter((_, i) => data[i].estado === 'ACEPTADO');
-                    }
+                    
+                    // 1. Mapeamos los datos de la API al formato de la interfaz Participante
+                    const todosLosParticipantes = data.map((item: any) => this.mapToParticipante(item));
 
-                    // If filtered list is empty but data wasn't, maybe we want to show pending too? 
-                    // Let's stick to showing what we have. If 0 after filter, fallback to mock? No, that's confusing.
-                    // If API returned data, it means it works. If 0 participants, show 0.
+                    this.participantes = todosLosParticipantes.filter((_, i) => data[i].estado === 3);
 
-                    if (this.participantes.length === 0 && data.length > 0 && data[0].estado) {
-                        // All pending?
-                        // Just show them for now so user sees something.
-                        this.participantes = data.map((item: any) => ({
-                            id: item.id || item.id_inscripcion,
-                            nombre: item.nombre_usuario || item.nombre_completo || item.nombre || 'Desconocido',
-                            academia: item.academia || 'Independiente',
-                            modalidad: Array.isArray(item.modalidades) ? item.modalidades.join(', ') : (item.modalidad || 'N/A'),
-                            cinturon: item.cinturon || 'Blanco',
-                            peso: item.peso || 'N/A',
-                            edad: (item.edad || 0).toString(),
-                            genero: item.sexo || item.genero || 'N/A',
-                            pais: item.nacionalidad || item.pais || 'Colombia',
-                            ciudad: item.ciudad || ''
-                        }));
+                    // 3. Si después de filtrar no queda nadie (porque quizás todos están aceptados/rechazados)
+                    // puedes decidir si mostrar una lista vacía o volver a cargar sin filtro. 
+                    // Aquí mantengo tu lógica de "seguridad" pero solo con los de estado 2.
+                    if (this.participantes.length === 0) {
+                    console.log('No hay participantes pendientes (estado 2).');
                     }
 
                     this.extractAvailableOptions();
                     this.checkActiveFilters();
                     this.applyFilters();
                 } else {
-                    console.warn('No participants found from API, using mock.');
                     this.mockParticipantes();
-                    this.extractAvailableOptions();
-                    this.checkActiveFilters();
-                    this.applyFilters();
                 }
             },
             error: (err) => {
-                console.warn('Error fetching participants, using mock fallback', err);
+                console.error('Error al cargar participantes:', err);
                 this.mockParticipantes();
-                this.extractAvailableOptions();
-                this.checkActiveFilters();
-                this.applyFilters();
             }
         });
     }
 
+    private mapToParticipante(item: any): Participante {
+        return {
+            id: item.idDocumento || item.id_inscripcion || item.id,
+            nombre: item.nombreC || item.nombre_completo || item.nombre || item.nombre_usuario || 'Desconocido',
+            academia: item.academia || 'Independiente',
+            // Si secciones/modalidades es array, lo une con comas
+            modalidad: Array.isArray(item.modalidades) ? item.modalidades.join(', ') : 
+                    Array.isArray(item.secciones) ? item.secciones.join(', ') : 
+                    (item.modalidad || 'N/A'),
+            cinturon: item.cinturonRango || item.cinturon || 'Blanco',
+            peso: item.peso || 'N/A',
+            edad: (item.edad || 0).toString(),
+            genero: item.sexo || item.genero || 'N/A',
+            pais: item.nacionalidad || item.pais || 'Colombia',
+            ciudad: item.ciudad || ''
+        };
+    }
     private mockParticipantes(): void {
         // Generate some ghost data - Generate MORE for pagination testing if needed or keep mock
         // Helper to generate duplicates for volume

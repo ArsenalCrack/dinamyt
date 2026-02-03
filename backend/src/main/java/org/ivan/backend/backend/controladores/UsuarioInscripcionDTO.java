@@ -5,6 +5,7 @@
 package org.ivan.backend.backend.controladores;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  *
@@ -21,11 +22,45 @@ public class UsuarioInscripcionDTO {
     private String ciudad;
     private String correo;
     private String numeroCelular;
+    private String instructor;
+    private String academia;
+    private List<String> secciones;
+    private long idincripcion;
 
     // 🔴 ESTE ES EL ESTADO DE LA INSCRIPCIÓN
     private Integer estado;
+    
+    public List<String> getSecciones() {
+        return secciones;
+    }
+    
+    public long getIdincripcion() {    
+        return idincripcion;
+    }
 
     // getters y setters
+    public void setIdincripcion(long idincripcion) {
+        this.idincripcion = idincripcion;    
+    }
+
+    public void setSecciones(List<String> secciones) {
+        this.secciones = secciones;
+    }
+
+    public String getAcademia() {
+        return academia;
+    }
+
+    public void setAcademia(String academia) {
+        this.academia = academia;
+    }
+
+    public String getInstructor() {
+        return instructor;
+    }
+    public void setInstructor(String instructor) {
+        this.instructor = instructor;
+    }
 
     public Long getIdDocumento() {
         return idDocumento;

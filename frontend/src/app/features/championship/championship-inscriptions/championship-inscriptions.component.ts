@@ -166,41 +166,61 @@ export class ChampionshipInscriptionsComponent implements OnInit {
       this.applyFilters();
     }
   }
-
+  calcularEdad(fechaNacimiento: string): number {
+  if (!fechaNacimiento) return 0;
+  const birthDate = new Date(fechaNacimiento);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
   loadInscriptions(): void {
     if (!this.championshipId) return;
     this.loading = true;
     this.scrollLock.lock();
 
     this.api.getInscriptionsByChampionship(this.championshipId)
-      .pipe(delay(1000))
-      .subscribe({
-        next: (data) => {
-          console.log(data);
-          if (data && Array.isArray(data)) {
-            this.inscriptions = data.map((item: any) => ({
-              id: item.id || item.id_inscripcion,
-              nombre: item.nombre_usuario || item.nombre_completo || item.nombre || 'Desconocido',
-              edad: item.edad || 0,
+    .pipe(delay(1000))
+    .subscribe({
+      next: (data) => {
+        console.log('Datos recibidos:', data);
+        if (data && Array.isArray(data)) {
+          this.inscriptions = data.map((item: any) => ({ 
+              id: item.idDocumento,
+              nombre: item.nombreC || 'Desconocido',
               sexo: item.sexo || 'N/A',
-              peso: item.peso || '0kg',
-              documentoId: item.documento || item.documentoId || 'Sin Doc',
-              academia: item.academia || 'Independiente',
+              documentoId: item.idDocumento || 'Sin Doc',
               nacionalidad: item.nacionalidad || 'Colombia',
-              ciudad: item.ciudad || 'Bogotá',
-              modalidades: item.modalidades || [],
-              cinturon: item.cinturon || 'Blanco',
-              instructor: item.instructor || 'Indefinido',
+              ciudad: item.ciudad || 'No definida',
+              cinturon: item.cinturonRango || 'Blanco',
               correo: item.correo || '',
-              telefono: item.telefono || '',
-              estado: item.estado || 'PENDIENTE',
-              expanded: false
+              telefono: item.numeroCelular || '',
+              edad: item.fechaNacimiento ? this.calcularEdad(item.fechaNacimiento) : 0,
+              
+              estado: (() => {
+                if (item.estado === 2) return 'PENDIENTE';
+                if (item.estado === 3) return 'ACEPTADO';
+                if (item.estado === 4) return 'RECHAZADO';
+                return 'PENDIENTE'; // Valor por defecto por seguridad
+              })(),
+              
+              peso: 'N/A',
+              academia: item.academia || 'Independiente',
+              modalidades: item.secciones || [],
+              instructor: item.instructor || 'Indefinido',
+              expanded: false,
+              idinscripcion: item.idincripcion
             }));
-            this.applyFilters();
-          }
-          this.loading = false;
-          this.scrollLock.unlock();
-        },
+
+          console.log('Datos mapeados:', this.inscriptions);
+          this.applyFilters(); // <--- OJO AQUÍ
+        }
+        this.loading = false;
+        this.scrollLock.unlock();
+      },
         error: (err) => {
           console.warn('API de inscripciones no disponible, usando mocks.', err);
           // Keep mocks

@@ -38,11 +38,24 @@ public class Inscripciones {
     @Column(name="invitado")
     private boolean invitado;
     
+    @Column(name="visible")
+    private boolean visible;
+    
     public boolean isInvitado() {
         return invitado;
     }
 
     // ===== GETTERS & SETTERS =====
+
+    public boolean isVisible() {
+        return visible;
+    }
+
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
+    
+    
     public void setInvitado(boolean invitado) {    
         this.invitado = invitado;
     }

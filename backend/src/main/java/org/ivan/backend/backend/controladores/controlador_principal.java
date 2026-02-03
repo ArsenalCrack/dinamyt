@@ -19,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -436,7 +437,7 @@ public class controlador_principal {
 
     @PostMapping("/inscripciones")
     private ResponseEntity<?> inscribirse(@RequestBody Map<String, Object> datos) throws Exception {
-
+        List<String> seccionesActuales = new ArrayList<>();
         Campeonato campeonato = campeonatoRepository.findById(
                 Integer.parseInt(datos.get("campeonatoId").toString()))
                 .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
@@ -485,17 +486,23 @@ public class controlador_principal {
         // Verificar si el usuario ya tiene inscripción en este campeonato
         Inscripciones inscripcion = inscripcionRepository
                 .findByUsuarioAndCampeonato(usuario.getIdDocumento(), campeonato.getIdCampeonato())
-                .orElseGet(Inscripciones::new); // si no existe, creamos una nueva
+                .orElseGet(Inscripciones::new);
+        
 
         // Leer las secciones que ya tenía
-        List<String> seccionesActuales = new ArrayList<>();
+        if(inscripcion.isVisible()){
+        
         if (inscripcion.getSecciones() != null && !inscripcion.getSecciones().isEmpty()) {
             seccionesActuales = objectMapper.readValue(
                     inscripcion.getSecciones(),
                     new TypeReference<List<String>>() {
                     });
+        
         }
-
+        }else{
+            inscripcion.setVisible(true);
+        }
+        
         // Agregar solo nuevas secciones que no tenía antes
         for (String id : nuevasIds) {
             if (!seccionesActuales.contains(id)) {
@@ -503,14 +510,13 @@ public class controlador_principal {
             }
         }
 
+
         // Guardar en la inscripción
         inscripcion.setUsuario(usuario.getIdDocumento());
         inscripcion.setCampeonato(campeonato.getIdCampeonato());
         inscripcion.setSecciones(objectMapper.writeValueAsString(seccionesActuales));
         inscripcion.setTipousuario(5); // ajusta según tu lógica
-        if (inscripcion.getFechaInscripcion() == null) {
-            inscripcion.setFechaInscripcion(LocalDateTime.now());
-        }
+        inscripcion.setFechaInscripcion(LocalDateTime.now());
         inscripcion.setEstado(2);
         inscripcionRepository.save(inscripcion);
 
@@ -522,7 +528,7 @@ public class controlador_principal {
     @GetMapping("/inscripciones/usuario/{id}")
     private ResponseEntity<?> getMisInscripciones(@PathVariable Long id) {
         try {
-            List<Inscripciones> inscripciones = inscripcionRepository.findByUsuario(id);
+            List<Inscripciones> inscripciones = inscripcionRepository.findByUsuarioAndVisibleTrueAndInvitadoFalse(id);
             List<Map<String, Object>> response = new ArrayList<>();
             ObjectMapper mapper = new ObjectMapper();
 
@@ -581,10 +587,10 @@ public class controlador_principal {
 
     @PostMapping("/invitaciones/enviar")
     private ResponseEntity<?> enviarinvitacion(@RequestBody Map<String, Object> datos){
+        
         Inscripciones inscripcion = inscripcionRepository
                 .findByUsuarioAndCampeonato(Long.valueOf(datos.get("id_usuario").toString()), Long.valueOf(datos.get("id_campeonato").toString()))
                 .orElseGet(Inscripciones::new);
-        System.out.println(datos.get("id_usuario") +" "+" "+ datos.get("id_campeonato")+" "+ datos.get("id_tipo"));
         Long idUsuario = Long.valueOf(datos.get("id_usuario").toString());
 
         if (!usuarioRepository.existsById(idUsuario)) {
@@ -609,9 +615,9 @@ public class controlador_principal {
 
         inscripcion.setEstado(2);
         inscripcion.setInvitado(true);
-        if (inscripcion.getFechaInscripcion() == null) {
-            inscripcion.setFechaInscripcion(LocalDateTime.now());
-        }
+        inscripcion.setVisible(true);
+        inscripcion.setFechaInscripcion(LocalDateTime.now());
+        
         inscripcionRepository.save(inscripcion);
 
         return ResponseEntity.ok(Map.of("message", "Inscripción creada"));
@@ -620,7 +626,7 @@ public class controlador_principal {
     
     @GetMapping("/invitaciones/usuario/{userId}")
     private ResponseEntity<?> ObInvitaciones(@PathVariable Long userId){
-        List<Inscripciones> inscripciones = inscripcionRepository.findByUsuarioAndInvitadoTrue(userId);
+        List<Inscripciones> inscripciones = inscripcionRepository.findByUsuarioAndVisibleTrueAndInvitadoTrue(userId);
         if (inscripciones!=null) {
             return ResponseEntity.ok(inscripciones);
         }
@@ -633,7 +639,7 @@ public class controlador_principal {
 
     List<UsuarioInscripcionDTO> resultado = new ArrayList<>();
 
-    List<Inscripciones> inscripciones = inscripcionRepository.findByCampeonato(id);
+    List<Inscripciones> inscripciones = inscripcionRepository.findByCampeonatoAndTipousuarioAndVisibleTrue(id,5);
 
     for (Inscripciones ins : inscripciones) {
 
@@ -642,7 +648,6 @@ public class controlador_principal {
 
         UsuarioInscripcionDTO dto = new UsuarioInscripcionDTO();
 
-        // ===== DATOS DEL USUARIO =====
         dto.setIdDocumento(u.getIdDocumento());
         dto.setNombreC(u.getNombreC());
         dto.setSexo(u.getSexo());
@@ -652,19 +657,31 @@ public class controlador_principal {
         dto.setCiudad(u.getCiudad());
         dto.setCorreo(u.getCorreo());
         dto.setNumeroCelular(u.getNumeroCelular());
-
-        // ===== ESTADO DE LA INSCRIPCIÓN =====
+        dto.setInstructor(u.getInstructor().getNombreC());
+        dto.setAcademia(u.getAcademia().getNombre());
+        List<String> secciones = JsonCleaner.embellecerModalidades(ins.getSecciones());
+        dto.setSecciones(secciones);
+        dto.setIdincripcion(ins.getIdInscripcion());
         dto.setEstado(ins.isEstado());
 
         resultado.add(dto);
-
-        // ===== PRINT =====
-        System.out.println("Usuario: " + u.getNombreC());
-        System.out.println("Estado inscripción: " + ins.isEstado());
-        System.out.println("----------------------");
     }
 
     return ResponseEntity.ok(resultado);
 }
 
+    @GetMapping("/campeonatos/{campeonatoId}/jueces")
+    private ResponseEntity<?> objuez(@PathVariable Long campeonatoId){
+        List<Integer> tiposInteres = Arrays.asList(6,7,8);
+        List<Inscripciones> inscripciones = inscripcionRepository.findByCampeonatoAndTipousuarioInAndEstadoAndVisibleTrue(campeonatoId, tiposInteres,3);
+        return ResponseEntity.ok(inscripciones);
+    }
+
+    @DeleteMapping("/inscripciones/{inscriptionId}")
+    private ResponseEntity<?> elimiarinscripcionpropia(@PathVariable Integer inscriptionId){
+        Inscripciones ins = inscripcionRepository.findById(inscriptionId).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        ins.setVisible(false);
+        inscripcionRepository.save(ins);
+        return ResponseEntity.ok(ins);
+    }
 }
