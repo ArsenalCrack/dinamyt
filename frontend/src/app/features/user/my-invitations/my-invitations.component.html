@@ -38,15 +38,16 @@
                 [class.rejected]="item.estado === 'RECHAZADO'">
                 <div class="card-summary">
                     <div class="user-avatar">
-                        <!-- Icon based on Role if available -->
-                        <i class="fas" [ngClass]="item.rol === 'Juez' ? 'fa-gavel' : 'fa-user-ninja'"></i>
+                        <!-- Icon based on Role -->
+                        <i class="fas" [ngClass]="item.tipousuario >= 6 ? 'fa-gavel' : 'fa-user-ninja'"></i>
                     </div>
                     <div class="user-main-info">
-                        <h3>{{ item.campeonatoNombre || 'Campeonato' }}</h3>
+                        <h3>{{ item.nombre }}</h3>
                         <div class="meta-row">
                             <span class="meta-text" *ngIf="item.fecha">{{ item.fecha | date:'mediumDate' }}</span>
-                            <span class="badge-belt" *ngIf="item.rol">{{ item.rol }}</span>
                         </div>
+                        <p class="role-text">Has sido invitado como: {{ getRoleLabel(item.tipousuario) }}</p>
+                        <p class="inviter-text">Invitado por: {{ item.nombre_creador }}</p>
                     </div>
                 </div>
 

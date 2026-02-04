@@ -45,8 +45,9 @@
                     <div class="user-main-info">
                         <h3>{{ item.campeonatoNombre || 'Campeonato' }}</h3>
                         <div class="meta-row">
-                            <span class="meta-text" *ngIf="item.fechaInscripcion">{{ item.fechaInscripcion |
-                                date:'mediumDate' }}</span>
+                            <span class="meta-text" *ngIf="item.fechaInscripcion">
+                                {{ item.fechaInscripcion | date: "EEEE, d 'de' MMMM 'Hora: ' h:mm a" | titlecase }}
+                            </span>
                         </div>
                     </div>
                     <div class="toggle-icon">
@@ -81,7 +82,7 @@
                                             <span>{{ section.EDAD }} Años</span>
                                         </div>
                                     </div>
-                                    <div class="spec-column" *ngIf="section.PESO">
+                                    <div class="spec-column" *ngIf="section.PESO && section.PESO !== 'SIN_PESO'">
                                         <span class="spec-label">Peso</span>
                                         <div class="spec-value">
                                             <i class="fas fa-weight"></i>

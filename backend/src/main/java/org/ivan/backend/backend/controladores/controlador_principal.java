@@ -82,8 +82,10 @@ public class controlador_principal {
         } else if (usuario.getTipousuario().getID_Tipo() == null) {
             usuario.getTipousuario().setID_Tipo(1);
         }
-        Academia academia = academiaRepository.findById(0).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
-        Usuario instructor = usuarioRepository.findById(0L).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+        Academia academia = academiaRepository.findById(0)
+                .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+        Usuario instructor = usuarioRepository.findById(0L)
+                .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
         usuario.setInstructor(instructor);
         usuario.setAcademia(academia);
         usuariosPendientes.put(usuario.getCorreo(), usuario);
@@ -426,9 +428,10 @@ public class controlador_principal {
     }
 
     @GetMapping("/usuarios/search/{query}")
-    private ResponseEntity<?> buscarUsuarios(@PathVariable String query, @RequestParam String excluirId,@RequestParam Long idCampeonato) {
+    private ResponseEntity<?> buscarUsuarios(@PathVariable String query, @RequestParam String excluirId,
+            @RequestParam Long idCampeonato) {
         List<Usuario> usuarios = usuarioRepository.findUsuariosDisponiblesPorCampeonato(query,
-                1, Long.parseLong(excluirId),idCampeonato);
+                1, Long.parseLong(excluirId), idCampeonato);
         if (usuarios != null) {
             return ResponseEntity.ok(usuarios);
         }
@@ -487,29 +490,27 @@ public class controlador_principal {
         Inscripciones inscripcion = inscripcionRepository
                 .findByUsuarioAndCampeonato(usuario.getIdDocumento(), campeonato.getIdCampeonato())
                 .orElseGet(Inscripciones::new);
-        
 
         // Leer las secciones que ya tenía
-        if(inscripcion.isVisible()){
-        
-        if (inscripcion.getSecciones() != null && !inscripcion.getSecciones().isEmpty()) {
-            seccionesActuales = objectMapper.readValue(
-                    inscripcion.getSecciones(),
-                    new TypeReference<List<String>>() {
-                    });
-        
-        }
-        }else{
+        if (inscripcion.isVisible()) {
+
+            if (inscripcion.getSecciones() != null && !inscripcion.getSecciones().isEmpty()) {
+                seccionesActuales = objectMapper.readValue(
+                        inscripcion.getSecciones(),
+                        new TypeReference<List<String>>() {
+                        });
+
+            }
+        } else {
             inscripcion.setVisible(true);
         }
-        
+
         // Agregar solo nuevas secciones que no tenía antes
         for (String id : nuevasIds) {
             if (!seccionesActuales.contains(id)) {
                 seccionesActuales.add(id);
             }
         }
-
 
         // Guardar en la inscripción
         inscripcion.setUsuario(usuario.getIdDocumento());
@@ -586,10 +587,11 @@ public class controlador_principal {
     }
 
     @PostMapping("/invitaciones/enviar")
-    private ResponseEntity<?> enviarinvitacion(@RequestBody Map<String, Object> datos){
-        
+    private ResponseEntity<?> enviarinvitacion(@RequestBody Map<String, Object> datos) {
+
         Inscripciones inscripcion = inscripcionRepository
-                .findByUsuarioAndCampeonato(Long.valueOf(datos.get("id_usuario").toString()), Long.valueOf(datos.get("id_campeonato").toString()))
+                .findByUsuarioAndCampeonato(Long.valueOf(datos.get("id_usuario").toString()),
+                        Long.valueOf(datos.get("id_campeonato").toString()))
                 .orElseGet(Inscripciones::new);
         Long idUsuario = Long.valueOf(datos.get("id_usuario").toString());
 
@@ -610,76 +612,79 @@ public class controlador_principal {
         inscripcion.setCampeonato(Long.valueOf(idCampeonato));
 
         inscripcion.setTipousuario(
-                Integer.valueOf(datos.get("id_tipo").toString())
-        );
+                Integer.valueOf(datos.get("id_tipo").toString()));
 
         inscripcion.setEstado(2);
         inscripcion.setInvitado(true);
         inscripcion.setVisible(true);
         inscripcion.setFechaInscripcion(LocalDateTime.now());
-        
+
         inscripcionRepository.save(inscripcion);
 
         return ResponseEntity.ok(Map.of("message", "Inscripción creada"));
 
     }
-    
+
     @GetMapping("/invitaciones/usuario/{userId}")
-    private ResponseEntity<?> ObInvitaciones(@PathVariable Long userId){
+    private ResponseEntity<?> ObInvitaciones(@PathVariable Long userId) {
         List<Inscripciones> inscripciones = inscripcionRepository.findByUsuarioAndVisibleTrueAndInvitadoTrue(userId);
-        if (inscripciones!=null) {
+        if (inscripciones != null) {
             return ResponseEntity.ok(inscripciones);
         }
-        
+
         return ResponseEntity.status(404).body(Map.of("message", "Sin invitaciones"));
     }
-    
+
     @GetMapping("/campeonatos/{id}/inscripciones")
     private ResponseEntity<?> obinscripcionesmicampeonato(@PathVariable Long id) {
 
-    List<UsuarioInscripcionDTO> resultado = new ArrayList<>();
+        List<UsuarioInscripcionDTO> resultado = new ArrayList<>();
 
-    List<Inscripciones> inscripciones = inscripcionRepository.findByCampeonatoAndTipousuarioAndVisibleTrue(id,5);
+        List<Inscripciones> inscripciones = inscripcionRepository.findByCampeonatoAndTipousuarioAndVisibleTrue(id, 5);
 
-    for (Inscripciones ins : inscripciones) {
+        for (Inscripciones ins : inscripciones) {
 
-        Usuario u = usuarioRepository.findById(ins.getUsuario()).orElse(null);
-        if (u == null) continue;
+            Usuario u = usuarioRepository.findById(ins.getUsuario()).orElse(null);
+            if (u == null)
+                continue;
 
-        UsuarioInscripcionDTO dto = new UsuarioInscripcionDTO();
+            UsuarioInscripcionDTO dto = new UsuarioInscripcionDTO();
 
-        dto.setIdDocumento(u.getIdDocumento());
-        dto.setNombreC(u.getNombreC());
-        dto.setSexo(u.getSexo());
-        dto.setFechaNacimiento(u.getFechaNacimiento());
-        dto.setCinturonRango(u.getCinturonRango());
-        dto.setNacionalidad(u.getNacionalidad());
-        dto.setCiudad(u.getCiudad());
-        dto.setCorreo(u.getCorreo());
-        dto.setNumeroCelular(u.getNumeroCelular());
-        dto.setInstructor(u.getInstructor().getNombreC());
-        dto.setAcademia(u.getAcademia().getNombre());
-        List<String> secciones = JsonCleaner.embellecerModalidades(ins.getSecciones());
-        dto.setSecciones(secciones);
-        dto.setIdincripcion(ins.getIdInscripcion());
-        dto.setEstado(ins.isEstado());
+            dto.setIdDocumento(u.getIdDocumento());
+            dto.setNombreC(u.getNombreC());
+            dto.setSexo(u.getSexo());
+            dto.setFechaNacimiento(u.getFechaNacimiento());
+            dto.setCinturonRango(u.getCinturonRango());
+            dto.setNacionalidad(u.getNacionalidad());
+            dto.setCiudad(u.getCiudad());
+            dto.setCorreo(u.getCorreo());
+            dto.setNumeroCelular(u.getNumeroCelular());
+            dto.setInstructor(u.getInstructor().getNombreC());
+            dto.setAcademia(u.getAcademia().getNombre());
+            List<String> secciones = JsonCleaner.embellecerModalidades(ins.getSecciones());
+            dto.setSecciones(secciones);
+            dto.setIdincripcion(ins.getIdInscripcion());
+            dto.setEstado(ins.isEstado());
+            dto.setFechaInscripcion(ins.getFechaInscripcion());
 
-        resultado.add(dto);
+            resultado.add(dto);
+        }
+
+        return ResponseEntity.ok(resultado);
     }
 
-    return ResponseEntity.ok(resultado);
-}
-
     @GetMapping("/campeonatos/{campeonatoId}/jueces")
-    private ResponseEntity<?> objuez(@PathVariable Long campeonatoId){
-        List<Integer> tiposInteres = Arrays.asList(6,7,8);
-        List<Inscripciones> inscripciones = inscripcionRepository.findByCampeonatoAndTipousuarioInAndEstadoAndVisibleTrue(campeonatoId, tiposInteres,3);
+    private ResponseEntity<?> objuez(@PathVariable Long campeonatoId) {
+        List<Integer> tiposInteres = Arrays.asList(6, 7, 8);
+        List<Inscripciones> inscripciones = inscripcionRepository
+                .findByCampeonatoAndTipousuarioInAndEstadoAndVisibleTrue(campeonatoId, tiposInteres, 3);
         return ResponseEntity.ok(inscripciones);
     }
 
     @DeleteMapping("/inscripciones/{inscriptionId}")
-    private ResponseEntity<?> elimiarinscripcionpropia(@PathVariable Integer inscriptionId){
-        Inscripciones ins = inscripcionRepository.findById(inscriptionId).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+    private ResponseEntity<?> elimiarinscripcionpropia(@PathVariable Integer inscriptionId) {
+        Inscripciones ins = inscripcionRepository.findById(inscriptionId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         ins.setVisible(false);
         inscripcionRepository.save(ins);
         return ResponseEntity.ok(ins);

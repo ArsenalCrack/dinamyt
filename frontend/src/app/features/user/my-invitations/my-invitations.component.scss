@@ -137,6 +137,18 @@
                 font-size: 0.85rem;
                 color: #777;
             }
+
+            .role-text,
+            .inviter-text {
+                margin: 0.3rem 0;
+                font-size: 0.9rem;
+                color: var(--color-texto);
+
+                &.role-text {
+                    font-weight: 600;
+                    color: var(--color-acento);
+                }
+            }
         }
     }
 

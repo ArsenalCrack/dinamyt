@@ -34,38 +34,38 @@ export class MyInvitationsComponent implements OnInit {
     this.loadInvitations();
   }
   mapEstado(estado: number): 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' {
-  switch (estado) {
-    case 3: return 'ACEPTADO';
-    case 4: return 'RECHAZADO';
-    default: return 'PENDIENTE';
-  }
-}
-
-
-loadInvitations(): void {
-  const userId = sessionStorage.getItem('idDocumento');
-  if (!userId) {
-    this.loading = false;
-    return;
-  }
-
-  this.loading = true;
-  this.api.getMisInvitaciones(userId).subscribe({
-    next: (data) => {
-      this.invitations = data.map((i: any) => ({
-        ...i,
-        estadoTexto: this.mapEstado(i.estado)
-      }));
-
-      this.applyFilter();
-      this.loading = false;
-    },
-    error: (err) => {
-      console.error('Error fetching invitations', err);
-      this.loading = false;
+    switch (estado) {
+      case 3: return 'ACEPTADO';
+      case 4: return 'RECHAZADO';
+      default: return 'PENDIENTE';
     }
-  });
-}
+  }
+
+
+  loadInvitations(): void {
+    const userId = sessionStorage.getItem('idDocumento');
+    if (!userId) {
+      this.loading = false;
+      return;
+    }
+
+    this.loading = true;
+    this.api.getMisInvitaciones(userId).subscribe({
+      next: (data) => {
+        this.invitations = data.map((i: any) => ({
+          ...i,
+          estadoTexto: this.mapEstado(i.estado)
+        }));
+
+        this.applyFilter();
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Error fetching invitations', err);
+        this.loading = false;
+      }
+    });
+  }
 
   setTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
     this.activeTab = tab;
@@ -74,8 +74,8 @@ loadInvitations(): void {
 
   applyFilter(): void {
     this.filteredInvitations =
-    this.invitations.filter(i => i.estadoTexto === this.activeTab);
-}
+      this.invitations.filter(i => i.estadoTexto === this.activeTab);
+  }
 
 
   goBack(): void {
@@ -170,6 +170,15 @@ loadInvitations(): void {
       case 'RECHAZADO': return 'Rechazada';
       case 'PENDIENTE': return 'Pendiente';
       default: return status;
+    }
+  }
+  getRoleLabel(roleId: number): string {
+    switch (roleId) {
+      case 5: return 'Competidor';
+      case 6: return 'Juez Central';
+      case 7: return 'Juez de Mesa';
+      case 8: return 'Juez';
+      default: return 'Participante';
     }
   }
 }

@@ -82,7 +82,6 @@ export class ChampionshipInvitationsComponent implements OnInit {
     if (this.championshipId) {
       this.loadInvitations();
     } else {
-      this.mockData();
       this.applyFilters();
     }
   }
@@ -110,15 +109,13 @@ export class ChampionshipInvitationsComponent implements OnInit {
             }));
             this.applyFilters();
           } else {
-            this.mockData();
             this.applyFilters();
           }
           this.loading = false;
           this.scrollLock.unlock();
         },
         error: (err) => {
-          console.warn('API de invitaciones no disponible, usando mocks.', err);
-          this.mockData();
+          console.warn('API de invitaciones no disponible.', err);
           this.applyFilters();
           this.loading = false;
           this.scrollLock.unlock();
@@ -126,27 +123,6 @@ export class ChampionshipInvitationsComponent implements OnInit {
       });
   }
 
-  mockData(): void {
-    // Generate some mock invitations
-    this.invitations = [
-      // Competidores Pendientes
-      { id: 1, documento: '1000203040', nombre: 'Miguel O´Hara', email: 'miguel.2099@spider.com', avatar: '', tipo: 'COMPETIDOR', estado: 'PENDIENTE', fechaEnvio: '2025-10-01' },
-      { id: 2, documento: '1000203041', nombre: 'Gwen Stacy', email: 'gwen.stacy@spider.com', avatar: '', tipo: 'COMPETIDOR', estado: 'PENDIENTE', fechaEnvio: '2025-10-02' },
-      // Competidores Aceptados
-      { id: 3, documento: '1000203042', nombre: 'Peter Parker', email: 'peter.parker@spider.com', avatar: '', tipo: 'COMPETIDOR', estado: 'ACEPTADO', fechaEnvio: '2025-09-28' },
-      { id: 4, documento: '1000203043', nombre: 'Miles Morales', email: 'miles.morales@spider.com', avatar: '', tipo: 'COMPETIDOR', estado: 'ACEPTADO', fechaEnvio: '2025-09-29' },
-      // Competidores Rechazados
-      { id: 5, documento: '1000203044', nombre: 'Eddie Brock', email: 'venom@symbiote.com', avatar: '', tipo: 'COMPETIDOR', estado: 'RECHAZADO', fechaEnvio: '2025-09-30' },
-
-      // Jueces Pendientes
-      { id: 6, documento: '9000102030', nombre: 'Matt Murdock', email: 'matt@nelsonmurdock.com', rol: 'Juez Central', tipo: 'JUEZ', estado: 'PENDIENTE', fechaEnvio: '2025-10-05' },
-      { id: 7, documento: '9000102031', nombre: 'Jennifer Walters', email: 'jen@shehulk.com', rol: 'Juez de Mesa', tipo: 'JUEZ', estado: 'PENDIENTE', fechaEnvio: '2025-10-06' },
-      // Jueces Aceptados
-      { id: 8, documento: '9000102032', nombre: 'Steve Rogers', email: 'cap@avengers.com', rol: 'Juez Principal', tipo: 'JUEZ', estado: 'ACEPTADO', fechaEnvio: '2025-09-15' },
-      // Jueces Rechazados
-      { id: 9, documento: '9000102033', nombre: 'Tony Stark', email: 'ironman@stark.com', rol: 'Juez de Mesa', tipo: 'JUEZ', estado: 'RECHAZADO', fechaEnvio: '2025-09-10' },
-    ];
-  }
 
   goBack(): void {
     this.location.back();
@@ -240,7 +216,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
       return;
     }
 
-    this.api.searchUsers(this.inviteSearchQuery,sessionStorage.getItem('idDocumento') || '',this.championshipId || '').subscribe({
+    this.api.searchUsers(this.inviteSearchQuery, sessionStorage.getItem('idDocumento') || '', this.championshipId || '').subscribe({
       next: (users) => {
         this.availableUsers = (users || [])
           .filter(u => (u.idDocumento || u.documento || u.id) != '0')

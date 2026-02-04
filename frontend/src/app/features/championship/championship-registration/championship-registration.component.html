@@ -1,4 +1,8 @@
 <div class="registration-container">
+    <div class="toast-notification" *ngIf="toastVisible">
+        <i class="fas fa-check-circle"></i>
+        <span>{{ toastMessage }}</span>
+    </div>
     <div class="registration-card">
         <header class="header">
             <button type="button" (click)="goBack()" class="btn-back">
@@ -46,7 +50,34 @@
                 </div>
             </div>
 
-            <form (ngSubmit)="submitRegistration()" #regForm="ngForm" *ngIf="!noModalitiesAvailable">
+
+            <!-- Confirmation Modal -->
+            <div class="modal-overlay" *ngIf="showConfirmModal">
+                <div class="modal-box">
+                    <div class="modal-header">
+                        <i class="fas fa-question-circle warning-icon" style="color: var(--color-acento);"></i>
+                        <h3>¿Confirmar Inscripción?</h3>
+                    </div>
+                    <div class="modal-desc">
+                        <p *ngIf="!showReInscriptionWarning">Estás a punto de inscribirte en el campeonato.</p>
+
+                        <div *ngIf="showReInscriptionWarning" class="warning-text">
+                            <strong>Nota Importante:</strong>
+                            <p>Tenga en cuenta que si se inscribió anteriormente a este campeonato y ya fue aceptado, su
+                                solicitud de Inscripción volverá a estar pendiente.</p>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" (click)="cancelConfirmation()">CANCELAR</button>
+                        <button type="button" class="btn-confirm-reject" style="background-color: var(--color-acento);"
+                            (click)="confirmRegistration()">
+                            SÍ, CONFIRMAR INSCRIPCIÓN
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <form (ngSubmit)="initiateRegistration()" #regForm="ngForm" *ngIf="!noModalitiesAvailable">
                 <section class="form-section">
                     <div class="section-header">
                         <i class="fas fa-trophy"></i>

@@ -187,22 +187,64 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                     this.applyFilters();
 
                     // Fetch judges
+                    // Fetch judges
                     this.api.getJuecesByCampeonato(this.id!).subscribe({
-                        next: (jueces) => {
-                            this.jueces = jueces || [];
-                            this.filterJueces();
+                        next: (data: any[]) => {
+                            console.log('Raw Judges Data:', data); // DEBUG
+                            const rawInscriptions = data || [];
+                            // Map over inscriptions and fetch user details for each
+                            const judgePromises = rawInscriptions.map((ins: any) => {
+                                const userId = ins.usuario;
+                                // Use searchUsers to get user info by ID
+                                // CRITICAL: Pass '0' as championshipId to avoid excluding users already inscribed in this championship!
+                                return new Promise<Juez | null>((resolve) => {
+                                    this.api.searchUsers(String(userId), '0', '0').subscribe({
+                                        next: (users: any[]) => {
+                                            // The search might return multiple, find the exact match by ID
+                                            const user = users.find(u => String(u.idDocumento) === String(userId));
+                                            if (user) {
+                                                // Determine role using tipousuario directly from the inscription (DB column)
+                                                // 6: Central, 7: Mesa, 8: Juez
+                                                const typeId = ins.tipousuario ?? ins.idTipo ?? ins.id_tipo;
+                                                console.log(`Judge User ${userId} found. TypeID:`, typeId, 'from ins.tipousuario:', ins.tipousuario); // DEBUG
+
+                                                let role = 'Juez';
+                                                if (typeId === 6) role = 'Juez Central';
+                                                else if (typeId === 7) role = 'Juez de Mesa';
+                                                else if (typeId === 8) role = 'Juez';
+                                                else if (typeId === 'COMPETIDOR') role = 'Competidor'; // Sanity check
+
+                                                resolve({
+                                                    id: user.idDocumento,
+                                                    nombre: user.nombreC,
+                                                    avatar: 'assets/avatar-1.png',
+                                                    rol: role,
+                                                    categoria: user.cinturonRango || 'N/A',
+                                                    pais: user.nacionalidad,
+                                                    ciudad: user.ciudad
+                                                });
+                                            } else {
+                                                console.warn(`Judge User ${ins.tipousuario} NOT found in search results.`); // DEBUG
+                                                resolve(null);
+                                            }
+                                        },
+                                        error: (err) => {
+                                            console.error(`Error searching user ${userId}`, err); // DEBUG
+                                            resolve(null)
+                                        }
+                                    });
+                                });
+                            });
+
+                            Promise.all(judgePromises).then(results => {
+                                this.jueces = results.filter(j => j !== null) as Juez[];
+                                console.log('Final Hydrated Judges:', this.jueces); // DEBUG
+                                this.filterJueces();
+                            });
                         },
-                        error: () => {
-                            this.jueces = [
-                                { id: 101, nombre: 'Juan Pérez', avatar: 'assets/avatar-1.png', rol: 'Juez Central', categoria: 'A', pais: 'Colombia', ciudad: 'Bogotá' },
-                                { id: 102, nombre: 'María García', avatar: 'assets/avatar-2.png', rol: 'Juez de Mesa', categoria: 'B', pais: 'Brasil', ciudad: 'Sao Paulo' },
-                                { id: 103, nombre: 'Carlos Silva', avatar: 'assets/avatar-3.png', rol: 'Arbitro', categoria: 'Internacional', pais: 'México', ciudad: 'CDMX' },
-                                { id: 104, nombre: 'Ana Torres', avatar: 'assets/avatar-4.png', rol: 'Juez Lateral', categoria: 'C', pais: 'Colombia', ciudad: 'Cali' },
-                                { id: 105, nombre: 'Pedro Diaz', avatar: 'assets/avatar-5.png', rol: 'Juez Central', categoria: 'A', pais: 'Chile', ciudad: 'Santiago' },
-                                { id: 106, nombre: 'Lucia Mendez', avatar: 'assets/avatar-6.png', rol: 'Juez de Mesa', categoria: 'B', pais: 'Argentina', ciudad: 'Buenos Aires' },
-                                { id: 107, nombre: 'Roberto Gomez', avatar: 'assets/avatar-7.png', rol: 'Arbitro', categoria: 'A', pais: 'Colombia', ciudad: 'Medellín' }
-                            ];
-                            this.filterJueces();
+                        error: (err) => {
+                            console.error('Error loading judges', err);
+                            this.jueces = [];
                         }
                     });
 
@@ -218,10 +260,10 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     }
 
     loadParticipantes(): void {
-        this.api.getInscriptionsByChampionship(this.id!).subscribe({ 
+        this.api.getInscriptionsByChampionship(this.id!).subscribe({
             next: (data) => {
                 if (data && Array.isArray(data) && data.length > 0) {
-                    
+
                     // 1. Mapeamos los datos de la API al formato de la interfaz Participante
                     const todosLosParticipantes = data.map((item: any) => this.mapToParticipante(item));
 
@@ -231,19 +273,16 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                     // puedes decidir si mostrar una lista vacía o volver a cargar sin filtro. 
                     // Aquí mantengo tu lógica de "seguridad" pero solo con los de estado 2.
                     if (this.participantes.length === 0) {
-                    console.log('No hay participantes pendientes (estado 2).');
+                        console.log('No hay participantes pendientes (estado 2).');
                     }
 
                     this.extractAvailableOptions();
                     this.checkActiveFilters();
                     this.applyFilters();
-                } else {
-                    this.mockParticipantes();
                 }
             },
             error: (err) => {
                 console.error('Error al cargar participantes:', err);
-                this.mockParticipantes();
             }
         });
     }
@@ -254,8 +293,8 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
             nombre: item.nombreC || item.nombre_completo || item.nombre || item.nombre_usuario || 'Desconocido',
             academia: item.academia || 'Independiente',
             // Si secciones/modalidades es array, lo une con comas
-            modalidad: Array.isArray(item.modalidades) ? item.modalidades.join(', ') : 
-                    Array.isArray(item.secciones) ? item.secciones.join(', ') : 
+            modalidad: Array.isArray(item.modalidades) ? item.modalidades.join(', ') :
+                Array.isArray(item.secciones) ? item.secciones.join(', ') :
                     (item.modalidad || 'N/A'),
             cinturon: item.cinturonRango || item.cinturon || 'Blanco',
             peso: item.peso || 'N/A',
@@ -264,22 +303,6 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
             pais: item.nacionalidad || item.pais || 'Colombia',
             ciudad: item.ciudad || ''
         };
-    }
-    private mockParticipantes(): void {
-        // Generate some ghost data - Generate MORE for pagination testing if needed or keep mock
-        // Helper to generate duplicates for volume
-        const base = [
-            { id: 1, nombre: 'Carlos Ruiz', academia: 'Cobra Kai', modalidad: 'Combates', cinturon: 'Azul', peso: '70kg', edad: '22', genero: 'Masculino', pais: 'Colombia', ciudad: 'Bogotá' },
-            { id: 2, nombre: 'Diana Prince', academia: 'Themyscira Gym', modalidad: 'Defensa personal', cinturon: 'Negro', peso: '60kg', edad: '28', genero: 'Femenino', pais: 'Colombia', ciudad: 'Medellín' },
-            { id: 3, nombre: 'Miguel Diaz', academia: 'Eagle Fang', modalidad: 'Combates', cinturon: 'Blanco', peso: '65kg', edad: '17', genero: 'Masculino', pais: 'México', ciudad: 'Monterrey' },
-            { id: 4, nombre: 'Samantha LaRusso', academia: 'Miyagi-Do', modalidad: 'Kata', cinturon: 'Verde', peso: '55kg', edad: '17', genero: 'Femenino', pais: 'EE.UU.', ciudad: 'Los Angeles' }
-        ];
-
-        // Multiply data for demo purposes
-        this.participantes = [];
-        for (let i = 0; i < 50; i++) {
-            this.participantes.push(...base.map(p => ({ ...p, id: p.id + (i * 10), nombre: p.nombre + ' ' + (i + 1) })));
-        }
     }
 
     extractAvailableOptions(): void {

@@ -49,7 +49,15 @@
                         <h3>{{ item.nombre }}</h3>
                         <div class="meta-row">
                             <span class="badge-belt">{{ item.cinturon }}</span>
-                            <span class="meta-text">{{ item.peso }} • {{ item.edad }} años</span>
+                            <span class="meta-text" *ngIf="item.peso !== 'SIN_PESO' && item.peso !== 'N/A'">{{ item.peso
+                                }} • {{ item.edad }} años</span>
+                            <span class="meta-text" *ngIf="item.peso === 'SIN_PESO' || item.peso === 'N/A'">{{ item.edad
+                                }} años</span>
+                            <span class="meta-text"
+                                style="margin-left:8px; border-left: 1px solid #ddd; padding-left: 8px;">
+                                <i class="far fa-calendar-alt"></i> {{ item.fecha | date: "EEEE, d 'de' MMMM 'hora: '
+                                h:mm a" | titlecase }}
+                            </span>
                         </div>
                     </div>
                     <div class="expand-icon">
@@ -82,7 +90,9 @@
                         <div class="detail-item full-width">
                             <label>Modalidades Inscritas</label>
                             <div class="modalities-list">
-                                <span class="modality-tag" *ngFor="let mod of item.modalidades">{{ mod }}</span>
+                                <span class="modality-tag" *ngFor="let mod of item.modalidades">
+                                    {{ cleanModality(mod) }}
+                                </span>
                             </div>
                         </div>
                         <div class="detail-item">

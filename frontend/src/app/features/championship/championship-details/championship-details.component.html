@@ -165,15 +165,11 @@
                                         <i class="fas fa-user"></i>
                                     </div>
                                     <div class="judge-info">
-                                        <div class="top-row">
-                                            <span class="judge-name">{{ juez.nombre }}</span>
-                                            <span class="judge-badge-cat" *ngIf="juez.categoria">Cat. {{ juez.categoria
-                                                }}</span>
-                                        </div>
+                                        <span class="judge-name">{{ juez.nombre }}</span>
                                         <span class="judge-role">{{ juez.rol || 'Juez Certificado' }}</span>
                                         <span class="judge-loc" *ngIf="juez.ciudad || juez.pais">
-                                            <i class="fas fa-map-marker-alt"></i> {{ juez.ciudad }}{{ juez.pais ? ', ' +
-                                            juez.pais : '' }}
+                                            <i class="fas fa-map-marker-alt"></i> {{ juez.ciudad }}{{ (juez.ciudad &&
+                                            juez.pais) ? ', ' : '' }}{{ juez.pais }}
                                         </span>
                                     </div>
                                 </div>

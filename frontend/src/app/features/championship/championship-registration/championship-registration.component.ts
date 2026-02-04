@@ -160,6 +160,8 @@ export class ChampionshipRegistrationComponent implements OnInit {
         });
     }
 
+    showReInscriptionWarning = false;
+
     loadExistingInscriptions(): void {
         if (!this.currentUser.id) {
             this.filterAvailableModalities();
@@ -169,9 +171,21 @@ export class ChampionshipRegistrationComponent implements OnInit {
 
         this.api.getMisInscripciones(this.currentUser.id).subscribe({
             next: (data: any[]) => {
-                const currentChampInscriptions = data.filter(i =>
-                    i.campeonatoId == this.id || (i.campeonato && i.campeonato.idCampeonato == this.id)
-                );
+                console.log('Mis Inscripciones raw:', data);
+                const currentChampInscriptions = data.filter(i => {
+                    // Check all possible locations of championship ID
+                    const iCampId = i.campeonato?.idCampeonato || i.campeonatoId || i.campeonato;
+                    return iCampId == this.id;
+                });
+
+                console.log('Inscriptions for this championship:', currentChampInscriptions);
+
+                console.log('Inscriptions for this championship:', currentChampInscriptions);
+
+                // Any existing inscription triggers the warning/modal
+                if (currentChampInscriptions.length > 0) {
+                    this.showReInscriptionWarning = true;
+                }
 
                 this.registeredModalities = [];
                 currentChampInscriptions.forEach(ins => {
@@ -180,6 +194,20 @@ export class ChampionshipRegistrationComponent implements OnInit {
                             if (sec.MODALIDAD) this.registeredModalities.push(sec.MODALIDAD);
                             if (sec.modalidad) this.registeredModalities.push(sec.modalidad); // fallback
                         });
+                    } else if (ins.secciones) {
+                        // Fallback parsing if backend returns raw string string
+                        // Note: backend might return processed object if using DTO, but here we use raw entity endpoint?
+                        // Actually getMisInscripciones in ApiService might be using the raw endpoint.
+                        // Let's also check if secciones is array or string
+                        try {
+                            let parsed = typeof ins.secciones === 'string' ? JSON.parse(ins.secciones) : ins.secciones;
+                            if (Array.isArray(parsed)) {
+                                parsed.forEach((s: any) => {
+                                    if (s.MODALIDAD) this.registeredModalities.push(s.MODALIDAD);
+                                    else if (typeof s === 'string' && s.includes('-')) this.registeredModalities.push(s.split('-')[0].trim());
+                                });
+                            }
+                        } catch (e) { }
                     }
                 });
 
@@ -424,13 +452,15 @@ export class ChampionshipRegistrationComponent implements OnInit {
         }
     }
 
-    submitRegistration(): void {
+    showConfirmModal = false;
+
+    // Triggered by form submit
+    initiateRegistration(): void {
         if (this.isFieldRequired('peso')) {
             if (!this.registrationData.peso) {
                 this.weightError = 'El peso es obligatorio';
                 return;
             }
-            // Strict re-validation on submit
             const weightVal = parseInt(this.registrationData.peso, 10);
             if (isNaN(weightVal) || weightVal < 10) {
                 this.weightError = 'Peso inválido';
@@ -438,34 +468,49 @@ export class ChampionshipRegistrationComponent implements OnInit {
             }
             if (!this.checkWeightMatch(weightVal)) {
                 this.weightError = 'Tu peso no cumple con los requisitos de las modalidades seleccionadas.';
-                // Stop submission
                 return;
             }
         }
 
-        /* Belt check is done at selection time, but double check here */
         if (this.isFieldRequired('cinturon') && !this.currentUser.cinturon) {
             this.message = 'Se requiere cinturón en tu perfil.';
             this.success = false;
             return;
         }
 
+        // Logic check: "no quiero que aparezca la cajita, si es la primera vez que se inscribe"
+        // Meaning: Only show confirmation modal if we need to show the ReInscription warning.
+        // Otherwise, proceed directly.
+        if (this.showReInscriptionWarning) {
+            this.showConfirmModal = true;
+            this.scrollLock.lock();
+        } else {
+            this.confirmRegistration();
+        }
+    }
+
+    cancelConfirmation(): void {
+        this.showConfirmModal = false;
+        this.scrollLock.unlock();
+    }
+
+    // Actual API call
+    confirmRegistration(): void {
+        this.showConfirmModal = false;
         this.submitting = true;
         this.message = null;
 
         const payload: any = {
-            idUsuario: this.currentUser.id, // ID User
-            campeonatoId: this.id,          // ID Championship
+            idUsuario: this.currentUser.id,
+            campeonatoId: this.id,
             codigo: this.code,
             modalidades: this.registrationData.modalidades,
         };
 
-        // Belt
         if (this.isFieldRequired('cinturon')) {
             payload.cinturon = this.currentUser.cinturon;
         }
 
-        // Weight
         if (this.isFieldRequired('peso')) {
             payload.peso = this.registrationData.peso;
         }
@@ -476,9 +521,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
             payload.genero = this.currentUser.sexo;
         }
 
-        // Calculate Age at Championship Date
         if (checkReq('edad') || checkReq('fechaNacimiento')) {
-            // Calculate age on the day of the championship
             const targetDate = this.campeonato?.fechaInicio;
             const ageAtEvent = this.getAge(this.currentUser.fechaNacimiento, targetDate);
 
@@ -487,12 +530,9 @@ export class ChampionshipRegistrationComponent implements OnInit {
             }
         }
 
-        console.log('Submitting payload:', payload);
-
-        // Simulated API call
-        // Simulated API call with delay and spinner
         this.loadingMessage = 'Procesando inscripción...';
         this.loading = true;
+        // Scroll lock is already on or we ensure it
         this.scrollLock.lock();
 
         this.api.inscribirUsuarioCampeonato(payload)
@@ -501,26 +541,43 @@ export class ChampionshipRegistrationComponent implements OnInit {
                 next: (res) => {
                     this.success = true;
                     this.message = 'Inscripción realizada exitosamente.';
-                    // Stay loading until redirect or for a moment
+                    this.showToast('La Inscripción se ha realizado con éxito'); // Show toast
+
                     setTimeout(() => {
                         this.loading = false;
-                        this.scrollLock.unlock();
+                        this.scrollLock.unlock(); // Ensure unlock happens before navigation
                         this.router.navigate(['/campeonatos']);
-                    }, 500);
+                    }, 2000); // Wait for toast
                 },
                 error: (err) => {
                     console.error('Error inscribiendo usuario', err);
                     this.success = false;
                     this.message = err.error?.message || 'Hubo un error al realizar la inscripción.';
                     this.submitting = false;
-                    // Turn off full screen spinner to show error
                     this.loading = false;
                     this.scrollLock.unlock();
                 }
             });
     }
 
+    // Toast Logic
+    toastVisible = false;
+    toastMessage = '';
+
+    showToast(msg: string): void {
+        this.toastMessage = msg;
+        this.toastVisible = true;
+        setTimeout(() => {
+            this.toastVisible = false;
+        }, 3000);
+    }
+
     goBack(): void {
+        this.scrollLock.unlock(); // Safety unlock
         this.backNav.backOr({ fallbackUrl: '/campeonatos' });
+    }
+
+    ngOnDestroy(): void {
+        this.scrollLock.unlock();
     }
 }

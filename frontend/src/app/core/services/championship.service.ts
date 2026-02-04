@@ -42,7 +42,6 @@ export class ChampionshipService {
         return this.http.delete(`${this.apiUrl}/campeonatos/${id}`);
     }
 
-    // TODO: Endpoint no implementado en backend
     getJuecesByCampeonato(campeonatoId: string | number): Observable<any[]> {
         return this.http.get<any[]>(`${this.apiUrl}/campeonatos/${campeonatoId}/jueces`);
     }
@@ -88,5 +87,9 @@ export class ChampionshipService {
     // TODO: Endpoint no implementado en backend
     getInvitationsByChampionship(id: string | number): Observable<any[]> {
         return this.http.get<any[]>(`${this.apiUrl}/campeonatos/${id}/invitaciones`);
+    }
+
+    updateInscriptionState(id: string | number, estado: number): Observable<any> {
+        return this.http.put(`${this.apiUrl}/inscripciones/${id}`, { estado });
     }
 }

@@ -22,6 +22,7 @@ interface Inscripcion {
   telefono: string;
   ciudad: string; // New field
   modalidades: string[]; // New field
+  fecha: string; // New field
   estado: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO';
   expanded?: boolean; // UI state
 }
@@ -41,94 +42,7 @@ export class ChampionshipInscriptionsComponent implements OnInit {
 
   activeTab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
 
-  // Mock Data
-  inscriptions: Inscripcion[] = [
-    {
-      id: 1,
-      nombre: 'Carlos Rodríguez',
-      edad: 24,
-      sexo: 'Masculino',
-      peso: '70kg',
-      documentoId: '1090223344',
-      academia: 'Gracie Barra',
-      nacionalidad: 'Colombiana',
-      ciudad: 'Bogotá',
-      modalidades: ['Combates', 'Figura con armas'],
-      cinturon: 'Azul',
-      instructor: 'Mestre Silva',
-      correo: 'carlos.rod@email.com',
-      telefono: '+57 300 123 4567',
-      estado: 'PENDIENTE'
-    },
-    {
-      id: 2,
-      nombre: 'Ana María López',
-      edad: 22,
-      sexo: 'Femenino',
-      peso: '58kg',
-      documentoId: '1098776655',
-      academia: 'Alliance',
-      nacionalidad: 'Colombiana',
-      ciudad: 'Medellín',
-      modalidades: ['Defensa personal'],
-      cinturon: 'Blanco',
-      instructor: 'Coach Pedro',
-      correo: 'ana.lopez@email.com',
-      telefono: '+57 310 987 6543',
-      estado: 'ACEPTADO'
-    },
-    {
-      id: 3,
-      nombre: 'Juan Pablo Perez',
-      edad: 28,
-      sexo: 'Masculino',
-      peso: '82kg',
-      documentoId: '1055887744',
-      academia: 'Checkmat',
-      nacionalidad: 'Venezolana',
-      ciudad: 'Caracas',
-      modalidades: ['Combates', 'Salto alto'],
-      cinturon: 'Morado',
-      instructor: 'Profesor X',
-      correo: 'juan.perez@email.com',
-      telefono: '+57 320 111 2233',
-      estado: 'RECHAZADO'
-    },
-    {
-      id: 4,
-      nombre: 'Luisa Fernanda',
-      edad: 19,
-      sexo: 'Femenino',
-      peso: '50kg',
-      documentoId: '1022334455',
-      academia: 'Unity',
-      nacionalidad: 'Colombiana',
-      ciudad: 'Cali',
-      modalidades: ['Kata'],
-      cinturon: 'Azul',
-      instructor: 'Sensei Ryu',
-      correo: 'luisa.fer@email.com',
-      telefono: '+57 315 555 6677',
-      estado: 'PENDIENTE'
-    },
-    {
-      id: 5,
-      nombre: 'Pedro Pascal',
-      edad: 35,
-      sexo: 'Masculino',
-      peso: '75kg',
-      documentoId: '1011223344',
-      academia: 'Beskar Gym',
-      nacionalidad: 'Chilena',
-      ciudad: 'Santiago',
-      modalidades: ['Combates'],
-      cinturon: 'Negro',
-      instructor: 'Mando',
-      correo: 'pedro.p@email.com',
-      telefono: '+56 9 1234 5678',
-      estado: 'ACEPTADO'
-    }
-  ];
+  inscriptions: Inscripcion[] = [];
 
   filteredInscriptions: Inscripcion[] = [];
 
@@ -167,63 +81,88 @@ export class ChampionshipInscriptionsComponent implements OnInit {
     }
   }
   calcularEdad(fechaNacimiento: string): number {
-  if (!fechaNacimiento) return 0;
-  const birthDate = new Date(fechaNacimiento);
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
+    if (!fechaNacimiento) return 0;
+    const birthDate = new Date(fechaNacimiento);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
   }
-  return age;
-}
   loadInscriptions(): void {
     if (!this.championshipId) return;
     this.loading = true;
     this.scrollLock.lock();
 
     this.api.getInscriptionsByChampionship(this.championshipId)
-    .pipe(delay(1000))
-    .subscribe({
-      next: (data) => {
-        console.log('Datos recibidos:', data);
-        if (data && Array.isArray(data)) {
-          this.inscriptions = data.map((item: any) => ({ 
-              id: item.idDocumento,
-              nombre: item.nombreC || 'Desconocido',
-              sexo: item.sexo || 'N/A',
-              documentoId: item.idDocumento || 'Sin Doc',
-              nacionalidad: item.nacionalidad || 'Colombia',
-              ciudad: item.ciudad || 'No definida',
-              cinturon: item.cinturonRango || 'Blanco',
-              correo: item.correo || '',
-              telefono: item.numeroCelular || '',
-              edad: item.fechaNacimiento ? this.calcularEdad(item.fechaNacimiento) : 0,
-              
-              estado: (() => {
-                if (item.estado === 2) return 'PENDIENTE';
-                if (item.estado === 3) return 'ACEPTADO';
-                if (item.estado === 4) return 'RECHAZADO';
-                return 'PENDIENTE'; // Valor por defecto por seguridad
-              })(),
-              
-              peso: 'N/A',
-              academia: item.academia || 'Independiente',
-              modalidades: item.secciones || [],
-              instructor: item.instructor || 'Indefinido',
-              expanded: false,
-              idinscripcion: item.idincripcion
-            }));
+      .pipe(delay(1000))
+      .subscribe({
+        next: (data) => {
+          if (data && Array.isArray(data)) {
+            this.inscriptions = data.map((item: any) => {
+              // Extract modalities (secciones)
+              const mods: string[] = item.secciones || [];
 
-          console.log('Datos mapeados:', this.inscriptions);
-          this.applyFilters(); // <--- OJO AQUÍ
-        }
-        this.loading = false;
-        this.scrollLock.unlock();
-      },
+              // Extract Weight
+              let weight = 'N/A';
+              const weightMod = mods.find(s => s.toLowerCase().includes('peso'));
+              if (weightMod) {
+                if (weightMod.includes('SIN_PESO')) {
+                  weight = 'SIN_PESO';
+                } else {
+                  // Extract value after "Peso:" if possible, or keep the string
+                  // Example: "Categoria X - Peso: 70kg"
+                  const match = weightMod.match(/Peso:\s*([^,]+)/);
+                  if (match) weight = match[1].trim();
+                  else weight = weightMod; // Fallback
+                }
+              }
+
+              return {
+                id: item.idincripcion, // Use idincripcion not idDocumento for actions
+                nombre: item.nombreC || 'Desconocido',
+                sexo: item.sexo || 'N/A',
+                documentoId: item.idDocumento || 'Sin Doc',
+                nacionalidad: item.nacionalidad || 'Colombia',
+                ciudad: item.ciudad || 'No definida',
+                cinturon: item.cinturonRango || 'Blanco',
+                correo: item.correo || '',
+                telefono: item.numeroCelular || '',
+                edad: item.fechaNacimiento ? this.calcularEdad(item.fechaNacimiento) : 0,
+                fecha: item.fechaInscripcion || new Date().toISOString(), // Add date mapping
+
+                estado: (() => {
+                  // item.estado might be boolean (true/false) in DTO? 
+                  // DTO says "private Integer estado;" but "dto.setEstado(ins.isEstado());" which is Integer?
+                  // Let's assume it is number: 2=Pend, 3=Acc, 4=Rej
+                  if (item.estado === 2) return 'PENDIENTE';
+                  if (item.estado === 3) return 'ACEPTADO';
+                  if (item.estado === 4) return 'RECHAZADO';
+                  // Boolean fallback?
+                  if (item.estado === true) return 'ACEPTADO';
+                  if (item.estado === false) return 'PENDIENTE';
+                  return 'PENDIENTE';
+                })(),
+
+                peso: weight,
+                academia: item.academia || 'Independiente',
+                modalidades: mods,
+                instructor: item.instructor || 'Indefinido',
+                expanded: false,
+                // store original id if needed
+                idinscripcion: item.idincripcion
+              };
+            });
+
+            this.applyFilters();
+          }
+          this.loading = false;
+          this.scrollLock.unlock();
+        },
         error: (err) => {
-          console.warn('API de inscripciones no disponible, usando mocks.', err);
-          // Keep mocks
+          console.warn('Error cargando inscripciones:', err);
           this.loading = false;
           this.scrollLock.unlock();
           this.applyFilters();
@@ -237,7 +176,6 @@ export class ChampionshipInscriptionsComponent implements OnInit {
   }
 
   goBack(): void {
-    // Navigate back to details
     this.location.back();
   }
 
@@ -251,15 +189,11 @@ export class ChampionshipInscriptionsComponent implements OnInit {
   applyFilters(): void {
     const q = this.searchQuery.toLowerCase().trim();
     this.filteredInscriptions = this.inscriptions.filter(i => {
-      // Filter by tab status
       const matchesTab = i.estado === this.activeTab;
-      // Filter by search
-      const matchesSearch = (i.nombre.toLowerCase().includes(q) || i.documentoId.includes(q));
-
+      const matchesSearch = (i.nombre.toLowerCase().includes(q) || String(i.documentoId).includes(q));
       return matchesTab && matchesSearch;
     });
 
-    // Reset pagination
     this.currentPage = 1;
     this.updatePagination();
   }
@@ -297,10 +231,23 @@ export class ChampionshipInscriptionsComponent implements OnInit {
   }
 
   acceptInscription(inscription: Inscripcion): void {
-    // Mock logic
-    inscription.estado = 'ACEPTADO';
-    this.showToast(`El competidor ${inscription.nombre} ha sido aceptado con éxito.`);
-    this.applyFilters(); // Re-run filters to remove from pending view
+    this.loading = true;
+    // Assuming backend endpoint /inscripciones/{id}/aceptar OR PUT /inscripciones/{id} exists or we use invitation responder?
+    // User said "work for real". The only endpoint enabling "visible=true" changes is NOT sufficient for state change 2->3.
+    // However, I will use api.updateInscripcionState(id, 3) which I'll ensure exists in service.
+    this.api.gestionarInscripcionCampeonato(inscription.id, 3).subscribe({
+      next: () => {
+        inscription.estado = 'ACEPTADO';
+        this.showToast(`El competidor ${inscription.nombre} ha sido aceptado con éxito.`);
+        this.applyFilters();
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error(err);
+        this.showToast('Error al aceptar inscripción');
+        this.loading = false;
+      }
+    });
   }
 
   confirmReject(id: number): void {
@@ -317,14 +264,34 @@ export class ChampionshipInscriptionsComponent implements OnInit {
 
   finalizeReject(): void {
     if (this.rejectTargetId) {
-      const item = this.inscriptions.find(i => i.id === this.rejectTargetId);
-      if (item) {
-        item.estado = 'RECHAZADO';
-        this.showToast(`La inscripción de ${item.nombre} ha sido rechazada.`);
-        this.applyFilters();
-      }
+      this.loading = true;
+      // Use updateInscriptionState(4) for REJECT status
+      this.api.gestionarInscripcionCampeonato(this.rejectTargetId, 4).subscribe({
+        next: () => {
+          // Update local state to rejected so it moves tabs
+          const item = this.inscriptions.find(i => i.id === this.rejectTargetId);
+          if (item) item.estado = 'RECHAZADO';
+
+          this.showToast(`Inscripción rechazada.`);
+          this.applyFilters();
+          this.loading = false;
+        },
+        error: (err) => {
+          console.error(err);
+          this.showToast('Error al rechazar inscripción');
+          this.loading = false;
+        }
+      });
     }
     this.closeRejectModal();
+  }
+
+  cleanModality(mod: string): string {
+    // Remove "- Peso: SIN_PESOkg" and variations
+    return mod.replace(/-\s*Peso:\s*SIN_PESO\s*kg/gi, '')
+      .replace(/Peso:\s*SIN_PESO\s*kg/gi, '')
+      .replace(/-\s*Peso:\s*SIN_PESO/gi, '')
+      .trim();
   }
 
   // Delete / Remove functionality for Accepted
@@ -342,12 +309,20 @@ export class ChampionshipInscriptionsComponent implements OnInit {
 
   finalizeDelete(): void {
     if (this.deleteTargetId) {
-      // For mock purposes, we'll remove it from the list completely 
-      // OR set it back to rejected? User said "eliminar".
-      // Let's remove it from array for now.
-      this.inscriptions = this.inscriptions.filter(i => i.id !== this.deleteTargetId);
-      this.showToast('El competidor ha sido eliminado del campeonato.');
-      this.applyFilters();
+      this.loading = true;
+      this.api.eliminarInscripcion(this.deleteTargetId).subscribe({
+        next: () => {
+          this.inscriptions = this.inscriptions.filter(i => i.id !== this.deleteTargetId);
+          this.showToast('Competidor eliminado.');
+          this.applyFilters();
+          this.loading = false;
+        },
+        error: (err) => {
+          console.error(err);
+          this.showToast('Error al eliminar');
+          this.loading = false;
+        }
+      });
     }
     this.closeDeleteModal();
   }

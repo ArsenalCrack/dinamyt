@@ -38,7 +38,7 @@ export class ApiService {
   setTempEmail(email: string) { this.user.setTempEmail(email); }
   updateProfile(data: any) { return this.user.updateProfile(data); }
   uploadProfilePhoto(file: File) { return this.user.uploadProfilePhoto(file); }
-  searchUsers(query: string, excluirId: string,idCampeonato: string) { return this.user.searchUsers(query, excluirId, idCampeonato); }
+  searchUsers(query: string, excluirId: string, idCampeonato: string) { return this.user.searchUsers(query, excluirId, idCampeonato); }
 
   // --- Academy Delegates ---
   cargaracademias() { return this.academy.cargaracademias(); }
@@ -73,5 +73,6 @@ export class ApiService {
   getLiveManagement(id: string | number) { return this.championship.getLiveManagement(id); }
   getInscriptionsByChampionship(id: string | number) { return this.championship.getInscriptionsByChampionship(id); }
   getInvitationsByChampionship(id: string | number) { return this.championship.getInvitationsByChampionship(id); }
+  gestionarInscripcionCampeonato(id: string | number, estado: number) { return this.championship.updateInscriptionState(id, estado); }
 
 }

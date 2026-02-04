@@ -29,18 +29,29 @@ public class UsuarioInscripcionDTO {
 
     // 🔴 ESTE ES EL ESTADO DE LA INSCRIPCIÓN
     private Integer estado;
-    
+
+    // 🔴 FECHA DE INSCRIPCIÓN
+    private java.time.LocalDateTime fechaInscripcion;
+
+    public java.time.LocalDateTime getFechaInscripcion() {
+        return fechaInscripcion;
+    }
+
+    public void setFechaInscripcion(java.time.LocalDateTime fechaInscripcion) {
+        this.fechaInscripcion = fechaInscripcion;
+    }
+
     public List<String> getSecciones() {
         return secciones;
     }
-    
-    public long getIdincripcion() {    
+
+    public long getIdincripcion() {
         return idincripcion;
     }
 
     // getters y setters
     public void setIdincripcion(long idincripcion) {
-        this.idincripcion = idincripcion;    
+        this.idincripcion = idincripcion;
     }
 
     public void setSecciones(List<String> secciones) {
@@ -58,6 +69,7 @@ public class UsuarioInscripcionDTO {
     public String getInstructor() {
         return instructor;
     }
+
     public void setInstructor(String instructor) {
         this.instructor = instructor;
     }
@@ -141,6 +153,5 @@ public class UsuarioInscripcionDTO {
     public void setEstado(Integer estado) {
         this.estado = estado;
     }
-    
-}
 
+}
