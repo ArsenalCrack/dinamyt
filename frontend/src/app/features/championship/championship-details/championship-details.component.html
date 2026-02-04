@@ -270,6 +270,11 @@
                                         <app-custom-select [options]="generosOptions" [(ngModel)]="generoFilter"
                                             (ngModelChange)="applyFilters()"></app-custom-select>
                                     </div>
+
+                                    <button class="btn-clear-filters" (click)="clearFilters()"
+                                        title="Restablecer todos los filtros">
+                                        <i class="fas fa-eraser"></i> <span>Limpiar Filtros</span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -330,7 +335,7 @@
                                         <span class="tag-info modal" *ngIf="p.modalidad !== 'TODAS'">{{ p.modalidad
                                             }}</span>
                                         <span class="tag-info">{{ p.peso }}</span>
-                                        <span class="tag-info">{{ p.edad }} años</span>
+                                        <span class="tag-info">{{ p.edad }}</span>
                                         <span class="tag-info">{{ p.genero }}</span>
                                     </div>
                                     <div class="card-loc-row" *ngIf="p.ciudad || p.pais">

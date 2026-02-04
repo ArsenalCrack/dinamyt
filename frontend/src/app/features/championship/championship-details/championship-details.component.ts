@@ -21,6 +21,11 @@ interface Participante {
     genero: string;
     pais?: string;
     ciudad?: string;
+    // New fields for granular filtering
+    metaModalities?: string[];
+    metaBelts?: string[];
+    metaAges?: string[];
+    metaWeights?: string[];
 }
 
 interface Juez {
@@ -288,52 +293,134 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     }
 
     private mapToParticipante(item: any): Participante {
+        const rawModalities: string[] = Array.isArray(item.modalidades) ? item.modalidades :
+            Array.isArray(item.secciones) ? item.secciones :
+                (item.modalidad ? [item.modalidad] : []);
+
+        const parsedModalities: string[] = [];
+        const parsedBelts: string[] = [];
+        const parsedAges: string[] = [];
+        const parsedWeights: string[] = [];
+
+        if (rawModalities.length > 0) {
+            rawModalities.forEach(modString => {
+                // Regex: "ModalityName (Belt) - Edad: Age - Peso: Weight"
+                // Example: "Salto largo (BLANCO/NARANJA) - Edad: 4-12 - Peso: 10-20kg"
+                const match = modString.match(/^(.*?)\s*\((.*?)\)\s*-\s*Edad:\s*(.*?)\s*-\s*Peso:\s*(.*)$/i);
+                if (match) {
+                    parsedModalities.push(match[1].trim());
+                    parsedBelts.push(match[2].trim());
+                    parsedAges.push(match[3].trim());
+                    parsedWeights.push(match[4].trim());
+                } else {
+                    // Fallback to just name if simpler format
+                    // e.g. "Modality (Belt)"
+                    const simpleMatch = modString.match(/^(.*?)\s*\(/);
+                    if (simpleMatch) {
+                        parsedModalities.push(simpleMatch[1].trim());
+                    } else {
+                        parsedModalities.push(modString.trim());
+                    }
+                }
+            });
+        }
+
+        const unique = (arr: string[]) => Array.from(new Set(arr)).filter(Boolean);
+
         return {
             id: item.idDocumento || item.id_inscripcion || item.id,
             nombre: item.nombreC || item.nombre_completo || item.nombre || item.nombre_usuario || 'Desconocido',
             academia: item.academia || 'Independiente',
-            // Si secciones/modalidades es array, lo une con comas
-            modalidad: Array.isArray(item.modalidades) ? item.modalidades.join(', ') :
-                Array.isArray(item.secciones) ? item.secciones.join(', ') :
-                    (item.modalidad || 'N/A'),
+            // Display formatted list of modality names
+            modalidad: unique(parsedModalities).join(', ') || ((item.modalidad || 'N/A') as string),
             cinturon: item.cinturonRango || item.cinturon || 'Blanco',
-            peso: item.peso || 'N/A',
-            edad: (item.edad || 0).toString(),
+            peso: this.formatRange(item.peso || 'N/A'),
+            edad: (item.fechaNacimiento ? this.calcularEdad(item.fechaNacimiento).toString() : this.formatRange((item.edad || 0).toString())) + ' Años',
             genero: item.sexo || item.genero || 'N/A',
             pais: item.nacionalidad || item.pais || 'Colombia',
-            ciudad: item.ciudad || ''
+            ciudad: item.ciudad || '',
+
+            // Meta-data for filters
+            metaModalities: unique(parsedModalities),
+            metaBelts: unique(parsedBelts),
+            metaAges: unique(parsedAges),
+            metaWeights: unique(parsedWeights)
         };
+    }
+
+    private formatRange(val: string): string {
+        if (!val) return val;
+        // Check if it's a range like "d-d" and not just a negative number or something else
+        // Simple regex for "number-number"
+        if (/^\d+(\.\d+)?\s*-\s*\d+(\.\d+)?/.test(val)) {
+            return val.replace('-', ' a ');
+        }
+        return val;
+    }
+
+    private calcularEdad(fechaNacimiento: string): number {
+        if (!fechaNacimiento) return 0;
+        const birthDate = new Date(fechaNacimiento);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age;
     }
 
     extractAvailableOptions(): void {
         const toOption = (val: string) => ({ label: val, value: val });
-        const unique = (arr: string[]) => Array.from(new Set(arr)).sort();
+        // Extracts unique values from array of arrays
+        const uniqueFlat = (extractor: (p: Participante) => string[] | undefined) => {
+            const allValues = this.participantes.flatMap(p => extractor(p) || []);
+            return Array.from(new Set(allValues)).filter(Boolean).sort();
+        };
+        // Extracts unique values from simple array
+        const uniqueSimple = (arr: string[]) => Array.from(new Set(arr)).filter(Boolean).sort();
 
         this.modalidadesOptions = [
             { label: 'Todas', value: 'TODAS' },
-            ...unique(this.participantes.map(p => p.modalidad)).map(toOption)
+            ...uniqueFlat(p => p.metaModalities).map(toOption)
         ];
         this.cinturonesOptions = [
             { label: 'Todos', value: 'TODAS' },
-            ...unique(this.participantes.map(p => p.cinturon)).map(toOption)
+            ...uniqueFlat(p => p.metaBelts).map(val => ({
+                label: val.includes('/') ? val.replace('/', ' hasta ') : val,
+                value: val
+            }))
         ];
         this.pesosOptions = [
             { label: 'Todos', value: 'TODAS' },
-            ...unique(this.participantes.map(p => p.peso)).map(toOption)
+            ...uniqueFlat(p => p.metaWeights).map(val => ({ label: this.formatRange(val), value: val }))
         ];
         this.edadesOptions = [
             { label: 'Todas', value: 'TODAS' },
-            ...this.participantes.map(p => p.edad).filter((v, i, a) => a.indexOf(v) === i)
-                .sort((a, b) => parseInt(a) - parseInt(b)).map(toOption)
+            ...uniqueFlat(p => p.metaAges).map(val => ({ label: this.formatRange(val) + ' Años', value: val }))
         ];
         this.generosOptions = [
             { label: 'Todos', value: 'TODAS' },
-            ...unique(this.participantes.map(p => p.genero)).map(toOption)
+            ...uniqueSimple(this.participantes.map(p => p.genero)).map(toOption)
         ];
     }
 
     onModalityChange(): void {
         this.checkActiveFilters();
+        // Reset sub-filters when modality changes to avoid impossible combinations
+        this.cinturonFilter = 'TODAS';
+        this.pesoFilter = 'TODAS';
+        this.edadFilter = 'TODAS';
+        this.applyFilters();
+    }
+
+    clearFilters(): void {
+        this.searchQuery = '';
+        this.modalidadFilter = 'TODAS';
+        this.cinturonFilter = 'TODAS';
+        this.pesoFilter = 'TODAS';
+        this.edadFilter = 'TODAS';
+        this.generoFilter = 'TODAS';
         this.applyFilters();
     }
 
@@ -368,12 +455,20 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                 p.academia.toLowerCase().includes(query) ||
                 (p.ciudad && p.ciudad.toLowerCase().includes(query));
 
-            const matchMod = this.modalidadFilter === 'TODAS' || p.modalidad === this.modalidadFilter;
+            // Use parsed meta-arrays for checking filter matches
+            const matchMod = this.modalidadFilter === 'TODAS' ||
+                (p.metaModalities && p.metaModalities.includes(this.modalidadFilter));
 
             // Only apply filters if they are visible/active for the modality
-            const matchCinturon = !this.filtersVisible.cinturon || this.cinturonFilter === 'TODAS' || p.cinturon === this.cinturonFilter;
-            const matchPeso = !this.filtersVisible.peso || this.pesoFilter === 'TODAS' || p.peso === this.pesoFilter;
-            const matchEdad = !this.filtersVisible.edad || this.edadFilter === 'TODAS' || p.edad === this.edadFilter;
+            const matchCinturon = !this.filtersVisible.cinturon || this.cinturonFilter === 'TODAS' ||
+                (p.metaBelts && p.metaBelts.includes(this.cinturonFilter));
+
+            const matchPeso = !this.filtersVisible.peso || this.pesoFilter === 'TODAS' ||
+                (p.metaWeights && p.metaWeights.includes(this.pesoFilter));
+
+            const matchEdad = !this.filtersVisible.edad || this.edadFilter === 'TODAS' ||
+                (p.metaAges && p.metaAges.includes(this.edadFilter));
+
             const matchGenero = !this.filtersVisible.genero || this.generoFilter === 'TODAS' || p.genero === this.generoFilter;
 
             return matchSearch && matchMod && matchCinturon && matchPeso && matchEdad && matchGenero;
