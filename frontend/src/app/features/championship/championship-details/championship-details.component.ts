@@ -203,7 +203,7 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                                 // Use searchUsers to get user info by ID
                                 // CRITICAL: Pass '0' as championshipId to avoid excluding users already inscribed in this championship!
                                 return new Promise<Juez | null>((resolve) => {
-                                    this.api.searchUsers(String(userId), '0', '0').subscribe({
+                                    this.api.searchUsers(String(userId), '0', '0',6).subscribe({
                                         next: (users: any[]) => {
                                             // The search might return multiple, find the exact match by ID
                                             const user = users.find(u => String(u.idDocumento) === String(userId));

@@ -108,7 +108,7 @@ public class Inscripciones {
         this.fechaInscripcion = fechaInscripcion;
     }
 
-    public Integer isEstado() {
+    public Integer getEstado() {
         return estado;
     }
 

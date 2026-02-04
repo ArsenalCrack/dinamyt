@@ -137,4 +137,28 @@ public class JsonCleaner {
         Matcher matcher = pattern.matcher(texto);
         return matcher.find() ? matcher.group(1) : "";
     }
+    
+    public static String obtenerPrimerPeso(String rawString) {
+    if (rawString == null || rawString.isEmpty() || rawString.equals("[]")) {
+        return "";
+    }
+
+    // Limpiamos igual que en embellecerModalidades
+    String limpio = rawString.replace("[", "")
+                             .replace("]", "")
+                             .replace("\"", "");
+
+    // Separamos modalidades
+    String[] modalidades = limpio.split(",");
+
+    for (String mod : modalidades) {
+        String peso = extraerValor(mod, "PESO");
+        if (!peso.isEmpty()) {
+            return peso; // ← primer peso encontrado
+        }
+    }
+
+    return ""; // No se encontró ningún peso
+}
+
 }

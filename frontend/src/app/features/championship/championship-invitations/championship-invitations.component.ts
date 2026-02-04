@@ -86,6 +86,15 @@ export class ChampionshipInvitationsComponent implements OnInit {
     }
   }
 
+  private mapEstado(estado: number): 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' {
+  switch (estado) {
+    case 2: return 'PENDIENTE';
+    case 3: return 'ACEPTADO';
+    case 4: return 'RECHAZADO';
+    default: return 'PENDIENTE';
+  }
+}
+
   loadInvitations(): void {
     if (!this.championshipId) return;
     this.loading = true;
@@ -96,15 +105,16 @@ export class ChampionshipInvitationsComponent implements OnInit {
       .subscribe({
         next: (data) => {
           if (data && Array.isArray(data)) {
+            console.log(data);
             this.invitations = data.map((item: any) => ({
-              id: item.id || item.id_invitacion,
-              documento: item.documento || item.documentoId || '0',
-              nombre: item.nombre_completo || item.nombre || 'Usuario',
+              id: item.id || item.idincripcion,
+              documento: item.idDocumentos || item.usuario || '0',
+              nombre: item.nombreC || item.nombre || 'Usuario',
               email: item.email || item.correo || '',
               avatar: item.avatar || '',
               rol: item.rol,
-              estado: item.estado || 'PENDIENTE',
-              tipo: item.id_tipo === 5 ? 'COMPETIDOR' : 'JUEZ', // Basic inference
+              estado: this.mapEstado(item.estado),
+              tipo: item.tipoUsuario === 5 ? 'COMPETIDOR' : 'JUEZ',
               fechaEnvio: item.fecha_envio || new Date().toISOString()
             }));
             this.applyFilters();
@@ -210,13 +220,21 @@ export class ChampionshipInvitationsComponent implements OnInit {
     this.scrollLock.unlock();
   }
 
+  private getTipoInscripcion(): number {
+    if (this.activeSection === 'COMPETIDOR') {
+      return 5;
+    }
+    // Para juez basta con enviar uno cualquiera (ej: 6)
+    return 6;
+  }
+
   searchUsers(): void {
     if (!this.inviteSearchQuery.trim()) {
       this.availableUsers = [];
       return;
     }
-
-    this.api.searchUsers(this.inviteSearchQuery, sessionStorage.getItem('idDocumento') || '', this.championshipId || '').subscribe({
+    const tipo = this.getTipoInscripcion();
+    this.api.searchUsers(this.inviteSearchQuery, sessionStorage.getItem('idDocumento') || '', this.championshipId || '',tipo).subscribe({
       next: (users) => {
         this.availableUsers = (users || [])
           .filter(u => (u.idDocumento || u.documento || u.id) != '0')

@@ -38,7 +38,7 @@ export class ApiService {
   setTempEmail(email: string) { this.user.setTempEmail(email); }
   updateProfile(data: any) { return this.user.updateProfile(data); }
   uploadProfilePhoto(file: File) { return this.user.uploadProfilePhoto(file); }
-  searchUsers(query: string, excluirId: string, idCampeonato: string) { return this.user.searchUsers(query, excluirId, idCampeonato); }
+  searchUsers(query: string, excluirId: string, idCampeonato: string,tipo: number) { return this.user.searchUsers(query, excluirId, idCampeonato,tipo); }
 
   // --- Academy Delegates ---
   cargaracademias() { return this.academy.cargaracademias(); }

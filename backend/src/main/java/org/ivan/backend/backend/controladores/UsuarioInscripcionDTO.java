@@ -5,6 +5,7 @@
 package org.ivan.backend.backend.controladores;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -26,13 +27,69 @@ public class UsuarioInscripcionDTO {
     private String academia;
     private List<String> secciones;
     private long idincripcion;
+    private String peso;
+    private String campeonato;
+    private LocalDate fecha_inicio;
+    private String ciudad_campeonato;
+    private String nombre_Creador;
+    private Integer tipoUsuario;
 
     // 🔴 ESTE ES EL ESTADO DE LA INSCRIPCIÓN
     private Integer estado;
 
     // 🔴 FECHA DE INSCRIPCIÓN
-    private java.time.LocalDateTime fechaInscripcion;
+    private LocalDateTime fechaInscripcion;
 
+    public Integer getTipoUsuario() {
+        return tipoUsuario;
+    }
+
+    public void setTipoUsuario(Integer tipoUsuario) {
+        this.tipoUsuario = tipoUsuario;
+    }
+
+    public String getCampeonato() {
+        return campeonato;
+    }
+
+    public void setCampeonato(String campeonato) {
+        this.campeonato = campeonato;
+    }
+
+    public LocalDate getFecha_inicio() {
+        return fecha_inicio;
+    }
+
+    public void setFecha_inicio(LocalDate fecha_inicio) {
+        this.fecha_inicio = fecha_inicio;
+    }
+
+    public String getCiudad_campeonato() {
+        return ciudad_campeonato;
+    }
+
+    public void setCiudad_campeonato(String ciudad_campeonato) {
+        this.ciudad_campeonato = ciudad_campeonato;
+    }
+
+    public String getNombre_Creador() {
+        return nombre_Creador;
+    }
+
+    public void setNombre_Creador(String nombre_Creador) {
+        this.nombre_Creador = nombre_Creador;
+    }
+
+    
+    public String getPeso() {
+        return peso;
+    }
+
+    public void setPeso(String peso) {
+        this.peso = peso;
+    }
+    
+    
     public java.time.LocalDateTime getFechaInscripcion() {
         return fechaInscripcion;
     }

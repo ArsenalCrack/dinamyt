@@ -53,9 +53,19 @@ export class MyInvitationsComponent implements OnInit {
     this.api.getMisInvitaciones(userId).subscribe({
       next: (data) => {
         this.invitations = data.map((i: any) => ({
-          ...i,
+          id_invitacion: i.idincripcion,
+          estado: i.estado,
+          id_tipo: i.tipoUsuario,
+
+          // 🔁 Mapeo de nombres del backend → frontend
+          nombre_campeonato: i.campeonato,
+          fecha_campeonato: i.fecha_inicio,
+          ciudad: i.ciudad_campeonato,
+          nombre_invitador: i.nombre_Creador,
+
+          // internos del componente
           estadoTexto: this.mapEstado(i.estado),
-          expanded: false // Default collapsed
+          expanded: false
         }));
 
         this.applyFilter();

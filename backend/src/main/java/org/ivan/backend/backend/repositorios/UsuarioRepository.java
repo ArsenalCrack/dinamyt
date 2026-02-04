@@ -20,25 +20,37 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
                         Long idInstructorExcluir);
 
         @Query("""
-                        SELECT u
-                        FROM Usuario u
-                        WHERE
-                          (LOWER(u.nombreC) LIKE LOWER(CONCAT('%', :nombre, '%')) OR CAST(u.idDocumento AS string) LIKE CONCAT('%', :nombre, '%'))
-                          AND u.estado = :estado
-                          AND u.idDocumento <> :idExcluir
-                          AND NOT EXISTS (
-                            SELECT i
-                            FROM Inscripciones i
-                            WHERE
-                              i.usuario = u.idDocumento
-                              AND i.campeonato = :idCampeonato
-                              AND i.estado IN (2, 3)
-                          )
-                        """)
+            SELECT u
+            FROM Usuario u
+            WHERE
+              (
+                LOWER(u.nombreC) LIKE LOWER(CONCAT('%', :nombre, '%'))
+                OR CAST(u.idDocumento AS string) LIKE CONCAT('%', :nombre, '%')
+              )
+              AND u.estado = :estado
+              AND u.idDocumento <> :idExcluir
+              AND NOT EXISTS (
+                SELECT 1
+                FROM Inscripciones i
+                WHERE
+                  i.usuario = u.idDocumento
+                  AND i.campeonato = :idCampeonato
+                  AND (
+                    (:tipo = 5 AND i.tipousuario = 5)
+                    OR
+                    (:tipo IN (6,7,8) AND i.tipousuario IN (6,7,8))
+                  )
+              )
+        """)
         List<Usuario> findUsuariosDisponiblesPorCampeonato(
-                        @Param("nombre") String nombre,
-                        @Param("estado") Integer estado,
-                        @Param("idExcluir") Long idExcluir,
-                        @Param("idCampeonato") Long idCampeonato);
+            @Param("nombre") String nombre,
+            @Param("estado") Integer estado,
+            @Param("idExcluir") Long idExcluir,
+            @Param("idCampeonato") Long idCampeonato,
+            @Param("tipo") Integer tipo
+        );
+
+
+
 
 }
