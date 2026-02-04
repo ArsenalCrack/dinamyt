@@ -49,10 +49,18 @@
                         <h3>{{ item.nombre }}</h3>
                         <div class="meta-row">
                             <span class="badge-belt">{{ item.cinturon }}</span>
-                            <span class="meta-text" *ngIf="item.peso !== 'SIN_PESO' && item.peso !== 'N/A'">{{ item.peso
+                            <span class="meta-text"
+                                *ngIf="(item.peso !== 'SIN_PESO' && item.peso !== 'N/A') && item.edad !== null">{{
+                                item.peso
                                 }} • {{ item.edad }} años</span>
-                            <span class="meta-text" *ngIf="item.peso === 'SIN_PESO' || item.peso === 'N/A'">{{ item.edad
+                            <span class="meta-text"
+                                *ngIf="(item.peso === 'SIN_PESO' || item.peso === 'N/A') && item.edad !== null">{{
+                                item.edad
                                 }} años</span>
+                            <span class="meta-text"
+                                *ngIf="(item.peso !== 'SIN_PESO' && item.peso !== 'N/A') && item.edad === null">{{
+                                item.peso
+                                }}</span>
                             <span class="meta-text"
                                 style="margin-left:8px; border-left: 1px solid #ddd; padding-left: 8px;">
                                 <i class="far fa-calendar-alt"></i> {{ item.fecha | date: "EEEE, d 'de' MMMM 'hora: '

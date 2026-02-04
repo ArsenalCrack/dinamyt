@@ -10,7 +10,7 @@ import { ApiService } from '../../../core/services/api.service';
 interface Inscripcion {
   id: number;
   nombre: string;
-  edad: number;
+  edad: number | null; // Allow null for age
   sexo: string;
   peso: string;
   documentoId: string;
@@ -80,8 +80,8 @@ export class ChampionshipInscriptionsComponent implements OnInit {
       this.applyFilters();
     }
   }
-  calcularEdad(fechaNacimiento: string): number {
-    if (!fechaNacimiento) return 0;
+  calcularEdad(fechaNacimiento: string): number | null {
+    if (!fechaNacimiento) return null;
     const birthDate = new Date(fechaNacimiento);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -130,7 +130,7 @@ export class ChampionshipInscriptionsComponent implements OnInit {
                 cinturon: item.cinturonRango || 'Blanco',
                 correo: item.correo || '',
                 telefono: item.numeroCelular || '',
-                edad: item.fechaNacimiento ? this.calcularEdad(item.fechaNacimiento) : 0,
+                edad: item.fechaNacimiento ? this.calcularEdad(item.fechaNacimiento) : null,
                 fecha: item.fechaInscripcion || new Date().toISOString(), // Add date mapping
 
                 estado: (() => {
@@ -288,10 +288,18 @@ export class ChampionshipInscriptionsComponent implements OnInit {
 
   cleanModality(mod: string): string {
     // Remove "- Peso: SIN_PESOkg" and variations
-    return mod.replace(/-\s*Peso:\s*SIN_PESO\s*kg/gi, '')
+    // Also remove "- Edad: NULL" or "Edad: NULL"
+    let cleaned = mod.replace(/-\s*Peso:\s*SIN_PESO\s*kg/gi, '')
       .replace(/Peso:\s*SIN_PESO\s*kg/gi, '')
       .replace(/-\s*Peso:\s*SIN_PESO/gi, '')
-      .trim();
+      .replace(/-\s*Edad:\s*NULL/gi, '')
+      .replace(/Edad:\s*NULL\s*-\s*/gi, '') // If it's in the middle or start with a dash after
+      .replace(/Edad:\s*NULL/gi, '');
+
+    // Cleanup potential double dashes or trailing dashes
+    cleaned = cleaned.replace(/\s*-\s*-\s*/g, ' - ').replace(/\s*-\s*$/, '').trim();
+
+    return cleaned;
   }
 
   // Delete / Remove functionality for Accepted

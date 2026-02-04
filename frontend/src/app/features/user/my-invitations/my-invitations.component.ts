@@ -54,7 +54,8 @@ export class MyInvitationsComponent implements OnInit {
       next: (data) => {
         this.invitations = data.map((i: any) => ({
           ...i,
-          estadoTexto: this.mapEstado(i.estado)
+          estadoTexto: this.mapEstado(i.estado),
+          expanded: false // Default collapsed
         }));
 
         this.applyFilter();
@@ -77,6 +78,11 @@ export class MyInvitationsComponent implements OnInit {
       this.invitations.filter(i => i.estadoTexto === this.activeTab);
   }
 
+
+
+  toggleExpanded(item: any): void {
+    item.expanded = !item.expanded;
+  }
 
   goBack(): void {
     this.backNav.backOr({ fallbackUrl: '/dashboard' });
@@ -149,9 +155,10 @@ export class MyInvitationsComponent implements OnInit {
   }
 
   updateLocalStatus(id: number, newStatus: string): void {
-    const item = this.invitations.find(i => i.id === id);
+    const item = this.invitations.find(i => i.id_invitacion === id);
     if (item) {
-      item.estado = newStatus;
+      item.estado = (newStatus === 'ACEPTADO' ? 3 : (newStatus === 'RECHAZADO' ? 4 : item.estado));
+      item.estadoTexto = newStatus;
       this.applyFilter();
     }
   }
