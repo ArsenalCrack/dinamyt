@@ -38,6 +38,7 @@ public class controlador_principal {
     private final CampeonatoRepository campeonatoRepository;
     private final InscripcionRepository inscripcionRepository;
     private final Map<String, Usuario> usuariosPendientes = new HashMap<>();
+    private final Map<String, Campeonato> campeonatoenvivo = new HashMap<>();
 
     private controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository,
             CampeonatoRepository campeonatoRepository, InscripcionRepository inscripcionRepository) {
@@ -763,5 +764,30 @@ public class controlador_principal {
             resultado.add(dto);
         }
         return ResponseEntity.ok(resultado);
+    }
+    
+    @PutMapping("/inscripciones/{id}")
+    private ResponseEntity<?> actualizarestadoinscripcion(@PathVariable Integer id,@RequestBody Map<String, Integer> estado){
+        Inscripciones ins =inscripcionRepository.findById(id).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        Campeonato cam =campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString())).orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
+        ins.setEstado(estado.get("estado"));
+        inscripcionRepository.save(ins);
+        System.out.println(estado.get("estado"));
+        if (estado.get("estado")==3) {
+            cam.setParticipantes(cam.getParticipantes()+1);
+        }else{
+            if (cam.getParticipantes()>0) {   
+                cam.setParticipantes(cam.getParticipantes()-1);
+            }                       
+        }
+        campeonatoRepository.save(cam);
+        return ResponseEntity.ok(ins);
+    }
+
+    @GetMapping("/campeonatos/{id}/live-management")
+    private ResponseEntity<?> panelcampeonato(@PathVariable Integer id){
+        Campeonato cam =campeonatoRepository.findById(id).orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
+        campeonatoenvivo.put(cam.getIdCampeonato().toString(),cam);
+        return ResponseEntity.ok(cam);
     }
 }

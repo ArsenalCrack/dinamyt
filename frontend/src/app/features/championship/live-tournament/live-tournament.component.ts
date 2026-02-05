@@ -85,7 +85,7 @@ export class LiveTournamentComponent implements OnInit {
           // For now, I'll log and use fallback if empty.
           console.log('Live Data:', data);
           if (data && data.tatamis) {
-            this.tatamis = data.tatamis;
+            this.tatamis = data.numTatamis;
             this.sectionsQueue = data.queue || [];
             this.finishedSections = data.finished || [];
             this.totalSections = this.sectionsQueue.length + this.finishedSections.length +

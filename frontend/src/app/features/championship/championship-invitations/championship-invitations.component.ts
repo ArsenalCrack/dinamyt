@@ -108,7 +108,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
             console.log(data);
             this.invitations = data.map((item: any) => ({
               id: item.id || item.idincripcion,
-              documento: item.idDocumentos || item.usuario || '0',
+              documento: item.idDocumento || item.usuario || '0',
               nombre: item.nombreC || item.nombre || 'Usuario',
               email: item.email || item.correo || '',
               avatar: item.avatar || '',
