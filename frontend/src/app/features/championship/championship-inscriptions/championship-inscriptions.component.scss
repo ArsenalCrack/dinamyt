@@ -664,8 +664,8 @@
     }
 
     .page-card {
-        padding: 2rem;
-        /* Ensure 2rem padding on card as requested previously */
+        padding: 1rem;
+        /* Reduced padding for more space on mobile */
     }
 
     .header {
@@ -720,6 +720,11 @@
             }
         }
 
+        .card-details {
+            padding: 0;
+            /* Allow children to control padding to avoid double spacing */
+        }
+
         .details-grid {
             grid-template-columns: 1fr;
             gap: 1.2rem;
@@ -748,7 +753,18 @@
                 padding: 16px;
                 /* Fat finger friendly */
                 font-size: 1rem;
+                white-space: normal;
+                height: auto;
+                min-height: 54px;
+                /* Minimum touch target */
+                line-height: 1.2;
             }
+        }
+
+        .status-message {
+            margin: 1rem;
+            width: auto;
+            /* Ensure it stays within bounds */
         }
 
         .modality-tag {

@@ -9,6 +9,7 @@ import { BackNavigationService } from '../../../core/services/back-navigation.se
 import { NavigationHistoryService } from '../../../core/services/navigation-history.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../../../core/services/auth.service';
 
 interface Participante {
     id: number;
@@ -128,14 +129,118 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     totalPages: number = 1;
     paginatedParticipantes: Participante[] = [];
 
+    // Modals state
+    showLoginModal = false;
+    showAccessCodeModal = false;
+    accessCode = '';
+    accessCodeError: string | null = null;
+    accessCodeSubmitting = false;
+
     constructor(
         private route: ActivatedRoute,
         private api: ApiService,
+        private auth: AuthService,
         private router: Router,
         private backNav: BackNavigationService,
         private navHistory: NavigationHistoryService,
         private scrollLock: ScrollLockService
     ) { }
+
+    // ... (ngOnInit and loadData remain similar, just ensuring Imports are there)
+
+    isOwner(): boolean {
+        if (!this.campeonato || !this.currentUserId) return false;
+        return String(this.campeonato.creadoPor) === String(this.currentUserId);
+    }
+
+    get canRegister(): boolean {
+        if (!this.campeonato) return false;
+        if (this.isOwner()) return false;
+        return (this.campeonato.estadoReal === 'PLANIFICADO') && !!this.campeonato.puedeInscribirse;
+    }
+
+    registerChampionship(): void {
+        const id = this.campeonato?.id || this.campeonato?.idCampeonato;
+        if (!id) return;
+
+        // 1. Check Auth
+        if (!this.auth.isLoggedIn()) {
+            this.showLoginModal = true;
+            this.scrollLock.lock();
+            return;
+        }
+
+        // 2. Check Private
+        if (!this.campeonato.esPublico) {
+            this.showAccessCodeModal = true;
+            this.accessCode = '';
+            this.accessCodeError = null;
+            this.accessCodeSubmitting = false;
+            this.scrollLock.lock();
+            return;
+        }
+
+        // 3. Register (Navigate to inscription form)
+        this.router.navigate(['/campeonato/register', id]);
+    }
+
+    // Login Modal Actions
+    closeLoginModal(): void {
+        this.showLoginModal = false;
+        this.scrollLock.unlock();
+    }
+
+    goToLogin(): void {
+        this.closeLoginModal();
+        const id = this.campeonato?.id || this.campeonato?.idCampeonato;
+        // Redirect back here or to explore with params? 
+        // User wants "all functions". Explore redirects with ?autoRegister.
+        // We can do the same but pointing to this page logic if we reload, 
+        // or just let them login and they have to come back.
+        // Better:
+        this.auth.redirectUrl = this.router.url; // Come back to details
+        this.router.navigate(['/login']);
+    }
+
+    // Access Code Modal Actions
+    closeAccessCodeModal(): void {
+        this.showAccessCodeModal = false;
+        this.accessCode = '';
+        this.scrollLock.unlock();
+    }
+
+    onAccessCodeChange(value: string): void {
+        let clean = value.replace(/[^0-9]/g, '');
+        if (clean.length > 6) clean = clean.substring(0, 6);
+        this.accessCode = clean;
+    }
+
+    submitAccessCode(): void {
+        const id = this.campeonato?.id || this.campeonato?.idCampeonato;
+        const code = (this.accessCode || '').trim();
+
+        if (!id) return;
+        if (!code) {
+            this.accessCodeError = 'El código es obligatorio.';
+            return;
+        }
+
+        this.accessCodeSubmitting = true;
+        this.accessCodeError = null;
+
+        this.api.validarCodigoCampeonato(id, code).subscribe({
+            next: () => {
+                this.accessCodeSubmitting = false;
+                this.closeAccessCodeModal();
+                this.router.navigate(['/campeonato/register', id], { queryParams: { code: code } });
+            },
+            error: (err) => {
+                this.accessCodeSubmitting = false;
+                const msg = err?.error?.message || err?.error?.mensaje;
+                this.accessCodeError = msg || 'Código inválido. Intenta de nuevo.';
+            }
+        });
+    }
 
     ngOnInit(): void {
         this.currentUserId = sessionStorage.getItem('idDocumento');
@@ -203,7 +308,7 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                                 // Use searchUsers to get user info by ID
                                 // CRITICAL: Pass '0' as championshipId to avoid excluding users already inscribed in this championship!
                                 return new Promise<Juez | null>((resolve) => {
-                                    this.api.searchUsers(String(userId), '0', '0',6).subscribe({
+                                    this.api.searchUsers(String(userId), '0', '0', 6).subscribe({
                                         next: (users: any[]) => {
                                             // The search might return multiple, find the exact match by ID
                                             const user = users.find(u => String(u.idDocumento) === String(userId));
@@ -613,10 +718,7 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
         return 'ACTIVO';
     }
 
-    isOwner(): boolean {
-        if (!this.campeonato || !this.currentUserId) return false;
-        return String(this.campeonato.creadoPor) === String(this.currentUserId);
-    }
+
 
     copyCode(): void {
         const codeToCopy = this.campeonato?.Codigo || this.campeonato?.codigo;

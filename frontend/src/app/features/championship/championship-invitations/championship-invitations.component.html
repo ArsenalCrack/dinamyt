@@ -78,7 +78,7 @@
                         </div>
 
                         <div class="date-info">
-                            Enviada: {{ item.fechaEnvio }}
+                            Enviada: {{ item.fechaEnvio | date: "EEEE, d 'de' MMMM 'hora: ' h:mm a" | titlecase }}
                         </div>
                     </div>
                 </div>

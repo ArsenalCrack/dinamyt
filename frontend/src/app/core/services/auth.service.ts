@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, of } from 'rxjs';
+import { Router } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 @Injectable({
@@ -21,8 +22,48 @@ export class AuthService {
 
   public redirectUrl: string | null = null;
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private router: Router) {
     this.checkLoginStatus();
+    // Listen for storage changes to sync across tabs
+    window.addEventListener('storage', (event) => {
+      if (event.key === 'usuario' || event.key === 'token') {
+        this.validateSessionConsistency();
+      }
+    });
+  }
+
+  private validateSessionConsistency() {
+    const storedUserStr = localStorage.getItem('usuario');
+    const sessionEmail = sessionStorage.getItem('correo');
+
+    // If I think I'm logged in (have session email)
+    if (sessionEmail) {
+      if (!storedUserStr) {
+        // localStorage cleared elsewhere -> Logout here too
+        this.forceLogout();
+        return;
+      }
+
+      try {
+        const storedUser = JSON.parse(storedUserStr);
+        const storageEmail = storedUser.usuario?.correo || storedUser.correo || storedUser.email;
+
+        // If the user in localStorage is different from my session user -> Conflict -> Logout
+        if (storageEmail && storageEmail !== sessionEmail) {
+          this.forceLogout();
+        }
+      } catch (e) {
+        // Corrupt storage -> safety logout
+        this.forceLogout();
+      }
+    }
+  }
+
+  forceLogout() {
+    sessionStorage.clear();
+    // Don't clear localStorage as it might be valid for the OTHER tab
+    this.setLoggedIn(false, null);
+    this.router.navigate(['/login']);
   }
 
   // --- API Methods ---
@@ -102,7 +143,20 @@ export class AuthService {
           const parsed = JSON.parse(storedUser);
           const user = parsed.usuario || parsed;
           this.usernameSubject.next(user.nombreC || user.nombre || user.correo);
-          // Roles would need to be extracted or passed, for now empty
+
+          // Also check consistency immediately on load/refresh
+          const sessionEmail = sessionStorage.getItem('correo');
+          const storageEmail = user.correo || user.email;
+
+          if (sessionEmail && storageEmail && sessionEmail !== storageEmail) {
+            // We have a stored user that doesn't match our session. 
+            // Trust session (token) but warn/clear if critical?
+            // Actually, if we refresh and they differ, we are in the mixed state.
+            // Best to force logout to be safe.
+            this.forceLogout();
+            return;
+          }
+
         } catch (e) { }
       }
     } else {

@@ -38,7 +38,7 @@ export class ApiService {
   setTempEmail(email: string) { this.user.setTempEmail(email); }
   updateProfile(data: any) { return this.user.updateProfile(data); }
   uploadProfilePhoto(file: File) { return this.user.uploadProfilePhoto(file); }
-  searchUsers(query: string, excluirId: string, idCampeonato: string,tipo: number) { return this.user.searchUsers(query, excluirId, idCampeonato,tipo); }
+  searchUsers(query: string, excluirId: string, idCampeonato: string, tipo: number) { return this.user.searchUsers(query, excluirId, idCampeonato, tipo); }
 
   // --- Academy Delegates ---
   cargaracademias() { return this.academy.cargaracademias(); }
@@ -69,6 +69,7 @@ export class ApiService {
   eliminarInscripcion(inscriptionId: string | number) { return this.championship.eliminarInscripcion(inscriptionId); }
   getMisInvitaciones(userId: string | number) { return this.championship.getMisInvitaciones(userId); }
   responderInvitacion(invitationId: string | number, estado: string) { return this.championship.responderInvitacion(invitationId, estado); }
+  deleteInvitation(invitationId: string | number) { return this.championship.deleteInvitation(invitationId); }
   enviarInvitacion(payload: any) { return this.championship.enviarInvitacion(payload); }
   getLiveManagement(id: string | number) { return this.championship.getLiveManagement(id); }
   getInscriptionsByChampionship(id: string | number) { return this.championship.getInscriptionsByChampionship(id); }

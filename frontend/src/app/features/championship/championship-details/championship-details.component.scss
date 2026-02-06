@@ -1449,14 +1449,36 @@
     }
 }
 
+/* Tabs Wrapper */
+.tabs-actions-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    margin-bottom: 2.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+    /* Allow wrapping on small screens */
+
+    .details-tabs {
+        flex: 1;
+        border-bottom: none;
+        /* Remove border from nav since wrapper has it */
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .action-container {
+        padding-bottom: 0.5rem;
+        /* Align with tabs visually */
+    }
+}
+
 /* Tabs Navigation */
 .details-tabs {
     display: flex;
     gap: 2.5rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    margin-bottom: 2.5rem;
     overflow-x: auto;
-    padding-bottom: 0;
 
     /* Scrollbar hide */
     -ms-overflow-style: none;
@@ -1521,6 +1543,38 @@
             &::after {
                 transform: scaleX(1);
             }
+        }
+    }
+
+    /* Register Button in Tabs */
+    .btn-register-action {
+        margin-left: auto;
+        background: var(--color-acento);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        height: fit-content;
+        align-self: center;
+        white-space: nowrap;
+        font-size: 0.95rem;
+        box-shadow: 0 4px 12px rgba(214, 0, 0, 0.15);
+
+        i {
+            font-size: 1.1rem;
+        }
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(214, 0, 0, 0.25);
+            background: #b50000;
+            /* Fallback for acento-hover if var missing */
         }
     }
 }
@@ -1637,6 +1691,33 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+    .tabs-actions-wrapper {
+        flex-direction: column-reverse;
+        /* Button creates visual top stack */
+        align-items: stretch;
+        gap: 1.5rem;
+        border-bottom: none;
+        /* Border handled by tabs themselves in mobile */
+        margin-bottom: 2rem;
+
+        .action-container {
+            padding-bottom: 0;
+
+            .btn-register-action {
+                width: 100%;
+                justify-content: center;
+                margin: 0;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+        }
+
+        .details-tabs {
+            border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+            /* Add border back to tabs for mobile scroll */
+        }
+    }
+
     .details-tabs {
         gap: 0;
         justify-content: space-between;
@@ -1793,5 +1874,196 @@
         font-size: 0.9rem;
         font-weight: 600;
         color: var(--color-texto);
+    }
+}
+
+/* --- Added Styles for Modal & Register Button --- */
+
+.btn-register-action {
+    background: var(--color-acento);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.6rem;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    font-size: 1rem;
+    box-shadow: 0 4px 12px rgba(214, 0, 0, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+
+    i {
+        font-size: 1.1rem;
+    }
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(214, 0, 0, 0.3);
+        background: #b00000;
+    }
+}
+
+/* Modal styles from Explore Championships */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    /* Slightly darker */
+    backdrop-filter: blur(4px);
+    z-index: 2500;
+}
+
+.modal-box {
+    background: #fff;
+    padding: 2rem;
+    border-radius: 20px;
+    min-width: 320px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalPop {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-body {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    justify-content: center;
+    width: 100%;
+
+    .modal-icon {
+        font-size: 2.5rem;
+        color: var(--color-acento);
+        flex-shrink: 0;
+    }
+
+    .modal-text {
+        font-size: 1.1rem;
+        color: var(--color-principal);
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        line-height: 1.4;
+        text-align: left;
+    }
+}
+
+.modal-close {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    background: transparent;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+
+    &:hover {
+        background: #f0f0f0;
+        color: var(--color-principal);
+    }
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    width: 100%;
+    margin-top: 0.5rem;
+
+    button {
+        flex: 1;
+        padding: 0.9rem;
+        border: none;
+        border-radius: 12px;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .modal-action-primary {
+        background: var(--color-acento);
+        color: #fff;
+
+        &:hover {
+            background: #b00000;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(214, 0, 0, 0.25);
+        }
+    }
+
+    .modal-action-secondary {
+        background: var(--color-principal);
+        color: #fff;
+
+        &:hover {
+            background: #333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+    }
+}
+
+/* Modal form adjustments */
+.modal-form {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.modal-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+    color: var(--color-principal);
+}
+
+.modal-input {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid var(--color-borde);
+    border-radius: 10px;
+    font-size: 1.2rem;
+    text-align: center;
+    letter-spacing: 2px;
+    font-weight: 700;
+
+    &:focus {
+        border-color: var(--color-acento);
+        outline: none;
     }
 }

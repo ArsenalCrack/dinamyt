@@ -122,18 +122,63 @@
 
         .user-main-info {
             flex: 1;
+            min-width: 0;
+            /* Critical for text truncation/wrapping in flex container */
+            padding-right: 1rem;
 
-            h3 {
-                margin: 0 0 0.25rem 0;
-                font-size: 1.1rem;
-                color: var(--color-principal);
+            .championship-row {
+                margin-bottom: 0.8rem;
+                display: flex;
+                flex-direction: column;
+                /* Stack label and name for better hierarchy */
+                align-items: flex-start;
+                gap: 0.2rem;
+
+                .label-gray {
+                    color: #999;
+                    font-size: 0.7rem;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
+
+                .championship-name {
+                    font-size: 1.25rem;
+                    font-weight: 800;
+                    color: var(--color-principal);
+                    line-height: 1.2;
+                    word-wrap: break-word;
+                    /* Ensure different browsers handle it */
+                    overflow-wrap: break-word;
+                    width: 100%;
+                }
             }
 
             .meta-row {
                 display: flex;
                 align-items: center;
-                gap: 0.8rem;
+                gap: 0.5rem;
                 flex-wrap: wrap;
+                margin-bottom: 1rem;
+
+                .meta-text {
+                    color: #666;
+                    font-size: 0.9rem;
+                    line-height: 1.5;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    /* Ensure text wraps nicely */
+                    white-space: normal;
+                    overflow-wrap: break-word;
+                    word-break: break-word;
+
+                    i {
+                        color: var(--color-acento);
+                        font-size: 1rem;
+                        flex-shrink: 0;
+                    }
+                }
             }
 
             .badge-belt {
@@ -147,8 +192,31 @@
             }
 
             .meta-text {
-                font-size: 0.85rem;
                 color: #777;
+            }
+
+            .btn-small-action {
+                padding: 0.6rem 1.2rem;
+                background-color: var(--color-acento);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 0.85rem;
+                font-weight: 700;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                transition: transform 0.2s, box-shadow 0.2s;
+
+                i {
+                    font-size: 0.9rem;
+                }
+
+                &:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(214, 0, 0, 0.2);
+                }
             }
         }
 
@@ -416,8 +484,30 @@
             display: block;
         }
 
+        .championship-row {
+            margin-bottom: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+
+            .label-gray {
+                color: #888;
+                font-size: 0.85rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .championship-name {
+                font-size: 1.1rem;
+                font-weight: 800;
+                color: var(--color-principal);
+            }
+        }
+
         h3 {
-            margin: 0;
+            margin-bottom: 0.8rem;
             color: var(--color-principal);
             font-size: 1.4rem;
             font-weight: 700;
@@ -497,6 +587,11 @@
             flex-direction: column;
             gap: 0.4rem;
 
+            span {
+                display: block;
+                font-size: 0.75rem;
+            }
+
             i {
                 margin: 0;
             }
@@ -520,10 +615,74 @@
         button {
             width: 100%;
             max-width: none;
+            font-size: 0.95rem;
+            /* Ensure readable button text */
+            padding: 0.9rem;
+            /* Touch-friendly target */
         }
     }
 
     .header .btn-back {
         display: none;
+    }
+
+    /* Mobile adjustments for invitation card */
+    .inscription-card {
+        .card-summary {
+            padding: 1rem;
+            align-items: flex-start;
+            /* Stack text better */
+            gap: 0.8rem;
+
+            .user-avatar {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+                margin-top: 0.2rem;
+            }
+
+            .user-main-info {
+                padding-right: 0;
+
+                .championship-row {
+                    .championship-name {
+                        font-size: 1.1rem;
+                        /* Slightly smaller on mobile */
+                    }
+
+                    .label-gray {
+                        font-size: 0.65rem;
+                    }
+                }
+
+                .meta-row {
+                    .meta-text {
+                        font-size: 0.85rem;
+                    }
+                }
+
+                .btn-small-action {
+                    width: 100%;
+                    justify-content: center;
+                    padding: 0.7rem;
+                    margin-top: 0.5rem;
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 480px) {
+    .inscription-card .card-summary {
+        .user-avatar {
+            display: none;
+            /* Hide avatar on very small screens to save space */
+        }
+
+        .user-main-info {
+            .championship-row .championship-name {
+                font-size: 1rem;
+            }
+        }
     }
 }

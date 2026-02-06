@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
@@ -27,7 +27,8 @@ export class MyInvitationsComponent implements OnInit {
   constructor(
     private api: ApiService,
     private backNav: BackNavigationService,
-    privatelocation: Location
+    private location: Location,
+    private router: Router
   ) { }
 
   ngOnInit(): void {
@@ -52,6 +53,12 @@ export class MyInvitationsComponent implements OnInit {
     this.loading = true;
     this.api.getMisInvitaciones(userId).subscribe({
       next: (data) => {
+        // Detailed Debug for ID issue
+        if (data && data.length > 0) {
+          console.log('Sample Raw Invitation Keys:', Object.keys(data[0]));
+          console.log('Sample Raw Invitation Values:', JSON.stringify(data[0]));
+        }
+
         this.invitations = data.map((i: any) => ({
           id_invitacion: i.idincripcion,
           estado: i.estado,
@@ -59,8 +66,17 @@ export class MyInvitationsComponent implements OnInit {
 
           // 🔁 Mapeo de nombres del backend → frontend
           nombre_campeonato: i.campeonato,
-          fecha_campeonato: i.fecha_inicio,
+          // Handle various possible backend naming conventions for ids
+          // We try extensive mapping because the field name is uncertain
+          id_campeonato: i.id_campeonato || i.idCampeonato || i.IdCampeonato || i.campeonato_id || i.campeonatoId,
+
+          // Championship details (if needed)
           ciudad: i.ciudad_campeonato,
+
+          // Invitation Date details (User requested fecha_inscripcion)
+          // We include fecha_envio as likely candidate from other endpoints
+          fecha_invitacion: i.fecha_inscripcion || i.fechaInscripcion || i.fecha_envio || i.fecha_registro || i.fecha_creacion,
+
           nombre_invitador: i.nombre_Creador,
 
           // internos del componente
@@ -96,6 +112,20 @@ export class MyInvitationsComponent implements OnInit {
 
   goBack(): void {
     this.backNav.backOr({ fallbackUrl: '/dashboard' });
+  }
+
+  viewDetails(item: any): void {
+    if (!item.id_campeonato) {
+      console.warn('Cannot view details: Championship ID missing. Available keys:', Object.keys(item));
+      return;
+    }
+
+    // Rol 5 = Competidor
+    if (item.id_tipo === 5) {
+      this.router.navigate(['/campeonato/register', item.id_campeonato]);
+    } else {
+      this.router.navigate(['/campeonato/details', item.id_campeonato]);
+    }
   }
 
   // Actions

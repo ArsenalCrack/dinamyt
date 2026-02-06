@@ -87,13 +87,13 @@ export class ChampionshipInvitationsComponent implements OnInit {
   }
 
   private mapEstado(estado: number): 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' {
-  switch (estado) {
-    case 2: return 'PENDIENTE';
-    case 3: return 'ACEPTADO';
-    case 4: return 'RECHAZADO';
-    default: return 'PENDIENTE';
+    switch (estado) {
+      case 2: return 'PENDIENTE';
+      case 3: return 'ACEPTADO';
+      case 4: return 'RECHAZADO';
+      default: return 'PENDIENTE';
+    }
   }
-}
 
   loadInvitations(): void {
     if (!this.championshipId) return;
@@ -115,7 +115,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
               rol: item.rol,
               estado: this.mapEstado(item.estado),
               tipo: item.tipoUsuario === 5 ? 'COMPETIDOR' : 'JUEZ',
-              fechaEnvio: item.fecha_envio || new Date().toISOString()
+              fechaEnvio: item.fechaInscripcion || item.fecha_inscripcion || item.fecha || item.fechaEnvio || item.fecha_envio || new Date().toISOString()
             }));
             this.applyFilters();
           } else {
@@ -234,7 +234,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
       return;
     }
     const tipo = this.getTipoInscripcion();
-    this.api.searchUsers(this.inviteSearchQuery, sessionStorage.getItem('idDocumento') || '', this.championshipId || '',tipo).subscribe({
+    this.api.searchUsers(this.inviteSearchQuery, sessionStorage.getItem('idDocumento') || '', this.championshipId || '', tipo).subscribe({
       next: (users) => {
         this.availableUsers = (users || [])
           .filter(u => (u.idDocumento || u.documento || u.id) != '0')
@@ -331,17 +331,28 @@ export class ChampionshipInvitationsComponent implements OnInit {
 
   finalizeCancel(): void {
     if (this.cancelTargetId) {
-      // Remove from list
-      this.invitations = this.invitations.filter(i => i.id !== this.cancelTargetId);
+      this.api.deleteInvitation(this.cancelTargetId).subscribe({
+        next: () => {
+          // Remove from list
+          this.invitations = this.invitations.filter(i => i.id !== this.cancelTargetId);
 
-      const msg = this.activeTab === 'PENDIENTE'
-        ? 'Invitación cancelada correctamente.'
-        : 'Usuario eliminado de la lista de invitaciones.';
+          const msg = this.activeTab === 'PENDIENTE'
+            ? 'Invitación cancelada correctamente.'
+            : 'Usuario eliminado de la lista de invitaciones.';
 
-      this.showToast(msg);
-      this.applyFilters();
+          this.showToast(msg);
+          this.applyFilters();
+          this.closeCancelModal();
+        },
+        error: (err) => {
+          console.error('Error deleting invitation', err);
+          this.showToast('Error al cancelar la invitación: ' + (err.error?.message || 'Error desconocido'), true);
+          this.closeCancelModal();
+        }
+      });
+    } else {
+      this.closeCancelModal();
     }
-    this.closeCancelModal();
   }
 
   showToast(msg: string, isError: boolean = false): void {

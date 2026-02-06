@@ -50,21 +50,30 @@
         <div *ngIf="!loading && campeonato" class="content">
 
             <!-- Navbar Tabs -->
-            <nav class="details-tabs">
-                <button class="tab-btn" [class.active]="activeTab === 'info'" (click)="setActiveTab('info')">
-                    <i class="fas fa-info-circle"></i>
-                    <span>Información</span>
-                </button>
-                <button class="tab-btn" [class.active]="activeTab === 'participants'"
-                    (click)="setActiveTab('participants')">
-                    <i class="fas fa-users"></i>
-                    <span>Inscritos</span>
-                </button>
-                <button class="tab-btn" [class.active]="activeTab === 'results'" (click)="setActiveTab('results')">
-                    <i class="fas fa-trophy"></i>
-                    <span>Resultados</span>
-                </button>
-            </nav>
+            <!-- Navbar Tabs & Action Wrapper -->
+            <div class="tabs-actions-wrapper">
+                <nav class="details-tabs">
+                    <button class="tab-btn" [class.active]="activeTab === 'info'" (click)="setActiveTab('info')">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Información</span>
+                    </button>
+                    <button class="tab-btn" [class.active]="activeTab === 'participants'"
+                        (click)="setActiveTab('participants')">
+                        <i class="fas fa-users"></i>
+                        <span>Inscritos</span>
+                    </button>
+                    <button class="tab-btn" [class.active]="activeTab === 'results'" (click)="setActiveTab('results')">
+                        <i class="fas fa-trophy"></i>
+                        <span>Resultados</span>
+                    </button>
+                </nav>
+
+                <div class="action-container" *ngIf="canRegister">
+                    <button class="btn-register-action" (click)="registerChampionship()">
+                        <i class="fas fa-check-circle"></i> Inscribirse
+                    </button>
+                </div>
+            </div>
 
             <div class="tab-content">
 
@@ -397,4 +406,59 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal para solicitar login -->
+    <div *ngIf="showLoginModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-body">
+                <i class="fas fa-lock modal-icon"></i>
+                <div class="modal-text">Debes iniciar sesión para inscribirte en un campeonato</div>
+            </div>
+            <button class="modal-close" (click)="closeLoginModal()" aria-label="Cerrar">✕</button>
+            <div class="modal-actions">
+                <button class="modal-action-primary" (click)="goToLogin()">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Iniciar Sesión
+                </button>
+                <button class="modal-action-secondary" (click)="closeLoginModal()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para código de acceso (campeonatos privados) -->
+    <div *ngIf="showAccessCodeModal" class="modal-overlay">
+        <div class="modal-box" role="dialog" aria-modal="true" aria-label="Ingresar código de acceso">
+            <div class="modal-body">
+                <i class="fas fa-lock modal-icon" aria-hidden="true"></i>
+                <div class="modal-text">
+                    Este campeonato es privado. Ingresa el código para continuar tu inscripción.
+                </div>
+            </div>
+            <button class="modal-close" (click)="closeAccessCodeModal()" aria-label="Cerrar">✕</button>
+
+            <div class="modal-form">
+                <label class="modal-label" for="access-code">Código</label>
+                <input id="access-code" class="modal-input" type="text" autocomplete="off" placeholder="Ej: 000000"
+                    [ngModel]="accessCode" (ngModelChange)="onAccessCodeChange($event)" maxlength="6"
+                    [disabled]="accessCodeSubmitting" inputmode="numeric"
+                    style="width: 100%; padding: 1rem; border: 2px solid var(--color-borde); border-radius: 10px; font-size: 1.2rem; text-align: center; letter-spacing: 2px; font-weight: 700;">
+                <div *ngIf="accessCodeError" class="modal-error"
+                    style="color: #e74c3c; margin-top: 0.5rem; font-size: 0.9rem; font-weight: 600;">{{
+                    accessCodeError }}</div>
+            </div>
+
+            <div class="modal-actions" style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="modal-action-primary" (click)="submitAccessCode()" [disabled]="accessCodeSubmitting"
+                    style="background: var(--color-acento); color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 10px; font-weight: 700; cursor: pointer; flex: 1;">
+                    <i class="fas" [ngClass]="accessCodeSubmitting ? 'fa-spinner fa-spin' : 'fa-check'"
+                        aria-hidden="true"></i>
+                    Validar código
+                </button>
+                <button class="modal-action-secondary" (click)="closeAccessCodeModal()"
+                    [disabled]="accessCodeSubmitting"
+                    style="background: #f0f0f0; color: #555; border: none; padding: 0.8rem 1.5rem; border-radius: 10px; font-weight: 700; cursor: pointer; flex: 1;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
 </div>

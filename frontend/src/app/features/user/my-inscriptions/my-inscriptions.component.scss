@@ -428,6 +428,11 @@
             flex-direction: column;
             gap: 0.4rem;
 
+            span {
+                display: block;
+                font-size: 0.75rem;
+            }
+
             i {
                 margin: 0;
             }

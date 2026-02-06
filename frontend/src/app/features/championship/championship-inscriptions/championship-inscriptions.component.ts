@@ -268,13 +268,12 @@ export class ChampionshipInscriptionsComponent implements OnInit {
       // Use updateInscriptionState(4) for REJECT status
       this.api.gestionarInscripcionCampeonato(this.rejectTargetId, 4).subscribe({
         next: () => {
-          // Update local state to rejected so it moves tabs
-          const item = this.inscriptions.find(i => i.id === this.rejectTargetId);
-          if (item) item.estado = 'RECHAZADO';
-
           this.showToast(`Inscripción rechazada.`);
-          this.applyFilters();
-          this.loading = false;
+          // Reload from server to ensure fresh state and clear update
+          this.loadInscriptions();
+          // Modal closing and loading=false is handled by loadInscriptions logic or we reset here?
+          // loadInscriptions sets loading=true then false.
+          // But we need to close modal now.
         },
         error: (err) => {
           console.error(err);
@@ -318,12 +317,12 @@ export class ChampionshipInscriptionsComponent implements OnInit {
   finalizeDelete(): void {
     if (this.deleteTargetId) {
       this.loading = true;
-      this.api.eliminarInscripcion(this.deleteTargetId).subscribe({
+      // User requested that "Eliminar" also sets state to 4 (Rejected)
+      this.api.gestionarInscripcionCampeonato(this.deleteTargetId, 4).subscribe({
         next: () => {
-          this.inscriptions = this.inscriptions.filter(i => i.id !== this.deleteTargetId);
-          this.showToast('Competidor eliminado.');
-          this.applyFilters();
-          this.loading = false;
+          this.showToast('Competidor eliminado (enviado a rechazados).');
+          this.loadInscriptions();
+          // Modal close handled below, loading handled by loadInscriptions
         },
         error: (err) => {
           console.error(err);

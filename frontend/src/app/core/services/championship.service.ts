@@ -69,6 +69,10 @@ export class ChampionshipService {
         return this.http.put(`${this.apiUrl}/invitaciones/${invitationId}`, { estado });
     }
 
+    deleteInvitation(invitationId: string | number): Observable<any> {
+        return this.http.delete(`${this.apiUrl}/invitaciones/${invitationId}`);
+    }
+
     // TODO: Endpoint no implementado en backend
     enviarInvitacion(payload: { id_usuario: string, id_campeonato: string, id_tipo: number }): Observable<any> {
         return this.http.post(`${this.apiUrl}/invitaciones/enviar`, payload);
