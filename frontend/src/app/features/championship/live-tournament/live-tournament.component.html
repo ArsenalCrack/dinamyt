@@ -101,17 +101,31 @@
                     <div class="tatami-id">
                         <i class="fas fa-square"></i> {{ tatami.name }}
                     </div>
-                    <div class="status-badge">
-                        <span class="status-dot"></span>
-                        {{ tatami.currentSection?.status === 'RUNNING' ? 'EN CURSO' : (tatami.status === 'BUSY' ?
-                        'ASIGNADO' : 'LIBRE') }}
+                    <div class="header-right" style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="btn-action judges"
+                            style="padding: 0.3rem 0.6rem; font-size: 0.8rem; width: auto;"
+                            (click)="assignJudges(tatami)" title="Asignar Jueces">
+                            <i class="fas fa-gavel"></i>
+                        </button>
+                        <div class="status-badge">
+                            <span class="status-dot"></span>
+                            {{ tatami.currentSection?.status === 'RUNNING' ? 'EN CURSO' : (tatami.status === 'BUSY' ?
+                            'ASIGNADO' : 'LIBRE') }}
+                        </div>
                     </div>
                 </div>
 
                 <div class="tatami-content">
                     <ng-container *ngIf="tatami.currentSection; else freeState">
                         <div class="section-card">
-                            <div class="section-badge">{{ tatami.currentSection.category }}</div>
+                            <div class="section-top-row"
+                                style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                                <div class="section-badge">{{ tatami.currentSection.category }}</div>
+                                <button class="btn-action competitors" (click)="viewCompetitors(tatami.currentSection)">
+                                    <i class="fas fa-list"></i> Ver Lista
+                                </button>
+                            </div>
+
                             <h3 class="section-title">{{ tatami.currentSection.name }}</h3>
 
                             <div class="competitors-section">

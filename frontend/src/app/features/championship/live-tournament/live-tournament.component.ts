@@ -26,6 +26,7 @@ interface Tatami {
   name: string;
   status: 'FREE' | 'BUSY';
   currentSection?: Section;
+  judges?: string[];
 }
 
 @Component({
@@ -178,6 +179,14 @@ export class LiveTournamentComponent implements OnInit {
     if (tatami.currentSection && tatami.currentSection.status === 'READY') {
       tatami.currentSection.status = 'RUNNING';
     }
+  }
+
+  assignJudges(tatami: Tatami) {
+    alert(`Funcionalidad de Asignar Jueces para ${tatami.name} próximamente.`);
+  }
+
+  viewCompetitors(section: Section) {
+    alert(`Mostrando lista de competidores para ${section.name}`);
   }
 
   finishSection(tatami: Tatami) {

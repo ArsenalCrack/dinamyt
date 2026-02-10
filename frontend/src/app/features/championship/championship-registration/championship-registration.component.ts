@@ -150,10 +150,6 @@ export class ChampionshipRegistrationComponent implements OnInit {
                 }
             },
             error: () => {
-                this.campeonato = {
-                    nombre: 'Gran Torneo de Verano 2026',
-                    ubicacion: 'Coliseo El Campín, Bogotá'
-                };
                 this.fallbackModalities();
                 this.loading = false;
             }

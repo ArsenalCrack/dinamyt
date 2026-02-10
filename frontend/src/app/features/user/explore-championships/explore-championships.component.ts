@@ -432,6 +432,9 @@ export class ExploreChampionshipsComponent implements OnInit {
   }
 
   registerChampionship(id: number): void {
+    // Refresh user ID just in case
+    this.currentUserId = sessionStorage.getItem('idDocumento');
+
     // Verificar si el usuario está logueado (criterio centralizado)
     if (!this.auth.isLoggedIn()) {
       this.pendingRegistrationId = id;
@@ -440,7 +443,66 @@ export class ExploreChampionshipsComponent implements OnInit {
       return;
     }
 
+    if (!this.currentUserId) {
+      console.warn('User logged in but no ID found in session.');
+      this.proceedRegistration(id);
+      return;
+    }
+
+    // Check for existing inscriptions (checking 'invitado' flag)
+    this.cargando = true;
+    console.log('Registering for ID:', id, 'Current User:', this.currentUserId);
+
+    this.api.getMisInscripciones(this.currentUserId).subscribe({
+      next: (inscripciones: any[]) => {
+        console.log('Raw Inscriptions for user:', inscripciones);
+
+        const record = inscripciones.find((item: any) => {
+          // Robust ID finding
+          let campId = item.id_campeonato || item.idCampeonato || item.IdCampeonato ||
+            item.campeonato_id || item.campeonatoId || item.id_torneo || item.ref_campeonato;
+
+          if (!campId && typeof item.campeonato === 'object' && item.campeonato !== null) {
+            campId = item.campeonato.id || item.campeonato.idCampeonato;
+          }
+
+          const isMatch = String(campId) === String(id);
+
+          if (isMatch) console.log('Match found in inscriptions:', item);
+
+          // We only care if they are already in the list for this championship
+          return isMatch;
+        });
+
+        if (record) {
+          console.log('Checking invited status:', record.invitado);
+
+          if (record.invitado == 1) {
+            // If invited, block and alert. 
+            // We check if invited is explicitly 1.
+            this.cargando = false;
+            alert('Has sido invitado a este campeonato como competidor. Debes inscribirte mediante la invitación en tu sección de invitaciones.');
+            return;
+          }
+        }
+
+        console.log('No blocking invitation found. Proceeding.');
+        this.proceedRegistration(id);
+      },
+      error: (err) => {
+        console.error('Error checking invitations', err);
+        this.proceedRegistration(id);
+      }
+    });
+  }
+
+  private proceedRegistration(id: number): void {
     const selected = this.championships.find(c => c.id === id) || this.filteredChampionships.find(c => c.id === id) || null;
+
+    // Reset loading if it was set by registerChampionship check
+    // But we might want to keep it if we are navigating away? 
+    // Actually validation is fast, creating modal is synchronous.
+    this.cargando = false;
 
     if (selected && !selected.esPublico) {
       this.showAccessCodeModal = true;

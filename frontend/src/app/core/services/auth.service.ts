@@ -132,33 +132,50 @@ export class AuthService {
   }
 
   checkLoginStatus() {
-    // Basic check from storage - can be refined
+    // Basic check from storage
+    const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
     const idDoc = sessionStorage.getItem('ID_documento') || sessionStorage.getItem('idDocumento');
+    const correoSession = sessionStorage.getItem('correo');
+
+    // Check localStorage just to populate data if session is valid
     const storedUser = localStorage.getItem('usuario');
 
-    if (idDoc || storedUser) {
+    // STRICT CHECK: User is logged in ONLY if there is a session token or session-specific identifier.
+    // relying on storedUser (localStorage) alone causes "ghost" sessions after closing tabs.
+    if (token || idDoc || correoSession) {
       this.isLoggedInSubject.next(true);
+
+      // Try to populate username from best available source
+      let username = null;
+
+      // 1. Try localStorage user object
       if (storedUser) {
         try {
           const parsed = JSON.parse(storedUser);
           const user = parsed.usuario || parsed;
-          this.usernameSubject.next(user.nombreC || user.nombre || user.correo);
-
-          // Also check consistency immediately on load/refresh
-          const sessionEmail = sessionStorage.getItem('correo');
-          const storageEmail = user.correo || user.email;
-
-          if (sessionEmail && storageEmail && sessionEmail !== storageEmail) {
-            // We have a stored user that doesn't match our session. 
-            // Trust session (token) but warn/clear if critical?
-            // Actually, if we refresh and they differ, we are in the mixed state.
-            // Best to force logout to be safe.
-            this.forceLogout();
-            return;
-          }
-
+          username = user.nombreC || user.nombre || user.correo;
         } catch (e) { }
       }
+
+      // 2. Fallback to session storage name
+      if (!username) {
+        username = sessionStorage.getItem('nombreC') || correoSession;
+      }
+
+      this.usernameSubject.next(username);
+
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser);
+          const user = parsed.usuario || parsed;
+          const storageEmail = user.correo || user.email;
+
+          if (correoSession && storageEmail && correoSession !== storageEmail) {
+            this.forceLogout();
+          }
+        } catch (e) { }
+      }
+
     } else {
       this.isLoggedInSubject.next(false);
       this.usernameSubject.next(null);

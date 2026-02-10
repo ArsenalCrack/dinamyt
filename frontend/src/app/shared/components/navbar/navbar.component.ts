@@ -183,33 +183,36 @@ export class NavbarComponent implements OnInit, OnDestroy {
    * @param notifyAuthService Si se debe notificar al AuthService de los cambios encontrados.
    */
   updateLocalStatus(notifyAuthService: boolean = false): void {
-    const rawUsuario = localStorage.getItem('usuario');
-    try {
-      const parsed = rawUsuario ? JSON.parse(rawUsuario) : null;
-      this.usuario = parsed?.usuario || parsed;
-    } catch {
-      this.usuario = null;
-    }
-
-    this.username = sessionStorage.getItem('nombreC') || this.usuario?.nombreC || null;
+    // 1. Check strict session indicators (active tab session)
     const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
     const correo = sessionStorage.getItem('correo');
-    this.isLoggedIn = !!(token || this.username || correo);
+
+    // User is logged in ONLY if strict session exists in sessionStorage
+    this.isLoggedIn = !!(token || correo);
+
+    if (this.isLoggedIn) {
+      // 2. Load user metadata only if session is active
+      const rawUsuario = localStorage.getItem('usuario');
+      try {
+        const parsed = rawUsuario ? JSON.parse(rawUsuario) : null;
+        this.usuario = parsed?.usuario || parsed;
+      } catch {
+        this.usuario = null;
+      }
+
+      this.username = sessionStorage.getItem('nombreC') || this.usuario?.nombreC || null;
+    } else {
+      // Clear local state if no session
+      this.usuario = null;
+      this.username = null;
+    }
 
     // Extract user type
     this.userType = null;
-    if (this.usuario) {
+    if (this.isLoggedIn && this.usuario) {
       const roles = extractUserRoles(this.usuario);
 
-      if (roles.includes('administrador') || roles.includes('admin_proyecto')) {
-        this.userType = 3;
-      } else if (roles.includes('dueño')) {
-        this.userType = 4;
-      } else if (roles.includes('instructor')) {
-        this.userType = 2;
-      } else if (roles.includes('usuario')) {
-        this.userType = 1;
-      }
+
     }
 
     if (notifyAuthService) {

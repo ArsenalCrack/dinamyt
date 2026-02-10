@@ -163,6 +163,9 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
         const id = this.campeonato?.id || this.campeonato?.idCampeonato;
         if (!id) return;
 
+        // Refresh user ID just in case
+        this.currentUserId = sessionStorage.getItem('idDocumento');
+
         // 1. Check Auth
         if (!this.auth.isLoggedIn()) {
             this.showLoginModal = true;
@@ -170,6 +173,55 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
             return;
         }
 
+        if (!this.currentUserId) {
+            // Fallback
+            this.proceedChampionshipRegistration(id);
+            return;
+        }
+
+        // Check for invitations first
+        console.log('Details: Registering for ID:', id, 'User:', this.currentUserId);
+        this.loading = true; // Show loading if possible, or just wait
+
+        this.api.getMisInscripciones(this.currentUserId).subscribe({
+            next: (inscripciones: any[]) => {
+                this.loading = false;
+                console.log('Details: Raw Inscriptions:', inscripciones);
+
+                const record = inscripciones.find((item: any) => {
+                    // Robust ID finding
+                    let campId = item.id_campeonato || item.idCampeonato || item.IdCampeonato ||
+                        item.campeonato_id || item.campeonatoId || item.id_torneo || item.ref_campeonato;
+
+                    if (!campId && typeof item.campeonato === 'object' && item.campeonato !== null) {
+                        campId = item.campeonato.id || item.campeonato.idCampeonato;
+                    }
+
+                    const isMatch = String(campId) === String(id);
+                    if (isMatch) console.log('Details: Match found:', item);
+                    return isMatch;
+                });
+
+                if (record) {
+                    console.log('Details: Checking invited status:', record.invitado);
+                    if (record.invitado == 1) {
+                        alert('Has sido invitado a este campeonato como competidor. Debes inscribirte mediante la invitación en tu sección de invitaciones.');
+                        return;
+                    }
+                }
+
+                console.log('Details: No blocking invitation. Proceeding.');
+                this.proceedChampionshipRegistration(id);
+            },
+            error: (err) => {
+                console.error('Error checking inscriptions', err);
+                this.loading = false;
+                this.proceedChampionshipRegistration(id);
+            }
+        });
+    }
+
+    private proceedChampionshipRegistration(id: any): void {
         // 2. Check Private
         if (!this.campeonato.esPublico) {
             this.showAccessCodeModal = true;

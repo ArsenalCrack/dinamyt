@@ -429,8 +429,10 @@ public class controlador_principal {
     }
 
     @GetMapping("/usuarios/search/{query}")
-    private ResponseEntity<?> buscarUsuarios(@PathVariable String query, @RequestParam String excluirId,@RequestParam Long idCampeonato,@RequestParam Integer tipo) {
-        List<Usuario> usuarios = usuarioRepository.findUsuariosDisponiblesPorCampeonato(query,1, Long.parseLong(excluirId), idCampeonato,tipo);
+    private ResponseEntity<?> buscarUsuarios(@PathVariable String query, @RequestParam String excluirId,
+            @RequestParam Long idCampeonato, @RequestParam Integer tipo) {
+        List<Usuario> usuarios = usuarioRepository.findUsuariosDisponiblesPorCampeonato(query, 1,
+                Long.parseLong(excluirId), idCampeonato, tipo);
         if (usuarios != null) {
             return ResponseEntity.ok(usuarios);
         }
@@ -588,22 +590,22 @@ public class controlador_principal {
     @PostMapping("/invitaciones/enviar")
     private ResponseEntity<?> enviarinvitacion(@RequestBody Map<String, Object> datos) {
         Inscripciones inscripcion;
-        if(datos.get("id_tipo").toString()=="5"){
-             inscripcion= inscripcionRepository
-                .findByUsuarioAndCampeonatoAndTipousuario(Long.valueOf(datos.get("id_usuario").toString()),
-                        Long.valueOf(datos.get("id_campeonato").toString()),5)
-                .orElseGet(Inscripciones::new);
+        if (datos.get("id_tipo").toString() == "5") {
+            inscripcion = inscripcionRepository
+                    .findByUsuarioAndCampeonatoAndTipousuario(Long.valueOf(datos.get("id_usuario").toString()),
+                            Long.valueOf(datos.get("id_campeonato").toString()), 5)
+                    .orElseGet(Inscripciones::new);
             inscripcion.setTipousuario(
-                Integer.valueOf(datos.get("id_tipo").toString()));
-        }else{
-            inscripcion= inscripcionRepository
-                .findInscripcionJuez(Long.valueOf(datos.get("id_usuario").toString()),
-                        Long.valueOf(datos.get("id_campeonato").toString()))
-                .orElseGet(Inscripciones::new);
+                    Integer.valueOf(datos.get("id_tipo").toString()));
+        } else {
+            inscripcion = inscripcionRepository
+                    .findInscripcionJuez(Long.valueOf(datos.get("id_usuario").toString()),
+                            Long.valueOf(datos.get("id_campeonato").toString()))
+                    .orElseGet(Inscripciones::new);
             inscripcion.setTipousuario(
-                Integer.valueOf(datos.get("id_tipo").toString()));
+                    Integer.valueOf(datos.get("id_tipo").toString()));
         }
-        
+
         Long idUsuario = Long.valueOf(datos.get("id_usuario").toString());
 
         if (!usuarioRepository.existsById(idUsuario)) {
@@ -636,12 +638,11 @@ public class controlador_principal {
     @GetMapping("/invitaciones/usuario/{userId}")
     private ResponseEntity<?> ObInvitaciones(@PathVariable Long userId) {
 
-        List<Inscripciones> inscripciones =
-            inscripcionRepository.findByUsuarioAndVisibleTrueAndInvitadoTrue(userId);
+        List<Inscripciones> inscripciones = inscripcionRepository.findByUsuarioAndVisibleTrueAndInvitadoTrue(userId);
 
         if (inscripciones == null || inscripciones.isEmpty()) {
             return ResponseEntity.status(404)
-                .body(Map.of("message", "Sin invitaciones"));
+                    .body(Map.of("message", "Sin invitaciones"));
         }
 
         List<UsuarioInscripcionDTO> respuesta = new ArrayList<>();
@@ -671,13 +672,13 @@ public class controlador_principal {
         return ResponseEntity.ok(respuesta);
     }
 
-
     @GetMapping("/campeonatos/{id}/inscripciones")
     private ResponseEntity<?> obinscripcionesmicampeonato(@PathVariable Long id) {
 
         List<UsuarioInscripcionDTO> resultado = new ArrayList<>();
 
-        List<Inscripciones> inscripciones = inscripcionRepository.findByCampeonatoAndTipousuarioAndVisibleTrueAndInvitadoFalse(id, 5);
+        List<Inscripciones> inscripciones = inscripcionRepository
+                .findByCampeonatoAndTipousuarioAndVisibleTrueAndInvitadoFalse(id, 5);
 
         for (Inscripciones ins : inscripciones) {
 
@@ -728,32 +729,35 @@ public class controlador_principal {
     }
 
     @PutMapping("/invitaciones/{invitationId}")
-    private ResponseEntity<?> respuestraainscripcion(@PathVariable Integer invitationId, @RequestBody Map<String, Object> estado){
-        System.out.println(invitationId+" "+estado);
+    private ResponseEntity<?> respuestraainscripcion(@PathVariable Integer invitationId,
+            @RequestBody Map<String, Object> estado) {
+        System.out.println(invitationId + " " + estado);
         if (estado.get("estado").toString().equals("ACEPTADO")) {
-            Inscripciones ins =inscripcionRepository.findById(invitationId) .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+            Inscripciones ins = inscripcionRepository.findById(invitationId)
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
             ins.setEstado(3);
             inscripcionRepository.save(ins);
-        }else{
-            Inscripciones ins =inscripcionRepository.findById(invitationId) .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        } else {
+            Inscripciones ins = inscripcionRepository.findById(invitationId)
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
             ins.setEstado(4);
             inscripcionRepository.save(ins);
         }
         return ResponseEntity.ok("");
     }
-    
+
     @GetMapping("/campeonatos/{id}/invitaciones")
-    private ResponseEntity<?> obtenerinvitacionesdelcampeonato(@PathVariable Long id){
-        List<Inscripciones> inss =inscripcionRepository.findByCampeonatoAndVisibleTrueAndInvitadoTrue(id);
+    private ResponseEntity<?> obtenerinvitacionesdelcampeonato(@PathVariable Long id) {
+        List<Inscripciones> inss = inscripcionRepository.findByCampeonatoAndVisibleTrueAndInvitadoTrue(id);
         List<UsuarioInscripcionDTO> resultado = new ArrayList<>();
         for (Inscripciones ins : inss) {
 
             Usuario u = usuarioRepository.findById(ins.getUsuario()).orElse(null);
             if (u == null)
                 continue;
-            
+
             UsuarioInscripcionDTO dto = new UsuarioInscripcionDTO();
-            
+
             dto.setIdincripcion(ins.getIdInscripcion());
             dto.setIdDocumento(ins.getUsuario());
             dto.setNombreC(u.getNombreC());
@@ -765,29 +769,33 @@ public class controlador_principal {
         }
         return ResponseEntity.ok(resultado);
     }
-    
+
     @PutMapping("/inscripciones/{id}")
-    private ResponseEntity<?> actualizarestadoinscripcion(@PathVariable Integer id,@RequestBody Map<String, Integer> estado){
-        Inscripciones ins =inscripcionRepository.findById(id).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Campeonato cam =campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString())).orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
+    private ResponseEntity<?> actualizarestadoinscripcion(@PathVariable Integer id,
+            @RequestBody Map<String, Integer> estado) {
+        Inscripciones ins = inscripcionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        Campeonato cam = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
+                .orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
         ins.setEstado(estado.get("estado"));
         inscripcionRepository.save(ins);
         System.out.println(estado.get("estado"));
-        if (estado.get("estado")==3) {
-            cam.setParticipantes(cam.getParticipantes()+1);
-        }else{
-            if (cam.getParticipantes()>0) {   
-                cam.setParticipantes(cam.getParticipantes()-1);
-            }                       
+        if (estado.get("estado") == 3) {
+            cam.setParticipantes(cam.getParticipantes() + 1);
+        } else {
+            if (cam.getParticipantes() > 0) {
+                cam.setParticipantes(cam.getParticipantes() - 1);
+            }
         }
         campeonatoRepository.save(cam);
         return ResponseEntity.ok(ins);
     }
 
-    @GetMapping("/campeonatos/{id}/live-management")
-    private ResponseEntity<?> panelcampeonato(@PathVariable Integer id){
-        Campeonato cam =campeonatoRepository.findById(id).orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
-        campeonatoenvivo.put(cam.getIdCampeonato().toString(),cam);
+    // @GetMapping("/campeonatos/{id}/live-management")
+    private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
+        Campeonato cam = campeonatoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
+        campeonatoenvivo.put(cam.getIdCampeonato().toString(), cam);
         return ResponseEntity.ok(cam);
     }
 }
