@@ -95,6 +95,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    path: 'campeonato/juez/:id',
+    loadComponent: () => import('./features/championship/live-tournament/judge-panel/judge-panel.component').then(m => m.JudgePanelComponent),
+    canActivate: [authGuard]
+  },
+  {
     path: 'mi-academia',
     loadComponent: () => import('./features/academy/components/my-academy/my-academy.component').then(m => m.MyAcademyComponent),
     canActivate: [authGuard]

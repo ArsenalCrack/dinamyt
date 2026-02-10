@@ -142,6 +142,118 @@
     }
 }
 
+/* Judge Section */
+.judge-section {
+    margin-bottom: 40px;
+
+    .judge-card-active {
+        background: linear-gradient(135deg, #2c3e50, #1a1a1a);
+        color: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        border-left: 5px solid var(--color-acento);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+
+        .judge-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+
+            .icon-pulse {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.1);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--color-acento);
+                font-size: 1.8rem;
+                animation: pulse 2s infinite;
+            }
+
+            h3 {
+                margin: 0;
+                font-family: 'Montserrat', sans-serif;
+                font-size: 1.4rem;
+                font-weight: 700;
+            }
+
+            p {
+                margin: 5px 0 0 0;
+                color: rgba(255, 255, 255, 0.8);
+                font-size: 0.95rem;
+            }
+        }
+
+        .assignments-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+
+            .assignment-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+                &:last-child {
+                    border-bottom: none;
+                    padding-bottom: 0;
+                }
+
+                .championship-name {
+                    font-weight: 600;
+                    font-size: 1.1rem;
+                }
+
+                .btn-judge-access {
+                    background: var(--color-acento);
+                    color: white;
+                    text-decoration: none;
+                    padding: 8px 20px;
+                    border-radius: 20px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    transition: all 0.3s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+
+                    &:hover {
+                        background: white;
+                        color: var(--color-acento);
+                        transform: translateX(5px);
+                    }
+                }
+            }
+        }
+    }
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(214, 0, 0, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 15px rgba(214, 0, 0, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(214, 0, 0, 0);
+    }
+}
+
 .actions-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

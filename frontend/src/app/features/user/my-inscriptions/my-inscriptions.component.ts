@@ -49,7 +49,7 @@ export class MyInscriptionsComponent implements OnInit {
       .pipe(delay(1000))
       .subscribe({
         next: (data: any[]) => {
-          this.inscriptions = data.map(item => ({
+          this.inscriptions = (data || []).map(item => ({
             ...item,
             id: item.idInscripcion,
             estado: this.mapStatus(item.estado),

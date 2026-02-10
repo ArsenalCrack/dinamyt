@@ -25,6 +25,10 @@ export class DashboardComponent implements OnInit {
   // Modal welcome
   showProfileAlert = false;
 
+  // Judge Access
+  judgeAssignments: any[] = [];
+  loadingJudge = false;
+
   constructor(
     private apiService: ApiService,
     private auth: AuthService,
@@ -111,10 +115,39 @@ export class DashboardComponent implements OnInit {
           }
         }
       },
+
       error: () => {
         // Keep defaults (hide create card)
         // Intentar calcular el estado con sessionStorage si falla la API
         this.computeProfileStatus(null);
+      }
+    });
+
+    this.loadJudgeInvitations();
+  }
+
+  loadJudgeInvitations() {
+    const userId = sessionStorage.getItem('idDocumento');
+    if (!userId) return;
+
+    this.loadingJudge = true;
+    this.apiService.getMisInvitaciones(userId).subscribe({
+      next: (invitations: any[]) => {
+        if (!invitations || !Array.isArray(invitations)) {
+          this.loadingJudge = false;
+          return;
+        }
+        // Filter invitations that are ACCEPTED and related to Judge role (type 6 or 7)
+        this.judgeAssignments = invitations.filter(inv => {
+          const isAccepted = inv.estado === 'ACEPTADO' || inv.estado === 3; // Normalize status
+          const isJudge = inv.id_tipo === 6 || inv.id_tipo === 7 || inv.tipousuario === 6 || inv.tipousuario === 7;
+          return isAccepted && isJudge;
+        });
+        this.loadingJudge = false;
+      },
+      error: (e) => {
+        console.error('Error loading judge invitations', e);
+        this.loadingJudge = false;
       }
     });
   }

@@ -96,4 +96,16 @@ export class ChampionshipService {
     updateInscriptionState(id: string | number, estado: number): Observable<any> {
         return this.http.put(`${this.apiUrl}/inscripciones/${id}`, { estado });
     }
+
+    assignJudgesToTatami(championshipId: string | number, tatamiId: number, body: any): Observable<any> {
+        return this.http.post(`${this.apiUrl}/campeonatos/${championshipId}/live-management/tatamis/${tatamiId}/jueces`, body);
+    }
+
+    updateSectionStatus(championshipId: string | number, sectionId: string, status: string, tatamiId?: number): Observable<any> {
+        return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/secciones/${sectionId}/status`, { status, tatamiId });
+    }
+
+    updateMatchScore(championshipId: string | number, matchId: string, scores: any): Observable<any> {
+        return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/matches/${matchId}/score`, scores);
+    }
 }

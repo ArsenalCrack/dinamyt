@@ -1,0 +1,75 @@
+<div class="judge-panel-container">
+    <app-loading-spinner *ngIf="loading" message="Conectando con el Tatami..."></app-loading-spinner>
+
+    <div class="panel-content" *ngIf="!loading">
+        <header class="panel-header">
+            <button class="btn-back" (click)="goBack()">
+                <i class="fas fa-arrow-left"></i> Salir
+            </button>
+            <div class="header-info">
+                <h1>{{ assignedTatami?.name || 'Sin Asignar' }}</h1>
+                <span class="role-badge">{{ role }}</span>
+            </div>
+            <div class="connection-status">
+                <span class="dot"></span> En Vivo
+            </div>
+        </header>
+
+        <section class="match-area" *ngIf="currentSection; else waiting">
+            <div class="category-banner">
+                {{ currentSection.name }} - {{ currentSection.category }}
+            </div>
+
+            <div class="competitors-board">
+                <!-- RED aka AKA -->
+                <div class="competitor red">
+                    <div class="comp-info">
+                        <span class="name">{{ competitorRed?.name }}</span>
+                        <span class="academy">{{ competitorRed?.academy }}</span>
+                    </div>
+                    <div class="score-display">
+                        {{ scores.red }}
+                    </div>
+                    <div class="controls" *ngIf="role === 'Juez Central' || role === 'Juez de Mesa'">
+                        <button (click)="addPoint('red', 1)">+1</button>
+                        <button (click)="addPoint('red', 2)">+2</button>
+                        <button (click)="addPoint('red', 3)">IP</button>
+                    </div>
+                </div>
+
+                <!-- VS -->
+                <div class="vs-divider">VS</div>
+
+                <!-- BLUE aka AO -->
+                <div class="competitor blue">
+                    <div class="comp-info">
+                        <span class="name">{{ competitorBlue?.name }}</span>
+                        <span class="academy">{{ competitorBlue?.academy }}</span>
+                    </div>
+                    <div class="score-display">
+                        {{ scores.blue }}
+                    </div>
+                    <div class="controls" *ngIf="role === 'Juez Central' || role === 'Juez de Mesa'">
+                        <button (click)="addPoint('blue', 1)">+1</button>
+                        <button (click)="addPoint('blue', 2)">+2</button>
+                        <button (click)="addPoint('blue', 3)">IP</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="match-actions" *ngIf="role === 'Juez de Mesa'">
+                <button class="btn-timer-start"><i class="fas fa-play"></i> Iniciar Combate</button>
+                <button class="btn-timer-pause"><i class="fas fa-pause"></i> Pausar</button>
+                <button class="btn-finish"><i class="fas fa-flag-checkered"></i> Finalizar</button>
+            </div>
+        </section>
+
+        <ng-template #waiting>
+            <div class="waiting-screen">
+                <i class="fas fa-clock"></i>
+                <h2>Esperando siguiente encuentro...</h2>
+                <p>Mantente atento a las instrucciones del Jefe de Tatami.</p>
+            </div>
+        </ng-template>
+    </div>
+</div>

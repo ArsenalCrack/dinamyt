@@ -5,6 +5,8 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
+import { AssignJudgesComponent } from './assign-judges/assign-judges.component';
+import { SectionCompetitorsComponent } from './section-competitors/section-competitors.component';
 
 interface Competitor {
   id: string;
@@ -27,12 +29,13 @@ interface Tatami {
   status: 'FREE' | 'BUSY';
   currentSection?: Section;
   judges?: string[];
+  assignedJudges?: any; // Stores { central, table, normal }
 }
 
 @Component({
   selector: 'app-live-tournament',
   standalone: true,
-  imports: [CommonModule, RouterModule, LoadingSpinnerComponent],
+  imports: [CommonModule, RouterModule, LoadingSpinnerComponent, AssignJudgesComponent, SectionCompetitorsComponent],
   templateUrl: './live-tournament.component.html',
   styleUrl: './live-tournament.component.scss'
 })
@@ -43,6 +46,9 @@ export class LiveTournamentComponent implements OnInit {
   sectionsQueue: Section[] = [];
   finishedSections: Section[] = [];
   tatamis: Tatami[] = [];
+
+  currentAssignTatami: Tatami | null = null;
+  currentViewSection: Section | null = null;
 
   // Stats
   totalSections = 0;
@@ -163,12 +169,19 @@ export class LiveTournamentComponent implements OnInit {
 
   assignNextSection(tatami: Tatami) {
     if (this.sectionsQueue.length > 0) {
-      const section = this.sectionsQueue.shift()!;
-      section.status = 'READY';
-      section.tatamiId = tatami.id;
-
-      tatami.status = 'BUSY';
-      tatami.currentSection = section;
+      const section = this.sectionsQueue[0]; // Peek
+      if (this.championshipId) {
+        this.api.updateSectionStatus(this.championshipId, section.id, 'READY', tatami.id).subscribe({
+          next: () => {
+            this.sectionsQueue.shift();
+            section.status = 'READY';
+            section.tatamiId = tatami.id;
+            tatami.status = 'BUSY';
+            tatami.currentSection = section;
+          },
+          error: (e) => console.error('Error assigning section', e)
+        });
+      }
     } else {
       tatami.status = 'FREE';
       tatami.currentSection = undefined;
@@ -176,29 +189,83 @@ export class LiveTournamentComponent implements OnInit {
   }
 
   startSection(tatami: Tatami) {
-    if (tatami.currentSection && tatami.currentSection.status === 'READY') {
-      tatami.currentSection.status = 'RUNNING';
+    if (tatami.currentSection && tatami.currentSection.status === 'READY' && this.championshipId) {
+      const sec = tatami.currentSection;
+      this.api.updateSectionStatus(this.championshipId, sec.id, 'RUNNING').subscribe({
+        next: () => {
+          sec.status = 'RUNNING';
+        },
+        error: (e) => console.error('Error starting section', e)
+      });
     }
   }
 
   assignJudges(tatami: Tatami) {
-    alert(`Funcionalidad de Asignar Jueces para ${tatami.name} próximamente.`);
+    this.currentAssignTatami = tatami;
+    this.scrollLock.lock();
+  }
+
+  onJudgesAssigned(result: any) {
+    if (this.currentAssignTatami && this.championshipId) {
+      const payload = {
+        central: result.central?.id,
+        table: result.table?.id,
+        normal: result.normal?.map((j: any) => j.id) || []
+      };
+
+      this.api.assignJudgesToTatami(this.championshipId, this.currentAssignTatami.id, payload).subscribe({
+        next: () => {
+          console.log(`Judges assigned for ${this.currentAssignTatami!.name}:`, result);
+
+          const judgesList = [];
+          if (result.central) judgesList.push(result.central.nombre);
+          if (result.table) judgesList.push(result.table.nombre);
+          if (result.normal) judgesList.push(...result.normal.map((j: any) => j.nombre));
+
+          // Update local model
+          if (this.currentAssignTatami) {
+            this.currentAssignTatami.judges = judgesList;
+            this.currentAssignTatami.assignedJudges = result;
+          }
+          this.closeAssignModal();
+        },
+        error: (e) => console.error('Error assigning judges', e)
+      });
+    } else {
+      this.closeAssignModal();
+    }
+  }
+
+  closeAssignModal() {
+    this.currentAssignTatami = null;
+    this.scrollLock.unlock();
   }
 
   viewCompetitors(section: Section) {
-    alert(`Mostrando lista de competidores para ${section.name}`);
+    this.currentViewSection = section;
+    this.scrollLock.lock();
+  }
+
+  closeViewCompetitors() {
+    this.currentViewSection = null;
+    this.scrollLock.unlock();
   }
 
   finishSection(tatami: Tatami) {
-    if (tatami.currentSection && tatami.currentSection.status === 'RUNNING') {
+    if (tatami.currentSection && tatami.currentSection.status === 'RUNNING' && this.championshipId) {
       if (confirm(`¿Finalizar la sección en ${tatami.name}?`)) {
         const finished = tatami.currentSection;
-        finished.status = 'FINISHED';
-        this.finishedSections.unshift(finished);
+        this.api.updateSectionStatus(this.championshipId, finished.id, 'FINISHED').subscribe({
+          next: () => {
+            finished.status = 'FINISHED';
+            this.finishedSections.unshift(finished);
 
-        tatami.status = 'FREE';
-        tatami.currentSection = undefined;
-        this.assignNextSection(tatami);
+            tatami.status = 'FREE';
+            tatami.currentSection = undefined;
+            this.assignNextSection(tatami);
+          },
+          error: (e) => console.error('Error finishing section', e)
+        });
       }
     }
   }

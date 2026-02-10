@@ -76,4 +76,8 @@ export class ApiService {
   getInvitationsByChampionship(id: string | number) { return this.championship.getInvitationsByChampionship(id); }
   gestionarInscripcionCampeonato(id: string | number, estado: number) { return this.championship.updateInscriptionState(id, estado); }
 
+  assignJudgesToTatami(championshipId: string | number, tatamiId: number, body: any) { return this.championship.assignJudgesToTatami(championshipId, tatamiId, body); }
+  updateSectionStatus(championshipId: string | number, sectionId: string, status: string, tatamiId?: number) { return this.championship.updateSectionStatus(championshipId, sectionId, status, tatamiId); }
+  updateMatchScore(championshipId: string | number, matchId: string, scores: any) { return this.championship.updateMatchScore(championshipId, matchId, scores); }
+
 }

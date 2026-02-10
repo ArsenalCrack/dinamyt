@@ -25,6 +25,29 @@
     </div>
   </section>
 
+  <section class="judge-section" *ngIf="judgeAssignments.length > 0">
+    <div class="judge-card-active">
+      <div class="judge-header">
+        <div class="icon-pulse">
+          <i class="fas fa-gavel"></i>
+        </div>
+        <div>
+          <h3>Panel de Juez Activo</h3>
+          <p>Tienes campeonatos asignados como juez.</p>
+        </div>
+      </div>
+      <div class="assignments-list">
+        <div class="assignment-item" *ngFor="let assign of judgeAssignments">
+          <span class="championship-name">{{ assign.campeonatoNombre || 'Campeonato' }}</span>
+          <a [routerLink]="['/campeonato/juez', assign.id_campeonato || assign.idCampeonato || assign.campeonatoId]"
+            class="btn-judge-access">
+            Entrar al Tatami <i class="fas fa-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Mis Inscripciones arriba -->
   <div class="inscriptions-grid">
     <div class="horizontal-card">

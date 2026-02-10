@@ -1,0 +1,55 @@
+<div class="modal-overlay">
+    <div class="modal-content">
+        <header class="modal-header">
+            <div class="header-title">
+                <h2><i class="fas fa-users"></i> Lista de Competidores</h2>
+                <div class="section-info">
+                    <span class="category">{{ section?.category }}</span>
+                    <span class="section-name">{{ section?.name }}</span>
+                </div>
+            </div>
+            <button class="btn-close" (click)="close.emit()"><i class="fas fa-times"></i></button>
+        </header>
+
+        <div class="modal-body custom-scrollbar">
+            <div class="print-header">
+                <h1>{{ section?.name }}</h1>
+                <p>{{ section?.category }}</p>
+            </div>
+
+            <table class="competitors-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Nombre</th>
+                        <th>Academia</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let comp of section?.competitors; let i = index">
+                        <td class="col-num">{{ i + 1 }}</td>
+                        <td class="col-name">
+                            <span class="avatar">{{ comp.name.charAt(0) }}</span>
+                            {{ comp.name }}
+                        </td>
+                        <td class="col-academy">{{ comp.academy }}</td>
+                        <td class="col-status">
+                            <span class="status-badge">Inscrito</span>
+                        </td>
+                    </tr>
+                    <tr *ngIf="!section?.competitors?.length">
+                        <td colspan="4" class="empty-state">No hay competidores en esta sección</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="modal-footer">
+            <button class="btn-cancel" (click)="close.emit()">Cerrar</button>
+            <button class="btn-print" (click)="printList()">
+                <i class="fas fa-print"></i> Imprimir Listado
+            </button>
+        </footer>
+    </div>
+</div>

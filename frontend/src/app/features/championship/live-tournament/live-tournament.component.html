@@ -172,4 +172,11 @@
             </div>
         </main>
     </div>
+
+    <app-assign-judges *ngIf="currentAssignTatami" [tatami]="currentAssignTatami" [championshipId]="championshipId"
+        [allTatamis]="tatamis" (close)="closeAssignModal()" (save)="onJudgesAssigned($event)">
+    </app-assign-judges>
+
+    <app-section-competitors *ngIf="currentViewSection" [section]="currentViewSection" (close)="closeViewCompetitors()">
+    </app-section-competitors>
 </div>
