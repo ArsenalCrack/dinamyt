@@ -18,13 +18,19 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api") // 1. Cambiamos la ruta base a "/api"
@@ -38,7 +44,6 @@ public class controlador_principal {
     private final CampeonatoRepository campeonatoRepository;
     private final InscripcionRepository inscripcionRepository;
     private final Map<String, Usuario> usuariosPendientes = new HashMap<>();
-    private final Map<String, Campeonato> campeonatoenvivo = new HashMap<>();
 
     private controlador_principal(UsuarioRepository usuarioRepository, AcademiaRepository academiaRepository,
             CampeonatoRepository campeonatoRepository, InscripcionRepository inscripcionRepository) {
@@ -441,6 +446,7 @@ public class controlador_principal {
 
     @PostMapping("/inscripciones")
     private ResponseEntity<?> inscribirse(@RequestBody Map<String, Object> datos) throws Exception {
+        try {
         List<String> seccionesActuales = new ArrayList<>();
         Campeonato campeonato = campeonatoRepository.findById(
                 Integer.parseInt(datos.get("campeonatoId").toString()))
@@ -463,7 +469,7 @@ public class controlador_principal {
                 usuario.getSexo());
 
         if (seccionesAsignadas == null || seccionesAsignadas.isEmpty()) {
-            return ResponseEntity.status(500).body(Map.of("message", "Sección adecuada no encontrada"));
+            return ResponseEntity.status(400).body(Map.of("message", "Sección adecuada no encontrada"));
         }
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -525,6 +531,14 @@ public class controlador_principal {
         return ResponseEntity.ok(Map.of(
                 "campeonato", campeonato,
                 "inscripcion", inscripcion));
+        }
+    catch (RuntimeException e) {
+        System.out.println(e.getMessage());
+        return ResponseEntity.status(400).body(Map.of("message", e.getMessage()));
+    }
+    catch (Exception e) {
+        return ResponseEntity.status(400).body(Map.of("message", "Error interno del servidor"));
+    }
     }
 
     @GetMapping("/inscripciones/usuario/{id}")
@@ -771,31 +785,133 @@ public class controlador_principal {
     }
 
     @PutMapping("/inscripciones/{id}")
-    private ResponseEntity<?> actualizarestadoinscripcion(@PathVariable Integer id,
-            @RequestBody Map<String, Integer> estado) {
-        Inscripciones ins = inscripcionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Campeonato cam = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
-                .orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
-        ins.setEstado(estado.get("estado"));
-        inscripcionRepository.save(ins);
-        System.out.println(estado.get("estado"));
-        if (estado.get("estado") == 3) {
-            cam.setParticipantes(cam.getParticipantes() + 1);
-        } else {
-            if (cam.getParticipantes() > 0) {
-                cam.setParticipantes(cam.getParticipantes() - 1);
+        private ResponseEntity<?> actualizarestadoinscripcion(@PathVariable Integer id,
+                @RequestBody Map<String, Integer> estado) {
+            Inscripciones ins = inscripcionRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+            Campeonato cam = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
+                    .orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
+            ins.setEstado(estado.get("estado"));
+            inscripcionRepository.save(ins);
+            System.out.println(estado.get("estado"));
+            if (estado.get("estado") == 3) {
+                cam.setParticipantes(cam.getParticipantes() + 1);
+            } else {
+                if (cam.getParticipantes() > 0) {
+                    cam.setParticipantes(cam.getParticipantes() - 1);
+                }
+            }
+            campeonatoRepository.save(cam);
+            return ResponseEntity.ok(ins);
+        }
+
+        @GetMapping("/campeonatos/{id}/live-management")
+        private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
+
+        Campeonato cam = campeonatoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+
+        List<Inscripciones> inscripciones = inscripcionRepository
+                .findByCampeonatoAndTipousuarioAndVisibleTrueAndInvitadoFalse(
+                        cam.getIdCampeonato().longValue(), 5
+                );
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        // 🔹 Secciones activas del campeonato
+        List<String> seccionesCampeonato;
+        try {
+            seccionesCampeonato = mapper.readValue(
+                    cam.getSeccionesActivas(),
+                    new TypeReference<List<String>>() {}
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Error leyendo secciones del campeonato"));
+        }
+
+        Set<String> setSeccionesCampeonato = new HashSet<>(seccionesCampeonato);
+
+        Map<String, List<UsuarioInscripcionDTO>> individualesMasculinos = new HashMap<>();
+        Map<String, List<UsuarioInscripcionDTO>> individualesFemeninos = new HashMap<>();
+        Map<String, List<UsuarioInscripcionDTO>> mixtos = new HashMap<>();
+
+
+        for (Inscripciones ins : inscripciones) {
+
+            Usuario u = usuarioRepository.findById(ins.getUsuario()).orElse(null);
+            if (u == null || ins.getSecciones() == null) continue;
+
+            List<String> seccionesInscrito;
+            try {
+                seccionesInscrito = mapper.readValue(
+                        ins.getSecciones(),
+                        new TypeReference<List<String>>() {}
+                );
+            } catch (Exception e) {
+                continue;
+            }
+
+            List<String> seccionesFinales = seccionesInscrito.stream()
+                    .filter(setSeccionesCampeonato::contains)
+                    .toList();
+
+            for (String seccion : seccionesFinales) {
+
+                String modalidad = seccion.split("-")[0];
+
+                UsuarioInscripcionDTO dto = new UsuarioInscripcionDTO();
+                dto.setIdDocumento(u.getIdDocumento());
+                dto.setNombreC(u.getNombreC());
+                dto.setSexo(u.getSexo());
+                dto.setFechaNacimiento(u.getFechaNacimiento());
+                dto.setCinturonRango(u.getCinturonRango());
+                dto.setAcademia(u.getAcademia().getNombre());
+                dto.setInstructor(u.getInstructor().getNombreC());
+                dto.setSecciones(List.of(seccion));
+                dto.setPeso(JsonCleaner.obtenerPrimerPeso(ins.getSecciones()));
+
+
+                if (seccion.contains("MIXTO")) {
+
+                    mixtos
+                        .computeIfAbsent(modalidad, k -> new ArrayList<>())
+                        .add(dto);
+
+                } else if (seccion.contains("MASCULINO")) {
+
+                    individualesMasculinos
+                        .computeIfAbsent(modalidad, k -> new ArrayList<>())
+                        .add(dto);
+
+                } else if (seccion.contains("FEMENINO")) {
+
+                    individualesFemeninos
+                        .computeIfAbsent(modalidad, k -> new ArrayList<>())
+                        .add(dto);
+                }
+
             }
         }
-        campeonatoRepository.save(cam);
-        return ResponseEntity.ok(ins);
+
+        // 🔹 ORDENAMIENTO FINAL (EDAD → CINTURÓN)
+        Inscripcion.ordenarListas(individualesMasculinos);
+        Inscripcion.ordenarListas(individualesFemeninos);
+        Inscripcion.ordenarListas(mixtos);
+
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("campeonato", cam);
+        response.put("individuales", Map.of(
+                "masculinos", individualesMasculinos,
+                "femeninos", individualesFemeninos
+        ));
+        response.put("mixtos", mixtos);
+        
+        return ResponseEntity.ok(response);
     }
 
-    // @GetMapping("/campeonatos/{id}/live-management")
-    private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
-        Campeonato cam = campeonatoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
-        campeonatoenvivo.put(cam.getIdCampeonato().toString(), cam);
-        return ResponseEntity.ok(cam);
-    }
+
+
+
 }

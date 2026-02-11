@@ -548,7 +548,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
                 error: (err) => {
                     console.error('Error inscribiendo usuario', err);
                     this.success = false;
-                    this.message = err.error?.message || 'Hubo un error al realizar la inscripción.';
+                    this.message = err.error.message || 'Hubo un error al realizar la inscripción.';
                     this.submitting = false;
                     this.loading = false;
                     this.scrollLock.unlock();

@@ -1,5 +1,8 @@
 package org.ivan.backend.backend.controladores;
 
+import java.time.LocalDate;
+import java.time.Period;
+import java.util.Comparator;
 import org.ivan.backend.backend.secciones.Seccion;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -94,11 +97,19 @@ public class Inscripcion {
         }
 
         // GÉNERO
+        // GÉNERO
         if (s.getGENERO() != null) {
-            if (genero == null || !genero.equalsIgnoreCase(s.getGENERO())) {
-                return false;
+
+            // Si la sección es MIXTO, acepta cualquier género
+            if ("Mixto".equalsIgnoreCase(s.getGENERO())) {
+                // no se valida género
+            } else {
+                if (genero == null || !genero.equalsIgnoreCase(s.getGENERO())) {
+                    return false;
+                }
             }
         }
+
 
         return true;
     }
@@ -133,7 +144,7 @@ public class Inscripcion {
 
                         if (encontrada != null) {
                             throw new RuntimeException(
-                                    "Más de una sección válida para la modalidad: " + modalidad
+                                    "Mas de una seccion valida para la modalidad: " + modalidad
                             );
                         }
 
@@ -143,7 +154,7 @@ public class Inscripcion {
 
                 if (encontrada == null) {
                     throw new RuntimeException(
-                            "El competidor no cumple ninguna sección para la modalidad: " + modalidad
+                            "El competidor no cumple ninguna seccion para la modalidad: " + modalidad
                     );
                 }
 
@@ -152,8 +163,35 @@ public class Inscripcion {
 
             return resultado;
 
-        } catch (Exception e) {
-            throw new RuntimeException("Error al procesar secciones", e);
+        } catch (RuntimeException e) {
+            throw e;
         }
+    }
+        static void ordenarListas(Map<String, List<UsuarioInscripcionDTO>> listas) {
+
+        Map<String, Integer> ordenCinturon = Map.of(
+                "BLANCO", 1,
+                "AMARILLO", 2,
+                "VERDE", 3,
+                "AZUL", 4,
+                "ROJO", 5,
+                "NEGRO", 6
+        );
+
+        Comparator<UsuarioInscripcionDTO> comparador =
+        Comparator
+                .comparingInt(Inscripcion::calcularEdad)
+                .thenComparingInt(dto ->
+                        ordenCinturon.getOrDefault(dto.getCinturonRango(), 99)
+                );
+
+
+        listas.values().forEach(lista -> lista.sort(comparador));
+    }
+    private static int calcularEdad(UsuarioInscripcionDTO dto) {
+        return Period.between(
+                dto.getFechaNacimiento(),
+                LocalDate.now()
+        ).getYears();
     }
 }
