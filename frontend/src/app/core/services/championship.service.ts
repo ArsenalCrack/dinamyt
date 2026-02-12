@@ -108,4 +108,53 @@ export class ChampionshipService {
     updateMatchScore(championshipId: string | number, matchId: string, scores: any): Observable<any> {
         return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/matches/${matchId}/score`, scores);
     }
+
+    // --- Specific Live Flow Methods (Semantic Wrappers) ---
+
+    startSection(championshipId: string | number, sectionId: string): Observable<any> {
+        return this.updateSectionStatus(championshipId, sectionId, 'RUNNING');
+    }
+
+    finishSection(championshipId: string | number, sectionId: string): Observable<any> {
+        return this.updateSectionStatus(championshipId, sectionId, 'FINISHED');
+    }
+
+    /**
+     * Assigns a section (modality) to a specific tatami.
+     * Note: This might need backend support to persist the assignment if the page reloads.
+     */
+    assignSectionToTatami(championshipId: string | number, sectionId: string, tatamiId: number): Observable<any> {
+        // We reuse updateSectionStatus but sending the tatamiId and status 'ASSIGNED' or 'BUSY'
+        // Assuming backend handles this state.
+        return this.updateSectionStatus(championshipId, sectionId, 'BUSY', tatamiId);
+    }
+
+    /**
+     * Persist the assignment of a whole Demographic Group to a Tatami.
+     * Use this when user clicks "Assign Group" in the modal.
+     */
+    assignGroupToTatami(championshipId: string | number, tatamiId: number, group: any): Observable<any> {
+        return this.http.post(`${this.apiUrl}/campeonatos/${championshipId}/live-management/tatamis/${tatamiId}/assign-group`, group);
+    }
+
+    /**
+     * Clear the current assignment of a Tatami (Undo/Cancel).
+     */
+    unassignTatami(championshipId: string | number, tatamiId: number): Observable<any> {
+        return this.http.delete(`${this.apiUrl}/campeonatos/${championshipId}/live-management/tatamis/${tatamiId}/assignment`);
+    }
+
+    /**
+     * Submit final results/winners for a specific section.
+     */
+    submitSectionResults(championshipId: string | number, sectionId: string, results: any): Observable<any> {
+        return this.http.post(`${this.apiUrl}/campeonatos/${championshipId}/live-management/secciones/${sectionId}/results`, results);
+    }
+
+    /**
+     * Update status of a competitor (e.g. ABSENT, DISQUALIFIED).
+     */
+    markCompetitorStatus(championshipId: string | number, sectionId: string, competitorId: string, status: 'ABSENT' | 'DISQUALIFIED' | 'PRESENT'): Observable<any> {
+        return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/secciones/${sectionId}/competitors/${competitorId}/status`, { status });
+    }
 }
