@@ -16,4 +16,22 @@ export class SectionCompetitorsComponent {
     printList() {
         window.print();
     }
+
+    getStatusClass(status: string): any {
+        switch (status) {
+            case 'PRESENTE': return 'status-present';
+            case 'AUSENTE': return 'status-absent';
+            case 'DESCALIFICADO': return 'status-dq';
+            default: return 'status-enrolled'; // INSCRITO
+        }
+    }
+
+    formatStatus(status: string): string {
+        switch (status) {
+            case 'PRESENTE': return 'PRESENTE'; // or check-in icon?
+            case 'AUSENTE': return 'AUSENTE';
+            case 'DESCALIFICADO': return 'DESCALIF.';
+            default: return 'INSCRITO';
+        }
+    }
 }

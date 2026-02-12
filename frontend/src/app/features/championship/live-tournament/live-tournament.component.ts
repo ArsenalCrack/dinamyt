@@ -13,6 +13,11 @@ interface Competitor {
   id: string;
   name: string;
   academy: string;
+  belt?: string;
+  weight?: string;
+  gender?: string;
+  age?: number;
+  status?: string;
 }
 
 // Internal Tatami State
@@ -123,6 +128,18 @@ export class LiveTournamentComponent implements OnInit {
 
     // 2. Extract Data for Competitors (Mapping Section ID -> Competitor List)
     this.allCompetitorsMap.clear();
+    const getAge = (dob: string) => {
+      if (!dob) return 0;
+      const birth = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
     const extract = (groupData: any) => {
       if (!groupData) return;
       Object.keys(groupData).forEach(modality => {
@@ -138,7 +155,12 @@ export class LiveTournamentComponent implements OnInit {
             this.allCompetitorsMap.get(sectionId)?.push({
               id: u.idDocumento,
               name: u.nombreC,
-              academy: u.academia || 'Sin Academia'
+              academy: u.academia || 'Sin Academia',
+              belt: u.cinturonRango,
+              weight: u.peso,
+              gender: u.sexo,
+              age: getAge(u.fechaNacimiento),
+              status: u.estado || 'INSCRITO'
             });
           });
         }
@@ -264,7 +286,8 @@ export class LiveTournamentComponent implements OnInit {
 
     tatami.statusModality = 'RUNNING';
 
-    this.api.updateSectionStatus(this.championshipId, tatami.currentModalityId, 'RUNNING').subscribe({
+    // Use specific API
+    this.api.startSection(this.championshipId, tatami.currentModalityId).subscribe({
       error: (e) => console.warn('Backend update failed', e)
     });
   }
@@ -276,7 +299,8 @@ export class LiveTournamentComponent implements OnInit {
       const finishedId = tatami.currentModalityId;
 
       if (this.championshipId) {
-        this.api.updateSectionStatus(this.championshipId, finishedId, 'FINISHED').subscribe();
+        // Use specific API
+        this.api.finishSection(this.championshipId, finishedId).subscribe();
       }
 
       this.finishedModalities.unshift({
@@ -291,6 +315,36 @@ export class LiveTournamentComponent implements OnInit {
       // Load next
       this.advanceQueue(tatami);
     }
+  }
+
+  unassignGroup(tatami: Tatami) {
+    if (!this.championshipId) return;
+    if (confirm('¿Estás seguro de cancelar la asignación actual? El Tatami quedará LIBRE.')) {
+      this.api.unassignTatami(this.championshipId, tatami.id).subscribe({
+        next: () => {
+          // Reset Tatami locally
+          tatami.status = 'FREE';
+          tatami.currentGroup = undefined;
+          tatami.modalityQueue = undefined;
+          tatami.currentModalityId = undefined;
+          tatami.statusModality = 'READY'; // or undefined
+          tatami.assignedJudges = undefined; // If unassign clears judges too? Usually separate.
+          // Judges usually stay assigned to Tatami, group is what leaves.
+        },
+        error: (e) => alert('Error al desasignar')
+      });
+    }
+  }
+
+  submitResults(tatami: Tatami) {
+    // Placeholder for Results Modal
+    alert(`Aquí se abrirá el modal para registrar resultados de: ${this.formatModalityName(tatami.currentModalityId!)}`);
+    // this.api.submitSectionResults(...)
+  }
+
+  manageCompetitors(tatami: Tatami) {
+    // Placeholder for Competitors Management (Check-in)
+    alert(`Aquí se gestionará la asistencia/check-in para: ${this.getPrimaryModalityName(tatami.currentGroup!)}`);
   }
 
   // --- Helpers ---
