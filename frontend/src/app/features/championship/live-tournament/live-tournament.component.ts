@@ -7,6 +7,7 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { AssignJudgesComponent } from './assign-judges/assign-judges.component';
 import { SectionCompetitorsComponent } from './section-competitors/section-competitors.component';
+import { DemographicGroup, LiveManagementService } from './live-management.service';
 
 interface Competitor {
   id: string;
@@ -14,22 +15,23 @@ interface Competitor {
   academy: string;
 }
 
-interface Section {
-  id: string;
-  name: string; // e.g. "Kumite Male -75kg"
-  category: string; // e.g. "Black Belt"
-  competitors: Competitor[];
-  status: 'PENDING' | 'READY' | 'RUNNING' | 'FINISHED';
-  tatamiId?: number;
-}
-
+// Internal Tatami State
 interface Tatami {
   id: number;
   name: string;
   status: 'FREE' | 'BUSY';
-  currentSection?: Section;
+
+  // New Structure
+  currentGroup?: DemographicGroup;
+  modalityQueue?: string[]; // The list of modality IDs to run (Sorted)
+  currentModalityId?: string; // The specific ID currently running (e.g. "COMBATES-...")
+  statusModality?: 'READY' | 'RUNNING' | 'FINISHED'; // State of the current modality within the tatami
+
+  // Future Queue (Pipelining)
+  nextGroup?: DemographicGroup;
+
   judges?: string[];
-  assignedJudges?: any; // Stores { central, table, normal }
+  assignedJudges?: any;
 }
 
 @Component({
@@ -43,22 +45,29 @@ export class LiveTournamentComponent implements OnInit {
   championshipId: string | null = null;
   championshipName: string = 'Cargando...';
 
-  sectionsQueue: Section[] = [];
-  finishedSections: Section[] = [];
+  // State
+  availableGroups: DemographicGroup[] = [];
+  finishedModalities: any[] = []; // Just history log
   tatamis: Tatami[] = [];
 
-  currentAssignTatami: Tatami | null = null;
-  currentViewSection: Section | null = null;
+  // Active Data Holders (Mapping ID -> Details)
+  allCompetitorsMap = new Map<string, Competitor[]>(); // active_section_id -> competitors
 
-  // Stats
-  totalSections = 0;
+  currentAssignTatami: Tatami | null = null;
+  currentViewSectionId: string | null = null; // ID of the specific modality section to view
+
+  showGroupSelector = false;
+  targetTatamiForSelection: Tatami | null = null;
+
+  totalActive = 0;
   loading = true;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private api: ApiService,
-    private scrollLock: ScrollLockService
+    private scrollLock: ScrollLockService,
+    private liveService: LiveManagementService
   ) { }
 
   ngOnInit(): void {
@@ -80,124 +89,246 @@ export class LiveTournamentComponent implements OnInit {
 
   loadLiveManagementData() {
     if (!this.championshipId) return;
+    this.loading = true;
 
-    // Attempt to call the new API endpoint
     this.api.getLiveManagement(this.championshipId)
       .pipe(delay(1500))
       .subscribe({
         next: (data) => {
-          // If backend were ready, we would map `data` to our local arrays.
-          // Since it's likely 404/500 now or unimplemented, we might not reach here correctly yet.
-          // Or if user mocks it in backend, we should use it.
-          // For now, I'll log and use fallback if empty.
-          console.log('Live Data:', data);
-          if (data && data.tatamis) {
-            this.tatamis = data.numTatamis;
-            this.sectionsQueue = data.queue || [];
-            this.finishedSections = data.finished || [];
-            this.totalSections = this.sectionsQueue.length + this.finishedSections.length +
-              this.tatamis.filter(t => t.currentSection).length;
+          if (data && data.campeonato) {
+            this.processBackendData(data);
           } else {
-            this.assignInitialSections();
+            console.warn('Backend returned empty/invalid structure, using mocks.');
+            this.initMockData();
           }
           this.loading = false;
           this.scrollLock.unlock();
         },
         error: (e) => {
-          console.warn('Backend implementation for Live Management not found/ready, using mocks.', e);
+          console.warn('Error fetching live data, using mocks.', e);
           this.initMockData();
-          this.assignInitialSections();
           this.loading = false;
           this.scrollLock.unlock();
         }
       });
   }
 
-  exit(): void {
-    this.router.navigate(['/campeonato/panel', this.championshipId]);
-  }
-
-  initMockData() {
-    // Create 10 Tatamis
-    for (let i = 1; i <= 10; i++) {
+  processBackendData(data: any) {
+    // 1. Setup Tatamis
+    const numTatamis = data.campeonato.numTatamis || 1;
+    this.tatamis = [];
+    for (let i = 1; i <= numTatamis; i++) {
       this.tatamis.push({ id: i, name: `Tatami ${i}`, status: 'FREE' });
     }
 
-    // Create 50 Mock Sections
-    const modalities = ['Kumite', 'Kata', 'Kobudo', 'Defensa Personal'];
-    const categories = ['Cinturón Negro', 'Cinturón Café', 'Cinturón Azul', 'Cinturón Verde', 'Cinturón Naranja', 'Cinturón Blanco'];
-    const ages = ['Mayores (18-35)', 'Juvenil (15-17)', 'Cadetes (12-14)', 'Infantil (10-11)', 'Pre-Infantil (8-9)', 'Master (+35)'];
-    const genders = ['Masculino', 'Femenino', 'Mixto'];
-
-    for (let i = 1; i <= 50; i++) {
-      const mod = modalities[Math.floor(Math.random() * modalities.length)];
-      const cat = categories[Math.floor(Math.random() * categories.length)];
-      const age = ages[Math.floor(Math.random() * ages.length)];
-      const gen = genders[Math.floor(Math.random() * genders.length)];
-
-      this.sectionsQueue.push({
-        id: `sec-${i}`,
-        name: `${mod} ${gen} - ${age}`,
-        category: cat,
-        competitors: this.generateCompetitors(Math.floor(Math.random() * 6) + 2),
-        status: 'PENDING'
+    // 2. Extract Data for Competitors (Mapping Section ID -> Competitor List)
+    this.allCompetitorsMap.clear();
+    const extract = (groupData: any) => {
+      if (!groupData) return;
+      Object.keys(groupData).forEach(modality => {
+        const users = groupData[modality];
+        if (Array.isArray(users)) {
+          users.forEach((u: any) => {
+            const sectionId = (u.secciones && u.secciones.length > 0) ? u.secciones[0] : 'UNKNOWN';
+            if (!this.allCompetitorsMap.has(sectionId)) {
+              this.allCompetitorsMap.set(sectionId, []);
+            }
+            // Check if not already added to avoid duplicates if user is in multiple lists (shouldn't happen per modality)
+            // But here we iterate modalities.
+            this.allCompetitorsMap.get(sectionId)?.push({
+              id: u.idDocumento,
+              name: u.nombreC,
+              academy: u.academia || 'Sin Academia'
+            });
+          });
+        }
       });
+    };
+
+    if (data.individuales) {
+      extract(data.individuales.masculinos);
+      extract(data.individuales.femeninos);
     }
-    this.totalSections = this.sectionsQueue.length;
-    this.championshipName = 'Campeonato Demo (Mock)';
+    extract(data.mixtos);
+
+    // 3. Process Sections via Service
+    const seccionesRules = this.liveService.parseSecciones(data.campeonato.secciones);
+    const seccionesActivas = this.liveService.parseSeccionesActivas(data.campeonato.seccionesActivas);
+
+    // Filter active sections to only those that actually have competitors or are valid
+    // This is optional, but good for cleanup.
+    // const relevantActiveSections = seccionesActivas; // Using all for now as strict whitelist 
+
+    this.availableGroups = this.liveService.processSecciones(seccionesRules, seccionesActivas, this.allCompetitorsMap);
+    this.totalActive = this.availableGroups.reduce((acc, g) => acc + g.activeModalities.length, 0);
   }
 
-  generateCompetitors(count: number): Competitor[] {
-    const names = ['Santiago R.', 'Valentina M.', 'Juan P.', 'Carlos D.', 'Ana L.', 'Pedro S.', 'Laura G.', 'Miguel T.', 'Sofía V.', 'Andrés C.'];
-    const academies = ['Dinamyt Central', 'Dojo Cobra', 'Tiger Academy', 'Eagle Martial Arts'];
-    const list: Competitor[] = [];
-    for (let i = 0; i < count; i++) {
-      list.push({
-        id: `comp-${Math.random().toString(36).substr(2, 9)}`,
-        name: names[Math.floor(Math.random() * names.length)],
-        academy: academies[Math.floor(Math.random() * academies.length)]
+  // --- UI Actions ---
+
+  filteredGroupsForSelection: DemographicGroup[] = [];
+
+  openGroupSelector(tatami: Tatami) {
+    // Allow if FREE OR (BUSY and no nextGroup and not a special Jump tatami)
+    const totalTatamis = this.tatamis.length;
+    const isLast = tatami.id === totalTatamis;
+    const isPenultimate = tatami.id === totalTatamis - 1;
+    const isJumpTatami = isLast || isPenultimate;
+
+    // Rule: "This won't happen in jumps.. only in the rest".
+    // So if Jump Tatami is BUSY, return.
+    if (tatami.status === 'BUSY') {
+      if (isJumpTatami) return;
+      if (tatami.nextGroup) return; // Already queued
+    }
+
+    this.targetTatamiForSelection = tatami;
+
+    if (totalTatamis < 2) {
+      this.filteredGroupsForSelection = this.availableGroups;
+    } else {
+      // Strict Filter Logic
+      this.filteredGroupsForSelection = this.availableGroups.filter(group => {
+        const type = this.liveService.getDemographicType(group);
+
+        if (isLast) return type === 'SALTO_ALTO';
+        if (isPenultimate) return type === 'SALTO_LARGO';
+
+        // If we are queuing for a "General" tatami, we still only want General groups
+        return type === 'GENERAL';
       });
     }
-    return list;
+
+    this.showGroupSelector = true;
+    this.scrollLock.lock();
   }
 
-  assignInitialSections() {
-    this.tatamis.forEach(tatami => {
-      this.assignNextSection(tatami);
+  closeGroupSelector() {
+    this.showGroupSelector = false;
+    this.targetTatamiForSelection = null;
+    this.filteredGroupsForSelection = [];
+    this.scrollLock.unlock();
+  }
+
+  selectGroup(group: DemographicGroup) {
+    if (!this.targetTatamiForSelection) return;
+
+    const tatami = this.targetTatamiForSelection;
+
+    // Remove from available list immediately
+    this.availableGroups = this.availableGroups.filter(g => g.id !== group.id);
+
+    if (tatami.status === 'FREE') {
+      // Assign as Current
+      tatami.currentGroup = group;
+      tatami.modalityQueue = [...group.activeModalities];
+      tatami.status = 'BUSY';
+      this.advanceQueue(tatami);
+    } else {
+      // Queue as Next
+      tatami.nextGroup = group;
+    }
+
+    this.closeGroupSelector();
+  }
+
+  advanceQueue(tatami: Tatami) {
+    if (!tatami.modalityQueue) return;
+
+    if (tatami.modalityQueue.length > 0) {
+      // Peek next
+      tatami.currentModalityId = tatami.modalityQueue[0];
+      tatami.statusModality = 'READY';
+    } else {
+      // Finished all modalities in the CURRENT group
+
+      // Check for Pipelined Group
+      if (tatami.nextGroup) {
+        tatami.currentGroup = tatami.nextGroup;
+        tatami.modalityQueue = [...tatami.nextGroup.activeModalities];
+        tatami.nextGroup = undefined;
+
+        this.advanceQueue(tatami); // Start first modality of new group
+      } else {
+        // Really Free
+        tatami.status = 'FREE';
+        tatami.currentGroup = undefined;
+        tatami.currentModalityId = undefined;
+        tatami.modalityQueue = undefined;
+        tatami.statusModality = undefined;
+      }
+    }
+  }
+
+  startCurrentModality(tatami: Tatami) {
+    if (!tatami.currentModalityId || !this.championshipId) return;
+
+    tatami.statusModality = 'RUNNING';
+
+    this.api.updateSectionStatus(this.championshipId, tatami.currentModalityId, 'RUNNING').subscribe({
+      error: (e) => console.warn('Backend update failed', e)
     });
   }
 
-  assignNextSection(tatami: Tatami) {
-    if (this.sectionsQueue.length > 0) {
-      const section = this.sectionsQueue[0]; // Peek
+  finishCurrentModality(tatami: Tatami) {
+    if (!tatami.currentModalityId || !tatami.modalityQueue) return;
+
+    if (confirm('¿Finalizar esta modalidad y pasar a la siguiente?')) {
+      const finishedId = tatami.currentModalityId;
+
       if (this.championshipId) {
-        this.api.updateSectionStatus(this.championshipId, section.id, 'READY', tatami.id).subscribe({
-          next: () => {
-            this.sectionsQueue.shift();
-            section.status = 'READY';
-            section.tatamiId = tatami.id;
-            tatami.status = 'BUSY';
-            tatami.currentSection = section;
-          },
-          error: (e) => console.error('Error assigning section', e)
-        });
+        this.api.updateSectionStatus(this.championshipId, finishedId, 'FINISHED').subscribe();
       }
-    } else {
-      tatami.status = 'FREE';
-      tatami.currentSection = undefined;
+
+      this.finishedModalities.unshift({
+        id: finishedId,
+        name: this.formatModalityName(finishedId),
+        tatamiId: tatami.id
+      });
+
+      // Remove current from queue
+      tatami.modalityQueue.shift();
+
+      // Load next
+      this.advanceQueue(tatami);
     }
   }
 
-  startSection(tatami: Tatami) {
-    if (tatami.currentSection && tatami.currentSection.status === 'READY' && this.championshipId) {
-      const sec = tatami.currentSection;
-      this.api.updateSectionStatus(this.championshipId, sec.id, 'RUNNING').subscribe({
-        next: () => {
-          sec.status = 'RUNNING';
-        },
-        error: (e) => console.error('Error starting section', e)
-      });
+  // --- Helpers ---
+
+  getFormatGroupTitle(group: DemographicGroup): string {
+    return this.liveService.formatDemographicName(group);
+  }
+
+  formatModalityName(fullId: string): string {
+    // e.g. "COMBATES-MASCULINO..." -> "Combates"
+    if (!fullId) return '';
+    const parts = fullId.split('-');
+    // Replace underscores with spaces for readability
+    return parts[0].replace(/_/g, ' ');
+  }
+
+  // Used in HTML to get competitors for the CURRENT running modality
+  getCompetitorsForModality(fullId: string | undefined): Competitor[] {
+    if (!fullId) return [];
+    return this.allCompetitorsMap.get(fullId) || [];
+  }
+
+  getPrimaryModalityName(group: DemographicGroup): string {
+    if (!group || !group.activeModalities || group.activeModalities.length === 0) {
+      return 'Grupo';
     }
+    // "COMBATES-MASCULINO..." -> "COMBATES" -> "COMBATES" (replace internal _ with space)
+    const first = group.activeModalities[0];
+    if (!first) return 'Grupo';
+    return first.split('-')[0].replace(/_/g, ' ');
+  }
+
+
+
+  // --- Legacy / Required methods ---
+
+  exit(): void {
+    this.router.navigate(['/campeonato/panel', this.championshipId]);
   }
 
   assignJudges(tatami: Tatami) {
@@ -212,24 +343,17 @@ export class LiveTournamentComponent implements OnInit {
         table: result.table?.id,
         normal: result.normal?.map((j: any) => j.id) || []
       };
-
       this.api.assignJudgesToTatami(this.championshipId, this.currentAssignTatami.id, payload).subscribe({
         next: () => {
-          console.log(`Judges assigned for ${this.currentAssignTatami!.name}:`, result);
-
           const judgesList = [];
           if (result.central) judgesList.push(result.central.nombre);
           if (result.table) judgesList.push(result.table.nombre);
           if (result.normal) judgesList.push(...result.normal.map((j: any) => j.nombre));
 
-          // Update local model
-          if (this.currentAssignTatami) {
-            this.currentAssignTatami.judges = judgesList;
-            this.currentAssignTatami.assignedJudges = result;
-          }
+          this.currentAssignTatami!.judges = judgesList;
+          this.currentAssignTatami!.assignedJudges = result;
           this.closeAssignModal();
-        },
-        error: (e) => console.error('Error assigning judges', e)
+        }
       });
     } else {
       this.closeAssignModal();
@@ -241,32 +365,40 @@ export class LiveTournamentComponent implements OnInit {
     this.scrollLock.unlock();
   }
 
-  viewCompetitors(section: Section) {
-    this.currentViewSection = section;
+  viewCompetitors(sectionId: string | undefined) {
+    if (!sectionId) return;
+    this.currentViewSectionId = sectionId;
     this.scrollLock.lock();
   }
 
   closeViewCompetitors() {
-    this.currentViewSection = null;
+    this.currentViewSectionId = null;
     this.scrollLock.unlock();
   }
 
-  finishSection(tatami: Tatami) {
-    if (tatami.currentSection && tatami.currentSection.status === 'RUNNING' && this.championshipId) {
-      if (confirm(`¿Finalizar la sección en ${tatami.name}?`)) {
-        const finished = tatami.currentSection;
-        this.api.updateSectionStatus(this.championshipId, finished.id, 'FINISHED').subscribe({
-          next: () => {
-            finished.status = 'FINISHED';
-            this.finishedSections.unshift(finished);
+  // Getter for the view component
+  get currentViewSectionObject(): any {
+    if (!this.currentViewSectionId) return null;
+    return {
+      id: this.currentViewSectionId,
+      name: this.formatModalityName(this.currentViewSectionId),
+      category: 'Detalle',
+      competitors: this.getCompetitorsForModality(this.currentViewSectionId) || []
+    };
+  }
 
-            tatami.status = 'FREE';
-            tatami.currentSection = undefined;
-            this.assignNextSection(tatami);
-          },
-          error: (e) => console.error('Error finishing section', e)
-        });
-      }
-    }
+  initMockData() {
+    this.tatamis = [
+      { id: 1, name: 'Tatami 1', status: 'FREE' },
+      { id: 2, name: 'Tatami 2', status: 'FREE' }
+    ];
+    this.availableGroups = [{
+      id: 'mock1',
+      edad: '10-12',
+      peso: '30-40',
+      cinturon: 'Blanco',
+      genero: 'Mixto',
+      activeModalities: ['KATA-MOCK', 'COMBATE-MOCK']
+    }];
   }
 }

@@ -1,5 +1,7 @@
 <div class="live-container">
     <app-loading-spinner *ngIf="loading" message="Inicializando panel..." [fixed]="true"></app-loading-spinner>
+
+    <!-- HEADER -->
     <header class="live-header">
         <div class="header-left">
             <span class="live-badge">
@@ -22,22 +24,22 @@
             <div class="stat-item pending">
                 <i class="fas fa-clock"></i>
                 <div class="stat-info">
-                    <span class="value">{{ sectionsQueue.length }}</span>
-                    <span class="label">Pendientes</span>
+                    <span class="value">{{ availableGroups.length }}</span>
+                    <span class="label">Grupos</span>
                 </div>
             </div>
             <div class="stat-item finished">
                 <i class="fas fa-clipboard-check"></i>
                 <div class="stat-info">
-                    <span class="value">{{ finishedSections.length }}</span>
-                    <span class="label">Finalizadas</span>
+                    <span class="value">{{ finishedModalities.length }}</span>
+                    <span class="label">Fin</span>
                 </div>
             </div>
             <div class="stat-item total">
                 <i class="fas fa-list"></i>
                 <div class="stat-info">
-                    <span class="value">{{ totalSections }}</span>
-                    <span class="label">Total</span>
+                    <span class="value">{{ totalActive }}</span>
+                    <span class="label">Activas</span>
                 </div>
             </div>
         </div>
@@ -50,24 +52,37 @@
     </header>
 
     <div class="main-layout">
-        <!-- Sidebar: Queue & History -->
+
+        <!-- SIDEBAR: GROUP QUEUE -->
         <aside class="side-panel">
             <div class="panel-section queue">
                 <header>
-                    <h3><i class="fas fa-random"></i> Cola de Espera</h3>
-                    <span class="count">{{ sectionsQueue.length }}</span>
+                    <h3><i class="fas fa-layer-group"></i> Grupos Pendientes</h3>
+                    <span class="count">{{ availableGroups.length }}</span>
                 </header>
                 <div class="queue-list custom-scrollbar">
-                    <div class="queue-item" *ngFor="let section of sectionsQueue; let i = index">
+                    <div class="queue-item" *ngFor="let group of availableGroups; let i = index">
                         <div class="queue-pos">{{ i + 1 }}</div>
                         <div class="queue-info">
-                            <h4>{{ section.name }}</h4>
-                            <span class="queue-meta">{{ section.category }}</span>
+                            <!-- First modality prominent -->
+                            <h4 class="primary-modality">
+                                {{ getPrimaryModalityName(group) }}
+                            </h4>
+                            <!-- Demographics as tags -->
+                            <div class="demo-tags">
+                                <span class="tag-badge">{{ group.genero }}</span>
+                                <span class="tag-badge">{{ group.cinturon }}</span>
+                                <span class="tag-badge">{{ group.edad }} años</span>
+                                <span class="tag-badge">{{ group.peso }} kg</span>
+                            </div>
+                            <span class="queue-meta">
+                                + {{ group.activeModalities.length - 1 }} modalidades más
+                            </span>
                         </div>
                     </div>
-                    <div class="empty-state" *ngIf="sectionsQueue.length === 0">
+                    <div class="empty-state" *ngIf="availableGroups.length === 0">
                         <i class="fas fa-check"></i>
-                        <p>No hay secciones en cola</p>
+                        <p>No hay grupos pendientes</p>
                     </div>
                 </div>
             </div>
@@ -77,24 +92,24 @@
                     <h3><i class="fas fa-history"></i> Recientes</h3>
                 </header>
                 <div class="history-list custom-scrollbar">
-                    <div class="history-item" *ngFor="let section of finishedSections.slice(0, 5)">
+                    <div class="history-item" *ngFor="let item of finishedModalities.slice(0, 5)">
                         <span class="check-icon"><i class="fas fa-check"></i></span>
                         <div class="history-info">
-                            <h4>{{ section.name }}</h4>
-                            <span class="history-meta">Tatami #{{ section.tatamiId }}</span>
+                            <h4>{{ item.name }}</h4>
+                            <span class="history-meta">Tatami #{{ item.tatamiId }}</span>
                         </div>
                     </div>
-                    <div class="empty-state" *ngIf="finishedSections.length === 0">
-                        <p>Aún no hay secciones finalizadas</p>
+                    <div class="empty-state" *ngIf="finishedModalities.length === 0">
+                        <p>Aún no hay finalizadas</p>
                     </div>
                 </div>
             </div>
         </aside>
 
-        <!-- Main: Tatamis Grid -->
+        <!-- MAIN: TATAMIS GRID -->
         <main class="tatamis-grid custom-scrollbar">
             <div class="tatami-card" *ngFor="let tatami of tatamis" [class.status-busy]="tatami.status === 'BUSY'"
-                [class.status-running]="tatami.currentSection?.status === 'RUNNING'"
+                [class.status-running]="tatami.statusModality === 'RUNNING'"
                 [class.status-free]="tatami.status === 'FREE'">
 
                 <div class="tatami-header">
@@ -109,53 +124,83 @@
                         </button>
                         <div class="status-badge">
                             <span class="status-dot"></span>
-                            {{ tatami.currentSection?.status === 'RUNNING' ? 'EN CURSO' : (tatami.status === 'BUSY' ?
-                            'ASIGNADO' : 'LIBRE') }}
+                            {{ tatami.statusModality === 'RUNNING' ? 'EN CURSO' : (tatami.status === 'BUSY' ? 'ASIGNADO'
+                            : 'LIBRE') }}
                         </div>
                     </div>
                 </div>
 
                 <div class="tatami-content">
-                    <ng-container *ngIf="tatami.currentSection; else freeState">
+                    <ng-container *ngIf="tatami.currentGroup; else freeState">
                         <div class="section-card">
                             <div class="section-top-row"
                                 style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                                <div class="section-badge">{{ tatami.currentSection.category }}</div>
-                                <button class="btn-action competitors" (click)="viewCompetitors(tatami.currentSection)">
+
+                                <div class="demo-tags"
+                                    style="display: flex; gap: 0.4rem; flex-wrap: wrap; max-width: 70%;">
+                                    <span class="tag-badge"
+                                        style="background: #e3f2fd; color: #1565c0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                                        {{ tatami.currentGroup.genero }}
+                                    </span>
+                                    <span class="tag-badge"
+                                        style="background: #e3f2fd; color: #1565c0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                                        {{ tatami.currentGroup.cinturon }}
+                                    </span>
+                                    <span class="tag-badge"
+                                        style="background: #e3f2fd; color: #1565c0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                                        {{ tatami.currentGroup.edad }} años
+                                    </span>
+                                    <span class="tag-badge"
+                                        style="background: #e3f2fd; color: #1565c0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                                        {{ tatami.currentGroup.peso }} kg
+                                    </span>
+                                </div>
+
+                                <button class="btn-action competitors"
+                                    (click)="viewCompetitors(tatami.currentModalityId)">
                                     <i class="fas fa-list"></i> Ver Lista
                                 </button>
                             </div>
 
-                            <h3 class="section-title">{{ tatami.currentSection.name }}</h3>
+                            <h3 class="section-title">
+                                {{ formatModalityName(tatami.currentModalityId!) }}
+                            </h3>
+
+                            <div class="next-up-info" *ngIf="tatami.modalityQueue && tatami.modalityQueue.length > 1">
+                                <small>Siguiente: {{ formatModalityName(tatami.modalityQueue[1]) }}</small>
+                            </div>
 
                             <div class="competitors-section">
-                                <div class="comp-header">
-                                    <i class="fas fa-users"></i> {{ tatami.currentSection.competitors.length }}
-                                    Competidores
-                                </div>
-                                <div class="comp-list">
-                                    <span *ngFor="let comp of tatami.currentSection.competitors.slice(0, 3)"
-                                        class="comp-pill">
-                                        {{ comp.name }}
-                                    </span>
-                                    <span *ngIf="tatami.currentSection.competitors.length > 3" class="comp-pill more">
-                                        +{{ tatami.currentSection.competitors.length - 3 }}
-                                    </span>
-                                </div>
+                                <ng-container
+                                    *ngIf="getCompetitorsForModality(tatami.currentModalityId).length as count">
+                                    <div class="comp-header">
+                                        <i class="fas fa-users"></i> {{ count }} Competidores
+                                    </div>
+                                    <div class="comp-list">
+                                        <span
+                                            *ngFor="let comp of getCompetitorsForModality(tatami.currentModalityId).slice(0, 3)"
+                                            class="comp-pill">
+                                            {{ comp.name }}
+                                        </span>
+                                        <span *ngIf="count > 3" class="comp-pill more">
+                                            +{{ count - 3 }}
+                                        </span>
+                                    </div>
+                                </ng-container>
                             </div>
                         </div>
 
                         <div class="tatami-actions">
-                            <button *ngIf="tatami.currentSection.status === 'READY'" class="btn-action start"
-                                (click)="startSection(tatami)">
+                            <button *ngIf="tatami.statusModality === 'READY'" class="btn-action start"
+                                (click)="startCurrentModality(tatami)">
                                 <span class="icon"><i class="fas fa-play"></i></span>
-                                <span class="text">INICIAR SECCIÓN</span>
+                                <span class="text">INICIAR MODALIDAD</span>
                             </button>
 
-                            <button *ngIf="tatami.currentSection.status === 'RUNNING'" class="btn-action finish"
-                                (click)="finishSection(tatami)">
-                                <span class="icon"><i class="fas fa-stop"></i></span>
-                                <span class="text">FINALIZAR</span>
+                            <button *ngIf="tatami.statusModality === 'RUNNING'" class="btn-action finish"
+                                (click)="finishCurrentModality(tatami)">
+                                <span class="icon"><i class="fas fa-step-forward"></i></span>
+                                <span class="text">SIGUIENTE / FINALIZAR</span>
                             </button>
                         </div>
                     </ng-container>
@@ -165,7 +210,9 @@
                             <div class="pulse-ring"></div>
                             <i class="fas fa-coffee"></i>
                             <p>Esperando asignación</p>
-                            <span class="sub-text">Tatami disponible</span>
+                            <button class="btn-assign-group" (click)="openGroupSelector(tatami)">
+                                <i class="fas fa-layer-group"></i> Asignar Grupo
+                            </button>
                         </div>
                     </ng-template>
                 </div>
@@ -173,10 +220,58 @@
         </main>
     </div>
 
+    <!-- MODAL: ASSIGN JUDGES -->
     <app-assign-judges *ngIf="currentAssignTatami" [tatami]="currentAssignTatami" [championshipId]="championshipId"
         [allTatamis]="tatamis" (close)="closeAssignModal()" (save)="onJudgesAssigned($event)">
     </app-assign-judges>
 
-    <app-section-competitors *ngIf="currentViewSection" [section]="currentViewSection" (close)="closeViewCompetitors()">
+    <!-- MODAL: VIEW COMPETITORS -->
+    <app-section-competitors *ngIf="currentViewSectionObject" [section]="currentViewSectionObject"
+        (close)="closeViewCompetitors()">
     </app-section-competitors>
+
+    <!-- MODAL: GROUP SELECTOR -->
+    <div class="modal-overlay" *ngIf="showGroupSelector" (click)="closeGroupSelector()">
+        <div class="modal-content group-selector" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Asignar Grupo a {{ targetTatamiForSelection?.name }}</h2>
+                <button class="close-btn" (click)="closeGroupSelector()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body custom-scrollbar">
+                <div class="group-list">
+                    <div class="group-card" *ngFor="let group of filteredGroupsForSelection"
+                        (click)="selectGroup(group)">
+                        <div class="group-details">
+                            <h3 style="margin: 0; font-size: 1rem; color: #2d3436;">
+                                {{ getPrimaryModalityName(group) }}
+                            </h3>
+                            <div class="demo-tags"
+                                style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                                <span class="tag-badge"
+                                    style="background: #e1f5fe; color: #0277bd; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">{{
+                                    group.genero }}</span>
+                                <span class="tag-badge"
+                                    style="background: #e1f5fe; color: #0277bd; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">{{
+                                    group.cinturon }}</span>
+                                <span class="tag-badge"
+                                    style="background: #e1f5fe; color: #0277bd; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">{{
+                                    group.edad }} años</span>
+                                <span class="tag-badge"
+                                    style="background: #e1f5fe; color: #0277bd; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">{{
+                                    group.peso }} kg</span>
+                            </div>
+                            <small style="display: block; margin-top: 0.4rem; color: #95a5a6; font-size: 0.75rem;">
+                                + {{ group.activeModalities.length - 1 }} modalidades adicionales
+                            </small>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color: #dfe6e9;"></i>
+                    </div>
+                    <div class="empty-state" *ngIf="filteredGroupsForSelection.length === 0">
+                        <p>No hay grupos disponibles para este Tatami</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
