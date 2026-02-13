@@ -27,7 +27,7 @@ public class Usuario {
     @Column(name = "cinturon_rango", length = 20)
     private String cinturonRango;
 
-    @Column(name = "Nacionalidad", length = 20)
+    @Column(name = "Nacionalidad")
     private String nacionalidad;
 
     @Column(name = "ciudad", length = 100)

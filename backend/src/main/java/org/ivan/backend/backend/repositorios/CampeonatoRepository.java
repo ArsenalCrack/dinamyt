@@ -11,4 +11,5 @@ public interface CampeonatoRepository extends JpaRepository<Campeonato, Integer>
 
     List<Campeonato> findByCreadoPor(long creadoPor);
     List<Campeonato> findByVisibleTrue();
+    List<Campeonato> findByVisibleTrueAndEstado(String estado);
 }

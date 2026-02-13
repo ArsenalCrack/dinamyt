@@ -37,6 +37,7 @@ import org.springframework.http.HttpStatus;
 public class controlador_principal {
 
     @Autowired
+    private CampeonatoLiveMapper campeonatoLiveMapper;
     private EmailService emailService;
 
     private final UsuarioRepository usuarioRepository;
@@ -94,6 +95,7 @@ public class controlador_principal {
                 .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
         usuario.setInstructor(instructor);
         usuario.setAcademia(academia);
+        usuario.setEstado(1);
         usuariosPendientes.put(usuario.getCorreo(), usuario);
         return ResponseEntity.ok("");
     }
@@ -326,7 +328,7 @@ public class controlador_principal {
 
     @GetMapping("/campeonatos")
     private ResponseEntity<?> cargarcampeonatos() {
-        List<Campeonato> campeonatos = campeonatoRepository.findByVisibleTrue();
+        List<Campeonato> campeonatos = campeonatoRepository.findByVisibleTrueAndEstado("LISTO");
         return ResponseEntity.ok(campeonatos);
     }
 
@@ -412,7 +414,6 @@ public class controlador_principal {
                 campeonato.setSecciones(mapper.writeValueAsString(resultado));
             }
 
-            campeonato.setParticipantes(0);
             campeonato.setEstado("BORRADOR");
             campeonato.setPuedeInscribirse(true);
             if (datos.get("fechaInicio") != null) {
@@ -476,23 +477,6 @@ public class controlador_principal {
         List<String> nuevasIds = seccionesAsignadas.values().stream()
                 .map(Seccion::getID)
                 .toList();
-
-        // Actualizar secciones activas del campeonato
-        List<String> actualesCampeonato = new ArrayList<>();
-        if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
-            actualesCampeonato = objectMapper.readValue(
-                    campeonato.getSeccionesActivas(),
-                    new TypeReference<List<String>>() {
-                    });
-        }
-        for (String id : nuevasIds) {
-            if (!actualesCampeonato.contains(id)) {
-                actualesCampeonato.add(id);
-            }
-        }
-        campeonato.setSeccionesActivas(objectMapper.writeValueAsString(actualesCampeonato));
-        campeonatoRepository.save(campeonato);
-
         // Verificar si el usuario ya tiene inscripción en este campeonato
         Inscripciones inscripcion = inscripcionRepository
                 .findByUsuarioAndCampeonato(usuario.getIdDocumento(), campeonato.getIdCampeonato())
@@ -743,17 +727,78 @@ public class controlador_principal {
     }
 
     @PutMapping("/invitaciones/{invitationId}")
-    private ResponseEntity<?> respuestraainscripcion(@PathVariable Integer invitationId,
+    public ResponseEntity<?> respuestraainvitacion(@PathVariable Integer invitationId,
             @RequestBody Map<String, Object> estado) {
-        System.out.println(invitationId + " " + estado);
-        if (estado.get("estado").toString().equals("ACEPTADO")) {
-            Inscripciones ins = inscripcionRepository.findById(invitationId)
+        Inscripciones ins = inscripcionRepository.findById(invitationId)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        
+        ObjectMapper mapper = new ObjectMapper();
+        System.out.println(invitationId + " " + estado);
+        if (estado.get("estado").toString().equals("ACEPTADO")) {     
             ins.setEstado(3);
+
+            List<String> lista = mapper.readValue(
+                    ins.getSecciones(),
+                    new TypeReference<List<String>>() {}
+            );
+            Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString())).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+            List<String> actualesCampeonato = new ArrayList<>();
+            if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
+                actualesCampeonato = mapper.readValue(
+                        campeonato.getSeccionesActivas(),
+                        new TypeReference<List<String>>() {
+                        });
+            }
+            for (String id : lista) {
+                if (!actualesCampeonato.contains(id)) {
+                    actualesCampeonato.add(id);
+                }
+            }
+            
+            campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
+            campeonatoRepository.save(campeonato);
             inscripcionRepository.save(ins);
         } else {
-            Inscripciones ins = inscripcionRepository.findById(invitationId)
+            ins.setEstado(4);
+            inscripcionRepository.save(ins);
+        }
+        return ResponseEntity.ok("");
+    }
+    
+    @PutMapping("/inscripciones/{id}")
+    public ResponseEntity<?> responderinscripcion(@PathVariable Integer id,
+            @RequestBody Map<String, Object> estado) {
+        Inscripciones ins = inscripcionRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        
+        ObjectMapper mapper = new ObjectMapper();
+        System.out.println(id + " " + estado);
+        if (estado.get("estado").toString().equals("3")) {     
+            ins.setEstado(3);
+
+            List<String> lista = mapper.readValue(
+                    ins.getSecciones(),
+                    new TypeReference<List<String>>() {}
+            );
+            Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString())).orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+            System.out.println(campeonato.getIdCampeonato());
+            List<String> actualesCampeonato = new ArrayList<>();
+            if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
+                actualesCampeonato = mapper.readValue(
+                        campeonato.getSeccionesActivas(),
+                        new TypeReference<List<String>>() {
+                        });
+            }
+            for (String id2 : lista) {
+                if (!actualesCampeonato.contains(id2)) {
+                    actualesCampeonato.add(id2);
+                }
+            }
+            
+            campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
+            campeonatoRepository.save(campeonato);
+            inscripcionRepository.save(ins);
+        } else {
             ins.setEstado(4);
             inscripcionRepository.save(ins);
         }
@@ -784,134 +829,61 @@ public class controlador_principal {
         return ResponseEntity.ok(resultado);
     }
 
-    @PutMapping("/inscripciones/{id}")
-        private ResponseEntity<?> actualizarestadoinscripcion(@PathVariable Integer id,
-                @RequestBody Map<String, Integer> estado) {
-            Inscripciones ins = inscripcionRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-            Campeonato cam = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
-                    .orElseThrow(() -> new RuntimeException("campeonato no encontrado"));
-            ins.setEstado(estado.get("estado"));
-            inscripcionRepository.save(ins);
-            System.out.println(estado.get("estado"));
-            if (estado.get("estado") == 3) {
-                cam.setParticipantes(cam.getParticipantes() + 1);
-            } else {
-                if (cam.getParticipantes() > 0) {
-                    cam.setParticipantes(cam.getParticipantes() - 1);
-                }
-            }
-            campeonatoRepository.save(cam);
-            return ResponseEntity.ok(ins);
-        }
+    @GetMapping("/campeonatos/{id}/live-management")
+private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
 
-        @GetMapping("/campeonatos/{id}/live-management")
-        private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
+    Campeonato cam = campeonatoRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
 
-        Campeonato cam = campeonatoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
-
-        List<Inscripciones> inscripciones = inscripcionRepository
-                .findByCampeonatoAndTipousuarioAndVisibleTrueAndInvitadoFalse(
-                        cam.getIdCampeonato().longValue(), 5
-                );
-
-        ObjectMapper mapper = new ObjectMapper();
-
-        // 🔹 Secciones activas del campeonato
-        List<String> seccionesCampeonato;
-        try {
-            seccionesCampeonato = mapper.readValue(
-                    cam.getSeccionesActivas(),
-                    new TypeReference<List<String>>() {}
+    List<Inscripciones> inscripciones = inscripcionRepository
+            .findByCampeonatoAndTipousuarioAndVisibleTrueAndInvitadoFalse(
+                    cam.getIdCampeonato().longValue(), 5
             );
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Error leyendo secciones del campeonato"));
-        }
 
-        Set<String> setSeccionesCampeonato = new HashSet<>(seccionesCampeonato);
+    CampeonatoLiveDTO liveDTO =
+            campeonatoLiveMapper.construirCampeonatoLive(cam, inscripciones);
 
-        Map<String, List<UsuarioInscripcionDTO>> individualesMasculinos = new HashMap<>();
-        Map<String, List<UsuarioInscripcionDTO>> individualesFemeninos = new HashMap<>();
-        Map<String, List<UsuarioInscripcionDTO>> mixtos = new HashMap<>();
-
-
-        for (Inscripciones ins : inscripciones) {
-
-            Usuario u = usuarioRepository.findById(ins.getUsuario()).orElse(null);
-            if (u == null || ins.getSecciones() == null) continue;
-
-            List<String> seccionesInscrito;
-            try {
-                seccionesInscrito = mapper.readValue(
-                        ins.getSecciones(),
-                        new TypeReference<List<String>>() {}
-                );
-            } catch (Exception e) {
-                continue;
-            }
-
-            List<String> seccionesFinales = seccionesInscrito.stream()
-                    .filter(setSeccionesCampeonato::contains)
-                    .toList();
-
-            for (String seccion : seccionesFinales) {
-
-                String modalidad = seccion.split("-")[0];
-
-                UsuarioInscripcionDTO dto = new UsuarioInscripcionDTO();
-                dto.setIdDocumento(u.getIdDocumento());
-                dto.setNombreC(u.getNombreC());
-                dto.setSexo(u.getSexo());
-                dto.setFechaNacimiento(u.getFechaNacimiento());
-                dto.setCinturonRango(u.getCinturonRango());
-                dto.setAcademia(u.getAcademia().getNombre());
-                dto.setInstructor(u.getInstructor().getNombreC());
-                dto.setSecciones(List.of(seccion));
-                dto.setPeso(JsonCleaner.obtenerPrimerPeso(ins.getSecciones()));
-
-
-                if (seccion.contains("MIXTO")) {
-
-                    mixtos
-                        .computeIfAbsent(modalidad, k -> new ArrayList<>())
-                        .add(dto);
-
-                } else if (seccion.contains("MASCULINO")) {
-
-                    individualesMasculinos
-                        .computeIfAbsent(modalidad, k -> new ArrayList<>())
-                        .add(dto);
-
-                } else if (seccion.contains("FEMENINO")) {
-
-                    individualesFemeninos
-                        .computeIfAbsent(modalidad, k -> new ArrayList<>())
-                        .add(dto);
-                }
-
-            }
-        }
-
-        // 🔹 ORDENAMIENTO FINAL (EDAD → CINTURÓN)
-        Inscripcion.ordenarListas(individualesMasculinos);
-        Inscripcion.ordenarListas(individualesFemeninos);
-        Inscripcion.ordenarListas(mixtos);
-
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("campeonato", cam);
-        response.put("individuales", Map.of(
-                "masculinos", individualesMasculinos,
-                "femeninos", individualesFemeninos
-        ));
-        response.put("mixtos", mixtos);
+    return ResponseEntity.ok(liveDTO);
+}
         
-        return ResponseEntity.ok(response);
+    @PostMapping("/tatamis/{tatamiId}/jueces")
+    private ResponseEntity<?> assignJudgesToTatami(@PathVariable Long championshipId,@PathVariable Long tatamiId,@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/tatamis/{tatamiId}/assign-group")
+    private ResponseEntity<?> assignGroupToTatami(@PathVariable Long championshipId,@PathVariable Long tatamiId,@RequestBody Map<String, Object> group) {
+        System.out.println("");
+        return ResponseEntity.ok().build();
+    }
 
+    @DeleteMapping("/tatamis/{tatamiId}/assignment")
+    private ResponseEntity<?> unassignTatami(@PathVariable Long championshipId,@PathVariable Long tatamiId) {
+        return ResponseEntity.ok().build();
+    }
 
+    // ------------------ SECCIONES ------------------
+
+    @PutMapping("/secciones/{sectionId}/status")
+    private ResponseEntity<?> updateSectionStatus(@PathVariable Long championshipId,@PathVariable String sectionId,@RequestBody String request) {
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/secciones/{sectionId}/results")
+    private ResponseEntity<?> submitSectionResults(@PathVariable Long championshipId,@PathVariable String sectionId,@RequestBody Object results) {
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/secciones/{sectionId}/competitors/{competitorId}/status")
+    private ResponseEntity<?> markCompetitorStatus(@PathVariable Long championshipId,@PathVariable String sectionId,@PathVariable String competitorId,@RequestBody String request) {
+        return ResponseEntity.ok().build();
+    }
+
+    // ------------------ MATCHES ------------------
+
+    @PutMapping("/matches/{matchId}/score")
+    private ResponseEntity<?> updateMatchScore(@PathVariable Long championshipId,@PathVariable String matchId,@RequestBody Object scores) {
+        return ResponseEntity.ok().build();
+    }
 
 }
