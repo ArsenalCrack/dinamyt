@@ -143,6 +143,16 @@
                 background: rgba(149, 165, 166, 0.1);
                 color: #7f8c8d;
             }
+
+            &.borrador {
+                background: rgba(241, 196, 15, 0.1);
+                color: #f39c12;
+            }
+
+            &.listo {
+                background: rgba(39, 174, 96, 0.1);
+                color: #27ae60;
+            }
         }
     }
 }
@@ -369,9 +379,28 @@
             }
         }
     }
+
+    &.disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background: #fafafa;
+
+        /* We keep it clickable for the alert, but visually disabled */
+
+        &:hover {
+            transform: none;
+            box-shadow: none;
+            border-color: var(--color-borde);
+
+            .icon-wrapper {
+                background: rgba(26, 26, 26, 0.05);
+                color: var(--color-principal);
+            }
+        }
+    }
 }
 
-/* Delete Modal Styling Refined */
+/* Shared Modal Styling */
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -383,7 +412,7 @@
     padding: 1rem;
 }
 
-.modal-box.delete-modal {
+.modal-box {
     background: #fff;
     padding: 2.5rem;
     border-radius: 24px;
@@ -398,7 +427,6 @@
 
     .warning-icon {
         font-size: 5rem;
-        color: #e74c3c;
         display: block;
         margin: 0 auto;
     }
@@ -443,31 +471,72 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-size: 0.9rem;
+            transition: all 0.2s;
+
+            &:disabled {
+                opacity: 0.7;
+                cursor: not-allowed;
+            }
         }
 
         .btn-cancel {
             background: #eee;
             color: #333;
-            transition: background 0.2s;
 
             &:hover {
                 background: #e0e0e0;
             }
         }
+    }
+
+    /* Specific variants */
+    &.delete-modal {
+        .warning-icon {
+            color: #e74c3c;
+        }
 
         .btn-confirm-delete {
             background: #e74c3c;
             color: #fff;
-            transition: all 0.2s;
 
             &:hover {
                 background: #c0392b;
                 box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
             }
+        }
+    }
 
-            &:disabled {
-                opacity: 0.7;
-                cursor: not-allowed;
+    &.publish-modal {
+        .warning-icon {
+            color: #27ae60;
+        }
+
+        .btn-confirm-publish {
+            background: #27ae60;
+            color: #fff;
+
+            &:hover {
+                background: #219150;
+                box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
+            }
+        }
+    }
+
+    &.info-modal {
+        .warning-icon {
+            color: #f39c12;
+            font-size: 4rem;
+            /* Slightly smaller for info */
+        }
+
+        .btn-confirm-info {
+            background: var(--color-principal);
+            color: #fff;
+            width: 100%;
+
+            &:hover {
+                background: #333;
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             }
         }
     }
@@ -557,7 +626,7 @@
     }
 
     /* Modal Responsive Fix */
-    .modal-box.delete-modal {
+    .modal-box {
         padding: 2rem 1.5rem;
         margin: 1rem;
         max-width: 360px;

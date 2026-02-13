@@ -76,7 +76,7 @@ export class ApiService {
   getInvitationsByChampionship(id: string | number) { return this.championship.getInvitationsByChampionship(id); }
   gestionarInscripcionCampeonato(id: string | number, estado: number) { return this.championship.updateInscriptionState(id, estado); }
 
-  assignJudgesToTatami(championshipId: string | number, tatamiId: number, body: any) { return this.championship.assignJudgesToTatami(championshipId, tatamiId, body); }
+  assignJudgesToTatami(championshipId: string | number, tatamiId: number, body: any) { return this.championship.asignarJuecesATatami(championshipId, tatamiId, body); }
   updateSectionStatus(championshipId: string | number, sectionId: string, status: string, tatamiId?: number) { return this.championship.updateSectionStatus(championshipId, sectionId, status, tatamiId); }
   updateMatchScore(championshipId: string | number, matchId: string, scores: any) { return this.championship.updateMatchScore(championshipId, matchId, scores); }
 
@@ -87,5 +87,5 @@ export class ApiService {
   assignGroupToTatami(championshipId: string | number, tatamiId: number, group: any) { return this.championship.assignGroupToTatami(championshipId, tatamiId, group); }
   unassignTatami(championshipId: string | number, tatamiId: number) { return this.championship.unassignTatami(championshipId, tatamiId); }
   submitSectionResults(championshipId: string | number, sectionId: string, results: any) { return this.championship.submitSectionResults(championshipId, sectionId, results); }
-  markCompetitorStatus(championshipId: string | number, sectionId: string, competitorId: string, status: any) { return this.championship.markCompetitorStatus(championshipId, sectionId, competitorId, status); }
+  markCompetitorStatus(championshipId: string | number, sectionId: string, competitorId: string, status: any) { return this.championship.actualizarEstadoCompetidor(championshipId, sectionId, competitorId, status); }
 }

@@ -25,7 +25,10 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
 
     // Modal states
     showDeleteModal = false;
+    showPublishModal = false;
+    showEditBlockedModal = false;
     isDeleting = false;
+    isPublishing = false;
 
     constructor(
         private route: ActivatedRoute,
@@ -76,6 +79,7 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
                 // Calculate status
                 if (!this.campeonato.pais) this.campeonato.pais = 'Colombia'; // Ghost
                 if (!this.campeonato.ciudad) this.campeonato.ciudad = 'Bogotá'; // Ghost
+                console.log('Campeonato Data:', this.campeonato); // Debug: Check incoming status
                 this.campeonato.estadoReal = this.calculateStatus(this.campeonato.fechaInicio, this.campeonato.fecha_fin);
 
                 this.loading = false;
@@ -90,6 +94,16 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
 
     calculateStatus(fechaInicio: string, fechaFin: string | undefined): string {
         if (!fechaInicio) return 'PLANIFICADO';
+
+        // Priority: Explicit Status > Privacy (Draft) > Date Logic
+        if (this.campeonato?.estado === 'BORRADOR') return 'BORRADOR';
+        if (this.campeonato?.estado === 'LISTO') return 'LISTO';
+
+        // If not public (and not LISTO/BORRADOR), it is a Draft
+        // Check for loose equality or boolean
+        const isPublic = this.campeonato?.esPublico === true || this.campeonato?.esPublico === 1 || this.campeonato?.esPublico === '1';
+        if (!isPublic) return 'BORRADOR';
+
         const now = new Date();
         now.setHours(0, 0, 0, 0);
 
@@ -146,7 +160,60 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
     }
 
     editChampionship(): void {
+        if (this.campeonato.estado === 'LISTO') {
+            this.showEditBlockedModal = true;
+            this.scrollLock.lock();
+            return;
+        }
         this.router.navigate(['/campeonato/edit', this.id]);
+    }
+
+    closeEditBlockedModal(): void {
+        this.showEditBlockedModal = false;
+        this.scrollLock.unlock();
+    }
+
+    publishChampionship(): void {
+        if (!this.id || this.isPublishing) return;
+        this.showPublishModal = true;
+        this.scrollLock.lock();
+    }
+
+    closePublishModal(): void {
+        this.showPublishModal = false;
+        this.isPublishing = false;
+        this.scrollLock.unlock();
+    }
+
+    confirmPublish(): void {
+        this.isPublishing = true;
+        // Construct payload to update status to LISTO and ensure visibility
+        const payload = {
+            ...this.campeonato,
+            estado: 'LISTO',
+            esPublico: 1,
+            visible: 1,
+            // Ensure modalities are sent in expected format if they were parsed
+            modalidades: typeof this.campeonato.modalidades === 'string'
+                ? JSON.parse(this.campeonato.modalidades)
+                : this.campeonato.modalidades
+        };
+
+        this.api.updateCampeonato(this.id!, payload).subscribe({
+            next: (updatedData) => {
+                this.closePublishModal();
+                // Update local state
+                this.campeonato.estado = 'LISTO';
+                this.campeonato.esPublico = 1;
+                this.campeonato.visible = 1;
+                this.campeonato.estadoReal = 'LISTO';
+            },
+            error: (err) => {
+                console.error('Error publishing championship:', err);
+                this.isPublishing = false;
+                alert('Hubo un error al publicar el campeonato. Por favor intenta de nuevo.'); // Fallback alert for error
+            }
+        });
     }
 
     viewPublicDetails(): void {

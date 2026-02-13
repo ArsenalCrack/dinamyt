@@ -430,6 +430,11 @@ export class LiveTournamentComponent implements OnInit {
     this.scrollLock.unlock();
   }
 
+  viewResults(item: any) {
+    if (!item || !item.id) return;
+    this.viewCompetitors(item.id);
+  }
+
   // Getter for the view component
   get currentViewSectionObject(): any {
     if (!this.currentViewSectionId) return null;

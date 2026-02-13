@@ -47,8 +47,21 @@
             <!-- Actions Grid -->
             <div class="actions-grid">
 
+                <!-- Publish Action (Only if Draft) -->
+                <button class="action-card primary" *ngIf="campeonato.estadoReal === 'BORRADOR'"
+                    (click)="publishChampionship()">
+                    <div class="icon-wrapper">
+                        <i class="fas" [ngClass]="isPublishing ? 'fa-spinner fa-spin' : 'fa-upload'"></i>
+                    </div>
+                    <div class="action-info">
+                        <h3>Publicar</h3>
+                        <p>Hacer visible y cambiar a LISTO</p>
+                    </div>
+                </button>
+
                 <!-- Live Management Action (Highlighted) -->
-                <button class="action-card primary" *ngIf="campeonato.estadoReal !== 'TERMINADO'"
+                <button class="action-card primary"
+                    *ngIf="campeonato.estadoReal !== 'TERMINADO' && campeonato.estadoReal !== 'BORRADOR'"
                     (click)="startChampionship()">
                     <div class="icon-wrapper">
                         <i class="fas fa-desktop"></i>
@@ -80,7 +93,8 @@
                     </div>
                 </button>
 
-                <button class="action-card" (click)="editChampionship()" *ngIf="campeonato.estadoReal !== 'TERMINADO'">
+                <button class="action-card" (click)="editChampionship()"
+                    [class.disabled]="campeonato.estado === 'LISTO'" *ngIf="campeonato.estadoReal !== 'TERMINADO'">
                     <div class="icon-wrapper">
                         <i class="fas fa-edit"></i>
                     </div>
@@ -110,6 +124,44 @@
                     </div>
                 </button>
 
+            </div>
+        </div>
+    </div>
+
+    <!-- Publish Modal -->
+    <div class="modal-overlay" *ngIf="showPublishModal">
+        <div class="modal-box publish-modal">
+            <div class="modal-header">
+                <div class="icon-container">
+                    <i class="fas fa-rocket warning-icon"></i>
+                </div>
+                <h3>¿Publicar Campeonato?</h3>
+                <p>Una vez publicado, será visible para todos y no podrás editar los datos básicos como nombre o fechas.
+                </p>
+            </div>
+            <div class="modal-actions-delete">
+                <button class="btn-cancel" (click)="closePublishModal()" [disabled]="isPublishing">Cancelar</button>
+                <button class="btn-confirm-publish" (click)="confirmPublish()" [disabled]="isPublishing">
+                    <i class="fas" [ngClass]="isPublishing ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+                    {{ isPublishing ? 'Publicando...' : 'Sí, Publicar' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Blocked Modal -->
+    <div class="modal-overlay" *ngIf="showEditBlockedModal">
+        <div class="modal-box info-modal">
+            <div class="modal-header">
+                <div class="icon-container">
+                    <i class="fas fa-lock warning-icon"></i>
+                </div>
+                <h3>Edición Restringida</h3>
+                <p>El campeonato ya está publicado ("LISTO"). Para garantizar la integridad de los datos, la edición
+                    básica está deshabilitada.</p>
+            </div>
+            <div class="modal-actions-delete">
+                <button class="btn-confirm-info" (click)="closeEditBlockedModal()">Entendido</button>
             </div>
         </div>
     </div>

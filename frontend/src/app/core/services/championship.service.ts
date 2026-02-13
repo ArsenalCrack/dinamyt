@@ -97,8 +97,23 @@ export class ChampionshipService {
         return this.http.put(`${this.apiUrl}/inscripciones/${id}`, { estado });
     }
 
-    assignJudgesToTatami(championshipId: string | number, tatamiId: number, body: any): Observable<any> {
+    /**
+     * Asigna jueces a un tatami específico.
+     * Backend: Implementar este endpoint para recibir la lista de jueces y guardarla asociada al tatami.
+     * Body esperado: { "juezCentral": id, "juecesNormales": [id1, id2...], "juezMesa": id }
+     */
+    asignarJuecesATatami(championshipId: string | number, tatamiId: number, body: any): Observable<any> {
         return this.http.post(`${this.apiUrl}/campeonatos/${championshipId}/live-management/tatamis/${tatamiId}/jueces`, body);
+    }
+
+    /**
+     * Obtiene los jueces pertenecientes al campeonato para ser mostrados en el buscador y asignados.
+     * Backend: Buscar todos los jueces (usuarios con rol juez/instructor/etc que sean válidos) del campeonato.
+     * Estos jueces se listarán en el modal de asignar jueces.
+     * Respuesta esperada: Lista de objetos usuario { id, nombre, apellido, nacionalidad, etc. }
+     */
+    obtenerJuecesDelCampeonato(championshipId: string | number): Observable<any> {
+        return this.http.get(`${this.apiUrl}/campeonatos/${championshipId}/jueces-live-disponibles`);
     }
 
     updateSectionStatus(championshipId: string | number, sectionId: string, status: string, tatamiId?: number): Observable<any> {
@@ -120,41 +135,43 @@ export class ChampionshipService {
     }
 
     /**
-     * Assigns a section (modality) to a specific tatami.
-     * Note: This might need backend support to persist the assignment if the page reloads.
+     * Asigna una sección (modalidad) a un tatami específico.
+     * Nota: Esto podría necesitar soporte del backend para persistir la asignación si la página se recarga.
      */
     assignSectionToTatami(championshipId: string | number, sectionId: string, tatamiId: number): Observable<any> {
-        // We reuse updateSectionStatus but sending the tatamiId and status 'ASSIGNED' or 'BUSY'
-        // Assuming backend handles this state.
+        // Reutilizamos updateSectionStatus enviando el tatamiId y estado 'ASSIGNED' o 'BUSY'
+        // Asumiendo que el backend maneja este estado.
         return this.updateSectionStatus(championshipId, sectionId, 'BUSY', tatamiId);
     }
 
     /**
-     * Persist the assignment of a whole Demographic Group to a Tatami.
-     * Use this when user clicks "Assign Group" in the modal.
+     * Persistir la asignación de un Grupo Demográfico completo a un Tatami.
+     * Usar esto cuando el usuario hace clic en "Asignar Grupo" en el modal.
      */
     assignGroupToTatami(championshipId: string | number, tatamiId: number, group: any): Observable<any> {
         return this.http.post(`${this.apiUrl}/campeonatos/${championshipId}/live-management/tatamis/${tatamiId}/assign-group`, group);
     }
 
     /**
-     * Clear the current assignment of a Tatami (Undo/Cancel).
+     * Limpiar la asignación actual de un Tatami (Deshacer/Cancelar).
      */
     unassignTatami(championshipId: string | number, tatamiId: number): Observable<any> {
         return this.http.delete(`${this.apiUrl}/campeonatos/${championshipId}/live-management/tatamis/${tatamiId}/assignment`);
     }
 
     /**
-     * Submit final results/winners for a specific section.
+     * Enviar resultados finales/ganadores para una sección específica.
      */
     submitSectionResults(championshipId: string | number, sectionId: string, results: any): Observable<any> {
         return this.http.post(`${this.apiUrl}/campeonatos/${championshipId}/live-management/secciones/${sectionId}/results`, results);
     }
 
     /**
-     * Update status of a competitor (e.g. ABSENT, DISQUALIFIED).
+     * Actualiza el estado de un competidor (ej. AUSENTE, DESCALIFICADO, PRESENTE).
+     * Backend: Implementar endpoint para cambiar estado individual. Útil para Check-in.
+     * Body esperado: { "status": "AUSENTE" | "DESCALIFICADO" | "PRESENTE" }
      */
-    markCompetitorStatus(championshipId: string | number, sectionId: string, competitorId: string, status: 'ABSENT' | 'DISQUALIFIED' | 'PRESENT'): Observable<any> {
+    actualizarEstadoCompetidor(championshipId: string | number, sectionId: string, competitorId: string, status: 'AUSENTE' | 'DESCALIFICADO' | 'PRESENTE'): Observable<any> {
         return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/secciones/${sectionId}/competitors/${competitorId}/status`, { status });
     }
 }

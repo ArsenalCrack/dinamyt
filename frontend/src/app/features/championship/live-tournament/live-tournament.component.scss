@@ -261,25 +261,59 @@
     .history-item {
         display: flex;
         gap: 0.8rem;
-        padding: 0.6rem;
-        opacity: 0.7;
+        padding: 0.8rem;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        opacity: 1;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+        align-items: center;
 
         .check-icon {
             color: #2ecc71;
             font-size: 0.8rem;
-            margin-top: 3px;
+        }
+
+        .history-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         h4 {
             margin: 0;
             font-size: 0.85rem;
-            color: #7f8c8d;
-            text-decoration: line-through;
+            color: #2c3e50;
+            font-weight: 600;
         }
 
         .history-meta {
             font-size: 0.7rem;
             color: #bdc3c7;
+        }
+
+        .btn-results {
+            background: #fff;
+            border: 1px solid #dfe6e9;
+            color: #636e72;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.8rem;
+
+            &:hover {
+                background: #f1c40f;
+                border-color: #f1c40f;
+                color: #fff;
+                transform: scale(1.1);
+            }
         }
     }
 }
