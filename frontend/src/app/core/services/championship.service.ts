@@ -108,9 +108,9 @@ export class ChampionshipService {
 
     /**
      * Obtiene los jueces pertenecientes al campeonato para ser mostrados en el buscador y asignados.
-     * Backend: Buscar todos los jueces (usuarios con rol juez/instructor/etc que sean válidos) del campeonato.
+     * Backend: Buscar todos los jueces (usuarios con rol juez/juez central/etc que sean válidos) del campeonato.
      * Estos jueces se listarán en el modal de asignar jueces.
-     * Respuesta esperada: Lista de objetos usuario { id, nombre, apellido, nacionalidad, etc. }
+     * Respuesta esperada: Lista de objetos usuario { id, nombre, apellido, nacionalidad, rol  etc. }
      */
     obtenerJuecesDelCampeonato(championshipId: string | number): Observable<any> {
         return this.http.get(`${this.apiUrl}/campeonatos/${championshipId}/jueces-live-disponibles`);
