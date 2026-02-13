@@ -337,9 +337,28 @@ export class LiveTournamentComponent implements OnInit {
   }
 
   submitResults(tatami: Tatami) {
-    // Placeholder for Results Modal
-    alert(`Aquí se abrirá el modal para registrar resultados de: ${this.formatModalityName(tatami.currentModalityId!)}`);
-    // this.api.submitSectionResults(...)
+    if (!tatami.currentModalityId || !this.championshipId) return;
+
+    // 1. Simulación: Admin ingresa/revisa resultados (Aquí iría la apertura del Modal de Resultados)
+    // El usuario pidió asegurar que el admin vea los resultados antes de hacerlos públicos.
+
+    // TODO: Reemplazar prompt/confirm con un Modal Real de Resultados más adelante.
+    const adminCheck = confirm(`Administrador: ¿Está listo para registrar y revisar los resultados de: ${this.formatModalityName(tatami.currentModalityId)}?`);
+    if (!adminCheck) return;
+
+    // 2. Simulación de datos (En el futuro vendrán del formulario del modal)
+    const mockJudgeResults = {
+      detalles: 'Estos resultados han sido verificados por el Juez Central',
+      estado: 'FINALIZADO_REVISADO'
+    };
+
+    // 3. Confirmación final para "Mostrar al público"
+    if (confirm('¿Los resultados son correctos? Al confirmar, se guardarán y se mostrarán al PÚBLICO.')) {
+      this.api.enviarResultadosSeccion(this.championshipId, tatami.currentModalityId, mockJudgeResults).subscribe({
+        next: () => alert('Resultados publicados correctamente.'),
+        error: (e) => alert('Error al publicar resultados.')
+      });
+    }
   }
 
   manageCompetitors(tatami: Tatami) {

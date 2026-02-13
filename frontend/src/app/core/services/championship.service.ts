@@ -139,13 +139,12 @@ export class ChampionshipService {
      * Nota: Esto podría necesitar soporte del backend para persistir la asignación si la página se recarga.
      */
     assignSectionToTatami(championshipId: string | number, sectionId: string, tatamiId: number): Observable<any> {
-        // Reutilizamos updateSectionStatus enviando el tatamiId y estado 'ASSIGNED' o 'BUSY'
-        // Asumiendo que el backend maneja este estado.
-        return this.updateSectionStatus(championshipId, sectionId, 'BUSY', tatamiId);
+        // Reutilizamos updateSectionStatus enviando el tatamiId y estado 'OCUPADO'
+        return this.updateSectionStatus(championshipId, sectionId, 'OCUPADO', tatamiId);
     }
 
     /**
-     * Persistir la asignación de un Grupo Demográfico completo a un Tatami.
+     * Persistir la asignación de un Grupo Demográfico completo a un Tatami.. osea no solo una sección, sino varias que tienen iguales categorias.
      * Usar esto cuando el usuario hace clic en "Asignar Grupo" en el modal.
      */
     assignGroupToTatami(championshipId: string | number, tatamiId: number, group: any): Observable<any> {
@@ -160,9 +159,10 @@ export class ChampionshipService {
     }
 
     /**
-     * Enviar resultados finales/ganadores para una sección específica.
+     * Enviar resultados finales de una sección.
+     * Esta acción debería hacer públicos los resultados tras la validación del administrador.
      */
-    submitSectionResults(championshipId: string | number, sectionId: string, results: any): Observable<any> {
+    enviarResultadosSeccion(championshipId: string | number, sectionId: string, results: any): Observable<any> {
         return this.http.post(`${this.apiUrl}/campeonatos/${championshipId}/live-management/secciones/${sectionId}/results`, results);
     }
 

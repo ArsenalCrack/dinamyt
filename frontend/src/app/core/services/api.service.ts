@@ -86,6 +86,6 @@ export class ApiService {
   assignSectionToTatami(championshipId: string | number, sectionId: string, tatamiId: number) { return this.championship.assignSectionToTatami(championshipId, sectionId, tatamiId); }
   assignGroupToTatami(championshipId: string | number, tatamiId: number, group: any) { return this.championship.assignGroupToTatami(championshipId, tatamiId, group); }
   unassignTatami(championshipId: string | number, tatamiId: number) { return this.championship.unassignTatami(championshipId, tatamiId); }
-  submitSectionResults(championshipId: string | number, sectionId: string, results: any) { return this.championship.submitSectionResults(championshipId, sectionId, results); }
+  enviarResultadosSeccion(championshipId: string | number, sectionId: string, results: any) { return this.championship.enviarResultadosSeccion(championshipId, sectionId, results); }
   markCompetitorStatus(championshipId: string | number, sectionId: string, competitorId: string, status: any) { return this.championship.actualizarEstadoCompetidor(championshipId, sectionId, competitorId, status); }
 }
