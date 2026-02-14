@@ -49,54 +49,27 @@ export class AssignJudgesComponent implements OnInit {
         if (!this.championshipId) return;
         this.loading = true;
 
-        // Fetch judges (inscriptions with type Juez/Central/Mesa) -> same logic as details
-        this.api.getJuecesByCampeonato(this.championshipId).subscribe({
+        this.api.obtenerJuecesDelCampeonato(this.championshipId).subscribe({
             next: (data: any[]) => {
-                const rawInscriptions = data || [];
-                const judgePromises = rawInscriptions.map((ins: any) => {
-                    const userId = ins.usuario;
-                    return new Promise<Juez | null>((resolve) => {
-                        this.api.searchUsers(String(userId), '0', '0', 6).subscribe({
-                            next: (users: any[]) => {
-                                const user = users.find(u => String(u.idDocumento) === String(userId));
-                                if (user) {
-                                    // Determine role from inscription
-                                    const typeId = ins.tipousuario ?? ins.idTipo ?? ins.id_tipo;
-                                    let role = 'Juez';
-                                    if (typeId === 6) role = 'Juez Central';
-                                    else if (typeId === 7) role = 'Juez de Mesa';
+                this.jueces = (data || []).map(j => ({
+                    id: j.id || j.idDocumento,
+                    nombre: j.nombre || j.nombreC || j.nombre_completo,
+                    avatar: j.avatar || 'assets/avatar-1.png',
+                    rol: j.rol || 'Juez',
+                    categoria: j.categoria || j.cinturonRango || 'N/A',
+                    pais: j.pais || j.nacionalidad,
+                    ciudad: j.ciudad,
+                    assignedToTatami: false
+                }));
 
-                                    resolve({
-                                        id: user.idDocumento,
-                                        nombre: user.nombreC,
-                                        avatar: 'assets/avatar-1.png',
-                                        rol: role,
-                                        categoria: user.cinturonRango || 'N/A',
-                                        pais: user.nacionalidad,
-                                        ciudad: user.ciudad,
-                                        assignedToTatami: false
-                                    });
-                                } else {
-                                    resolve(null);
-                                }
-                            },
-                            error: () => resolve(null)
-                        });
-                    });
-                });
-
-                Promise.all(judgePromises).then(results => {
-                    this.jueces = results.filter(j => j !== null) as Juez[];
-                    this.restoreAssignments();
-                    this.checkAssignments();
-                    this.filterJudges();
-                    this.loading = false;
-                });
+                this.restoreAssignments();
+                this.checkAssignments();
+                this.filterJudges();
+                this.loading = false;
             },
             error: (e) => {
                 console.error('Error loading judges', e);
                 this.loading = false;
-                // Mock if needed or empty
             }
         });
     }

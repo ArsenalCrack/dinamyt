@@ -64,6 +64,7 @@ export class ApiService {
   updateCampeonato(id: string | number, payload: any) { return this.championship.updateCampeonato(id, payload); }
   deleteCampeonato(id: string | number) { return this.championship.deleteCampeonato(id); }
   getJuecesByCampeonato(campeonatoId: string | number) { return this.championship.getJuecesByCampeonato(campeonatoId); }
+  obtenerJuecesDelCampeonato(championshipId: string | number) { return this.championship.obtenerJuecesDelCampeonato(championshipId); }
   inscribirUsuarioCampeonato(payload: any) { return this.championship.inscribirUsuarioCampeonato(payload); }
   getMisInscripciones(userId: string | number) { return this.championship.getMisInscripciones(userId); }
   eliminarInscripcion(inscriptionId: string | number) { return this.championship.eliminarInscripcion(inscriptionId); }

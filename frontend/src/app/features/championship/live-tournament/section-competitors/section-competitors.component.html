@@ -20,7 +20,7 @@
             <table class="competitors-table">
                 <thead>
                     <tr>
-                        <th>#</th>
+                        <th class="col-num">#</th>
                         <th>Nombre</th>
                         <th>Academia</th>
                         <th>Cinturón</th>
@@ -33,15 +33,10 @@
                     <tr *ngFor="let comp of section?.competitors; let i = index">
                         <td class="col-num">{{ i + 1 }}</td>
                         <td class="col-name">
-                            <div style="display: flex; align-items: center; gap: 0.8rem;">
-                                <span class="avatar"
-                                    style="width: 32px; height: 32px; display:flex; align-items:center; justify-content:center; background:#eee; border-radius:50%; font-weight:bold; color:#555;">{{
-                                    comp.name.charAt(0) }}</span>
-                                <div
-                                    style="display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2;">
-                                    <span style="font-weight: 500;">{{ comp.name }}</span>
-                                    <small style="color: #7f8c8d; font-size: 0.75rem;">{{ comp.gender }}</small>
-                                </div>
+                            <span class="avatar">{{ comp.name.charAt(0) }}</span>
+                            <div class="name-info">
+                                <span class="name-text">{{ comp.name }}</span>
+                                <small class="gender-text">{{ comp.gender }}</small>
                             </div>
                         </td>
                         <td class="col-academy">{{ comp.academy }}</td>
@@ -49,15 +44,13 @@
                         <td>{{ comp.weight ? comp.weight + ' kg' : '-' }}</td>
                         <td>{{ comp.age ? comp.age + ' años' : '-' }}</td>
                         <td class="col-status">
-                            <span class="status-badge" [ngClass]="getStatusClass(comp.status)"
-                                style="padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">
+                            <span class="status-badge" [ngClass]="getStatusClass(comp.status)">
                                 {{ formatStatus(comp.status) }}
                             </span>
                         </td>
                     </tr>
                     <tr *ngIf="!section?.competitors?.length">
-                        <td colspan="7" class="empty-state" style="text-align: center; padding: 2rem; color: #888;">No
-                            hay competidores en esta sección</td>
+                        <td colspan="7" class="empty-state">No hay competidores en esta sección</td>
                     </tr>
                 </tbody>
             </table>

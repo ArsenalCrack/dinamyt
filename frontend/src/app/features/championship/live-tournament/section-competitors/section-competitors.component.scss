@@ -1,35 +1,49 @@
+// VARIABLES
+$bg-dark: #121212;
+$panel-dark: #1e1e1e;
+$card-dark: #252525;
+$text-light: #e0e0e0;
+$text-muted: #a0a0a0;
+$accent-red: #e50914;
+$accent-blue: #2979ff;
+$border-color: #333;
+
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 1100;
 
     @media print {
-        position: static;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: auto;
         background: white;
         display: block;
-        height: auto;
         backdrop-filter: none;
+        z-index: 9999;
     }
 }
 
 .modal-content {
-    background: #1a1a1a;
-    width: 800px;
+    background: $panel-dark;
+    width: 850px;
     max-width: 95%;
     max-height: 85vh;
-    border-radius: 12px;
-    border: 1px solid #333;
+    border-radius: 16px;
+    border: 1px solid $border-color;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
     overflow: hidden;
 
     @media print {
@@ -41,13 +55,16 @@
         box-shadow: none;
         background: white;
         border-radius: 0;
+        overflow: visible;
+        margin: 0;
+        padding: 0;
     }
 }
 
 .modal-header {
-    padding: 1rem 1.5rem;
-    background: #111;
-    border-bottom: 1px solid #333;
+    padding: 1.5rem;
+    background: #181818;
+    border-bottom: 1px solid $border-color;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -55,18 +72,19 @@
     .header-title {
         display: flex;
         flex-direction: column;
-        gap: 0.2rem;
+        gap: 0.3rem;
 
         h2 {
             color: #fff;
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
             margin: 0;
+            font-weight: 700;
 
             i {
-                color: var(--color-principal, #e50914);
+                color: $accent-red;
             }
         }
 
@@ -74,18 +92,17 @@
             display: flex;
             gap: 0.5rem;
             font-size: 0.85rem;
+            color: $text-muted;
 
             .category {
-                color: #888;
+                font-weight: 600;
+                color: #ccc;
 
                 &::after {
                     content: '•';
                     margin-left: 0.5rem;
+                    color: #555;
                 }
-            }
-
-            .section-name {
-                color: #ccc;
             }
         }
     }
@@ -93,9 +110,10 @@
     .btn-close {
         background: none;
         border: none;
-        color: #888;
+        color: #666;
         font-size: 1.2rem;
         cursor: pointer;
+        transition: color 0.2s;
 
         &:hover {
             color: #fff;
@@ -111,8 +129,7 @@
     flex: 1;
     overflow-y: auto;
     padding: 0;
-    /* Table will handle padding */
-    background: #1a1a1a;
+    background: $panel-dark;
 
     .print-header {
         display: none;
@@ -131,208 +148,238 @@
         }
     }
 
-    @media print {
-        background: white;
-        overflow: visible;
-        padding: 2rem;
+    .competitors-table {
+        width: 100%;
+        border-collapse: collapse;
 
-        .print-header {
-            display: block;
-        }
-    }
-}
-
-.competitors-table {
-    width: 100%;
-    border-collapse: collapse;
-
-    th,
-    td {
-        padding: 1rem 1.5rem;
-        text-align: left;
-    }
-
-    thead {
-        background: #222;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-
-        th {
-            color: #888;
-            font-weight: 500;
-            font-size: 0.85rem;
-            text-transform: uppercase;
+        th,
+        td {
+            padding: 1rem 1.5rem;
+            text-align: left;
         }
 
-        @media print {
-            background: #eee;
-            color: #000;
-            position: static;
+        thead {
+            background: #252525;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid $border-color;
 
             th {
-                color: #000;
-                font-weight: bold;
-                border-bottom: 2px solid #000;
+                color: $text-muted;
+                font-weight: 600;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
         }
-    }
 
-    tbody {
-        tr {
-            border-bottom: 1px solid #2a2a2a;
+        tbody {
+            tr {
+                border-bottom: 1px solid #2a2a2a;
+                transition: background 0.2s;
 
-            &:last-child {
-                border-bottom: none;
-            }
-
-            &:hover {
-                background: #222;
-            }
-
-            @media print {
-                border-bottom: 1px solid #ccc;
+                &:last-child {
+                    border-bottom: none;
+                }
 
                 &:hover {
-                    background: transparent;
+                    background: #2a2a2a;
                 }
             }
-        }
 
-        td {
-            color: #ccc;
-            font-size: 0.95rem;
-
-            @media print {
-                color: #000;
-            }
-        }
-
-        .col-num {
-            width: 50px;
-            color: #666;
-            font-weight: bold;
-        }
-
-        .col-name {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            color: #fff;
-
-            @media print {
-                color: #000;
+            td {
+                color: $text-light;
+                font-size: 0.9rem;
             }
 
-            .avatar {
-                width: 28px;
-                height: 28px;
-                background: #444;
-                border-radius: 50%;
+            .col-num {
+                width: 50px;
+                color: #666;
+                font-weight: 700;
+            }
+
+            .col-name {
                 display: flex;
                 align-items: center;
-                justify-content: center;
-                font-size: 0.7rem;
-                font-weight: bold;
-                color: #fff;
+                gap: 1rem;
 
-                @media print {
-                    border: 1px solid #000;
-                    color: #000;
-                    background: transparent;
+                .avatar {
+                    width: 36px;
+                    height: 36px;
+                    background: #333;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    font-weight: 700;
+                    color: #fff;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                }
+
+                .name-info {
+                    display: flex;
+                    flex-direction: column;
+                    line-height: 1.3;
+
+                    .name-text {
+                        font-weight: 600;
+                        color: #fff;
+                    }
+
+                    .gender-text {
+                        color: $text-muted;
+                        font-size: 0.75rem;
+                    }
                 }
             }
-        }
 
-        .col-academy {
-            color: #aaa;
-
-            @media print {
-                color: #333;
-            }
-        }
-
-        .status-badge {
-            padding: 0.2rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            display: inline-block;
-            min-width: 70px;
-            text-align: center;
-
-            &.status-enrolled {
-                background: rgba(33, 150, 243, 0.15);
-                color: #64b5f6;
+            .col-academy {
+                color: #aaa;
             }
 
-            &.status-present {
-                background: rgba(46, 204, 113, 0.15);
-                color: #2ecc71;
-            }
+            .status-badge {
+                padding: 0.3rem 0.8rem;
+                border-radius: 4px;
+                font-size: 0.7rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                display: inline-block;
+                min-width: 80px;
+                text-align: center;
+                letter-spacing: 0.5px;
 
-            &.status-absent {
-                background: rgba(231, 76, 60, 0.15);
-                color: #e74c3c;
-            }
+                &.status-enrolled {
+                    background: rgba($accent-blue, 0.15);
+                    color: lighten($accent-blue, 10%);
+                }
 
-            &.status-dq {
-                background: rgba(149, 165, 166, 0.15);
-                color: #bdc3c7;
-            }
+                &.status-present {
+                    background: rgba(#00e676, 0.15);
+                    color: #00e676;
+                }
 
-            @media print {
-                border: 1px solid #000;
-                color: #000 !important;
-                background: transparent !important;
+                &.status-absent {
+                    background: rgba(#ff5252, 0.15);
+                    color: #ff5252;
+                }
+
+                &.status-dq {
+                    background: rgba(#9e9e9e, 0.15);
+                    color: #bdbdbd;
+                }
             }
         }
 
         .empty-state {
             text-align: center;
             padding: 3rem;
-            color: #666;
+            color: $text-muted;
             font-style: italic;
+        }
+    }
+
+    @media print {
+        background: white;
+        overflow: visible;
+        padding: 2rem;
+        display: block; // Correct flex issue
+
+        .print-header {
+            display: block;
+        }
+
+        .competitors-table {
+            thead {
+                background: #eee;
+                position: static;
+
+                th {
+                    color: #000;
+                    font-weight: bold;
+                    border-bottom: 2px solid #000;
+                }
+            }
+
+            tbody {
+                tr {
+                    border-bottom: 1px solid #ccc;
+                    page-break-inside: avoid; // Avoid breaking row across pages
+
+                    &:hover {
+                        background: transparent;
+                    }
+                }
+
+                td {
+                    color: #000;
+                }
+
+                .col-name .avatar {
+                    border: 1px solid #000;
+                    color: #000;
+                    background: transparent;
+                }
+
+                .col-name .name-info .name-text {
+                    color: #000;
+                }
+
+                .col-name .name-info .gender-text {
+                    color: #333;
+                }
+
+                .status-badge {
+                    border: 1px solid #000;
+                    color: #000 !important;
+                    background: transparent !important;
+                }
+            }
         }
     }
 }
 
 .modal-footer {
-    padding: 1rem 1.5rem;
-    background: #111;
-    border-top: 1px solid #333;
+    padding: 1.5rem;
+    background: #181818;
+    border-top: 1px solid $border-color;
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
 
     button {
-        padding: 0.6rem 1.2rem;
-        border-radius: 4px;
+        padding: 0.7rem 1.5rem;
+        border-radius: 8px;
         cursor: pointer;
-        font-weight: 500;
+        font-weight: 600;
         border: none;
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        transition: 0.2s;
     }
 
     .btn-cancel {
-        background: #333;
-        color: #ccc;
+        background: transparent;
+        border: 1px solid #444;
+        color: $text-muted;
 
         &:hover {
-            background: #444;
+            border-color: #fff;
             color: #fff;
         }
     }
 
     .btn-print {
-        background: #fff;
-        color: #000;
+        background: $accent-red;
+        color: #fff;
+        box-shadow: 0 4px 15px rgba($accent-red, 0.3);
 
         &:hover {
-            background: #eee;
+            background: lighten($accent-red, 5%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba($accent-red, 0.5);
         }
     }
 
@@ -341,37 +388,61 @@
     }
 }
 
-/* Scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+// SCROLLBAR
+.custom-scrollbar {
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: $panel-dark;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: #1a1a1a;
-}
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 3px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-/* Global Print Hiding */
+// GLOBAL PRINT OVERRIDES
 @media print {
-    body>*:not(app-live-tournament) {
-        display: none !important;
+
+    // Hide everything in the body by default
+    ::ng-deep body * {
+        visibility: hidden;
     }
 
-    app-live-tournament>*:not(.modal-overlay) {
-        display: none !important;
+    // Make the modal overlay and everything inside it visible
+    .modal-overlay,
+    .modal-overlay * {
+        visibility: visible;
     }
 
-    /* Force background colors */
-    * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
+    // Ensure layout is clean
+    .modal-overlay {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100vw;
+        height: auto;
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+
+    // Reset styles for the body to prevent scrollbars/margins
+    ::ng-deep body {
+        overflow: visible !important;
+        background: white;
+    }
+
+    // Reset scrollbars for print
+    ::-webkit-scrollbar {
+        display: none;
     }
 }

@@ -39,6 +39,12 @@ interface Tatami {
   assignedJudges?: any;
 }
 
+export interface SelectableGroup extends DemographicGroup {
+  sourceTatamiId?: number;
+  isPartial?: boolean;
+  modalityToSteal?: string;
+}
+
 @Component({
   selector: 'app-live-tournament',
   standalone: true,
@@ -187,7 +193,8 @@ export class LiveTournamentComponent implements OnInit {
 
   // --- UI Actions ---
 
-  filteredGroupsForSelection: DemographicGroup[] = [];
+  // Helper Interface for Selection
+  filteredGroupsForSelection: SelectableGroup[] = [];
 
   openGroupSelector(tatami: Tatami) {
     // Allow if FREE OR (BUSY and no nextGroup and not a special Jump tatami)
@@ -204,12 +211,49 @@ export class LiveTournamentComponent implements OnInit {
     }
 
     this.targetTatamiForSelection = tatami;
+    this.filteredGroupsForSelection = [];
+
+    // 1. Get Standard Available Groups
+    let candidates: SelectableGroup[] = [...this.availableGroups];
+
+    // 2. If NO standard groups are available, look for "Stealable" things
+    if (candidates.length === 0) {
+
+      // A. Look for "Queued Next Groups" (Whole groups waiting)
+      this.tatamis.forEach(t => {
+        if (t.id !== tatami.id && t.nextGroup) {
+          candidates.push({ ...t.nextGroup, sourceTatamiId: t.id });
+        }
+      });
+
+      // B. Look for "Pending Modalities" in BUSY groups (Slicing active groups)
+      // User specifically asked: "Siguiente: DEFENSA PERSONAL... asignar a otro tatami"
+      this.tatamis.forEach(t => {
+        if (t.id !== tatami.id && t.status === 'BUSY' && t.currentGroup && t.modalityQueue && t.modalityQueue.length > 1) {
+          // Index 0 is running/ready. Index 1+ are pending.
+          // We can steal index 1 (the immediate next) or any other. Let's steal index 1.
+          const nextModalityId = t.modalityQueue[1];
+          if (nextModalityId) {
+            // Create a "Partial Group" representation
+            candidates.push({
+              ...t.currentGroup,
+              // Override active modalities to just be this one for the target
+              activeModalities: [nextModalityId],
+              // Meta info for stealing
+              sourceTatamiId: t.id,
+              isPartial: true,
+              modalityToSteal: nextModalityId
+            });
+          }
+        }
+      });
+    }
 
     if (totalTatamis < 2) {
-      this.filteredGroupsForSelection = this.availableGroups;
+      this.filteredGroupsForSelection = candidates;
     } else {
       // Strict Filter Logic
-      this.filteredGroupsForSelection = this.availableGroups.filter(group => {
+      this.filteredGroupsForSelection = candidates.filter(group => {
         const type = this.liveService.getDemographicType(group);
 
         if (isLast) return type === 'SALTO_ALTO';
@@ -231,18 +275,41 @@ export class LiveTournamentComponent implements OnInit {
     this.scrollLock.unlock();
   }
 
-  selectGroup(group: DemographicGroup) {
+  selectGroup(group: SelectableGroup) {
     if (!this.targetTatamiForSelection) return;
 
     const tatami = this.targetTatamiForSelection;
 
-    // Remove from available list immediately
-    this.availableGroups = this.availableGroups.filter(g => g.id !== group.id);
+    // A. Clean up source if it was stolen
+    if (group.sourceTatamiId) {
+      const sourceTatami = this.tatamis.find(t => t.id === group.sourceTatamiId);
 
+      if (sourceTatami) {
+        if (group.isPartial && group.modalityToSteal) {
+          // CASE: Stealing a specific modality from a running queue
+          if (sourceTatami.modalityQueue) {
+            // Remove the stolen modality from the source queue
+            sourceTatami.modalityQueue = sourceTatami.modalityQueue.filter(m => m !== group.modalityToSteal);
+          }
+        } else if (sourceTatami.nextGroup && sourceTatami.nextGroup.id === group.id) {
+          // CASE: Stealing a whole queued nextGroup
+          sourceTatami.nextGroup = undefined;
+        }
+      }
+    } else {
+      // B. Remove from available list if it was standard
+      this.availableGroups = this.availableGroups.filter(g => g.id !== group.id);
+    }
+
+    // Assign to Target
+    // If it's a partial group, we are effectively creating a new "Session" for that group on this tatami
+    // containing ONLY the stolen modality.
+
+    // Note: If tatami was BUSY, we are queuing it. If FREE, we run it.
     if (tatami.status === 'FREE') {
       // Assign as Current
       tatami.currentGroup = group;
-      tatami.modalityQueue = [...group.activeModalities];
+      tatami.modalityQueue = [...group.activeModalities]; // Should be just [modalityToSteal] or all modalities
       tatami.status = 'BUSY';
       this.advanceQueue(tatami);
     } else {

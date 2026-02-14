@@ -100,7 +100,8 @@ export class ChampionshipService {
     /**
      * Asigna jueces a un tatami específico.
      * Backend: Implementar este endpoint para recibir la lista de jueces y guardarla asociada al tatami.
-     * Body esperado: { "juezCentral": id, "juecesNormales": [id1, id2...], "juezMesa": id }
+     * Body esperado: { "juezCentral": id_usuario, "jueez": [id_usuario1, ...], "juezMesa": id_usuario }
+     * Nota: Validar que los usuarios asignados tengan el rol correspondiente si es necesario.
      */
     asignarJuecesATatami(championshipId: string | number, tatamiId: number, body: any): Observable<any> {
         return this.http.post(`${this.apiUrl}/campeonatos/${championshipId}/live-management/tatamis/${tatamiId}/jueces`, body);
@@ -108,9 +109,26 @@ export class ChampionshipService {
 
     /**
      * Obtiene los jueces pertenecientes al campeonato para ser mostrados en el buscador y asignados.
-     * Backend: Buscar todos los jueces (usuarios con rol juez/juez central/etc que sean válidos) del campeonato.
-     * Estos jueces se listarán en el modal de asignar jueces.
-     * Respuesta esperada: Lista de objetos usuario { id, nombre, apellido, nacionalidad, rol  etc. }
+     * Backend: Buscar todos los jueces (usuarios con rol juez/juez central/etc) que estén inscritos en el campeonato.
+     * Lógica clave:
+     * 1. Consultar la tabla de 'inscripciones' filtrando por el id_campeonato.
+     * 2. Filtrar por 'tipousuario' (o columna similar de rol en la inscripción).
+     *    - Juez Central: ID 6
+     *    - Juez de Mesa: ID 7
+     *    - Juez Normal/De Esquina: ID 8 (o cualquier otro asignado a jueces)
+     * 3. Retornar la información del usuario asociado a esa inscripción.
+     *
+     * Respuesta esperada: Lista de objetos usuario:
+     * [
+     *   {
+     *     "id": "123",
+     *     "nombre": "Juan Perez",
+     *     "rol": "Juez Central", // O el string que corresponda según el ID (6->Juez Central, etc)
+     *     "pais": "Colombia",
+     *     "avatar": "url..."
+     *   },
+     *   ...
+     * ]
      */
     obtenerJuecesDelCampeonato(championshipId: string | number): Observable<any> {
         return this.http.get(`${this.apiUrl}/campeonatos/${championshipId}/jueces-live-disponibles`);
