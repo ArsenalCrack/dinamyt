@@ -25,6 +25,18 @@ public interface InscripcionRepository extends JpaRepository<Inscripciones, Inte
         @Param("campeonato") Long campeonato
     );
 
+    @Query("""
+        SELECT i
+        FROM Inscripciones i
+        WHERE
+          i.campeonato = :campeonato
+          AND i.tipousuario IN (6,7,8)
+          AND i.visible = true
+          AND i.estado = 3
+    """)
+    List<Inscripciones> findIdcampeonatojueces(
+        @Param("campeonato") Long campeonato
+    );
     Optional<Inscripciones> findByUsuarioAndCampeonato(Long usuario, Long campeonato);
     
     Optional<Inscripciones> findByUsuarioAndCampeonatoAndVisibleTrue(Long usuario, Long campeonato);

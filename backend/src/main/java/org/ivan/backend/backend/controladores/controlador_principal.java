@@ -66,7 +66,9 @@ public class controlador_principal {
 
         return respuesta;
     }
+    
 
+    // ------------------ USUARIOS ------------------
     @PostMapping("/registro")
     private ResponseEntity<?> Crear(@RequestBody Usuario usuario) {
 
@@ -254,6 +256,8 @@ public class controlador_principal {
         return ResponseEntity.ok(usuario);
     }
 
+    
+    // ------------------ CAMPEONATOS-INVITACIONES-INSCRIPCIONES ------------------
     @PostMapping("/campeonatos")
     private ResponseEntity<?> crear(@RequestBody Map<String, Object> datos) {
         try {
@@ -725,6 +729,14 @@ public class controlador_principal {
         inscripcionRepository.save(ins);
         return ResponseEntity.ok(ins);
     }
+    @DeleteMapping("/invitaciones/{invitationId}")
+    private ResponseEntity<?> eliminarinvitacion(@PathVariable Integer inscriptionId){
+        Inscripciones ins = inscripcionRepository.findById(inscriptionId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        ins.setVisible(false);
+        inscripcionRepository.save(ins);
+        return ResponseEntity.ok(ins);
+    }
 
     @PutMapping("/invitaciones/{invitationId}")
     public ResponseEntity<?> respuestraainvitacion(@PathVariable Integer invitationId,
@@ -830,7 +842,7 @@ public class controlador_principal {
     }
 
     @GetMapping("/campeonatos/{id}/live-management")
-private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
+    private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
 
     Campeonato cam = campeonatoRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
@@ -845,20 +857,45 @@ private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
 
     return ResponseEntity.ok(liveDTO);
 }
-        
+    @GetMapping("/campeonatos/{championshipId}/jueces-live-disponibles")
+    private ResponseEntity<?> buscarjuecesactivosenelcampeonato(@PathVariable Long championshipId){
+        List<Inscripciones> jueces = inscripcionRepository.findIdcampeonatojueces(championshipId);
+        List<UsuarioInscripcionDTO> LISTA = new ArrayList<>();
+        for (Inscripciones i:jueces) {
+            UsuarioInscripcionDTO juez=new UsuarioInscripcionDTO();
+            Usuario us = usuarioRepository.findById(i.getUsuario()).orElse(null);
+            juez.setIdDocumento(i.getUsuario());
+            juez.setNombreC(us.getNombreC());
+            juez.setRol(i.getTipousuario());
+            juez.setNacionalidad(us.getNacionalidad());
+            LISTA.add(juez);
+        }
+        if (LISTA.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Jueces no encontrados"));
+        } else {
+            return ResponseEntity.ok(LISTA);            
+        }
+    }
     @PostMapping("/tatamis/{tatamiId}/jueces")
     private ResponseEntity<?> assignJudgesToTatami(@PathVariable Long championshipId,@PathVariable Long tatamiId,@RequestBody Map<String, Object> body) {
+        System.out.println(championshipId);
+        System.out.println(tatamiId);
+        System.out.println(body);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/tatamis/{tatamiId}/assign-group")
     private ResponseEntity<?> assignGroupToTatami(@PathVariable Long championshipId,@PathVariable Long tatamiId,@RequestBody Map<String, Object> group) {
-        System.out.println("");
+        System.out.println(championshipId);
+        System.out.println(tatamiId);
+        System.out.println(group);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/tatamis/{tatamiId}/assignment")
     private ResponseEntity<?> unassignTatami(@PathVariable Long championshipId,@PathVariable Long tatamiId) {
+        System.out.println(championshipId);
+        System.out.println(tatamiId);
         return ResponseEntity.ok().build();
     }
 
@@ -866,16 +903,26 @@ private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
 
     @PutMapping("/secciones/{sectionId}/status")
     private ResponseEntity<?> updateSectionStatus(@PathVariable Long championshipId,@PathVariable String sectionId,@RequestBody String request) {
+        System.out.println(championshipId);
+        System.out.println(sectionId);
+        System.out.println(request);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/secciones/{sectionId}/results")
     private ResponseEntity<?> submitSectionResults(@PathVariable Long championshipId,@PathVariable String sectionId,@RequestBody Object results) {
+        System.out.println(championshipId);
+        System.out.println(sectionId);
+        System.out.println(results);
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/secciones/{sectionId}/competitors/{competitorId}/status")
     private ResponseEntity<?> markCompetitorStatus(@PathVariable Long championshipId,@PathVariable String sectionId,@PathVariable String competitorId,@RequestBody String request) {
+        System.out.println(championshipId);
+        System.out.println(sectionId);
+        System.out.println(competitorId);
+        System.out.println(request);
         return ResponseEntity.ok().build();
     }
 
@@ -883,6 +930,9 @@ private ResponseEntity<?> panelcampeonato(@PathVariable Integer id) {
 
     @PutMapping("/matches/{matchId}/score")
     private ResponseEntity<?> updateMatchScore(@PathVariable Long championshipId,@PathVariable String matchId,@RequestBody Object scores) {
+        System.out.println(championshipId);
+        System.out.println(matchId);
+        System.out.println(scores);
         return ResponseEntity.ok().build();
     }
 

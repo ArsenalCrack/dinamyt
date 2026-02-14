@@ -33,13 +33,21 @@ public class UsuarioInscripcionDTO {
     private String ciudad_campeonato;
     private String nombre_Creador;
     private Integer tipoUsuario;
-
+    private Integer rol;
     // 🔴 ESTE ES EL ESTADO DE LA INSCRIPCIÓN
     private Integer estado;
 
     // 🔴 FECHA DE INSCRIPCIÓN
     private LocalDateTime fechaInscripcion;
 
+    public Integer getRol() {
+        return rol;
+    }
+
+    public void setRol(Integer rol) {
+        this.rol = rol;
+    }
+    
     public Integer getTipoUsuario() {
         return tipoUsuario;
     }
