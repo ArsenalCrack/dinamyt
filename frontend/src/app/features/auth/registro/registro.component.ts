@@ -38,7 +38,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
   Mensajes: string = '';
   exito: boolean = false;
   cargando: boolean = false;
-  loadingText: string = 'Procesando... por favor espera';
+  textoCarga: string = 'Procesando... por favor espera';
 
   // Datos del modelo
   idDocumento!: string;
@@ -50,7 +50,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
   fechaNacimiento!: string;
   correo!: string;
   contrasena!: string;
-  confirmPassword!: string;
+  confirmarContrasena!: string;
   academia: string = '';
   academiaOtra: string = '';
   instructor: string = '';
@@ -61,7 +61,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
 
   // Lista de países para el autocompletado
   paisesList: string[] = [];
-  // Component-bound selects for custom date picker
+  // Opciones de selects para el selector de fecha personalizado
   diasOptions: Array<{ value: string; label: string }> = [];
   mesesOptions: Array<{ value: string; label: string }> = [];
   aniosOptions: Array<{ value: string; label: string }> = [];
@@ -78,7 +78,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
   nombresMaxLength = 40;
   apellidosMaxLength = 40;
   correoMaxLength = 40;
-  nacionalidadMaxLength = 50; // Fallback default
+  nacionalidadMaxLength = 50; // Valor por defecto
   nombresLimitMsg: string = '';
   apellidosLimitMsg: string = '';
   correoLimitMsg: string = '';
@@ -479,7 +479,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
 
     // Mostrar overlay bloqueante desde que se envía la petición
     this.cargando = true;
-    this.loadingText = 'Procesando... por favor espera';
+    this.textoCarga = 'Procesando... por favor espera';
     this.lockScroll();
     this.Mensajes = '';
     const startedAt = Date.now();
@@ -487,7 +487,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
     this.api.registrarUsuario(usuario).subscribe({
       next: async (res) => {
         this.exito = true;
-        this.loadingText = 'Verificando código...';
+        this.textoCarga = 'Verificando código...';
         this.Mensajes = '';
         sessionStorage.setItem('verifyMode', 'register');
         sessionStorage.setItem('emailParaVerificar', this.correo);
@@ -508,7 +508,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
     });
   }
 
-  // Permitir solo dígitos en el campo documento
+  // Permitir solo dígitos en el campo de documento
   onlyDigits(event: Event) {
     const input = event.target as HTMLInputElement;
     input.value = input.value.replace(/\D/g, '');
@@ -521,7 +521,7 @@ export class RegistroComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Reenviar código desde banner (para usuarios que vuelven tras expiración)
+  // Reenviar código desde el banner (para usuarios que vuelven tras expiración)
   reenviarDesdeBanner() {
     if (!this.correo) {
       alert('No hay un correo registrado');

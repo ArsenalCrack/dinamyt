@@ -5,7 +5,7 @@
     </div>
     <div class="registration-card">
         <header class="header">
-            <button type="button" (click)="goBack()" class="btn-back">
+            <button type="button" (click)="volverAtras()" class="btn-back">
                 <i class="fas fa-arrow-left fa-2x"></i>
             </button>
             <div class="header-text">
@@ -15,9 +15,9 @@
             </div>
         </header>
 
-        <app-loading-spinner *ngIf="loading" [message]="loadingMessage"></app-loading-spinner>
+        <app-loading-spinner *ngIf="cargando" [message]="mensajeCarga"></app-loading-spinner>
 
-        <div *ngIf="!loading && campeonato" class="form-content">
+        <div *ngIf="!cargando && campeonato" class="form-content">
             <div class="alert alert-info" *ngIf="code">
                 <i class="fas fa-key"></i> Has accedido con un código de invitación privado.
             </div>
@@ -117,7 +117,7 @@
                 </section>
 
                 <div class="form-actions">
-                    <button type="button" class="btn-cancel" (click)="goBack()">Cancelar</button>
+                    <button type="button" class="btn-cancel" (click)="volverAtras()">Cancelar</button>
                     <button type="submit" class="btn-submit"
                         [disabled]="submitting || !regForm.form.valid || registrationData.modalidades.length === 0">
                         <i class="fas" [ngClass]="submitting ? 'fa-spinner fa-spin' : 'fa-check-circle'"></i>

@@ -2,7 +2,7 @@
     <div class="details-card">
         <header class="header">
             <div class="header-main-info">
-                <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+                <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás">
                     <i class="fas fa-arrow-left"></i>
                 </button>
                 <div class="header-content-col">
@@ -17,7 +17,7 @@
         </header>
 
         <!-- Modal de eliminación -->
-        <div class="modal-overlay" *ngIf="showDeleteModal">
+        <div class="modal-overlay" *ngIf="mostrarModalEliminar">
             <div class="modal-box delete-modal">
                 <div class="modal-header">
                     <div class="icon-container">
@@ -30,24 +30,24 @@
                     </div>
                 </div>
                 <div class="modal-actions-delete">
-                    <button class="btn-cancel" (click)="closeDeleteModal()" [disabled]="isDeleting">Cancelar</button>
-                    <button class="btn-confirm-delete" (click)="confirmDelete()" [disabled]="isDeleting">
-                        <i class="fas" [ngClass]="isDeleting ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
-                        {{ isDeleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+                    <button class="btn-cancel" (click)="cerrarModalEliminar()" [disabled]="eliminando">Cancelar</button>
+                    <button class="btn-confirm-delete" (click)="confirmarEliminar()" [disabled]="eliminando">
+                        <i class="fas" [ngClass]="eliminando ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
+                        {{ eliminando ? 'Eliminando...' : 'Sí, Eliminar' }}
                     </button>
                 </div>
             </div>
         </div>
 
-        <app-loading-spinner *ngIf="loading" message="Cargando información..."></app-loading-spinner>
+        <app-loading-spinner *ngIf="cargando" message="Cargando información..."></app-loading-spinner>
 
-        <div *ngIf="error" class="error-msg">
+        <div *ngIf="mensajeError" class="error-msg">
             <i class="fas fa-exclamation-circle"></i>
-            <p>{{ error }}</p>
+            <p>{{ mensajeError }}</p>
             <button (click)="loadData()">Reintentar</button>
         </div>
 
-        <div *ngIf="!loading && campeonato" class="content">
+        <div *ngIf="!cargando && campeonato" class="content">
 
             <!-- Navbar Tabs -->
             <!-- Navbar Tabs & Action Wrapper -->
@@ -92,10 +92,10 @@
                                 <span class="code-label">CÓDIGO DE ACCESO:</span>
                                 <div class="code-wrapper" title="Haga clic para copiar">
                                     <span class="code-value">{{ campeonato.Codigo }}</span>
-                                    <button class="btn-copy" (click)="copyCode(); $event.stopPropagation()"
-                                        [class.copied]="copied">
-                                        <i class="fas" [ngClass]="copied ? 'fa-check' : 'fa-copy'"></i>
-                                        <span>{{ copied ? '¡Copiado!' : 'Copiar' }}</span>
+                                    <button class="btn-copy" (click)="copiarCodigo(); $event.stopPropagation()"
+                                        [class.copied]="copiado">
+                                        <i class="fas" [ngClass]="copiado ? 'fa-check' : 'fa-copy'"></i>
+                                        <span>{{ copiado ? '¡Copiado!' : 'Copiar' }}</span>
                                     </button>
                                 </div>
                             </div>
@@ -359,7 +359,7 @@
 
                             <!-- Pagination Controls -->
                             <div class="pagination-controls"
-                                *ngIf="totalPages > 1 && !loading && filteredParticipantes.length > 0">
+                                *ngIf="totalPages > 1 && !cargando && filteredParticipantes.length > 0">
                                 <button class="btn-page nav" (click)="prevPage()" [disabled]="currentPage === 1"
                                     aria-label="Anterior">
                                     <i class="fas fa-chevron-left"></i>

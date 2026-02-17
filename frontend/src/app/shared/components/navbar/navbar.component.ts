@@ -47,7 +47,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
       this.closeDropdown();
       this.closeNotifications();
       this.closeMobileNavbar();
-      // No need to update AuthService on every navigation, just update local state
+      // Solo actualizar estado local, no es necesario notificar a AuthService en cada navegación
       this.updateLocalStatus();
     });
   }
@@ -57,11 +57,10 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.checkLoginStatus();
 
     // Cargar usuario cacheado (si existe) para poder armar /me correctamente.
-    // Cargar usuario cacheado (si existe) para poder armar /me correctamente.
     const rawUsuario = localStorage.getItem('usuario');
     try {
       const parsed = rawUsuario ? JSON.parse(rawUsuario) : null;
-      // Si el backend devuelve { usuario: {...}, instructor: ... }, extraemos usuario
+      // Si el backend devuelve { usuario: {...}, instructor: ... }, extraer solo el usuario
       this.usuario = parsed?.usuario || parsed;
     } catch {
       this.usuario = null;
@@ -83,7 +82,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
         this.usuario = null;
         this.userType = null;
       } else {
-        // Just update local state, don't ping AuthService back
+        // Solo actualizar estado local, sin notificar de vuelta a AuthService
         this.updateLocalStatus(false);
       }
     });
@@ -102,7 +101,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
       this.username = username || sessionStorage.getItem('nombreC') || this.usuario?.nombreC || null;
     });
 
-    // Evita llamar /me sin body: el backend responde 400 si request == null.
+    // Evitar llamar /me sin body: el backend responde 400 si el request es null.
     const correo = (sessionStorage.getItem('correo') || this.usuario?.correo || '').trim();
     const idDocumento = this.usuario?.idDocumento ?? this.usuario?.id_documento ?? null;
 
@@ -117,10 +116,9 @@ export class NavbarComponent implements OnInit, OnDestroy {
 
     const startedAt = Date.now();
 
-    // Safety timeout to prevent infinite loading state
+    // Timeout de seguridad para evitar estado de carga infinito
     const timeout = setTimeout(() => {
       if (this.loading) {
-        console.warn('Navbar user load timed out');
         this.loading = false;
       }
     }, 5000);
@@ -144,7 +142,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
         this.isLoggedIn = true;
         this.auth.setLoggedIn(true, this.username);
 
-        // Recalcular userType localmente sin volver a llamar a AuthService
+        // Recalcular tipo de usuario localmente sin llamar a AuthService
         this.updateLocalStatus(false);
 
         await delayRemaining(startedAt);
@@ -153,9 +151,8 @@ export class NavbarComponent implements OnInit, OnDestroy {
       error: async () => {
         clearTimeout(timeout);
         await delayRemaining(startedAt);
-        console.warn('Error loading user in navbar');
         this.loading = false;
-        // Even on error, we update local state from whatever we have
+        // Incluso con error, actualizar estado local con lo que tengamos disponible
         this.updateLocalStatus(false);
       }
     });
@@ -183,15 +180,15 @@ export class NavbarComponent implements OnInit, OnDestroy {
    * @param notifyAuthService Si se debe notificar al AuthService de los cambios encontrados.
    */
   updateLocalStatus(notifyAuthService: boolean = false): void {
-    // 1. Check strict session indicators (active tab session)
+    // 1. Verificar indicadores estrictos de sesión (sesión activa de la pestaña)
     const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
     const correo = sessionStorage.getItem('correo');
 
-    // User is logged in ONLY if strict session exists in sessionStorage
+    // El usuario está logueado SOLO si existe una sesión estricta en sessionStorage
     this.isLoggedIn = !!(token || correo);
 
     if (this.isLoggedIn) {
-      // 2. Load user metadata only if session is active
+      // 2. Cargar metadatos del usuario solo si la sesión está activa
       const rawUsuario = localStorage.getItem('usuario');
       try {
         const parsed = rawUsuario ? JSON.parse(rawUsuario) : null;
@@ -202,17 +199,20 @@ export class NavbarComponent implements OnInit, OnDestroy {
 
       this.username = sessionStorage.getItem('nombreC') || this.usuario?.nombreC || null;
     } else {
-      // Clear local state if no session
+      // Limpiar estado local si no hay sesión activa
       this.usuario = null;
       this.username = null;
     }
 
-    // Extract user type
+    // Extraer tipo de usuario a partir de los roles
     this.userType = null;
     if (this.isLoggedIn && this.usuario) {
       const roles = extractUserRoles(this.usuario);
-
-
+      // Determinar tipo numérico según los roles extraídos
+      if (roles.includes('administrador')) this.userType = 3;
+      else if (roles.includes('dueño')) this.userType = 4;
+      else if (roles.includes('instructor')) this.userType = 2;
+      else if (roles.includes('usuario')) this.userType = 1;
     }
 
     if (notifyAuthService) {
@@ -247,13 +247,13 @@ export class NavbarComponent implements OnInit, OnDestroy {
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
 
-    // Close User Dropdown
+    // Cerrar dropdown de usuario
     const clickedInsideUser = target.closest('.user-menu-wrapper');
     if (!clickedInsideUser && this.showUserDropdown) {
       this.closeDropdown();
     }
 
-    // Close Notification Dropdown
+    // Cerrar dropdown de notificaciones
     const clickedInsideNotif = target.closest('.notification-wrapper');
     const clickedInsideMobileNotif = target.closest('.mobile-notification-wrapper');
 

@@ -33,7 +33,7 @@ export class LoginComponent implements OnDestroy {
 
   mostrarPass: boolean = false;
   cargando: boolean = false;
-  errorMessage: string | null = null;
+  mensajeError: string | null = null;
 
   correo: string = '';
   contrasena: string = '';
@@ -55,7 +55,7 @@ export class LoginComponent implements OnDestroy {
   }
 
   login() {
-    this.errorMessage = null;
+    this.mensajeError = null;
     this.cargando = true;
     this.lockScroll();
     const startedAt = Date.now();
@@ -64,7 +64,7 @@ export class LoginComponent implements OnDestroy {
       next: async (res: any) => {
         localStorage.setItem('usuario', JSON.stringify(res));
 
-        // Backend expected to return token and user info
+        // El backend debe retornar token e información del usuario
         const token = res?.token || res?.accessToken || null;
         const user = res?.user || res?.usuario || res;
 
@@ -179,42 +179,42 @@ export class LoginComponent implements OnDestroy {
       error: async (err: HttpErrorResponse) => {
         // Mantener scroll bloqueado mientras se muestre el modal
 
-        // Mensajes de error más específicos según el código de estado
+        // Mensajes de error según el código de estado HTTP
         if (err.status === 401) {
           // 401 = No autorizado (credenciales incorrectas)
           const mensaje = err.error?.message || err.error?.error || '';
           if (mensaje.toLowerCase().includes('contraseña') || mensaje.toLowerCase().includes('password')) {
-            this.errorMessage = 'Contraseña incorrecta. Intenta de nuevo.';
+            this.mensajeError = 'Contraseña incorrecta. Intenta de nuevo.';
           } else if (mensaje.toLowerCase().includes('correo') || mensaje.toLowerCase().includes('email')) {
-            this.errorMessage = 'Este correo no está registrado.';
+            this.mensajeError = 'Este correo no está registrado.';
           } else {
-            this.errorMessage = 'Correo o contraseña incorrectos.';
+            this.mensajeError = 'Correo o contraseña incorrectos.';
           }
         } else if (err.status === 404) {
           // 404 = Usuario no encontrado
-          this.errorMessage = 'Este correo no está registrado.';
+          this.mensajeError = 'Este correo no está registrado.';
         } else if (err.status === 403) {
           // 403 = Cuenta bloqueada o no verificada
-          this.errorMessage = err.error?.message || 'Tu cuenta no está activa. Revisa tu correo.';
+          this.mensajeError = err.error?.message || 'Tu cuenta no está activa. Revisa tu correo.';
         } else if (err.status === 0) {
           // Sin conexión al servidor
-          this.errorMessage = 'No se puede conectar con el servidor. Revisa tu conexión.';
+          this.mensajeError = 'No se puede conectar con el servidor. Revisa tu conexión.';
         } else {
           // Otros errores
-          this.errorMessage = err.error?.message || err.error?.error || err.statusText || 'No se pudo iniciar sesión. Intenta de nuevo.';
+          this.mensajeError = err.error?.message || err.error?.error || err.statusText || 'No se pudo iniciar sesión. Intenta de nuevo.';
         }
 
         await delayRemaining(startedAt);
         this.cargando = false;
 
-        if (this.errorMessage) this.lockScroll();
+        if (this.mensajeError) this.lockScroll();
         else this.unlockScroll();
       }
     });
   }
 
-  closeError() {
-    this.errorMessage = null;
+  cerrarError() {
+    this.mensajeError = null;
     this.unlockScroll();
   }
 

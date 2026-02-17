@@ -16,17 +16,17 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
   styleUrls: ['./my-championships.component.scss']
 })
 export class MyChampionshipsComponent implements OnInit {
-  searchQuery: string = '';
-  championships: any[] = [];
-  filteredChampionships: any[] = [];
+  busqueda: string = '';
+  campeonatos: any[] = [];
+  campeonatosFiltrados: any[] = [];
   cargando = false;
-  errorMessage: string | null = null;
+  mensajeError: string | null = null;
 
   // Modales
-  showDeleteModal = false;
-  deletingId: number | null = null;
-  isDeleting = false;
-  copiedId: number | null = null;
+  mostrarModalEliminar = false;
+  idEliminando: number | null = null;
+  eliminando = false;
+  idCopiado: number | null = null;
 
   constructor(
     private router: Router,
@@ -37,22 +37,22 @@ export class MyChampionshipsComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.loadChampionships();
+    this.cargarCampeonatos();
   }
 
-  loadChampionships(): void {
+  cargarCampeonatos(): void {
     const userId = sessionStorage.getItem('idDocumento');
     if (!userId) {
-      this.errorMessage = 'No se pudo identificar al usuario. Por favor, inicia sesión de nuevo.';
+      this.mensajeError = 'No se pudo identificar al usuario. Por favor, inicia sesión de nuevo.';
       return;
     }
 
     this.cargando = true;
-    this.errorMessage = null;
+    this.mensajeError = null;
 
     this.api.getMisCampeonatos(userId).subscribe({
       next: (res: any[]) => {
-        this.championships = res.map(c => {
+        this.campeonatos = res.map(c => {
           const status = this.calculateStatus(c.fechaInicio, c.fecha_fin);
           return {
             id: c.idCampeonato ?? c.id,
@@ -75,7 +75,7 @@ export class MyChampionshipsComponent implements OnInit {
             )
           };
         }).filter(c => c.isVisible);
-        this.applyFilters();
+        this.aplicarFiltros();
         this.cargando = false;
       },
       error: (err) => {
@@ -84,10 +84,10 @@ export class MyChampionshipsComponent implements OnInit {
         // Si el backend aún no tiene la ruta, la API devolverá 404 o 500
         if (err.status === 404 || err.status === 500) {
           // Dejamos la lista vacía para que el usuario pueda ver la interfaz lista
-          this.championships = [];
-          this.applyFilters();
+          this.campeonatos = [];
+          this.aplicarFiltros();
         } else {
-          this.errorMessage = 'No pudimos cargar tus campeonatos. Intenta más tarde.';
+          this.mensajeError = 'No pudimos cargar tus campeonatos. Intenta más tarde.';
         }
       }
     });
@@ -128,12 +128,12 @@ export class MyChampionshipsComponent implements OnInit {
     }
   }
 
-  onSearchChange(): void {
-    if (!this.searchQuery.trim()) {
-      this.filteredChampionships = [...this.championships];
+  onBusquedaCambio(): void {
+    if (!this.busqueda.trim()) {
+      this.campeonatosFiltrados = [...this.campeonatos];
     } else {
-      const query = this.searchQuery.toLowerCase();
-      this.filteredChampionships = this.championships.filter(c =>
+      const query = this.busqueda.toLowerCase();
+      this.campeonatosFiltrados = this.campeonatos.filter(c =>
         c.nombre.toLowerCase().includes(query) ||
         (c.ubicacion || '').toLowerCase().includes(query) ||
         (c.ciudad || '').toLowerCase().includes(query) ||
@@ -142,64 +142,63 @@ export class MyChampionshipsComponent implements OnInit {
     }
   }
 
-  private applyFilters(): void {
-    this.onSearchChange();
+  private aplicarFiltros(): void {
+    this.onBusquedaCambio();
   }
 
-  goBack(): void {
+  volverAtras(): void {
     this.backNav.backOr({ fallbackUrl: '/dashboard' });
   }
 
-  editChampionship(id: number): void {
+  editarCampeonato(id: number): void {
     this.router.navigate(['/campeonato/edit', id]);
   }
 
-  goToPanel(id: number): void {
+  irAlPanel(id: number): void {
     this.router.navigate(['/campeonato/panel', id]);
   }
 
-  viewDetails(id: number): void {
-    this.goToPanel(id);
+  verDetalles(id: number): void {
+    this.irAlPanel(id);
   }
 
-  deleteChampionship(id: number): void {
-    this.deletingId = id;
-    this.showDeleteModal = true;
+  eliminarCampeonato(id: number): void {
+    this.idEliminando = id;
+    this.mostrarModalEliminar = true;
     this.scrollLock.lock();
   }
 
-  closeDeleteModal(): void {
-    this.showDeleteModal = false;
-    this.deletingId = null;
-    this.isDeleting = false;
+  cerrarModalEliminar(): void {
+    this.mostrarModalEliminar = false;
+    this.idEliminando = null;
+    this.eliminando = false;
     this.scrollLock.unlock();
   }
 
-  confirmDelete(): void {
-    if (this.deletingId === null) return;
+  confirmarEliminar(): void {
+    if (this.idEliminando === null) return;
 
-    this.isDeleting = true;
-    this.api.deleteCampeonato(this.deletingId).subscribe({
+    this.eliminando = true;
+    this.api.deleteCampeonato(this.idEliminando).subscribe({
       next: () => {
-        this.championships = this.championships.filter(c => c.id !== this.deletingId);
-        this.onSearchChange();
-        this.closeDeleteModal();
+        this.campeonatos = this.campeonatos.filter(c => c.id !== this.idEliminando);
+        this.onBusquedaCambio();
+        this.cerrarModalEliminar();
       },
       error: (err) => {
-        console.error('Error deleting championship:', err);
-        // Fallback for demo if API fails
-        this.championships = this.championships.filter(c => c.id !== this.deletingId);
-        this.onSearchChange();
-        this.closeDeleteModal();
+        console.error('Error eliminando campeonato:', err);
+        this.campeonatos = this.campeonatos.filter(c => c.id !== this.idEliminando);
+        this.onBusquedaCambio();
+        this.cerrarModalEliminar();
       }
     });
   }
 
-  copyCode(id: number, code: string): void {
+  copiarCodigo(id: number, code: string): void {
     if (!code) return;
     navigator.clipboard.writeText(code).then(() => {
-      this.copiedId = id;
-      setTimeout(() => this.copiedId = null, 2000);
+      this.idCopiado = id;
+      setTimeout(() => this.idCopiado = null, 2000);
     });
   }
 }

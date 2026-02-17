@@ -10,7 +10,7 @@ import { tap } from 'rxjs/operators';
 export class AuthService {
   private apiUrl = 'http://localhost:8080/api';
 
-  // State Management
+  // Gestión de Estado
   private isLoggedInSubject = new BehaviorSubject<boolean>(false);
   public isLoggedIn$ = this.isLoggedInSubject.asObservable();
 
@@ -24,7 +24,7 @@ export class AuthService {
 
   constructor(private http: HttpClient, private router: Router) {
     this.checkLoginStatus();
-    // Listen for storage changes to sync across tabs
+    // Escuchar cambios en storage para sincronizar entre pestañas
     window.addEventListener('storage', (event) => {
       if (event.key === 'usuario' || event.key === 'token') {
         this.validateSessionConsistency();
@@ -36,10 +36,10 @@ export class AuthService {
     const storedUserStr = localStorage.getItem('usuario');
     const sessionEmail = sessionStorage.getItem('correo');
 
-    // If I think I'm logged in (have session email)
+    // Si creo que estoy logueado (tengo correo en sesión)
     if (sessionEmail) {
       if (!storedUserStr) {
-        // localStorage cleared elsewhere -> Logout here too
+        // localStorage fue limpiado en otra pestaña -> Cerrar sesión aquí también
         this.forceLogout();
         return;
       }
@@ -48,12 +48,12 @@ export class AuthService {
         const storedUser = JSON.parse(storedUserStr);
         const storageEmail = storedUser.usuario?.correo || storedUser.correo || storedUser.email;
 
-        // If the user in localStorage is different from my session user -> Conflict -> Logout
+        // Si el usuario en localStorage es diferente al de mi sesión -> Conflicto -> Cerrar sesión
         if (storageEmail && storageEmail !== sessionEmail) {
           this.forceLogout();
         }
       } catch (e) {
-        // Corrupt storage -> safety logout
+        // Storage corrupto -> cerrar sesión por seguridad
         this.forceLogout();
       }
     }
@@ -61,19 +61,19 @@ export class AuthService {
 
   forceLogout() {
     sessionStorage.clear();
-    // Don't clear localStorage as it might be valid for the OTHER tab
+    // No limpiar localStorage ya que puede ser válido para la OTRA pestaña
     this.setLoggedIn(false, null);
     this.router.navigate(['/login']);
   }
 
-  // --- API Methods ---
+  // --- Métodos de API ---
 
   login(credentials: { correo: string; contrasena: string }) {
     return this.http.post(`${this.apiUrl}/login`, credentials).pipe(
       tap((res: any) => {
         if (res && res.usuario) {
           this.setLoggedIn(true, res.usuario.nombre || res.usuario.correo);
-          // Store roles if available, or update later
+          // Guardar roles si están disponibles, o actualizar después
         }
       })
     );
@@ -99,23 +99,23 @@ export class AuthService {
     return this.http.post(`${this.apiUrl}/cambiar-password`, data);
   }
 
-  // --- State Helpers ---
+  // --- Ayudantes de Estado ---
 
   isLoggedIn(): boolean {
     return this.isLoggedInSubject.value;
   }
 
   isAdminType3(): boolean {
-    // Check current roles
+    // Verificar roles actuales
     const roles = this.rolesSubject.value;
     if (roles.includes('administrador') || roles.includes('admin_proyecto')) return true;
 
-    // Fallback to session storage if roles not loaded yet but type is stored
+    // Respaldo en sessionStorage si los roles aún no se cargaron pero el tipo está guardado
     const sessType = sessionStorage.getItem('tipo_usuario');
     return sessType === '3';
   }
 
-  // --- State Management Methods ---
+  // --- Métodos de Gestión de Estado ---
 
   setRoles(roles: string[]) {
     this.rolesSubject.next(roles);
@@ -132,23 +132,23 @@ export class AuthService {
   }
 
   checkLoginStatus() {
-    // Basic check from storage
+    // Verificación básica desde almacenamiento
     const token = sessionStorage.getItem('token') || sessionStorage.getItem('authToken');
     const idDoc = sessionStorage.getItem('ID_documento') || sessionStorage.getItem('idDocumento');
     const correoSession = sessionStorage.getItem('correo');
 
-    // Check localStorage just to populate data if session is valid
+    // Verificar localStorage solo para poblar datos si la sesión es válida
     const storedUser = localStorage.getItem('usuario');
 
-    // STRICT CHECK: User is logged in ONLY if there is a session token or session-specific identifier.
-    // relying on storedUser (localStorage) alone causes "ghost" sessions after closing tabs.
+    // VERIFICACIÓN ESTRICTA: El usuario está logueado SOLO si hay un token de sesión o identificador específico.
+    // Depender solo de storedUser (localStorage) causa sesiones "fantasma" al cerrar pestañas.
     if (token || idDoc || correoSession) {
       this.isLoggedInSubject.next(true);
 
-      // Try to populate username from best available source
+      // Intentar poblar nombre de usuario desde la mejor fuente disponible
       let username = null;
 
-      // 1. Try localStorage user object
+      // 1. Intentar desde el objeto de usuario en localStorage
       if (storedUser) {
         try {
           const parsed = JSON.parse(storedUser);
@@ -157,7 +157,7 @@ export class AuthService {
         } catch (e) { }
       }
 
-      // 2. Fallback to session storage name
+      // 2. Respaldo desde sessionStorage
       if (!username) {
         username = sessionStorage.getItem('nombreC') || correoSession;
       }

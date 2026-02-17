@@ -13,12 +13,12 @@ export class SectionCompetitorsComponent {
     @Input() section: any;
     @Output() close = new EventEmitter<void>();
 
-    printList() {
+    imprimirLista() {
         window.print();
     }
 
-    getStatusClass(status: string): any {
-        switch (status) {
+    obtenerClaseEstado(estado: string): any {
+        switch (estado) {
             case 'PRESENTE': return 'status-present';
             case 'AUSENTE': return 'status-absent';
             case 'DESCALIFICADO': return 'status-dq';
@@ -26,9 +26,9 @@ export class SectionCompetitorsComponent {
         }
     }
 
-    formatStatus(status: string): string {
-        switch (status) {
-            case 'PRESENTE': return 'PRESENTE'; // or check-in icon?
+    formatearEstado(estado: string): string {
+        switch (estado) {
+            case 'PRESENTE': return 'PRESENTE';
             case 'AUSENTE': return 'AUSENTE';
             case 'DESCALIFICADO': return 'DESCALIF.';
             default: return 'INSCRITO';

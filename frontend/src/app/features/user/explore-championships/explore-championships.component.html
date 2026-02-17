@@ -1,7 +1,7 @@
 <div class="explore-championships-container">
   <div class="explore-championships-card">
     <header class="header">
-      <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+      <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
         <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
         <span class="visually-hidden">Volver atrás</span>
       </button>
@@ -16,13 +16,13 @@
       <div class="search-row">
         <div class="search-input-wrapper">
           <input type="text" class="search-input" id="explore-championships-search" name="searchExploreChampionships"
-            aria-label="Buscar campeonatos" placeholder="Buscar por nombre o ubicación..." [(ngModel)]="searchQuery"
-            (input)="onSearchChange()">
+            aria-label="Buscar campeonatos" placeholder="Buscar por nombre o ubicación..." [(ngModel)]="busqueda"
+            (input)="alCambiarBusqueda()">
           <i class="fas fa-search search-icon" aria-hidden="true"></i>
         </div>
 
-        <button type="button" class="btn-filter-toggle" (click)="toggleMobileFilters()"
-          [class.active]="showMobileFilters" aria-label="Mostrar filtros">
+        <button type="button" class="btn-filter-toggle" (click)="alternarFiltrosMovil()"
+          [class.active]="mostrarFiltrosMovil" aria-label="Mostrar filtros">
           <i class="fas fa-sliders-h"></i>
         </button>
       </div>
@@ -30,86 +30,86 @@
 
     <div class="filters-desktop" aria-label="Filtros">
       <div class="filters" role="group" aria-label="Filtrar por estado">
-        <button type="button" class="filter-pill" [class.active]="statusFilter === 'TODOS'"
-          (click)="setStatusFilter('TODOS')">
+        <button type="button" class="filter-pill" [class.active]="filtroEstado === 'TODOS'"
+          (click)="seleccionarFiltroEstado('TODOS')">
           Todos
         </button>
-        <button type="button" class="filter-pill" [class.active]="statusFilter === 'ACTIVO'"
-          (click)="setStatusFilter('ACTIVO')">
+        <button type="button" class="filter-pill" [class.active]="filtroEstado === 'ACTIVO'"
+          (click)="seleccionarFiltroEstado('ACTIVO')">
           Activos
         </button>
-        <button type="button" class="filter-pill" [class.active]="statusFilter === 'PLANIFICADO'"
-          (click)="setStatusFilter('PLANIFICADO')">
+        <button type="button" class="filter-pill" [class.active]="filtroEstado === 'PLANIFICADO'"
+          (click)="seleccionarFiltroEstado('PLANIFICADO')">
           Planificados
         </button>
-        <button type="button" class="filter-pill" [class.active]="statusFilter === 'TERMINADO'"
-          (click)="setStatusFilter('TERMINADO')">
+        <button type="button" class="filter-pill" [class.active]="filtroEstado === 'TERMINADO'"
+          (click)="seleccionarFiltroEstado('TERMINADO')">
           Terminados
         </button>
       </div>
 
       <div class="filters" role="group" aria-label="Filtrar por privacidad">
-        <button type="button" class="filter-pill" [class.active]="privacyFilter === 'TODOS'"
-          (click)="setPrivacyFilter('TODOS')">
+        <button type="button" class="filter-pill" [class.active]="filtroPrivacidad === 'TODOS'"
+          (click)="seleccionarFiltroPrivacidad('TODOS')">
           Todos
         </button>
-        <button type="button" class="filter-pill" [class.active]="privacyFilter === 'PUBLICO'"
-          (click)="setPrivacyFilter('PUBLICO')">
+        <button type="button" class="filter-pill" [class.active]="filtroPrivacidad === 'PUBLICO'"
+          (click)="seleccionarFiltroPrivacidad('PUBLICO')">
           Públicos
         </button>
-        <button type="button" class="filter-pill" [class.active]="privacyFilter === 'PRIVADO'"
-          (click)="setPrivacyFilter('PRIVADO')">
+        <button type="button" class="filter-pill" [class.active]="filtroPrivacidad === 'PRIVADO'"
+          (click)="seleccionarFiltroPrivacidad('PRIVADO')">
           Privados
         </button>
       </div>
 
       <div class="filters" role="group" aria-label="Ordenar por fecha">
-        <button type="button" class="filter-pill" [class.active]="dateSort === 'MAS_RECIENTE'"
-          (click)="setDateSort('MAS_RECIENTE')">
+        <button type="button" class="filter-pill" [class.active]="ordenFecha === 'MAS_RECIENTE'"
+          (click)="seleccionarOrdenFecha('MAS_RECIENTE')">
           Más reciente
         </button>
-        <button type="button" class="filter-pill" [class.active]="dateSort === 'MAS_ANTIGUO'"
-          (click)="setDateSort('MAS_ANTIGUO')">
+        <button type="button" class="filter-pill" [class.active]="ordenFecha === 'MAS_ANTIGUO'"
+          (click)="seleccionarOrdenFecha('MAS_ANTIGUO')">
           Más antiguo
         </button>
       </div>
     </div>
 
-    <div class="filters-mobile" *ngIf="showMobileFilters">
+    <div class="filters-mobile" *ngIf="mostrarFiltrosMovil">
       <div class="filter-field">
         <label class="filters-label" for="explore-championships-status">Estado</label>
-        <app-custom-select [options]="statusOptions" placeholder="Selecciona un estado" ariaLabel="Filtrar por estado"
-          inputId="explore-championships-status" [ngModel]="statusFilter"
-          (ngModelChange)="setStatusFilterFromUi($event)">
+        <app-custom-select [options]="opcionesEstado" placeholder="Selecciona un estado" ariaLabel="Filtrar por estado"
+          inputId="explore-championships-status" [ngModel]="filtroEstado"
+          (ngModelChange)="seleccionarFiltroEstadoUI($event)">
         </app-custom-select>
       </div>
 
       <div class="filter-field">
         <label class="filters-label" for="explore-championships-privacy">Privacidad</label>
-        <app-custom-select [options]="privacyOptions" placeholder="Selecciona privacidad"
-          ariaLabel="Filtrar por privacidad" inputId="explore-championships-privacy" [ngModel]="privacyFilter"
-          (ngModelChange)="setPrivacyFilterFromUi($event)">
+        <app-custom-select [options]="opcionesPrivacidad" placeholder="Selecciona privacidad"
+          ariaLabel="Filtrar por privacidad" inputId="explore-championships-privacy" [ngModel]="filtroPrivacidad"
+          (ngModelChange)="seleccionarFiltroPrivacidadUI($event)">
         </app-custom-select>
       </div>
 
       <div class="filter-field">
         <label class="filters-label" for="explore-championships-date">Ordenar por</label>
-        <app-custom-select [options]="dateSortOptions" placeholder="Selecciona orden" ariaLabel="Ordenar por fecha"
-          inputId="explore-championships-date" [ngModel]="dateSort" (ngModelChange)="setDateSortFromUi($event)">
+        <app-custom-select [options]="opcionesOrdenFecha" placeholder="Selecciona orden" ariaLabel="Ordenar por fecha"
+          inputId="explore-championships-date" [ngModel]="ordenFecha" (ngModelChange)="seleccionarOrdenFechaUI($event)">
         </app-custom-select>
       </div>
     </div>
 
     <app-loading-spinner *ngIf="cargando" message="Cargando campeonatos..." [fixed]="false"></app-loading-spinner>
 
-    <div *ngIf="errorMessage" class="error">
-      <span>{{ errorMessage }}</span>
-      <button type="button" class="btn-retry" (click)="loadChampionships()">Reintentar</button>
+    <div *ngIf="mensajeError" class="error">
+      <span>{{ mensajeError }}</span>
+      <button type="button" class="btn-retry" (click)="cargarCampeonatos()">Reintentar</button>
     </div>
 
     <div class="championships-grid">
-      <ng-container *ngIf="filteredChampionships.length > 0; else noResults">
-        <div class="championship-card" *ngFor="let championship of paginatedChampionships">
+      <ng-container *ngIf="campeonatosFiltrados.length > 0; else noResults">
+        <div class="championship-card" *ngFor="let championship of campeonatosPaginados">
           <div class="card-header">
             <h3>{{ championship.nombre }}</h3>
 
@@ -155,12 +155,12 @@
               </div>
               <div class="capacity-bar">
                 <div class="capacity-fill"
-                  [style.width.%]="getProgressPercentage(championship.participantes, championship.capacidad)"></div>
+                  [style.width.%]="obtenerPorcentajeProgreso(championship.participantes, championship.capacidad)"></div>
               </div>
               <p class="available-slots">
                 <ng-container
-                  *ngIf="getAvailableSlots(championship.participantes, championship.capacidad, championship.cuposDisponibles) !== null; else noCapacity">
-                  {{ getAvailableSlots(championship.participantes, championship.capacidad,
+                  *ngIf="obtenerCuposDisponibles(championship.participantes, championship.capacidad, championship.cuposDisponibles) !== null; else noCapacity">
+                  {{ obtenerCuposDisponibles(championship.participantes, championship.capacidad,
                   championship.cuposDisponibles) }} espacios disponibles
                 </ng-container>
                 <ng-template #noCapacity>Sin cupo definido</ng-template>
@@ -169,12 +169,12 @@
           </div>
 
           <div class="card-actions">
-            <button class="btn-secondary" (click)="viewDetails(championship.id)">
+            <button class="btn-secondary" (click)="verDetalles(championship.idCampeonato)">
               <i class="fas fa-eye"></i>
               Ver detalles
             </button>
-            <button *ngIf="canRegister(championship)" class="btn-primary"
-              (click)="registerChampionship(championship.id)" [disabled]="!championship.puedeInscribirse">
+            <button *ngIf="puedeInscribirse(championship)" class="btn-primary"
+              (click)="registrarCampeonato(championship.idCampeonato)" [disabled]="!championship.puedeInscribirse">
               <i class="fas fa-check"></i>
               Inscribirse
             </button>
@@ -191,44 +191,45 @@
     </div>
 
     <!-- Pagination Controls -->
-    <div class="pagination-controls" *ngIf="totalPages > 1 && !cargando && filteredChampionships.length > 0">
-      <button class="btn-page nav" (click)="prevPage()" [disabled]="currentPage === 1" aria-label="Anterior">
+    <div class="pagination-controls" *ngIf="totalPaginas > 1 && !cargando && campeonatosFiltrados.length > 0">
+      <button class="btn-page nav" (click)="paginaAnterior()" [disabled]="paginaActual === 1" aria-label="Anterior">
         <i class="fas fa-chevron-left"></i>
       </button>
 
       <div class="pages-list">
-        <button *ngFor="let p of getPageNumbers()" class="btn-page number" [class.active]="p === currentPage"
-          (click)="goToPage(p)">
+        <button *ngFor="let p of obtenerNumerosPagina()" class="btn-page number" [class.active]="p === paginaActual"
+          (click)="irAPagina(p)">
           {{ p }}
         </button>
       </div>
 
-      <button class="btn-page nav" (click)="nextPage()" [disabled]="currentPage === totalPages" aria-label="Siguiente">
+      <button class="btn-page nav" (click)="paginaSiguiente()" [disabled]="paginaActual === totalPaginas"
+        aria-label="Siguiente">
         <i class="fas fa-chevron-right"></i>
       </button>
     </div>
   </div>
 
   <!-- Modal para solicitar login -->
-  <div *ngIf="showLoginModal" class="modal-overlay">
+  <div *ngIf="mostrarModalLogin" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-body">
         <i class="fas fa-lock modal-icon"></i>
         <div class="modal-text">Debes iniciar sesión para inscribirte en un campeonato</div>
       </div>
-      <button class="modal-close" (click)="closeLoginModal()" aria-label="Cerrar">✕</button>
+      <button class="modal-close" (click)="cerrarModalLogin()" aria-label="Cerrar">✕</button>
       <div class="modal-actions">
-        <button class="modal-action-primary" (click)="goToLogin()">
+        <button class="modal-action-primary" (click)="irALogin()">
           <i class="fas fa-sign-in-alt"></i>
           Iniciar Sesión
         </button>
-        <button class="modal-action-secondary" (click)="closeLoginModal()">Cerrar</button>
+        <button class="modal-action-secondary" (click)="cerrarModalLogin()">Cerrar</button>
       </div>
     </div>
   </div>
 
   <!-- Modal para código de acceso (campeonatos privados) -->
-  <div *ngIf="showAccessCodeModal" class="modal-overlay">
+  <div *ngIf="mostrarModalCodigo" class="modal-overlay">
     <div class="modal-box" role="dialog" aria-modal="true" aria-label="Ingresar código de acceso">
       <div class="modal-body">
         <i class="fas fa-lock modal-icon" aria-hidden="true"></i>
@@ -236,29 +237,29 @@
           Este campeonato es privado. Ingresa el código para continuar tu inscripción.
         </div>
       </div>
-      <button class="modal-close" (click)="closeAccessCodeModal()" aria-label="Cerrar">✕</button>
+      <button class="modal-close" (click)="cerrarModalCodigo()" aria-label="Cerrar">✕</button>
 
       <div class="modal-form">
         <label class="modal-label" for="access-code">Código</label>
         <input id="access-code" class="modal-input" type="text" autocomplete="off" placeholder="Ej: 000000"
-          [ngModel]="accessCode" (ngModelChange)="onAccessCodeChange($event)" (keydown)="onAccessCodeKeyDown($event)"
-          (paste)="onAccessCodePaste($event)" maxlength="6" [disabled]="accessCodeSubmitting" inputmode="numeric">
-        <div *ngIf="accessCodeError" class="modal-error">{{ accessCodeError }}</div>
+          [ngModel]="codigoAcceso" (ngModelChange)="alCambiarCodigo($event)" (keydown)="alPresionarTeclaCodigo($event)"
+          (paste)="alPegarCodigo($event)" maxlength="6" [disabled]="enviandoCodigoAcceso" inputmode="numeric">
+        <div *ngIf="errorCodigoAcceso" class="modal-error">{{ errorCodigoAcceso }}</div>
       </div>
 
       <div class="modal-actions">
-        <button class="modal-action-primary" (click)="submitAccessCode()" [disabled]="accessCodeSubmitting">
-          <i class="fas" [ngClass]="accessCodeSubmitting ? 'fa-spinner fa-spin' : 'fa-check'" aria-hidden="true"></i>
+        <button class="modal-action-primary" (click)="enviarCodigo()" [disabled]="enviandoCodigoAcceso">
+          <i class="fas" [ngClass]="enviandoCodigoAcceso ? 'fa-spinner fa-spin' : 'fa-check'" aria-hidden="true"></i>
           Validar código
         </button>
-        <button class="modal-action-secondary" (click)="closeAccessCodeModal()"
-          [disabled]="accessCodeSubmitting">Cancelar</button>
+        <button class="modal-action-secondary" (click)="cerrarModalCodigo()"
+          [disabled]="enviandoCodigoAcceso">Cancelar</button>
       </div>
     </div>
   </div>
 
   <!-- Modal de eliminación -->
-  <div class="modal-overlay" *ngIf="showDeleteModal">
+  <div class="modal-overlay" *ngIf="mostrarModalEliminar">
     <div class="modal-box delete-modal">
       <div class="modal-header">
         <div class="warning-icon">
@@ -268,10 +269,10 @@
         <p>Esta acción no se puede deshacer. El campeonato dejará de ser visible para todos los usuarios.</p>
       </div>
       <div class="modal-actions-delete">
-        <button class="btn-cancel" (click)="closeDeleteModal()" [disabled]="isDeleting">Cancelar</button>
-        <button class="btn-confirm-delete" (click)="confirmDelete()" [disabled]="isDeleting">
-          <i class="fas" [ngClass]="isDeleting ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
-          {{ isDeleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+        <button class="btn-cancel" (click)="cerrarModalEliminar()" [disabled]="estaEliminando">Cancelar</button>
+        <button class="btn-confirm-delete" (click)="confirmarEliminacion()" [disabled]="estaEliminando">
+          <i class="fas" [ngClass]="estaEliminando ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
+          {{ estaEliminando ? 'Eliminando...' : 'Sí, Eliminar' }}
         </button>
       </div>
     </div>

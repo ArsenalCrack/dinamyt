@@ -26,14 +26,14 @@ export class VerifyComponent implements OnInit, OnDestroy {
 
   // Variables del formulario
   codigo: string = '';
-  emailUsuario: string = ''; // Aquí deberías cargar el correo desde un servicio o el estado
+  emailUsuario: string = ''; // Correo cargado desde sesión
   modo: 'register' | 'recovery' = 'register'; // Modo de verificación
 
   // Variables de estado
   mensaje: string = '';
   exito: boolean = false;
   cargando: boolean = false;
-  loadingText: string = 'Verificando...';
+  textoCarga: string = 'Verificando...';
   // Temporizador
   expiresAt: number | null = null;
   remainingMs: number = 0;
@@ -60,7 +60,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
     }
 
-    // Cargar expiración del CÓDIGO desde sessionStorage
+    // Cargar expiración del código desde sessionStorage
     const exp = sessionStorage.getItem('verifyExpiresAt');
     if (exp) {
       this.expiresAt = Number(exp);
@@ -69,7 +69,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
       sessionStorage.setItem('verifyExpiresAt', String(this.expiresAt));
     }
 
-    // Cargar cooldown de REENVÍO desde localStorage
+    // Cargar cooldown de reenvío desde localStorage
     const resendExp = localStorage.getItem('verifyResendExpiresAt');
     if (resendExp) {
       const t = Number(resendExp);
@@ -84,7 +84,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
     this.startTimer();
   }
 
-  // ... (lockScroll/unlockScroll methods remain here, but I need to make sure I don't overwrite them or misplace braces)
+
   private lockScroll() {
     if (this.modalLocked) return;
     this.scrollLock.lock();
@@ -106,7 +106,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
     }
 
     this.cargando = true;
-    this.loadingText = 'Verificando...';
+    this.textoCarga = 'Verificando...';
     this.lockScroll();
     this.mensaje = '';
     const startedAt = Date.now();
@@ -117,13 +117,13 @@ export class VerifyComponent implements OnInit, OnDestroy {
     };
     this.api.verificarCodigo(datos).subscribe({
       next: async (rest: any) => {
-        // mantener spinner mientras redirige
+        // Mantener el spinner mientras redirige
         this.cargando = true;
-        this.loadingText = 'Abriendo...';
+        this.textoCarga = 'Abriendo...';
         this.exito = true;
         this.mensaje = 'Código verificado. Continuamos...';
 
-        // Limpiar cooldown al verificar exitosamente (opcional, pero limpio)
+        // Limpiar cooldown al verificar exitosamente
         localStorage.removeItem('verifyResendExpiresAt');
 
         await delayRemaining(startedAt);
@@ -132,7 +132,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
           sessionStorage.removeItem('emailParaVerificar');
           sessionStorage.removeItem('verifyMode');
           sessionStorage.removeItem('verifyExpiresAt');
-          // Indicar que acaba de verificar para mostrar modal en dashboard
+          // Indicar que acabó de verificar para mostrar alerta en el dashboard
           sessionStorage.setItem('justVerified', 'true');
           this.router.navigate(['/login']);
         } else if (this.modo === 'recovery') {
@@ -157,7 +157,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
     if (this.resendRemainingSeconds > 0) return;
 
     this.cargando = true;
-    this.loadingText = 'Enviando...';
+    this.textoCarga = 'Enviando...';
     this.lockScroll();
     this.mensaje = '';
     const startedAt = Date.now();
@@ -167,7 +167,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
         this.exito = true;
         this.mensaje = 'Enviamos un nuevo código. Revisa tu correo.';
 
-        // 1. Resetear expiración del código (5 mins)
+        // 1. Resetear expiración del código (5 min)
         const expires = Date.now() + 5 * 60 * 1000;
         sessionStorage.setItem('verifyExpiresAt', String(expires));
         this.expiresAt = expires;
@@ -235,7 +235,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
       clearInterval(this.timerHandle);
       this.timerHandle = null;
     }
-    // Si acabó y no lo hemos manejado aún, mostrar mensaje y redirigir
+    // Si el código expiró y aún no se ha manejado, mostrar mensaje y redirigir
     if (this.expired && !prev && !this.expiredHandled) {
       this.handleExpiration();
     }
@@ -245,14 +245,14 @@ export class VerifyComponent implements OnInit, OnDestroy {
     this.expiredHandled = true;
     this.mensaje = 'El código ha caducado.';
     this.exito = false;
-    // mostrar modal y esperar a que el usuario cierre
+    // Mostrar modal y esperar a que el usuario cierre
     this.expiredModalVisible = true;
   }
 
   expiredModalVisible = false;
 
   closeExpiredModal() {
-    // Solo cerrar el modal y permanecer en la página de verificación
+    // Cerrar el modal y permanecer en la página de verificación
     this.expiredModalVisible = false;
     this.mensaje = 'El código ha caducado. Reenvía para obtener uno nuevo.';
     this.exito = false;
@@ -260,7 +260,7 @@ export class VerifyComponent implements OnInit, OnDestroy {
   }
 
   closeCodeNotMatchModal() {
-    // Cerrar el modal y limpiar el código para que intente nuevamente
+    // Cerrar el modal y limpiar el código para reintentar
     this.codeNotMatchModalVisible = false;
     this.codigo = '';
     this.mensaje = '';
@@ -271,15 +271,15 @@ export class VerifyComponent implements OnInit, OnDestroy {
     const input = event.target as HTMLInputElement;
     let value = input.value;
 
-    // Remove non-numeric characters
+    // Eliminar caracteres no numéricos
     value = value.replace(/[^0-9]/g, '');
 
-    // Limit to 6 characters
+    // Limitar a 6 caracteres
     if (value.length > 6) {
       value = value.substring(0, 6);
     }
 
-    // Update input and model
+    // Actualizar input y modelo
     input.value = value;
     this.codigo = value;
   }
@@ -290,7 +290,6 @@ export class VerifyComponent implements OnInit, OnDestroy {
     const mm = Math.floor(sec / 60).toString().padStart(2, '0');
     const ss = (sec % 60).toString().padStart(2, '0');
     return `${mm}:${ss}`;
-    this.lockScroll();
   }
 
   ngOnDestroy(): void {

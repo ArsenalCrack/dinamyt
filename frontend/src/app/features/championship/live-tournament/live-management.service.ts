@@ -42,17 +42,17 @@ export class LiveManagementService {
             const rawAge = ageMatch ? ageMatch[1] : 'N/A';
             const rawWeight = weightMatch ? weightMatch[1] : 'N/A';
 
-            // Format ranges: 4_9 -> 4-9
+            // Formatear rangos: 4_9 -> 4-9
             const edadDisplay = rawAge.replace(/_/g, '-');
             const pesoDisplay = rawWeight.replace(/_/g, '-');
 
-            // Remove Age and Weight from string to process the rest
-            // We replace with empty string, then cleanup consecutive hyphens
+            // Remover Edad y Peso del string para procesar el resto
+            // Reemplazamos con cadena vacía y limpiamos guiones consecutivos
             let remainder = sectionId
                 .replace(/EDAD\(.*?\)/, '')
                 .replace(/PESO\(.*?\)/, '')
-                .replace(/-+$/, '') // trim trailing dash
-                .replace(/--+/g, '-'); // collapse dashes
+                .replace(/-+$/, '') // limpiar guión final
+                .replace(/--+/g, '-'); // colapsar guiones
 
             const parts = remainder.split('-').filter(p => p.trim().length > 0);
 
@@ -60,21 +60,21 @@ export class LiveManagementService {
 
             const rawModality = parts[0];
             const rawGender = parts[1];
-            // Gender format
+            // Formato de género
             const gender = rawGender ? rawGender.replace(/_/g, ' ') : 'General';
 
             let modalityType = 'GENERAL';
-            // Determine if it is a Jump group which needs separation
+            // Determinar si es un grupo de salto que necesita separación
             if (rawModality.includes('SALTO_ALTO') || rawModality.includes('SALTO ALTO')) modalityType = 'SALTO_ALTO';
             else if (rawModality.includes('SALTO_LARGO') || rawModality.includes('SALTO LARGO')) modalityType = 'SALTO_LARGO';
 
-            // Belt is the rest
+            // Cinturón es el resto
             const beltParts = parts.slice(2);
             const beltPart = beltParts.length > 0 ? beltParts.join('-') : 'General';
-            // Clean belt display just in case
+            // Limpiar display del cinturón
             const cinturonDisplay = beltPart.replace(/_/g, '-');
 
-            // Group Key
+            // Clave del grupo demográfico
             const groupKey = `${edadDisplay}|${pesoDisplay}|${cinturonDisplay}|${gender}|${modalityType}`;
 
             if (!groupsMap.has(groupKey)) {
@@ -94,10 +94,10 @@ export class LiveManagementService {
             }
         });
 
-        // Remove groups with no active modalities
+        // Remover grupos sin modalidades activas
         const result = Array.from(groupsMap.values()).filter(g => g.activeModalities.length > 0);
 
-        // Sort modalities within each group
+        // Ordenar modalidades dentro de cada grupo
         result.forEach(g => {
             g.activeModalities = this.sortModalities(g.activeModalities);
         });
@@ -105,9 +105,9 @@ export class LiveManagementService {
         return result;
     }
 
-    // Helper for Tatami Assignment Logic
+    // Helper para lógica de asignación de tatamis
     getDemographicType(group: DemographicGroup): 'SALTO_ALTO' | 'SALTO_LARGO' | 'GENERAL' {
-        // Check first modality (they are grouped by type so all should match)
+        // Verificar primera modalidad (están agrupadas por tipo, todas deberían coincidir)
         if (group.activeModalities.length === 0) return 'GENERAL';
         const id = group.activeModalities[0].toUpperCase();
 

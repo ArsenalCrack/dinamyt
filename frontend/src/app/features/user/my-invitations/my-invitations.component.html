@@ -2,7 +2,7 @@
   <div class="page-card">
 
     <header class="header">
-      <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+      <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás">
         <i class="fas fa-arrow-left"></i>
       </button>
       <div class="header-content">
@@ -11,36 +11,36 @@
       </div>
     </header>
 
-    <!-- Tabs -->
+    <!-- Pestañas -->
     <nav class="tabs-nav">
-      <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setTab('PENDIENTE')">
+      <button class="tab-btn" [class.active]="pestanaActiva === 'PENDIENTE'" (click)="seleccionarPestana('PENDIENTE')">
         <i class="fas fa-clock"></i>
         <span>Pendientes</span>
       </button>
-      <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setTab('ACEPTADO')">
+      <button class="tab-btn" [class.active]="pestanaActiva === 'ACEPTADO'" (click)="seleccionarPestana('ACEPTADO')">
         <i class="fas fa-check-circle"></i>
         <span>Aceptadas</span>
       </button>
-      <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setTab('RECHAZADO')">
+      <button class="tab-btn" [class.active]="pestanaActiva === 'RECHAZADO'" (click)="seleccionarPestana('RECHAZADO')">
         <i class="fas fa-times-circle"></i>
         <span>Rechazadas</span>
       </button>
     </nav>
 
-    <app-loading-spinner *ngIf="loading" message="Cargando invitaciones..."></app-loading-spinner>
+    <app-loading-spinner *ngIf="cargando" message="Cargando invitaciones..."></app-loading-spinner>
 
-    <div class="inscriptions-list" *ngIf="!loading">
+    <div class="inscriptions-list" *ngIf="!cargando">
 
-      <div class="empty-state" *ngIf="filteredInvitations.length === 0">
+      <div class="empty-state" *ngIf="invitacionesFiltradas.length === 0">
         <i class="fas fa-envelope-open"></i>
-        <p>No tienes invitaciones {{ getStatusLabel(activeTab) | lowercase }}s.</p>
+        <p>No tienes invitaciones {{ obtenerEtiquetaEstado(pestanaActiva) | lowercase }}s.</p>
       </div>
 
-      <div class="inscription-card" *ngFor="let item of filteredInvitations"
+      <div class="inscription-card" *ngFor="let item of invitacionesFiltradas"
         [class.rejected]="item.estadoTexto === 'RECHAZADO'" [class.expanded]="item.expanded">
 
-        <!-- Summary -->
-        <div class="card-summary" (click)="toggleExpanded(item)">
+        <!-- Resumen -->
+        <div class="card-summary" (click)="alternarExpandido(item)">
           <div class="user-avatar">
             <i class="fas fa-trophy"></i>
           </div>
@@ -58,7 +58,7 @@
               </span>
             </div>
 
-            <button class="btn-small-action" (click)="viewDetails(item); $event.stopPropagation()">
+            <button class="btn-small-action" (click)="verDetalles(item); $event.stopPropagation()">
               <i class="fas fa-eye"></i> Ver detalles
             </button>
           </div>
@@ -68,14 +68,14 @@
           </div>
         </div>
 
-        <!-- Details -->
+        <!-- Detalles -->
         <div class="card-details-wrapper" *ngIf="item.expanded">
           <div class="card-details">
 
             <div class="details-grid">
               <div class="detail-item">
                 <label>Rol asignado</label>
-                <span>{{ getRoleLabel(item.id_tipo) }}</span>
+                <span>{{ obtenerEtiquetaRol(item.id_tipo) }}</span>
               </div>
 
               <div class="detail-item">
@@ -91,21 +91,21 @@
               </div>
             </div>
 
-            <!-- Actions -->
+            <!-- Acciones -->
             <div class="actions-row">
 
               <ng-container *ngIf="item.estadoTexto === 'PENDIENTE'">
-                <button class="btn-reject" (click)="confirmReject(item.id_invitacion)">
+                <button class="btn-reject" (click)="confirmarRechazo(item.id_invitacion)">
                   <i class="fas fa-times"></i> Rechazar
                 </button>
 
-                <button class="btn-primary" (click)="acceptInvitation(item.id_invitacion)">
+                <button class="btn-primary" (click)="aceptarInvitacion(item.id_invitacion)">
                   <i class="fas fa-check"></i> Aceptar
                 </button>
               </ng-container>
 
               <ng-container *ngIf="item.estadoTexto === 'ACEPTADO'">
-                <button class="btn-delete" (click)="confirmCancel(item.id_invitacion)">
+                <button class="btn-delete" (click)="confirmarCancelacion(item.id_invitacion)">
                   <i class="fas fa-ban"></i> Cancelar Invitación
                 </button>
               </ng-container>
@@ -123,8 +123,8 @@
   </div>
 </div>
 
-<!-- Reject Modal -->
-<div class="modal-overlay" *ngIf="showRejectModal">
+<!-- Modal Rechazar -->
+<div class="modal-overlay" *ngIf="mostrarModalRechazar">
   <div class="modal-box">
     <div class="modal-header">
       <i class="fas fa-times-circle warning-icon"></i>
@@ -134,16 +134,16 @@
       No participarás en este campeonato.
     </p>
     <div class="modal-actions">
-      <button class="btn-cancel" (click)="closeModals()">Cancelar</button>
-      <button class="btn-confirm-reject" (click)="finalizeReject()">
-        {{ processing ? 'Procesando...' : 'Rechazar' }}
+      <button class="btn-cancel" (click)="cerrarModales()">Cancelar</button>
+      <button class="btn-confirm-reject" (click)="finalizarRechazo()">
+        {{ procesando ? 'Procesando...' : 'Rechazar' }}
       </button>
     </div>
   </div>
 </div>
 
-<!-- Cancel Modal -->
-<div class="modal-overlay" *ngIf="showCancelModal">
+<!-- Modal Cancelar -->
+<div class="modal-overlay" *ngIf="mostrarModalCancelar">
   <div class="modal-box">
     <div class="modal-header">
       <i class="fas fa-exclamation-triangle warning-icon"></i>
@@ -153,9 +153,9 @@
       Ya habías aceptado, pero puedes cancelar tu participación.
     </p>
     <div class="modal-actions">
-      <button class="btn-cancel" (click)="closeModals()">Volver</button>
-      <button class="btn-confirm-reject" (click)="finalizeCancel()">
-        {{ processing ? 'Procesando...' : 'Sí, Cancelar' }}
+      <button class="btn-cancel" (click)="cerrarModales()">Volver</button>
+      <button class="btn-confirm-reject" (click)="finalizarCancelacion()">
+        {{ procesando ? 'Procesando...' : 'Sí, Cancelar' }}
       </button>
     </div>
   </div>

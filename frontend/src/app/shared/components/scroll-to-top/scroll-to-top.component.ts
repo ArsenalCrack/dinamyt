@@ -13,7 +13,7 @@ export class ScrollToTopComponent {
 
     @HostListener('window:scroll', [])
     onWindowScroll() {
-        // Show button if scrolled down more than 300px
+        // Mostrar botón si el scroll supera los 300px
         this.isVisible = window.scrollY > 300;
     }
 

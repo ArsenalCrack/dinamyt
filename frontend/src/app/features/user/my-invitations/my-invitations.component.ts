@@ -13,16 +13,16 @@ import { BackNavigationService } from '../../../core/services/back-navigation.se
   styleUrls: ['./my-invitations.component.scss']
 })
 export class MyInvitationsComponent implements OnInit {
-  activeTab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
-  loading = true;
-  invitations: any[] = [];
-  filteredInvitations: any[] = [];
+  pestanaActiva: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
+  cargando = true;
+  invitaciones: any[] = [];
+  invitacionesFiltradas: any[] = [];
 
-  // Modals for actions
-  showRejectModal = false;
-  showCancelModal = false;
-  selectedInvitationId: number | null = null;
-  processing = false;
+  // Modales para acciones
+  mostrarModalRechazar = false;
+  mostrarModalCancelar = false;
+  idInvitacionSeleccionada: number | null = null;
+  procesando = false;
 
   constructor(
     private api: ApiService,
@@ -32,7 +32,7 @@ export class MyInvitationsComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.loadInvitations();
+    this.cargarInvitaciones();
   }
   mapEstado(estado: number): 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' {
     switch (estado) {
@@ -43,38 +43,33 @@ export class MyInvitationsComponent implements OnInit {
   }
 
 
-  loadInvitations(): void {
+  cargarInvitaciones(): void {
     const userId = sessionStorage.getItem('idDocumento');
     if (!userId) {
-      this.loading = false;
+      this.cargando = false;
       return;
     }
 
-    this.loading = true;
+    this.cargando = true;
     this.api.getMisInvitaciones(userId).subscribe({
       next: (data) => {
         // Detailed Debug for ID issue
         if (data && data.length > 0) {
-          console.log('Sample Raw Invitation Keys:', Object.keys(data[0]));
-          console.log('Sample Raw Invitation Values:', JSON.stringify(data[0]));
         }
 
-        this.invitations = data.map((i: any) => ({
+        this.invitaciones = data.map((i: any) => ({
           id_invitacion: i.idincripcion,
           estado: i.estado,
           id_tipo: i.tipoUsuario,
 
           // 🔁 Mapeo de nombres del backend → frontend
           nombre_campeonato: i.campeonato,
-          // Handle various possible backend naming conventions for ids
-          // We try extensive mapping because the field name is uncertain
           id_campeonato: i.id_campeonato || i.idCampeonato || i.IdCampeonato || i.campeonato_id || i.campeonatoId,
 
-          // Championship details (if needed)
+          // Detalles del campeonato
           ciudad: i.ciudad_campeonato,
 
-          // Invitation Date details (User requested fecha_inscripcion)
-          // We include fecha_envio as likely candidate from other endpoints
+          // Fecha de invitación
           fecha_invitacion: i.fecha_inscripcion || i.fechaInscripcion || i.fecha_envio || i.fecha_registro || i.fecha_creacion,
 
           nombre_invitador: i.nombre_Creador,
@@ -84,39 +79,39 @@ export class MyInvitationsComponent implements OnInit {
           expanded: false
         }));
 
-        this.applyFilter();
-        this.loading = false;
+        this.aplicarFiltro();
+        this.cargando = false;
       },
       error: (err) => {
-        console.error('Error fetching invitations', err);
-        this.loading = false;
+        console.error('Error al cargar invitaciones', err);
+        this.cargando = false;
       }
     });
   }
 
-  setTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
-    this.activeTab = tab;
-    this.applyFilter();
+  seleccionarPestana(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
+    this.pestanaActiva = tab;
+    this.aplicarFiltro();
   }
 
-  applyFilter(): void {
-    this.filteredInvitations =
-      this.invitations.filter(i => i.estadoTexto === this.activeTab);
+  aplicarFiltro(): void {
+    this.invitacionesFiltradas =
+      this.invitaciones.filter(i => i.estadoTexto === this.pestanaActiva);
   }
 
 
 
-  toggleExpanded(item: any): void {
+  alternarExpandido(item: any): void {
     item.expanded = !item.expanded;
   }
 
-  goBack(): void {
+  volverAtras(): void {
     this.backNav.backOr({ fallbackUrl: '/dashboard' });
   }
 
-  viewDetails(item: any): void {
+  verDetalles(item: any): void {
     if (!item.id_campeonato) {
-      console.warn('Cannot view details: Championship ID missing. Available keys:', Object.keys(item));
+      console.warn('No se puede ver detalles: ID de campeonato faltante. Claves disponibles:', Object.keys(item));
       return;
     }
 
@@ -128,82 +123,79 @@ export class MyInvitationsComponent implements OnInit {
     }
   }
 
-  // Actions
-  acceptInvitation(id: number): void {
-    this.processing = true;
+  // Acciones
+  aceptarInvitacion(id: number): void {
+    this.procesando = true;
     this.api.responderInvitacion(id, 'ACEPTADO').subscribe({
       next: () => {
-        this.updateLocalStatus(id, 'ACEPTADO');
-        this.processing = false;
+        this.actualizarEstadoLocal(id, 'ACEPTADO');
+        this.procesando = false;
       },
       error: (e) => {
         console.error(e);
-        this.processing = false;
+        this.procesando = false;
       }
     });
   }
 
-  confirmReject(id: number): void {
-    this.selectedInvitationId = id;
-    this.showRejectModal = true;
+  confirmarRechazo(id: number): void {
+    this.idInvitacionSeleccionada = id;
+    this.mostrarModalRechazar = true;
   }
 
-  confirmCancel(id: number): void {
-    this.selectedInvitationId = id;
-    this.showCancelModal = true;
+  confirmarCancelacion(id: number): void {
+    this.idInvitacionSeleccionada = id;
+    this.mostrarModalCancelar = true;
   }
 
-  finalizeReject(): void {
-    if (!this.selectedInvitationId) return;
-    this.processing = true;
-    this.api.responderInvitacion(this.selectedInvitationId, 'RECHAZADO').subscribe({
+  finalizarRechazo(): void {
+    if (!this.idInvitacionSeleccionada) return;
+    this.procesando = true;
+    this.api.responderInvitacion(this.idInvitacionSeleccionada, 'RECHAZADO').subscribe({
       next: () => {
-        this.updateLocalStatus(this.selectedInvitationId!, 'RECHAZADO');
-        this.closeModals();
-        this.processing = false;
+        this.actualizarEstadoLocal(this.idInvitacionSeleccionada!, 'RECHAZADO');
+        this.cerrarModales();
+        this.procesando = false;
       },
       error: (e) => {
         console.error(e);
-        this.processing = false;
+        this.procesando = false;
       }
     });
   }
 
-  finalizeCancel(): void {
-    if (!this.selectedInvitationId) return;
-    // "Cancelar invitación cuando ya haya sido aceptada" - treating as Reject/Cancel
-    this.processing = true;
-    this.api.responderInvitacion(this.selectedInvitationId, 'CANCELADO').subscribe({
+  finalizarCancelacion(): void {
+    if (!this.idInvitacionSeleccionada) return;
+    this.procesando = true;
+    this.api.responderInvitacion(this.idInvitacionSeleccionada, 'CANCELADO').subscribe({
       next: () => {
-        // Maybe remove it or move to Rejected tab? Let's move to Rejected/Cancelled if that state exists
-        // For now moving to rejected tab locally
-        this.updateLocalStatus(this.selectedInvitationId!, 'RECHAZADO');
-        this.closeModals();
-        this.processing = false;
+        this.actualizarEstadoLocal(this.idInvitacionSeleccionada!, 'RECHAZADO');
+        this.cerrarModales();
+        this.procesando = false;
       },
       error: (e) => {
         console.error(e);
-        this.processing = false;
+        this.procesando = false;
       }
     });
   }
 
-  closeModals(): void {
-    this.showRejectModal = false;
-    this.showCancelModal = false;
-    this.selectedInvitationId = null;
+  cerrarModales(): void {
+    this.mostrarModalRechazar = false;
+    this.mostrarModalCancelar = false;
+    this.idInvitacionSeleccionada = null;
   }
 
-  updateLocalStatus(id: number, newStatus: string): void {
-    const item = this.invitations.find(i => i.id_invitacion === id);
+  actualizarEstadoLocal(id: number, nuevoEstado: string): void {
+    const item = this.invitaciones.find(i => i.id_invitacion === id);
     if (item) {
-      item.estado = (newStatus === 'ACEPTADO' ? 3 : (newStatus === 'RECHAZADO' ? 4 : item.estado));
-      item.estadoTexto = newStatus;
-      this.applyFilter();
+      item.estado = (nuevoEstado === 'ACEPTADO' ? 3 : (nuevoEstado === 'RECHAZADO' ? 4 : item.estado));
+      item.estadoTexto = nuevoEstado;
+      this.aplicarFiltro();
     }
   }
 
-  getStatusClass(status: string): string {
+  obtenerClaseEstado(status: string): string {
     switch (status) {
       case 'ACEPTADO': return 'status-accepted';
       case 'RECHAZADO': return 'status-rejected';
@@ -211,7 +203,7 @@ export class MyInvitationsComponent implements OnInit {
     }
   }
 
-  getStatusLabel(status: string): string {
+  obtenerEtiquetaEstado(status: string): string {
     switch (status) {
       case 'ACEPTADO': return 'Aceptada';
       case 'RECHAZADO': return 'Rechazada';
@@ -219,7 +211,7 @@ export class MyInvitationsComponent implements OnInit {
       default: return status;
     }
   }
-  getRoleLabel(roleId: number): string {
+  obtenerEtiquetaRol(roleId: number): string {
     switch (roleId) {
       case 5: return 'Competidor';
       case 6: return 'Juez Central';

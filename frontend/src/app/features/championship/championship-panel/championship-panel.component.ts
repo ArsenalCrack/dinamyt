@@ -18,17 +18,17 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 export class ChampionshipPanelComponent implements OnInit, OnDestroy {
     id: string | null = null;
     campeonato: any = null;
-    loading = true;
-    error: string | null = null;
+    cargando = true;
+    mensajeError: string | null = null;
     currentUserId: string | null = null;
-    copied = false;
+    copiado = false;
 
-    // Modal states
-    showDeleteModal = false;
-    showPublishModal = false;
-    showEditBlockedModal = false;
-    isDeleting = false;
-    isPublishing = false;
+    // Estados de modales
+    mostrarModalEliminar = false;
+    mostrarModalPublicar = false;
+    mostrarModalEdicionBloqueada = false;
+    eliminando = false;
+    publicando = false;
 
     constructor(
         private route: ActivatedRoute,
@@ -46,13 +46,13 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
         if (this.id) {
             this.loadData();
         } else {
-            this.error = 'ID de campeonato no válido.';
-            this.loading = false;
+            this.mensajeError = 'ID de campeonato no válido.';
+            this.cargando = false;
         }
     }
 
     loadData(): void {
-        this.loading = true;
+        this.cargando = true;
         this.api.getCampeonatoById(this.id!).subscribe({
             next: (data) => {
                 this.campeonato = data;
@@ -70,24 +70,23 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
                     return;
                 }
 
-                // Validate Ownership
+                // Validar propiedad del campeonato
                 if (!this.isOwner()) {
-                    this.router.navigate(['/mis-campeonatos']); // Redirect if not owner
+                    this.router.navigate(['/mis-campeonatos']); // Redirigir si no es dueño
                     return;
                 }
 
-                // Calculate status
-                if (!this.campeonato.pais) this.campeonato.pais = 'Colombia'; // Ghost
-                if (!this.campeonato.ciudad) this.campeonato.ciudad = 'Bogotá'; // Ghost
-                console.log('Campeonato Data:', this.campeonato); // Debug: Check incoming status
+                // Calcular estado
+                if (!this.campeonato.pais) this.campeonato.pais = 'Colombia';
+                if (!this.campeonato.ciudad) this.campeonato.ciudad = 'Bogotá';
                 this.campeonato.estadoReal = this.calculateStatus(this.campeonato.fechaInicio, this.campeonato.fecha_fin);
 
-                this.loading = false;
+                this.cargando = false;
             },
             error: (err) => {
                 console.error('Error loading championship panel:', err);
-                this.error = 'No se pudo cargar la información del campeonato.';
-                this.loading = false;
+                this.mensajeError = 'No se pudo cargar la información del campeonato.';
+                this.cargando = false;
             }
         });
     }
@@ -95,12 +94,12 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
     calculateStatus(fechaInicio: string, fechaFin: string | undefined): string {
         if (!fechaInicio) return 'PLANIFICADO';
 
-        // Priority: Explicit Status > Privacy (Draft) > Date Logic
+        // Prioridad: Estado explícito > Privacidad (Borrador) > Lógica de fechas
         if (this.campeonato?.estado === 'BORRADOR') return 'BORRADOR';
         if (this.campeonato?.estado === 'LISTO') return 'LISTO';
 
-        // If not public (and not LISTO/BORRADOR), it is a Draft
-        // Check for loose equality or boolean
+        // Si no es público (y no es LISTO/BORRADOR), es un Borrador
+        // Verificar igualdad flexible o booleana
         const isPublic = this.campeonato?.esPublico === true || this.campeonato?.esPublico === 1 || this.campeonato?.esPublico === '1';
         if (!isPublic) return 'BORRADOR';
 
@@ -132,68 +131,66 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
         return String(this.campeonato.creadoPor) === String(this.currentUserId);
     }
 
-    goBack(): void {
+    volverAtras(): void {
         this.router.navigate(['/mis-campeonatos']);
     }
 
-    copyCode(): void {
+    copiarCodigo(): void {
         const codeToCopy = this.campeonato?.Codigo || this.campeonato?.codigo;
         if (!codeToCopy) return;
 
         navigator.clipboard.writeText(codeToCopy).then(() => {
-            this.copied = true;
-            setTimeout(() => this.copied = false, 2000);
+            this.copiado = true;
+            setTimeout(() => this.copiado = false, 2000);
         });
     }
 
-    // Action Methods
-    startChampionship(): void {
+    // Métodos de acción
+    iniciarCampeonato(): void {
         this.router.navigate(['/campeonato/live', this.id]);
     }
 
-    sendInvitations(): void {
+    enviarInvitaciones(): void {
         this.router.navigate(['/campeonato/invitations', this.id]);
     }
 
-    viewInscriptions(): void {
+    verInscripciones(): void {
         this.router.navigate(['/campeonato/inscriptions', this.id]);
     }
 
-    editChampionship(): void {
+    editarCampeonato(): void {
         if (this.campeonato.estado === 'LISTO') {
-            this.showEditBlockedModal = true;
+            this.mostrarModalEdicionBloqueada = true;
             this.scrollLock.lock();
             return;
         }
         this.router.navigate(['/campeonato/edit', this.id]);
     }
 
-    closeEditBlockedModal(): void {
-        this.showEditBlockedModal = false;
+    cerrarModalEdicionBloqueada(): void {
+        this.mostrarModalEdicionBloqueada = false;
         this.scrollLock.unlock();
     }
 
-    publishChampionship(): void {
-        if (!this.id || this.isPublishing) return;
-        this.showPublishModal = true;
+    publicarCampeonato(): void {
+        if (!this.id || this.publicando) return;
+        this.mostrarModalPublicar = true;
         this.scrollLock.lock();
     }
 
-    closePublishModal(): void {
-        this.showPublishModal = false;
-        this.isPublishing = false;
+    cerrarModalPublicar(): void {
+        this.mostrarModalPublicar = false;
+        this.publicando = false;
         this.scrollLock.unlock();
     }
 
-    confirmPublish(): void {
-        this.isPublishing = true;
-        // Construct payload to update status to LISTO and ensure visibility
+    confirmarPublicacion(): void {
+        this.publicando = true;
         const payload = {
             ...this.campeonato,
             estado: 'LISTO',
             esPublico: 1,
             visible: 1,
-            // Ensure modalities are sent in expected format if they were parsed
             modalidades: typeof this.campeonato.modalidades === 'string'
                 ? JSON.parse(this.campeonato.modalidades)
                 : this.campeonato.modalidades
@@ -201,51 +198,50 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
 
         this.api.updateCampeonato(this.id!, payload).subscribe({
             next: (updatedData) => {
-                this.closePublishModal();
-                // Update local state
+                this.cerrarModalPublicar();
                 this.campeonato.estado = 'LISTO';
                 this.campeonato.esPublico = 1;
                 this.campeonato.visible = 1;
                 this.campeonato.estadoReal = 'LISTO';
             },
             error: (err) => {
-                console.error('Error publishing championship:', err);
-                this.isPublishing = false;
-                alert('Hubo un error al publicar el campeonato. Por favor intenta de nuevo.'); // Fallback alert for error
+                console.error('Error al publicar campeonato:', err);
+                this.publicando = false;
+                alert('Hubo un error al publicar el campeonato. Por favor intenta de nuevo.');
             }
         });
     }
 
-    viewPublicDetails(): void {
+    verDetallesPublicos(): void {
         this.router.navigate(['/campeonato/details', this.id]);
     }
 
-    // Delete Logic
-    deleteChampionship(): void {
-        this.showDeleteModal = true;
+    // Lógica de eliminación
+    eliminarCampeonato(): void {
+        this.mostrarModalEliminar = true;
         this.scrollLock.lock();
     }
 
-    closeDeleteModal(): void {
-        this.showDeleteModal = false;
-        this.isDeleting = false;
+    cerrarModalEliminar(): void {
+        this.mostrarModalEliminar = false;
+        this.eliminando = false;
         this.scrollLock.unlock();
     }
 
-    confirmDelete(): void {
+    confirmarEliminar(): void {
         if (!this.id) return;
-        this.isDeleting = true;
+        this.eliminando = true;
         this.api.deleteCampeonato(this.id).subscribe({
             next: () => {
-                this.closeDeleteModal();
-                this.navHistory.removeLastUrl(); // Clean history
+                this.cerrarModalEliminar();
+                this.navHistory.removeLastUrl();
                 this.router.navigate(['/mis-campeonatos']);
             },
             error: (err) => {
-                console.error('Error deleting:', err);
-                this.isDeleting = false;
-                this.closeDeleteModal(); // Unlock scroll even on error
-                this.navHistory.removeLastUrl(); // Clean history even on fallback
+                console.error('Error al eliminar:', err);
+                this.eliminando = false;
+                this.cerrarModalEliminar();
+                this.navHistory.removeLastUrl();
                 this.router.navigate(['/mis-campeonatos']);
             }
         });

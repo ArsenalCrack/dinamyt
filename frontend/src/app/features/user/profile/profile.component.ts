@@ -39,7 +39,7 @@ export class ProfileComponent implements OnDestroy {
   ciudadMaxLength = 50;
 
   telefonoCodigo = '';
-  phoneCodeOptions: Array<{ value: string | null; label: string }> = [];
+  opcionesCodigoPais: Array<{ value: string | null; label: string }> = [];
 
   // Opciones para dropdowns
   private static readonly CINTURONES_BASE = [
@@ -98,13 +98,13 @@ export class ProfileComponent implements OnDestroy {
       if (c.phonecode) codes.add(c.phonecode.startsWith('+') ? c.phonecode : `+${c.phonecode}`);
     });
 
-    // Convert to sorted unique list
+    // Convertir a lista única ordenada
     const sortedCodes = Array.from(codes).sort((a, b) => {
-      // Parse numbers to sort numerically (+1, +7, +57)
+      // Parsear números para ordenar numéricamente (+1, +7, +57)
       return parseInt(a.replace(/\D/g, '')) - parseInt(b.replace(/\D/g, ''));
     });
 
-    this.phoneCodeOptions = [
+    this.opcionesCodigoPais = [
       { value: null, label: 'Sin prefijo' },
       ...sortedCodes.map(code => ({ value: code, label: code }))
     ];
@@ -152,12 +152,12 @@ export class ProfileComponent implements OnDestroy {
 
     // Caso: viene con +código
     if (cleaned.startsWith('+')) {
-      // Find matching code from options
-      const codes = this.phoneCodeOptions
+      // Buscar código coincidente de las opciones
+      const codes = this.opcionesCodigoPais
         .map(o => o.value)
         .filter(v => v !== null) as string[];
 
-      // Sort by length desc to match longest code first (+1 vs +123)
+      // Ordenar por longitud desc para coincidir primero con el código más largo (+1 vs +123)
       codes.sort((a, b) => b.length - a.length);
 
       const match = codes.find(c => cleaned.startsWith(c));
@@ -185,7 +185,7 @@ export class ProfileComponent implements OnDestroy {
         .map(c => c.name)
         .sort();
 
-      // Auto-update phone code if empty
+      // Auto-actualizar código telefónico si está vacío
       if (!this.telefonoCodigo && country.phonecode) {
         this.telefonoCodigo = country.phonecode.startsWith('+') ? country.phonecode : `+${country.phonecode}`;
       }
@@ -193,9 +193,9 @@ export class ProfileComponent implements OnDestroy {
       this.ciudadesList = [];
     }
 
-    // Clear city if not in list (optional, but safer)
+    // Limpiar ciudad si no está en la lista (más seguro)
     if (this.usuario.ciudad && !this.ciudadesList.includes(this.usuario.ciudad)) {
-      // Only clear if list is not empty (because if list is empty due to fetch error, we shouldn't wipe data)
+      // Solo limpiar si la lista no está vacía (si está vacía por error de carga, no borrar datos)
       if (this.ciudadesList.length > 0) this.usuario.ciudad = '';
     }
   }
@@ -250,14 +250,14 @@ export class ProfileComponent implements OnDestroy {
       reader.onload = () => this.fotoPreview = String(reader.result || '');
       reader.readAsDataURL(file);
       // Subir foto automáticamente
-      this.uploadPhoto();
+      this.subirFoto();
     }
   }
 
   private lockScroll() { document.body.style.overflow = 'hidden'; }
   private unlockScroll() { document.body.style.overflow = ''; }
 
-  uploadPhoto() {
+  subirFoto() {
     if (!this.fotoFile) return;
     this.saving = true;
     this.lockScroll();
@@ -284,7 +284,7 @@ export class ProfileComponent implements OnDestroy {
 
 
 
-  saveProfile() {
+  guardarPerfil() {
     this.message = null;
     this.saving = true;
     this.lockScroll();
@@ -308,20 +308,19 @@ export class ProfileComponent implements OnDestroy {
 
     const payload: any = {
       correo: emailValue,
-      numeroCelular: phoneFull, // Use the full phone number with code
-      numero_celular: phoneDigits, // Keeping compatibility if needed
+      numeroCelular: phoneFull, // Número completo con código de país
+      numero_celular: phoneDigits, // Mantener compatibilidad si es necesario
       codigo_pais: this.telefonoCodigo,
       ciudad: this.usuario.ciudad,
-      nacionalidad: this.usuario.nacionalidad, // Always send nationality
+      nacionalidad: this.usuario.nacionalidad, // Siempre enviar nacionalidad
       cinturonRango: cinturonValue,
-      // Removed academia/instructor fields
     };
 
     payload.numeroCelular = phoneFull;
 
 
     const startedAt = Date.now();
-    // Using updateProfile based on previous code view
+    // Llamar a updateProfile del servicio API
     this.api.updateProfile(payload).subscribe({
       next: async (u: any) => {
         // Persistir en sessionStorage
@@ -330,9 +329,8 @@ export class ProfileComponent implements OnDestroy {
         sessionStorage.setItem('nacionalidad', payload.nacionalidad || '');
 
         if (payload.numeroCelular !== undefined) {
-          sessionStorage.setItem('numero_celular', phoneDigits); // Store digits usually in session for inputs
+          sessionStorage.setItem('numero_celular', phoneDigits); // Guardar solo dígitos en sesión para inputs
           sessionStorage.setItem('numeroCelular', phoneDigits);
-          // Store Country Code? Maybe separate.
         }
 
         if (payload.cinturonRango !== undefined) {
@@ -363,11 +361,11 @@ export class ProfileComponent implements OnDestroy {
     });
   }
 
-  goChangePassword() {
+  irACambiarContrasena() {
     this.router.navigate(['/account/password']);
   }
 
-  goBack(): void {
+  volverAtras(): void {
     this.location.back();
   }
 

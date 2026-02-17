@@ -33,19 +33,19 @@
                     <tr *ngFor="let comp of section?.competitors; let i = index">
                         <td class="col-num">{{ i + 1 }}</td>
                         <td class="col-name">
-                            <span class="avatar">{{ comp.name.charAt(0) }}</span>
+                            <span class="avatar">{{ comp.nombre.charAt(0) }}</span>
                             <div class="name-info">
-                                <span class="name-text">{{ comp.name }}</span>
-                                <small class="gender-text">{{ comp.gender }}</small>
+                                <span class="name-text">{{ comp.nombre }}</span>
+                                <small class="gender-text">{{ comp.genero }}</small>
                             </div>
                         </td>
-                        <td class="col-academy">{{ comp.academy }}</td>
-                        <td>{{ comp.belt || '-' }}</td>
-                        <td>{{ comp.weight ? comp.weight + ' kg' : '-' }}</td>
-                        <td>{{ comp.age ? comp.age + ' años' : '-' }}</td>
+                        <td class="col-academy">{{ comp.academia }}</td>
+                        <td>{{ comp.cinturon || '-' }}</td>
+                        <td>{{ comp.peso ? comp.peso + ' kg' : '-' }}</td>
+                        <td>{{ comp.edad ? comp.edad + ' años' : '-' }}</td>
                         <td class="col-status">
-                            <span class="status-badge" [ngClass]="getStatusClass(comp.status)">
-                                {{ formatStatus(comp.status) }}
+                            <span class="status-badge" [ngClass]="obtenerClaseEstado(comp.estado)">
+                                {{ formatearEstado(comp.estado) }}
                             </span>
                         </td>
                     </tr>
@@ -58,7 +58,7 @@
 
         <footer class="modal-footer">
             <button class="btn-cancel" (click)="close.emit()">Cerrar</button>
-            <button class="btn-print" (click)="printList()">
+            <button class="btn-print" (click)="imprimirLista()">
                 <i class="fas fa-print"></i> Imprimir Listado
             </button>
         </footer>

@@ -1,7 +1,7 @@
 <div class="modal-overlay">
     <div class="modal-content">
         <header class="modal-header">
-            <h2><i class="fas fa-gavel"></i> Asignar Jueces - {{ tatami?.name }}</h2>
+            <h2><i class="fas fa-gavel"></i> Asignar Jueces - {{ tatami?.nombre }}</h2>
             <button class="btn-close" (click)="close.emit()"><i class="fas fa-times"></i></button>
         </header>
 
@@ -10,12 +10,12 @@
             <div class="column available-column">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Buscar juez..." [(ngModel)]="searchQuery"
-                        (ngModelChange)="filterJudges()">
+                    <input type="text" placeholder="Buscar juez..." [(ngModel)]="busqueda"
+                        (ngModelChange)="filtrarJueces()">
                 </div>
 
-                <div class="judges-list custom-scrollbar" *ngIf="!loading; else spinner">
-                    <div class="judge-item" *ngFor="let judge of filteredJueces">
+                <div class="judges-list custom-scrollbar" *ngIf="!cargando; else spinner">
+                    <div class="judge-item" *ngFor="let judge of juecesFiltrados">
                         <div class="judge-info">
                             <span class="name">{{ judge.nombre }}</span>
                             <span class="role-badge" [class.central]="judge.rol === 'Juez Central'">
@@ -23,20 +23,20 @@
                             </span>
                         </div>
                         <div class="judge-actions">
-                            <button class="btn-icon" (click)="assignCentral(judge)" title="Asignar como Central"
-                                [disabled]="!!centralJudge">
+                            <button class="btn-icon" (click)="asignarCentral(judge)" title="Asignar como Central"
+                                [disabled]="!!juezCentral">
                                 C
                             </button>
-                            <button class="btn-icon" (click)="assignTable(judge)" title="Asignar a Mesa"
-                                [disabled]="!!tableJudge">
+                            <button class="btn-icon" (click)="asignarMesa(judge)" title="Asignar a Mesa"
+                                [disabled]="!!juezMesa">
                                 M
                             </button>
-                            <button class="btn-icon" (click)="assignNormal(judge)" title="Asignar como Juez">
+                            <button class="btn-icon" (click)="asignarNormal(judge)" title="Asignar como Juez">
                                 J
                             </button>
                         </div>
                     </div>
-                    <div class="empty-state" *ngIf="filteredJueces.length === 0">
+                    <div class="empty-state" *ngIf="juecesFiltrados.length === 0">
                         <p>No hay jueces disponibles</p>
                     </div>
                 </div>
@@ -56,12 +56,12 @@
                 <!-- Central Judge Slot -->
                 <div class="slot-group">
                     <label>Juez Central (1)</label>
-                    <div class="slot central-slot" [class.filled]="centralJudge">
-                        <ng-container *ngIf="centralJudge; else emptyCentral">
+                    <div class="slot central-slot" [class.filled]="juezCentral">
+                        <ng-container *ngIf="juezCentral; else emptyCentral">
                             <div class="assigned-judge">
-                                <span class="avatar">{{ centralJudge.nombre.charAt(0) }}</span>
-                                <span class="name">{{ centralJudge.nombre }}</span>
-                                <button class="btn-remove" (click)="unassignCentral()"><i
+                                <span class="avatar">{{ juezCentral.nombre.charAt(0) }}</span>
+                                <span class="name">{{ juezCentral.nombre }}</span>
+                                <button class="btn-remove" (click)="desasignarCentral()"><i
                                         class="fas fa-times"></i></button>
                             </div>
                         </ng-container>
@@ -74,12 +74,12 @@
                 <!-- Table Judge Slot -->
                 <div class="slot-group">
                     <label>Juez de Mesa (1)</label>
-                    <div class="slot table-slot" [class.filled]="tableJudge">
-                        <ng-container *ngIf="tableJudge; else emptyTable">
+                    <div class="slot table-slot" [class.filled]="juezMesa">
+                        <ng-container *ngIf="juezMesa; else emptyTable">
                             <div class="assigned-judge">
-                                <span class="avatar">{{ tableJudge.nombre.charAt(0) }}</span>
-                                <span class="name">{{ tableJudge.nombre }}</span>
-                                <button class="btn-remove" (click)="unassignTable()"><i
+                                <span class="avatar">{{ juezMesa.nombre.charAt(0) }}</span>
+                                <span class="name">{{ juezMesa.nombre }}</span>
+                                <button class="btn-remove" (click)="desasignarMesa()"><i
                                         class="fas fa-times"></i></button>
                             </div>
                         </ng-container>
@@ -93,11 +93,12 @@
                 <div class="slot-group">
                     <label>Jueces de Esquina/Apoyo</label>
                     <div class="list-slot">
-                        <div class="assigned-judge mini" *ngFor="let judge of normalJudges; let i = index">
+                        <div class="assigned-judge mini" *ngFor="let judge of juecesNormales; let i = index">
                             <span class="name">{{ judge.nombre }}</span>
-                            <button class="btn-remove" (click)="unassignNormal(i)"><i class="fas fa-times"></i></button>
+                            <button class="btn-remove" (click)="desasignarNormal(i)"><i
+                                    class="fas fa-times"></i></button>
                         </div>
-                        <div class="empty-slot" *ngIf="normalJudges.length === 0">No hay jueces asignados</div>
+                        <div class="empty-slot" *ngIf="juecesNormales.length === 0">No hay jueces asignados</div>
                     </div>
                 </div>
             </div>
@@ -105,7 +106,7 @@
 
         <footer class="modal-footer">
             <button class="btn-cancel" (click)="close.emit()">Cancelar</button>
-            <button class="btn-save" (click)="onSave()">Guardar Asignación</button>
+            <button class="btn-save" (click)="guardar()">Guardar Asignación</button>
         </footer>
     </div>
 </div>

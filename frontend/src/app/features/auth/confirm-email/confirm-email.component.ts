@@ -81,14 +81,14 @@ export class ConfirmEmailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.exito = false;
     const startedAt = Date.now();
 
-    // Llamamos al servicio (Asegúrate de crear este método en api.service.ts)
+    // Llamamos al servicio de recuperación
     this.api.solicitarRecuperacion(this.correo).subscribe({
       next: async (res) => {
         await delayRemaining(startedAt);
         this.cargando = false;
         this.exito = true;
 
-        // ¡CLAVE! Aquí guardamos el permiso para que el Guard deje entrar a /verify
+        // Guardamos el permiso para que el Guard permita acceder a /verify
         sessionStorage.setItem('verifyMode', 'recovery');
         sessionStorage.setItem('emailParaVerificar', this.correo);
         // Guardar expiración del código: 5 minutos desde ahora
@@ -97,7 +97,7 @@ export class ConfirmEmailComponent implements OnInit, AfterViewInit, OnDestroy {
 
         this.mensaje = 'Código enviado.';
 
-        // Mostrar mensaje primero, luego spinner de redirección, y finalmente navegar
+        // Mostrar mensaje, luego spinner de redirección y finalmente navegar
         this.unlockScroll();
         this.redirectTimer = window.setTimeout(() => {
           this.redirigiendo = true;
@@ -123,7 +123,7 @@ export class ConfirmEmailComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     const flag = sessionStorage.getItem('verifyExpiredRedirect');
     if (flag === 'recovery') {
-      // show banner and prefill email if possible
+      // Mostrar banner y precompletar correo si es posible
       this.showExpiredBanner = true;
       this.correo = this.correo || (sessionStorage.getItem('emailParaVerificar') || '');
       sessionStorage.removeItem('verifyExpiredRedirect');

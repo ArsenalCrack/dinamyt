@@ -624,17 +624,16 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
     if (!sourceMod) return;
 
     const sourceItems = sourceMod.categorias[key] || [];
-    // Deep copy items to avoid reference issues
-    const copiedItems = sourceItems.map(item => ({ ...item })); // Shallow copy of object is enough if props are primitives
+    // Copia profunda de items para evitar problemas de referencia
+    const copiedItems = sourceItems.map(item => ({ ...item })); // Copia superficial es suficiente si las propiedades son primitivas
 
-    // Combine with current items, avoiding exact duplicates if any
+    // Combinar con items actuales, evitando duplicados exactos
     const currentItems = targetMod.categorias[key] || [];
 
-    // Simple strategy: just append (user can clean up) or careful merge.
-    // Let's filter out exact duplicates to be nice.
+    // Estrategia simple: añadir filtrando duplicados exactos
     const nonDuplicates = copiedItems.filter(newItem => {
-      // Check if newItem already exists in currentItems
-      // This is a basic equality check for our config structure
+      // Verificar si el newItem ya existe en currentItems
+      // Comparación básica de igualdad para nuestra estructura de config
       return !currentItems.some(existing =>
         existing.tipo === newItem.tipo &&
         existing.valor === newItem.valor &&
@@ -645,7 +644,7 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
 
     targetMod.categorias[key] = [...currentItems, ...nonDuplicates];
 
-    // Clear error if any
+    // Limpiar error si existe
     delete this.categoryError[`${targetMod.id}-${key}`];
     delete this.categoryError[`${targetMod.id}-modalidad`];
   }
@@ -1202,7 +1201,7 @@ export class CreateChampionshipComponent implements OnInit, OnDestroy {
   }
 
 
-  goBack(): void {
+  volverAtras(): void {
     this.backNav.backOr({
       fallbackUrl: '/dashboard'
     });

@@ -15,10 +15,10 @@ import { Subscription } from 'rxjs';
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit, OnDestroy {
-  username: string | null = null;
+  nombreUsuario: string | null = null;
   private sub?: Subscription;
 
-  constructor(private auth: AuthService) {}
+  constructor(private auth: AuthService) { }
 
   ngOnInit(): void {
     // Inicial
@@ -26,12 +26,12 @@ export class HomeComponent implements OnInit, OnDestroy {
     // Suscribirse a cambios reactivos de autenticación
     this.sub = this.auth.username$.subscribe(u => {
       if (u) {
-        this.username = u;
+        this.nombreUsuario = u;
       } else {
-        // Si no hay username, caer a correo si existe
+        // Si no hay nombreUsuario, caer a correo si existe
         const correo = sessionStorage.getItem('correo');
         const token = sessionStorage.getItem('token');
-        this.username = correo || (token ? 'usuario' : null);
+        this.nombreUsuario = correo || (token ? 'usuario' : null);
       }
     });
   }

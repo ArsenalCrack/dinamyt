@@ -6,18 +6,18 @@
   </header>
 
   <!-- Estado del perfil -->
-  <section class="profile-status" *ngIf="profileCompletion < 100">
+  <section class="profile-status" *ngIf="completitudPerfil < 100">
     <div class="status-card">
       <div class="status-header">
         <i class="fas fa-id-card"></i>
         <h3>Estado de tu perfil</h3>
       </div>
       <div class="progress-bar">
-        <div class="progress-fill" [style.width.%]="profileCompletion"></div>
+        <div class="progress-fill" [style.width.%]="completitudPerfil"></div>
       </div>
-      <p class="progress-text">{{ profileCompletion }}% completo</p>
-      <div *ngIf="missingFields.length" class="missing-list">
-        <p>Faltan: {{ missingFields.join(', ') }}</p>
+      <p class="progress-text">{{ completitudPerfil }}% completo</p>
+      <div *ngIf="camposFaltantes.length" class="missing-list">
+        <p>Faltan: {{ camposFaltantes.join(', ') }}</p>
       </div>
       <div class="status-actions">
         <a routerLink="/perfil" class="btn-action">Ir a mi perfil</a>
@@ -25,7 +25,7 @@
     </div>
   </section>
 
-  <section class="judge-section" *ngIf="judgeAssignments.length > 0">
+  <section class="judge-section" *ngIf="asignacionesJuez.length > 0">
     <div class="judge-card-active">
       <div class="judge-header">
         <div class="icon-pulse">
@@ -37,7 +37,7 @@
         </div>
       </div>
       <div class="assignments-list">
-        <div class="assignment-item" *ngFor="let assign of judgeAssignments">
+        <div class="assignment-item" *ngFor="let assign of asignacionesJuez">
           <span class="championship-name">{{ assign.campeonatoNombre || 'Campeonato' }}</span>
           <a [routerLink]="['/campeonato/juez', assign.id_campeonato || assign.idCampeonato || assign.campeonatoId]"
             class="btn-judge-access">
@@ -89,7 +89,7 @@
 
   <section class="actions-grid">
 
-    <div class="action-card" *ngIf="canCreate">
+    <div class="action-card" *ngIf="puedeCrear">
       <div class="card-icon">
         <i class="fas fa-plus-circle"></i>
       </div>
@@ -98,7 +98,7 @@
       <a routerLink="/campeonatos/crear" class="btn-action">Crear ahora</a>
     </div>
 
-    <div class="action-card" *ngIf="hasMyChampionships">
+    <div class="action-card" *ngIf="tieneCampeonatos">
       <div class="card-icon">
         <i class="fas fa-user-tie"></i>
       </div>
@@ -130,7 +130,7 @@
     <hr aria-label="Opciones de seguridad y ayuda">
   </div>
 
-  <!-- Accesos seguros (rutas existentes en Angular) -->
+  <!-- Accesos seguros -->
   <section class="actions-grid">
     <div class="action-card">
       <div class="card-icon">
@@ -151,11 +151,8 @@
     </div>
   </section>
 
-
-
-
-  <!-- Modal de alerta de perfil incompleto (solo primera vez) -->
-  <div *ngIf="showProfileAlert" class="modal-overlay">
+  <!-- Modal de alerta de perfil incompleto -->
+  <div *ngIf="mostrarAlertaPerfil" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
         <div class="icon-container">
@@ -168,8 +165,8 @@
         </div>
       </div>
       <div class="modal-actions-alert">
-        <button class="btn-cancel" (click)="closeProfileAlert()">Más tarde</button>
-        <button class="btn-confirm-alert" (click)="goToProfile()">
+        <button class="btn-cancel" (click)="cerrarAlertaPerfil()">Más tarde</button>
+        <button class="btn-confirm-alert" (click)="irAlPerfil()">
           <i class="fas fa-user-edit"></i>
           Completar Perfil
         </button>

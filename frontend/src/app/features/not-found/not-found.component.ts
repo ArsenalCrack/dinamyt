@@ -14,17 +14,17 @@ export class NotFoundComponent {
   private router = inject(Router);
   private auth = inject(AuthService);
 
-  readonly isLoggedIn = this.auth.isLoggedIn();
+  readonly estaLogueado = this.auth.isLoggedIn();
 
-  goHome(): void {
+  irAlInicio(): void {
     this.router.navigate(['/']);
   }
 
-  goDashboard(): void {
+  irAlDashboard(): void {
     this.router.navigate(['/dashboard']);
   }
 
-  goLogin(): void {
+  irAlLogin(): void {
     this.router.navigate(['/login']);
   }
 }

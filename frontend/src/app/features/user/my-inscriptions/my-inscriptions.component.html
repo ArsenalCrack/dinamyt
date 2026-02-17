@@ -1,7 +1,7 @@
 <div class="inscriptions-container">
     <div class="page-card">
         <header class="header">
-            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+            <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás">
                 <i class="fas fa-arrow-left"></i>
             </button>
             <div class="header-content">
@@ -10,35 +10,38 @@
             </div>
         </header>
 
-        <!-- Tabs Navigation -->
+        <!-- Pestañas -->
         <nav class="tabs-nav">
-            <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setTab('PENDIENTE')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'PENDIENTE'"
+                (click)="seleccionarPestana('PENDIENTE')">
                 <i class="fas fa-clock"></i>
                 <span>Pendientes</span>
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setTab('ACEPTADO')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'ACEPTADO'"
+                (click)="seleccionarPestana('ACEPTADO')">
                 <i class="fas fa-check-circle"></i>
                 <span>Aceptadas</span>
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setTab('RECHAZADO')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'RECHAZADO'"
+                (click)="seleccionarPestana('RECHAZADO')">
                 <i class="fas fa-times-circle"></i>
                 <span>Rechazadas</span>
             </button>
         </nav>
 
-        <app-loading-spinner *ngIf="loading" message="Cargando inscripciones..."></app-loading-spinner>
+        <app-loading-spinner *ngIf="cargando" message="Cargando inscripciones..."></app-loading-spinner>
 
-        <div class="inscriptions-list" *ngIf="!loading">
-            <div class="empty-state" *ngIf="filteredInscriptions.length === 0">
+        <div class="inscriptions-list" *ngIf="!cargando">
+            <div class="empty-state" *ngIf="inscripcionesFiltradas.length === 0">
                 <i class="fas fa-clipboard-list"></i>
-                <p>No tienes inscripciones {{ getStatusLabel(activeTab) | lowercase }}s.</p>
+                <p>No tienes inscripciones {{ obtenerEtiquetaEstado(pestanaActiva) | lowercase }}s.</p>
             </div>
 
-            <div class="inscription-card" *ngFor="let item of filteredInscriptions"
+            <div class="inscription-card" *ngFor="let item of inscripcionesFiltradas"
                 [class.rejected]="item.estado === 'RECHAZADO'" [class.expanded]="item.expanded">
 
-                <!-- Clickable Header for Accordion -->
-                <div class="card-summary" (click)="toggleDetails(item)">
+                <!-- Cabecera clickeable para acordeón -->
+                <div class="card-summary" (click)="alternarDetalles(item)">
                     <div class="user-avatar">
                         <i class="fas fa-trophy"></i>
                     </div>
@@ -56,11 +59,11 @@
                     </div>
                 </div>
 
-                <!-- Expandable Content -->
+                <!-- Contenido expandible -->
                 <div class="card-details-wrapper" *ngIf="item.expanded">
                     <div class="card-details">
                         <div class="sections-container"
-                            *ngIf="item.seccionesDetalles && item.seccionesDetalles.length > 0; else noDetails">
+                            *ngIf="item.seccionesDetalles && item.seccionesDetalles.length > 0; else sinDetalles">
                             <h4 class="section-main-title">Modalidades inscritas</h4>
                             <div class="section-card" *ngFor="let section of item.seccionesDetalles">
                                 <div class="section-header">
@@ -92,8 +95,8 @@
                                 </div>
                             </div>
                         </div>
-                        <ng-template #noDetails>
-                            <!-- Fallback for legacy or parsing error -->
+                        <ng-template #sinDetalles>
+                            <!-- Fallback para errores de parseo -->
                             <div class="details-grid">
                                 <div class="detail-item full-width" *ngIf="item.modalidades">
                                     <label>Modalidades</label>
@@ -105,7 +108,7 @@
                         </ng-template>
 
                         <div class="actions-row">
-                            <button class="btn-reject" (click)="requestDelete(item.id); $event.stopPropagation()">
+                            <button class="btn-reject" (click)="solicitarEliminar(item.id); $event.stopPropagation()">
                                 <i class="fas fa-trash-alt"></i> {{ item.estado === 'PENDIENTE' ? 'Cancelar Solicitud' :
                                 'Eliminar Registro' }}
                             </button>
@@ -121,8 +124,8 @@
     </div>
 </div>
 
-<!-- Delete Modal -->
-<div class="modal-overlay" *ngIf="showDeleteModal">
+<!-- Modal Eliminar -->
+<div class="modal-overlay" *ngIf="mostrarModalEliminar">
     <div class="modal-box">
         <div class="modal-header">
             <i class="fas fa-trash-alt warning-icon"></i>
@@ -132,9 +135,9 @@
             Estás a punto de eliminar este registro de tu historial. Esta acción no se puede deshacer.
         </p>
         <div class="modal-actions">
-            <button class="btn-cancel" (click)="cancelDelete()">Cancelar</button>
-            <button class="btn-confirm-reject" (click)="confirmDelete()">
-                {{ deleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+            <button class="btn-cancel" (click)="cancelarEliminar()">Cancelar</button>
+            <button class="btn-confirm-reject" (click)="confirmarEliminar()">
+                {{ eliminando ? 'Eliminando...' : 'Sí, Eliminar' }}
             </button>
         </div>
     </div>

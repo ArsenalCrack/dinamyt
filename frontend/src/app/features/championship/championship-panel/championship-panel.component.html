@@ -1,17 +1,17 @@
 <div class="panel-container">
     <div class="panel-card">
-        <app-loading-spinner *ngIf="loading" message="Cargando panel de gestión..."
+        <app-loading-spinner *ngIf="cargando" message="Cargando panel de gestión..."
             [fixed]="false"></app-loading-spinner>
 
-        <div *ngIf="error" class="error-banner">
+        <div *ngIf="mensajeError" class="error-banner">
             <i class="fas fa-exclamation-triangle"></i>
-            <p>{{ error }}</p>
-            <button (click)="goBack()" class="btn-retry">Volver</button>
+            <p>{{ mensajeError }}</p>
+            <button (click)="volverAtras()" class="btn-retry">Volver</button>
         </div>
 
-        <div *ngIf="!loading && campeonato" class="panel-content">
+        <div *ngIf="!cargando && campeonato" class="panel-content">
             <header class="header">
-                <button type="button" (click)="goBack()" class="btn-back" title="Volver a mis campeonatos">
+                <button type="button" (click)="volverAtras()" class="btn-back" title="Volver a mis campeonatos">
                     <i class="fas fa-arrow-left"></i>
                 </button>
                 <div class="header-text">
@@ -24,7 +24,7 @@
                 </div>
             </header>
 
-            <!-- Access Code Section (Only if Private) -->
+            <!-- Sección de Código de Acceso (Solo si es Privado) -->
             <div class="access-code-section" *ngIf="!campeonato.esPublico">
                 <div class="code-card">
                     <div class="code-icon">
@@ -34,24 +34,24 @@
                         <h3>Código de Acceso</h3>
                         <p>Comparte este código con los participantes para que puedan inscribirse.</p>
                     </div>
-                    <div class="code-display" (click)="copyCode()" title="Clic para copiar">
+                    <div class="code-display" (click)="copiarCodigo()" title="Clic para copiar">
                         <span class="code-text">{{ campeonato.Codigo }}</span>
                         <button class="btn-copy">
-                            <i class="fas" [ngClass]="copied ? 'fa-check' : 'fa-copy'"></i>
+                            <i class="fas" [ngClass]="copiado ? 'fa-check' : 'fa-copy'"></i>
                         </button>
                     </div>
-                    <div class="copy-feedback" [class.show]="copied">¡Copiado al portapapeles!</div>
+                    <div class="copy-feedback" [class.show]="copiado">¡Copiado al portapapeles!</div>
                 </div>
             </div>
 
-            <!-- Actions Grid -->
+            <!-- Acciones -->
             <div class="actions-grid">
 
-                <!-- Publish Action (Only if Draft) -->
+                <!-- Publicar (Solo si es borrador) -->
                 <button class="action-card primary" *ngIf="campeonato.estadoReal === 'BORRADOR'"
-                    (click)="publishChampionship()">
+                    (click)="publicarCampeonato()">
                     <div class="icon-wrapper">
-                        <i class="fas" [ngClass]="isPublishing ? 'fa-spinner fa-spin' : 'fa-upload'"></i>
+                        <i class="fas" [ngClass]="publicando ? 'fa-spinner fa-spin' : 'fa-upload'"></i>
                     </div>
                     <div class="action-info">
                         <h3>Publicar</h3>
@@ -59,10 +59,10 @@
                     </div>
                 </button>
 
-                <!-- Live Management Action (Highlighted) -->
+                <!-- Panel en Vivo -->
                 <button class="action-card primary"
                     *ngIf="campeonato.estadoReal !== 'TERMINADO' && campeonato.estadoReal !== 'BORRADOR'"
-                    (click)="startChampionship()">
+                    (click)="iniciarCampeonato()">
                     <div class="icon-wrapper">
                         <i class="fas fa-desktop"></i>
                     </div>
@@ -72,8 +72,8 @@
                     </div>
                 </button>
 
-                <!-- Regular Actions -->
-                <button class="action-card" (click)="viewInscriptions()">
+                <!-- Acciones regulares -->
+                <button class="action-card" (click)="verInscripciones()">
                     <div class="icon-wrapper">
                         <i class="fas fa-users-cog"></i>
                     </div>
@@ -83,7 +83,7 @@
                     </div>
                 </button>
 
-                <button class="action-card" (click)="sendInvitations()">
+                <button class="action-card" (click)="enviarInvitaciones()">
                     <div class="icon-wrapper">
                         <i class="fas fa-paper-plane"></i>
                     </div>
@@ -93,7 +93,7 @@
                     </div>
                 </button>
 
-                <button class="action-card" (click)="editChampionship()"
+                <button class="action-card" (click)="editarCampeonato()"
                     [class.disabled]="campeonato.estado === 'LISTO'" *ngIf="campeonato.estadoReal !== 'TERMINADO'">
                     <div class="icon-wrapper">
                         <i class="fas fa-edit"></i>
@@ -104,7 +104,7 @@
                     </div>
                 </button>
 
-                <button class="action-card" (click)="viewPublicDetails()">
+                <button class="action-card" (click)="verDetallesPublicos()">
                     <div class="icon-wrapper">
                         <i class="fas fa-eye"></i>
                     </div>
@@ -114,7 +114,7 @@
                     </div>
                 </button>
 
-                <button class="action-card delete" (click)="deleteChampionship()">
+                <button class="action-card delete" (click)="eliminarCampeonato()">
                     <div class="icon-wrapper">
                         <i class="fas fa-trash-alt"></i>
                     </div>
@@ -128,8 +128,8 @@
         </div>
     </div>
 
-    <!-- Publish Modal -->
-    <div class="modal-overlay" *ngIf="showPublishModal">
+    <!-- Modal Publicar -->
+    <div class="modal-overlay" *ngIf="mostrarModalPublicar">
         <div class="modal-box publish-modal">
             <div class="modal-header">
                 <div class="icon-container">
@@ -140,17 +140,17 @@
                 </p>
             </div>
             <div class="modal-actions-delete">
-                <button class="btn-cancel" (click)="closePublishModal()" [disabled]="isPublishing">Cancelar</button>
-                <button class="btn-confirm-publish" (click)="confirmPublish()" [disabled]="isPublishing">
-                    <i class="fas" [ngClass]="isPublishing ? 'fa-spinner fa-spin' : 'fa-check'"></i>
-                    {{ isPublishing ? 'Publicando...' : 'Sí, Publicar' }}
+                <button class="btn-cancel" (click)="cerrarModalPublicar()" [disabled]="publicando">Cancelar</button>
+                <button class="btn-confirm-publish" (click)="confirmarPublicacion()" [disabled]="publicando">
+                    <i class="fas" [ngClass]="publicando ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+                    {{ publicando ? 'Publicando...' : 'Sí, Publicar' }}
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Edit Blocked Modal -->
-    <div class="modal-overlay" *ngIf="showEditBlockedModal">
+    <!-- Modal Edición Bloqueada -->
+    <div class="modal-overlay" *ngIf="mostrarModalEdicionBloqueada">
         <div class="modal-box info-modal">
             <div class="modal-header">
                 <div class="icon-container">
@@ -161,13 +161,13 @@
                     básica está deshabilitada.</p>
             </div>
             <div class="modal-actions-delete">
-                <button class="btn-confirm-info" (click)="closeEditBlockedModal()">Entendido</button>
+                <button class="btn-confirm-info" (click)="cerrarModalEdicionBloqueada()">Entendido</button>
             </div>
         </div>
     </div>
 
-    <!-- Delete Modal -->
-    <div class="modal-overlay" *ngIf="showDeleteModal">
+    <!-- Modal Eliminar -->
+    <div class="modal-overlay" *ngIf="mostrarModalEliminar">
         <div class="modal-box delete-modal">
             <div class="modal-header">
                 <div class="icon-container">
@@ -177,10 +177,10 @@
                 <p>Esta acción no se puede deshacer. Se perderán todos los datos asociados.</p>
             </div>
             <div class="modal-actions-delete">
-                <button class="btn-cancel" (click)="closeDeleteModal()" [disabled]="isDeleting">Cancelar</button>
-                <button class="btn-confirm-delete" (click)="confirmDelete()" [disabled]="isDeleting">
-                    <i class="fas" [ngClass]="isDeleting ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
-                    {{ isDeleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+                <button class="btn-cancel" (click)="cerrarModalEliminar()" [disabled]="eliminando">Cancelar</button>
+                <button class="btn-confirm-delete" (click)="confirmarEliminar()" [disabled]="eliminando">
+                    <i class="fas" [ngClass]="eliminando ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
+                    {{ eliminando ? 'Eliminando...' : 'Sí, Eliminar' }}
                 </button>
             </div>
         </div>

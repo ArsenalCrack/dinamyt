@@ -14,20 +14,20 @@ import { ScrollLockService } from '../../core/services/scroll-lock.service';
   styleUrls: ['./dashboard.component.scss']
 })
 export class DashboardComponent implements OnInit {
-  canCreate = false;
+  puedeCrear = false;
   nombreC: string | null = null;
-  hasMyChampionships = false;
+  tieneCampeonatos = false;
   // Estado de perfil
-  profileCompletion = 0;
-  missingFields: string[] = [];
+  completitudPerfil = 0;
+  camposFaltantes: string[] = [];
   usuario: any;
 
-  // Modal welcome
-  showProfileAlert = false;
+  // Modal bienvenida
+  mostrarAlertaPerfil = false;
 
-  // Judge Access
-  judgeAssignments: any[] = [];
-  loadingJudge = false;
+  // Acceso de Juez
+  asignacionesJuez: any[] = [];
+  cargandoJuez = false;
 
   constructor(
     private apiService: ApiService,
@@ -69,48 +69,45 @@ export class DashboardComponent implements OnInit {
         // cast explicitly to any if checks are loose, or strictly use UserRole
         const roles: any[] = u?.roles || u?.authorities || [];
         if (Array.isArray(roles) && roles.length) {
-          // Check for strings or objects if complex roles exist
           const flatRoles = roles.map(r => typeof r === 'string' ? r : (r as any).authority || (r as any).name);
-          this.canCreate = flatRoles.includes('ADMIN') || flatRoles.includes('ROLE_ADMIN') || flatRoles.includes('administrador');
+          this.puedeCrear = flatRoles.includes('ADMIN') || flatRoles.includes('ROLE_ADMIN') || flatRoles.includes('administrador');
         }
 
-        // Logic for User Types
-        // Default to Type 1 (Normal) if null/undefined
+        // Lógica para tipos de usuario
+        // Por defecto Tipo 1 (Normal) si es null/undefined
         let typeId = 1;
         if (u?.tipousuario) {
-          // Handle various potential casing for the ID
+          // Manejar las diferentes variantes de mayúsculas del ID
           const raw = u.tipousuario.idTipo || u.tipousuario.ID_Tipo || u.tipousuario.id_Tipo || u.tipousuario.IDTipo || u.tipousuario.id;
           typeId = raw ? Number(raw) : 1;
         }
 
         if (typeId === 3) {
-          this.canCreate = true;
-          this.hasMyChampionships = true;
+          this.puedeCrear = true;
+          this.tieneCampeonatos = true;
         }
 
-        if (!this.canCreate) {
-          this.canCreate = !!u?.canCreateChampionship;
+        if (!this.puedeCrear) {
+          this.puedeCrear = !!u?.canCreateChampionship;
         }
 
-        // Detect if user has created championships
         const createdList = u?.myChampionships || u?.createdChampionships || u?.championships || null;
         if (Array.isArray(createdList)) {
-          this.hasMyChampionships = createdList.length > 0;
+          this.tieneCampeonatos = createdList.length > 0;
         } else if (typeof u?.championshipsCount === 'number') {
-          this.hasMyChampionships = u.championshipsCount > 0;
+          this.tieneCampeonatos = u.championshipsCount > 0;
         } else if (typeof u?.createdCount === 'number') {
-          this.hasMyChampionships = u.createdCount > 0;
+          this.tieneCampeonatos = u.createdCount > 0;
         }
 
         // Calcular progreso de perfil con base en datos del proyecto
-        this.computeProfileStatus(u);
+        this.calcularEstadoPerfil(u);
 
-        // Check for welcome profile alert
+        // Verificar si mostrar alerta de bienvenida al perfil
         if (sessionStorage.getItem('showWelcomeProfileAlert')) {
           sessionStorage.removeItem('showWelcomeProfileAlert');
-          // Only show if completion < 100 to avoid annoying users who somehow have complete profiles
-          if (this.profileCompletion < 100) {
-            this.showProfileAlert = true;
+          if (this.completitudPerfil < 100) {
+            this.mostrarAlertaPerfil = true;
             this.scrollLock.lock();
           }
         }
@@ -119,57 +116,55 @@ export class DashboardComponent implements OnInit {
       error: () => {
         // Keep defaults (hide create card)
         // Intentar calcular el estado con sessionStorage si falla la API
-        this.computeProfileStatus(null);
+        this.calcularEstadoPerfil(null);
       }
     });
 
-    this.loadJudgeInvitations();
+    this.cargarInvitacionesJuez();
   }
 
-  loadJudgeInvitations() {
+  cargarInvitacionesJuez() {
     const userId = sessionStorage.getItem('idDocumento');
     if (!userId) return;
 
-    this.loadingJudge = true;
+    this.cargandoJuez = true;
     this.apiService.getMisInvitaciones(userId).subscribe({
       next: (invitations: any[]) => {
         if (!invitations || !Array.isArray(invitations)) {
-          this.loadingJudge = false;
+          this.cargandoJuez = false;
           return;
         }
-        // Filter invitations that are ACCEPTED and related to Judge role (type 6 or 7)
-        this.judgeAssignments = invitations.filter(inv => {
-          const isAccepted = inv.estado === 'ACEPTADO' || inv.estado === 3; // Normalize status
+        this.asignacionesJuez = invitations.filter(inv => {
+          const isAccepted = inv.estado === 'ACEPTADO' || inv.estado === 3;
           const isJudge = inv.id_tipo === 6 || inv.id_tipo === 7 || inv.tipousuario === 6 || inv.tipousuario === 7;
           return isAccepted && isJudge;
         });
-        this.loadingJudge = false;
+        this.cargandoJuez = false;
       },
       error: (e) => {
-        console.error('Error loading judge invitations', e);
-        this.loadingJudge = false;
+        console.error('Error al cargar invitaciones de juez', e);
+        this.cargandoJuez = false;
       }
     });
   }
 
-  closeProfileAlert(): void {
-    this.showProfileAlert = false;
+  cerrarAlertaPerfil(): void {
+    this.mostrarAlertaPerfil = false;
     this.scrollLock.unlock();
   }
 
-  goToProfile(): void {
-    this.showProfileAlert = false;
+  irAlPerfil(): void {
+    this.mostrarAlertaPerfil = false;
     this.scrollLock.unlock();
     this.router.navigate(['/perfil']);
   }
 
-  private computeProfileStatus(user: User | null): void {
+  private calcularEstadoPerfil(user: User | null): void {
     const fields = [
       { key: 'nombreC', label: 'Nombre completo' },
       { key: 'idDocumento', label: 'Documento' },
       { key: 'sexo', label: 'Sexo' },
       { key: 'fechaNacimiento', label: 'Fecha de nacimiento' },
-      // En el proyecto coexisten claves antiguas y nuevas
       { key: 'cinturon_rango', label: 'Cinturón/Rango' },
       { key: 'nacionalidad', label: 'Nacionalidad' },
       { key: 'numero_celular', label: 'Teléfono' },
@@ -188,7 +183,6 @@ export class DashboardComponent implements OnInit {
     };
 
     for (const f of fields) {
-      // safe access with casting to any since keys are dynamic strings
       const valFromUser = user ? (user as any)[f.key] : null;
       const fallbackKeys = sessionFallbackKeys[f.key] || [f.key];
       const valFromSession = fallbackKeys.map(k => sessionStorage.getItem(k)).find(v => v !== null);
@@ -201,7 +195,7 @@ export class DashboardComponent implements OnInit {
       }
     }
 
-    this.profileCompletion = Math.round((completed / fields.length) * 100);
-    this.missingFields = missing;
+    this.completitudPerfil = Math.round((completed / fields.length) * 100);
+    this.camposFaltantes = missing;
   }
 }

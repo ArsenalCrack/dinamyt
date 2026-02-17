@@ -3,7 +3,7 @@
     <app-loading-spinner *ngIf="cargando" message="Cargando tus campeonatos..." [fixed]="false"></app-loading-spinner>
 
     <header class="header">
-      <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+      <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
         <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
       </button>
       <div class="header-content">
@@ -12,22 +12,22 @@
       </div>
     </header>
 
-    <div class="search-section" *ngIf="championships.length > 0 || searchQuery">
+    <div class="search-section" *ngIf="campeonatos.length > 0 || busqueda">
       <input type="text" class="search-input" id="my-championships-search" name="searchChampionships"
-        aria-label="Buscar campeonatos" placeholder="Buscar por nombre o ubicación..." [(ngModel)]="searchQuery"
-        (input)="onSearchChange()">
+        aria-label="Buscar campeonatos" placeholder="Buscar por nombre o ubicación..." [(ngModel)]="busqueda"
+        (input)="onBusquedaCambio()">
       <i class="fas fa-search search-icon" aria-hidden="true"></i>
     </div>
 
-    <div *ngIf="errorMessage" class="error-banner">
+    <div *ngIf="mensajeError" class="error-banner">
       <i class="fas fa-exclamation-circle"></i>
-      <span>{{ errorMessage }}</span>
-      <button (click)="loadChampionships()" class="btn-retry">Reintentar</button>
+      <span>{{ mensajeError }}</span>
+      <button (click)="cargarCampeonatos()" class="btn-retry">Reintentar</button>
     </div>
 
-    <div class="championships-list" *ngIf="!cargando && !errorMessage">
-      <ng-container *ngIf="filteredChampionships.length > 0; else noResults">
-        <div class="championship-item" *ngFor="let championship of filteredChampionships">
+    <div class="championships-list" *ngIf="!cargando && !mensajeError">
+      <ng-container *ngIf="campeonatosFiltrados.length > 0; else sinResultados">
+        <div class="championship-item" *ngFor="let championship of campeonatosFiltrados">
           <div class="item-header">
             <div class="item-title">
               <h3>{{ championship.nombre }}</h3>
@@ -40,7 +40,7 @@
               </span>
             </div>
             <div class="item-actions">
-              <button class="btn-action primary" (click)="goToPanel(championship.id)" title="Gestionar Campeonato">
+              <button class="btn-action primary" (click)="irAlPanel(championship.id)" title="Gestionar Campeonato">
                 <i class="fas fa-cog" aria-hidden="true"></i>
                 <span>Administrar</span>
               </button>
@@ -68,12 +68,12 @@
         </div>
       </ng-container>
 
-      <ng-template #noResults>
+      <ng-template #sinResultados>
         <div class="no-results">
           <i class="fas fa-inbox"></i>
-          <p *ngIf="championships.length === 0">Aún no has creado ningún campeonato.</p>
-          <p *ngIf="championships.length > 0">No encontramos resultados para tu búsqueda.</p>
-          <button *ngIf="championships.length === 0" routerLink="/campeonatos/crear" class="btn-create-first">
+          <p *ngIf="campeonatos.length === 0">Aún no has creado ningún campeonato.</p>
+          <p *ngIf="campeonatos.length > 0">No encontramos resultados para tu búsqueda.</p>
+          <button *ngIf="campeonatos.length === 0" routerLink="/campeonatos/crear" class="btn-create-first">
             Crear mi primer campeonato
           </button>
         </div>
@@ -82,7 +82,7 @@
   </div>
 
   <!-- Modal de eliminación -->
-  <div *ngIf="showDeleteModal" class="modal-overlay">
+  <div *ngIf="mostrarModalEliminar" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-body">
         <div class="icon-container">
@@ -95,10 +95,10 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn-cancel" (click)="closeDeleteModal()" [disabled]="isDeleting">Cancelar</button>
-        <button class="btn-delete" (click)="confirmDelete()" [disabled]="isDeleting">
-          <i class="fas" [ngClass]="isDeleting ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
-          {{ isDeleting ? 'Eliminando...' : 'Sí, eliminar' }}
+        <button class="btn-cancel" (click)="cerrarModalEliminar()" [disabled]="eliminando">Cancelar</button>
+        <button class="btn-delete" (click)="confirmarEliminar()" [disabled]="eliminando">
+          <i class="fas" [ngClass]="eliminando ? 'fa-spinner fa-spin' : 'fa-trash'"></i>
+          {{ eliminando ? 'Eliminando...' : 'Sí, eliminar' }}
         </button>
       </div>
     </div>

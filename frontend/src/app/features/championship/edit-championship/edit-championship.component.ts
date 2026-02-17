@@ -65,7 +65,7 @@ interface PendingCategory {
 })
 export class EditChampionshipComponent implements OnInit, OnDestroy {
     id: string | null = null;
-    loading = true;
+    cargando = true;
 
     privacy: '' | 'PUBLICO' | 'PRIVADO' = '';
     readonly privacyOptions: Array<{ value: 'PUBLICO' | 'PRIVADO'; label: string }> = [
@@ -220,13 +220,13 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         if (this.id) {
             this.loadData();
         } else {
-            this.loading = false;
+            this.cargando = false;
             this.message = 'No se proporcionó un ID de campeonato.';
         }
     }
 
     loadData(): void {
-        this.loading = true;
+        this.cargando = true;
         this.api.getCampeonatoById(this.id!).subscribe({
             next: (data) => {
                 this.campeonato = {
@@ -241,11 +241,11 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                     maxParticipantes: data.maxParticipantes || null
                 };
 
-                this.onPaisChange(); // Update cities list and validate city
-                // Restore city after reload
+                this.onPaisChange(); // Actualizar lista de ciudades y validar ciudad
+                // Restaurar ciudad después de recargar
                 if (data.ciudad) this.campeonato.ciudad = data.ciudad;
 
-                // Handle legacy or diverse boolean/number values for visible/public
+                // Manejar valores heredados o diversos de booleano/número para visible/público
                 const isPublic = data.esPublico === true || data.esPublico === 'true' || data.esPublico === 1;
                 this.privacy = isPublic ? 'PUBLICO' : 'PRIVADO';
 
@@ -286,11 +286,11 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                     }
                 }
                 this.restoreDraft();
-                this.loading = false;
+                this.cargando = false;
             },
             error: (err) => {
                 console.error(err);
-                this.loading = false;
+                this.cargando = false;
                 this.message = 'Error al cargar la información del campeonato.';
             }
         });
@@ -416,7 +416,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                 if (!hasDivision) {
                     missing.push(`Modalidad "${mod.nombre}": Activa al menos un criterio de división (Cinturón, Edad, Peso o Género).`);
                 } else {
-                    // Check if enabled criteria actually have values
+                    // Verificar si los criterios habilitados realmente tienen valores
                     if (flags) {
                         if (flags['cinturon'] && (!mod.categorias.cinturon || mod.categorias.cinturon.length === 0)) {
                             missing.push(`Modalidad "${mod.nombre}": Categoría Cinturón activada pero sin valores.`);
@@ -544,10 +544,10 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         this.pending[mod.id][key].hasta = '';
     }
 
-    // Necessary helpers for addCategoryFromPending
+    // Helpers necesarios para addCategoryFromPending
     validarSolapamiento(categories: CategoriaConfig[], categoryKey: 'cinturon' | 'edad' | 'peso'): string | null {
-        // Check create-championship.ts lines 914-1005 for robust logic. 
-        // Implementing simplified but functional version matching Create
+        // Ver create-championship.ts líneas 914-1005 para la lógica robusta. 
+        // Implementación simplificada pero funcional, coincide con Create
         if (categoryKey === 'cinturon') {
             const individuales = categories.filter(c => c.tipo === 'individual').map(c => c.valor);
             const rangos = categories.filter(c => c.tipo === 'rango');
@@ -620,9 +620,9 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
     }
 
     onModalidadActivaChange(mod: ModalidadConfig): void {
-        // When deactivating, we just collapse. Data is preserved.
-        // Flags in categoryEnabled are also preserved so when reactivated, 
-        // the switches (and data) reappear as they were.
+        // Al desactivar, solo colapsamos. Los datos se preservan.
+        // Los flags en categoryEnabled también se preservan, así al reactivar 
+        // los switches (y datos) reaparecen como estaban.
         if (!mod.activa) {
             mod.expanded = false;
         } else {
@@ -736,7 +736,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
                     nombre: mod.nombre,
                     activa: mod.activa,
                     categorias: {
-                        // Only send categories if they are ENABLED in the UI
+                        // Solo enviar categorías si están HABILITADAS en la interfaz
                         cinturon: mod.activa && flags.cinturon ? mod.categorias.cinturon : [],
                         edad: mod.activa && flags.edad ? mod.categorias.edad : [],
                         peso: mod.activa && flags.peso ? mod.categorias.peso : [],
@@ -781,10 +781,10 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
         this.clearDraft();
         this.showCancelConfirm = false;
         this.scrollLock.unlock();
-        this.goBack();
+        this.volverAtras();
     }
 
-    goBack(): void {
+    volverAtras(): void {
         this.backNav.backOr({ fallbackUrl: '/mis-campeonatos' });
     }
 
@@ -831,7 +831,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
 
             // Re-trigger side effects
             if (this.campeonato.pais) this.onPaisChange();
-            // Restore city specifically as onPaisChange clears it
+            // Restaurar ciudad específicamente ya que onPaisChange la borra
             if (draft.campeonato && draft.campeonato.ciudad) {
                 this.campeonato.ciudad = draft.campeonato.ciudad;
             }

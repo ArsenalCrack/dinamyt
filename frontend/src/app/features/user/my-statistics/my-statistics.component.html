@@ -1,7 +1,7 @@
 <div class="my-stats-container">
   <div class="my-stats-card">
     <header class="header">
-      <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+      <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
         <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
         <span class="visually-hidden">Volver atrás</span>
       </button>
@@ -13,17 +13,17 @@
 
     <div class="search-section">
       <input type="text" class="search-input" id="my-stats-search" name="searchMyStats" aria-label="Buscar estadísticas"
-        placeholder="Buscar por campeonato, modalidad o categoría..." [(ngModel)]="searchQuery"
-        (input)="onSearchChange()">
+        placeholder="Buscar por campeonato, modalidad o categoría..." [(ngModel)]="busqueda"
+        (input)="onBusquedaCambio()">
       <i class="fas fa-search search-icon" aria-hidden="true"></i>
     </div>
 
     <div class="stats-list">
-      <ng-container *ngIf="filtered.length > 0; else noResults">
-        <div class="stat-item" *ngFor="let row of filtered">
+      <ng-container *ngIf="filtradas.length > 0; else sinResultados">
+        <div class="stat-item" *ngFor="let row of filtradas">
           <div class="item-header">
             <div class="item-title">
-              <h3>{{ row.championship }}</h3>
+              <h3>{{ row.campeonato }}</h3>
               <span class="pill">{{ row.modalidad }}</span>
             </div>
             <div class="item-meta">
@@ -39,7 +39,7 @@
         </div>
       </ng-container>
 
-      <ng-template #noResults>
+      <ng-template #sinResultados>
         <div class="no-results">
           <i class="fas fa-inbox"></i>
           <p>No encontramos estadísticas que coincidan con tu búsqueda.</p>

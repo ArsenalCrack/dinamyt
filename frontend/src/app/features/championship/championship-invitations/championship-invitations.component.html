@@ -1,33 +1,33 @@
 <div class="invitations-container">
-    <app-loading-spinner *ngIf="loading" [message]="'Cargando invitaciones...'" [fixed]="true"></app-loading-spinner>
-    <div class="toast-notification" *ngIf="toastVisible" [class.error]="toastIsError">
-        <i class="fas" [ngClass]="toastIsError ? 'fa-exclamation-circle' : 'fa-check-circle'"></i>
-        <span>{{ toastMessage }}</span>
+    <app-loading-spinner *ngIf="cargando" [message]="'Cargando invitaciones...'" [fixed]="true"></app-loading-spinner>
+    <div class="toast-notification" *ngIf="avisoVisible" [class.error]="avisoEsError">
+        <i class="fas" [ngClass]="avisoEsError ? 'fa-exclamation-circle' : 'fa-check-circle'"></i>
+        <span>{{ mensajeAviso }}</span>
     </div>
 
     <div class="page-card">
         <!-- Header -->
         <header class="header">
-            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+            <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás">
                 <i class="fas fa-arrow-left"></i>
             </button>
             <div class="header-content">
                 <h1>Gestión de Invitaciones</h1>
                 <p>Administra las invitaciones para competidores y jueces</p>
             </div>
-            <button class="btn-invite-new" (click)="openInviteModal()">
+            <button class="btn-invite-new" (click)="abrirModalInvitar()">
                 <i class="fas fa-paper-plane"></i>
-                <span>Invitar {{ activeSection === 'JUEZ' ? 'Juez' : 'Competidor' }}</span>
+                <span>Invitar {{ seccionActiva === 'JUEZ' ? 'Juez' : 'Competidor' }}</span>
             </button>
         </header>
 
         <!-- Section Switcher (Competitors vs Judges) -->
         <div class="section-switcher">
-            <button class="switch-btn" [class.active]="activeSection === 'COMPETIDOR'"
-                (click)="setActiveSection('COMPETIDOR')">
+            <button class="switch-btn" [class.active]="seccionActiva === 'COMPETIDOR'"
+                (click)="seleccionarSeccion('COMPETIDOR')">
                 <i class="fas fa-user-ninja"></i> Competidores
             </button>
-            <button class="switch-btn" [class.active]="activeSection === 'JUEZ'" (click)="setActiveSection('JUEZ')">
+            <button class="switch-btn" [class.active]="seccionActiva === 'JUEZ'" (click)="seleccionarSeccion('JUEZ')">
                 <i class="fas fa-gavel"></i> Jueces
             </button>
         </div>
@@ -35,21 +35,24 @@
         <!-- Search Bar -->
         <div class="search-section" id="invitations-top-anchor">
             <i class="fas fa-search"></i>
-            <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+            <input type="text" [(ngModel)]="busqueda" (input)="aplicarFiltros()"
                 placeholder="Buscar por nombre, documento o email...">
         </div>
 
         <!-- Status Tabs -->
         <nav class="tabs-nav">
-            <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setActiveTab('PENDIENTE')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'PENDIENTE'"
+                (click)="seleccionarPestana('PENDIENTE')">
                 <i class="fas fa-clock"></i>
                 <span>Pendientes</span>
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setActiveTab('ACEPTADO')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'ACEPTADO'"
+                (click)="seleccionarPestana('ACEPTADO')">
                 <i class="fas fa-check-circle"></i>
                 <span>Aceptados</span>
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setActiveTab('RECHAZADO')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'RECHAZADO'"
+                (click)="seleccionarPestana('RECHAZADO')">
                 <i class="fas fa-times-circle"></i>
                 <span>Rechazados</span>
             </button>
@@ -57,7 +60,7 @@
 
         <!-- Invitations List -->
         <div class="invitations-list">
-            <div class="invitation-card" *ngFor="let item of paginatedInvitations">
+            <div class="invitation-card" *ngFor="let item of invitacionesPaginadas">
                 <div class="card-content">
                     <div class="user-avatar" [class.judge]="item.tipo === 'JUEZ'">
                         <i class="fas" [ngClass]="item.tipo === 'JUEZ' ? 'fa-gavel' : 'fa-user'"></i>
@@ -86,7 +89,8 @@
                 <!-- Actions -->
                 <div class="card-actions">
                     <!-- Delete Action (Pending or Accepted) -->
-                    <button class="btn-cancel" *ngIf="item.estado !== 'RECHAZADO'" (click)="confirmCancel(item.id)"
+                    <button class="btn-cancel" *ngIf="item.estado !== 'RECHAZADO'"
+                        (click)="confirmarCancelacion(item.id)"
                         [title]="item.estado === 'PENDIENTE' ? 'Cancelar invitación' : 'Eliminar de la lista'">
                         <i class="fas" [ngClass]="item.estado === 'PENDIENTE' ? 'fa-times' : 'fa-trash'"></i>
                         <span>{{ item.estado === 'PENDIENTE' ? 'Cancelar' : 'Eliminar' }}</span>
@@ -103,18 +107,18 @@
             </div>
 
             <!-- Empty State -->
-            <div class="empty-state" *ngIf="filteredInvitations.length === 0">
+            <div class="empty-state" *ngIf="invitacionesFiltradas.length === 0">
                 <i class="fas fa-envelope-open-text"></i>
                 <p>No se encontraron invitaciones en esta sección.</p>
             </div>
 
             <!-- Pagination Controls -->
-            <div class="pagination-controls" *ngIf="totalPages > 1">
-                <button class="btn-page" (click)="prevPage()" [disabled]="currentPage === 1">
+            <div class="pagination-controls" *ngIf="totalPaginas > 1">
+                <button class="btn-page" (click)="paginaAnterior()" [disabled]="paginaActual === 1">
                     <i class="fas fa-chevron-left"></i>
                 </button>
-                <span class="page-count">{{ currentPage }} / {{ totalPages }}</span>
-                <button class="btn-page" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                <span class="page-count">{{ paginaActual }} / {{ totalPaginas }}</span>
+                <button class="btn-page" (click)="paginaSiguiente()" [disabled]="paginaActual === totalPaginas">
                     <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
@@ -123,47 +127,48 @@
 </div>
 
 <!-- Modal Cancellation/Deletion -->
-<div class="modal-overlay" *ngIf="cancelModalOpen">
+<div class="modal-overlay" *ngIf="modalCancelarAbierto">
     <div class="modal-box">
         <div class="modal-header">
             <i class="fas fa-trash-alt warning-icon"></i>
-            <h3>{{ activeTab === 'PENDIENTE' ? '¿Cancelar Invitación?' : '¿Eliminar Usuario?' }}</h3>
+            <h3>{{ pestanaActiva === 'PENDIENTE' ? '¿Cancelar Invitación?' : '¿Eliminar Usuario?' }}</h3>
         </div>
         <p class="modal-desc">
-            {{ activeTab === 'PENDIENTE'
+            {{ pestanaActiva === 'PENDIENTE'
             ? 'La invitación será revocada y el usuario ya no podrá aceptarla.'
             : 'El usuario será eliminado de la lista de aceptados de este campeonato.' }}
         </p>
         <div class="modal-actions">
-            <button class="btn-cancel-modal" (click)="closeCancelModal()">Volver</button>
-            <button class="btn-confirm-delete" (click)="finalizeCancel()">
-                {{ activeTab === 'PENDIENTE' ? 'Sí, Cancelar' : 'Sí, Eliminar' }}
+            <button class="btn-cancel-modal" (click)="cerrarModalCancelar()">Volver</button>
+            <button class="btn-confirm-delete" (click)="finalizarCancelacion()">
+                {{ pestanaActiva === 'PENDIENTE' ? 'Sí, Cancelar' : 'Sí, Eliminar' }}
             </button>
         </div>
     </div>
 </div>
 
 <!-- Modal Send Invitation -->
-<div class="modal-overlay" *ngIf="inviteModalOpen">
+<div class="modal-overlay" *ngIf="modalInvitarAbierto">
     <div class="modal-box large">
         <div class="modal-header">
-            <i class="fas" [ngClass]="activeSection === 'JUEZ' ? 'fa-gavel' : 'fa-user-plus'"
+            <i class="fas" [ngClass]="seccionActiva === 'JUEZ' ? 'fa-gavel' : 'fa-user-plus'"
                 style="color: var(--color-principal);"></i>
-            <h3>Invitar {{ activeSection === 'JUEZ' ? 'Juez' : 'Competidor' }}</h3>
+            <h3>Invitar {{ seccionActiva === 'JUEZ' ? 'Juez' : 'Competidor' }}</h3>
         </div>
 
         <div class="invite-content">
             <!-- Step 1: Search -->
-            <div class="invite-step" *ngIf="!selectedUser">
+            <div class="invite-step" *ngIf="!usuarioSeleccionado">
                 <p class="step-desc">Busca al usuario por nombre, documento o correo electrónico.</p>
                 <div class="search-input-wrapper">
                     <i class="fas fa-search"></i>
-                    <input type="text" [(ngModel)]="inviteSearchQuery" (input)="searchUsers()"
+                    <input type="text" [(ngModel)]="busquedaInvitar" (input)="buscarUsuarios()"
                         placeholder="Buscar usuario..." autoFocus>
                 </div>
 
                 <div class="search-results-list">
-                    <div class="search-result-item" *ngFor="let user of availableUsers" (click)="selectUser(user)">
+                    <div class="search-result-item" *ngFor="let user of usuariosDisponibles"
+                        (click)="seleccionarUsuario(user)">
                         <div class="user-avatar mini">
                             <i class="fas fa-user"></i>
                         </div>
@@ -176,39 +181,40 @@
                         </div>
                         <i class="fas fa-plus action-icon"></i>
                     </div>
-                    <div class="no-results" *ngIf="inviteSearchQuery && availableUsers.length === 0">
+                    <div class="no-results" *ngIf="busquedaInvitar && usuariosDisponibles.length === 0">
                         No se encontraron usuarios.
                     </div>
                 </div>
             </div>
 
             <!-- Step 2: Configure & Send -->
-            <div class="invite-step" *ngIf="selectedUser">
+            <div class="invite-step" *ngIf="usuarioSeleccionado">
                 <div class="selected-user-card">
                     <div class="user-avatar">
-                        <i class="fas" [ngClass]="activeSection === 'JUEZ' ? 'fa-gavel' : 'fa-user'"></i>
+                        <i class="fas" [ngClass]="seccionActiva === 'JUEZ' ? 'fa-gavel' : 'fa-user'"></i>
                     </div>
                     <div class="user-info">
-                        <h3>{{ selectedUser.nombre }}</h3>
-                        <span>{{ selectedUser.email }}</span>
+                        <h3>{{ usuarioSeleccionado.nombre }}</h3>
+                        <span>{{ usuarioSeleccionado.email }}</span>
                     </div>
-                    <button class="btn-change" (click)="unselectUser()">Cambiar</button>
+                    <button class="btn-change" (click)="deseleccionarUsuario()">Cambiar</button>
                 </div>
 
                 <!-- Role Selector for Judge -->
-                <div class="role-selector" *ngIf="activeSection === 'JUEZ'">
+                <div class="role-selector" *ngIf="seccionActiva === 'JUEZ'">
                     <label>Rol Asignado</label>
-                    <app-custom-select [options]="judgeRoleOptions" [(ngModel)]="selectedJudgeRole"
+                    <app-custom-select [options]="opcionesRolJuez" [(ngModel)]="rolJuezSeleccionado"
                         placeholder="Selecciona un rol"></app-custom-select>
                 </div>
             </div>
         </div>
 
         <div class="modal-actions">
-            <button class="btn-cancel-modal" (click)="closeInviteModal()">Cancelar</button>
-            <button class="btn-confirm-send" (click)="sendInvitation()" [disabled]="!selectedUser || sendingInvitation">
-                <i class="fas" [ngClass]="sendingInvitation ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
-                {{ sendingInvitation ? 'Enviando...' : 'Enviar Invitación' }}
+            <button class="btn-cancel-modal" (click)="cerrarModalInvitar()">Cancelar</button>
+            <button class="btn-confirm-send" (click)="enviarInvitacion()"
+                [disabled]="!usuarioSeleccionado || enviandoInvitacion">
+                <i class="fas" [ngClass]="enviandoInvitacion ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
+                {{ enviandoInvitacion ? 'Enviando...' : 'Enviar Invitación' }}
             </button>
         </div>
     </div>

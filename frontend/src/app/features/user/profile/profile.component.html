@@ -2,7 +2,7 @@
   <app-loading-spinner *ngIf="saving" message="Guardando cambios..." [fixed]="true"></app-loading-spinner>
   <div class="page-card">
     <div class="header-profile">
-      <a (click)="goBack()" class="btn-back" title="Volver atrás">
+      <a (click)="volverAtras()" class="btn-back" title="Volver atrás">
         <i class="fas fa-arrow-left fa-lg"></i>
       </a>
       <h2>Mi Perfil</h2>
@@ -23,7 +23,7 @@
       </div>
     </div>
 
-    <form (ngSubmit)="saveProfile()">
+    <form (ngSubmit)="guardarPerfil()">
       <div class="profile-grid">
         <!-- Bloqueados -->
         <div class="field disabled"><label>Documento</label>
@@ -59,7 +59,7 @@
           <label>Teléfono</label>
           <div class="phone-row">
             <div class="phone-code">
-              <app-custom-select name="telefonoCodigo" [(ngModel)]="telefonoCodigo" [options]="phoneCodeOptions"
+              <app-custom-select name="telefonoCodigo" [(ngModel)]="telefonoCodigo" [options]="opcionesCodigoPais"
                 placeholder="Prefijo">
               </app-custom-select>
             </div>
@@ -82,7 +82,7 @@
         <button class="btn-primary" type="submit" [disabled]="saving">{{ saving ? 'Guardando...' : 'Guardar
           cambios'
           }}</button>
-        <button class="btn-secondary" type="button" (click)="goChangePassword()">Cambiar contraseña</button>
+        <button class="btn-secondary" type="button" (click)="irACambiarContrasena()">Cambiar contraseña</button>
       </div>
     </form>
 

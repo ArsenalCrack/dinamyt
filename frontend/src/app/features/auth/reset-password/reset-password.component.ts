@@ -20,14 +20,14 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private scrollLock = inject(ScrollLockService);
 
-  // Variable del correo (recuperado de sesión)
+  // Correo del usuario (recuperado de sesión)
   correo: string = '';
 
-  // Modelo (Aquí corregimos el nombre para que coincida con el HTML y BD)
+  // Modelo (nombre corregido para coincidir con HTML y BD)
   contrasena: string = '';
-  confirmPassword: string = '';
+  confirmarContrasena: string = '';
 
-  // Visibilidad
+  // Visibilidad de contraseña
   mostrarPass: boolean = false;
   mostrarConfirm: boolean = false;
 
@@ -50,7 +50,7 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
   private unlockScroll() { this.scrollLock.unlock(); }
 
   cambiarPassword() {
-    if (this.contrasena !== this.confirmPassword) {
+    if (this.contrasena !== this.confirmarContrasena) {
       this.mensaje = 'Las contraseñas no coinciden.';
       return;
     }
@@ -74,11 +74,11 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
         this.exito = true;
         this.mensaje = 'Contraseña actualizada.';
 
-        // LIMPIEZA: Usamos los nombres correctos de tus variables de sesión
+        // LIMPIEZA: Usamos los nombres correctos de las variables de sesión
         sessionStorage.removeItem('emailParaVerificar');
         sessionStorage.removeItem('verifyMode');
 
-        // Al login
+        // Redirigir al login
         setTimeout(() => this.router.navigate(['/login']), 2000);
       },
       error: async (err) => {

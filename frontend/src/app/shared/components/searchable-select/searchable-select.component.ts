@@ -49,7 +49,7 @@ export class SearchableSelectComponent implements ControlValueAccessor, OnInit, 
     ngOnChanges(changes: SimpleChanges): void {
         if (changes['options']) {
             this.filteredOptions = this.options;
-            // If we have a value, ensure the label is correct (e.g. if loaded async)
+            // Si tenemos un valor, asegurar que el label sea correcto (ej: carga asíncrona)
             if (this.value) {
                 const found = this.options.find(o => o.value === this.value);
                 if (found) {
@@ -74,9 +74,7 @@ export class SearchableSelectComponent implements ControlValueAccessor, OnInit, 
 
         if (!search) {
             this.filteredOptions = [...this.options];
-            this.value = null; // Clear value if cleared text? Depends on UX.
-            // Or keep value until new valid selection? 
-            // User likely wants to clear.
+            this.value = null; // Limpiar valor si se borró el texto
             this.onChange(null);
         } else {
             this.filteredOptions = this.options.filter(opt =>
@@ -122,21 +120,21 @@ export class SearchableSelectComponent implements ControlValueAccessor, OnInit, 
 
     onInputBlur() {
         this.touched = true;
-        // Validate text matches an option
+        // Validar que el texto coincida con una opción
         const found = this.options.find(o => o.label === this.searchText);
         if (!found) {
-            // If text doesn't match match, revert to last valid value or clear
-            // If we want to allow clearing by deleting text
+            // Si el texto no coincide con una opción, revertir al último valor válido o limpiar
+            // Si el usuario borró el texto, limpiar el valor
             if (this.searchText === '') {
                 this.value = null;
                 this.onChange(null);
             } else {
-                // Restore display text of current value
+                // Restaurar el texto visible del valor actual
                 const current = this.options.find(o => o.value === this.value);
                 this.searchText = current ? current.label : '';
             }
         } else {
-            // Text matches a valid option, select it if not already
+            // El texto coincide con una opción válida, seleccionarla si no está ya seleccionada
             if (this.value !== found.value) {
                 this.value = found.value;
                 this.onChange(this.value);
@@ -152,7 +150,7 @@ export class SearchableSelectComponent implements ControlValueAccessor, OnInit, 
     @HostListener('document:click', ['$event.target'])
     onClickOutside(target: EventTarget | null) {
         if (target && !this.host.nativeElement.contains(target as Node)) {
-            // Validate on click outside
+            // Validar al hacer clic fuera del componente
             this.onInputBlur();
             this.close();
         }

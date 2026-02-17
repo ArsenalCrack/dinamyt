@@ -9,46 +9,19 @@ import { ApiService } from '../../../core/services/api.service';
 import { CustomSelectComponent } from '../../../shared/components/custom-select/custom-select.component';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+import { Campeonato } from '../../../core/models/campeonato.model';
 
 type EstadoCampeonato = 'ACTIVO' | 'PLANIFICADO' | 'TERMINADO' | 'BORRADOR';
 type PrivacidadFiltro = 'TODOS' | 'PUBLICO' | 'PRIVADO';
 
-interface CampeonatoApiItem {
-  id: number;
-  nombre: string;
-  fechaInicio: string;
-  ubicacion: string;
-  pais?: string;
-  ciudad?: string;
-  alcance: string | null;
-  creadoPor?: string | null;
-  esPublico?: boolean;
-  estado: EstadoCampeonato;
-  participantes: number;
-  capacidad: number | null;
-  cuposDisponibles: number | null;
-  puedeInscribirse: boolean;
-  visibilidad?: boolean;
-}
-
-interface CampeonatoUiItem {
-  id: number;
-  nombre: string;
-  fechaInicio: string;
-  ubicacion: string;
-  pais?: string;
-  ciudad?: string;
-  alcance: string | null;
-  creadoPor: string | null;
+interface CampeonatoUI extends Omit<Campeonato, 'cuposDisponibles'> {
+  // UI Specific or mapped properties
   creadoPorNombre: string | null;
-  esPublico: boolean;
   estadoKey: EstadoCampeonato;
   estadoLabel: string;
-  participantes: number;
-  capacidad: number | null;
-  cuposDisponibles: number | null;
-  puedeInscribirse: boolean;
+  cuposDisponibles?: number | null; // Allow null explicity or undefined
   isVisible: boolean;
+  capacidad: number | null; // Alias for maxParticipantes for UI consistency if needed
 }
 
 @Component({
@@ -59,59 +32,58 @@ interface CampeonatoUiItem {
   styleUrls: ['./explore-championships.component.scss']
 })
 export class ExploreChampionshipsComponent implements OnInit {
-  // ... (properties remain)
-  searchQuery: string = '';
-  championships: CampeonatoUiItem[] = [];
-  filteredChampionships: CampeonatoUiItem[] = [];
-  paginatedChampionships: CampeonatoUiItem[] = [];
+  busqueda: string = '';
+  campeonatos: CampeonatoUI[] = [];
+  campeonatosFiltrados: CampeonatoUI[] = [];
+  campeonatosPaginados: CampeonatoUI[] = [];
 
   // Pagination
-  currentPage: number = 1;
-  itemsPerPage: number = 6;
-  totalPages: number = 1;
+  paginaActual: number = 1;
+  itemsPorPagina: number = 6;
+  totalPaginas: number = 1;
 
-  statusFilter: 'TODOS' | EstadoCampeonato = 'TODOS';
-  privacyFilter: PrivacidadFiltro = 'TODOS';
-  dateSort: 'MAS_RECIENTE' | 'MAS_ANTIGUO' = 'MAS_RECIENTE';
+  filtroEstado: 'TODOS' | EstadoCampeonato = 'TODOS';
+  filtroPrivacidad: PrivacidadFiltro = 'TODOS';
+  ordenFecha: 'MAS_RECIENTE' | 'MAS_ANTIGUO' = 'MAS_RECIENTE';
 
-  readonly statusOptions: Array<{ value: 'TODOS' | EstadoCampeonato; label: string }> = [
+  readonly opcionesEstado: Array<{ value: 'TODOS' | EstadoCampeonato; label: string }> = [
     { value: 'TODOS', label: 'Todos' },
     { value: 'ACTIVO', label: 'Activos' },
     { value: 'PLANIFICADO', label: 'Planificados' },
     { value: 'TERMINADO', label: 'Terminados' },
   ];
 
-  readonly privacyOptions: Array<{ value: PrivacidadFiltro; label: string }> = [
+  readonly opcionesPrivacidad: Array<{ value: PrivacidadFiltro; label: string }> = [
     { value: 'TODOS', label: 'Todos' },
     { value: 'PUBLICO', label: 'Públicos' },
     { value: 'PRIVADO', label: 'Privados' },
   ];
 
-  readonly dateSortOptions: Array<{ value: 'MAS_RECIENTE' | 'MAS_ANTIGUO'; label: string }> = [
+  readonly opcionesOrdenFecha: Array<{ value: 'MAS_RECIENTE' | 'MAS_ANTIGUO'; label: string }> = [
     { value: 'MAS_RECIENTE', label: 'Más reciente' },
     { value: 'MAS_ANTIGUO', label: 'Más antiguo' },
   ];
 
   cargando = false;
-  errorMessage: string | null = null;
-  showLoginModal: boolean = false;
+  mensajeError: string | null = null;
+  mostrarModalLogin: boolean = false;
 
-  showAccessCodeModal = false;
-  accessCode = '';
-  accessCodeError: string | null = null;
-  accessCodeSubmitting = false;
-  accessCodeChampionshipId: number | null = null;
+  mostrarModalCodigo = false;
+  codigoAcceso = '';
+  errorCodigoAcceso: string | null = null;
+  enviandoCodigoAcceso = false;
+  idCampeonatoCodigo: number | null = null;
 
-  // Delete modal
-  showDeleteModal = false;
-  deletingId: number | null = null;
-  isDeleting = false;
+  // Modal de eliminación
+  mostrarModalEliminar = false;
+  idEliminando: number | null = null;
+  estaEliminando = false;
 
-  currentUserId: string | null = null;
-  showMobileFilters = false;
+  idUsuarioActual: string | null = null;
+  mostrarFiltrosMovil = false;
 
-  private modalLocked = false;
-  private pendingRegistrationId: number | null = null;
+  private modalBloqueado = false;
+  private idRegistroPendiente: number | null = null;
 
   constructor(
     private router: Router,
@@ -123,28 +95,28 @@ export class ExploreChampionshipsComponent implements OnInit {
     private backNav: BackNavigationService
   ) { }
 
-  private lockModal(): void {
-    if (this.modalLocked) return;
+  private bloquearModal(): void {
+    if (this.modalBloqueado) return;
     this.scrollLock.lock();
-    this.modalLocked = true;
+    this.modalBloqueado = true;
   }
 
-  private unlockModal(): void {
-    if (!this.modalLocked) return;
+  private desbloquearModal(): void {
+    if (!this.modalBloqueado) return;
     this.scrollLock.unlock();
-    this.modalLocked = false;
+    this.modalBloqueado = false;
   }
 
-  toggleMobileFilters(): void {
-    this.showMobileFilters = !this.showMobileFilters;
+  alternarFiltrosMovil(): void {
+    this.mostrarFiltrosMovil = !this.mostrarFiltrosMovil;
   }
 
   ngOnInit(): void {
-    this.currentUserId = sessionStorage.getItem('idDocumento');
-    this.loadChampionships();
+    this.idUsuarioActual = sessionStorage.getItem('idDocumento');
+    this.cargarCampeonatos();
   }
 
-  private estadoLabel(estado: string): string {
+  private obtenerEtiquetaEstado(estado: string): string {
     switch (estado) {
       case 'ACTIVO': return 'Activo';
       case 'PLANIFICADO': return 'Planificado';
@@ -154,19 +126,16 @@ export class ExploreChampionshipsComponent implements OnInit {
     }
   }
 
-  private calculateStatus(fechaInicio: string, fechaFin: string | undefined): EstadoCampeonato {
+  private calcularEstado(fechaInicio: string, fechaFin: string | undefined): EstadoCampeonato {
     if (!fechaInicio) return 'BORRADOR';
 
-    // Obtener fecha actual en medianoche local para comparar solo días
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
-    // Función auxiliar para parsear YYYY-MM-DD como fecha local
     const parseLocalDate = (dateStr: string): Date => {
       if (!dateStr) return new Date();
       const parts = dateStr.split('T')[0].split('-');
       if (parts.length === 3) {
-        // new Date(year, monthIndex, day) crea una fecha en hora local
         return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
       }
       return new Date(dateStr);
@@ -183,24 +152,14 @@ export class ExploreChampionshipsComponent implements OnInit {
     return 'ACTIVO';
   }
 
-  private estadoRank(estado: string): number {
-    switch (estado) {
-      case 'ACTIVO': return 0;
-      case 'PLANIFICADO': return 1;
-      case 'TERMINADO': return 2;
-      case 'BORRADOR': return 3;
-      default: return 99;
-    }
-  }
-
-  private sortCampeonatos(list: CampeonatoUiItem[]): CampeonatoUiItem[] {
-    return [...list].sort((a, b) => {
+  private ordenarCampeonatos(lista: CampeonatoUI[]): CampeonatoUI[] {
+    return [...lista].sort((a, b) => {
       const da = new Date(a.fechaInicio).getTime();
       const db = new Date(b.fechaInicio).getTime();
 
       let dateComparison = 0;
       if (!Number.isNaN(da) && !Number.isNaN(db)) {
-        if (this.dateSort === 'MAS_RECIENTE') {
+        if (this.ordenFecha === 'MAS_RECIENTE') {
           dateComparison = da - db;
         } else {
           dateComparison = db - da;
@@ -212,38 +171,26 @@ export class ExploreChampionshipsComponent implements OnInit {
     });
   }
 
-  loadChampionships(): void {
+  cargarCampeonatos(): void {
     this.cargando = true;
-    this.errorMessage = null;
+    this.mensajeError = null;
 
     this.api.getCampeonatos().subscribe({
       next: (res: any) => {
-        const items: CampeonatoApiItem[] = Array.isArray(res) ? res : [];
+        const items: any[] = Array.isArray(res) ? res : [];
 
+        this.campeonatos = items.map((c: any) => {
+          const calculatedStatus = this.calcularEstado(c.fechaInicio, c.fecha_fin);
 
-        // Map items
-        this.championships = items.map((c: any) => {
-          // Dynamic status calculation based on dates 
-          // (Ignoring the backend "BORRADOR" if dates exist)
-          const calculatedStatus = this.calculateStatus(c.fechaInicio, c.fecha_fin);
-
-          return {
-            id: c.idCampeonato ?? c.id,
-            nombre: c.nombre,
-            fechaInicio: c.fechaInicio,
-            ubicacion: c.ubicacion,
-            pais: c.pais || null,
-            ciudad: c.ciudad || null,
-            alcance: c.alcance ?? null,
-            creadoPor: c.creadoPor ? String(c.creadoPor) : null,
+          // Force casting/mapping to UI model
+          const mapped: CampeonatoUI = {
+            ...c, // Spread backend properties (Campeonato interface items)
+            idCampeonato: c.idCampeonato ?? c.id, // Ensure ID
             creadoPorNombre: c.creadoPorNombre || (c.nombreCreador ? `${c.nombreCreador}` : 'Desconocido'),
-            esPublico: c.esPublico !== false,
             estadoKey: calculatedStatus,
-            estadoLabel: this.estadoLabel(calculatedStatus),
-            participantes: c.participantes ?? 0,
+            estadoLabel: this.obtenerEtiquetaEstado(calculatedStatus),
             capacidad: c.maxParticipantes ?? c.capacidad,
             cuposDisponibles: c.cuposDisponibles ?? null,
-            puedeInscribirse: !!c.puedeInscribirse,
             isVisible: (
               c.visible !== 0 && c.visible !== '0' && c.visible !== false &&
               c.Visible !== 0 && c.Visible !== '0' && c.Visible !== false &&
@@ -251,15 +198,14 @@ export class ExploreChampionshipsComponent implements OnInit {
               c.Visibilidad !== 0 && c.Visibilidad !== '0' && c.Visibilidad !== false
             )
           };
+          return mapped;
         });
 
-        this.applyFilters();
+        this.aplicarFiltros();
         this.cargando = false;
 
-        // Auto-action handling
         const pendingId = this.route.snapshot.queryParams['autoRegister'];
         if (pendingId) {
-          // Clear query param to avoid re-triggering on refresh
           this.router.navigate([], {
             relativeTo: this.route,
             queryParams: { autoRegister: null },
@@ -269,10 +215,8 @@ export class ExploreChampionshipsComponent implements OnInit {
 
           const idNum = Number(pendingId);
           if (!isNaN(idNum)) {
-            // We need to wait a tick or ensure view is ready? 
-            // Logic is safe to call immediately as data is loaded.
             setTimeout(() => {
-              this.registerChampionship(idNum);
+              this.registrarCampeonato(idNum);
             }, 100);
           }
         }
@@ -280,66 +224,61 @@ export class ExploreChampionshipsComponent implements OnInit {
       error: (err) => {
         console.error('Error loading championships:', err);
         this.cargando = false;
-        this.errorMessage = 'No pudimos cargar los campeonatos. Intenta de nuevo.';
-        this.championships = [];
-        this.filteredChampionships = [];
-        this.paginatedChampionships = [];
+        this.mensajeError = 'No pudimos cargar los campeonatos. Intenta de nuevo.';
+        this.campeonatos = [];
+        this.campeonatosFiltrados = [];
+        this.campeonatosPaginados = [];
       }
     });
   }
 
-  onSearchChange(): void {
-    this.currentPage = 1; // Reset to first page on new search
-    this.applyFilters();
+  alCambiarBusqueda(): void {
+    this.paginaActual = 1;
+    this.aplicarFiltros();
   }
 
-  setStatusFilter(value: 'TODOS' | EstadoCampeonato): void {
-    this.statusFilter = value;
-    this.currentPage = 1;
-    this.applyFilters();
+  seleccionarFiltroEstado(value: 'TODOS' | EstadoCampeonato): void {
+    this.filtroEstado = value;
+    this.paginaActual = 1;
+    this.aplicarFiltros();
   }
 
-  setStatusFilterFromUi(value: string): void {
+  seleccionarFiltroEstadoUI(value: string): void {
     const allowed: Array<'TODOS' | EstadoCampeonato> = ['TODOS', 'ACTIVO', 'PLANIFICADO', 'TERMINADO'];
     const next = (allowed as string[]).includes(value) ? (value as any) : 'TODOS';
-    this.setStatusFilter(next);
+    this.seleccionarFiltroEstado(next);
   }
 
-  setPrivacyFilter(value: PrivacidadFiltro): void {
-    this.privacyFilter = value;
-    this.currentPage = 1;
-    this.applyFilters();
+  seleccionarFiltroPrivacidad(value: PrivacidadFiltro): void {
+    this.filtroPrivacidad = value;
+    this.paginaActual = 1;
+    this.aplicarFiltros();
   }
 
-  setPrivacyFilterFromUi(value: string): void {
+  seleccionarFiltroPrivacidadUI(value: string): void {
     const allowed: PrivacidadFiltro[] = ['TODOS', 'PUBLICO', 'PRIVADO'];
     const next = allowed.includes(value as PrivacidadFiltro) ? (value as PrivacidadFiltro) : 'TODOS';
-    this.setPrivacyFilter(next);
+    this.seleccionarFiltroPrivacidad(next);
   }
 
-  setDateSort(value: 'MAS_RECIENTE' | 'MAS_ANTIGUO'): void {
-    this.dateSort = value;
-    // Don't reset page? User requested "filters don't delete if page changes", 
-    // but usually sorting re-orders everything so page 2 might become page 1 content.
-    // "que los filtros no se borren si llego a cambiar de paginación" -> means pagination state shouldn't clear filters.
-    // BUT changing a filter usually rests pagination to 1 to avoid being out of bounds.
-    // I will reset page to 1 because the data order changes completely.
-    this.currentPage = 1;
-    this.applyFilters();
+  seleccionarOrdenFecha(value: 'MAS_RECIENTE' | 'MAS_ANTIGUO'): void {
+    this.ordenFecha = value;
+    this.paginaActual = 1;
+    this.aplicarFiltros();
   }
 
-  setDateSortFromUi(value: string): void {
+  seleccionarOrdenFechaUI(value: string): void {
     const allowed: Array<'MAS_RECIENTE' | 'MAS_ANTIGUO'> = ['MAS_RECIENTE', 'MAS_ANTIGUO'];
     const next = (allowed as string[]).includes(value) ? (value as any) : 'MAS_RECIENTE';
-    this.setDateSort(next);
+    this.seleccionarOrdenFecha(next);
   }
 
-  private applyFilters(): void {
-    const query = this.searchQuery.trim().toLowerCase();
-    const status = this.statusFilter;
-    const privacy = this.privacyFilter;
+  private aplicarFiltros(): void {
+    const query = this.busqueda.trim().toLowerCase();
+    const status = this.filtroEstado;
+    const privacy = this.filtroPrivacidad;
 
-    let next = this.championships.filter(c => c.isVisible);
+    let next = this.campeonatos.filter(c => c.isVisible);
 
     if (status !== 'TODOS') {
       next = next.filter(c => c.estadoKey === status);
@@ -357,63 +296,54 @@ export class ExploreChampionshipsComponent implements OnInit {
       );
     }
 
-    // Sort
-    this.filteredChampionships = this.sortCampeonatos(next);
+    this.campeonatosFiltrados = this.ordenarCampeonatos(next);
+    this.totalPaginas = Math.ceil(this.campeonatosFiltrados.length / this.itemsPorPagina) || 1;
 
-    // Calculate Pagination
-    this.totalPages = Math.ceil(this.filteredChampionships.length / this.itemsPerPage) || 1;
-
-    // Adjust current page if out of bounds (e.g. filter reduced results)
-    if (this.currentPage > this.totalPages) {
-      this.currentPage = 1;
+    if (this.paginaActual > this.totalPaginas) {
+      this.paginaActual = 1;
     }
 
-    this.updatePagination();
+    this.actualizarPaginacion();
   }
 
-  private updatePagination(): void {
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
-    this.paginatedChampionships = this.filteredChampionships.slice(startIndex, endIndex);
+  private actualizarPaginacion(): void {
+    const startIndex = (this.paginaActual - 1) * this.itemsPorPagina;
+    const endIndex = startIndex + this.itemsPorPagina;
+    this.campeonatosPaginados = this.campeonatosFiltrados.slice(startIndex, endIndex);
   }
 
-  nextPage(): void {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-      this.updatePagination();
-      // Optional: Scroll to top of grid?
+  paginaSiguiente(): void {
+    if (this.paginaActual < this.totalPaginas) {
+      this.paginaActual++;
+      this.actualizarPaginacion();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
 
-  prevPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-      this.updatePagination();
+  paginaAnterior(): void {
+    if (this.paginaActual > 1) {
+      this.paginaActual--;
+      this.actualizarPaginacion();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
 
-  goToPage(page: number): void {
-    if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
-      this.currentPage = page;
-      this.updatePagination();
+  irAPagina(page: number): void {
+    if (page >= 1 && page <= this.totalPaginas && page !== this.paginaActual) {
+      this.paginaActual = page;
+      this.actualizarPaginacion();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
 
-  getPageNumbers(): number[] {
-    // Simple range for now, or could be smarter (1, ... 4, 5, 6 ... 10)
-    // Since max items is not huge likely, lets just show all or limit to 5
-    const total = this.totalPages;
-    const current = this.currentPage;
+  obtenerNumerosPagina(): number[] {
+    const total = this.totalPaginas;
+    const current = this.paginaActual;
 
     if (total <= 7) {
       return Array.from({ length: total }, (_, i) => i + 1);
     }
 
-    // Complex pagination logic (1, 2, ..., 5, 6, 7, ..., 10) - simplified for 5 visible
-    // Let's just standard simple sliding window
     let start = Math.max(1, current - 2);
     let end = Math.min(total, current + 2);
 
@@ -424,41 +354,34 @@ export class ExploreChampionshipsComponent implements OnInit {
     return pages;
   }
 
-  goBack(): void {
+  volverAtras(): void {
     this.backNav.backOr({
       fallbackUrl: '/dashboard',
       disallowPrevious: [/^\/campeonatos\/crear(\b|\/|$)/]
     });
   }
 
-  registerChampionship(id: number): void {
-    // Refresh user ID just in case
-    this.currentUserId = sessionStorage.getItem('idDocumento');
+  registrarCampeonato(id: number): void {
+    this.idUsuarioActual = sessionStorage.getItem('idDocumento');
 
-    // Verificar si el usuario está logueado (criterio centralizado)
     if (!this.auth.isLoggedIn()) {
-      this.pendingRegistrationId = id;
-      this.showLoginModal = true;
-      this.lockModal();
+      this.idRegistroPendiente = id;
+      this.mostrarModalLogin = true;
+      this.bloquearModal();
       return;
     }
 
-    if (!this.currentUserId) {
+    if (!this.idUsuarioActual) {
       console.warn('User logged in but no ID found in session.');
-      this.proceedRegistration(id);
+      this.procesarRegistro(id);
       return;
     }
 
-    // Check for existing inscriptions (checking 'invitado' flag)
     this.cargando = true;
-    console.log('Registering for ID:', id, 'Current User:', this.currentUserId);
 
-    this.api.getMisInscripciones(this.currentUserId).subscribe({
+    this.api.getMisInscripciones(this.idUsuarioActual).subscribe({
       next: (inscripciones: any[]) => {
-        console.log('Raw Inscriptions for user:', inscripciones);
-
         const record = inscripciones.find((item: any) => {
-          // Robust ID finding
           let campId = item.id_campeonato || item.idCampeonato || item.IdCampeonato ||
             item.campeonato_id || item.campeonatoId || item.id_torneo || item.ref_campeonato;
 
@@ -466,207 +389,184 @@ export class ExploreChampionshipsComponent implements OnInit {
             campId = item.campeonato.id || item.campeonato.idCampeonato;
           }
 
-          const isMatch = String(campId) === String(id);
-
-          if (isMatch) console.log('Match found in inscriptions:', item);
-
-          // We only care if they are already in the list for this championship
-          return isMatch;
+          return String(campId) === String(id);
         });
 
         if (record) {
-          console.log('Checking invited status:', record.invitado);
-
           if (record.invitado == 1) {
-            // If invited, block and alert. 
-            // We check if invited is explicitly 1.
             this.cargando = false;
             alert('Has sido invitado a este campeonato como competidor. Debes inscribirte mediante la invitación en tu sección de invitaciones.');
             return;
           }
         }
 
-        console.log('No blocking invitation found. Proceeding.');
-        this.proceedRegistration(id);
+        this.procesarRegistro(id);
       },
       error: (err) => {
         console.error('Error checking invitations', err);
-        this.proceedRegistration(id);
+        this.procesarRegistro(id);
       }
     });
   }
 
-  private proceedRegistration(id: number): void {
-    const selected = this.championships.find(c => c.id === id) || this.filteredChampionships.find(c => c.id === id) || null;
+  private procesarRegistro(id: number): void {
+    const selected = this.campeonatos.find(c => c.idCampeonato === id) || this.campeonatosFiltrados.find(c => c.idCampeonato === id) || null;
 
-    // Reset loading if it was set by registerChampionship check
-    // But we might want to keep it if we are navigating away? 
-    // Actually validation is fast, creating modal is synchronous.
     this.cargando = false;
 
     if (selected && !selected.esPublico) {
-      this.showAccessCodeModal = true;
-      this.accessCodeChampionshipId = id;
-      this.accessCode = '';
-      this.accessCodeError = null;
-      this.accessCodeSubmitting = false;
-      this.lockModal();
+      this.mostrarModalCodigo = true;
+      this.idCampeonatoCodigo = id;
+      this.codigoAcceso = '';
+      this.errorCodigoAcceso = null;
+      this.enviandoCodigoAcceso = false;
+      this.bloquearModal();
       return;
     }
 
-    // Navegar a la página de inscripción para campeonatos públicos
     this.router.navigate(['/campeonato/register', id]);
   }
 
-  closeAccessCodeModal(): void {
-    this.showAccessCodeModal = false;
-    this.accessCode = '';
-    this.accessCodeError = null;
-    this.accessCodeSubmitting = false;
-    this.accessCodeChampionshipId = null;
-    this.unlockModal();
+  cerrarModalCodigo(): void {
+    this.mostrarModalCodigo = false;
+    this.codigoAcceso = '';
+    this.errorCodigoAcceso = null;
+    this.enviandoCodigoAcceso = false;
+    this.idCampeonatoCodigo = null;
+    this.desbloquearModal();
   }
 
-  onAccessCodeChange(value: string): void {
-    // Sanitiza el valor para que solo queden números
+  alCambiarCodigo(value: string): void {
     let clean = value.replace(/[^0-9]/g, '');
     if (clean.length > 6) {
       clean = clean.substring(0, 6);
     }
-    this.accessCode = clean;
+    this.codigoAcceso = clean;
   }
 
-  onAccessCodePaste(event: ClipboardEvent): void {
+  alPegarCodigo(event: ClipboardEvent): void {
     event.preventDefault();
     const clipboardData = event.clipboardData || (window as any).clipboardData;
     const pastedText = clipboardData.getData('text');
     const cleanPaste = pastedText.replace(/[^0-9]/g, '').slice(0, 6);
-    this.accessCode = cleanPaste;
+    this.codigoAcceso = cleanPaste;
   }
 
-  onAccessCodeKeyDown(event: KeyboardEvent): void {
+  alPresionarTeclaCodigo(event: KeyboardEvent): void {
     const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Home', 'End'];
 
-    // Permitir combinaciones con Ctrl o Meta (Mac) para Copiar/Pegar/Cortar/Seleccionar
     if (event.ctrlKey || event.metaKey) {
       return;
     }
 
-    // Permitir teclas de navegación y control básicas
     if (allowedKeys.includes(event.key)) {
       return;
     }
 
-    // Bloquear si NO es un número (evita letras, puntos, comas, etc.)
     if (!/^[0-9]$/.test(event.key)) {
       event.preventDefault();
     }
   }
 
-  submitAccessCode(): void {
-    const id = this.accessCodeChampionshipId;
-    const code = (this.accessCode || '').trim();
+  enviarCodigo(): void {
+    const id = this.idCampeonatoCodigo;
+    const code = (this.codigoAcceso || '').trim();
 
     if (!id) {
-      this.accessCodeError = 'No encontramos el campeonato seleccionado.';
+      this.errorCodigoAcceso = 'No encontramos el campeonato seleccionado.';
       return;
     }
     if (!code) {
-      this.accessCodeError = 'El código es obligatorio.';
+      this.errorCodigoAcceso = 'El código es obligatorio.';
       return;
     }
 
-    this.accessCodeSubmitting = true;
-    this.accessCodeError = null;
+    this.enviandoCodigoAcceso = true;
+    this.errorCodigoAcceso = null;
 
     this.api.validarCodigoCampeonato(id, code).subscribe({
       next: () => {
-        this.accessCodeSubmitting = false;
-        this.closeAccessCodeModal();
+        this.enviandoCodigoAcceso = false;
+        this.cerrarModalCodigo();
         this.router.navigate(['/campeonato/register', id], { queryParams: { code: code } });
       },
       error: (err) => {
-        this.accessCodeSubmitting = false;
+        this.enviandoCodigoAcceso = false;
         const msg = err?.error?.message || err?.error?.mensaje;
-        this.accessCodeError = msg || 'Código inválido. Intenta de nuevo.';
+        this.errorCodigoAcceso = msg || 'Código inválido. Intenta de nuevo.';
       }
     });
   }
 
-  closeLoginModal(): void {
-    this.showLoginModal = false;
-    this.unlockModal();
+  cerrarModalLogin(): void {
+    this.mostrarModalLogin = false;
+    this.desbloquearModal();
   }
 
-  goToLogin(): void {
-    this.showLoginModal = false;
-    this.unlockModal();
+  irALogin(): void {
+    this.mostrarModalLogin = false;
+    this.desbloquearModal();
 
-    if (this.pendingRegistrationId) {
-      this.auth.redirectUrl = `/campeonatos?autoRegister=${this.pendingRegistrationId}`;
-      this.pendingRegistrationId = null;
+    if (this.idRegistroPendiente) {
+      this.auth.redirectUrl = `/campeonatos?autoRegister=${this.idRegistroPendiente}`;
+      this.idRegistroPendiente = null;
     }
 
     this.router.navigate(['/login']);
   }
 
-  viewDetails(id: number): void {
-    // Navegar a detalles
+  verDetalles(id: number): void {
     this.router.navigate(['/campeonato/details', id]);
   }
 
-  deleteChampionship(id: number): void {
-    this.deletingId = id;
-    this.showDeleteModal = true;
-    this.lockModal();
+  eliminarCampeonato(id: number): void {
+    this.idEliminando = id;
+    this.mostrarModalEliminar = true;
+    this.bloquearModal();
   }
 
-  closeDeleteModal(): void {
-    this.showDeleteModal = false;
-    this.deletingId = null;
-    this.isDeleting = false;
-    this.unlockModal();
+  cerrarModalEliminar(): void {
+    this.mostrarModalEliminar = false;
+    this.idEliminando = null;
+    this.estaEliminando = false;
+    this.desbloquearModal();
   }
 
-  confirmDelete(): void {
-    if (this.deletingId === null) return;
+  confirmarEliminacion(): void {
+    if (this.idEliminando === null) return;
 
-    this.isDeleting = true;
-    this.api.deleteCampeonato(this.deletingId).subscribe({
+    this.estaEliminando = true;
+    this.api.deleteCampeonato(this.idEliminando).subscribe({
       next: () => {
-        // Soft delete: just remove from list and update UI
-        this.championships = this.championships.filter(c => c.id !== this.deletingId);
-        this.applyFilters();
-        this.closeDeleteModal();
+        this.campeonatos = this.campeonatos.filter(c => c.idCampeonato !== this.idEliminando);
+        this.aplicarFiltros();
+        this.cerrarModalEliminar();
       },
       error: (err) => {
         console.error('Error deleting championship:', err);
-        this.isDeleting = false;
-        this.closeDeleteModal(); // Close anyway, maybe show alert
-
+        this.estaEliminando = false;
+        this.cerrarModalEliminar();
       }
     });
   }
 
-  getAvailableSlots(participantes: number, capacidad: number | null, cuposDisponibles: number | null): number | null {
+  obtenerCuposDisponibles(participantes: number, capacidad: number | null, cuposDisponibles: number | null | undefined): number | null {
     if (cuposDisponibles !== null && cuposDisponibles !== undefined) return cuposDisponibles;
     if (capacidad === null || capacidad === undefined) return null;
     return capacidad - participantes;
   }
 
-  getProgressPercentage(participantes: number, capacidad: number | null): number {
+  obtenerPorcentajeProgreso(participantes: number, capacidad: number | null): number {
     if (!capacidad || capacidad <= 0) return 0;
     return Math.min(100, Math.max(0, (participantes / capacidad) * 100));
   }
 
-  isOwner(championship: CampeonatoUiItem): boolean {
-    return this.currentUserId !== null && String(this.currentUserId) === String(championship.creadoPor);
+  esCreador(championship: CampeonatoUI): boolean {
+    return this.idUsuarioActual !== null && String(this.idUsuarioActual) === String(championship.creadoPor);
   }
 
-  canRegister(championship: CampeonatoUiItem): boolean {
-    // No puede inscribirse si es el dueño
-    if (this.isOwner(championship)) return false;
-    // Solo puede inscribirse si está en fase PLANIFICADO
+  puedeInscribirse(championship: CampeonatoUI): boolean {
+    if (this.esCreador(championship)) return false;
     return championship.estadoKey === 'PLANIFICADO' && !!championship.puedeInscribirse;
   }
 }

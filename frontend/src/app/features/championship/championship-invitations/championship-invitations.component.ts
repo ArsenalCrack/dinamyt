@@ -9,10 +9,10 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 
 interface Invitacion {
   id: number;
-  documento: string; // User's document
+  documento: string; // Documento del usuario
   nombre: string;
   email: string;
-  avatar?: string; // Optional: mock avatar
+  avatar?: string; // Opcional: avatar
   rol?: string; // Para jueces: Juez Central, Mesa, etc.
   estado: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO';
   tipo: 'COMPETIDOR' | 'JUEZ';
@@ -29,45 +29,45 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
   styleUrls: ['./championship-invitations.component.scss']
 })
 export class ChampionshipInvitationsComponent implements OnInit {
-  championshipId: string | null = null;
+  idCampeonato: string | null = null;
 
-  judgeRoleOptions = [
+  opcionesRolJuez = [
     { value: 'Juez Central', label: 'Juez Central' },
     { value: 'Juez de Mesa', label: 'Juez de Mesa' },
     { value: 'Juez', label: 'Juez' }
   ];
 
-  // States
-  activeSection: 'COMPETIDOR' | 'JUEZ' = 'COMPETIDOR';
-  activeTab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
-  searchQuery: string = '';
+  // Estados
+  seccionActiva: 'COMPETIDOR' | 'JUEZ' = 'COMPETIDOR';
+  pestanaActiva: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
+  busqueda: string = '';
 
-  // Data
-  invitations: Invitacion[] = [];
-  filteredInvitations: Invitacion[] = [];
-  paginatedInvitations: Invitacion[] = [];
+  // Datos
+  invitaciones: Invitacion[] = [];
+  invitacionesFiltradas: Invitacion[] = [];
+  invitacionesPaginadas: Invitacion[] = [];
 
-  // Pagination
-  currentPage: number = 1;
-  itemsPerPage: number = 6;
-  totalPages: number = 1;
+  // Paginación
+  paginaActual: number = 1;
+  itemsPorPagina: number = 6;
+  totalPaginas: number = 1;
 
-  // Invite Modal States
-  inviteModalOpen = false;
-  inviteSearchQuery = '';
-  availableUsers: any[] = []; // Mock users found
-  selectedUser: any | null = null;
-  selectedJudgeRole: string = 'Juez';
-  sendingInvitation = false;
-  loading = false;
+  // Estados del Modal de Invitación
+  modalInvitarAbierto = false;
+  busquedaInvitar = '';
+  usuariosDisponibles: any[] = []; // Usuarios encontrados
+  usuarioSeleccionado: any | null = null;
+  rolJuezSeleccionado: string = 'Juez';
+  enviandoInvitacion = false;
+  cargando = false;
 
-  // Modal States
-  cancelModalOpen = false;
-  cancelTargetId: number | null = null;
+  // Estados del Modal
+  modalCancelarAbierto = false;
+  idObjetivoCancelar: number | null = null;
 
-  toastVisible = false;
-  toastIsError = false;
-  toastMessage = '';
+  avisoVisible = false;
+  avisoEsError = false;
+  mensajeAviso = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -78,11 +78,11 @@ export class ChampionshipInvitationsComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.championshipId = this.route.snapshot.paramMap.get('id');
-    if (this.championshipId) {
-      this.loadInvitations();
+    this.idCampeonato = this.route.snapshot.paramMap.get('id');
+    if (this.idCampeonato) {
+      this.cargarInvitaciones();
     } else {
-      this.applyFilters();
+      this.aplicarFiltros();
     }
   }
 
@@ -95,18 +95,17 @@ export class ChampionshipInvitationsComponent implements OnInit {
     }
   }
 
-  loadInvitations(): void {
-    if (!this.championshipId) return;
-    this.loading = true;
+  cargarInvitaciones(): void {
+    if (!this.idCampeonato) return;
+    this.cargando = true;
     this.scrollLock.lock();
 
-    this.api.getInvitationsByChampionship(this.championshipId)
+    this.api.getInvitationsByChampionship(this.idCampeonato)
       .pipe(delay(1000))
       .subscribe({
         next: (data) => {
           if (data && Array.isArray(data)) {
-            console.log(data);
-            this.invitations = data.map((item: any) => ({
+            this.invitaciones = data.map((item: any) => ({
               id: item.id || item.idincripcion,
               documento: item.idDocumento || item.usuario || '0',
               nombre: item.nombreC || item.nombre || 'Usuario',
@@ -117,126 +116,124 @@ export class ChampionshipInvitationsComponent implements OnInit {
               tipo: item.tipoUsuario === 5 ? 'COMPETIDOR' : 'JUEZ',
               fechaEnvio: item.fechaInscripcion || item.fecha_inscripcion || item.fecha || item.fechaEnvio || item.fecha_envio || new Date().toISOString()
             }));
-            this.applyFilters();
+            this.aplicarFiltros();
           } else {
-            this.applyFilters();
+            this.aplicarFiltros();
           }
-          this.loading = false;
+          this.cargando = false;
           this.scrollLock.unlock();
         },
         error: (err) => {
           console.warn('API de invitaciones no disponible.', err);
-          this.applyFilters();
-          this.loading = false;
+          this.aplicarFiltros();
+          this.cargando = false;
           this.scrollLock.unlock();
         }
       });
   }
 
 
-  goBack(): void {
+  volverAtras(): void {
     this.location.back();
   }
 
-  setActiveSection(section: 'COMPETIDOR' | 'JUEZ'): void {
-    this.activeSection = section;
-    this.currentPage = 1; // Reset pagination when switching context
-    this.applyFilters();
+  seleccionarSeccion(seccion: 'COMPETIDOR' | 'JUEZ'): void {
+    this.seccionActiva = seccion;
+    this.paginaActual = 1; // Reiniciar paginación al cambiar de sección
+    this.aplicarFiltros();
   }
 
-  setActiveTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
-    this.activeTab = tab;
-    this.currentPage = 1;
-    this.applyFilters();
+  seleccionarPestana(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
+    this.pestanaActiva = tab;
+    this.paginaActual = 1;
+    this.aplicarFiltros();
   }
 
-  applyFilters(): void {
-    const q = this.searchQuery.toLowerCase().trim();
+  aplicarFiltros(): void {
+    const q = this.busqueda.toLowerCase().trim();
 
-    this.filteredInvitations = this.invitations.filter(item => {
-      // 1. Filter by Section (Type)
-      const typeMatch = item.tipo === this.activeSection;
+    this.invitacionesFiltradas = this.invitaciones.filter(item => {
+      // 1. Filtrar por Sección (Tipo)
+      const coincideTipo = item.tipo === this.seccionActiva;
 
-      // 2. Filter by Status (Tab)
-      const statusMatch = item.estado === this.activeTab;
+      // 2. Filtrar por Estado (Pestaña)
+      const coincideEstado = item.estado === this.pestanaActiva;
 
-      // 3. Filter by Search (Name or ID - simulated by checking ID string)
-      const searchMatch = !q ||
+      // 3. Filtrar por Búsqueda (Nombre, Email o Documento)
+      const coincideBusqueda = !q ||
         item.nombre.toLowerCase().includes(q) ||
         item.email.toLowerCase().includes(q) ||
         item.documento.includes(q);
 
-      return typeMatch && statusMatch && searchMatch;
+      return coincideTipo && coincideEstado && coincideBusqueda;
     });
 
-    this.updatePagination();
+    this.actualizarPaginacion();
   }
 
-  updatePagination(): void {
-    this.totalPages = Math.ceil(this.filteredInvitations.length / this.itemsPerPage) || 1;
-    if (this.currentPage > this.totalPages) this.currentPage = 1;
+  actualizarPaginacion(): void {
+    this.totalPaginas = Math.ceil(this.invitacionesFiltradas.length / this.itemsPorPagina) || 1;
+    if (this.paginaActual > this.totalPaginas) this.paginaActual = 1;
 
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
-    this.paginatedInvitations = this.filteredInvitations.slice(startIndex, endIndex);
-
-    // Removed automatic scrollToTop here as requested
+    const inicio = (this.paginaActual - 1) * this.itemsPorPagina;
+    const fin = inicio + this.itemsPorPagina;
+    this.invitacionesPaginadas = this.invitacionesFiltradas.slice(inicio, fin);
   }
 
-  nextPage(): void {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-      this.updatePagination();
-      this.scrollToTop(); // Keep scroll only for pagination
+  paginaSiguiente(): void {
+    if (this.paginaActual < this.totalPaginas) {
+      this.paginaActual++;
+      this.actualizarPaginacion();
+      this.irArriba();
     }
   }
 
-  prevPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-      this.updatePagination();
-      this.scrollToTop(); // Keep scroll only for pagination
+  paginaAnterior(): void {
+    if (this.paginaActual > 1) {
+      this.paginaActual--;
+      this.actualizarPaginacion();
+      this.irArriba();
     }
   }
 
-  scrollToTop(): void {
+  irArriba(): void {
     const el = document.getElementById('invitations-top-anchor');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Invite Modal Logic
-  openInviteModal(): void {
-    this.inviteModalOpen = true;
+  // Lógica del Modal de Invitar
+  abrirModalInvitar(): void {
+    this.modalInvitarAbierto = true;
     this.scrollLock.lock();
-    this.inviteSearchQuery = '';
-    this.availableUsers = [];
-    this.selectedUser = null;
-    this.selectedUser = null;
-    this.selectedJudgeRole = 'Juez';
+    this.busquedaInvitar = '';
+    this.usuariosDisponibles = [];
+    this.usuarioSeleccionado = null;
+    this.usuarioSeleccionado = null;
+    this.rolJuezSeleccionado = 'Juez';
   }
 
-  closeInviteModal(): void {
-    this.inviteModalOpen = false;
+  cerrarModalInvitar(): void {
+    this.modalInvitarAbierto = false;
     this.scrollLock.unlock();
   }
 
-  private getTipoInscripcion(): number {
-    if (this.activeSection === 'COMPETIDOR') {
+  private obtenerTipoInscripcion(): number {
+    if (this.seccionActiva === 'COMPETIDOR') {
       return 5;
     }
     // Para juez basta con enviar uno cualquiera (ej: 6)
     return 6;
   }
 
-  searchUsers(): void {
-    if (!this.inviteSearchQuery.trim()) {
-      this.availableUsers = [];
+  buscarUsuarios(): void {
+    if (!this.busquedaInvitar.trim()) {
+      this.usuariosDisponibles = [];
       return;
     }
-    const tipo = this.getTipoInscripcion();
-    this.api.searchUsers(this.inviteSearchQuery, sessionStorage.getItem('idDocumento') || '', this.championshipId || '', tipo).subscribe({
+    const tipo = this.obtenerTipoInscripcion();
+    this.api.searchUsers(this.busquedaInvitar, sessionStorage.getItem('idDocumento') || '', this.idCampeonato || '', tipo).subscribe({
       next: (users) => {
-        this.availableUsers = (users || [])
+        this.usuariosDisponibles = (users || [])
           .filter(u => (u.idDocumento || u.documento || u.id) != '0')
           .map(u => ({
             id: u.idDocumento || u.documento || u.id,
@@ -246,31 +243,31 @@ export class ChampionshipInvitationsComponent implements OnInit {
           }));
       },
       error: (err) => {
-        console.error('Error finding users:', err);
-        this.availableUsers = [];
+        console.error('Error buscando usuarios:', err);
+        this.usuariosDisponibles = [];
       }
     });
   }
 
-  selectUser(user: any): void {
-    this.selectedUser = user;
-    this.availableUsers = []; // Clear list to show selection state
+  seleccionarUsuario(usuario: any): void {
+    this.usuarioSeleccionado = usuario;
+    this.usuariosDisponibles = []; // Limpiar lista para mostrar estado de selección
   }
 
-  unselectUser(): void {
-    this.selectedUser = null;
-    this.searchUsers(); // Show results again
+  deseleccionarUsuario(): void {
+    this.usuarioSeleccionado = null;
+    this.buscarUsuarios(); // Mostrar resultados nuevamente
   }
 
-  sendInvitation(): void {
-    if (!this.selectedUser) return;
+  enviarInvitacion(): void {
+    if (!this.usuarioSeleccionado) return;
 
-    this.sendingInvitation = true;
+    this.enviandoInvitacion = true;
 
-    // Determine ID_tipo
-    let idTipo = 5; // Default Competidor
-    if (this.activeSection === 'JUEZ') {
-      switch (this.selectedJudgeRole) {
+    // Determinar ID_tipo
+    let idTipo = 5; // Por defecto Competidor
+    if (this.seccionActiva === 'JUEZ') {
+      switch (this.rolJuezSeleccionado) {
         case 'Juez Central': idTipo = 6; break;
         case 'Juez de Mesa': idTipo = 7; break;
         case 'Juez': idTipo = 8; break;
@@ -279,88 +276,88 @@ export class ChampionshipInvitationsComponent implements OnInit {
     }
 
     const payload = {
-      id_usuario: this.selectedUser.id,
-      id_campeonato: this.championshipId || '',
+      id_usuario: this.usuarioSeleccionado.id,
+      id_campeonato: this.idCampeonato || '',
       id_tipo: idTipo
     };
 
     this.api.enviarInvitacion(payload).subscribe({
       next: (res) => {
-        const newInvitation: Invitacion = {
-          id: res.id || Math.floor(Math.random() * 10000), // Use ID from response if available
-          documento: this.selectedUser.id,
-          nombre: this.selectedUser.nombre,
-          email: this.selectedUser.email,
-          avatar: this.selectedUser.avatar,
-          tipo: this.activeSection,
+        const nuevaInvitacion: Invitacion = {
+          id: res.id || Math.floor(Math.random() * 10000), // Usar ID de la respuesta si está disponible
+          documento: this.usuarioSeleccionado.id,
+          nombre: this.usuarioSeleccionado.nombre,
+          email: this.usuarioSeleccionado.email,
+          avatar: this.usuarioSeleccionado.avatar,
+          tipo: this.seccionActiva,
           estado: 'PENDIENTE',
           fechaEnvio: new Date().toISOString().split('T')[0],
-          rol: this.activeSection === 'JUEZ' ? this.selectedJudgeRole : undefined
+          rol: this.seccionActiva === 'JUEZ' ? this.rolJuezSeleccionado : undefined
         };
 
-        this.invitations.unshift(newInvitation); // Add to top
-        this.sendingInvitation = false;
-        this.closeInviteModal();
-        this.showToast(`Invitación enviada a ${newInvitation.nombre}`);
+        this.invitaciones.unshift(nuevaInvitacion); // Agregar al inicio
+        this.enviandoInvitacion = false;
+        this.cerrarModalInvitar();
+        this.mostrarAviso(`Invitación enviada a ${nuevaInvitacion.nombre}`);
 
-        // Switch to "Pending" tab so user sees it
-        this.setActiveTab('PENDIENTE');
-        this.applyFilters();
+        // Cambiar a pestaña "Pendientes" para que el usuario la vea
+        this.seleccionarPestana('PENDIENTE');
+        this.aplicarFiltros();
       },
       error: (err) => {
         console.error('Error enviando invitación', err);
-        this.sendingInvitation = false;
-        // Don't close modal on error so user can retry
-        this.showToast(err.error?.message || 'No se ha enviado con exito', true);
+        this.enviandoInvitacion = false;
+        // No cerrar modal en caso de error para que el usuario pueda reintentar
+        this.mostrarAviso(err.error?.message || 'No se ha enviado con exito', true);
       }
     });
   }
 
-  // Cancel / Delete Invitation Logic
-  confirmCancel(id: number): void {
-    this.cancelTargetId = id;
-    this.cancelModalOpen = true;
+  // Lógica de Cancelar / Eliminar Invitación
+  confirmarCancelacion(id: number): void {
+    this.idObjetivoCancelar = id;
+    this.modalCancelarAbierto = true;
     this.scrollLock.lock();
   }
 
-  closeCancelModal(): void {
-    this.cancelModalOpen = false;
-    this.cancelTargetId = null;
+  cerrarModalCancelar(): void {
+    this.modalCancelarAbierto = false;
+    this.idObjetivoCancelar = null;
     this.scrollLock.unlock();
   }
 
-  finalizeCancel(): void {
-    if (this.cancelTargetId) {
-      this.api.deleteInvitation(this.cancelTargetId).subscribe({
+  finalizarCancelacion(): void {
+    if (this.idObjetivoCancelar) {
+      this.api.deleteInvitation(this.idObjetivoCancelar).subscribe({
         next: () => {
-          // Remove from list
-          this.invitations = this.invitations.filter(i => i.id !== this.cancelTargetId);
+          // Remover de la lista
+          this.invitaciones = this.invitaciones.filter(i => i.id !== this.idObjetivoCancelar);
 
-          const msg = this.activeTab === 'PENDIENTE'
+          const msg = this.pestanaActiva === 'PENDIENTE'
             ? 'Invitación cancelada correctamente.'
             : 'Usuario eliminado de la lista de invitaciones.';
 
-          this.showToast(msg);
-          this.applyFilters();
-          this.closeCancelModal();
+          this.mostrarAviso(msg);
+          this.aplicarFiltros();
+          this.cerrarModalCancelar();
         },
         error: (err) => {
-          console.error('Error deleting invitation', err);
-          this.showToast('Error al cancelar la invitación: ' + (err.error?.message || 'Error desconocido'), true);
-          this.closeCancelModal();
+          console.error('Error eliminando invitación', err);
+          this.mostrarAviso('Error al cancelar la invitación: ' + (err.error?.message || 'Error desconocido'), true);
+          this.cerrarModalCancelar();
         }
       });
     } else {
-      this.closeCancelModal();
+      this.cerrarModalCancelar();
     }
   }
 
-  showToast(msg: string, isError: boolean = false): void {
-    this.toastMessage = msg;
-    this.toastIsError = isError;
-    this.toastVisible = true;
+  mostrarAviso(msg: string, esError: boolean = false): void {
+    this.mensajeAviso = msg;
+    this.avisoEsError = esError;
+    this.avisoVisible = true;
     setTimeout(() => {
-      this.toastVisible = false;
+      this.avisoVisible = false;
     }, 3000);
   }
 }

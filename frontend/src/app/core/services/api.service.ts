@@ -21,11 +21,11 @@ export class ApiService {
   ) { }
 
   getSaludo(): Observable<any> {
-    // Keep internal general wrapper or move to GeneralService if desired
+    // Mantener wrapper general interno
     return this.http.get(`${this.apiUrl}/saludo`);
   }
 
-  // --- Auth Delegates ---
+  // --- Delegados de Autenticación ---
   login(credentials: { correo: string; contrasena: string }) { return this.auth.login(credentials); }
   registrarUsuario(usuario: any) { return this.auth.registrarUsuario(usuario); }
   solicitarRecuperacion(correo: string) { return this.auth.solicitarRecuperacion(correo); }
@@ -33,14 +33,14 @@ export class ApiService {
   reenviarCodigo(correo: string) { return this.auth.reenviarCodigo(correo); }
   cambiarPassword(data: any) { return this.auth.cambiarPassword(data); }
 
-  // --- User Delegates ---
+  // --- Delegados de Usuario ---
   getCurrentUser(user: any) { return this.user.getCurrentUser(user); }
   setTempEmail(email: string) { this.user.setTempEmail(email); }
   updateProfile(data: any) { return this.user.updateProfile(data); }
   uploadProfilePhoto(file: File) { return this.user.uploadProfilePhoto(file); }
   searchUsers(query: string, excluirId: string, idCampeonato: string, tipo: number) { return this.user.searchUsers(query, excluirId, idCampeonato, tipo); }
 
-  // --- Academy Delegates ---
+  // --- Delegados de Academia ---
   cargaracademias() { return this.academy.cargaracademias(); }
   createAcademy(data: any) { return this.academy.createAcademy(data); }
   cargarinstructor(academia: number, idInstructor: string) { return this.academy.cargarinstructor(academia, idInstructor); }
@@ -54,7 +54,7 @@ export class ApiService {
   eliminarMiembro(idAcademia: string, idUsuario: string) { return this.academy.eliminarMiembro(idAcademia, idUsuario); }
   updateAcademia(idAcademia: string, payload: any) { return this.academy.updateAcademia(idAcademia, payload); }
 
-  // --- Championship Delegates ---
+  // --- Delegados de Campeonato ---
   getCinturones() { return this.championship.getCinturones(); }
   crearCampeonato(payload: any) { return this.championship.crearCampeonato(payload); }
   getCampeonatos() { return this.championship.getCampeonatos(); }
@@ -81,7 +81,7 @@ export class ApiService {
   updateSectionStatus(championshipId: string | number, sectionId: string, status: string, tatamiId?: number) { return this.championship.updateSectionStatus(championshipId, sectionId, status, tatamiId); }
   updateMatchScore(championshipId: string | number, matchId: string, scores: any) { return this.championship.updateMatchScore(championshipId, matchId, scores); }
 
-  // --- Specific Live Flow ---
+  // --- Flujo en vivo específico ---
   startSection(championshipId: string | number, sectionId: string) { return this.championship.startSection(championshipId, sectionId); }
   finishSection(championshipId: string | number, sectionId: string) { return this.championship.finishSection(championshipId, sectionId); }
   assignSectionToTatami(championshipId: string | number, sectionId: string, tatamiId: number) { return this.championship.assignSectionToTatami(championshipId, sectionId, tatamiId); }

@@ -14,7 +14,7 @@ export class BackNavigationService {
   constructor(
     private router: Router,
     private history: NavigationHistoryService
-  ) {}
+  ) { }
 
   async backOr(options: BackNavigationOptions): Promise<void> {
     const current = this.history.getCurrentUrl() || '';
@@ -24,7 +24,7 @@ export class BackNavigationService {
     const isDisallowed = (url: string) =>
       disallow.some((rule) => (typeof rule === 'string' ? url === rule : rule.test(url)));
 
-    // Si no hay historial útil dentro de la app, o el anterior es "mala idea", usar fallback.
+    // Si no hay historial útil dentro de la app, o el anterior no es adecuado, usar fallback.
     const canGoPrevious = !!previous && previous !== current && !isDisallowed(previous);
     const target = canGoPrevious ? previous : options.fallbackUrl;
 

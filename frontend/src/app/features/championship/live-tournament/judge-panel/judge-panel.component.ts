@@ -14,21 +14,21 @@ import { interval, Subscription } from 'rxjs';
     styleUrls: ['./judge-panel.component.scss']
 })
 export class JudgePanelComponent implements OnInit, OnDestroy {
-    championshipId: string | null = null;
-    loading = true;
-    errorMessage: string | null = null;
+    idCampeonato: string | null = null;
+    cargando = true;
+    mensajeError: string | null = null;
 
-    // Status
-    assignedTatami: any = null;
-    currentSection: any = null;
-    role: string = 'Juez'; // Can be 'Central', 'Mesa', 'Esquina'
+    // Estado
+    tatamiAsignado: any = null;
+    seccionActual: any = null;
+    rol: string = 'Juez'; // Puede ser 'Central', 'Mesa', 'Esquina'
 
-    // Scoring / Combat
-    competitorRed: any = null;
-    competitorBlue: any = null;
-    scores: { red: number, blue: number } = { red: 0, blue: 0 };
+    // Puntuación / Combate
+    competidorRojo: any = null;
+    competidorAzul: any = null;
+    puntuaciones: { rojo: number, azul: number } = { rojo: 0, azul: 0 };
 
-    pollingSubscription: Subscription | null = null;
+    suscripcionPolling: Subscription | null = null;
 
     constructor(
         private route: ActivatedRoute,
@@ -37,71 +37,67 @@ export class JudgePanelComponent implements OnInit, OnDestroy {
     ) { }
 
     ngOnInit(): void {
-        this.championshipId = this.route.snapshot.paramMap.get('id');
-        if (!this.championshipId) {
-            this.errorMessage = 'Campeonato no válido';
-            this.loading = false;
+        this.idCampeonato = this.route.snapshot.paramMap.get('id');
+        if (!this.idCampeonato) {
+            this.mensajeError = 'Campeonato no válido';
+            this.cargando = false;
             return;
         }
 
-        this.checkAssignment();
+        this.verificarAsignacion();
 
-        // Poll for updates every 5 seconds (to check for new matches/sections)
-        this.pollingSubscription = interval(5000).subscribe(() => {
-            this.refreshStatus();
+        // Consultar actualizaciones cada 5 segundos
+        this.suscripcionPolling = interval(5000).subscribe(() => {
+            this.actualizarEstado();
         });
     }
 
     ngOnDestroy(): void {
-        if (this.pollingSubscription) {
-            this.pollingSubscription.unsubscribe();
+        if (this.suscripcionPolling) {
+            this.suscripcionPolling.unsubscribe();
         }
     }
 
-    checkAssignment() {
-        this.loading = true;
-        // Mock API call - in real scenario, call backend to get judge status
-        // this.api.getJudgeAssignment(this.championshipId).subscribe(...)
+    verificarAsignacion() {
+        this.cargando = true;
+        // TODO: Llamar al backend para obtener el estado del juez
+        // this.api.getJudgeAssignment(this.idCampeonato).subscribe(...)
 
-        // Simulate API delay
+        // Simulación de datos
         setTimeout(() => {
-            // Mock data
-            this.loading = false;
-            // Logic to simulate assignment. In real app, response will tell us where we are.
-            this.assignedTatami = { id: 1, name: 'Tatami 1' };
-            this.role = 'Juez Central';
+            this.cargando = false;
+            this.tatamiAsignado = { id: 1, nombre: 'Tatami 1' };
+            this.rol = 'Juez Central';
 
-            this.currentSection = {
+            this.seccionActual = {
                 id: 'sec-123',
-                name: 'Kumite Masculino -75kg',
-                category: 'Cinturón Negro',
-                status: 'RUNNING'
+                nombre: 'Kumite Masculino -75kg',
+                categoria: 'Cinturón Negro',
+                estado: 'RUNNING'
             };
 
-            this.competitorRed = { name: 'Juan Pérez', academy: 'Dojo Cobra' };
-            this.competitorBlue = { name: 'Carlos Díaz', academy: 'Eagle M.A.' };
+            this.competidorRojo = { nombre: 'Juan Pérez', academia: 'Dojo Cobra' };
+            this.competidorAzul = { nombre: 'Carlos Díaz', academia: 'Eagle M.A.' };
         }, 1000);
     }
 
-    refreshStatus() {
-        // Background refresh
-        console.log('Refreshing judge status...');
-        // logic to update current match score or status
+    actualizarEstado() {
+        // Actualización en segundo plano
     }
 
-    addPoint(color: 'red' | 'blue', points: number) {
-        if (color === 'red') this.scores.red += points;
-        else this.scores.blue += points;
+    agregarPunto(color: 'rojo' | 'azul', puntos: number) {
+        if (color === 'rojo') this.puntuaciones.rojo += puntos;
+        else this.puntuaciones.azul += puntos;
 
-        if (this.currentSection && this.championshipId) {
-            this.api.updateMatchScore(this.championshipId, 'current-match', this.scores).subscribe({
-                next: () => console.log('Score updated'),
-                error: (e) => console.error('Error updating score', e)
+        if (this.seccionActual && this.idCampeonato) {
+            this.api.updateMatchScore(this.idCampeonato, 'current-match', this.puntuaciones).subscribe({
+                next: () => { },
+                error: () => { }
             });
         }
     }
 
-    goBack() {
+    volverAtras() {
         this.router.navigate(['/mis-inscripciones']);
     }
 }

@@ -1,13 +1,13 @@
 <div class="inscriptions-container">
-    <app-loading-spinner *ngIf="loading" [message]="'Cargando inscripciones...'" [fixed]="true"></app-loading-spinner>
-    <div class="toast-notification" *ngIf="toastVisible">
+    <app-loading-spinner *ngIf="cargando" [message]="'Cargando inscripciones...'" [fixed]="true"></app-loading-spinner>
+    <div class="toast-notification" *ngIf="avisoVisible">
         <i class="fas fa-check-circle"></i>
-        <span>{{ toastMessage }}</span>
+        <span>{{ mensajeAviso }}</span>
     </div>
 
     <div class="page-card">
         <header class="header">
-            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás">
+            <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás">
                 <i class="fas fa-arrow-left"></i>
             </button>
             <div class="header-content">
@@ -18,37 +18,41 @@
 
         <div class="search-section" id="inscriptions-search-anchor">
             <i class="fas fa-search"></i>
-            <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+            <input type="text" [(ngModel)]="busqueda" (input)="aplicarFiltros()"
                 placeholder="Buscar por nombre o documento...">
         </div>
 
         <!-- Tabs Navigation -->
         <nav class="tabs-nav">
-            <button class="tab-btn" [class.active]="activeTab === 'PENDIENTE'" (click)="setActiveTab('PENDIENTE')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'PENDIENTE'"
+                (click)="seleccionarPestana('PENDIENTE')">
                 <i class="fas fa-clock"></i>
                 <span>Pendientes</span>
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'ACEPTADO'" (click)="setActiveTab('ACEPTADO')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'ACEPTADO'"
+                (click)="seleccionarPestana('ACEPTADO')">
                 <i class="fas fa-check-circle"></i>
                 <span>Aceptados</span>
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'RECHAZADO'" (click)="setActiveTab('RECHAZADO')">
+            <button class="tab-btn" [class.active]="pestanaActiva === 'RECHAZADO'"
+                (click)="seleccionarPestana('RECHAZADO')">
                 <i class="fas fa-times-circle"></i>
                 <span>Rechazados</span>
             </button>
         </nav>
 
         <div class="inscriptions-list">
-            <div class="inscription-card" *ngFor="let item of paginatedInscriptions" [class.expanded]="item.expanded"
-                [class.rejected]="item.estado === 'RECHAZADO'">
-                <div class="card-summary" (click)="toggleDetails(item.id)">
+            <div class="inscription-card" *ngFor="let item of inscripcionesPaginadas" [class.expanded]="item.expandido"
+                [class.rejected]="item.estadoTexto === 'RECHAZADO'">
+                <div class="card-summary" (click)="alternarDetalles(item.idincripcion)">
                     <div class="user-avatar">
                         <i class="fas fa-user"></i>
                     </div>
                     <div class="user-main-info">
-                        <h3>{{ item.nombre }}</h3>
+                        <h3>{{ item.nombreC }}</h3>
                         <div class="meta-row">
-                            <span class="badge-belt">{{ item.cinturon }}</span>
+                            <span class="badge-belt">{{ item.cinturonRango }}</span>
+                            <!-- Logic for weight display -->
                             <span class="meta-text"
                                 *ngIf="(item.peso !== 'SIN_PESO' && item.peso !== 'N/A') && item.edad !== null">{{
                                 item.peso
@@ -63,22 +67,23 @@
                                 }}</span>
                             <span class="meta-text"
                                 style="margin-left:8px; border-left: 1px solid #ddd; padding-left: 8px;">
-                                <i class="far fa-calendar-alt"></i> Enviada: {{ item.fecha | date: "EEEE, d 'de' MMMM
+                                <i class="far fa-calendar-alt"></i> Enviada: {{ item.fechaInscripcion | date: "EEEE, d
+                                'de' MMMM
                                 'hora: '
                                 h:mm a" | titlecase }}
                             </span>
                         </div>
                     </div>
                     <div class="expand-icon">
-                        <i class="fas" [ngClass]="item.expanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        <i class="fas" [ngClass]="item.expandido ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
                     </div>
                 </div>
 
-                <div class="card-details" *ngIf="item.expanded">
+                <div class="card-details" *ngIf="item.expandido">
                     <div class="details-grid">
                         <div class="detail-item">
                             <label>Documento ID</label>
-                            <span>{{ item.documentoId }}</span>
+                            <span>{{ item.idDocumento }}</span>
                         </div>
                         <div class="detail-item">
                             <label>Sexo</label>
@@ -99,8 +104,8 @@
                         <div class="detail-item full-width">
                             <label>Modalidades Inscritas</label>
                             <div class="modalities-list">
-                                <span class="modality-tag" *ngFor="let mod of item.modalidades">
-                                    {{ cleanModality(mod) }}
+                                <span class="modality-tag" *ngFor="let mod of item.secciones">
+                                    {{ limpiarModalidad(mod) }}
                                 </span>
                             </div>
                         </div>
@@ -110,7 +115,7 @@
                         </div>
                         <div class="detail-item">
                             <label>Teléfono</label>
-                            <span>{{ item.telefono }}</span>
+                            <span>{{ item.numeroCelular }}</span>
                         </div>
                         <div class="detail-item full-width">
                             <label>Correo Electrónico</label>
@@ -118,43 +123,43 @@
                         </div>
                     </div>
 
-                    <div class="actions-row" *ngIf="item.estado === 'PENDIENTE'">
-                        <button class="btn-reject" (click)="confirmReject(item.id)">
+                    <div class="actions-row" *ngIf="item.estadoTexto === 'PENDIENTE'">
+                        <button class="btn-reject" (click)="confirmarRechazo(item.idincripcion)">
                             <i class="fas fa-times"></i> Rechazar
                         </button>
-                        <button class="btn-accept" (click)="acceptInscription(item)">
+                        <button class="btn-accept" (click)="aceptarInscripcion(item)">
                             <i class="fas fa-check"></i> Aceptar
                         </button>
                     </div>
 
                     <!-- Action for Accepted: Delete -->
-                    <div class="actions-row" *ngIf="item.estado === 'ACEPTADO'">
-                        <button class="btn-delete" (click)="confirmDelete(item.id)">
+                    <div class="actions-row" *ngIf="item.estadoTexto === 'ACEPTADO'">
+                        <button class="btn-delete" (click)="confirmarEliminacion(item.idincripcion)">
                             <i class="fas fa-trash"></i> Eliminar Competidor
                         </button>
                     </div>
 
-                    <div class="status-message" *ngIf="item.estado === 'ACEPTADO' && false">
+                    <div class="status-message" *ngIf="item.estadoTexto === 'ACEPTADO' && false">
                         <i class="fas fa-check-circle"></i> Competidor Aceptado
                     </div>
-                    <div class="status-message rejected" *ngIf="item.estado === 'RECHAZADO'">
+                    <div class="status-message rejected" *ngIf="item.estadoTexto === 'RECHAZADO'">
                         <i class="fas fa-times-circle"></i> Inscripción Rechazada
                     </div>
                 </div>
             </div>
 
-            <div class="empty-state" *ngIf="filteredInscriptions.length === 0">
+            <div class="empty-state" *ngIf="inscripcionesFiltradas.length === 0">
                 <i class="fas fa-clipboard-list"></i>
                 <p>No hay inscripciones en esta sección.</p>
             </div>
 
             <!-- Pagination Controls -->
-            <div class="pagination-controls" *ngIf="totalPages > 1">
-                <button class="btn-page nav" (click)="prevPage()" [disabled]="currentPage === 1">
+            <div class="pagination-controls" *ngIf="totalPaginas > 1">
+                <button class="btn-page nav" (click)="paginaAnterior()" [disabled]="paginaActual === 1">
                     <i class="fas fa-chevron-left"></i>
                 </button>
-                <span class="page-count">{{ currentPage }} / {{ totalPages }}</span>
-                <button class="btn-page nav" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                <span class="page-count">{{ paginaActual }} / {{ totalPaginas }}</span>
+                <button class="btn-page nav" (click)="paginaSiguiente()" [disabled]="paginaActual === totalPaginas">
                     <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
@@ -163,7 +168,7 @@
 </div>
 
 <!-- Modal de Rechazo -->
-<div class="modal-overlay" *ngIf="rejectModalOpen">
+<div class="modal-overlay" *ngIf="modalRechazoAbierto">
     <div class="modal-box">
         <div class="modal-header">
             <i class="fas fa-exclamation-triangle warning-icon"></i>
@@ -173,8 +178,8 @@
             Estás a punto de rechazar a este competidor. Esta acción no se puede deshacer.
         </p>
         <div class="modal-actions">
-            <button class="btn-cancel" (click)="closeRejectModal()">Cancelar</button>
-            <button class="btn-confirm-reject" (click)="finalizeReject()">
+            <button class="btn-cancel" (click)="cerrarModalRechazo()">Cancelar</button>
+            <button class="btn-confirm-reject" (click)="finalizarRechazo()">
                 Sí, Rechazar
             </button>
         </div>
@@ -182,7 +187,7 @@
 </div>
 
 <!-- Modal de Eliminación (Accepted) -->
-<div class="modal-overlay" *ngIf="deleteModalOpen">
+<div class="modal-overlay" *ngIf="modalEliminarAbierto">
     <div class="modal-box">
         <div class="modal-header">
             <i class="fas fa-trash-alt warning-icon" style="color: #c0392b;"></i>
@@ -192,8 +197,8 @@
             El competidor será eliminado de la lista de aceptados. Esta acción es irreversible.
         </p>
         <div class="modal-actions">
-            <button class="btn-cancel" (click)="closeDeleteModal()">Cancelar</button>
-            <button class="btn-confirm-delete" (click)="finalizeDelete()">
+            <button class="btn-cancel" (click)="cerrarModalEliminar()">Cancelar</button>
+            <button class="btn-confirm-delete" (click)="finalizarEliminacion()">
                 Sí, Eliminar
             </button>
         </div>

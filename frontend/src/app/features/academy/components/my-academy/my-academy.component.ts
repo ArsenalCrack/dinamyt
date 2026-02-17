@@ -20,23 +20,23 @@ import { ScrollLockService } from '../../../../core/services/scroll-lock.service
     styleUrls: ['./my-academy.component.scss']
 })
 export class MyAcademyComponent implements OnInit {
-    loading = true;
-    user: any = null;
-    userType: number = 0;
+    cargando = true;
+    usuario: any = null;
+    tipoUsuario: number = 0;
 
-    // States
-    showCreateBtn = false;
-    showJoinForm = false;
-    showCreateForm = false;
+    // Estados
+    mostrarBotonCrear = false;
+    mostrarFormularioUnirse = false;
+    mostrarFormularioCrear = false;
 
-    // Join Form Data
-    academyOptions: any[] = [];
-    instructorOptions: any[] = [];
-    selectedAcademyId: string | null = null;
-    selectedInstructorId: string | null = null;
+    // Datos del Formulario de Unirse
+    opcionesAcademia: any[] = [];
+    opcionesInstructor: any[] = [];
+    idAcademiaSeleccionada: string | null = null;
+    idInstructorSeleccionado: string | null = null;
 
-    // Create Form Data
-    newAcademy = {
+    // Datos del Formulario de Crear
+    nuevaAcademia = {
         nombre: '',
         direccion: '',
         numeroContacto: '',
@@ -49,9 +49,9 @@ export class MyAcademyComponent implements OnInit {
     ciudadesList: string[] = [];
     ciudadMaxLength = 50;
 
-    submitting = false;
-    message: string | null = null;
-    success = false;
+    enviando = false;
+    mensaje: string | null = null;
+    exito = false;
 
     constructor(
         private api: ApiService,
@@ -61,20 +61,20 @@ export class MyAcademyComponent implements OnInit {
     ) { }
 
     ngOnInit(): void {
-        this.loadUser();
-        this.initLocationData();
+        this.cargarUsuario();
+        this.inicializarDatosUbicacion();
     }
 
-    private initLocationData() {
+    private inicializarDatosUbicacion() {
         this.paisesList = this.locationService.getAllCountries().map(c => c.name).sort();
     }
 
     onCountryChange() {
         this.ciudadesList = [];
-        this.newAcademy.ciudad = '';
-        if (!this.newAcademy.pais) return;
+        this.nuevaAcademia.ciudad = '';
+        if (!this.nuevaAcademia.pais) return;
 
-        const country = this.locationService.getCountryByName(this.newAcademy.pais);
+        const country = this.locationService.getCountryByName(this.nuevaAcademia.pais);
         if (country) {
             this.ciudadesList = this.locationService.getCitiesByCountryCode(country.isoCode)
                 .map(c => c.name)
@@ -88,169 +88,149 @@ export class MyAcademyComponent implements OnInit {
         }
     }
 
-    loadUser() {
-        this.loading = true;
+    cargarUsuario() {
+        this.cargando = true;
         this.scrollLock.lock();
 
-        // 1. Try to load from LocalStorage first (Source of Truth for Navbar)
+        // 1. Intentar cargar desde localStorage primero
         const storedUser = localStorage.getItem('usuario');
         if (storedUser) {
             try {
                 const parsed = JSON.parse(storedUser);
-                this.user = parsed.usuario || parsed;
-                const roles = extractUserRoles(this.user);
-                this.setUserTypeFromRoles(roles);
-                console.log('User loaded from LocalStorage:', this.user, 'Type:', this.userType);
+                this.usuario = parsed.usuario || parsed;
+                const roles = extractUserRoles(this.usuario);
+                this.establecerTipoDesdeRoles(roles);
 
-                // If we found a valid type, we can stop loading or continue to API for updates
-                if (this.userType !== 0) {
-                    this.checkAcademyStatus(this.user);
-                    this.loading = false;
+                if (this.tipoUsuario !== 0) {
+                    this.verificarEstadoAcademia(this.usuario);
+                    this.cargando = false;
                     this.scrollLock.unlock();
                 }
-            } catch (e) { console.error('Error parsing stored user', e); }
+            } catch (e) { }
         }
 
         const idDoc = sessionStorage.getItem('ID_documento') || sessionStorage.getItem('idDocumento');
-        const tipoUsuario = sessionStorage.getItem('tipo_usuario');
+        const tipoUsuarioSesion = sessionStorage.getItem('tipo_usuario');
 
-        this.api.getCurrentUser({ ID_documento: idDoc, tipo_usuario: tipoUsuario })
+        this.api.getCurrentUser({ ID_documento: idDoc, tipo_usuario: tipoUsuarioSesion })
             .pipe(delay(1000))
             .subscribe({
                 next: (u: any) => {
-                    // If API returns a valid object with ID (not just empty echo), update
-                    // But if API is just echoing inputs and missing fields, ignore it or merge carefully
-                    // The echo problem: u might be { ID_documento: "...", tipo_usuario: "..." } but missing 'academia', 'instructor' fields
+                    const esEco = !('academia' in u) && !('instructor' in u);
 
-                    // Simple heuristic: if u has 'academia' (even if null) it's likely a real DB object. 
-                    // If u only has what we sent, it's an echo.
-                    // Check if API returned a valid object vs an echo
-                    // Echo often lacks 'academia' or 'instructor' whole objects, BUT might contain 'tipo_usuario'
-                    const isEcho = !('academia' in u) && !('instructor' in u);
-
-                    if (!isEcho) {
-                        this.user = u;
+                    if (!esEco) {
+                        this.usuario = u;
                         const roles = extractUserRoles(u);
-                        this.setUserTypeFromRoles(roles);
-                        this.checkAcademyStatus(u);
+                        this.establecerTipoDesdeRoles(roles);
+                        this.verificarEstadoAcademia(u);
                     } else {
-                        console.warn('API returned potential echo. Response:', u);
-                        // Even if it is an echo, it might hold the correct 'tipo_usuario' we just sent.
-                        // If local storage is stale (Type 1) but this response clearly says Type 4, trust this response for the TYPE at least.
 
                         const roles = extractUserRoles(u);
                         if (roles.length > 0) {
-                            this.setUserTypeFromRoles(roles); // FORCE update type from API response
+                            this.establecerTipoDesdeRoles(roles);
                         }
 
-                        if (!this.user) {
-                            this.user = u; // Use this as fallback user object if nothing local
-                            this.checkAcademyStatus(u);
+                        if (!this.usuario) {
+                            this.usuario = u;
+                            this.verificarEstadoAcademia(u);
                         } else {
-                            // We have local user, re-check status with POTENTIALLY UPDATED type
-                            this.checkAcademyStatus(this.user);
+                            this.verificarEstadoAcademia(this.usuario);
                         }
                     }
-                    if (this.loading) {
-                        this.loading = false;
+                    if (this.cargando) {
+                        this.cargando = false;
                         this.scrollLock.unlock();
                     }
                 },
                 error: (err) => {
-                    console.error(err);
-                    if (!this.user) this.message = "Error cargando perfil.";
-                    if (this.loading) {
-                        this.loading = false;
+                    if (!this.usuario) this.mensaje = "Error cargando perfil.";
+                    if (this.cargando) {
+                        this.cargando = false;
                         this.scrollLock.unlock();
                     }
                 }
             });
     }
 
-    setUserTypeFromRoles(roles: string[]) {
-        let type = 1;
-        if (roles.includes('dueño')) type = 4;
-        else if (roles.includes('administrador') || roles.includes('admin_proyecto')) type = 3;
-        else if (roles.includes('instructor')) type = 2;
-        else type = 1;
+    establecerTipoDesdeRoles(roles: string[]) {
+        let tipo = 1;
+        if (roles.includes('dueño')) tipo = 4;
+        else if (roles.includes('administrador') || roles.includes('admin_proyecto')) tipo = 3;
+        else if (roles.includes('instructor')) tipo = 2;
+        else tipo = 1;
 
-        // Force override from session if present and valid
+        // Forzar tipo desde sesión si está presente y es válido
         try {
             const sessType = sessionStorage.getItem('tipo_usuario');
             if (sessType) {
                 const sessTypeId = Number(sessType);
-                // Trust session more if it is 'higher' or more specific than default 1
                 if (!isNaN(sessTypeId) && sessTypeId > 1) {
-                    type = sessTypeId;
+                    tipo = sessTypeId;
                 }
             }
         } catch (e) { }
 
-        // CRITICAL: Prevent downgrading of ANY established role (Owner, Admin, Instructor) to 'Usuario' (1)
-        // This protects against incomplete API "echo" responses that miss role arrays.
-        // If we previously knew they were type X (> 1), and now we calculate 1, keep X.
-        if (this.userType > 1 && type === 1) {
-            console.log(`Preserving UserType ${this.userType} despite missing roles in current update (calculated ${type})`);
-            type = this.userType;
+        // CRÍTICO: Prevenir degradación de roles establecidos
+        if (this.tipoUsuario > 1 && tipo === 1) {
+            tipo = this.tipoUsuario;
         }
 
-        this.userType = type;
+        this.tipoUsuario = tipo;
     }
 
-    checkAcademyStatus(u: any) {
-        const isInvalid = (val: any) => !val || val === '0' || val === 0 || val === 'null';
-        const hasAcademia = !isInvalid(u.academia) && !isInvalid(u.ID_Academia);
-        const hasInstructor = !isInvalid(u.instructor) && !isInvalid(u.ID_Instructor);
+    verificarEstadoAcademia(u: any) {
+        const esInvalido = (val: any) => !val || val === '0' || val === 0 || val === 'null';
+        const tieneAcademia = !esInvalido(u.academia) && !esInvalido(u.ID_Academia);
+        const tieneInstructor = !esInvalido(u.instructor) && !esInvalido(u.ID_Instructor);
 
-        console.log('UserType:', this.userType, 'HasAcademia:', hasAcademia, 'HasInstructor:', hasInstructor);
 
-        // Reset states
-        this.showCreateBtn = false;
-        this.showJoinForm = false;
 
-        if (this.userType === 4) {
-            // Owner
-            if (!hasAcademia) {
-                // Only show button if form is not active
-                if (!this.showCreateForm) {
-                    this.showCreateBtn = true;
+        // Resetear estados
+        this.mostrarBotonCrear = false;
+        this.mostrarFormularioUnirse = false;
+
+        if (this.tipoUsuario === 4) {
+            // Dueño
+            if (!tieneAcademia) {
+                if (!this.mostrarFormularioCrear) {
+                    this.mostrarBotonCrear = true;
                 }
-                this.showJoinForm = false;
+                this.mostrarFormularioUnirse = false;
             } else {
                 this.router.navigate(['/dashboard']);
             }
         } else {
-            // Others
-            this.showCreateForm = false;
-            if (!hasAcademia) {
-                this.showJoinForm = true;
-                this.loadAcademias();
+            // Otros
+            this.mostrarFormularioCrear = false;
+            if (!tieneAcademia) {
+                this.mostrarFormularioUnirse = true;
+                this.cargarAcademias();
             } else {
-                this.message = "Ya perteneces a una academia.";
+                this.mensaje = "Ya perteneces a una academia.";
             }
         }
     }
 
-    // Getter/Setter for Academy Selection to handle side effects cleanly
-    get academyId(): string | null {
-        return this.selectedAcademyId;
+    // Getter/Setter para selección de academia
+    get idAcademia(): string | null {
+        return this.idAcademiaSeleccionada;
     }
 
-    set academyId(val: string | null) {
-        this.selectedAcademyId = val;
-        this.selectedInstructorId = null;
-        this.instructorOptions = [];
+    set idAcademia(val: string | null) {
+        this.idAcademiaSeleccionada = val;
+        this.idInstructorSeleccionado = null;
+        this.opcionesInstructor = [];
 
         if (val) {
-            this.loadInstructors(val);
+            this.cargarInstructores(val);
         }
     }
 
-    loadAcademias() {
+    cargarAcademias() {
         this.api.cargaracademias().subscribe({
             next: (data) => {
-                this.academyOptions = (data || [])
-                    .filter(a => a.id !== 0 && a.ID_academia !== 0) // Filter invalid ID 0
+                this.opcionesAcademia = (data || [])
+                    .filter(a => a.id !== 0 && a.ID_academia !== 0)
                     .map(a => ({
                         value: String(a.id || a.ID_academia || ''),
                         label: a.nombre || a.Nombre_academia
@@ -259,83 +239,80 @@ export class MyAcademyComponent implements OnInit {
         });
     }
 
-    // Extracted side effect logic
-    loadInstructors(academyId: string) {
-        this.api.cargarinstructor(Number(academyId), '').subscribe({
+    cargarInstructores(idAcademia: string) {
+        this.api.cargarinstructor(Number(idAcademia), '').subscribe({
             next: (data) => {
-                this.instructorOptions = (data || []).map(i => {
-                    // Handle potential nesting or direct user object
-                    const user = i.Instructor || i; // If wrapped in 'Instructor' property? or just 'i'
+                this.opcionesInstructor = (data || []).map(i => {
+                    const usuario = i.Instructor || i;
                     return {
-                        value: String(user.id || user.ID_documento || user.idDocumento || user.documento || ''),
-                        label: user.nombreC || user.nombre || (user.nombre + ' ' + user.apellido)
+                        value: String(usuario.id || usuario.ID_documento || usuario.idDocumento || usuario.documento || ''),
+                        label: usuario.nombreC || usuario.nombre || (usuario.nombre + ' ' + usuario.apellido)
                     };
                 });
             },
-            error: (err) => console.error('Error loading instructors', err)
+            error: () => { }
         });
     }
 
-    joinAcademy() {
-        if (!this.selectedAcademyId || !this.selectedInstructorId) return;
+    unirseAcademia() {
+        if (!this.idAcademiaSeleccionada || !this.idInstructorSeleccionado) return;
 
-        this.submitting = true;
+        this.enviando = true;
 
-        // Use field names matching Backend/DB expectations
         const payload = {
-            idAcademia: this.selectedAcademyId,
-            Instructor: this.selectedInstructorId, // Changed to 'Instructor' per user request
-            userId: this.user.idDocumento || this.user.id
+            idAcademia: this.idAcademiaSeleccionada,
+            Instructor: this.idInstructorSeleccionado,
+            userId: this.usuario.idDocumento || this.usuario.id
         };
 
         this.api.registrarseEnAcademia(payload).subscribe({
             next: (res) => {
-                this.success = true;
-                this.message = 'Solicitud enviada o inscripción exitosa.';
-                this.submitting = false;
+                this.exito = true;
+                this.mensaje = 'Solicitud enviada o inscripción exitosa.';
+                this.enviando = false;
             },
             error: (err) => {
-                this.success = false;
-                this.message = err.error?.message || 'Error al inscribirse.';
-                this.submitting = false;
+                this.exito = false;
+                this.mensaje = err.error?.message || 'Error al inscribirse.';
+                this.enviando = false;
             }
         });
     }
 
-    toggleCreateForm() {
-        this.showCreateForm = !this.showCreateForm;
-        this.showCreateBtn = !this.showCreateForm;
-        this.message = null;
+    alternarFormularioCrear() {
+        this.mostrarFormularioCrear = !this.mostrarFormularioCrear;
+        this.mostrarBotonCrear = !this.mostrarFormularioCrear;
+        this.mensaje = null;
     }
 
-    createAcademy() {
-        if (!this.newAcademy.nombre || !this.newAcademy.direccion || !this.newAcademy.numeroContacto || !this.newAcademy.descripcion || !this.newAcademy.pais || !this.newAcademy.ciudad) {
-            this.message = "Por favor completa todos los campos obligatorios.";
-            this.success = false;
+    crearAcademia() {
+        if (!this.nuevaAcademia.nombre || !this.nuevaAcademia.direccion || !this.nuevaAcademia.numeroContacto || !this.nuevaAcademia.descripcion || !this.nuevaAcademia.pais || !this.nuevaAcademia.ciudad) {
+            this.mensaje = "Por favor completa todos los campos obligatorios.";
+            this.exito = false;
             return;
         }
 
-        this.submitting = true;
-        this.message = null;
+        this.enviando = true;
+        this.mensaje = null;
 
         const payload = {
-            ...this.newAcademy,
-            ownerId: this.user.idDocumento || this.user.ID_documento || this.user.id
+            ...this.nuevaAcademia,
+            ownerId: this.usuario.idDocumento || this.usuario.ID_documento || this.usuario.id
         };
 
         this.api.createAcademy(payload).subscribe({
             next: (res: any) => {
-                this.success = true;
-                this.message = "Academia creada exitosamente!";
-                this.submitting = false;
-                this.showCreateForm = false;
-                // Reload user to update status (should now have academy)
-                setTimeout(() => this.loadUser(), 1500);
+                this.exito = true;
+                this.mensaje = "Academia creada exitosamente!";
+                this.enviando = false;
+                this.mostrarFormularioCrear = false;
+                // Recargar usuario para actualizar el estado
+                setTimeout(() => this.cargarUsuario(), 1500);
             },
             error: (err) => {
-                this.success = false;
-                this.message = err.error?.message || "Error al crear academia.";
-                this.submitting = false;
+                this.exito = false;
+                this.mensaje = err.error?.message || "Error al crear academia.";
+                this.enviando = false;
             }
         });
     }

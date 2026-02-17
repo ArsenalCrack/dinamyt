@@ -1,70 +1,70 @@
 <div class="judge-panel-container">
-    <app-loading-spinner *ngIf="loading" message="Conectando con el Tatami..."></app-loading-spinner>
+    <app-loading-spinner *ngIf="cargando" message="Conectando con el Tatami..."></app-loading-spinner>
 
-    <div class="panel-content" *ngIf="!loading">
+    <div class="panel-content" *ngIf="!cargando">
         <header class="panel-header">
-            <button class="btn-back" (click)="goBack()">
+            <button class="btn-back" (click)="volverAtras()">
                 <i class="fas fa-arrow-left"></i> Salir
             </button>
             <div class="header-info">
-                <h1>{{ assignedTatami?.name || 'Sin Asignar' }}</h1>
-                <span class="role-badge">{{ role }}</span>
+                <h1>{{ tatamiAsignado?.nombre || 'Sin Asignar' }}</h1>
+                <span class="role-badge">{{ rol }}</span>
             </div>
             <div class="connection-status">
                 <span class="dot"></span> En Vivo
             </div>
         </header>
 
-        <section class="match-area" *ngIf="currentSection; else waiting">
+        <section class="match-area" *ngIf="seccionActual; else esperando">
             <div class="category-banner">
-                {{ currentSection.name }} - {{ currentSection.category }}
+                {{ seccionActual.nombre }} - {{ seccionActual.categoria }}
             </div>
 
             <div class="competitors-board">
-                <!-- RED aka AKA -->
+                <!-- ROJO aka AKA -->
                 <div class="competitor red">
                     <div class="comp-info">
-                        <span class="name">{{ competitorRed?.name }}</span>
-                        <span class="academy">{{ competitorRed?.academy }}</span>
+                        <span class="name">{{ competidorRojo?.nombre }}</span>
+                        <span class="academy">{{ competidorRojo?.academia }}</span>
                     </div>
                     <div class="score-display">
-                        {{ scores.red }}
+                        {{ puntuaciones.rojo }}
                     </div>
-                    <div class="controls" *ngIf="role === 'Juez Central' || role === 'Juez de Mesa'">
-                        <button (click)="addPoint('red', 1)">+1</button>
-                        <button (click)="addPoint('red', 2)">+2</button>
-                        <button (click)="addPoint('red', 3)">IP</button>
+                    <div class="controls" *ngIf="rol === 'Juez Central' || rol === 'Juez de Mesa'">
+                        <button (click)="agregarPunto('rojo', 1)">+1</button>
+                        <button (click)="agregarPunto('rojo', 2)">+2</button>
+                        <button (click)="agregarPunto('rojo', 3)">IP</button>
                     </div>
                 </div>
 
                 <!-- VS -->
                 <div class="vs-divider">VS</div>
 
-                <!-- BLUE aka AO -->
+                <!-- AZUL aka AO -->
                 <div class="competitor blue">
                     <div class="comp-info">
-                        <span class="name">{{ competitorBlue?.name }}</span>
-                        <span class="academy">{{ competitorBlue?.academy }}</span>
+                        <span class="name">{{ competidorAzul?.nombre }}</span>
+                        <span class="academy">{{ competidorAzul?.academia }}</span>
                     </div>
                     <div class="score-display">
-                        {{ scores.blue }}
+                        {{ puntuaciones.azul }}
                     </div>
-                    <div class="controls" *ngIf="role === 'Juez Central' || role === 'Juez de Mesa'">
-                        <button (click)="addPoint('blue', 1)">+1</button>
-                        <button (click)="addPoint('blue', 2)">+2</button>
-                        <button (click)="addPoint('blue', 3)">IP</button>
+                    <div class="controls" *ngIf="rol === 'Juez Central' || rol === 'Juez de Mesa'">
+                        <button (click)="agregarPunto('azul', 1)">+1</button>
+                        <button (click)="agregarPunto('azul', 2)">+2</button>
+                        <button (click)="agregarPunto('azul', 3)">IP</button>
                     </div>
                 </div>
             </div>
 
-            <div class="match-actions" *ngIf="role === 'Juez de Mesa'">
+            <div class="match-actions" *ngIf="rol === 'Juez de Mesa'">
                 <button class="btn-timer-start"><i class="fas fa-play"></i> Iniciar Combate</button>
                 <button class="btn-timer-pause"><i class="fas fa-pause"></i> Pausar</button>
                 <button class="btn-finish"><i class="fas fa-flag-checkered"></i> Finalizar</button>
             </div>
         </section>
 
-        <ng-template #waiting>
+        <ng-template #esperando>
             <div class="waiting-screen">
                 <i class="fas fa-clock"></i>
                 <h2>Esperando siguiente encuentro...</h2>

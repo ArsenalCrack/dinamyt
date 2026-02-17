@@ -9,7 +9,7 @@ export class NavigationHistoryService {
   private history: string[] = [];
 
   constructor(private router: Router) {
-    // Initialize with current URL if explicitly loaded
+    // Inicializar con la URL actual si fue cargada directamente
     if (this.router.url) {
       this.history.push(this.router.url);
     }
@@ -21,19 +21,19 @@ export class NavigationHistoryService {
       .subscribe((e) => {
         const url = e.urlAfterRedirects;
 
-        // Safety: prevent duplicate consecutive pushes (some redirects cause this)
+        // Seguridad: evitar pushes duplicados consecutivos (algunos redirects lo causan)
         const last = this.history[this.history.length - 1];
         if (last === url) {
           return;
         }
 
-        // Check if we are "going back" to the previous item in our stack
+        // Verificar si estamos "volviendo" al ítem anterior en la pila
         const previousIndex = this.history.length - 2;
         if (previousIndex >= 0 && this.history[previousIndex] === url) {
-          // We went back. Pop the top element (the one we just left).
+          // Retrocedimos. Quitamos el elemento superior (el que acabamos de dejar).
           this.history.pop();
         } else {
-          // We went forward (or jumped somewhere new). Push.
+          // Avanzamos (o saltamos a otra ruta). Push.
           this.history.push(url);
         }
       });
@@ -49,9 +49,9 @@ export class NavigationHistoryService {
   }
 
   /**
-   * Manually remove the last entry from history.
-   * Useful when performing a destructive action (like delete)
-   * where you don't want the user to go "back" to the deleted page.
+   * Eliminar la última entrada del historial manualmente.
+   * Útil al realizar acciones destructivas (como eliminar)
+   * donde no se desea que el usuario vuelva a la página eliminada.
    */
   removeLastUrl(): void {
     if (this.history.length > 0) {

@@ -7,17 +7,17 @@
         <p class="hero-subtitle">
             Sistema integral de gestión y organización de <br>campeonatos de Hapkido
         </p>
-                <div class="hero-buttons">
-                        <ng-container *ngIf="!username; else loggedActions">
-                            <button routerLink="/register" class="btn-hero btn-primary">Crear Cuenta</button>
-                            <button routerLink="/login" class="btn-hero btn-outline-dark">Iniciar Sesión</button>
-                        </ng-container>
+        <div class="hero-buttons">
+            <ng-container *ngIf="!nombreUsuario; else loggedActions">
+                <button routerLink="/register" class="btn-hero btn-primary">Crear Cuenta</button>
+                <button routerLink="/login" class="btn-hero btn-outline-dark">Iniciar Sesión</button>
+            </ng-container>
 
-                        <ng-template #loggedActions>
-                            <button routerLink="/dashboard" class="btn-hero btn-primary">Ir al panel</button>
-                            <button routerLink="/perfil" class="btn-hero btn-outline-dark">Mi perfil</button>
-                        </ng-template>
-                </div>
+            <ng-template #loggedActions>
+                <button routerLink="/dashboard" class="btn-hero btn-primary">Ir al panel</button>
+                <button routerLink="/perfil" class="btn-hero btn-outline-dark">Mi perfil</button>
+            </ng-template>
+        </div>
     </div>
 </section>
 
@@ -99,15 +99,15 @@
             Únete a Dinamyt y simplifica la gestión.
         </p>
 
-                <div class="cta-buttons">
-                        <ng-container *ngIf="!username; else ctaLogged">
-                            <button routerLink="/register" class="btn-cta btn-white-border">Comenzar Ahora</button>
-                            <button routerLink="/login" class="btn-cta btn-red-filled">Ya tengo cuenta</button>
-                        </ng-container>
-                        <ng-template #ctaLogged>
-                            <button routerLink="/dashboard" class="btn-cta btn-white-border">Ir al panel</button>
-                            <button routerLink="/perfil" class="btn-cta btn-red-filled">Mi perfil</button>
-                        </ng-template>
-                </div>
+        <div class="cta-buttons">
+            <ng-container *ngIf="!nombreUsuario; else ctaLogged">
+                <button routerLink="/register" class="btn-cta btn-white-border">Comenzar Ahora</button>
+                <button routerLink="/login" class="btn-cta btn-red-filled">Ya tengo cuenta</button>
+            </ng-container>
+            <ng-template #ctaLogged>
+                <button routerLink="/dashboard" class="btn-cta btn-white-border">Ir al panel</button>
+                <button routerLink="/perfil" class="btn-cta btn-red-filled">Mi perfil</button>
+            </ng-template>
+        </div>
     </div>
 </section>

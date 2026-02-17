@@ -1,5 +1,5 @@
 <div class="create-championship">
-    <app-loading-spinner *ngIf="saving || loading" [message]="savingText" [fixed]="true"></app-loading-spinner>
+    <app-loading-spinner *ngIf="saving || cargando" [message]="savingText" [fixed]="true"></app-loading-spinner>
 
     <div *ngIf="showCreateConfirm" class="confirm-overlay" role="dialog" aria-modal="true"
         aria-label="Confirmar guardar cambios">
@@ -35,9 +35,10 @@
         </div>
     </div>
 
-    <div class="page-card" *ngIf="!loading">
+    <div class="page-card" *ngIf="!cargando">
         <header class="page-header">
-            <button type="button" (click)="goBack()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
+            <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás"
+                aria-label="Volver atrás">
                 <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
                 <span class="visually-hidden">Volver atrás</span>
             </button>

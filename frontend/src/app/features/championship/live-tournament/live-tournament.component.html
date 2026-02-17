@@ -1,5 +1,5 @@
 <div class="live-container">
-    <app-loading-spinner *ngIf="loading" message="Inicializando panel..." [fixed]="true"></app-loading-spinner>
+    <app-loading-spinner *ngIf="cargando" message="Inicializando panel..." [fixed]="true"></app-loading-spinner>
 
     <!-- HEADER -->
     <header class="live-header">
@@ -8,7 +8,7 @@
                 <span class="dot"></span> EN VIVO
             </span>
             <div class="title-group">
-                <h1>{{ championshipName }}</h1>
+                <h1>{{ nombreCampeonato }}</h1>
                 <span class="subtitle">Panel de Control de Tatamis</span>
             </div>
         </div>
@@ -24,28 +24,28 @@
             <div class="stat-item pending">
                 <i class="fas fa-clock"></i>
                 <div class="stat-info">
-                    <span class="value">{{ availableGroups.length }}</span>
+                    <span class="value">{{ gruposDisponibles.length }}</span>
                     <span class="label">Grupos</span>
                 </div>
             </div>
             <div class="stat-item finished">
                 <i class="fas fa-clipboard-check"></i>
                 <div class="stat-info">
-                    <span class="value">{{ finishedModalities.length }}</span>
+                    <span class="value">{{ modalidadesFinalizadas.length }}</span>
                     <span class="label">Fin</span>
                 </div>
             </div>
             <div class="stat-item total">
                 <i class="fas fa-list"></i>
                 <div class="stat-info">
-                    <span class="value">{{ totalActive }}</span>
+                    <span class="value">{{ totalActivas }}</span>
                     <span class="label">Activas</span>
                 </div>
             </div>
         </div>
 
         <div class="header-actions">
-            <button (click)="exit()" class="btn-exit">
+            <button (click)="salir()" class="btn-exit">
                 <i class="fas fa-sign-out-alt"></i> Salir
             </button>
         </div>
@@ -58,15 +58,15 @@
             <div class="panel-section queue">
                 <header>
                     <h3><i class="fas fa-layer-group"></i> Grupos Pendientes</h3>
-                    <span class="count">{{ availableGroups.length }}</span>
+                    <span class="count">{{ gruposDisponibles.length }}</span>
                 </header>
                 <div class="queue-list custom-scrollbar">
-                    <div class="queue-item" *ngFor="let group of availableGroups; let i = index">
+                    <div class="queue-item" *ngFor="let group of gruposDisponibles; let i = index">
                         <div class="queue-pos">{{ i + 1 }}</div>
                         <div class="queue-info">
                             <!-- First modality prominent -->
                             <h4 class="primary-modality">
-                                {{ getPrimaryModalityName(group) }}
+                                {{ obtenerNombreModalidadPrincipal(group) }}
                             </h4>
                             <!-- Demographics as tags -->
                             <div class="demo-tags">
@@ -80,7 +80,7 @@
                             </span>
                         </div>
                     </div>
-                    <div class="empty-state" *ngIf="availableGroups.length === 0"
+                    <div class="empty-state" *ngIf="gruposDisponibles.length === 0"
                         style="padding: 2rem; text-align: center; color: #666;">
                         <i class="fas fa-check" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
                         <p style="margin: 0; font-size: 0.9rem;">No hay grupos pendientes</p>
@@ -93,17 +93,17 @@
                     <h3><i class="fas fa-check-circle"></i> Terminadas</h3>
                 </header>
                 <div class="history-list custom-scrollbar">
-                    <div class="history-item" *ngFor="let item of finishedModalities">
+                    <div class="history-item" *ngFor="let item of modalidadesFinalizadas">
                         <span class="check-icon"><i class="fas fa-check"></i></span>
                         <div class="history-info">
                             <h4>{{ item.name }}</h4>
                             <span class="history-meta">Tatami #{{ item.tatamiId }}</span>
                         </div>
-                        <button class="btn-results" (click)="viewResults(item)" title="Ver Resultados">
+                        <button class="btn-results" (click)="verResultados(item)" title="Ver Resultados">
                             <i class="fas fa-list-ol"></i>
                         </button>
                     </div>
-                    <div class="empty-state" *ngIf="finishedModalities.length === 0"
+                    <div class="empty-state" *ngIf="modalidadesFinalizadas.length === 0"
                         style="padding: 2rem; text-align: center; color: #666;">
                         <p style="margin: 0; font-style: italic; font-size: 0.8rem;">Aún no hay finalizadas</p>
                     </div>
@@ -113,76 +113,78 @@
 
         <!-- MAIN: TATAMIS GRID -->
         <main class="tatamis-grid custom-scrollbar">
-            <div class="tatami-card" *ngFor="let tatami of tatamis" [class.status-busy]="tatami.status === 'BUSY'"
-                [class.status-running]="tatami.statusModality === 'RUNNING'"
-                [class.status-free]="tatami.status === 'FREE'">
+            <div class="tatami-card" *ngFor="let tatami of tatamis" [class.status-busy]="tatami.estado === 'BUSY'"
+                [class.status-running]="tatami.estadoModalidad === 'RUNNING'"
+                [class.status-free]="tatami.estado === 'FREE'">
 
                 <div class="tatami-header">
                     <div class="tatami-id">
-                        <i class="fas fa-square"></i> {{ tatami.name }}
+                        <i class="fas fa-square"></i> {{ tatami.nombre }}
                     </div>
                     <div class="header-right" style="display: flex; gap: 0.5rem; align-items: center;">
-                        <button class="header-btn unassign" *ngIf="tatami.status === 'BUSY'"
-                            (click)="unassignGroup(tatami)" title="Cancelar Asignación">
+                        <button class="header-btn unassign" *ngIf="tatami.estado === 'BUSY'"
+                            (click)="desasignarGrupo(tatami)" title="Cancelar Asignación">
                             <i class="fas fa-times"></i>
                         </button>
-                        <button class="header-btn judges" (click)="assignJudges(tatami)" title="Asignar Jueces">
+                        <button class="header-btn judges" (click)="asignarJueces(tatami)" title="Asignar Jueces">
                             <i class="fas fa-gavel"></i>
                         </button>
                         <div class="status-badge">
                             <span class="status-dot"></span>
-                            {{ tatami.statusModality === 'RUNNING' ? 'EN CURSO' : (tatami.status === 'BUSY' ? 'ASIGNADO'
+                            {{ tatami.estadoModalidad === 'RUNNING' ? 'EN CURSO' : (tatami.estado === 'BUSY' ?
+                            'ASIGNADO'
                             : 'LIBRE') }}
                         </div>
                     </div>
                 </div>
 
                 <div class="tatami-content">
-                    <ng-container *ngIf="tatami.currentGroup; else freeState">
+                    <ng-container *ngIf="tatami.grupoActual; else estadoLibre">
                         <div class="section-card">
                             <div class="section-top-row"
                                 style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
 
                                 <div class="demo-tags">
                                     <span class="tag-badge">
-                                        {{ tatami.currentGroup.genero }}
+                                        {{ tatami.grupoActual.genero }}
                                     </span>
                                     <span class="tag-badge">
-                                        {{ tatami.currentGroup.cinturon }}
+                                        {{ tatami.grupoActual.cinturon }}
                                     </span>
                                     <span class="tag-badge">
-                                        {{ tatami.currentGroup.edad }} años
+                                        {{ tatami.grupoActual.edad }} años
                                     </span>
                                     <span class="tag-badge">
-                                        {{ tatami.currentGroup.peso }} kg
+                                        {{ tatami.grupoActual.peso }} kg
                                     </span>
                                 </div>
 
                                 <button class="btn-action competitors"
-                                    (click)="viewCompetitors(tatami.currentModalityId)">
+                                    (click)="verCompetidores(tatami.modalidadActualId)">
                                     <i class="fas fa-list"></i> Ver Lista
                                 </button>
                             </div>
 
                             <h3 class="section-title">
-                                {{ formatModalityName(tatami.currentModalityId!) }}
+                                {{ formatearNombreModalidad(tatami.modalidadActualId!) }}
                             </h3>
 
-                            <div class="next-up-info" *ngIf="tatami.modalityQueue && tatami.modalityQueue.length > 1">
-                                <small>Siguiente: {{ formatModalityName(tatami.modalityQueue[1]) }}</small>
+                            <div class="next-up-info"
+                                *ngIf="tatami.colaModalidades && tatami.colaModalidades.length > 1">
+                                <small>Siguiente: {{ formatearNombreModalidad(tatami.colaModalidades[1]) }}</small>
                             </div>
 
                             <div class="competitors-section">
                                 <ng-container
-                                    *ngIf="getCompetitorsForModality(tatami.currentModalityId).length as count">
+                                    *ngIf="obtenerCompetidoresModalidad(tatami.modalidadActualId).length as count">
                                     <div class="comp-header">
                                         <span><i class="fas fa-users"></i> {{ count }} Competidores</span>
                                     </div>
                                     <div class="comp-list">
                                         <span
-                                            *ngFor="let comp of getCompetitorsForModality(tatami.currentModalityId).slice(0, 3)"
+                                            *ngFor="let comp of obtenerCompetidoresModalidad(tatami.modalidadActualId).slice(0, 3)"
                                             class="comp-pill">
-                                            {{ comp.name }}
+                                            {{ comp.nombre }}
                                         </span>
                                         <span *ngIf="count > 3" class="comp-pill more">
                                             +{{ count - 3 }}
@@ -193,19 +195,19 @@
                         </div>
 
                         <div class="tatami-actions">
-                            <button *ngIf="tatami.statusModality === 'READY'" class="btn-action start"
-                                (click)="startCurrentModality(tatami)">
+                            <button *ngIf="tatami.estadoModalidad === 'READY'" class="btn-action start"
+                                (click)="iniciarModalidadActual(tatami)">
                                 <span class="icon"><i class="fas fa-play"></i></span>
                                 <span class="text">INICIAR</span>
                             </button>
 
-                            <div *ngIf="tatami.statusModality === 'RUNNING'"
+                            <div *ngIf="tatami.estadoModalidad === 'RUNNING'"
                                 style="display: flex; gap: 0.5rem; width: 100%;">
-                                <button class="btn-action results" (click)="submitResults(tatami)">
+                                <button class="btn-action results" (click)="enviarResultados(tatami)">
                                     <span class="icon"><i class="fas fa-trophy"></i></span>
                                     <span class="text">RESULTADOS</span>
                                 </button>
-                                <button class="btn-action finish" (click)="finishCurrentModality(tatami)">
+                                <button class="btn-action finish" (click)="finalizarModalidadActual(tatami)">
                                     <span class="icon"><i class="fas fa-step-forward"></i></span>
                                     <span class="text">FIN</span>
                                 </button>
@@ -213,13 +215,13 @@
                         </div>
                     </ng-container>
 
-                    <ng-template #freeState>
+                    <ng-template #estadoLibre>
                         <div class="free-state-content">
                             <div class="pulse-ring">
                                 <i class="fas fa-power-off"></i>
                             </div>
                             <p>TATAMI DISPONIBLE</p>
-                            <button class="btn-assign-group" (click)="openGroupSelector(tatami)">
+                            <button class="btn-assign-group" (click)="abrirSelectorGrupo(tatami)">
                                 <i class="fas fa-plus-circle"></i> Asignar Grupo
                             </button>
                         </div>
@@ -230,38 +232,39 @@
     </div>
 
     <!-- MODAL: ASSIGN JUDGES -->
-    <app-assign-judges *ngIf="currentAssignTatami" [tatami]="currentAssignTatami" [championshipId]="championshipId"
-        [allTatamis]="tatamis" (close)="closeAssignModal()" (save)="onJudgesAssigned($event)">
+    <app-assign-judges *ngIf="tatamiAsignarJuecesActual" [tatami]="tatamiAsignarJuecesActual"
+        [championshipId]="idCampeonato" [allTatamis]="tatamis" (close)="cerrarModalAsignar()"
+        (save)="onJuecesAsignados($event)">
     </app-assign-judges>
 
     <!-- MODAL: VIEW COMPETITORS -->
-    <app-section-competitors *ngIf="currentViewSectionObject" [section]="currentViewSectionObject"
-        (close)="closeViewCompetitors()">
+    <app-section-competitors *ngIf="objetoSeccionVistaActual" [section]="objetoSeccionVistaActual"
+        (close)="cerrarVistaCompetidores()">
     </app-section-competitors>
 
     <!-- MODAL: GROUP SELECTOR -->
-    <div class="modal-overlay" *ngIf="showGroupSelector" (click)="closeGroupSelector()">
+    <div class="modal-overlay" *ngIf="mostrarSelectorGrupo" (click)="cerrarSelectorGrupo()">
         <div class="modal-content group-selector" (click)="$event.stopPropagation()">
             <div class="modal-header">
-                <h2>Asignar Grupo a {{ targetTatamiForSelection?.name }}</h2>
-                <button class="close-btn" (click)="closeGroupSelector()"><i class="fas fa-times"></i></button>
+                <h2>Asignar Grupo a {{ tatamiObjetivoSeleccion?.nombre }}</h2>
+                <button class="close-btn" (click)="cerrarSelectorGrupo()"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body custom-scrollbar">
                 <div class="group-list">
-                    <div class="group-card" *ngFor="let group of filteredGroupsForSelection"
-                        (click)="selectGroup(group)" [class.stolen]="group.sourceTatamiId">
+                    <div class="group-card" *ngFor="let group of gruposFiltradosParaSeleccion"
+                        (click)="seleccionarGrupo(group)" [class.stolen]="group.tatamiOrigenId">
                         <div class="group-details">
                             <h3>
-                                <i class="fas fa-users"></i> {{ getPrimaryModalityName(group) }}
+                                <i class="fas fa-users"></i> {{ obtenerNombreModalidadPrincipal(group) }}
                             </h3>
                             <div class="demo-tags">
                                 <span class="tag-badge">{{ group.genero }}</span>
                                 <span class="tag-badge">{{ group.cinturon }}</span>
                                 <span class="tag-badge">{{ group.edad }} años</span>
                                 <span class="tag-badge">{{ group.peso }} kg</span>
-                                <span *ngIf="group.sourceTatamiId" class="tag-badge"
+                                <span *ngIf="group.tatamiOrigenId" class="tag-badge"
                                     style="background: #333; border-color: #ffd700; color: #ffd700; display: flex; align-items: center; gap: 0.3rem;">
-                                    <i class="fas fa-exchange-alt"></i> TRAER DE TATAMI {{ group.sourceTatamiId }}
+                                    <i class="fas fa-exchange-alt"></i> TRAER DE TATAMI {{ group.tatamiOrigenId }}
                                 </span>
                             </div>
                             <small style="display: block; margin-top: 0.5rem; color: #666; font-size: 0.75rem;">
@@ -270,7 +273,7 @@
                         </div>
                         <i class="fas fa-chevron-right"></i>
                     </div>
-                    <div class="empty-state" *ngIf="filteredGroupsForSelection.length === 0">
+                    <div class="empty-state" *ngIf="gruposFiltradosParaSeleccion.length === 0">
                         <p>No hay grupos disponibles para este Tatami</p>
                     </div>
                 </div>

@@ -9,40 +9,40 @@ import { AssignJudgesComponent } from './assign-judges/assign-judges.component';
 import { SectionCompetitorsComponent } from './section-competitors/section-competitors.component';
 import { DemographicGroup, LiveManagementService } from './live-management.service';
 
-interface Competitor {
+interface Competidor {
   id: string;
-  name: string;
-  academy: string;
-  belt?: string;
-  weight?: string;
-  gender?: string;
-  age?: number;
-  status?: string;
+  nombre: string;
+  academia: string;
+  cinturon?: string;
+  peso?: string;
+  genero?: string;
+  edad?: number;
+  estado?: string;
 }
 
-// Internal Tatami State
+// Estado interno del Tatami
 interface Tatami {
   id: number;
-  name: string;
-  status: 'FREE' | 'BUSY';
+  nombre: string;
+  estado: 'FREE' | 'BUSY';
 
-  // New Structure
-  currentGroup?: DemographicGroup;
-  modalityQueue?: string[]; // The list of modality IDs to run (Sorted)
-  currentModalityId?: string; // The specific ID currently running (e.g. "COMBATES-...")
-  statusModality?: 'READY' | 'RUNNING' | 'FINISHED'; // State of the current modality within the tatami
+  // Nueva Estructura
+  grupoActual?: DemographicGroup;
+  colaModalidades?: string[]; // Lista de IDs de modalidades a ejecutar (Ordenada)
+  modalidadActualId?: string; // El ID específico en ejecución (ej: "COMBATES-...")
+  estadoModalidad?: 'READY' | 'RUNNING' | 'FINISHED'; // Estado de la modalidad actual dentro del tatami
 
-  // Future Queue (Pipelining)
-  nextGroup?: DemographicGroup;
+  // Cola futura (Pipelining)
+  siguienteGrupo?: DemographicGroup;
 
-  judges?: string[];
-  assignedJudges?: any;
+  jueces?: string[];
+  juecesAsignados?: any;
 }
 
-export interface SelectableGroup extends DemographicGroup {
-  sourceTatamiId?: number;
-  isPartial?: boolean;
-  modalityToSteal?: string;
+export interface GrupoSeleccionable extends DemographicGroup {
+  tatamiOrigenId?: number;
+  esParcial?: boolean;
+  modalidadARobar?: string;
 }
 
 @Component({
@@ -53,25 +53,25 @@ export interface SelectableGroup extends DemographicGroup {
   styleUrl: './live-tournament.component.scss'
 })
 export class LiveTournamentComponent implements OnInit {
-  championshipId: string | null = null;
-  championshipName: string = 'Cargando...';
+  idCampeonato: string | null = null;
+  nombreCampeonato: string = 'Cargando...';
 
-  // State
-  availableGroups: DemographicGroup[] = [];
-  finishedModalities: any[] = []; // Just history log
+  // Estado
+  gruposDisponibles: DemographicGroup[] = [];
+  modalidadesFinalizadas: any[] = []; // Historial
   tatamis: Tatami[] = [];
 
-  // Active Data Holders (Mapping ID -> Details)
-  allCompetitorsMap = new Map<string, Competitor[]>(); // active_section_id -> competitors
+  // Mapas de datos activos (ID -> Detalles)
+  mapaCompetidores = new Map<string, Competidor[]>(); // seccion_activa_id -> competidores
 
-  currentAssignTatami: Tatami | null = null;
-  currentViewSectionId: string | null = null; // ID of the specific modality section to view
+  tatamiAsignarJuecesActual: Tatami | null = null;
+  seccionVistaActualId: string | null = null; // ID de la sección de modalidad específica a visualizar
 
-  showGroupSelector = false;
-  targetTatamiForSelection: Tatami | null = null;
+  mostrarSelectorGrupo = false;
+  tatamiObjetivoSeleccion: Tatami | null = null;
 
-  totalActive = 0;
-  loading = true;
+  totalActivas = 0;
+  cargando = true;
 
   constructor(
     private route: ActivatedRoute,
@@ -82,91 +82,89 @@ export class LiveTournamentComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.championshipId = this.route.snapshot.paramMap.get('id');
+    this.idCampeonato = this.route.snapshot.paramMap.get('id');
     this.scrollLock.lock();
-    this.loadChampionshipData();
-    this.loadLiveManagementData();
+    this.cargarDatosCampeonato();
+    this.cargarDatosGestionEnVivo();
   }
 
-  loadChampionshipData() {
-    if (!this.championshipId) return;
-    this.api.getCampeonatoById(this.championshipId).subscribe({
+  cargarDatosCampeonato() {
+    if (!this.idCampeonato) return;
+    this.api.getCampeonatoById(this.idCampeonato).subscribe({
       next: (data) => {
-        this.championshipName = data.nombre || data.nombreEvento;
+        this.nombreCampeonato = data.nombre || data.nombreEvento;
       },
-      error: (e) => console.error('Error loading championship details', e)
+      error: (e) => console.error('Error cargando detalles del campeonato', e)
     });
   }
 
-  loadLiveManagementData() {
-    if (!this.championshipId) return;
-    this.loading = true;
+  cargarDatosGestionEnVivo() {
+    if (!this.idCampeonato) return;
+    this.cargando = true;
 
-    this.api.getLiveManagement(this.championshipId)
+    this.api.getLiveManagement(this.idCampeonato)
       .pipe(delay(1500))
       .subscribe({
         next: (data) => {
           if (data && data.campeonato) {
-            this.processBackendData(data);
+            this.procesarDatosBackend(data);
           } else {
-            console.warn('Backend returned empty/invalid structure, using mocks.');
-            this.initMockData();
+            console.warn('Backend retornó estructura vacía/inválida, usando datos de prueba.');
+            this.inicializarDatosPrueba();
           }
-          this.loading = false;
+          this.cargando = false;
           this.scrollLock.unlock();
         },
         error: (e) => {
-          console.warn('Error fetching live data, using mocks.', e);
-          this.initMockData();
-          this.loading = false;
+          console.warn('Error obteniendo datos en vivo, usando datos de prueba.', e);
+          this.inicializarDatosPrueba();
+          this.cargando = false;
           this.scrollLock.unlock();
         }
       });
   }
 
-  processBackendData(data: any) {
-    // 1. Setup Tatamis
+  procesarDatosBackend(data: any) {
+    // 1. Configurar Tatamis
     const numTatamis = data.campeonato.numTatamis || 1;
     this.tatamis = [];
     for (let i = 1; i <= numTatamis; i++) {
-      this.tatamis.push({ id: i, name: `Tatami ${i}`, status: 'FREE' });
+      this.tatamis.push({ id: i, nombre: `Tatami ${i}`, estado: 'FREE' });
     }
 
-    // 2. Extract Data for Competitors (Mapping Section ID -> Competitor List)
-    this.allCompetitorsMap.clear();
-    const getAge = (dob: string) => {
-      if (!dob) return 0;
-      const birth = new Date(dob);
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-      const m = today.getMonth() - birth.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-        age--;
+    // 2. Extraer datos de competidores (Mapeo ID Sección -> Lista de Competidores)
+    this.mapaCompetidores.clear();
+    const calcularEdad = (fechaNac: string) => {
+      if (!fechaNac) return 0;
+      const nacimiento = new Date(fechaNac);
+      const hoy = new Date();
+      let edad = hoy.getFullYear() - nacimiento.getFullYear();
+      const m = hoy.getMonth() - nacimiento.getMonth();
+      if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) {
+        edad--;
       }
-      return age;
+      return edad;
     };
 
-    const extract = (groupData: any) => {
-      if (!groupData) return;
-      Object.keys(groupData).forEach(modality => {
-        const users = groupData[modality];
-        if (Array.isArray(users)) {
-          users.forEach((u: any) => {
-            const sectionId = (u.secciones && u.secciones.length > 0) ? u.secciones[0] : 'UNKNOWN';
-            if (!this.allCompetitorsMap.has(sectionId)) {
-              this.allCompetitorsMap.set(sectionId, []);
+    const extraer = (datosGrupo: any) => {
+      if (!datosGrupo) return;
+      Object.keys(datosGrupo).forEach(modalidad => {
+        const usuarios = datosGrupo[modalidad];
+        if (Array.isArray(usuarios)) {
+          usuarios.forEach((u: any) => {
+            const seccionId = (u.secciones && u.secciones.length > 0) ? u.secciones[0] : 'DESCONOCIDO';
+            if (!this.mapaCompetidores.has(seccionId)) {
+              this.mapaCompetidores.set(seccionId, []);
             }
-            // Check if not already added to avoid duplicates if user is in multiple lists (shouldn't happen per modality)
-            // But here we iterate modalities.
-            this.allCompetitorsMap.get(sectionId)?.push({
+            this.mapaCompetidores.get(seccionId)?.push({
               id: u.idDocumento,
-              name: u.nombreC,
-              academy: u.academia || 'Sin Academia',
-              belt: u.cinturonRango,
-              weight: u.peso,
-              gender: u.sexo,
-              age: getAge(u.fechaNacimiento),
-              status: u.estado || 'INSCRITO'
+              nombre: u.nombreC,
+              academia: u.academia || 'Sin Academia',
+              cinturon: u.cinturonRango,
+              peso: u.peso,
+              genero: u.sexo,
+              edad: calcularEdad(u.fechaNacimiento),
+              estado: u.estado || 'INSCRITO'
             });
           });
         }
@@ -174,75 +172,62 @@ export class LiveTournamentComponent implements OnInit {
     };
 
     if (data.individuales) {
-      extract(data.individuales.masculinos);
-      extract(data.individuales.femeninos);
+      extraer(data.individuales.masculinos);
+      extraer(data.individuales.femeninos);
     }
-    extract(data.mixtos);
+    extraer(data.mixtos);
 
-    // 3. Process Sections via Service
-    const seccionesRules = this.liveService.parseSecciones(data.campeonato.secciones);
+    // 3. Procesar secciones mediante el servicio
+    const reglasSeciones = this.liveService.parseSecciones(data.campeonato.secciones);
     const seccionesActivas = this.liveService.parseSeccionesActivas(data.campeonato.seccionesActivas);
 
-    // Filter active sections to only those that actually have competitors or are valid
-    // This is optional, but good for cleanup.
-    // const relevantActiveSections = seccionesActivas; // Using all for now as strict whitelist 
-
-    this.availableGroups = this.liveService.processSecciones(seccionesRules, seccionesActivas, this.allCompetitorsMap);
-    this.totalActive = this.availableGroups.reduce((acc, g) => acc + g.activeModalities.length, 0);
+    this.gruposDisponibles = this.liveService.processSecciones(reglasSeciones, seccionesActivas, this.mapaCompetidores);
+    this.totalActivas = this.gruposDisponibles.reduce((acc, g) => acc + g.activeModalities.length, 0);
   }
 
-  // --- UI Actions ---
+  // --- Acciones de UI ---
 
-  // Helper Interface for Selection
-  filteredGroupsForSelection: SelectableGroup[] = [];
+  // Interfaz auxiliar para selección
+  gruposFiltradosParaSeleccion: GrupoSeleccionable[] = [];
 
-  openGroupSelector(tatami: Tatami) {
-    // Allow if FREE OR (BUSY and no nextGroup and not a special Jump tatami)
+  abrirSelectorGrupo(tatami: Tatami) {
     const totalTatamis = this.tatamis.length;
-    const isLast = tatami.id === totalTatamis;
-    const isPenultimate = tatami.id === totalTatamis - 1;
-    const isJumpTatami = isLast || isPenultimate;
+    const esUltimo = tatami.id === totalTatamis;
+    const esPenultimo = tatami.id === totalTatamis - 1;
+    const esTatamiSalto = esUltimo || esPenultimo;
 
-    // Rule: "This won't happen in jumps.. only in the rest".
-    // So if Jump Tatami is BUSY, return.
-    if (tatami.status === 'BUSY') {
-      if (isJumpTatami) return;
-      if (tatami.nextGroup) return; // Already queued
+    if (tatami.estado === 'BUSY') {
+      if (esTatamiSalto) return;
+      if (tatami.siguienteGrupo) return; // Ya tiene cola
     }
 
-    this.targetTatamiForSelection = tatami;
-    this.filteredGroupsForSelection = [];
+    this.tatamiObjetivoSeleccion = tatami;
+    this.gruposFiltradosParaSeleccion = [];
 
-    // 1. Get Standard Available Groups
-    let candidates: SelectableGroup[] = [...this.availableGroups];
+    // 1. Obtener grupos disponibles estándar
+    let candidatos: GrupoSeleccionable[] = [...this.gruposDisponibles];
 
-    // 2. If NO standard groups are available, look for "Stealable" things
-    if (candidates.length === 0) {
+    // 2. Si NO hay grupos estándar, buscar elementos "robables"
+    if (candidatos.length === 0) {
 
-      // A. Look for "Queued Next Groups" (Whole groups waiting)
+      // A. Buscar "Grupos en cola siguiente" (Grupos completos esperando)
       this.tatamis.forEach(t => {
-        if (t.id !== tatami.id && t.nextGroup) {
-          candidates.push({ ...t.nextGroup, sourceTatamiId: t.id });
+        if (t.id !== tatami.id && t.siguienteGrupo) {
+          candidatos.push({ ...t.siguienteGrupo, tatamiOrigenId: t.id });
         }
       });
 
-      // B. Look for "Pending Modalities" in BUSY groups (Slicing active groups)
-      // User specifically asked: "Siguiente: DEFENSA PERSONAL... asignar a otro tatami"
+      // B. Buscar "Modalidades pendientes" en grupos OCUPADOS (Dividir grupos activos)
       this.tatamis.forEach(t => {
-        if (t.id !== tatami.id && t.status === 'BUSY' && t.currentGroup && t.modalityQueue && t.modalityQueue.length > 1) {
-          // Index 0 is running/ready. Index 1+ are pending.
-          // We can steal index 1 (the immediate next) or any other. Let's steal index 1.
-          const nextModalityId = t.modalityQueue[1];
-          if (nextModalityId) {
-            // Create a "Partial Group" representation
-            candidates.push({
-              ...t.currentGroup,
-              // Override active modalities to just be this one for the target
-              activeModalities: [nextModalityId],
-              // Meta info for stealing
-              sourceTatamiId: t.id,
-              isPartial: true,
-              modalityToSteal: nextModalityId
+        if (t.id !== tatami.id && t.estado === 'BUSY' && t.grupoActual && t.colaModalidades && t.colaModalidades.length > 1) {
+          const siguienteModalidadId = t.colaModalidades[1];
+          if (siguienteModalidadId) {
+            candidatos.push({
+              ...t.grupoActual,
+              activeModalities: [siguienteModalidadId],
+              tatamiOrigenId: t.id,
+              esParcial: true,
+              modalidadARobar: siguienteModalidadId
             });
           }
         }
@@ -250,294 +235,269 @@ export class LiveTournamentComponent implements OnInit {
     }
 
     if (totalTatamis < 2) {
-      this.filteredGroupsForSelection = candidates;
+      this.gruposFiltradosParaSeleccion = candidatos;
     } else {
-      // Strict Filter Logic
-      this.filteredGroupsForSelection = candidates.filter(group => {
-        const type = this.liveService.getDemographicType(group);
+      // Lógica de filtro estricto
+      this.gruposFiltradosParaSeleccion = candidatos.filter(grupo => {
+        const tipo = this.liveService.getDemographicType(grupo);
 
-        if (isLast) return type === 'SALTO_ALTO';
-        if (isPenultimate) return type === 'SALTO_LARGO';
+        if (esUltimo) return tipo === 'SALTO_ALTO';
+        if (esPenultimo) return tipo === 'SALTO_LARGO';
 
-        // If we are queuing for a "General" tatami, we still only want General groups
-        return type === 'GENERAL';
+        return tipo === 'GENERAL';
       });
     }
 
-    this.showGroupSelector = true;
+    this.mostrarSelectorGrupo = true;
     this.scrollLock.lock();
   }
 
-  closeGroupSelector() {
-    this.showGroupSelector = false;
-    this.targetTatamiForSelection = null;
-    this.filteredGroupsForSelection = [];
+  cerrarSelectorGrupo() {
+    this.mostrarSelectorGrupo = false;
+    this.tatamiObjetivoSeleccion = null;
+    this.gruposFiltradosParaSeleccion = [];
     this.scrollLock.unlock();
   }
 
-  selectGroup(group: SelectableGroup) {
-    if (!this.targetTatamiForSelection) return;
+  seleccionarGrupo(grupo: GrupoSeleccionable) {
+    if (!this.tatamiObjetivoSeleccion) return;
 
-    const tatami = this.targetTatamiForSelection;
+    const tatami = this.tatamiObjetivoSeleccion;
 
-    // A. Clean up source if it was stolen
-    if (group.sourceTatamiId) {
-      const sourceTatami = this.tatamis.find(t => t.id === group.sourceTatamiId);
+    // A. Limpiar fuente si fue robado
+    if (grupo.tatamiOrigenId) {
+      const tatamiOrigen = this.tatamis.find(t => t.id === grupo.tatamiOrigenId);
 
-      if (sourceTatami) {
-        if (group.isPartial && group.modalityToSteal) {
-          // CASE: Stealing a specific modality from a running queue
-          if (sourceTatami.modalityQueue) {
-            // Remove the stolen modality from the source queue
-            sourceTatami.modalityQueue = sourceTatami.modalityQueue.filter(m => m !== group.modalityToSteal);
+      if (tatamiOrigen) {
+        if (grupo.esParcial && grupo.modalidadARobar) {
+          if (tatamiOrigen.colaModalidades) {
+            tatamiOrigen.colaModalidades = tatamiOrigen.colaModalidades.filter(m => m !== grupo.modalidadARobar);
           }
-        } else if (sourceTatami.nextGroup && sourceTatami.nextGroup.id === group.id) {
-          // CASE: Stealing a whole queued nextGroup
-          sourceTatami.nextGroup = undefined;
+        } else if (tatamiOrigen.siguienteGrupo && tatamiOrigen.siguienteGrupo.id === grupo.id) {
+          tatamiOrigen.siguienteGrupo = undefined;
         }
       }
     } else {
-      // B. Remove from available list if it was standard
-      this.availableGroups = this.availableGroups.filter(g => g.id !== group.id);
+      // B. Remover de la lista disponible si era estándar
+      this.gruposDisponibles = this.gruposDisponibles.filter(g => g.id !== grupo.id);
     }
 
-    // Assign to Target
-    // If it's a partial group, we are effectively creating a new "Session" for that group on this tatami
-    // containing ONLY the stolen modality.
-
-    // Note: If tatami was BUSY, we are queuing it. If FREE, we run it.
-    if (tatami.status === 'FREE') {
-      // Assign as Current
-      tatami.currentGroup = group;
-      tatami.modalityQueue = [...group.activeModalities]; // Should be just [modalityToSteal] or all modalities
-      tatami.status = 'BUSY';
-      this.advanceQueue(tatami);
+    // Asignar al objetivo
+    if (tatami.estado === 'FREE') {
+      tatami.grupoActual = grupo;
+      tatami.colaModalidades = [...grupo.activeModalities];
+      tatami.estado = 'BUSY';
+      this.avanzarCola(tatami);
     } else {
-      // Queue as Next
-      tatami.nextGroup = group;
+      tatami.siguienteGrupo = grupo;
     }
 
-    this.closeGroupSelector();
+    this.cerrarSelectorGrupo();
   }
 
-  advanceQueue(tatami: Tatami) {
-    if (!tatami.modalityQueue) return;
+  avanzarCola(tatami: Tatami) {
+    if (!tatami.colaModalidades) return;
 
-    if (tatami.modalityQueue.length > 0) {
-      // Peek next
-      tatami.currentModalityId = tatami.modalityQueue[0];
-      tatami.statusModality = 'READY';
+    if (tatami.colaModalidades.length > 0) {
+      tatami.modalidadActualId = tatami.colaModalidades[0];
+      tatami.estadoModalidad = 'READY';
     } else {
-      // Finished all modalities in the CURRENT group
+      // Terminaron todas las modalidades del grupo actual
 
-      // Check for Pipelined Group
-      if (tatami.nextGroup) {
-        tatami.currentGroup = tatami.nextGroup;
-        tatami.modalityQueue = [...tatami.nextGroup.activeModalities];
-        tatami.nextGroup = undefined;
+      // Verificar grupo en pipeline
+      if (tatami.siguienteGrupo) {
+        tatami.grupoActual = tatami.siguienteGrupo;
+        tatami.colaModalidades = [...tatami.siguienteGrupo.activeModalities];
+        tatami.siguienteGrupo = undefined;
 
-        this.advanceQueue(tatami); // Start first modality of new group
+        this.avanzarCola(tatami); // Iniciar primera modalidad del nuevo grupo
       } else {
-        // Really Free
-        tatami.status = 'FREE';
-        tatami.currentGroup = undefined;
-        tatami.currentModalityId = undefined;
-        tatami.modalityQueue = undefined;
-        tatami.statusModality = undefined;
+        // Realmente libre
+        tatami.estado = 'FREE';
+        tatami.grupoActual = undefined;
+        tatami.modalidadActualId = undefined;
+        tatami.colaModalidades = undefined;
+        tatami.estadoModalidad = undefined;
       }
     }
   }
 
-  startCurrentModality(tatami: Tatami) {
-    if (!tatami.currentModalityId || !this.championshipId) return;
+  iniciarModalidadActual(tatami: Tatami) {
+    if (!tatami.modalidadActualId || !this.idCampeonato) return;
 
-    tatami.statusModality = 'RUNNING';
+    tatami.estadoModalidad = 'RUNNING';
 
-    // Use specific API
-    this.api.startSection(this.championshipId, tatami.currentModalityId).subscribe({
-      error: (e) => console.warn('Backend update failed', e)
+    this.api.startSection(this.idCampeonato, tatami.modalidadActualId).subscribe({
+      error: (e) => console.warn('Falló la actualización en backend', e)
     });
   }
 
-  finishCurrentModality(tatami: Tatami) {
-    if (!tatami.currentModalityId || !tatami.modalityQueue) return;
+  finalizarModalidadActual(tatami: Tatami) {
+    if (!tatami.modalidadActualId || !tatami.colaModalidades) return;
 
     if (confirm('¿Finalizar esta modalidad y pasar a la siguiente?')) {
-      const finishedId = tatami.currentModalityId;
+      const idFinalizada = tatami.modalidadActualId;
 
-      if (this.championshipId) {
-        // Use specific API
-        this.api.finishSection(this.championshipId, finishedId).subscribe();
+      if (this.idCampeonato) {
+        this.api.finishSection(this.idCampeonato, idFinalizada).subscribe();
       }
 
-      this.finishedModalities.unshift({
-        id: finishedId,
-        name: this.formatModalityName(finishedId),
+      this.modalidadesFinalizadas.unshift({
+        id: idFinalizada,
+        name: this.formatearNombreModalidad(idFinalizada),
         tatamiId: tatami.id
       });
 
-      // Remove current from queue
-      tatami.modalityQueue.shift();
+      // Remover actual de la cola
+      tatami.colaModalidades.shift();
 
-      // Load next
-      this.advanceQueue(tatami);
+      // Cargar siguiente
+      this.avanzarCola(tatami);
     }
   }
 
-  unassignGroup(tatami: Tatami) {
-    if (!this.championshipId) return;
+  desasignarGrupo(tatami: Tatami) {
+    if (!this.idCampeonato) return;
     if (confirm('¿Estás seguro de cancelar la asignación actual? El Tatami quedará LIBRE.')) {
-      this.api.unassignTatami(this.championshipId, tatami.id).subscribe({
+      this.api.unassignTatami(this.idCampeonato, tatami.id).subscribe({
         next: () => {
-          // Reset Tatami locally
-          tatami.status = 'FREE';
-          tatami.currentGroup = undefined;
-          tatami.modalityQueue = undefined;
-          tatami.currentModalityId = undefined;
-          tatami.statusModality = 'READY'; // or undefined
-          tatami.assignedJudges = undefined; // If unassign clears judges too? Usually separate.
-          // Judges usually stay assigned to Tatami, group is what leaves.
+          tatami.estado = 'FREE';
+          tatami.grupoActual = undefined;
+          tatami.colaModalidades = undefined;
+          tatami.modalidadActualId = undefined;
+          tatami.estadoModalidad = 'READY';
+          tatami.juecesAsignados = undefined;
         },
         error: (e) => alert('Error al desasignar')
       });
     }
   }
 
-  submitResults(tatami: Tatami) {
-    if (!tatami.currentModalityId || !this.championshipId) return;
+  enviarResultados(tatami: Tatami) {
+    if (!tatami.modalidadActualId || !this.idCampeonato) return;
 
-    // 1. Simulación: Admin ingresa/revisa resultados (Aquí iría la apertura del Modal de Resultados)
-    // El usuario pidió asegurar que el admin vea los resultados antes de hacerlos públicos.
+    const confirmacionAdmin = confirm(`Administrador: ¿Está listo para registrar y revisar los resultados de: ${this.formatearNombreModalidad(tatami.modalidadActualId)}?`);
+    if (!confirmacionAdmin) return;
 
-    // TODO: Reemplazar prompt/confirm con un Modal Real de Resultados más adelante.
-    const adminCheck = confirm(`Administrador: ¿Está listo para registrar y revisar los resultados de: ${this.formatModalityName(tatami.currentModalityId)}?`);
-    if (!adminCheck) return;
-
-    // 2. Simulación de datos (En el futuro vendrán del formulario del modal)
-    const mockJudgeResults = {
+    const resultadosJuez = {
       detalles: 'Estos resultados han sido verificados por el Juez Central',
       estado: 'FINALIZADO_REVISADO'
     };
 
-    // 3. Confirmación final para "Mostrar al público"
     if (confirm('¿Los resultados son correctos? Al confirmar, se guardarán y se mostrarán al PÚBLICO.')) {
-      this.api.enviarResultadosSeccion(this.championshipId, tatami.currentModalityId, mockJudgeResults).subscribe({
+      this.api.enviarResultadosSeccion(this.idCampeonato, tatami.modalidadActualId, resultadosJuez).subscribe({
         next: () => alert('Resultados publicados correctamente.'),
         error: (e) => alert('Error al publicar resultados.')
       });
     }
   }
 
-  manageCompetitors(tatami: Tatami) {
-    // Placeholder for Competitors Management (Check-in)
-    alert(`Aquí se gestionará la asistencia/check-in para: ${this.getPrimaryModalityName(tatami.currentGroup!)}`);
+  gestionarCompetidores(tatami: Tatami) {
+    alert(`Aquí se gestionará la asistencia/check-in para: ${this.obtenerNombreModalidadPrincipal(tatami.grupoActual!)}`);
   }
 
   // --- Helpers ---
 
-  getFormatGroupTitle(group: DemographicGroup): string {
-    return this.liveService.formatDemographicName(group);
+  obtenerTituloGrupo(grupo: DemographicGroup): string {
+    return this.liveService.formatDemographicName(grupo);
   }
 
-  formatModalityName(fullId: string): string {
-    // e.g. "COMBATES-MASCULINO..." -> "Combates"
-    if (!fullId) return '';
-    const parts = fullId.split('-');
-    // Replace underscores with spaces for readability
-    return parts[0].replace(/_/g, ' ');
+  formatearNombreModalidad(idCompleto: string): string {
+    if (!idCompleto) return '';
+    const partes = idCompleto.split('-');
+    return partes[0].replace(/_/g, ' ');
   }
 
-  // Used in HTML to get competitors for the CURRENT running modality
-  getCompetitorsForModality(fullId: string | undefined): Competitor[] {
-    if (!fullId) return [];
-    return this.allCompetitorsMap.get(fullId) || [];
+  // Usado en HTML para obtener competidores de la modalidad en curso
+  obtenerCompetidoresModalidad(idCompleto: string | undefined): Competidor[] {
+    if (!idCompleto) return [];
+    return this.mapaCompetidores.get(idCompleto) || [];
   }
 
-  getPrimaryModalityName(group: DemographicGroup): string {
-    if (!group || !group.activeModalities || group.activeModalities.length === 0) {
+  obtenerNombreModalidadPrincipal(grupo: DemographicGroup): string {
+    if (!grupo || !grupo.activeModalities || grupo.activeModalities.length === 0) {
       return 'Grupo';
     }
-    // "COMBATES-MASCULINO..." -> "COMBATES" -> "COMBATES" (replace internal _ with space)
-    const first = group.activeModalities[0];
-    if (!first) return 'Grupo';
-    return first.split('-')[0].replace(/_/g, ' ');
+    const primera = grupo.activeModalities[0];
+    if (!primera) return 'Grupo';
+    return primera.split('-')[0].replace(/_/g, ' ');
   }
 
 
 
-  // --- Legacy / Required methods ---
+  // --- Métodos legacy / requeridos ---
 
-  exit(): void {
-    this.router.navigate(['/campeonato/panel', this.championshipId]);
+  salir(): void {
+    this.router.navigate(['/campeonato/panel', this.idCampeonato]);
   }
 
-  assignJudges(tatami: Tatami) {
-    this.currentAssignTatami = tatami;
+  asignarJueces(tatami: Tatami) {
+    this.tatamiAsignarJuecesActual = tatami;
     this.scrollLock.lock();
   }
 
-  onJudgesAssigned(result: any) {
-    if (this.currentAssignTatami && this.championshipId) {
+  onJuecesAsignados(resultado: any) {
+    if (this.tatamiAsignarJuecesActual && this.idCampeonato) {
       const payload = {
-        central: result.central?.id,
-        table: result.table?.id,
-        normal: result.normal?.map((j: any) => j.id) || []
+        central: resultado.central?.id,
+        table: resultado.table?.id,
+        normal: resultado.normal?.map((j: any) => j.id) || []
       };
-      this.api.assignJudgesToTatami(this.championshipId, this.currentAssignTatami.id, payload).subscribe({
+      this.api.assignJudgesToTatami(this.idCampeonato, this.tatamiAsignarJuecesActual.id, payload).subscribe({
         next: () => {
-          const judgesList = [];
-          if (result.central) judgesList.push(result.central.nombre);
-          if (result.table) judgesList.push(result.table.nombre);
-          if (result.normal) judgesList.push(...result.normal.map((j: any) => j.nombre));
+          const listaJueces = [];
+          if (resultado.central) listaJueces.push(resultado.central.nombre);
+          if (resultado.table) listaJueces.push(resultado.table.nombre);
+          if (resultado.normal) listaJueces.push(...resultado.normal.map((j: any) => j.nombre));
 
-          this.currentAssignTatami!.judges = judgesList;
-          this.currentAssignTatami!.assignedJudges = result;
-          this.closeAssignModal();
+          this.tatamiAsignarJuecesActual!.jueces = listaJueces;
+          this.tatamiAsignarJuecesActual!.juecesAsignados = resultado;
+          this.cerrarModalAsignar();
         }
       });
     } else {
-      this.closeAssignModal();
+      this.cerrarModalAsignar();
     }
   }
 
-  closeAssignModal() {
-    this.currentAssignTatami = null;
+  cerrarModalAsignar() {
+    this.tatamiAsignarJuecesActual = null;
     this.scrollLock.unlock();
   }
 
-  viewCompetitors(sectionId: string | undefined) {
-    if (!sectionId) return;
-    this.currentViewSectionId = sectionId;
+  verCompetidores(seccionId: string | undefined) {
+    if (!seccionId) return;
+    this.seccionVistaActualId = seccionId;
     this.scrollLock.lock();
   }
 
-  closeViewCompetitors() {
-    this.currentViewSectionId = null;
+  cerrarVistaCompetidores() {
+    this.seccionVistaActualId = null;
     this.scrollLock.unlock();
   }
 
-  viewResults(item: any) {
+  verResultados(item: any) {
     if (!item || !item.id) return;
-    this.viewCompetitors(item.id);
+    this.verCompetidores(item.id);
   }
 
-  // Getter for the view component
-  get currentViewSectionObject(): any {
-    if (!this.currentViewSectionId) return null;
+  // Getter para el componente de vista
+  get objetoSeccionVistaActual(): any {
+    if (!this.seccionVistaActualId) return null;
     return {
-      id: this.currentViewSectionId,
-      name: this.formatModalityName(this.currentViewSectionId),
+      id: this.seccionVistaActualId,
+      name: this.formatearNombreModalidad(this.seccionVistaActualId),
       category: 'Detalle',
-      competitors: this.getCompetitorsForModality(this.currentViewSectionId) || []
+      competitors: this.obtenerCompetidoresModalidad(this.seccionVistaActualId) || []
     };
   }
 
-  initMockData() {
+  inicializarDatosPrueba() {
     this.tatamis = [
-      { id: 1, name: 'Tatami 1', status: 'FREE' },
-      { id: 2, name: 'Tatami 2', status: 'FREE' }
+      { id: 1, nombre: 'Tatami 1', estado: 'FREE' },
+      { id: 2, nombre: 'Tatami 2', estado: 'FREE' }
     ];
-    this.availableGroups = [{
+    this.gruposDisponibles = [{
       id: 'mock1',
       edad: '10-12',
       peso: '30-40',

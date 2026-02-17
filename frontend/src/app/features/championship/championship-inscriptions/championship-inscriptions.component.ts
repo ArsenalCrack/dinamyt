@@ -1,33 +1,20 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule, Location } from '@angular/common'; // Import Location
+import { CommonModule, Location } from '@angular/common';
 import { delay } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
 import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 import { ApiService } from '../../../core/services/api.service';
-
-interface Inscripcion {
-  id: number;
-  nombre: string;
-  edad: number | null; // Allow null for age
-  sexo: string;
-  peso: string;
-  documentoId: string;
-  academia: string;
-  nacionalidad: string;
-  cinturon: string;
-  instructor: string;
-  correo: string;
-  telefono: string;
-  ciudad: string; // New field
-  modalidades: string[]; // New field
-  fecha: string; // New field
-  estado: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO';
-  expanded?: boolean; // UI state
-}
-
+import { UsuarioInscripcionDTO } from '../../../core/models/domain.models';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+
+// Extend DTO for UI properties if necessary (like expanded state)
+interface InscripcionUI extends UsuarioInscripcionDTO {
+  expandido?: boolean;
+  edad?: number | null; // Calculated
+  estadoTexto?: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'; // Derived from estado number
+}
 
 @Component({
   selector: 'app-championship-inscriptions',
@@ -37,31 +24,31 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
   styleUrls: ['./championship-inscriptions.component.scss']
 })
 export class ChampionshipInscriptionsComponent implements OnInit {
-  championshipId: string | null = null;
-  searchQuery: string = '';
+  idCampeonato: string | null = null;
+  busqueda: string = '';
 
-  activeTab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
+  pestanaActiva: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
 
-  inscriptions: Inscripcion[] = [];
-
-  filteredInscriptions: Inscripcion[] = [];
+  inscripciones: InscripcionUI[] = [];
+  inscripcionesFiltradas: InscripcionUI[] = [];
 
   // Logic states
-  rejectModalOpen = false;
-  loading = false; // Added loading state
-  rejectTargetId: number | null = null;
+  modalRechazoAbierto = false;
+  cargando = false;
+  idObjetivoRechazo: number | null = null;
+  originalIdObjetivoRechazo: number | null = null; // In case we need the raw ID
 
-  deleteModalOpen = false;
-  deleteTargetId: number | null = null;
+  modalEliminarAbierto = false;
+  idObjetivoEliminar: number | null = null;
 
-  toastVisible = false;
-  toastMessage = '';
+  avisoVisible = false;
+  mensajeAviso = '';
 
   // Pagination
-  currentPage: number = 1;
-  itemsPerPage: number = 5;
-  totalPages: number = 1;
-  paginatedInscriptions: Inscripcion[] = [];
+  paginaActual: number = 1;
+  itemsPorPagina: number = 5;
+  totalPaginas: number = 1;
+  inscripcionesPaginadas: InscripcionUI[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -73,14 +60,15 @@ export class ChampionshipInscriptionsComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.championshipId = this.route.snapshot.paramMap.get('id');
-    if (this.championshipId) {
-      this.loadInscriptions();
+    this.idCampeonato = this.route.snapshot.paramMap.get('id');
+    if (this.idCampeonato) {
+      this.cargarInscripciones();
     } else {
-      this.applyFilters();
+      this.aplicarFiltros();
     }
   }
-  calcularEdad(fechaNacimiento: string): number | null {
+
+  calcularEdad(fechaNacimiento: string | Date): number | null {
     if (!fechaNacimiento) return null;
     const birthDate = new Date(fechaNacimiento);
     const today = new Date();
@@ -91,254 +79,231 @@ export class ChampionshipInscriptionsComponent implements OnInit {
     }
     return age;
   }
-  loadInscriptions(): void {
-    if (!this.championshipId) return;
-    this.loading = true;
+
+  cargarInscripciones(): void {
+    if (!this.idCampeonato) return;
+    this.cargando = true;
     this.scrollLock.lock();
 
-    this.api.getInscriptionsByChampionship(this.championshipId)
+    this.api.getInscriptionsByChampionship(this.idCampeonato)
       .pipe(delay(1000))
       .subscribe({
-        next: (data) => {
+        next: (data: any[]) => {
           if (data && Array.isArray(data)) {
-            this.inscriptions = data.map((item: any) => {
-              // Extract modalities (secciones)
-              const mods: string[] = item.secciones || [];
+            this.inscripciones = data.map((item: any) => {
+              // Map raw data to DTO/UI
+              // Ensure we use the properties from UsuarioInscripcionDTO or raw backend response
+              // Backend DTO: idincripcion, nombreC, idDocumento, etc.
 
-              // Extract Weight
-              let weight = 'N/A';
-              const weightMod = mods.find(s => s.toLowerCase().includes('peso'));
-              if (weightMod) {
-                if (weightMod.includes('SIN_PESO')) {
-                  weight = 'SIN_PESO';
-                } else {
-                  // Extract value after "Peso:" if possible, or keep the string
-                  // Example: "Categoria X - Peso: 70kg"
-                  const match = weightMod.match(/Peso:\s*([^,]+)/);
-                  if (match) weight = match[1].trim();
-                  else weight = weightMod; // Fallback
-                }
-              }
+              // Calculate derived fields
+              const estadoNum = item.estado; // 2=Pend, 3=Acc, 4=Rej based on previous logic observation
+              let estadoTexto: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
+              if (estadoNum === 3) estadoTexto = 'ACEPTADO';
+              else if (estadoNum === 4) estadoTexto = 'RECHAZADO';
+              else estadoTexto = 'PENDIENTE'; // Default to 2
 
-              return {
-                id: item.idincripcion, // Use idincripcion not idDocumento for actions
-                nombre: item.nombreC || 'Desconocido',
-                sexo: item.sexo || 'N/A',
-                documentoId: item.idDocumento || 'Sin Doc',
-                nacionalidad: item.nacionalidad || 'Colombia',
-                ciudad: item.ciudad || 'No definida',
-                cinturon: item.cinturonRango || 'Blanco',
-                correo: item.correo || '',
-                telefono: item.numeroCelular || '',
-                edad: item.fechaNacimiento ? this.calcularEdad(item.fechaNacimiento) : null,
-                fecha: item.fechaInscripcion || new Date().toISOString(), // Add date mapping
+              const edadCalc = item.fechaNacimiento ? this.calcularEdad(item.fechaNacimiento) : null;
 
-                estado: (() => {
-                  // item.estado might be boolean (true/false) in DTO? 
-                  // DTO says "private Integer estado;" but "dto.setEstado(ins.isEstado());" which is Integer?
-                  // Let's assume it is number: 2=Pend, 3=Acc, 4=Rej
-                  if (item.estado === 2) return 'PENDIENTE';
-                  if (item.estado === 3) return 'ACEPTADO';
-                  if (item.estado === 4) return 'RECHAZADO';
-                  // Boolean fallback?
-                  if (item.estado === true) return 'ACEPTADO';
-                  if (item.estado === false) return 'PENDIENTE';
-                  return 'PENDIENTE';
-                })(),
+              // Ensure 'secciones' is array
+              const seccionesArr = Array.isArray(item.secciones) ? item.secciones : (item.secciones ? [item.secciones] : []);
 
-                peso: weight,
-                academia: item.academia || 'Independiente',
-                modalidades: mods,
-                instructor: item.instructor || 'Indefinido',
-                expanded: false,
-                // store original id if needed
-                idinscripcion: item.idincripcion
+              const mapped: InscripcionUI = {
+                ...item, // Spread raw properties (idincripcion, nombreC, etc.)
+                secciones: seccionesArr,
+                expandido: false,
+                edad: edadCalc,
+                estadoTexto: estadoTexto,
+                // Ensure specific fields exist if spread missing or null
+                fechaInscripcion: item.fechaInscripcion || new Date().toISOString()
               };
+
+              // Verify fallback for DTO mismatches if needed?
+              // Assuming 'item' matches UsuarioInscripcionDTO structure mostly.
+              return mapped;
             });
 
-            this.applyFilters();
+            this.aplicarFiltros();
           }
-          this.loading = false;
+          this.cargando = false;
           this.scrollLock.unlock();
         },
         error: (err) => {
           console.warn('Error cargando inscripciones:', err);
-          this.loading = false;
+          this.cargando = false;
           this.scrollLock.unlock();
-          this.applyFilters();
+          this.aplicarFiltros();
         }
       });
   }
 
-  setActiveTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
-    this.activeTab = tab;
-    this.applyFilters();
+  seleccionarPestana(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
+    this.pestanaActiva = tab;
+    this.aplicarFiltros();
   }
 
-  goBack(): void {
+  volverAtras(): void {
     this.location.back();
   }
 
-  toggleDetails(id: number): void {
-    const item = this.inscriptions.find(i => i.id === id);
+  alternarDetalles(id: number): void {
+    // id refers to idincripcion
+    const item = this.inscripciones.find(i => i.idincripcion === id);
     if (item) {
-      item.expanded = !item.expanded;
+      item.expandido = !item.expandido;
     }
   }
 
-  applyFilters(): void {
-    const q = this.searchQuery.toLowerCase().trim();
-    this.filteredInscriptions = this.inscriptions.filter(i => {
-      const matchesTab = i.estado === this.activeTab;
-      const matchesSearch = (i.nombre.toLowerCase().includes(q) || String(i.documentoId).includes(q));
+  aplicarFiltros(): void {
+    const q = this.busqueda.toLowerCase().trim();
+    this.inscripcionesFiltradas = this.inscripciones.filter(i => {
+      // Filter by status
+      const matchesTab = i.estadoTexto === this.pestanaActiva;
+
+      // Filter by search (Nombre or Documento)
+      // nombreC and idDocumento from DTO
+      const nombre = i.nombreC || '';
+      const doc = i.idDocumento || '';
+      const matchesSearch = (nombre.toLowerCase().includes(q) || String(doc).includes(q));
+
       return matchesTab && matchesSearch;
     });
 
-    this.currentPage = 1;
-    this.updatePagination();
+    this.paginaActual = 1;
+    this.actualizarPaginacion();
   }
 
-  updatePagination(): void {
-    this.totalPages = Math.ceil(this.filteredInscriptions.length / this.itemsPerPage) || 1;
-    if (this.currentPage > this.totalPages) this.currentPage = 1;
+  actualizarPaginacion(): void {
+    this.totalPaginas = Math.ceil(this.inscripcionesFiltradas.length / this.itemsPorPagina) || 1;
+    if (this.paginaActual > this.totalPaginas) this.paginaActual = 1;
 
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
-    this.paginatedInscriptions = this.filteredInscriptions.slice(startIndex, endIndex);
+    const inicio = (this.paginaActual - 1) * this.itemsPorPagina;
+    const fin = inicio + this.itemsPorPagina;
+    this.inscripcionesPaginadas = this.inscripcionesFiltradas.slice(inicio, fin);
   }
 
-  nextPage(): void {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-      this.updatePagination();
-      this.scrollToTop();
+  paginaSiguiente(): void {
+    if (this.paginaActual < this.totalPaginas) {
+      this.paginaActual++;
+      this.actualizarPaginacion();
+      this.irArriba();
     }
   }
 
-  prevPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-      this.updatePagination();
-      this.scrollToTop();
+  paginaAnterior(): void {
+    if (this.paginaActual > 1) {
+      this.paginaActual--;
+      this.actualizarPaginacion();
+      this.irArriba();
     }
   }
 
-  private scrollToTop(): void {
+  private irArriba(): void {
     const element = document.getElementById('inscriptions-search-anchor');
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
-  acceptInscription(inscription: Inscripcion): void {
-    this.loading = true;
-    // Assuming backend endpoint /inscripciones/{id}/aceptar OR PUT /inscripciones/{id} exists or we use invitation responder?
-    // User said "work for real". The only endpoint enabling "visible=true" changes is NOT sufficient for state change 2->3.
-    // However, I will use api.updateInscripcionState(id, 3) which I'll ensure exists in service.
-    this.api.gestionarInscripcionCampeonato(inscription.id, 3).subscribe({
+  aceptarInscripcion(inscripcion: InscripcionUI): void {
+    this.cargando = true;
+    // 3 = ACEPTADO
+    this.api.gestionarInscripcionCampeonato(inscripcion.idincripcion, 3).subscribe({
       next: () => {
-        inscription.estado = 'ACEPTADO';
-        this.showToast(`El competidor ${inscription.nombre} ha sido aceptado con éxito.`);
-        this.applyFilters();
-        this.loading = false;
+        inscripcion.estadoTexto = 'ACEPTADO';
+        inscripcion.estado = 3;
+        this.mostrarAviso(`El competidor ${inscripcion.nombreC} ha sido aceptado con éxito.`);
+        this.aplicarFiltros();
+        this.cargando = false;
       },
       error: (err) => {
         console.error(err);
-        this.showToast('Error al aceptar inscripción');
-        this.loading = false;
+        this.mostrarAviso('Error al aceptar inscripción');
+        this.cargando = false;
       }
     });
   }
 
-  confirmReject(id: number): void {
-    this.rejectTargetId = id;
-    this.rejectModalOpen = true;
+  confirmarRechazo(id: number): void {
+    this.idObjetivoRechazo = id;
+    this.modalRechazoAbierto = true;
     this.scrollLock.lock();
   }
 
-  closeRejectModal(): void {
-    this.rejectModalOpen = false;
-    this.rejectTargetId = null;
+  cerrarModalRechazo(): void {
+    this.modalRechazoAbierto = false;
+    this.idObjetivoRechazo = null;
     this.scrollLock.unlock();
   }
 
-  finalizeReject(): void {
-    if (this.rejectTargetId) {
-      this.loading = true;
-      // Use updateInscriptionState(4) for REJECT status
-      this.api.gestionarInscripcionCampeonato(this.rejectTargetId, 4).subscribe({
+  finalizarRechazo(): void {
+    if (this.idObjetivoRechazo) {
+      this.cargando = true;
+      // 4 = RECHAZADO
+      this.api.gestionarInscripcionCampeonato(this.idObjetivoRechazo, 4).subscribe({
         next: () => {
-          this.showToast(`Inscripción rechazada.`);
-          // Reload from server to ensure fresh state and clear update
-          this.loadInscriptions();
-          // Modal closing and loading=false is handled by loadInscriptions logic or we reset here?
-          // loadInscriptions sets loading=true then false.
-          // But we need to close modal now.
+          this.mostrarAviso(`Inscripción rechazada.`);
+          this.cargarInscripciones();
         },
         error: (err) => {
           console.error(err);
-          this.showToast('Error al rechazar inscripción');
-          this.loading = false;
+          this.mostrarAviso('Error al rechazar inscripción');
+          this.cargando = false;
         }
       });
     }
-    this.closeRejectModal();
+    this.cerrarModalRechazo();
   }
 
-  cleanModality(mod: string): string {
-    // Remove "- Peso: SIN_PESOkg" and variations
-    // Also remove "- Edad: NULL" or "Edad: NULL"
+  limpiarModalidad(mod: string): string {
+    if (!mod) return '';
     let cleaned = mod.replace(/-\s*Peso:\s*SIN_PESO\s*kg/gi, '')
       .replace(/Peso:\s*SIN_PESO\s*kg/gi, '')
       .replace(/-\s*Peso:\s*SIN_PESO/gi, '')
       .replace(/-\s*Edad:\s*NULL/gi, '')
-      .replace(/Edad:\s*NULL\s*-\s*/gi, '') // If it's in the middle or start with a dash after
+      .replace(/Edad:\s*NULL\s*-\s*/gi, '')
       .replace(/Edad:\s*NULL/gi, '');
 
-    // Cleanup potential double dashes or trailing dashes
     cleaned = cleaned.replace(/\s*-\s*-\s*/g, ' - ').replace(/\s*-\s*$/, '').trim();
 
     return cleaned;
   }
 
-  // Delete / Remove functionality for Accepted
-  confirmDelete(id: number): void {
-    this.deleteTargetId = id;
-    this.deleteModalOpen = true;
+  confirmarEliminacion(id: number): void {
+    this.idObjetivoEliminar = id;
+    this.modalEliminarAbierto = true;
     this.scrollLock.lock();
   }
 
-  closeDeleteModal(): void {
-    this.deleteModalOpen = false;
-    this.deleteTargetId = null;
+  cerrarModalEliminar(): void {
+    this.modalEliminarAbierto = false;
+    this.idObjetivoEliminar = null;
     this.scrollLock.unlock();
   }
 
-  finalizeDelete(): void {
-    if (this.deleteTargetId) {
-      this.loading = true;
-      // User requested that "Eliminar" also sets state to 4 (Rejected)
-      this.api.gestionarInscripcionCampeonato(this.deleteTargetId, 4).subscribe({
+  finalizarEliminacion(): void {
+    if (this.idObjetivoEliminar) {
+      this.cargando = true;
+      // Eliminar -> Estado 4 (Rechazado) according to previous logic
+      this.api.gestionarInscripcionCampeonato(this.idObjetivoEliminar, 4).subscribe({
         next: () => {
-          this.showToast('Competidor eliminado (enviado a rechazados).');
-          this.loadInscriptions();
-          // Modal close handled below, loading handled by loadInscriptions
+          this.mostrarAviso('Competidor eliminado (enviado a rechazados).');
+          this.cargarInscripciones();
         },
         error: (err) => {
           console.error(err);
-          this.showToast('Error al eliminar');
-          this.loading = false;
+          this.mostrarAviso('Error al eliminar');
+          this.cargando = false;
         }
       });
     }
-    this.closeDeleteModal();
+    this.cerrarModalEliminar();
   }
 
-  showToast(msg: string): void {
-    this.toastMessage = msg;
-    this.toastVisible = true;
+  mostrarAviso(msg: string): void {
+    this.mensajeAviso = msg;
+    this.avisoVisible = true;
     setTimeout(() => {
-      this.toastVisible = false;
+      this.avisoVisible = false;
     }, 3000);
   }
 }

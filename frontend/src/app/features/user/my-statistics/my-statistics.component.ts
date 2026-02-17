@@ -5,8 +5,8 @@ import { RouterModule } from '@angular/router';
 import { Location } from '@angular/common';
 import { BackNavigationService } from '../../../core/services/back-navigation.service';
 
-type MyStatRow = {
-  championship: string;
+type FilaEstadistica = {
+  campeonato: string;
   modalidad: string;
   categoria: string;
   puntos: number;
@@ -22,21 +22,21 @@ type MyStatRow = {
   styleUrls: ['./my-statistics.component.scss']
 })
 export class MyStatisticsComponent implements OnInit {
-  searchQuery = '';
-  stats: MyStatRow[] = [];
-  filtered: MyStatRow[] = [];
+  busqueda = '';
+  estadisticas: FilaEstadistica[] = [];
+  filtradas: FilaEstadistica[] = [];
 
   constructor(
     private location: Location,
     private backNav: BackNavigationService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     // TODO: Conectar con API cuando esté disponible.
     // Datos dummy para maquetación inicial.
-    this.stats = [
+    this.estadisticas = [
       {
-        championship: 'Campeonato Nacional 2025',
+        campeonato: 'Campeonato Nacional 2025',
         modalidad: 'Combate',
         categoria: 'Senior -67kg',
         puntos: 32,
@@ -44,7 +44,7 @@ export class MyStatisticsComponent implements OnInit {
         fecha: '2025-02-15'
       },
       {
-        championship: 'Torneo Regional de Combate',
+        campeonato: 'Torneo Regional de Combate',
         modalidad: 'Combate',
         categoria: 'Senior -60kg',
         puntos: 18,
@@ -52,7 +52,7 @@ export class MyStatisticsComponent implements OnInit {
         fecha: '2025-03-20'
       },
       {
-        championship: 'Figuras Internacionales 2025',
+        campeonato: 'Figuras Internacionales 2025',
         modalidad: 'Poomsae',
         categoria: 'Senior Individual',
         puntos: 7.6,
@@ -60,23 +60,23 @@ export class MyStatisticsComponent implements OnInit {
         fecha: '2025-04-10'
       }
     ];
-    this.filtered = [...this.stats];
+    this.filtradas = [...this.estadisticas];
   }
 
-  onSearchChange(): void {
-    const q = this.searchQuery.trim().toLowerCase();
+  onBusquedaCambio(): void {
+    const q = this.busqueda.trim().toLowerCase();
     if (!q) {
-      this.filtered = [...this.stats];
+      this.filtradas = [...this.estadisticas];
       return;
     }
-    this.filtered = this.stats.filter(r =>
-      r.championship.toLowerCase().includes(q) ||
+    this.filtradas = this.estadisticas.filter(r =>
+      r.campeonato.toLowerCase().includes(q) ||
       r.modalidad.toLowerCase().includes(q) ||
       r.categoria.toLowerCase().includes(q)
     );
   }
 
-  goBack(): void {
+  volverAtras(): void {
     this.backNav.backOr({ fallbackUrl: '/dashboard' });
   }
 }

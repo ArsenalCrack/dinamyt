@@ -56,15 +56,15 @@
         </div>
       </div>
 
-      <!-- Modal alert centered, blocks background until closed -->
-      <div *ngIf="errorMessage" class="modal-overlay">
+      <!-- Modal de alerta de error centrado -->
+      <div *ngIf="mensajeError" class="modal-overlay">
         <div class="modal-box">
           <div class="modal-body">
             <i class="fas fa-exclamation-circle modal-icon"></i>
-            <div class="modal-text">{{ errorMessage }}</div>
+            <div class="modal-text">{{ mensajeError }}</div>
           </div>
-          <button class="modal-close" (click)="closeError()" aria-label="Cerrar">✕</button>
-          <button class="modal-action" (click)="closeError()">Cerrar</button>
+          <button class="modal-close" (click)="cerrarError()" aria-label="Cerrar">✕</button>
+          <button class="modal-action" (click)="cerrarError()">Cerrar</button>
         </div>
       </div>
 

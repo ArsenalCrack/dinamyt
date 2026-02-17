@@ -15,14 +15,14 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
   styleUrl: './my-inscriptions.component.scss'
 })
 export class MyInscriptionsComponent implements OnInit {
-  activeTab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
-  loading = true;
-  inscriptions: any[] = [];
-  filteredInscriptions: any[] = [];
+  pestanaActiva: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' = 'PENDIENTE';
+  cargando = true;
+  inscripciones: any[] = [];
+  inscripcionesFiltradas: any[] = [];
 
-  showDeleteModal = false;
-  selectedInscriptionId: number | null = null;
-  deleting = false;
+  mostrarModalEliminar = false;
+  idInscripcionSeleccionada: number | null = null;
+  eliminando = false;
 
   constructor(
     private api: ApiService,
@@ -32,48 +32,48 @@ export class MyInscriptionsComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.loadInscriptions();
+    this.cargarInscripciones();
   }
 
-  loadInscriptions(): void {
+  cargarInscripciones(): void {
     const userId = sessionStorage.getItem('idDocumento');
     if (!userId) {
-      console.warn('No User ID found in session');
-      this.loading = false;
+      console.warn('No se encontró ID de usuario en sesión');
+      this.cargando = false;
       return;
     }
 
-    this.loading = true;
+    this.cargando = true;
     this.scrollLock.lock();
     this.api.getMisInscripciones(userId)
       .pipe(delay(1000))
       .subscribe({
         next: (data: any[]) => {
-          this.inscriptions = (data || []).map(item => ({
+          this.inscripciones = (data || []).map(item => ({
             ...item,
             id: item.idInscripcion,
-            estado: this.mapStatus(item.estado),
-            expanded: false // Default collapsed
+            estado: this.mapearEstado(item.estado),
+            expanded: false
           })) || [];
-          this.applyFilter();
-          this.loading = false;
+          this.aplicarFiltro();
+          this.cargando = false;
           this.scrollLock.unlock();
         },
         error: (err) => {
-          console.error('Error fetching inscriptions', err);
-          this.inscriptions = [];
-          this.applyFilter();
-          this.loading = false;
+          console.error('Error al cargar inscripciones', err);
+          this.inscripciones = [];
+          this.aplicarFiltro();
+          this.cargando = false;
           this.scrollLock.unlock();
         }
       });
   }
 
-  toggleDetails(item: any): void {
+  alternarDetalles(item: any): void {
     item.expanded = !item.expanded;
   }
 
-  mapStatus(status: number): string {
+  mapearEstado(status: number): string {
     switch (status) {
       case 3: return 'ACEPTADO';
       case 2: return 'PENDIENTE';
@@ -82,50 +82,50 @@ export class MyInscriptionsComponent implements OnInit {
     }
   }
 
-  setTab(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
-    this.activeTab = tab;
-    this.applyFilter();
+  seleccionarPestana(tab: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO'): void {
+    this.pestanaActiva = tab;
+    this.aplicarFiltro();
   }
 
-  applyFilter(): void {
-    this.filteredInscriptions = this.inscriptions.filter(i => i.estado === this.activeTab);
+  aplicarFiltro(): void {
+    this.inscripcionesFiltradas = this.inscripciones.filter(i => i.estado === this.pestanaActiva);
   }
 
-  goBack(): void {
+  volverAtras(): void {
     this.location.back();
   }
 
-  requestDelete(id: number): void {
-    this.selectedInscriptionId = id;
-    this.showDeleteModal = true;
+  solicitarEliminar(id: number): void {
+    this.idInscripcionSeleccionada = id;
+    this.mostrarModalEliminar = true;
   }
 
-  cancelDelete(): void {
-    this.showDeleteModal = false;
-    this.selectedInscriptionId = null;
+  cancelarEliminar(): void {
+    this.mostrarModalEliminar = false;
+    this.idInscripcionSeleccionada = null;
   }
 
-  confirmDelete(): void {
-    if (!this.selectedInscriptionId) return;
+  confirmarEliminar(): void {
+    if (!this.idInscripcionSeleccionada) return;
 
-    this.deleting = true;
-    this.api.eliminarInscripcion(this.selectedInscriptionId).subscribe({
+    this.eliminando = true;
+    this.api.eliminarInscripcion(this.idInscripcionSeleccionada).subscribe({
       next: () => {
-        this.inscriptions = this.inscriptions.filter(i => i.id !== this.selectedInscriptionId);
-        this.applyFilter();
-        this.deleting = false;
-        this.showDeleteModal = false;
-        this.selectedInscriptionId = null;
+        this.inscripciones = this.inscripciones.filter(i => i.id !== this.idInscripcionSeleccionada);
+        this.aplicarFiltro();
+        this.eliminando = false;
+        this.mostrarModalEliminar = false;
+        this.idInscripcionSeleccionada = null;
       },
       error: (err) => {
-        console.error('Error deleting inscription', err);
-        this.deleting = false;
+        console.error('Error al eliminar inscripción', err);
+        this.eliminando = false;
         alert('Error al eliminar la inscripción.');
       }
     });
   }
 
-  getStatusClass(status: string): string {
+  obtenerClaseEstado(status: string): string {
     switch (status) {
       case 'ACEPTADO': return 'status-accepted';
       case 'RECHAZADO': return 'status-rejected';
@@ -133,7 +133,7 @@ export class MyInscriptionsComponent implements OnInit {
     }
   }
 
-  getStatusLabel(status: string): string {
+  obtenerEtiquetaEstado(status: string): string {
     switch (status) {
       case 'ACEPTADO': return 'Aceptada';
       case 'RECHAZADO': return 'Rechazada';

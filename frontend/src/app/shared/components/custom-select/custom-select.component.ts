@@ -32,10 +32,10 @@ export class CustomSelectComponent implements ControlValueAccessor, OnInit {
 
   private hasUserInteracted = false;
 
-  private onChange: (_: any) => void = () => {};
-  private onTouched: () => void = () => {};
+  private onChange: (_: any) => void = () => { };
+  private onTouched: () => void = () => { };
 
-  constructor(private host: ElementRef) {}
+  constructor(private host: ElementRef) { }
 
   ngOnInit(): void {
     if (!this.inputId) {
@@ -126,7 +126,7 @@ export class CustomSelectComponent implements ControlValueAccessor, OnInit {
     if (this.isOpen) this.positionOptions();
   }
 
-  // Position the options dropdown within the viewport to avoid creating page scrollbars
+  // Posicionar el dropdown de opciones dentro del viewport para evitar scrollbars en la página
   positionOptions() {
     try {
       const el = this.host.nativeElement as HTMLElement;
@@ -134,31 +134,31 @@ export class CustomSelectComponent implements ControlValueAccessor, OnInit {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // preferred width: at least element width, up to viewport minus margins
+      // Ancho preferido: al menos el ancho del elemento, hasta el viewport menos márgenes
       const margin = 16;
       const preferredWidth = Math.max(rect.width, 160);
       const maxWidth = Math.min(preferredWidth, vw - margin * 2);
 
-      // compute left so dropdown stays within viewport
+      // Calcular posición izquierda para que el dropdown quede dentro del viewport
       let left = rect.left;
       if (left + maxWidth + margin > vw) left = Math.max(margin, vw - maxWidth - margin);
       if (left < margin) left = margin;
 
-      // space below and above (relative to viewport)
+      // Espacio disponible abajo y arriba (relativo al viewport)
       const spaceBelow = vh - rect.bottom - margin;
       const spaceAbove = rect.top - margin;
-      // use the larger side to keep the dropdown height consistent when it opens upward
+      // Usar el lado más grande para mantener la altura consistente cuando se abre hacia arriba
       const availableSpace = Math.max(spaceBelow, spaceAbove);
       const maxHeight = Math.max(Math.min(240, availableSpace), 120);
 
-      // choose vertical placement: prefer below when space is equal or greater
+      // Elegir ubicación vertical: preferir abajo cuando el espacio es igual o mayor
       let top: number | null = null;
       let bottom: number | null = null;
       if (spaceBelow >= spaceAbove) {
-        // place below using viewport coordinates (rect.bottom is viewport-relative)
+        // Colocar abajo usando coordenadas del viewport
         top = rect.bottom + 8;
       } else {
-        // place above: compute bottom distance from viewport bottom
+        // Colocar arriba: calcular distancia inferior desde el borde del viewport
         bottom = vh - rect.top + 8;
       }
 

@@ -20,8 +20,8 @@ export class ChampionshipRegistrationComponent implements OnInit {
     id: string | null = null;
     code: string = '';
     campeonato: any = null;
-    loading = true;
-    loadingMessage = 'Cargando información del torneo...';
+    cargando = true;
+    mensajeCarga = 'Cargando información del torneo...';
     submitting = false;
     message: string | null = null;
     success = false;
@@ -125,7 +125,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
     // ...
 
     loadChampionship(): void {
-        this.loading = true;
+        this.cargando = true;
         this.api.getCampeonatoById(this.id!).subscribe({
             next: (data) => {
                 this.campeonato = data;
@@ -134,7 +134,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
                         const parsed = typeof data.modalidades === 'string' ? JSON.parse(data.modalidades) : data.modalidades;
                         if (Array.isArray(parsed)) {
                             this.fullModalities = parsed;
-                            // Check existing inscriptions before filtering
+                            // Verificar inscripciones existentes antes de filtrar
                             this.loadExistingInscriptions();
                         } else {
                             throw new Error('Modalidades is not an array');
@@ -142,16 +142,16 @@ export class ChampionshipRegistrationComponent implements OnInit {
                     } catch (e) {
                         console.error('Error parsing modalidades', e);
                         this.fallbackModalities();
-                        this.loading = false;
+                        this.cargando = false;
                     }
                 } else {
                     this.fallbackModalities();
-                    this.loading = false;
+                    this.cargando = false;
                 }
             },
             error: () => {
                 this.fallbackModalities();
-                this.loading = false;
+                this.cargando = false;
             }
         });
     }
@@ -161,24 +161,19 @@ export class ChampionshipRegistrationComponent implements OnInit {
     loadExistingInscriptions(): void {
         if (!this.currentUser.id) {
             this.filterAvailableModalities();
-            this.loading = false;
+            this.cargando = false;
             return;
         }
 
         this.api.getMisInscripciones(this.currentUser.id).subscribe({
             next: (data: any[]) => {
-                console.log('Mis Inscripciones raw:', data);
                 const currentChampInscriptions = data.filter(i => {
-                    // Check all possible locations of championship ID
+                    // Verificar todas las posibles ubicaciones del ID del campeonato
                     const iCampId = i.campeonato?.idCampeonato || i.campeonatoId || i.campeonato;
                     return iCampId == this.id;
                 });
 
-                console.log('Inscriptions for this championship:', currentChampInscriptions);
-
-                console.log('Inscriptions for this championship:', currentChampInscriptions);
-
-                // Any existing inscription triggers the warning/modal
+                // Cualquier inscripción existente activa la advertencia/modal
                 if (currentChampInscriptions.length > 0) {
                     this.showReInscriptionWarning = true;
                 }
@@ -191,10 +186,10 @@ export class ChampionshipRegistrationComponent implements OnInit {
                             if (sec.modalidad) this.registeredModalities.push(sec.modalidad); // fallback
                         });
                     } else if (ins.secciones) {
-                        // Fallback parsing if backend returns raw string string
-                        // Note: backend might return processed object if using DTO, but here we use raw entity endpoint?
-                        // Actually getMisInscripciones in ApiService might be using the raw endpoint.
-                        // Let's also check if secciones is array or string
+                        // Parseo alternativo si el backend devuelve un string crudo
+                        // El backend puede devolver un objeto procesado o una cadena cruda
+                        // El backend puede devolver un objeto procesado o una cadena cruda
+                        // Verificar si secciones es array o string
                         try {
                             let parsed = typeof ins.secciones === 'string' ? JSON.parse(ins.secciones) : ins.secciones;
                             if (Array.isArray(parsed)) {
@@ -208,12 +203,12 @@ export class ChampionshipRegistrationComponent implements OnInit {
                 });
 
                 this.filterAvailableModalities();
-                this.loading = false;
+                this.cargando = false;
             },
             error: (err) => {
                 console.error('Error loading existing inscriptions', err);
-                this.filterAvailableModalities(); // Continue anyway
-                this.loading = false;
+                this.filterAvailableModalities(); // Continuar de todas formas
+                this.cargando = false;
             }
         });
     }
@@ -235,7 +230,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
         const validIds = this.fullModalities.filter(mod => {
             const modName = mod.nombre || mod.id;
 
-            // Filter out already registered modalities
+            // Filtrar modalidades ya registradas
             if (this.registeredModalities.includes(modName)) {
                 alreadyRegisteredCount++;
                 return false;
@@ -243,7 +238,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
 
             let matchesRequirement = true;
 
-            // Check Age Requirements
+            // Verificar requisitos de edad
             if (mod.categorias && mod.categorias.edad && mod.categorias.edad.length > 0) {
                 if (userAge === null || isNaN(userAge)) {
                     ageMismatchCount++;
@@ -257,7 +252,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
                 }
             }
 
-            // Check Belt Requirements
+            // Verificar requisitos de cinturón
             if (matchesRequirement && mod.categorias && mod.categorias.cinturon && mod.categorias.cinturon.length > 0) {
                 if (userBelt && userBelt !== 'null') {
                     const matchesAnyBelt = mod.categorias.cinturon.some((cat: any) => this.matchesBelt(cat, userBelt));
@@ -268,7 +263,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
                 }
             }
 
-            // Check Gender Requirements
+            // Verificar requisitos de género
             if (matchesRequirement && mod.categorias && mod.categorias.genero === 'individual') {
                 if (!userGender) {
                     genderMismatchCount++;
@@ -294,7 +289,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
             } else if (alreadyRegisteredCount > 0) {
                 this.unavailableMessage = "Ya estás inscrito en algunas modalidades y no cumples los requisitos para las restantes.";
             } else {
-                // Not registered in any, but all filtered
+                // No registrado en ninguna, pero todas filtradas
                 if (ageMismatchCount > 0 && beltMismatchCount === 0 && genderMismatchCount === 0) {
                     this.unavailableMessage = "Tu edad no cumple con los requisitos de ninguna categoría disponible.";
                 } else if (beltMismatchCount > 0 && ageMismatchCount === 0 && genderMismatchCount === 0) {
@@ -351,21 +346,21 @@ export class ChampionshipRegistrationComponent implements OnInit {
         if (index > -1) {
             this.registrationData.modalidades.splice(index, 1);
         } else {
-            // Check if modality requires belt and if user has it
+            // Verificar si la modalidad requiere cinturón y si el usuario lo tiene
             if (this.checkModalityRequirement(val, 'cinturon')) {
                 if (!this.currentUser.cinturon || this.currentUser.cinturon === 'null') {
-                    // Show custom Alert Logic instead of setting this.message
+                    // Mostrar alerta personalizada en lugar de un mensaje simple
                     this.showProfileAlert = true;
                     this.scrollLock.lock();
                     this.success = false;
-                    return; // Don't add
+                    return; // No agregar modalidad
                 }
             }
             this.registrationData.modalidades.push(val);
             this.message = null;
         }
 
-        // Reset weight if not required
+        // Limpiar peso si no es requerido
         if (!this.isFieldRequired('peso')) this.registrationData.peso = '';
         this.weightError = null;
     }
@@ -393,7 +388,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
     }
 
     isFieldRequired(field: 'cinturon' | 'peso'): boolean {
-        // Find if any selected modality has configuration for this field
+        // Verificar si alguna modalidad seleccionada requiere este campo
         return this.registrationData.modalidades.some(modName => {
             return this.checkModalityRequirement(modName, field);
         });
@@ -405,7 +400,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
 
         if (weightModalities.length === 0) return true;
 
-        // Weight must be valid for ALL selected modalities that care about weight
+        // El peso debe ser válido para TODAS las modalidades seleccionadas que lo requieran
         return weightModalities.every(mod => {
             return mod.categorias.peso.some((cat: any) => this.matchesWeight(cat, weight));
         });
@@ -424,7 +419,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
 
     validateWeight(event: Event): void {
         const input = event.target as HTMLInputElement;
-        let val = input.value.replace(/\D/g, ''); // Remove non-digits
+        let val = input.value.replace(/\D/g, ''); // Remover caracteres no numéricos
 
         if (val.length > 3) {
             val = val.slice(0, 3);
@@ -438,7 +433,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
         } else if (val && parseInt(val) < 10) {
             this.weightError = 'Peso mínimo 10kg';
         } else {
-            // Check if weight matches any category range for selected modalities
+            // Verificar si el peso coincide con alguna categoría de las modalidades seleccionadas
             const validWeight = this.checkWeightMatch(parseInt(val));
             if (!validWeight) {
                 this.weightError = 'Tu peso no entra en ninguna categoría disponible.';
@@ -450,7 +445,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
 
     showConfirmModal = false;
 
-    // Triggered by form submit
+    // Disparado por el submit del formulario
     initiateRegistration(): void {
         if (this.isFieldRequired('peso')) {
             if (!this.registrationData.peso) {
@@ -474,9 +469,8 @@ export class ChampionshipRegistrationComponent implements OnInit {
             return;
         }
 
-        // Logic check: "no quiero que aparezca la cajita, si es la primera vez que se inscribe"
-        // Meaning: Only show confirmation modal if we need to show the ReInscription warning.
-        // Otherwise, proceed directly.
+        // Lógica: no mostrar modal de confirmación si es la primera inscripción
+        // Solo mostrar si ya existe una inscripción previa (advertencia de re-inscripción)
         if (this.showReInscriptionWarning) {
             this.showConfirmModal = true;
             this.scrollLock.lock();
@@ -490,7 +484,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
         this.scrollLock.unlock();
     }
 
-    // Actual API call
+    // Llamada real a la API
     confirmRegistration(): void {
         this.showConfirmModal = false;
         this.submitting = true;
@@ -526,9 +520,9 @@ export class ChampionshipRegistrationComponent implements OnInit {
             }
         }
 
-        this.loadingMessage = 'Procesando inscripción...';
-        this.loading = true;
-        // Scroll lock is already on or we ensure it
+        this.mensajeCarga = 'Procesando inscripción...';
+        this.cargando = true;
+        // El bloqueo de scroll ya está activo o lo aseguramos
         this.scrollLock.lock();
 
         this.api.inscribirUsuarioCampeonato(payload)
@@ -537,20 +531,20 @@ export class ChampionshipRegistrationComponent implements OnInit {
                 next: (res) => {
                     this.success = true;
                     this.message = 'Inscripción realizada exitosamente.';
-                    this.showToast('La Inscripción se ha realizado con éxito'); // Show toast
+                    this.showToast('La Inscripción se ha realizado con éxito'); // Mostrar notificación
 
                     setTimeout(() => {
-                        this.loading = false;
-                        this.scrollLock.unlock(); // Ensure unlock happens before navigation
+                        this.cargando = false;
+                        this.scrollLock.unlock(); // Desbloquear scroll antes de navegar
                         this.router.navigate(['/campeonatos']);
-                    }, 2000); // Wait for toast
+                    }, 2000); // Esperar al toast
                 },
                 error: (err) => {
                     console.error('Error inscribiendo usuario', err);
                     this.success = false;
                     this.message = err.error.message || 'Hubo un error al realizar la inscripción.';
                     this.submitting = false;
-                    this.loading = false;
+                    this.cargando = false;
                     this.scrollLock.unlock();
                 }
             });
@@ -568,7 +562,7 @@ export class ChampionshipRegistrationComponent implements OnInit {
         }, 3000);
     }
 
-    goBack(): void {
+    volverAtras(): void {
         this.scrollLock.unlock(); // Safety unlock
         this.backNav.backOr({ fallbackUrl: '/campeonatos' });
     }

@@ -42,11 +42,11 @@ export class LocationService {
         };
     }
 
-    // Helper to find ISO by name (useful for restoring state from existing DB string names)
+    // Buscar país por nombre (útil para restaurar estado desde strings de la BD)
     getCountryByName(name: string): CountrySimple | undefined {
         if (!name) return undefined;
         const cleanName = name.trim().toLowerCase();
-        // This might be slow if called often, but okay for init
+        // Puede ser lento si se llama frecuentemente, pero está bien para inicialización
         const all = Country.getAllCountries();
         return all.find(c => c.name.toLowerCase() === cleanName) ?
             this.mapCountry(all.find(c => c.name.toLowerCase() === cleanName)!) : undefined;

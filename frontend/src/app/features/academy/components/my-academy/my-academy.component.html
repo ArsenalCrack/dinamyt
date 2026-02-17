@@ -1,112 +1,112 @@
 <div class="my-academy-container">
-    <app-loading-spinner *ngIf="loading"></app-loading-spinner>
+    <app-loading-spinner *ngIf="cargando"></app-loading-spinner>
 
-    <div class="content-card" *ngIf="!loading">
+    <div class="content-card" *ngIf="!cargando">
         <h1>Mi Academia</h1>
 
-        <!-- Owner: Create Academy Button -->
-        <div *ngIf="showCreateBtn" class="create-section">
+        <!-- Dueño: Botón Crear Academia -->
+        <div *ngIf="mostrarBotonCrear" class="create-section">
             <i class="fas fa-university icon-lg"></i>
             <p>Parece que eres dueño, pero aún no tienes una academia registrada.</p>
-            <button class="btn-create" (click)="toggleCreateForm()">
+            <button class="btn-create" (click)="alternarFormularioCrear()">
                 <i class="fas fa-plus-circle"></i> Crear Academia
             </button>
         </div>
 
-        <!-- Create Form -->
-        <div *ngIf="showCreateForm" class="create-form-section">
+        <!-- Formulario de Crear -->
+        <div *ngIf="mostrarFormularioCrear" class="create-form-section">
             <div class="form-header">
                 <h2>Registrar Nueva Academia</h2>
-                <button class="btn-cancel" (click)="toggleCreateForm()">Cancelar</button>
+                <button class="btn-cancel" (click)="alternarFormularioCrear()">Cancelar</button>
             </div>
 
-            <form (ngSubmit)="createAcademy()">
+            <form (ngSubmit)="crearAcademia()">
                 <div class="profile-grid">
                     <div class="field editable">
                         <label>Nombre de la Academia *</label>
-                        <input type="text" [(ngModel)]="newAcademy.nombre" name="nombre" placeholder="Ej: Eagle Dojo"
+                        <input type="text" [(ngModel)]="nuevaAcademia.nombre" name="nombre" placeholder="Ej: Eagle Dojo"
                             required />
                     </div>
 
                     <div class="field editable">
                         <label>País *</label>
-                        <app-country-autocomplete name="pais" [(ngModel)]="newAcademy.pais"
+                        <app-country-autocomplete name="pais" [(ngModel)]="nuevaAcademia.pais"
                             (ngModelChange)="onCountryChange()" [paises]="paisesList" placeholder="País">
                         </app-country-autocomplete>
                     </div>
 
                     <div class="field editable">
                         <label>Ciudad *</label>
-                        <app-country-autocomplete name="ciudad" [(ngModel)]="newAcademy.ciudad" [paises]="ciudadesList"
-                            [maxLength]="ciudadMaxLength" placeholder="Ciudad">
+                        <app-country-autocomplete name="ciudad" [(ngModel)]="nuevaAcademia.ciudad"
+                            [paises]="ciudadesList" [maxLength]="ciudadMaxLength" placeholder="Ciudad">
                         </app-country-autocomplete>
                     </div>
 
                     <div class="field editable">
                         <label>Dirección *</label>
-                        <input type="text" [(ngModel)]="newAcademy.direccion" name="direccion"
+                        <input type="text" [(ngModel)]="nuevaAcademia.direccion" name="direccion"
                             placeholder="Calle 123 #45-67" required />
                     </div>
 
                     <div class="field editable">
                         <label>Número de Contacto *</label>
-                        <input type="tel" [(ngModel)]="newAcademy.numeroContacto" name="numeroContacto"
+                        <input type="tel" [(ngModel)]="nuevaAcademia.numeroContacto" name="numeroContacto"
                             placeholder="+57 300 123 4567" required />
                     </div>
 
                     <div class="field editable">
                         <label>Link Red Social (Opcional)</label>
-                        <input type="url" [(ngModel)]="newAcademy.linkRedSocial" name="linkRedSocial"
+                        <input type="url" [(ngModel)]="nuevaAcademia.linkRedSocial" name="linkRedSocial"
                             placeholder="https://instagram.com/..." />
                     </div>
 
                     <div class="field editable large">
                         <label>Descripción *</label>
-                        <textarea [(ngModel)]="newAcademy.descripcion" name="descripcion" rows="3"
+                        <textarea [(ngModel)]="nuevaAcademia.descripcion" name="descripcion" rows="3"
                             placeholder="Breve descripción..." required></textarea>
                     </div>
                 </div>
 
                 <div class="actions">
-                    <button type="submit" class="btn-join" [disabled]="submitting">
-                        <i class="fas" [ngClass]="submitting ? 'fa-spinner fa-spin' : 'fa-save'"></i>
-                        {{ submitting ? 'Guardando...' : 'Registrar Academia' }}
+                    <button type="submit" class="btn-join" [disabled]="enviando">
+                        <i class="fas" [ngClass]="enviando ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+                        {{ enviando ? 'Guardando...' : 'Registrar Academia' }}
                     </button>
                 </div>
             </form>
         </div>
 
-        <!-- Others: Join Academy -->
-        <div *ngIf="showJoinForm" class="join-section">
+        <!-- Otros: Unirse a Academia -->
+        <div *ngIf="mostrarFormularioUnirse" class="join-section">
             <i class="fas fa-user-graduate icon-lg"></i>
             <p>Únete a una academia para comenzar tu entrenamiento.</p>
 
-            <form (ngSubmit)="joinAcademy()">
+            <form (ngSubmit)="unirseAcademia()">
                 <div class="form-group">
                     <label>Selecciona tu Academia</label>
-                    <app-searchable-select [options]="academyOptions" [(ngModel)]="academyId" name="academy"
+                    <app-searchable-select [options]="opcionesAcademia" [(ngModel)]="idAcademia" name="academy"
                         placeholder="Buscar academia..."></app-searchable-select>
                 </div>
 
-                <div class="form-group" *ngIf="selectedAcademyId">
+                <div class="form-group" *ngIf="idAcademiaSeleccionada">
                     <label>Selecciona tu Instructor</label>
-                    <app-searchable-select [options]="instructorOptions" [(ngModel)]="selectedInstructorId"
+                    <app-searchable-select [options]="opcionesInstructor" [(ngModel)]="idInstructorSeleccionado"
                         name="instructor" placeholder="Oscar..."></app-searchable-select>
-                    <small *ngIf="instructorOptions.length === 0">No hay instructores disponibles.</small>
+                    <small *ngIf="opcionesInstructor.length === 0">No hay instructores disponibles.</small>
                 </div>
 
                 <div class="actions">
                     <button type="submit" class="btn-join"
-                        [disabled]="!selectedAcademyId || !selectedInstructorId || submitting">
-                        <i class="fas" [ngClass]="submitting ? 'fa-spinner fa-spin' : 'fa-check'"></i>
-                        {{ submitting ? 'Procesando...' : 'Inscribirse' }}
+                        [disabled]="!idAcademiaSeleccionada || !idInstructorSeleccionado || enviando">
+                        <i class="fas" [ngClass]="enviando ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+                        {{ enviando ? 'Procesando...' : 'Inscribirse' }}
                     </button>
                 </div>
             </form>
         </div>
 
-        <div *ngIf="message" class="alert" [class.success]="success" [class.error]="!success">
-            {{ message }}
+        <div *ngIf="mensaje" class="alert" [class.success]="exito" [class.error]="!exito">
+            {{ mensaje }}
         </div>
     </div>
 </div>

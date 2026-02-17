@@ -27,7 +27,7 @@ export class ChangePasswordComponent implements OnDestroy {
 
   constructor(private api: ApiService, private router: Router, private location: Location) { }
 
-  goBack(): void {
+  volverAtras(): void {
     this.location.back();
   }
 
@@ -38,7 +38,7 @@ export class ChangePasswordComponent implements OnDestroy {
   private lockScroll() { document.body.style.overflow = 'hidden'; }
   private unlockScroll() { document.body.style.overflow = ''; }
 
-  submit() {
+  enviar() {
     this.mensaje = null;
     if (!this.nueva || this.nueva.length < 8) {
       this.mensaje = 'La nueva contraseña debe tener al menos 8 caracteres.';

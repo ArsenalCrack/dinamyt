@@ -49,12 +49,12 @@ interface Juez {
 export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     id: string | null = null;
     campeonato: any = null;
-    loading = true;
-    error: string | null = null;
+    cargando = true;
+    mensajeError: string | null = null;
     currentUserId: string | null = null;
-    copied = false;
-    showDeleteModal = false;
-    isDeleting = false;
+    copiado = false;
+    mostrarModalEliminar = false;
+    eliminando = false;
 
     // Jueces
     jueces: Juez[] = [];
@@ -179,17 +179,15 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
             return;
         }
 
-        // Check for invitations first
-        console.log('Details: Registering for ID:', id, 'User:', this.currentUserId);
-        this.loading = true; // Show loading if possible, or just wait
+        // Verificar invitaciones primero
+        this.cargando = true;
 
         this.api.getMisInscripciones(this.currentUserId).subscribe({
             next: (inscripciones: any[]) => {
-                this.loading = false;
-                console.log('Details: Raw Inscriptions:', inscripciones);
+                this.cargando = false;
 
                 const record = inscripciones.find((item: any) => {
-                    // Robust ID finding
+                    // Búsqueda robusta del ID
                     let campId = item.id_campeonato || item.idCampeonato || item.IdCampeonato ||
                         item.campeonato_id || item.campeonatoId || item.id_torneo || item.ref_campeonato;
 
@@ -198,31 +196,27 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                     }
 
                     const isMatch = String(campId) === String(id);
-                    if (isMatch) console.log('Details: Match found:', item);
                     return isMatch;
                 });
 
                 if (record) {
-                    console.log('Details: Checking invited status:', record.invitado);
                     if (record.invitado == 1) {
                         alert('Has sido invitado a este campeonato como competidor. Debes inscribirte mediante la invitación en tu sección de invitaciones.');
                         return;
                     }
                 }
-
-                console.log('Details: No blocking invitation. Proceeding.');
                 this.proceedChampionshipRegistration(id);
             },
             error: (err) => {
                 console.error('Error checking inscriptions', err);
-                this.loading = false;
+                this.cargando = false;
                 this.proceedChampionshipRegistration(id);
             }
         });
     }
 
     private proceedChampionshipRegistration(id: any): void {
-        // 2. Check Private
+        // 2. Verificar si es privado
         if (!this.campeonato.esPublico) {
             this.showAccessCodeModal = true;
             this.accessCode = '';
@@ -232,11 +226,11 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
             return;
         }
 
-        // 3. Register (Navigate to inscription form)
+        // 3. Registrar (navegar al formulario de inscripción)
         this.router.navigate(['/campeonato/register', id]);
     }
 
-    // Login Modal Actions
+    // Acciones del modal de login
     closeLoginModal(): void {
         this.showLoginModal = false;
         this.scrollLock.unlock();
@@ -245,12 +239,8 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     goToLogin(): void {
         this.closeLoginModal();
         const id = this.campeonato?.id || this.campeonato?.idCampeonato;
-        // Redirect back here or to explore with params? 
-        // User wants "all functions". Explore redirects with ?autoRegister.
-        // We can do the same but pointing to this page logic if we reload, 
-        // or just let them login and they have to come back.
-        // Better:
-        this.auth.redirectUrl = this.router.url; // Come back to details
+        // Redirigir de vuelta a esta página después del login
+        this.auth.redirectUrl = this.router.url; // Volver a los detalles
         this.router.navigate(['/login']);
     }
 
@@ -300,13 +290,13 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
         if (this.id) {
             this.loadData();
         } else {
-            this.error = 'No se proporcionó un ID de campeonato.';
-            this.loading = false;
+            this.mensajeError = 'No se proporcionó un ID de campeonato.';
+            this.cargando = false;
         }
     }
 
     loadData(): void {
-        this.loading = true;
+        this.cargando = true;
         this.scrollLock.lock();
         this.api.getCampeonatoById(this.id!)
             .pipe(delay(800))
@@ -314,8 +304,8 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                 next: (data) => {
                     this.campeonato = data;
 
-                    // Check visibility access
-                    // User requirement: if visible/visibilidad is 0, user cannot access via URL
+                    // Verificar acceso por visibilidad
+                    // Requisito: si visible/visibilidad es 0, el usuario no puede acceder por URL
                     const isVisible = (
                         data.visible !== 0 && data.visible !== '0' && data.visible !== false &&
                         data.Visible !== 0 && data.Visible !== '0' && data.Visible !== false &&
@@ -323,12 +313,12 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                         data.Visibilidad !== 0 && data.Visibilidad !== '0' && data.Visibilidad !== false
                     );
                     if (!isVisible) {
-                        this.router.navigate(['/campeonatos']); // Redirect if not visible
-                        this.scrollLock.unlock(); // Ensure lock is released if it was somehow set
+                        this.router.navigate(['/campeonatos']); // Redirigir si no es visible
+                        this.scrollLock.unlock(); // Asegurar que el bloqueo se libere
                         return;
                     }
 
-                    // Parse Modalities Config
+                    // Parsear configuración de modalidades
                     try {
                         this.modalidadesConfig = typeof data.modalidades === 'string'
                             ? JSON.parse(data.modalidades)
@@ -348,33 +338,30 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                     this.checkActiveFilters();
                     this.applyFilters();
 
-                    // Fetch judges
-                    // Fetch judges
+                    // Obtener jueces
                     this.api.getJuecesByCampeonato(this.id!).subscribe({
                         next: (data: any[]) => {
-                            console.log('Raw Judges Data:', data); // DEBUG
                             const rawInscriptions = data || [];
-                            // Map over inscriptions and fetch user details for each
+                            // Mapear inscripciones y obtener detalles de usuario para cada una
                             const judgePromises = rawInscriptions.map((ins: any) => {
                                 const userId = ins.usuario;
-                                // Use searchUsers to get user info by ID
-                                // CRITICAL: Pass '0' as championshipId to avoid excluding users already inscribed in this championship!
+                                // Usar searchUsers para obtener info del usuario por ID
+                                // CRÍTICO: Pasar '0' como idCampeonato para no excluir usuarios ya inscritos en este campeonato
                                 return new Promise<Juez | null>((resolve) => {
                                     this.api.searchUsers(String(userId), '0', '0', 6).subscribe({
                                         next: (users: any[]) => {
-                                            // The search might return multiple, find the exact match by ID
+                                            // La búsqueda puede retornar múltiples, encontrar coincidencia exacta por ID
                                             const user = users.find(u => String(u.idDocumento) === String(userId));
                                             if (user) {
-                                                // Determine role using tipousuario directly from the inscription (DB column)
+                                                // Determinar rol usando tipousuario directamente de la inscripción (columna BD)
                                                 // 6: Central, 7: Mesa, 8: Juez
                                                 const typeId = ins.tipousuario ?? ins.idTipo ?? ins.id_tipo;
-                                                console.log(`Judge User ${userId} found. TypeID:`, typeId, 'from ins.tipousuario:', ins.tipousuario); // DEBUG
 
                                                 let role = 'Juez';
                                                 if (typeId === 6) role = 'Juez Central';
                                                 else if (typeId === 7) role = 'Juez de Mesa';
                                                 else if (typeId === 8) role = 'Juez';
-                                                else if (typeId === 'COMPETIDOR') role = 'Competidor'; // Sanity check
+                                                else if (typeId === 'COMPETIDOR') role = 'Competidor'; // Verificación de seguridad
 
                                                 resolve({
                                                     id: user.idDocumento,
@@ -386,12 +373,10 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                                                     ciudad: user.ciudad
                                                 });
                                             } else {
-                                                console.warn(`Judge User ${ins.tipousuario} NOT found in search results.`); // DEBUG
                                                 resolve(null);
                                             }
                                         },
                                         error: (err) => {
-                                            console.error(`Error searching user ${userId}`, err); // DEBUG
                                             resolve(null)
                                         }
                                     });
@@ -400,7 +385,6 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
 
                             Promise.all(judgePromises).then(results => {
                                 this.jueces = results.filter(j => j !== null) as Juez[];
-                                console.log('Final Hydrated Judges:', this.jueces); // DEBUG
                                 this.filterJueces();
                             });
                         },
@@ -410,12 +394,12 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                         }
                     });
 
-                    this.loading = false;
+                    this.cargando = false;
                     this.scrollLock.unlock();
                 },
                 error: (err) => {
                     console.error('Error loading championship details:', err);
-                    this.loading = false;
+                    this.cargando = false;
                     this.scrollLock.unlock();
                 }
             });
@@ -435,7 +419,6 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                     // puedes decidir si mostrar una lista vacía o volver a cargar sin filtro. 
                     // Aquí mantengo tu lógica de "seguridad" pero solo con los de estado 2.
                     if (this.participantes.length === 0) {
-                        console.log('No hay participantes pendientes (estado 2).');
                     }
 
                     this.extractAvailableOptions();
@@ -470,8 +453,8 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                     parsedAges.push(match[3].trim());
                     parsedWeights.push(match[4].trim());
                 } else {
-                    // Fallback to just name if simpler format
-                    // e.g. "Modality (Belt)"
+                    // Respaldo: solo usar el nombre si el formato es más simple
+                    // ej: "Modalidad (Cinturón)"
                     const simpleMatch = modString.match(/^(.*?)\s*\(/);
                     if (simpleMatch) {
                         parsedModalities.push(simpleMatch[1].trim());
@@ -507,8 +490,8 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
 
     private formatRange(val: string): string {
         if (!val) return val;
-        // Check if it's a range like "d-d" and not just a negative number or something else
-        // Simple regex for "number-number"
+        // Verificar si es un rango como "d-d" y no un número negativo u otra cosa
+        // Regex simple para "número-número"
         if (/^\d+(\.\d+)?\s*-\s*\d+(\.\d+)?/.test(val)) {
             return val.replace('-', ' a ');
         }
@@ -529,12 +512,12 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
 
     extractAvailableOptions(): void {
         const toOption = (val: string) => ({ label: val, value: val });
-        // Extracts unique values from array of arrays
+        // Extrae valores únicos de un array de arrays
         const uniqueFlat = (extractor: (p: Participante) => string[] | undefined) => {
             const allValues = this.participantes.flatMap(p => extractor(p) || []);
             return Array.from(new Set(allValues)).filter(Boolean).sort();
         };
-        // Extracts unique values from simple array
+        // Extrae valores únicos de un array simple
         const uniqueSimple = (arr: string[]) => Array.from(new Set(arr)).filter(Boolean).sort();
 
         this.modalidadesOptions = [
@@ -564,7 +547,7 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
 
     onModalityChange(): void {
         this.checkActiveFilters();
-        // Reset sub-filters when modality changes to avoid impossible combinations
+        // Resetear sub-filtros cuando cambia la modalidad para evitar combinaciones imposibles
         this.cinturonFilter = 'TODAS';
         this.pesoFilter = 'TODAS';
         this.edadFilter = 'TODAS';
@@ -597,7 +580,7 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                 genero: config.categorias.genero !== null
             };
         } else {
-            // Fallback if no config found (e.g. mock vs real mismatch)
+            // Respaldo si no se encuentra la configuración
             this.filtersVisible = { cinturon: true, peso: true, edad: true, genero: true };
         }
     }
@@ -605,18 +588,18 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     applyFilters(): void {
         const query = this.searchQuery.toLowerCase().trim();
 
-        // Filter
+        // Filtrar
         let result = this.participantes.filter(p => {
             const matchSearch = !query ||
                 p.nombre.toLowerCase().includes(query) ||
                 p.academia.toLowerCase().includes(query) ||
                 (p.ciudad && p.ciudad.toLowerCase().includes(query));
 
-            // Use parsed meta-arrays for checking filter matches
+            // Usar arrays meta-parseados para verificar coincidencias de filtros
             const matchMod = this.modalidadFilter === 'TODAS' ||
                 (p.metaModalities && p.metaModalities.includes(this.modalidadFilter));
 
-            // Only apply filters if they are visible/active for the modality
+            // Solo aplicar filtros si están visibles/activos para la modalidad
             const matchCinturon = !this.filtersVisible.cinturon || this.cinturonFilter === 'TODAS' ||
                 (p.metaBelts && p.metaBelts.includes(this.cinturonFilter));
 
@@ -631,7 +614,7 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
             return matchSearch && matchMod && matchCinturon && matchPeso && matchEdad && matchGenero;
         });
 
-        // Sort
+        // Ordenar
         result.sort((a, b) => {
             const [field, dir] = this.currentSort.split('-');
             const isAsc = dir === 'asc';
@@ -639,7 +622,7 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
             let valA: any = a[field as keyof Participante];
             let valB: any = b[field as keyof Participante];
 
-            // Handle numeric strings
+            // Manejar strings numéricos
             if (field === 'edad' || field === 'peso') {
                 valA = parseFloat(valA) || 0;
                 valB = parseFloat(valB) || 0;
@@ -657,7 +640,7 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
         this.filteredParticipantes = result;
         this.filteredCount = result.length;
 
-        // Reset pagination
+        // Resetear paginación
         this.currentPage = 1;
         this.updatePagination();
     }
@@ -731,16 +714,16 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
         }
     }
 
-    goBack(): void {
+    volverAtras(): void {
         const fallback = this.isOwner() ? '/mis-campeonatos' : '/campeonatos';
         this.backNav.backOr({ fallbackUrl: fallback });
     }
 
-    editChampionship(): void {
+    editarCampeonato(): void {
         this.router.navigate(['/campeonato/edit', this.id]);
     }
 
-    viewInscriptions(): void {
+    verInscripciones(): void {
         this.router.navigate(['/campeonato/inscriptions', this.id]);
     }
 
@@ -772,42 +755,41 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
 
 
 
-    copyCode(): void {
+    copiarCodigo(): void {
         const codeToCopy = this.campeonato?.Codigo || this.campeonato?.codigo;
         if (!codeToCopy) return;
 
         navigator.clipboard.writeText(codeToCopy).then(() => {
-            this.copied = true;
-            setTimeout(() => this.copied = false, 2000);
+            this.copiado = true;
+            setTimeout(() => this.copiado = false, 2000);
         });
     }
 
-    deleteChampionship(): void {
-        this.showDeleteModal = true;
+    eliminarCampeonato(): void {
+        this.mostrarModalEliminar = true;
         this.scrollLock.lock();
     }
 
-    closeDeleteModal(): void {
-        this.showDeleteModal = false;
-        this.isDeleting = false;
+    cerrarModalEliminar(): void {
+        this.mostrarModalEliminar = false;
+        this.eliminando = false;
         this.scrollLock.unlock();
     }
 
-    confirmDelete(): void {
+    confirmarEliminar(): void {
         if (!this.id) return;
-        this.isDeleting = true;
+        this.eliminando = true;
         this.api.deleteCampeonato(this.id).subscribe({
             next: () => {
-                this.closeDeleteModal();
-                this.navHistory.removeLastUrl(); // Remove current 'details' page from history
+                this.cerrarModalEliminar();
+                this.navHistory.removeLastUrl();
                 this.router.navigate(['/mis-campeonatos']);
             },
             error: (err) => {
-                console.error('Error deleting championship:', err);
-                this.isDeleting = false;
-                this.closeDeleteModal();
-                // Fallback
-                this.navHistory.removeLastUrl(); // Remove even on fallback/error if we leave
+                console.error('Error al eliminar campeonato:', err);
+                this.eliminando = false;
+                this.cerrarModalEliminar();
+                this.navHistory.removeLastUrl();
                 this.router.navigate(['/mis-campeonatos']);
             }
         });
@@ -874,15 +856,15 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
     }
 
     private scrollToJudgesSearch() {
-        // Prevent scroll on desktop (width > 768px)
+        // No hacer scroll en escritorio (ancho > 768px)
         if (window.innerWidth > 768) {
             return;
         }
 
-        // Scroll to the section header instead of the search box
+        // Hacer scroll al encabezado de la sección en lugar del campo de búsqueda
         const element = document.getElementById('judges-section-anchor');
         if (element) {
-            // Use a slight offset if possible, otherwise scrollIntoView is standard
+            // Usar un pequeño offset si es posible, scrollIntoView es estándar
             element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }

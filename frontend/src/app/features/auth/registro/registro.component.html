@@ -1,7 +1,7 @@
 <div class="registro-wrapper">
   <div class="container">
 
-    <app-loading-spinner *ngIf="cargando" [message]="loadingText" [fixed]="true"></app-loading-spinner>
+    <app-loading-spinner *ngIf="cargando" [message]="textoCarga" [fixed]="true"></app-loading-spinner>
 
     <button type="button" (click)="volverAtras()" class="btn-back" title="Volver atrás" aria-label="Volver atrás">
       <i class="fas fa-arrow-left fa-2x" aria-hidden="true"></i>
@@ -23,7 +23,7 @@
       </div>
     </div>
 
-    <!-- Modal for server messages -->
+    <!-- Modal de mensajes del servidor -->
     <div *ngIf="Mensajes && !exito" class="modal-overlay">
       <div class="modal-box">
         <div class="modal-body">
@@ -193,9 +193,9 @@
       <div class="form-group">
         <label for="registro-confirmPassword">Confirmar contraseña</label>
         <div class="password-wrapper">
-          <input [type]="mostrarConfirmPass ? 'text' : 'password'" id="registro-confirmPassword" name="confirmPassword"
-            [(ngModel)]="confirmPassword" #confirm="ngModel" autocomplete="new-password" required
-            placeholder="Repite tu contraseña"
+          <input [type]="mostrarConfirmPass ? 'text' : 'password'" id="registro-confirmPassword"
+            name="confirmarContrasena" [(ngModel)]="confirmarContrasena" #confirm="ngModel" autocomplete="new-password"
+            required placeholder="Repite tu contraseña"
             [class.input-error]="(confirm.invalid || confirm.value !== contrasena) && (confirm.dirty || confirm.touched)">
 
           <button type="button" class="eye-icon" (click)="mostrarConfirmPass = !mostrarConfirmPass"
@@ -210,11 +210,11 @@
       </div>
 
       <button type="submit" class="btn-submit"
-        [disabled]="registroForm.invalid || (contrasena !== confirmPassword) || cargando">
+        [disabled]="registroForm.invalid || (contrasena !== confirmarContrasena) || cargando">
         {{ cargando ? 'Registrando...' : 'Registrar' }}
       </button>
 
-      <!-- Modal alert centered, blocks background until closed (single instance kept above) -->
+      <!-- Modal de alerta centrado (instancia única arriba) -->
 
       <div class="link-bottom">
         <p>¿Ya tienes una cuenta? <a routerLink="/login">Iniciar sesión</a></p>

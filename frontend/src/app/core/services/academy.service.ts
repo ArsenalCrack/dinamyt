@@ -14,19 +14,10 @@ export class AcademyService {
         return this.http.get<any[]>(`${this.apiUrl}/academias`);
     }
 
-    // Deprecated usage in original API? kept for compatibility if needed.
-    // Original had "createAcademy" (singular) and "crearAcademia" (Spanish)
-    // I will check usages later, but for now safe to include both if distinct.
-    // createAcademy calls /academias/crear
-    // crearAcademia calls /academia/crear
-    // Wait, these are different endpoints in the text I read!
-    // One is /academias/crear (plural) - line 70
-    // One is /academia/crear (singular) - line 115
-    // I must keep both or consolidate if they are duplicated. The USER added /academias/crear recently.
 
     // TODO: Endpoint no implementado en backend
     createAcademy(data: any) {
-        // Current active endpoint for MyAcademyComponent
+        // Endpoint activo para MyAcademyComponent
         return this.http.post(`${this.apiUrl}/academias/crear`, data);
     }
 
@@ -41,7 +32,7 @@ export class AcademyService {
 
     // TODO: Endpoint no implementado en backend
     crearAcademia(payload: any) {
-        // Legacy or alternative endpoint?
+        // Endpoint alternativo o legacy
         return this.http.post(`${this.apiUrl}/academia/crear`, payload);
     }
 

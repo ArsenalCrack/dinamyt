@@ -8,11 +8,11 @@ export interface Juez {
     id: string; // idDocumento
     nombre: string;
     avatar: string;
-    rol?: string; // Role in the system (e.g. 'Juez', 'Juez Central')
+    rol?: string; // Rol en el sistema (ej: 'Juez', 'Juez Central')
     categoria?: string;
     pais?: string;
     ciudad?: string;
-    assignedToTatami?: boolean; // If assigned to ANY tatami
+    asignadoATatami?: boolean; // Si está asignado a CUALQUIER tatami
 }
 
 @Component({
@@ -24,30 +24,30 @@ export interface Juez {
 })
 export class AssignJudgesComponent implements OnInit {
     @Input() championshipId: string | null = null;
-    @Input() tatami: any; // Tatami object
-    @Input() allTatamis: any[] = []; // To check other assignments
+    @Input() tatami: any; // Objeto Tatami
+    @Input() allTatamis: any[] = []; // Para verificar otras asignaciones
     @Output() close = new EventEmitter<void>();
     @Output() save = new EventEmitter<any>();
 
     jueces: Juez[] = [];
-    filteredJueces: Juez[] = [];
-    loading = true;
-    searchQuery = '';
+    juecesFiltrados: Juez[] = [];
+    cargando = true;
+    busqueda = '';
 
-    // Assignments for THIS tatami
-    centralJudge: Juez | null = null;
-    tableJudge: Juez | null = null;
-    normalJudges: Juez[] = [];
+    // Asignaciones para ESTE tatami
+    juezCentral: Juez | null = null;
+    juezMesa: Juez | null = null;
+    juecesNormales: Juez[] = [];
 
     constructor(private api: ApiService) { }
 
     ngOnInit(): void {
-        this.loadJudges();
+        this.cargarJueces();
     }
 
-    loadJudges() {
+    cargarJueces() {
         if (!this.championshipId) return;
-        this.loading = true;
+        this.cargando = true;
 
         this.api.obtenerJuecesDelCampeonato(this.championshipId).subscribe({
             next: (data: any[]) => {
@@ -59,129 +59,119 @@ export class AssignJudgesComponent implements OnInit {
                     categoria: j.categoria || j.cinturonRango || 'N/A',
                     pais: j.pais || j.nacionalidad,
                     ciudad: j.ciudad,
-                    assignedToTatami: false
+                    asignadoATatami: false
                 }));
 
-                this.restoreAssignments();
-                this.checkAssignments();
-                this.filterJudges();
-                this.loading = false;
+                this.restaurarAsignaciones();
+                this.verificarAsignaciones();
+                this.filtrarJueces();
+                this.cargando = false;
             },
             error: (e) => {
-                console.error('Error loading judges', e);
-                this.loading = false;
+                console.error('Error cargando jueces', e);
+                this.cargando = false;
             }
         });
     }
 
-    // Check against all tatamis to mark assigned judges
-    checkAssignments() {
-        // First, mark everyone as unassigned initially
-        this.jueces.forEach(j => j.assignedToTatami = false);
+    // Verificar contra todos los tatamis para marcar jueces asignados
+    verificarAsignaciones() {
+        // Primero, marcar todos como no asignados
+        this.jueces.forEach(j => j.asignadoATatami = false);
 
-        // Check other tatamis
+        // Verificar otros tatamis
         this.allTatamis.forEach(t => {
-            // Skip current tatami
+            // Saltar tatami actual
             if (String(t.id) === String(this.tatami.id)) return;
 
-            if (t.assignedJudges) {
-                // If using new structure
-                const aj = t.assignedJudges;
-                if (aj.central) this.markAsBusy(aj.central.id);
-                if (aj.table) this.markAsBusy(aj.table.id);
+            if (t.juecesAsignados) {
+                const aj = t.juecesAsignados;
+                if (aj.central) this.marcarComoOcupado(aj.central.id);
+                if (aj.table) this.marcarComoOcupado(aj.table.id);
                 if (aj.normal && Array.isArray(aj.normal)) {
-                    aj.normal.forEach((j: any) => this.markAsBusy(j.id));
+                    aj.normal.forEach((j: any) => this.marcarComoOcupado(j.id));
                 }
-            } else if (t.judges && Array.isArray(t.judges)) {
-                // Legacy/Fallback string arrays (names or IDs? ambiguous without objects)
-                // If they are just names, we can't safely mark by ID. 
-                // We'll skip for now to avoid false positives or implement name matching if needed.
             }
         });
     }
 
-    markAsBusy(id: string) {
-        const judge = this.jueces.find(j => String(j.id) === String(id));
-        if (judge) judge.assignedToTatami = true;
+    marcarComoOcupado(id: string) {
+        const juez = this.jueces.find(j => String(j.id) === String(id));
+        if (juez) juez.asignadoATatami = true;
     }
 
-    restoreAssignments() {
-        if (this.tatami && this.tatami.assignedJudges) {
-            const aj = this.tatami.assignedJudges;
-            // Find the actual judge objects in our loaded list to ensure references are correct
+    restaurarAsignaciones() {
+        if (this.tatami && this.tatami.juecesAsignados) {
+            const aj = this.tatami.juecesAsignados;
+            // Buscar los objetos de juez reales en nuestra lista cargada
             if (aj.central) {
-                this.centralJudge = this.jueces.find(j => String(j.id) === String(aj.central.id)) || aj.central;
+                this.juezCentral = this.jueces.find(j => String(j.id) === String(aj.central.id)) || aj.central;
             }
             if (aj.table) {
-                this.tableJudge = this.jueces.find(j => String(j.id) === String(aj.table.id)) || aj.table;
+                this.juezMesa = this.jueces.find(j => String(j.id) === String(aj.table.id)) || aj.table;
             }
             if (aj.normal && Array.isArray(aj.normal)) {
-                this.normalJudges = aj.normal.map((nj: any) =>
+                this.juecesNormales = aj.normal.map((nj: any) =>
                     this.jueces.find(j => String(j.id) === String(nj.id)) || nj
                 );
             }
         }
     }
 
-    filterJudges() {
-        const q = this.searchQuery.toLowerCase();
-        this.filteredJueces = this.jueces.filter(j =>
-            !j.assignedToTatami &&
-            !this.isSelected(j) &&
+    filtrarJueces() {
+        const q = this.busqueda.toLowerCase();
+        this.juecesFiltrados = this.jueces.filter(j =>
+            !j.asignadoATatami &&
+            !this.estaSeleccionado(j) &&
             (j.nombre.toLowerCase().includes(q) || (j.rol && j.rol.toLowerCase().includes(q)))
         );
     }
 
-    isSelected(j: Juez): boolean {
-        return (this.centralJudge?.id === j.id) ||
-            (this.tableJudge?.id === j.id) ||
-            this.normalJudges.some(nj => nj.id === j.id);
+    estaSeleccionado(j: Juez): boolean {
+        return (this.juezCentral?.id === j.id) ||
+            (this.juezMesa?.id === j.id) ||
+            this.juecesNormales.some(nj => nj.id === j.id);
     }
 
-    assignCentral(j: Juez) {
-        if (this.centralJudge) {
-            // Return old one to pool
+    asignarCentral(j: Juez) {
+        if (this.juezCentral) {
+            // Devolver el anterior al pool
         }
-        this.centralJudge = j;
-        this.filterJudges();
+        this.juezCentral = j;
+        this.filtrarJueces();
     }
 
-    assignTable(j: Juez) {
-        this.tableJudge = j;
-        this.filterJudges();
+    asignarMesa(j: Juez) {
+        this.juezMesa = j;
+        this.filtrarJueces();
     }
 
-    assignNormal(j: Juez) {
-        this.normalJudges.push(j);
-        this.filterJudges();
+    asignarNormal(j: Juez) {
+        this.juecesNormales.push(j);
+        this.filtrarJueces();
     }
 
-    unassignCentral() {
-        this.centralJudge = null;
-        this.filterJudges();
+    desasignarCentral() {
+        this.juezCentral = null;
+        this.filtrarJueces();
     }
 
-    unassignTable() {
-        this.tableJudge = null;
-        this.filterJudges();
+    desasignarMesa() {
+        this.juezMesa = null;
+        this.filtrarJueces();
     }
 
-    unassignNormal(index: number) {
-        this.normalJudges.splice(index, 1);
-        this.filterJudges();
+    desasignarNormal(indice: number) {
+        this.juecesNormales.splice(indice, 1);
+        this.filtrarJueces();
     }
 
-    onSave() {
-        // Construct the payload
-        // We might need to save structure: { central: id, table: id, normal: [ids] }
-        // Or just a flat list if the backend only supports that.
-        // User asked "solo se puede asignar un juez central, varios jueces normales y un juez de mesa"
-        // So the UI enforces this. The data passing back can be an object.
-        const result = {
-            central: this.centralJudge,
-            table: this.tableJudge,
-            normal: this.normalJudges
+    guardar() {
+        const resultado = {
+            central: this.juezCentral,
+            table: this.juezMesa,
+            normal: this.juecesNormales
         };
-        this.save.emit(result);
+        this.save.emit(resultado);
     }
 }
