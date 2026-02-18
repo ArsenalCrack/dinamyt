@@ -5,6 +5,8 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { User, UserRole } from '../../core/models/user.model';
 import { ScrollLockService } from '../../core/services/scroll-lock.service';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 @Component({
   selector: 'app-dashboard',
@@ -124,25 +126,97 @@ export class DashboardComponent implements OnInit {
   }
 
   cargarInvitacionesJuez() {
-    const userId = sessionStorage.getItem('idDocumento');
+    // Intentar obtener ID de múltiples fuentes para robustez
+    let userId = sessionStorage.getItem('idDocumento');
+    if (!userId && this.usuario) {
+      userId = this.usuario.idDocumento || this.usuario.id || this.usuario.sub;
+    }
+    if (!userId) {
+      const stored = JSON.parse(localStorage.getItem('usuario') || '{}');
+      userId = stored.usuario?.idDocumento || stored.idDocumento;
+    }
+
+    console.log('Cargando panel de juez para Usuario ID:', userId);
+
     if (!userId) return;
 
     this.cargandoJuez = true;
-    this.apiService.getMisInvitaciones(userId).subscribe({
-      next: (invitations: any[]) => {
-        if (!invitations || !Array.isArray(invitations)) {
-          this.cargandoJuez = false;
-          return;
+
+    // Usamos forkJoin para traer todo lo necesario: inscripciones, invitaciones y la lista de campeonatos (para cruzar IDs)
+    forkJoin({
+      inscripciones: this.apiService.getMisInscripciones(userId).pipe(catchError(() => of([]))),
+      invitaciones: this.apiService.getMisInvitaciones(userId).pipe(catchError(() => of([]))),
+      campeonatos: this.apiService.getCampeonatos().pipe(catchError(() => of([]))) // Necesario para obtener IDs de invitaciones
+    }).subscribe({
+      next: ({ inscripciones, invitaciones, campeonatos }) => {
+        console.log('Datos crudos:', { inscripciones, invitaciones, campeonatos });
+
+        let listaUnificada: any[] = [];
+
+        // 1. Procesar Inscripciones (ya suelen traer ID)
+        if (Array.isArray(inscripciones)) {
+          listaUnificada = [...inscripciones];
         }
-        this.asignacionesJuez = invitations.filter(inv => {
-          const isAccepted = inv.estado === 'ACEPTADO' || inv.estado === 3;
-          const isJudge = inv.id_tipo === 6 || inv.id_tipo === 7 || inv.tipousuario === 6 || inv.tipousuario === 7;
-          return isAccepted && isJudge;
+
+        // 2. Procesar Invitaciones (Suelen venir sin ID de campeonato, solo nombre)
+        if (Array.isArray(invitaciones)) {
+          const invitacionesProcesadas = invitaciones.map(inv => {
+            // Normalizar DTO
+            const nombreCamp = inv.campeonato || inv.campeonatoNombre;
+            let idCamp = inv.id_campeonato || inv.idCampeonato || inv.campeonatoId;
+
+            // Si falta el ID, buscarlo en la lista de campeonatos por nombre
+            if (!idCamp && nombreCamp && Array.isArray(campeonatos)) {
+              const match = campeonatos.find((c: any) => c.nombre === nombreCamp);
+              if (match) {
+                idCamp = match.idCampeonato;
+              }
+            }
+
+            return {
+              ...inv,
+              campeonatoNombre: nombreCamp,
+              id_campeonato: idCamp,
+              // Normalizar tipos
+              tipousuario: inv.tipoUsuario || inv.tipousuario || inv.id_tipo,
+              estado: inv.estado
+            };
+          });
+          listaUnificada = [...listaUnificada, ...invitacionesProcesadas];
+        }
+
+        // 3. Filtrar Jueces Activos
+        const juecesActivos = listaUnificada.filter(item => {
+          const rawStatus = item.estado;
+          // Estado 3 = Aceptado/Inscrito, o string "ACEPTADO"
+          const isAccepted = String(rawStatus) === '3' || String(rawStatus).toUpperCase() === 'ACEPTADO';
+
+          const typeId = Number(item.tipousuario || item.id_tipo || item.idTipo || item.tipoUsuario);
+          // 6: Central, 7: Mesa, 8: Juez
+          const isJudge = [6, 7, 8].includes(typeId);
+
+          // Verificar que tengamos un ID de campeonato para redirigir
+          const hasId = !!(item.id_campeonato || item.idCampeonato || item.campeonatoId);
+
+          return isAccepted && isJudge && hasId;
         });
+
+        console.log('Jueces Filtrados Finales:', juecesActivos);
+
+        // 4. Mapeo final para la vista
+        this.asignacionesJuez = juecesActivos.map(a => ({
+          id_campeonato: a.id_campeonato || a.idCampeonato || a.campeonatoId,
+          campeonatoNombre: a.campeonatoNombre || a.nombreCampeonato || 'Campeonato',
+          rol: a.rol // Opcional
+        }));
+
+        // Eliminar duplicados por ID de campeonato (por si aparece en ambas listas)
+        this.asignacionesJuez = this.asignacionesJuez.filter((v, i, a) => a.findIndex(t => t.id_campeonato === v.id_campeonato) === i);
+
         this.cargandoJuez = false;
       },
-      error: (e) => {
-        console.error('Error al cargar invitaciones de juez', e);
+      error: (err) => {
+        console.error('Error cargando datos de juez', err);
         this.cargandoJuez = false;
       }
     });

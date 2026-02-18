@@ -89,4 +89,6 @@ export class ApiService {
   unassignTatami(championshipId: string | number, tatamiId: number) { return this.championship.unassignTatami(championshipId, tatamiId); }
   enviarResultadosSeccion(championshipId: string | number, sectionId: string, results: any) { return this.championship.enviarResultadosSeccion(championshipId, sectionId, results); }
   markCompetitorStatus(championshipId: string | number, sectionId: string, competitorId: string, status: any) { return this.championship.actualizarEstadoCompetidor(championshipId, sectionId, competitorId, status); }
+  getJudgeAssignment(championshipId: string | number, userId: string) { return this.championship.getJudgeAssignment(championshipId, userId); }
+  getCurrentMatch(championshipId: string | number, tatamiId: number) { return this.championship.getCurrentMatch(championshipId, tatamiId); }
 }

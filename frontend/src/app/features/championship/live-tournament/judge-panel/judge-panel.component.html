@@ -20,7 +20,8 @@
                 {{ seccionActual.nombre }} - {{ seccionActual.categoria }}
             </div>
 
-            <div class="competitors-board">
+            <!-- MODO COMBATE (1 vs 1) -->
+            <div class="competitors-board" *ngIf="modo === 'COMBATE'">
                 <!-- ROJO aka AKA -->
                 <div class="competitor red">
                     <div class="comp-info">
@@ -57,10 +58,39 @@
                 </div>
             </div>
 
+            <!-- MODO PUNTUACIÓN (Lista de Competidores) -->
+            <div class="competitors-list-mode" *ngIf="modo === 'PUNTUACION'">
+                <div class="list-header">
+                    <span>Competidor</span>
+                    <span>Puntaje Actual</span>
+                    <span *ngIf="rol !== 'Espectador'">Calificar</span>
+                </div>
+                <div class="competitor-list-item" *ngFor="let comp of competidores"
+                    [class.current]="comp.id === competidorActualId">
+                    <div class="comp-details">
+                        <span class="comp-name">{{ comp.nombre }}</span>
+                        <span class="comp-academy">{{ comp.academia }}</span>
+                        <span class="status-badge" *ngIf="comp.id === competidorActualId">En Turno</span>
+                    </div>
+                    <div class="comp-score-display">
+                        {{ comp.puntaje || '-' }}
+                    </div>
+                    <div class="comp-input-area" *ngIf="rol !== 'Espectador'">
+                        <input type="number" [(ngModel)]="comp.puntajeInput" placeholder="0.0" step="0.1">
+                        <button class="btn-score" (click)="calificarCompetidor(comp.id, comp.puntajeInput)">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="no-competitors" *ngIf="competidores.length === 0">
+                    <p>No hay competidores en lista.</p>
+                </div>
+            </div>
+
             <div class="match-actions" *ngIf="rol === 'Juez de Mesa'">
-                <button class="btn-timer-start"><i class="fas fa-play"></i> Iniciar Combate</button>
-                <button class="btn-timer-pause"><i class="fas fa-pause"></i> Pausar</button>
-                <button class="btn-finish"><i class="fas fa-flag-checkered"></i> Finalizar</button>
+                <button class="btn-timer-start"><i class="fas fa-play"></i> Inicio</button>
+                <button class="btn-timer-pause"><i class="fas fa-pause"></i> Pausa</button>
+                <button class="btn-finish"><i class="fas fa-flag-checkered"></i> Fin</button>
             </div>
         </section>
 

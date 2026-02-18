@@ -59,7 +59,20 @@ export class ChampionshipService {
         return this.http.delete(`${this.apiUrl}/inscripciones/${inscriptionId}`);
     }
 
-    // TODO: Endpoint no implementado en backend
+    /**
+     * Obtiene las invitaciones del usuario.
+     * Backend: Retornar invitaciones donde el usuario es invitado.
+     * Estructura esperada para Dashboard (Jueces):
+     * [
+     *   {
+     *     "id": 1,
+     *     "id_campeonato": 10,
+     *     "campeonatoNombre": "Torneo Nacional",
+     *     "estado": "ACEPTADO", // o 3
+     *     "id_tipo": 6 // 6=Juez Central, 7=Juez Mesa, etc.
+     *   }, ...
+     * ]
+     */
     getMisInvitaciones(userId: string | number): Observable<any[]> {
         return this.http.get<any[]>(`${this.apiUrl}/invitaciones/usuario/${userId}`);
     }
@@ -142,6 +155,23 @@ export class ChampionshipService {
         return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/matches/${matchId}/score`, scores);
     }
 
+    /**
+     * Actualiza el estado de un combate (ej. START, PAUSE, FINISH).
+     * Body esperado: { "status": "IN_PROGRESS" | "PAUSED" | "FINISHED" }
+     */
+    updateMatchStatus(championshipId: string | number, matchId: string, status: 'IN_PROGRESS' | 'PAUSED' | 'FINISHED'): Observable<any> {
+        return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/matches/${matchId}/status`, { status });
+    }
+
+    /**
+     * Enviar puntaje para un competidor específico en modalidad PUNTUACION / EXHIBICIÓN.
+     * Backend: Guardar el puntaje de la ronda para este competidor.
+     * Endpoint sugerido: PUT /campeonatos/{id}/live-management/matches/{matchId}/competitors/{competitorId}/score
+     */
+    updateCompetitorScore(championshipId: string | number, matchId: string, competitorId: string, score: number): Observable<any> {
+        return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/matches/${matchId}/competitors/${competitorId}/score`, { score });
+    }
+
     // --- Specific Live Flow Methods (Semantic Wrappers) ---
 
     startSection(championshipId: string | number, sectionId: string): Observable<any> {
@@ -191,5 +221,62 @@ export class ChampionshipService {
      */
     actualizarEstadoCompetidor(championshipId: string | number, sectionId: string, competitorId: string, status: 'AUSENTE' | 'DESCALIFICADO' | 'PRESENTE'): Observable<any> {
         return this.http.put(`${this.apiUrl}/campeonatos/${championshipId}/live-management/secciones/${sectionId}/competitors/${competitorId}/status`, { status });
+    }
+
+    /**
+     * Obtiene la asignación actual de un juez en un campeonato.
+     * Backend: Buscar en la tabla de asignaciones de tatami (o similar) donde el usuario sea juez.
+     * Retorna el ID y nombre del tatami asignado.
+     * 
+     * Respuesta esperada:
+     * {
+     *   "tatamiId": 1,
+     *   "nombre": "Tatami 1",
+     *   "rol": "Juez Central" // o 'Juez de Mesa', etc.
+     * }
+     * o null/404 si no tiene asignación activa.
+     */
+    getJudgeAssignment(championshipId: string | number, userId: string): Observable<any> {
+        return this.http.get(`${this.apiUrl}/campeonatos/${championshipId}/jueces/${userId}/asignacion`);
+    }
+
+    /**
+     * Obtiene el encuentro o la actividad actual en el tatami.
+     * 
+     * IMPORTANTE PARA INTEGRACIÓN CON BACKEND:
+     * Este endpoint debe ser capaz de retornar dos estructuras diferentes dependiendo de la modalidad:
+     * 
+     * 1. MODALIDAD COMBATE (1 vs 1, Rojo vs Azul):
+     *    Se usa para los enfrentamientos directos bajo el árbol de llaves de combate.
+     *    Estructura esperada:
+     *    {
+     *      "tipo": "COMBATE", // Identificador incuestionable
+     *      "matchId": "match-123",
+     *      "categoria": "Kumite Masculino -75kg",
+     *      "competidorRojo": { "id": "u1", "nombre": "...", "academia": "..." },
+     *      "competidorAzul": { "id": "u2", "nombre": "...", "academia": "..." },
+     *      "puntuacionRojo": 0,
+     *      "puntuacionAzul": 0,
+     *      "estado": "EN_PROGRESO"
+     *    }
+     * 
+     * 2. MODALIDAD PUNTUACIÓN / EXHIBICIÓN (Figuras, Defensa Personal, etc.):
+     *    En estas modalidades (generalmente mixtas) no existe Rojo vs Azul. Se compite en un solo grupo o tanda.
+     *    El backend debe retornar la lista de competidores de la categoría para ser evaluados.
+     *    Estructura esperada:
+     *    {
+     *      "tipo": "PUNTUACION",
+     *      "matchId": "group-456", // ID de la tanda o grupo
+     *      "categoria": "Figuras Mixto - Cinturones Negros",
+     *      "competidores": [
+     *         { "id": "u1", "nombre": "...", "academia": "...", "puntaje": 0, "orden": 1 },
+     *         { "id": "u2", "nombre": "...", "academia": "...", "puntaje": 0, "orden": 2 }
+     *      ],
+     *      "competidorActualId": "u1", // ID del competidor que está en turno (opcional pero recomendado)
+     *      "estado": "EN_PROGRESO"
+     *    }
+     */
+    getCurrentMatch(championshipId: string | number, tatamiId: number): Observable<any> {
+        return this.http.get(`${this.apiUrl}/campeonatos/${championshipId}/live-management/tatamis/${tatamiId}/current-match`);
     }
 }
