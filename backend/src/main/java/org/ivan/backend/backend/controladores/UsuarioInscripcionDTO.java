@@ -29,16 +29,34 @@ public class UsuarioInscripcionDTO {
     private long idincripcion;
     private String peso;
     private String campeonato;
+    private Long idcampeonato;
     private LocalDate fecha_inicio;
     private String ciudad_campeonato;
     private String nombre_Creador;
     private Integer tipoUsuario;
     private Integer rol;
+    private LocalDateTime fecha_inscripcion;
     // 🔴 ESTE ES EL ESTADO DE LA INSCRIPCIÓN
     private Integer estado;
 
     // 🔴 FECHA DE INSCRIPCIÓN
     private LocalDateTime fechaInscripcion;
+
+    public LocalDateTime getFecha_inscripcion() {
+        return fecha_inscripcion;
+    }
+
+    public void setFecha_inscripcion(LocalDateTime fecha_inscripcion) {
+        this.fecha_inscripcion = fecha_inscripcion;
+    }
+
+    public Long getIdcampeonato() {
+        return idcampeonato;
+    }
+
+    public void setIdcampeonato(Long idcampeonato) {
+        this.idcampeonato = idcampeonato;
+    }
 
     public Integer getRol() {
         return rol;

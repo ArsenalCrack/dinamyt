@@ -106,6 +106,7 @@ export class LiveTournamentComponent implements OnInit {
       .pipe(delay(1500))
       .subscribe({
         next: (data) => {
+          console.log(data)
           if (data && data.campeonato) {
             this.procesarDatosBackend(data);
           } else {

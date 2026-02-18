@@ -652,7 +652,7 @@ public class controlador_principal {
         for (Inscripciones ins : inscripciones) {
 
             UsuarioInscripcionDTO dto = new UsuarioInscripcionDTO();
-
+            dto.setFecha_inscripcion(ins.getFechaInscripcion());
             // ===== CAMPOS OBLIGATORIOS PARA EL FRONT =====
             dto.setIdincripcion(ins.getIdInscripcion());
             dto.setEstado(ins.getEstado());
@@ -660,6 +660,7 @@ public class controlador_principal {
             // ===========================================
 
             campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString())).ifPresent(c -> {
+                dto.setIdcampeonato(c.getIdCampeonato());
                 dto.setCampeonato(c.getNombre());
                 dto.setFecha_inicio(c.getFechaInicio());
                 dto.setCiudad_campeonato(c.getCiudad());
@@ -739,8 +740,7 @@ public class controlador_principal {
     }
 
     @PutMapping("/invitaciones/{invitationId}")
-    public ResponseEntity<?> respuestraainvitacion(@PathVariable Integer invitationId,
-            @RequestBody Map<String, Object> estado) {
+    public ResponseEntity<?> respuestraainvitacion(@PathVariable Integer invitationId,@RequestBody Map<String, Object> estado) {
         Inscripciones ins = inscripcionRepository.findById(invitationId)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         
@@ -778,8 +778,7 @@ public class controlador_principal {
     }
     
     @PutMapping("/inscripciones/{id}")
-    public ResponseEntity<?> responderinscripcion(@PathVariable Integer id,
-            @RequestBody Map<String, Object> estado) {
+    public ResponseEntity<?> responderinscripcion(@PathVariable Integer id,@RequestBody Map<String, Object> estado) {
         Inscripciones ins = inscripcionRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         
