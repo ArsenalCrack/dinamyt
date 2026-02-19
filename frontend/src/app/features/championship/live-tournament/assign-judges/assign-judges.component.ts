@@ -37,6 +37,7 @@ export class AssignJudgesComponent implements OnInit {
     // Asignaciones para ESTE tatami
     juezCentral: Juez | null = null;
     juezMesa: Juez | null = null;
+    juezRunning: Juez | null = null;
     juecesNormales: Juez[] = [];
 
     constructor(private api: ApiService) { }
@@ -88,6 +89,7 @@ export class AssignJudgesComponent implements OnInit {
                 const aj = t.juecesAsignados;
                 if (aj.central) this.marcarComoOcupado(aj.central.id);
                 if (aj.table) this.marcarComoOcupado(aj.table.id);
+                if (aj.running) this.marcarComoOcupado(aj.running.id);
                 if (aj.normal && Array.isArray(aj.normal)) {
                     aj.normal.forEach((j: any) => this.marcarComoOcupado(j.id));
                 }
@@ -110,6 +112,9 @@ export class AssignJudgesComponent implements OnInit {
             if (aj.table) {
                 this.juezMesa = this.jueces.find(j => String(j.id) === String(aj.table.id)) || aj.table;
             }
+            if (aj.running) {
+                this.juezRunning = this.jueces.find(j => String(j.id) === String(aj.running.id)) || aj.running;
+            }
             if (aj.normal && Array.isArray(aj.normal)) {
                 this.juecesNormales = aj.normal.map((nj: any) =>
                     this.jueces.find(j => String(j.id) === String(nj.id)) || nj
@@ -130,6 +135,7 @@ export class AssignJudgesComponent implements OnInit {
     estaSeleccionado(j: Juez): boolean {
         return (this.juezCentral?.id === j.id) ||
             (this.juezMesa?.id === j.id) ||
+            (this.juezRunning?.id === j.id) ||
             this.juecesNormales.some(nj => nj.id === j.id);
     }
 
@@ -143,6 +149,11 @@ export class AssignJudgesComponent implements OnInit {
 
     asignarMesa(j: Juez) {
         this.juezMesa = j;
+        this.filtrarJueces();
+    }
+
+    asignarRunning(j: Juez) {
+        this.juezRunning = j;
         this.filtrarJueces();
     }
 
@@ -161,6 +172,11 @@ export class AssignJudgesComponent implements OnInit {
         this.filtrarJueces();
     }
 
+    desasignarRunning() {
+        this.juezRunning = null;
+        this.filtrarJueces();
+    }
+
     desasignarNormal(indice: number) {
         this.juecesNormales.splice(indice, 1);
         this.filtrarJueces();
@@ -170,6 +186,7 @@ export class AssignJudgesComponent implements OnInit {
         const resultado = {
             central: this.juezCentral,
             table: this.juezMesa,
+            running: this.juezRunning,
             normal: this.juecesNormales
         };
         this.save.emit(resultado);

@@ -31,6 +31,10 @@
                                 [disabled]="!!juezMesa">
                                 M
                             </button>
+                            <button class="btn-icon" (click)="asignarRunning(judge)" title="Asignar como Juez Running"
+                                [disabled]="!!juezRunning">
+                                R
+                            </button>
                             <button class="btn-icon" (click)="asignarNormal(judge)" title="Asignar como Juez">
                                 J
                             </button>
@@ -84,6 +88,24 @@
                             </div>
                         </ng-container>
                         <ng-template #emptyTable>
+                            <div class="empty-slot">Sin asignar</div>
+                        </ng-template>
+                    </div>
+                </div>
+
+                <!-- Running Judge Slot -->
+                <div class="slot-group">
+                    <label>Juez Running (1)</label>
+                    <div class="slot running-slot" [class.filled]="juezRunning">
+                        <ng-container *ngIf="juezRunning; else emptyRunning">
+                            <div class="assigned-judge">
+                                <span class="avatar">{{ juezRunning.nombre.charAt(0) }}</span>
+                                <span class="name">{{ juezRunning.nombre }}</span>
+                                <button class="btn-remove" (click)="desasignarRunning()"><i
+                                        class="fas fa-times"></i></button>
+                            </div>
+                        </ng-container>
+                        <ng-template #emptyRunning>
                             <div class="empty-slot">Sin asignar</div>
                         </ng-template>
                     </div>

@@ -1,0 +1,80 @@
+falta implementar en el backend:
+- updateCampeonato
+para pasar un campeonato de borrador a publico
+--------------------------------------------------------------------------------
+agregar un nuevo tipo de usuario... 
+10 - Juez Running (no tiene ninguna accion dentro de la aplicación pero si tiene titulo dentro del campeonato
+                    me pidieron añadirlo....)
+--------------------------------------------------------------------------------
+Aparecen 0 participantes en los otros 2 campeonatos, cuando ya hay usuarios aceptados....  
+--------------------------------------------------------------------------------
+[URGENTE] FIX para Asignación de Jueces (Error 404)
+El frontend envía una petición POST a la ruta: 
+/campeonatos/{championshipId}/live-management/tatamis/{tatamiId}/jueces
+
+Actualmente el backend tiene mapeado: 
+@PostMapping("/tatamis/{tatamiId}/jueces")
+
+Esto causa un error 404 (Not Found) porque las rutas no coinciden. 
+Además, el método en Java 'assignJudgesToTatami' declara @PathVariable Long championshipId, 
+pero esta variable NO está presente en la ruta actual del @PostMapping, 
+lo cual provocaría un error interno incluso si coincidiera la ruta base.
+
+SOLUCION REQUERIDA:
+Actualizar el mapeo en controlador_principal.java para que coincida con la estructura jerárquica 
+y capture ambas variables:
+
+@PostMapping("/campeonatos/{championshipId}/live-management/tatamis/{tatamiId}/jueces")
+private ResponseEntity<?> assignJudgesToTatami(@PathVariable Long championshipId, @PathVariable Long tatamiId, @RequestBody Map<String, Object> body) { ... }
+
+--------------------------------------------------------------------------------
+
+usted acomodo para cuando actualicen en editar cameponato privado, el codigo no cambie?
+--------------------------------------------------------------------------------
+[CRÍTICO] ERROR 500 al Publicar Campeonato - Causa y Solución
+
+API AFECTADA: PUT /api/campeonatos/{id}
+MÉTODO JAVA: actualizarCampeonato (en controlador_principal.java)
+
+EL COMPORTAMIENTO ESPERADO:
+Cuando el usuario pulsa el botón "Sí, publicar" en el frontend, se envía una petición para cambiar:
+- estado: de "BORRADOR" a "LISTO"
+- esPublico: de true/false a true
+- visible: true
+
+EL PROBLEMA ACTUAL:
+1. El backend tiene hardcodeado `campeonato.setEstado("BORRADOR")` en la línea 419, lo que impide publicar el campeonato.
+2. El backend falla con Error 500 al intentar parsear las fechas (`LocalDate.parse`) porque reciben hora (ISO String) y solo esperan la fecha (YYYY-MM-DD).
+
+SOLUCIÓN REQUERIDA EN BACKEND (diferir la lógica dentro de actualizarCampeonato):
+
+// 1. PERMITIR CAMBIO DE ESTADO (Eliminar el hardcode de "BORRADOR" de la línea 419)
+if (datos.get("estado") != null) {
+    campeonato.setEstado(datos.get("estado").toString());
+} else {
+    // Si no viene estado explícito, deducirlo
+    if (datos.get("esPublico") != null && Boolean.parseBoolean(datos.get("esPublico").toString())) {
+        campeonato.setEstado("LISTO"); // Publicar como Listo / Activo
+    } else {
+        campeonato.setEstado("BORRADOR"); // Mantener borrador
+    }
+}
+
+// 2. CORREGIR PARSEO DE FECHAS (Evitar crash 500)
+if (datos.get("fechaInicio") != null) {
+    // Separamos por "T" para tomar solo la fecha YYYY-MM-DD
+    String fechaStr = datos.get("fechaInicio").toString().split("T")[0]; 
+    campeonato.setFechaInicio(LocalDate.parse(fechaStr));
+}
+if (datos.get("fechaFin") != null) {
+    String fechaStr = datos.get("fechaFin").toString().split("T")[0];
+    campeonato.setFecha_fin(LocalDate.parse(fechaStr));
+}
+
+// 3. NO regenerar código si ya existe (Evitar romper accesos previos)
+if (datos.get("esPublico") != null && !Boolean.parseBoolean(datos.get("esPublico").toString())) {
+    if (campeonato.getCodigo() == null || campeonato.getCodigo().isEmpty()) {
+       campeonato.setCodigo(GenerarCodigo());
+    }
+}
+--------------------------------------------------------------------------------

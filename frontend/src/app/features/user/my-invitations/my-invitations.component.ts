@@ -217,6 +217,7 @@ export class MyInvitationsComponent implements OnInit {
       case 6: return 'Juez Central';
       case 7: return 'Juez de Mesa';
       case 8: return 'Juez';
+      case 10: return 'Juez Running';
       default: return 'Participante';
     }
   }

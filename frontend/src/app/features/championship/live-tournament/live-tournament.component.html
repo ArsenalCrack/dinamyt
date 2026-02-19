@@ -165,13 +165,47 @@
                                 </button>
                             </div>
 
+                            <!-- Título de la Modalidad ACTUAL (Index 0) -->
                             <h3 class="section-title">
+                                <span class="badge-current" *ngIf="tatami.estadoModalidad !== 'RUNNING'">ACTUAL</span>
                                 {{ formatearNombreModalidad(tatami.modalidadActualId!) }}
                             </h3>
 
+                            <!-- Selector de Siguientes (Solo Index > 0) -->
+                            <div class="modality-queue"
+                                *ngIf="tatami.estadoModalidad !== 'RUNNING' && tatami.colaModalidades && tatami.colaModalidades.length > 1">
+                                <label class="queue-label">Siguientes (Click para cambiar orden):</label>
+                                <div class="queue-chips custom-scrollbar">
+                                    <ng-container *ngFor="let modId of tatami.colaModalidades; let i = index">
+                                        <!-- Solo mostrar del 2do en adelante -->
+                                        <div class="chip" *ngIf="i > 0" (click)="promoverModalidad(tatami, modId)"
+                                            title="Click para hacer ACTUAL">
+
+                                            <!-- Move Left/Up -->
+                                            <button class="move-btn" *ngIf="i > 1"
+                                                (click)="moverModalidad(tatami, i, -1, $event)" title="Adelantar">
+                                                <i class="fas fa-chevron-left"></i>
+                                            </button>
+
+                                            <span class="chip-content">
+                                                <i class="fas fa-arrow-up promote-icon"></i>
+                                                {{ formatearNombreModalidad(modId) }}
+                                            </span>
+
+                                            <!-- Move Right/Down -->
+                                            <button class="move-btn" *ngIf="i < tatami.colaModalidades.length - 1"
+                                                (click)="moverModalidad(tatami, i, 1, $event)" title="Retrasar">
+                                                <i class="fas fa-chevron-right"></i>
+                                            </button>
+                                        </div>
+                                    </ng-container>
+                                </div>
+                            </div>
+
                             <div class="next-up-info"
-                                *ngIf="tatami.colaModalidades && tatami.colaModalidades.length > 1">
-                                <small>Siguiente: {{ formatearNombreModalidad(tatami.colaModalidades[1]) }}</small>
+                                *ngIf="tatami.estadoModalidad === 'RUNNING' && tatami.colaModalidades && tatami.colaModalidades.length > 1">
+                                <small>Siguiente en cola: {{ formatearNombreModalidad(tatami.colaModalidades[1])
+                                    }}</small>
                             </div>
 
                             <div class="competitors-section">
@@ -252,7 +286,7 @@
             <div class="modal-body custom-scrollbar">
                 <div class="group-list">
                     <div class="group-card" *ngFor="let group of gruposFiltradosParaSeleccion"
-                        (click)="seleccionarGrupo(group)" [class.stolen]="group.tatamiOrigenId">
+                        (click)="seleccionarGrupo(group)" [class.stolen-border]="group.tatamiOrigenId">
                         <div class="group-details">
                             <h3>
                                 <i class="fas fa-users"></i> {{ obtenerNombreModalidadPrincipal(group) }}
@@ -262,8 +296,7 @@
                                 <span class="tag-badge">{{ group.cinturon }}</span>
                                 <span class="tag-badge">{{ group.edad }} años</span>
                                 <span class="tag-badge">{{ group.peso }} kg</span>
-                                <span *ngIf="group.tatamiOrigenId" class="tag-badge"
-                                    style="background: #333; border-color: #ffd700; color: #ffd700; display: flex; align-items: center; gap: 0.3rem;">
+                                <span *ngIf="group.tatamiOrigenId" class="tag-badge stolen-tag">
                                     <i class="fas fa-exchange-alt"></i> TRAER DE TATAMI {{ group.tatamiOrigenId }}
                                 </span>
                             </div>

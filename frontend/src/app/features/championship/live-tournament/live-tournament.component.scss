@@ -1064,3 +1064,117 @@ $glass-bg: rgba(30, 30, 30, 0.85);
         grid-template-columns: 1fr;
     }
 }
+/* Modality Queue Chips */
+.modality-queue {
+    margin: 0.5rem 0;
+    max-width: 100%;
+}
+
+.queue-label {
+    display: block;
+    font-size: 0.7rem;
+    color: #888;
+    margin-bottom: 0.3rem;
+}
+
+.queue-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.chip {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    color: #ccc;
+    
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+    
+    &.active {
+        background: $accent-red; 
+        color: white;
+        border-color: $accent-red;
+        font-weight: 600;
+        cursor: default;
+    }
+    
+    i {
+        font-size: 0.7rem;
+    }
+    
+}
+
+/* Current Modality Badge */
+.badge-current {
+    display: inline-block;
+    background: $accent-green; 
+    color: black;
+    font-size: 0.6rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    font-weight: 800;
+}
+
+/* Stolen Group Badge */
+.stolen-border {
+    border: 2px dashed rgb(255, 215, 0) !important;
+    background: rgba(255, 215, 0, 0.05) !important;
+}
+
+.stolen-tag {
+    background: rgb(255, 193, 7) !important;
+    color: black !important;
+    font-weight: 800 !important;
+    border: 1px solid rgb(255, 160, 0) !important;
+    animation: pulse-slow 2s infinite;
+}
+
+@keyframes pulse-slow {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; }
+    100% { opacity: 0.8; }
+}
+
+/* Move Buttons in Chips */
+.move-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    padding: 0 0.3rem;
+    cursor: pointer;
+    font-size: 0.7rem;
+    transition: color 0.2s;
+    
+    &:hover {
+        color: white;
+    }
+}
+
+.chip-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0 0.2rem;
+}
+
+/* Ensure the chip flex direction allows correct spacing */
+.chip {
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+}

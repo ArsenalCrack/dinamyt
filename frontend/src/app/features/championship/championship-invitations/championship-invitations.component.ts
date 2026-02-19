@@ -34,7 +34,8 @@ export class ChampionshipInvitationsComponent implements OnInit {
   opcionesRolJuez = [
     { value: 'Juez Central', label: 'Juez Central' },
     { value: 'Juez de Mesa', label: 'Juez de Mesa' },
-    { value: 'Juez', label: 'Juez' }
+    { value: 'Juez', label: 'Juez' },
+    { value: 'Juez Running', label: 'Juez Running' }
   ];
 
   // Estados
@@ -271,6 +272,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
         case 'Juez Central': idTipo = 6; break;
         case 'Juez de Mesa': idTipo = 7; break;
         case 'Juez': idTipo = 8; break;
+        case 'Juez Running': idTipo = 10; break;
         default: idTipo = 8;
       }
     }

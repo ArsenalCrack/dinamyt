@@ -208,32 +208,34 @@ export class LiveTournamentComponent implements OnInit {
     // 1. Obtener grupos disponibles estándar
     let candidatos: GrupoSeleccionable[] = [...this.gruposDisponibles];
 
-    // 2. Si NO hay grupos estándar, buscar elementos "robables"
-    if (candidatos.length === 0) {
+    // 2. SIEMPRE Buscar elementos "robables" de otros tatamis (Multitarea)
 
-      // A. Buscar "Grupos en cola siguiente" (Grupos completos esperando)
-      this.tatamis.forEach(t => {
-        if (t.id !== tatami.id && t.siguienteGrupo) {
-          candidatos.push({ ...t.siguienteGrupo, tatamiOrigenId: t.id });
-        }
-      });
+    // A. Buscar "Grupos en cola siguiente" (Grupos completos esperando en otro lado)
+    this.tatamis.forEach(t => {
+      if (t.id !== tatami.id && t.siguienteGrupo) {
+        candidatos.push({ ...t.siguienteGrupo, tatamiOrigenId: t.id });
+      }
+    });
 
-      // B. Buscar "Modalidades pendientes" en grupos OCUPADOS (Dividir grupos activos)
-      this.tatamis.forEach(t => {
-        if (t.id !== tatami.id && t.estado === 'BUSY' && t.grupoActual && t.colaModalidades && t.colaModalidades.length > 1) {
-          const siguienteModalidadId = t.colaModalidades[1];
-          if (siguienteModalidadId) {
-            candidatos.push({
-              ...t.grupoActual,
-              activeModalities: [siguienteModalidadId],
-              tatamiOrigenId: t.id,
-              esParcial: true,
-              modalidadARobar: siguienteModalidadId
-            });
-          }
+    // B. Buscar "Modalidades pendientes" en grupos OCUPADOS (Dividir grupos activos)
+    // ITERAR TODAS las modalidades pendientes, no solo la siguiente inmediata
+    this.tatamis.forEach(t => {
+      if (t.id !== tatami.id && t.estado === 'BUSY' && t.grupoActual && t.colaModalidades && t.colaModalidades.length > 1) {
+
+        // Empezamos desde 1 porque 0 es la actual ejecutándose
+        for (let i = 1; i < t.colaModalidades.length; i++) {
+          const modId = t.colaModalidades[i];
+
+          candidatos.push({
+            ...t.grupoActual, // Copiar datos demográficos del grupo base
+            activeModalities: [modId], // Solo esta modalidad específica
+            tatamiOrigenId: t.id,
+            esParcial: true,
+            modalidadARobar: modId
+          });
         }
-      });
-    }
+      }
+    });
 
     if (totalTatamis < 2) {
       this.gruposFiltradosParaSeleccion = candidatos;
@@ -323,6 +325,20 @@ export class LiveTournamentComponent implements OnInit {
     }
   }
 
+  promoverModalidad(tatami: Tatami, modalidadId: string) {
+    if (!tatami.colaModalidades || tatami.estadoModalidad === 'RUNNING') return;
+
+    const index = tatami.colaModalidades.indexOf(modalidadId);
+    if (index > 0) {
+      // Remover de su posición actual
+      tatami.colaModalidades.splice(index, 1);
+      // Poner al principio
+      tatami.colaModalidades.unshift(modalidadId);
+      // Actualizar la actual
+      tatami.modalidadActualId = modalidadId;
+    }
+  }
+
   iniciarModalidadActual(tatami: Tatami) {
     if (!tatami.modalidadActualId || !this.idCampeonato) return;
 
@@ -405,8 +421,34 @@ export class LiveTournamentComponent implements OnInit {
 
   formatearNombreModalidad(idCompleto: string): string {
     if (!idCompleto) return '';
+    // Extraer nombre base
     const partes = idCompleto.split('-');
-    return partes[0].replace(/_/g, ' ');
+    let nombre = partes[0].replace(/_/g, ' ');
+
+    // Añadir distintivo de género completo
+    const upperId = idCompleto.toUpperCase();
+    if (upperId.includes('MASCULINO')) nombre += ' (Masculino)';
+    else if (upperId.includes('FEMENINO')) nombre += ' (Femenino)';
+    else if (upperId.includes('MIXTO')) nombre += ' (Mixto)';
+
+    return nombre;
+  }
+
+  // Permite reordenar las modalidades pendientes (índices 1 en adelante)
+  moverModalidad(tatami: Tatami, index: number, direction: number, event: Event) {
+    event.stopPropagation(); // Evitar activar el click principal del chip
+    if (!tatami.colaModalidades) return;
+
+    const newIndex = index + direction;
+
+    // Solo permitir movimientos dentro de la zona de "pendientes" (índice 1 hacia adelante)
+    // No permitimos tocar el índice 0 (Actual) con estas flechas
+    if (newIndex < 1 || newIndex >= tatami.colaModalidades.length) return;
+
+    // Intercambio simple
+    const temp = tatami.colaModalidades[newIndex];
+    tatami.colaModalidades[newIndex] = tatami.colaModalidades[index];
+    tatami.colaModalidades[index] = temp;
   }
 
   // Usado en HTML para obtener competidores de la modalidad en curso
@@ -421,6 +463,8 @@ export class LiveTournamentComponent implements OnInit {
     }
     const primera = grupo.activeModalities[0];
     if (!primera) return 'Grupo';
+
+    // Para el título del grupo, usamos el nombre base limpio
     return primera.split('-')[0].replace(/_/g, ' ');
   }
 
