@@ -1,1 +1,0 @@
-|| sigue dando el error de borrar la invitación por la variable mal o no enviada 

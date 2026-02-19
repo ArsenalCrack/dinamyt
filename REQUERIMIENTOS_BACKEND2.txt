@@ -2,10 +2,6 @@ falta implementar en el backend:
 - updateCampeonato
 para pasar un campeonato de borrador a publico
 --------------------------------------------------------------------------------
-agregar un nuevo tipo de usuario... 
-10 - Juez Running (no tiene ninguna accion dentro de la aplicación pero si tiene titulo dentro del campeonato
-                    me pidieron añadirlo....)
---------------------------------------------------------------------------------
 Aparecen 0 participantes en los otros 2 campeonatos, cuando ya hay usuarios aceptados....  
 --------------------------------------------------------------------------------
 [URGENTE] FIX para Asignación de Jueces (Error 404)

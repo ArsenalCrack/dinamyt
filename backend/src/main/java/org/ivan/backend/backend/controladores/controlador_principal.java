@@ -722,6 +722,15 @@ public class controlador_principal {
     private ResponseEntity<?> elimiarinscripcionpropia(@PathVariable Integer inscriptionId) {
         Inscripciones ins = inscripcionRepository.findById(inscriptionId)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        System.out.println(ins.getEstado());
+        System.out.println(ins.getEstado());
+        if (ins.getEstado()==3 && ins.getTipousuario()==5) {
+            Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
+                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+            campeonato.setParticipantes(campeonato.getParticipantes()-1);
+            System.out.println(campeonato.getNombre());
+            campeonatoRepository.save(campeonato);
+        }
         ins.setVisible(false);
         inscripcionRepository.save(ins);
         return ResponseEntity.ok(ins);
@@ -731,6 +740,14 @@ public class controlador_principal {
     private ResponseEntity<?> eliminarinvitacion(@PathVariable Integer inscriptionId) {
         Inscripciones ins = inscripcionRepository.findById(inscriptionId)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        System.out.println(ins.getEstado());
+        if (ins.getEstado()==3 && ins.getTipousuario()==5) {
+            Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
+                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+            campeonato.setParticipantes(campeonato.getParticipantes()-1);
+            System.out.println(campeonato.getNombre());
+            campeonatoRepository.save(campeonato);
+        }
         ins.setVisible(false);
         inscripcionRepository.save(ins);
         return ResponseEntity.ok(ins);
@@ -741,18 +758,24 @@ public class controlador_principal {
             @RequestBody Map<String, Object> estado) {
         Inscripciones ins = inscripcionRepository.findById(invitationId)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
+        Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
+                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
         ObjectMapper mapper = new ObjectMapper();
         System.out.println(invitationId + " " + estado);
         if (estado.get("estado").toString().equals("ACEPTADO")) {
             ins.setEstado(3);
 
-            List<String> lista = mapper.readValue(
-                    ins.getSecciones(),
-                    new TypeReference<List<String>>() {
-                    });
-            Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
-                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+            List<String> lista;
+
+            if (ins.getSecciones() == null || ins.getSecciones().isBlank()) {
+                inscripcionRepository.save(ins);
+                return ResponseEntity.ok("");
+            } else {
+                lista = mapper.readValue(
+                        ins.getSecciones(),
+                        new TypeReference<List<String>>() {}
+                );
+            }
             List<String> actualesCampeonato = new ArrayList<>();
             if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
                 actualesCampeonato = mapper.readValue(
@@ -769,7 +792,12 @@ public class controlador_principal {
             campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
             campeonatoRepository.save(campeonato);
             inscripcionRepository.save(ins);
-        } else {
+        } else {            
+            if (ins.getEstado()==3 && ins.getTipousuario()==5) {
+                campeonato.setParticipantes(campeonato.getParticipantes()-1);
+                System.out.println(campeonato.getNombre());
+                campeonatoRepository.save(campeonato);
+        }
             ins.setEstado(4);
             inscripcionRepository.save(ins);
         }
@@ -780,7 +808,8 @@ public class controlador_principal {
     public ResponseEntity<?> responderinscripcion(@PathVariable Integer id, @RequestBody Map<String, Object> estado) {
         Inscripciones ins = inscripcionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
+        Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
+                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
         ObjectMapper mapper = new ObjectMapper();
         System.out.println(id + " " + estado);
         if (estado.get("estado").toString().equals("3")) {
@@ -790,8 +819,6 @@ public class controlador_principal {
                     ins.getSecciones(),
                     new TypeReference<List<String>>() {
                     });
-            Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
-                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
             System.out.println(campeonato.getIdCampeonato());
             List<String> actualesCampeonato = new ArrayList<>();
             if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
@@ -807,9 +834,15 @@ public class controlador_principal {
             }
 
             campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
+            campeonato.setParticipantes(campeonato.getParticipantes()+1);
             campeonatoRepository.save(campeonato);
             inscripcionRepository.save(ins);
         } else {
+            if (ins.getEstado()==3 && ins.getTipousuario()==5) {
+                campeonato.setParticipantes(campeonato.getParticipantes()-1);
+                System.out.println(campeonato.getNombre());
+                campeonatoRepository.save(campeonato);
+        }
             ins.setEstado(4);
             inscripcionRepository.save(ins);
         }

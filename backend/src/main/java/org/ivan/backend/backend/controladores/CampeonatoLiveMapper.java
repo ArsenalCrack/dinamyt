@@ -41,13 +41,30 @@ public class CampeonatoLiveMapper {
 
         Set<String> seccionesActivas = leerSeccionesActivas(cam);
 
-        Map<String, List<UsuarioInscripcionDTO>> masculinos = new HashMap<>();
-        Map<String, List<UsuarioInscripcionDTO>> femeninos = new HashMap<>();
-        Map<String, List<UsuarioInscripcionDTO>> mixtos = new HashMap<>();
+        Map<String, Map<String, List<UsuarioInscripcionDTO>>> masculinos = new HashMap<>();
+        Map<String, Map<String, List<UsuarioInscripcionDTO>>> femeninos = new HashMap<>();
+        Map<String, Map<String, List<UsuarioInscripcionDTO>>> mixtos = new HashMap<>();
+
+        Set<Long> usuarioIds = new HashSet<>();
 
         for (Inscripciones ins : inscripciones) {
+            if (ins.getUsuario() != null) {
+                usuarioIds.add(ins.getUsuario());
+            }
+        }
 
-            Usuario u = usuarioRepository.findById(ins.getUsuario()).orElse(null);
+        List<Usuario> usuarios = usuarioRepository.findByIdDocumentoIn(
+                new ArrayList<>(usuarioIds)
+        );
+
+        Map<Long, Usuario> usuarioMap = new HashMap<>();
+        for (Usuario u : usuarios) {
+            usuarioMap.put(u.getIdDocumento(), u);
+        }
+        
+        for (Inscripciones ins : inscripciones) {
+
+            Usuario u = usuarioMap.get(ins.getUsuario());
             if (u == null || ins.getSecciones() == null) continue;
 
             List<String> seccionesUsuario = leerSecciones(ins);
@@ -60,15 +77,23 @@ public class CampeonatoLiveMapper {
 
                 UsuarioInscripcionDTO dto = crearDTO(u, ins, seccion);
 
+                Map<String, Map<String, List<UsuarioInscripcionDTO>>> destino;
+
                 if (seccion.contains("MIXTO")) {
-                    mixtos.computeIfAbsent(modalidad, k -> new ArrayList<>()).add(dto);
+                    destino = mixtos;
+                } else if (seccion.contains("MASCULINO")) {
+                    destino = masculinos;
+                } else if (seccion.contains("FEMENINO")) {
+                    destino = femeninos;
+                } else {
+                    continue;
                 }
-                else if (seccion.contains("MASCULINO")) {
-                    masculinos.computeIfAbsent(modalidad, k -> new ArrayList<>()).add(dto);
-                }
-                else if (seccion.contains("FEMENINO")) {
-                    femeninos.computeIfAbsent(modalidad, k -> new ArrayList<>()).add(dto);
-                }
+
+                // modalidad -> seccion -> lista
+                destino
+                        .computeIfAbsent(modalidad, k -> new HashMap<>())
+                        .computeIfAbsent(seccion, k -> new ArrayList<>())
+                        .add(dto);
             }
         }
 
@@ -136,13 +161,11 @@ public class InscripcionOrdenador {
     );
 
     public static void ordenarPorEdadYCinturon(
-            Map<String, List<UsuarioInscripcionDTO>> mapa
+            Map<String, Map<String, List<UsuarioInscripcionDTO>>> mapa
     ) {
         Comparator<UsuarioInscripcionDTO> comparador =
                 Comparator
-                        // 1️⃣ EDAD (dinámica)
                         .comparingInt(CampeonatoLiveMapper::calcularEdad)
-                        // 2️⃣ CINTURÓN (orden lógico, no alfabético)
                         .thenComparingInt(dto ->
                                 ORDEN_CINTURON.getOrDefault(
                                         dto.getCinturonRango().toUpperCase(),
@@ -150,7 +173,11 @@ public class InscripcionOrdenador {
                                 )
                         );
 
-        mapa.values().forEach(lista -> lista.sort(comparador));
+        mapa.values().forEach(mapaSecciones ->
+                mapaSecciones.values().forEach(lista ->
+                        lista.sort(comparador)
+                )
+        );
     }
 }
 private static int calcularEdad(UsuarioInscripcionDTO dto) {
