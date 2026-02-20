@@ -149,34 +149,42 @@ export class LiveTournamentComponent implements OnInit {
 
     const extraer = (datosGrupo: any) => {
       if (!datosGrupo) return;
-      Object.keys(datosGrupo).forEach(modalidad => {
-        const usuarios = datosGrupo[modalidad];
-        if (Array.isArray(usuarios)) {
-          usuarios.forEach((u: any) => {
-            const seccionId = (u.secciones && u.secciones.length > 0) ? u.secciones[0] : 'DESCONOCIDO';
-            if (!this.mapaCompetidores.has(seccionId)) {
-              this.mapaCompetidores.set(seccionId, []);
+      Object.keys(datosGrupo).forEach(modalidadBase => {
+        const secciones = datosGrupo[modalidadBase];
+        if (secciones && typeof secciones === 'object' && !Array.isArray(secciones)) {
+          Object.keys(secciones).forEach(seccionId => {
+            const usuarios = secciones[seccionId];
+            if (Array.isArray(usuarios)) {
+              if (!this.mapaCompetidores.has(seccionId)) {
+                this.mapaCompetidores.set(seccionId, []);
+              }
+              usuarios.forEach((u: any) => {
+                this.mapaCompetidores.get(seccionId)?.push({
+                  id: u.idDocumento,
+                  nombre: u.nombreC,
+                  academia: u.academia || 'Sin Academia',
+                  cinturon: u.cinturonRango,
+                  peso: u.peso,
+                  genero: u.sexo,
+                  edad: calcularEdad(u.fechaNacimiento),
+                  estado: u.estado || 'INSCRITO'
+                });
+              });
             }
-            this.mapaCompetidores.get(seccionId)?.push({
-              id: u.idDocumento,
-              nombre: u.nombreC,
-              academia: u.academia || 'Sin Academia',
-              cinturon: u.cinturonRango,
-              peso: u.peso,
-              genero: u.sexo,
-              edad: calcularEdad(u.fechaNacimiento),
-              estado: u.estado || 'INSCRITO'
-            });
           });
         }
       });
     };
 
-    if (data.individuales) {
-      extraer(data.individuales.masculinos);
-      extraer(data.individuales.femeninos);
+    if (data.individualesFemeninos) {
+      extraer(data.individualesFemeninos);
     }
-    extraer(data.mixtos);
+    if (data.individualesMasculinos) {
+      extraer(data.individualesMasculinos);
+    }
+    if (data.mixtos) {
+      extraer(data.mixtos);
+    }
 
     // 3. Procesar secciones mediante el servicio
     const reglasSeciones = this.liveService.parseSecciones(data.campeonato.secciones);
@@ -342,6 +350,29 @@ export class LiveTournamentComponent implements OnInit {
   iniciarModalidadActual(tatami: Tatami) {
     if (!tatami.modalidadActualId || !this.idCampeonato) return;
 
+    // Obtener los competidores de la modalidad que intenta iniciar
+    const competidoresIntentandoIniciar = this.obtenerCompetidoresModalidad(tatami.modalidadActualId) || [];
+    if (competidoresIntentandoIniciar.length === 0) {
+      alert("No hay competidores en esta modalidad.");
+      return;
+    }
+
+    const idsIntentando = new Set(competidoresIntentandoIniciar.map(c => c.id));
+
+    // Revisar otros tatamis que estén en estado RUNNING
+    for (const otroTatami of this.tatamis) {
+      if (otroTatami.id !== tatami.id && otroTatami.estadoModalidad === 'RUNNING' && otroTatami.modalidadActualId) {
+        const competidoresCorriendo = this.obtenerCompetidoresModalidad(otroTatami.modalidadActualId) || [];
+
+        // Verificar intersección
+        const hayConflicto = competidoresCorriendo.some(c => idsIntentando.has(c.id));
+        if (hayConflicto) {
+          alert(`No se puede iniciar. Hay competidores de este grupo que actualmente están compitiendo en el ${otroTatami.nombre} (${this.formatearNombreModalidad(otroTatami.modalidadActualId)}).`);
+          return;
+        }
+      }
+    }
+
     tatami.estadoModalidad = 'RUNNING';
 
     this.api.startSection(this.idCampeonato, tatami.modalidadActualId).subscribe({
@@ -417,6 +448,18 @@ export class LiveTournamentComponent implements OnInit {
 
   obtenerTituloGrupo(grupo: DemographicGroup): string {
     return this.liveService.formatDemographicName(grupo);
+  }
+
+  obtenerPesoActual(tatami: Tatami): string {
+    if (tatami.modalidadActualId) {
+      const match = tatami.modalidadActualId.match(/PESO\((.*?)\)/);
+      if (match) {
+        return match[1].replace(/_/g, '-') + ' kg';
+      }
+    }
+    const peso = tatami.grupoActual?.peso || '';
+    if (peso === 'Varios Pesos') return peso;
+    return peso ? peso + ' kg' : '';
   }
 
   formatearNombreModalidad(idCompleto: string): string {

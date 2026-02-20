@@ -1,0 +1,146 @@
+Se ha detectado un bug grave en la inscripción a campeonatos que arroja el error: 
+"Query did not return a unique result: 2 results were returned".
+
+Este error pertenece netamente al Backend y es arrojado por Hibernate/JPA cuando un usuario (que ya tiene previamente una inscripción de otro rol, como "Juez") intenta completar su proceso de "Aceptar Invitación y ser Competidor", enviando un POST a `/inscripciones`.
+
+¿QUÉ CAUSA ESTE ERROR EXACTAMENTE?
+En nuestro archivo `controlador_principal.java`, aproximadamente en la línea 483-485 del método `@PostMapping("/inscripciones")`, intentamos verificar si el usuario ya existe en el torneo mediante esta consulta cruda:
+
+    Inscripciones inscripcion = inscripcionRepository
+            .findByUsuarioAndCampeonato(usuario.getIdDocumento(), campeonato.getIdCampeonato())
+            .orElseGet(Inscripciones::new);
+
+El problema con esto es que ese método "findByUsuarioAndCampeonato" buscará la primera inscripción que encuentre de ese usuario en ese campeonato, SIN IMPORTAR EL ROL. Entonces, si el usuario ya está agregado al evento como "Juez" (y en mesa además de eso, recibió una invitación como "Competidor" que generó un borrador paralelo), el servidor detectará "2 inscripciones", y como Hibernate está programado asumiendo que el método "findBy" con .Optional devolverá solo MÁXIMO 1, este colapsa tirando la excepción y retornando error 500 al cliente de Angular, truncando toda la lógica e impidiendo al competidor seleccionar sus pesos.
+
+¿CÓMO SOLUCIONARLO?
+Tenemos que permitir la coexistencia de múltiples inscripciones para un mismo usuario (hasta 3), siempre y cuando sus roles (tipousuario) sean distintos.
+
+1. Como el envío JSON normal que llega a `/inscripciones` desde Angular está puramente destinado a los "Competidores", vamos a hacer que la búsqueda limite obligatoriamente al tipo de usuario ID = 5. De esta manera, si la persona ya es "Juez", esa fila en la base de datos será totalmente ignorada e invisible, y buscará crear o modificar EXCLUSIVAMENTE la inscripción de "Competidor" (Tipousuario 5).
+
+CAMBIA EN TU CONTROLADOR `/inscripciones` ESTO:
+------------------------------------------
+Inscripciones inscripcion = inscripcionRepository
+        .findByUsuarioAndCampeonato(usuario.getIdDocumento(), campeonato.getIdCampeonato())
+        .orElseGet(Inscripciones::new);
+
+POR ESTO:
+------------------------------------------
+Inscripciones inscripcion = inscripcionRepository
+        .findByUsuarioAndCampeonatoAndTipousuario(usuario.getIdDocumento(), campeonato.getIdCampeonato(), 5)
+        .orElseGet(Inscripciones::new);
+
+
+SOBRE LA ACUMULACIÓN FUTURA DE INSCRIPCIONES Y ROLES:
+Se acordó que el sistema NO va a tener 2 inscripciones, sino 3 permitidas como máximo para el mismo campeonato:
+1. Juez (Ya sea central, mesa, etc.) - Generado internamente o por invitación.
+2. Competidor (Tipousuario 5) - Generado por invitación o orgánicamente pero terminada mediante la ruta de incripciones con pesos e índices corporales explícitos.
+3. Coach (Tipousuario 9) - Este contará como una inscripción separada totalmente distinta. (Nota: Al igual que los jueces, la creación del Coach NO debe pasar ni usar este endpoint de modificar/agregar el Payload de "/inscripciones", ya que eso es netamente para llenar los datos médicos y la matriz de modalidades permitidas de los peleadores. Tú y yo definiremos la ruta a futuro o a la directa en base de datos al dar Check)
+
+Asegúrate también de que, ya habiendo buscado con la variable = 5 en tu controlador, a la hora de dar ".save(inscripcion)", se setée `inscripcion.setTipousuario(5);` al guardar en la base de datos si fuera nueva.
+
+---------------------------------------------------------------------------------------------------------
+¡ATENCIÓN! UNIFICACIÓN DE ENDPOINTS DE INVITACIONES E INSCRIPCIONES (NUEVO REQUERIMIENTO)
+
+En el frontend hemos eliminado por completo el uso de los endpoints exclusivos de "invitaciones" (tanto el `@PutMapping("/invitaciones/{invitationId}")` como el `@DeleteMapping("/invitaciones/{inscriptionId}")`). 
+A partir de ahora, todo el flujo de aceptar, cancelar, rechazar o borrar una invitación o inscripción utilizará de manera centralizada EXCLUSIVAMENTE tus endpoints ya existentes:
+- `@PutMapping("/inscripciones/{id}")`
+- `@DeleteMapping("/inscripciones/{inscriptionId}")`
+
+Motivo: A nivel de tu base de datos y modelo, una invitación es literalmente un registro en la tabla `Inscripciones` (solo que con la bandera `invitado=true` y un estado distinto). Por ende, mantener dos rutas duplicadas que hacían exactamente la misma lógica estaba causando estragos de mantenimiento.
+
+ACCIONES QUE DEBES REALIZAR PARA QUE ESTO FUNCIONE CORRECTAMENTE EN EL BACKEND:
+1. El endpoint `@PutMapping("/inscripciones/{id}")` tiene actualmente un problema peligroso del cual te habías protegido en el de invitaciones pero omitiste aquí. Cuando un usuario responde la invitación y tiene un rol sin modalidades (como un Juez o Coach), su campo `secciones` está vacío o en `null`. En la línea ~818, haces lo siguiente:
+   List<String> lista = mapper.readValue(ins.getSecciones(), new TypeReference<List<String>>() {});
+   Esto te lanzará un error si `ins.getSecciones()` es null.
+
+   SOLUCIÓN: Importa la misma protección que ya tenías en `respuestraainvitacion`, añadiendo un condicional que valide si las secciones estàn blanqueadas antes de intentar parsearlo con Jackson.
+   Ejemplo:
+   if (ins.getSecciones() == null || ins.getSecciones().isBlank()) {
+       inscripcionRepository.save(ins);
+       return ResponseEntity.ok("");
+   } else {
+       lista = mapper.readValue(...)
+   }
+
+Con esto hecho, las funciones duplicadas de invitaciones que tenías anotadas con `@DeleteMapping("/invitaciones/{inscriptionId}")` (`eliminarinvitacion`) y `@PutMapping("/invitaciones/{invitationId}")` (`respuestraainvitacion`) puedes borrarlas por completo del código, ya que el Front dejó de consumirlas para centralizarse en las de Inscripciones directas.
+
+RESUMEN DE CÓMO DEBEN QUEDAR TUS MÉTODOS ÚNICOS:
+
+1. El único método para borrar/cancelar (tanto invitaciones como inscripciones orgánicas):
+
+```java
+    @DeleteMapping("/inscripciones/{inscriptionId}")
+    private ResponseEntity<?> elimiarinscripcionpropia(@PathVariable Integer inscriptionId) {
+        Inscripciones ins = inscripcionRepository.findById(inscriptionId)
+                .orElseThrow(() -> new RuntimeException("Inscripción no encontrada"));
+        
+        if (ins.getEstado() == 3 && ins.getTipousuario() == 5) {
+            Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
+                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+            campeonato.setParticipantes(campeonato.getParticipantes() - 1);
+            campeonatoRepository.save(campeonato);
+        }
+        ins.setVisible(false);
+        inscripcionRepository.save(ins);
+        return ResponseEntity.ok(ins);
+    }
+```
+
+2. El único método para responder/actualizar el estado (ACEPTAR / RECHAZAR):
+
+```java
+    @PutMapping("/inscripciones/{id}")
+    public ResponseEntity<?> responderinscripcion(@PathVariable Integer id, @RequestBody Map<String, Object> estado) {
+        Inscripciones ins = inscripcionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Inscripción no encontrada"));
+        Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
+                .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+        ObjectMapper mapper = new ObjectMapper();
+        
+        // El front ahora envía estado 3 (Aceptado) o 4 (Rechazado)
+        if (estado.get("estado").toString().equals("3")) {
+            ins.setEstado(3);
+
+            List<String> lista;
+            // ¡NUEVO!: Validación vital para roles como jueces que no tienen secciones
+            if (ins.getSecciones() == null || ins.getSecciones().isBlank()) {
+                inscripcionRepository.save(ins);
+                return ResponseEntity.ok("");
+            } else {
+                lista = mapper.readValue(
+                        ins.getSecciones(),
+                        new TypeReference<List<String>>() {
+                        });
+            }
+            
+            List<String> actualesCampeonato = new ArrayList<>();
+            if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
+                actualesCampeonato = mapper.readValue(
+                        campeonato.getSeccionesActivas(),
+                        new TypeReference<List<String>>() {
+                        });
+            }
+            for (String id2 : lista) {
+                if (!actualesCampeonato.contains(id2)) {
+                    actualesCampeonato.add(id2);
+                }
+            }
+
+            campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
+            campeonato.setParticipantes(campeonato.getParticipantes() + 1);
+            campeonatoRepository.save(campeonato);
+            inscripcionRepository.save(ins);
+        } else {
+            // Rechazado (4)
+            if (ins.getEstado() == 3 && ins.getTipousuario() == 5) {
+                campeonato.setParticipantes(campeonato.getParticipantes() - 1);
+                campeonatoRepository.save(campeonato);
+            }
+            ins.setEstado(4);
+            inscripcionRepository.save(ins);
+        }
+        return ResponseEntity.ok("");
+    }
+```
+
+Con estos dos métodos exactos, el backend podrá digerir sin problema las cancelaciones, las inscripciones finales, las aceptaciones de invitaciones, los rechazos de las mismas y cubrir la inexistencia de un árbol de llaves en los usuarios de mesas o directivos.

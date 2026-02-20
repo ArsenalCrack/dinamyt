@@ -64,7 +64,7 @@ export class MyInvitationsComponent implements OnInit {
 
           // 🔁 Mapeo de nombres del backend → frontend
           nombre_campeonato: i.campeonato,
-          id_campeonato: i.id_campeonato || i.idCampeonato || i.IdCampeonato || i.campeonato_id || i.campeonatoId,
+          id_campeonato: i.idcampeonato || i.id_campeonato || i.idCampeonato || i.IdCampeonato || i.campeonato_id || i.campeonatoId,
 
           // Detalles del campeonato
           ciudad: i.ciudad_campeonato,
@@ -110,25 +110,37 @@ export class MyInvitationsComponent implements OnInit {
   }
 
   verDetalles(item: any): void {
-    if (!item.id_campeonato) {
+    const champId = item.id_campeonato || item.campeonato_id || item.IdCampeonato;
+    if (!champId) {
+      alert('No se puede ver detalles: ID de campeonato faltante.');
       console.warn('No se puede ver detalles: ID de campeonato faltante. Claves disponibles:', Object.keys(item));
       return;
     }
 
-    // Rol 5 = Competidor
-    if (item.id_tipo === 5) {
-      this.router.navigate(['/campeonato/register', item.id_campeonato]);
-    } else {
-      this.router.navigate(['/campeonato/details', item.id_campeonato]);
-    }
+    this.router.navigate(['/campeonato/details', champId]);
   }
 
   // Acciones
-  aceptarInvitacion(id: number): void {
+  aceptarInvitacion(item: any): void {
+    if (item.id_tipo === 5) {
+      const champId = item.id_campeonato || item.campeonato_id || item.IdCampeonato;
+      if (!champId) {
+        alert('No se puede iniciar inscripción: ID de campeonato faltante.');
+        return;
+      }
+
+      // Pasar un queryparam indicando que viene de una invitación
+      this.router.navigate(['/campeonato/register', champId], {
+        queryParams: { invitacionId: item.id_invitacion, tipo: 'invitado' }
+      });
+      return;
+    }
+
+    // Para jueces u otros roles, proceso normal
     this.procesando = true;
-    this.api.responderInvitacion(id, 'ACEPTADO').subscribe({
+    this.api.gestionarInscripcionCampeonato(item.id_invitacion, 3).subscribe({
       next: () => {
-        this.actualizarEstadoLocal(id, 'ACEPTADO');
+        this.actualizarEstadoLocal(item.id_invitacion, 'ACEPTADO');
         this.procesando = false;
       },
       error: (e) => {
@@ -151,7 +163,7 @@ export class MyInvitationsComponent implements OnInit {
   finalizarRechazo(): void {
     if (!this.idInvitacionSeleccionada) return;
     this.procesando = true;
-    this.api.responderInvitacion(this.idInvitacionSeleccionada, 'RECHAZADO').subscribe({
+    this.api.gestionarInscripcionCampeonato(this.idInvitacionSeleccionada, 4).subscribe({
       next: () => {
         this.actualizarEstadoLocal(this.idInvitacionSeleccionada!, 'RECHAZADO');
         this.cerrarModales();
@@ -167,7 +179,7 @@ export class MyInvitationsComponent implements OnInit {
   finalizarCancelacion(): void {
     if (!this.idInvitacionSeleccionada) return;
     this.procesando = true;
-    this.api.responderInvitacion(this.idInvitacionSeleccionada, 'CANCELADO').subscribe({
+    this.api.eliminarInscripcion(this.idInvitacionSeleccionada).subscribe({
       next: () => {
         this.actualizarEstadoLocal(this.idInvitacionSeleccionada!, 'RECHAZADO');
         this.cerrarModales();

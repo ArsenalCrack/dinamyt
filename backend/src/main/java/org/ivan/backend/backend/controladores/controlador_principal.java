@@ -724,10 +724,10 @@ public class controlador_principal {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         System.out.println(ins.getEstado());
         System.out.println(ins.getEstado());
-        if (ins.getEstado()==3 && ins.getTipousuario()==5) {
+        if (ins.getEstado() == 3 && ins.getTipousuario() == 5) {
             Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
                     .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
-            campeonato.setParticipantes(campeonato.getParticipantes()-1);
+            campeonato.setParticipantes(campeonato.getParticipantes() - 1);
             System.out.println(campeonato.getNombre());
             campeonatoRepository.save(campeonato);
         }
@@ -741,10 +741,10 @@ public class controlador_principal {
         Inscripciones ins = inscripcionRepository.findById(inscriptionId)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         System.out.println(ins.getEstado());
-        if (ins.getEstado()==3 && ins.getTipousuario()==5) {
+        if (ins.getEstado() == 3 && ins.getTipousuario() == 5) {
             Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
                     .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
-            campeonato.setParticipantes(campeonato.getParticipantes()-1);
+            campeonato.setParticipantes(campeonato.getParticipantes() - 1);
             System.out.println(campeonato.getNombre());
             campeonatoRepository.save(campeonato);
         }
@@ -759,7 +759,7 @@ public class controlador_principal {
         Inscripciones ins = inscripcionRepository.findById(invitationId)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
-                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+                .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
         ObjectMapper mapper = new ObjectMapper();
         System.out.println(invitationId + " " + estado);
         if (estado.get("estado").toString().equals("ACEPTADO")) {
@@ -773,8 +773,8 @@ public class controlador_principal {
             } else {
                 lista = mapper.readValue(
                         ins.getSecciones(),
-                        new TypeReference<List<String>>() {}
-                );
+                        new TypeReference<List<String>>() {
+                        });
             }
             List<String> actualesCampeonato = new ArrayList<>();
             if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
@@ -792,12 +792,12 @@ public class controlador_principal {
             campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
             campeonatoRepository.save(campeonato);
             inscripcionRepository.save(ins);
-        } else {            
-            if (ins.getEstado()==3 && ins.getTipousuario()==5) {
-                campeonato.setParticipantes(campeonato.getParticipantes()-1);
+        } else {
+            if (ins.getEstado() == 3 && ins.getTipousuario() == 5) {
+                campeonato.setParticipantes(campeonato.getParticipantes() - 1);
                 System.out.println(campeonato.getNombre());
                 campeonatoRepository.save(campeonato);
-        }
+            }
             ins.setEstado(4);
             inscripcionRepository.save(ins);
         }
@@ -809,7 +809,7 @@ public class controlador_principal {
         Inscripciones ins = inscripcionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
-                    .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
+                .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
         ObjectMapper mapper = new ObjectMapper();
         System.out.println(id + " " + estado);
         if (estado.get("estado").toString().equals("3")) {
@@ -834,15 +834,15 @@ public class controlador_principal {
             }
 
             campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
-            campeonato.setParticipantes(campeonato.getParticipantes()+1);
+            campeonato.setParticipantes(campeonato.getParticipantes() + 1);
             campeonatoRepository.save(campeonato);
             inscripcionRepository.save(ins);
         } else {
-            if (ins.getEstado()==3 && ins.getTipousuario()==5) {
-                campeonato.setParticipantes(campeonato.getParticipantes()-1);
+            if (ins.getEstado() == 3 && ins.getTipousuario() == 5) {
+                campeonato.setParticipantes(campeonato.getParticipantes() - 1);
                 System.out.println(campeonato.getNombre());
                 campeonatoRepository.save(campeonato);
-        }
+            }
             ins.setEstado(4);
             inscripcionRepository.save(ins);
         }

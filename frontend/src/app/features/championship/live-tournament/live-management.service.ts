@@ -32,6 +32,7 @@ export class LiveManagementService {
         // seccionesActivas (from backend) appears to be the whitelist of ALL valid sections, NOT just "Running" ones.
 
         const groupsMap = new Map<string, DemographicGroup>();
+        var unificadoString = 'Varios Pesos';
 
         // Iterate over ALL active sections to ensure they appear even if no competitors are mapped
         seccionesActivas.forEach(sectionId => {
@@ -74,32 +75,29 @@ export class LiveManagementService {
             const beltPart = beltParts.length > 0 ? beltParts.join('-') : 'General';
             const cinturonDisplay = beltPart.replace(/_/g, '-');
 
-            // CLAVE DEL GRUPO
-            // Regla Usuario:
-            // 1. NO COMBATE: "no importa si es mixto, femenino o masculino... entrarán en el mismo".
-            //    -> Unificamos el género en la clave para agruparlos.
-            // 2. COMBATE: "así tengan la misma edad/cinturón... pueden cambiarlo de tatami por genero".
-            //    -> Mantenemos el género en la clave para mantenerlos separados y asignables a distintos tatamis.
-
             let genderKey = gender;
             let displayGender = gender;
+            let weightKey = pesoDisplay;
+            let displayWeight = pesoDisplay;
 
             if (!isCombat) {
-                genderKey = 'Unificado'; // Todos los géneros al mismo grupo
+                // Rule 1: NOT COMBAT -> unify by gender, split by weight
+                genderKey = 'Unificado';
                 displayGender = 'Mixto/Unificado';
+            } else {
+                // Rule 2: COMBAT -> split by gender, unify by weight
+                weightKey = 'Unificado_Pesos';
+                displayWeight = unificadoString;
             }
 
-            // Nota: El usuario mencionó "cambiar por peso" en combate. El peso ya es parte de la clave, 
-            // así que ya están separados por peso.
-
             // Clave única
-            const groupKey = `${edadDisplay}|${pesoDisplay}|${cinturonDisplay}|${genderKey}|${modalityType}`;
+            const groupKey = `${edadDisplay}|${weightKey}|${cinturonDisplay}|${genderKey}|${modalityType}`;
 
             if (!groupsMap.has(groupKey)) {
                 groupsMap.set(groupKey, {
                     id: groupKey,
                     edad: edadDisplay,
-                    peso: pesoDisplay,
+                    peso: displayWeight,
                     cinturon: cinturonDisplay,
                     genero: displayGender,
                     activeModalities: []
@@ -108,9 +106,12 @@ export class LiveManagementService {
 
             const group = groupsMap.get(groupKey)!;
 
-            // Si es un grupo unificado, actualizamos el label de género si encontramos variación
+            // Si es un grupo unificado, actualizamos el label si encontramos variación
             if (!isCombat && group.genero !== 'Mixto/Unificado' && group.genero !== gender) {
                 group.genero = 'Mixto/Unificado';
+            }
+            if (isCombat && group.peso !== unificadoString && group.peso !== pesoDisplay) {
+                group.peso = unificadoString;
             }
 
             if (!group.activeModalities.includes(sectionId)) {

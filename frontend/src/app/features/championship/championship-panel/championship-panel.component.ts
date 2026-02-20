@@ -188,6 +188,7 @@ export class ChampionshipPanelComponent implements OnInit, OnDestroy {
         this.publicando = true;
         const payload = {
             ...this.campeonato,
+            mensaje: 'publicar',
             estado: 'LISTO',
             esPublico: 1,
             visible: 1,

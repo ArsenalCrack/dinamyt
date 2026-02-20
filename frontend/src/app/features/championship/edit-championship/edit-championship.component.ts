@@ -726,6 +726,7 @@ export class EditChampionshipComponent implements OnInit, OnDestroy {
 
         const payload = {
             ...this.campeonato,
+            mensaje: 'editar',
             esPublico,
             modalidades: this.modalidades.map((mod) => {
                 // Determine expanded/active state and filter categories based on Enabled flags

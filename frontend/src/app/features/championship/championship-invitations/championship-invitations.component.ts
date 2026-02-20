@@ -330,7 +330,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
 
   finalizarCancelacion(): void {
     if (this.idObjetivoCancelar) {
-      this.api.deleteInvitation(this.idObjetivoCancelar).subscribe({
+      this.api.eliminarInscripcion(this.idObjetivoCancelar).subscribe({
         next: () => {
           // Remover de la lista
           this.invitaciones = this.invitaciones.filter(i => i.id !== this.idObjetivoCancelar);

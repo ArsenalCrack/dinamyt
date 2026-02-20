@@ -19,6 +19,9 @@ import { ScrollLockService } from '../../../core/services/scroll-lock.service';
 export class ChampionshipRegistrationComponent implements OnInit {
     id: string | null = null;
     code: string = '';
+    invitacionId: string | null = null;
+    tipoRegistro: string | null = null;
+
     campeonato: any = null;
     cargando = true;
     mensajeCarga = 'Cargando información del torneo...';
@@ -71,6 +74,8 @@ export class ChampionshipRegistrationComponent implements OnInit {
         this.loadUserFromSession();
         this.id = this.route.snapshot.paramMap.get('id');
         this.code = this.route.snapshot.queryParamMap.get('code') || '';
+        this.invitacionId = this.route.snapshot.queryParamMap.get('invitacionId');
+        this.tipoRegistro = this.route.snapshot.queryParamMap.get('tipo');
 
         if (this.id) {
             this.loadChampionship();
@@ -496,6 +501,13 @@ export class ChampionshipRegistrationComponent implements OnInit {
             codigo: this.code,
             modalidades: this.registrationData.modalidades,
         };
+
+        if (this.tipoRegistro === 'invitado') {
+            payload.mensaje = 'invitado';
+            if (this.invitacionId) {
+                payload.invitacionId = this.invitacionId;
+            }
+        }
 
         if (this.isFieldRequired('cinturon')) {
             payload.cinturon = this.currentUser.cinturon;

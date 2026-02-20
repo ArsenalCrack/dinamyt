@@ -73,7 +73,8 @@
                                 <span class="tag-badge">{{ group.genero }}</span>
                                 <span class="tag-badge">{{ group.cinturon }}</span>
                                 <span class="tag-badge">{{ group.edad }} años</span>
-                                <span class="tag-badge">{{ group.peso }} kg</span>
+                                <span class="tag-badge">{{ group.peso }}{{ group.peso === 'Varios Pesos' ? '' : ' kg'
+                                    }}</span>
                             </div>
                             <span class="queue-meta">
                                 + {{ group.activeModalities.length - 1 }} modalidades más
@@ -155,7 +156,7 @@
                                         {{ tatami.grupoActual.edad }} años
                                     </span>
                                     <span class="tag-badge">
-                                        {{ tatami.grupoActual.peso }} kg
+                                        {{ obtenerPesoActual(tatami) }}
                                     </span>
                                 </div>
 
@@ -295,7 +296,8 @@
                                 <span class="tag-badge">{{ group.genero }}</span>
                                 <span class="tag-badge">{{ group.cinturon }}</span>
                                 <span class="tag-badge">{{ group.edad }} años</span>
-                                <span class="tag-badge">{{ group.peso }} kg</span>
+                                <span class="tag-badge">{{ group.peso }}{{ group.peso === 'Varios Pesos' ? '' : ' kg'
+                                    }}</span>
                                 <span *ngIf="group.tatamiOrigenId" class="tag-badge stolen-tag">
                                     <i class="fas fa-exchange-alt"></i> TRAER DE TATAMI {{ group.tatamiOrigenId }}
                                 </span>

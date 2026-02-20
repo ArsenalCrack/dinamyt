@@ -1,6 +1,3 @@
-falta implementar en el backend:
-- updateCampeonato
-para pasar un campeonato de borrador a publico
 --------------------------------------------------------------------------------
 Aparecen 0 participantes en los otros 2 campeonatos, cuando ya hay usuarios aceptados....  
 --------------------------------------------------------------------------------
