@@ -1,6 +1,4 @@
---------------------------------------------------------------------------------
-Aparecen 0 participantes en los otros 2 campeonatos, cuando ya hay usuarios aceptados....  
---------------------------------------------------------------------------------
+
 [URGENTE] FIX para Asignación de Jueces (Error 404)
 El frontend envía una petición POST a la ruta: 
 /campeonatos/{championshipId}/live-management/tatamis/{tatamiId}/jueces
@@ -20,9 +18,6 @@ y capture ambas variables:
 @PostMapping("/campeonatos/{championshipId}/live-management/tatamis/{tatamiId}/jueces")
 private ResponseEntity<?> assignJudgesToTatami(@PathVariable Long championshipId, @PathVariable Long tatamiId, @RequestBody Map<String, Object> body) { ... }
 
---------------------------------------------------------------------------------
-
-usted acomodo para cuando actualicen en editar cameponato privado, el codigo no cambie?
 --------------------------------------------------------------------------------
 [CRÍTICO] ERROR 500 al Publicar Campeonato - Causa y Solución
 

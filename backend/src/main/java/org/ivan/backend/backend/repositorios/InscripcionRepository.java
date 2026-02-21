@@ -18,7 +18,7 @@ public interface InscripcionRepository extends JpaRepository<Inscripciones, Inte
         WHERE
           i.usuario = :usuario
           AND i.campeonato = :campeonato
-          AND i.tipousuario IN (6,7,8)
+          AND i.tipousuario IN (6,7,8,10)
     """)
     Optional<Inscripciones> findInscripcionJuez(
         @Param("usuario") Long usuario,
@@ -30,11 +30,37 @@ public interface InscripcionRepository extends JpaRepository<Inscripciones, Inte
         FROM Inscripciones i
         WHERE
           i.campeonato = :campeonato
-          AND i.tipousuario IN (6,7,8)
+          AND i.tipousuario IN (6,7,8,10)
           AND i.visible = true
           AND i.estado = 3
     """)
     List<Inscripciones> findIdcampeonatojueces(
+        @Param("campeonato") Long campeonato
+    );
+    
+    @Query("""
+        SELECT i
+        FROM Inscripciones i
+        WHERE
+          i.usuario = :usuario
+          AND i.campeonato = :campeonato
+          AND i.tipousuario = 5
+          AND i.invitado = false
+    """)
+    Optional<Inscripciones> FindByInscripcionCompetidor(
+        @Param("usuario") Long usuario,
+        @Param("campeonato") Long campeonato
+    );
+    @Query("""
+        SELECT i
+        FROM Inscripciones i
+        WHERE
+          i.usuario = :usuario
+          AND i.campeonato = :campeonato
+          AND i.tipousuario NOT IN (6,7,8,9,10)
+    """)
+    Optional<Inscripciones> FindByInscripcionCompetidorSacandoJueces(
+        @Param("usuario") Long usuario,
         @Param("campeonato") Long campeonato
     );
     Optional<Inscripciones> findByUsuarioAndCampeonato(Long usuario, Long campeonato);
@@ -49,7 +75,7 @@ public interface InscripcionRepository extends JpaRepository<Inscripciones, Inte
     
     List<Inscripciones> findByUsuarioAndInvitadoTrueAndVisibleTrue(Long usuario);
     
-    List<Inscripciones>findByCampeonatoAndTipousuarioAndVisibleTrueAndInvitadoFalse(Long campeonato,Integer tipousuario);
+    List<Inscripciones>findByCampeonatoAndTipousuarioAndVisibleTrueAndEstado(Long campeonato,Integer tipousuario,Integer estado);
     
     List<Inscripciones> findByCampeonatoAndTipousuarioInAndEstadoAndVisibleTrue(Long campeonato, List<Integer> tipos,Integer estado);
     
