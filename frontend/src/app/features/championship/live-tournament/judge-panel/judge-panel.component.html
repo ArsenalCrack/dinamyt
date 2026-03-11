@@ -31,7 +31,7 @@
                     <div class="score-display">
                         {{ puntuaciones.rojo }}
                     </div>
-                    <div class="controls" *ngIf="rol === 'Juez Central' || rol === 'Juez de Mesa'">
+                    <div class="controls" *ngIf="rol === 'Referi Central' || rol === 'Referi de Mesa'">
                         <button (click)="agregarPunto('rojo', 1)">+1</button>
                         <button (click)="agregarPunto('rojo', 2)">+2</button>
                         <button (click)="agregarPunto('rojo', 3)">IP</button>
@@ -50,7 +50,7 @@
                     <div class="score-display">
                         {{ puntuaciones.azul }}
                     </div>
-                    <div class="controls" *ngIf="rol === 'Juez Central' || rol === 'Juez de Mesa'">
+                    <div class="controls" *ngIf="rol === 'Referi Central' || rol === 'Referi de Mesa'">
                         <button (click)="agregarPunto('azul', 1)">+1</button>
                         <button (click)="agregarPunto('azul', 2)">+2</button>
                         <button (click)="agregarPunto('azul', 3)">IP</button>
@@ -87,7 +87,7 @@
                 </div>
             </div>
 
-            <div class="match-actions" *ngIf="rol === 'Juez de Mesa'">
+            <div class="match-actions" *ngIf="rol === 'Referi de Mesa'">
                 <button class="btn-timer-start"><i class="fas fa-play"></i> Inicio</button>
                 <button class="btn-timer-pause"><i class="fas fa-pause"></i> Pausa</button>
                 <button class="btn-finish"><i class="fas fa-flag-checkered"></i> Fin</button>

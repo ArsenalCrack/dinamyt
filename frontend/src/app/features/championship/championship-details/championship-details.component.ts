@@ -357,10 +357,12 @@ export class ChampionshipDetailsComponent implements OnInit, OnDestroy {
                                                 // 6: Central, 7: Mesa, 8: Juez
                                                 const typeId = ins.tipousuario ?? ins.idTipo ?? ins.id_tipo;
 
-                                                let role = 'Juez';
-                                                if (typeId === 6) role = 'Juez Central';
-                                                else if (typeId === 7) role = 'Juez de Mesa';
-                                                else if (typeId === 8) role = 'Juez';
+                                                let role = 'Referi de Esquina';
+                                                if (typeId === 6) role = 'Referi Central';
+                                                else if (typeId === 7) role = 'Referi de Mesa';
+                                                else if (typeId === 8) role = 'Referi de Esquina';
+                                                else if (typeId === 9) role = 'Coach';
+                                                else if (typeId === 10) role = 'Referi Running';
                                                 else if (typeId === 'COMPETIDOR') role = 'Competidor'; // Verificación de seguridad
 
                                                 resolve({

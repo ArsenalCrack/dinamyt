@@ -22,7 +22,7 @@ export class JudgePanelComponent implements OnInit, OnDestroy {
     // Estado
     tatamiAsignado: any = null;
     seccionActual: any = null;
-    rol: string = 'Juez'; // Puede ser 'Central', 'Mesa', 'Esquina'
+    rol: string = 'Referi de Esquina'; // Puede ser 'Central', 'Mesa', 'Esquina'
 
     // Estado de la modalidad
     modo: 'COMBATE' | 'PUNTUACION' = 'COMBATE';
@@ -76,7 +76,7 @@ export class JudgePanelComponent implements OnInit, OnDestroy {
                 this.cargando = false;
                 if (data) {
                     this.tatamiAsignado = { id: data.tatamiId, nombre: data.nombre };
-                    this.rol = data.rol || 'Juez'; // 'Juez Central', 'Juez de Mesa', etc.
+                    this.rol = data.rol || 'Referi de Esquina';
 
                     // Iniciar polling una vez confirmada la asignación
                     this.actualizarEstado(); // Primer llamada inmediata

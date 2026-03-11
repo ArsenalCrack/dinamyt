@@ -8,7 +8,7 @@ export interface Juez {
     id: string; // idDocumento
     nombre: string;
     avatar: string;
-    rol?: string; // Rol en el sistema (ej: 'Juez', 'Juez Central')
+    rol?: string; // Rol en el sistema (ej: 'Referi de Esquina', 'Referi Central')
     categoria?: string;
     pais?: string;
     ciudad?: string;
@@ -56,7 +56,7 @@ export class AssignJudgesComponent implements OnInit {
                     id: j.id || j.idDocumento,
                     nombre: j.nombre || j.nombreC || j.nombre_completo,
                     avatar: j.avatar || 'assets/avatar-1.png',
-                    rol: j.rol || 'Juez',
+                    rol: j.rol || 'Referi de Esquina',
                     categoria: j.categoria || j.cinturonRango || 'N/A',
                     pais: j.pais || j.nacionalidad,
                     ciudad: j.ciudad,

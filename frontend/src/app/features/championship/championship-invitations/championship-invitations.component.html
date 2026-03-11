@@ -17,7 +17,7 @@
             </div>
             <button class="btn-invite-new" (click)="abrirModalInvitar()">
                 <i class="fas fa-paper-plane"></i>
-                <span>Invitar {{ seccionActiva === 'JUEZ' ? 'Juez' : 'Competidor' }}</span>
+                <span>Invitar {{ seccionActiva === 'JUEZ' ? 'Staff/Coach' : 'Competidor' }}</span>
             </button>
         </header>
 
@@ -28,7 +28,7 @@
                 <i class="fas fa-user-ninja"></i> Competidores
             </button>
             <button class="switch-btn" [class.active]="seccionActiva === 'JUEZ'" (click)="seleccionarSeccion('JUEZ')">
-                <i class="fas fa-gavel"></i> Jueces
+                <i class="fas fa-gavel"></i> Staff y Coach
             </button>
         </div>
 
@@ -153,7 +153,7 @@
         <div class="modal-header">
             <i class="fas" [ngClass]="seccionActiva === 'JUEZ' ? 'fa-gavel' : 'fa-user-plus'"
                 style="color: var(--color-principal);"></i>
-            <h3>Invitar {{ seccionActiva === 'JUEZ' ? 'Juez' : 'Competidor' }}</h3>
+            <h3>Invitar {{ seccionActiva === 'JUEZ' ? 'Staff / Coach' : 'Competidor' }}</h3>
         </div>
 
         <div class="invite-content">

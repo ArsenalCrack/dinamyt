@@ -18,8 +18,8 @@
                     <div class="judge-item" *ngFor="let judge of juecesFiltrados">
                         <div class="judge-info">
                             <span class="name">{{ judge.nombre }}</span>
-                            <span class="role-badge" [class.central]="judge.rol === 'Juez Central'">
-                                {{ judge.rol || 'Juez' }}
+                            <span class="role-badge" [class.central]="judge.rol === 'Referi Central'">
+                                {{ judge.rol || 'Referi de Esquina' }}
                             </span>
                         </div>
                         <div class="judge-actions">
@@ -31,11 +31,11 @@
                                 [disabled]="!!juezMesa">
                                 M
                             </button>
-                            <button class="btn-icon" (click)="asignarRunning(judge)" title="Asignar como Juez Running"
+                            <button class="btn-icon" (click)="asignarRunning(judge)" title="Asignar como Referi Running"
                                 [disabled]="!!juezRunning">
                                 R
                             </button>
-                            <button class="btn-icon" (click)="asignarNormal(judge)" title="Asignar como Juez">
+                            <button class="btn-icon" (click)="asignarNormal(judge)" title="Asignar como Referi de Esquina">
                                 J
                             </button>
                         </div>
@@ -59,7 +59,7 @@
 
                 <!-- Central Judge Slot -->
                 <div class="slot-group">
-                    <label>Juez Central (1)</label>
+                    <label>Referi Central (1)</label>
                     <div class="slot central-slot" [class.filled]="juezCentral">
                         <ng-container *ngIf="juezCentral; else emptyCentral">
                             <div class="assigned-judge">
@@ -77,7 +77,7 @@
 
                 <!-- Table Judge Slot -->
                 <div class="slot-group">
-                    <label>Juez de Mesa (1)</label>
+                    <label>Referi de Mesa (1)</label>
                     <div class="slot table-slot" [class.filled]="juezMesa">
                         <ng-container *ngIf="juezMesa; else emptyTable">
                             <div class="assigned-judge">
@@ -95,7 +95,7 @@
 
                 <!-- Running Judge Slot -->
                 <div class="slot-group">
-                    <label>Juez Running (1)</label>
+                    <label>Referi Running (1)</label>
                     <div class="slot running-slot" [class.filled]="juezRunning">
                         <ng-container *ngIf="juezRunning; else emptyRunning">
                             <div class="assigned-judge">

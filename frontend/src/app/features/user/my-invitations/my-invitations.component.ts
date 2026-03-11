@@ -226,10 +226,11 @@ export class MyInvitationsComponent implements OnInit {
   obtenerEtiquetaRol(roleId: number): string {
     switch (roleId) {
       case 5: return 'Competidor';
-      case 6: return 'Juez Central';
-      case 7: return 'Juez de Mesa';
-      case 8: return 'Juez';
-      case 10: return 'Juez Running';
+      case 6: return 'Referi Central';
+      case 7: return 'Referi de Mesa';
+      case 8: return 'Referi de Esquina';
+      case 9: return 'Coach';
+      case 10: return 'Referi Running';
       default: return 'Participante';
     }
   }

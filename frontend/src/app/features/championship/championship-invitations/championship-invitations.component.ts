@@ -13,7 +13,7 @@ interface Invitacion {
   nombre: string;
   email: string;
   avatar?: string; // Opcional: avatar
-  rol?: string; // Para jueces: Juez Central, Mesa, etc.
+  rol?: string; // Para jueces: Referi Central, Mesa, etc.
   estado: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO';
   tipo: 'COMPETIDOR' | 'JUEZ';
   fechaEnvio: string;
@@ -32,10 +32,11 @@ export class ChampionshipInvitationsComponent implements OnInit {
   idCampeonato: string | null = null;
 
   opcionesRolJuez = [
-    { value: 'Juez Central', label: 'Juez Central' },
-    { value: 'Juez de Mesa', label: 'Juez de Mesa' },
-    { value: 'Juez', label: 'Juez' },
-    { value: 'Juez Running', label: 'Juez Running' }
+    { value: 'Referi Central', label: 'Referi Central' },
+    { value: 'Referi de Mesa', label: 'Referi de Mesa' },
+    { value: 'Referi de Esquina', label: 'Referi de Esquina' },
+    { value: 'Referi Running', label: 'Referi Running' },
+    { value: 'Coach', label: 'Coach' }
   ];
 
   // Estados
@@ -58,7 +59,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
   busquedaInvitar = '';
   usuariosDisponibles: any[] = []; // Usuarios encontrados
   usuarioSeleccionado: any | null = null;
-  rolJuezSeleccionado: string = 'Juez';
+  rolJuezSeleccionado: string = 'Referi de Esquina';
   enviandoInvitacion = false;
   cargando = false;
 
@@ -210,7 +211,7 @@ export class ChampionshipInvitationsComponent implements OnInit {
     this.usuariosDisponibles = [];
     this.usuarioSeleccionado = null;
     this.usuarioSeleccionado = null;
-    this.rolJuezSeleccionado = 'Juez';
+    this.rolJuezSeleccionado = 'Referi de Esquina';
   }
 
   cerrarModalInvitar(): void {
@@ -269,10 +270,11 @@ export class ChampionshipInvitationsComponent implements OnInit {
     let idTipo = 5; // Por defecto Competidor
     if (this.seccionActiva === 'JUEZ') {
       switch (this.rolJuezSeleccionado) {
-        case 'Juez Central': idTipo = 6; break;
-        case 'Juez de Mesa': idTipo = 7; break;
-        case 'Juez': idTipo = 8; break;
-        case 'Juez Running': idTipo = 10; break;
+        case 'Referi Central': idTipo = 6; break;
+        case 'Referi de Mesa': idTipo = 7; break;
+        case 'Referi de Esquina': idTipo = 8; break;
+        case 'Coach': idTipo = 9; break;
+        case 'Referi Running': idTipo = 10; break;
         default: idTipo = 8;
       }
     }

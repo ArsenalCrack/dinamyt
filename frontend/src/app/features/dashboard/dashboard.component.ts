@@ -192,8 +192,8 @@ export class DashboardComponent implements OnInit {
           const isAccepted = String(rawStatus) === '3' || String(rawStatus).toUpperCase() === 'ACEPTADO';
 
           const typeId = Number(item.tipousuario || item.id_tipo || item.idTipo || item.tipoUsuario);
-          // 6: Central, 7: Mesa, 8: Juez, 10: Juez Running
-          const isJudge = [6, 7, 8, 10].includes(typeId);
+          // 6: Central, 7: Mesa, 8: Esquina, 9: Coach, 10: Running
+          const isJudge = [6, 7, 8, 9, 10].includes(typeId);
 
           // Verificar que tengamos un ID de campeonato para redirigir
           const hasId = !!(item.id_campeonato || item.idCampeonato || item.campeonatoId);

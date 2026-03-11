@@ -460,9 +460,10 @@ public class controlador_principal {
                     Long.parseLong(datos.get("idUsuario").toString()))
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
             Integer peso = datos.get("peso") != null ? Integer.parseInt(datos.get("peso").toString()) : null;
-            
-            //verificar que no tenga inscripciones a este campeonato anteriormente
-            Optional<Inscripciones> inss = inscripcionRepository.FindByInscripcionCompetidor(usuario.getIdDocumento(), campeonato.getIdCampeonato());
+
+            // verificar que no tenga inscripciones a este campeonato anteriormente
+            Optional<Inscripciones> inss = inscripcionRepository.FindByInscripcionCompetidor(usuario.getIdDocumento(),
+                    campeonato.getIdCampeonato());
             if (inss.isPresent()) {
                 return ResponseEntity.status(400).body(Map.of("message", "Usuario ya inscrito en este campeonato"));
             }
@@ -518,36 +519,36 @@ public class controlador_principal {
             inscripcion.setTipousuario(5); // ajusta según tu lógica
             inscripcion.setFechaInscripcion(LocalDateTime.now());
             inscripcion.setEstado(2);
-            
+
             if (inscripcion.isInvitado()) {
                 ObjectMapper mapper = new ObjectMapper();
                 inscripcion.setEstado(3);
                 List<String> lista;
-            if (inscripcion.getSecciones() == null || inscripcion.getSecciones().isBlank()) {
-                inscripcionRepository.save(inscripcion);
-                return ResponseEntity.ok("");
-            } else {
-                lista = mapper.readValue(
-                        inscripcion.getSecciones(),
-                        new TypeReference<List<String>>() {
-                        });
-            }
-            
-            List<String> actualesCampeonato = new ArrayList<>();
-            if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
-                actualesCampeonato = mapper.readValue(
-                        campeonato.getSeccionesActivas(),
-                        new TypeReference<List<String>>() {
-                        });
-            }
-            for (String id2 : lista) {
-                if (!actualesCampeonato.contains(id2)) {
-                    actualesCampeonato.add(id2);
+                if (inscripcion.getSecciones() == null || inscripcion.getSecciones().isBlank()) {
+                    inscripcionRepository.save(inscripcion);
+                    return ResponseEntity.ok("");
+                } else {
+                    lista = mapper.readValue(
+                            inscripcion.getSecciones(),
+                            new TypeReference<List<String>>() {
+                            });
                 }
+
+                List<String> actualesCampeonato = new ArrayList<>();
+                if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
+                    actualesCampeonato = mapper.readValue(
+                            campeonato.getSeccionesActivas(),
+                            new TypeReference<List<String>>() {
+                            });
+                }
+                for (String id2 : lista) {
+                    if (!actualesCampeonato.contains(id2)) {
+                        actualesCampeonato.add(id2);
+                    }
+                }
+                campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
+                campeonato.setParticipantes(campeonato.getParticipantes() + 1);
             }
-            campeonato.setSeccionesActivas(mapper.writeValueAsString(actualesCampeonato));
-            campeonato.setParticipantes(campeonato.getParticipantes()+1);
-            }            
             campeonatoRepository.save(campeonato);
             inscripcionRepository.save(inscripcion);
 
@@ -714,7 +715,7 @@ public class controlador_principal {
         List<UsuarioInscripcionDTO> resultado = new ArrayList<>();
 
         List<Inscripciones> inscripciones = inscripcionRepository
-                .findByCampeonatoAndTipousuarioAndVisibleTrueAndEstado(id, 5,3);
+                .findByCampeonatoAndTipousuarioAndVisibleTrueAndEstado(id, 5, 3);
 
         for (Inscripciones ins : inscripciones) {
 
@@ -772,15 +773,15 @@ public class controlador_principal {
         inscripcionRepository.save(ins);
         return ResponseEntity.ok(ins);
     }
-    
-@PutMapping("/inscripciones/{id}")
+
+    @PutMapping("/inscripciones/{id}")
     public ResponseEntity<?> responderinscripcion(@PathVariable Integer id, @RequestBody Map<String, Object> estado) {
         Inscripciones ins = inscripcionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Inscripción no encontrada"));
         Campeonato campeonato = campeonatoRepository.findById(Integer.parseInt(ins.getCampeonato().toString()))
                 .orElseThrow(() -> new RuntimeException("Campeonato no encontrado"));
         ObjectMapper mapper = new ObjectMapper();
-        
+
         if (estado.get("estado").toString().equals("3")) {
             ins.setEstado(3);
 
@@ -794,7 +795,7 @@ public class controlador_principal {
                         new TypeReference<List<String>>() {
                         });
             }
-            
+
             List<String> actualesCampeonato = new ArrayList<>();
             if (campeonato.getSeccionesActivas() != null && !campeonato.getSeccionesActivas().isEmpty()) {
                 actualesCampeonato = mapper.readValue(
@@ -822,7 +823,6 @@ public class controlador_principal {
         }
         return ResponseEntity.ok("");
     }
-
 
     @GetMapping("/campeonatos/{id}/invitaciones")
     private ResponseEntity<?> obtenerinvitacionesdelcampeonato(@PathVariable Long id) {
@@ -856,7 +856,7 @@ public class controlador_principal {
 
         List<Inscripciones> inscripciones = inscripcionRepository
                 .findByCampeonatoAndTipousuarioAndVisibleTrueAndEstado(
-                        cam.getIdCampeonato().longValue(), 5,3);
+                        cam.getIdCampeonato().longValue(), 5, 3);
 
         CampeonatoLiveDTO liveDTO = campeonatoLiveMapper.construirCampeonatoLive(cam, inscripciones);
 

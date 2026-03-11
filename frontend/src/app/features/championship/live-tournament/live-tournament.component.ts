@@ -428,7 +428,7 @@ export class LiveTournamentComponent implements OnInit {
     if (!confirmacionAdmin) return;
 
     const resultadosJuez = {
-      detalles: 'Estos resultados han sido verificados por el Juez Central',
+      detalles: 'Estos resultados han sido verificados por el Referi Central',
       estado: 'FINALIZADO_REVISADO'
     };
 
