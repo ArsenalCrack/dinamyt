@@ -26,10 +26,9 @@
 |---|---|
 | **Nombre** | DINAMYT |
 | **Tipo** | Plataforma web fullstack orientada a servicios (SOA/REST) |
-| **Alcance** | Académico (Ingeniería de Software I — Universidad de Pamplona) **y producción real** |
+| **Alcance** | **producción real** |
 | **Problema que resuelve** | Los competidores de hapkido NO conocen sus puntuaciones durante la competencia y esperan todo el día para saber si ganaron. DINAMYT da visibilidad en tiempo real a competidores, entrenadores y público. |
-| **Autores** | Amir (desarrollador principal) + Andrés Iván González Guerrero |
-| **Tutor** | Prof. Geovanny Rubiano Torres |
+| **Autores** | Amir (desarrollador principal) + Andrés Iván González Guerrero (desarrollador) + Braqner Duvan Alvarado (desarrollador) |
 | **Estado** | En desarrollo activo. Frontend Angular muy avanzado. Backend Spring Boot funcional en módulos base. Live Tournament sin backend real. |
 
 ### Flujo completo del sistema
