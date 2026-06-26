@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/* Paleta DINAMYT: oscuro cálido + dorado. */
+:root {
+  color-scheme: dark;
+  --bg: #14141e;
+  --bg-card: #1c1c2a;
+  --bg-input: #0e0e18;
+  --border: #2a2a3e;
+  --text: #f0f0f8;
+  --text-muted: #9090b0;
+  --gold: #f0b800;
+  --danger: #ff5577;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  color: var(--text);
+  width: 100%;
+}
+input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
