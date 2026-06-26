@@ -108,6 +108,47 @@ describe('API campeonatos (integración con PGlite)', () => {
     await a.close();
   });
 
+  it('genera las secciones desde la config de categorías', async () => {
+    const a = app();
+    const auth = { authorization: `Bearer ${await token()}` };
+
+    const crear = await a.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: auth,
+      payload: {
+        nombre: 'Copa Secciones',
+        modalidades: [
+          {
+            modalidad: 'combate',
+            categorias: {
+              genero: 'separado',
+              cinturon: [{ activa: true, tipo: 'individual', valor: 'Verde' }],
+            },
+          },
+        ],
+      },
+    });
+    const id = crear.json().id as string;
+
+    const gen = await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${id}/generar-secciones`,
+      headers: auth,
+    });
+    expect(gen.statusCode).toBe(201);
+    expect(gen.json().total).toBe(2); // Masculino + Femenino
+
+    const list = await a.inject({
+      method: 'GET',
+      url: `/campeonatos/${id}/secciones`,
+      headers: auth,
+    });
+    expect(list.json()).toHaveLength(2);
+
+    await a.close();
+  });
+
   it('exige scope campeonatos para crear (403 con otro scope)', async () => {
     const a = app();
     const res = await a.inject({

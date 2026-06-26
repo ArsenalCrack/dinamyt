@@ -7,6 +7,7 @@ import {
   integer,
   decimal,
   date,
+  jsonb,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import {
@@ -45,6 +46,8 @@ export const modalidadesCampeonato = camp.table(
     modalidad: modalidadEnum('modalidad').notNull(),
     costoExtra: decimal('costo_extra', { precision: 10, scale: 2 }).default('0'),
     activa: boolean('activa').default(true),
+    /** Config de categorías para generar secciones: { genero, cinturon[], edad[], peso[] }. */
+    categorias: jsonb('categorias'),
   },
   (t) => [uniqueIndex('uq_modalidad_campeonato').on(t.campeonatoId, t.modalidad)],
 );

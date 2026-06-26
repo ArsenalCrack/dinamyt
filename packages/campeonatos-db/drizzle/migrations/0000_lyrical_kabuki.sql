@@ -29,7 +29,8 @@ CREATE TABLE "campeonatos"."modalidades_campeonato" (
 	"campeonato_id" uuid NOT NULL,
 	"modalidad" "campeonatos"."modalidad" NOT NULL,
 	"costo_extra" numeric(10, 2) DEFAULT '0',
-	"activa" boolean DEFAULT true
+	"activa" boolean DEFAULT true,
+	"categorias" jsonb
 );
 --> statement-breakpoint
 CREATE TABLE "campeonatos"."tatamis" (
@@ -104,9 +105,10 @@ CREATE TABLE "campeonatos"."secciones" (
 	"campeonato_id" uuid NOT NULL,
 	"modalidad" "campeonatos"."modalidad" NOT NULL,
 	"genero" "campeonatos"."genero_seccion",
-	"grupo_cinturon" "campeonatos"."grupo_cinturon",
+	"cinturon" varchar(100),
 	"rango_edad" varchar(30),
 	"rango_peso" varchar(30),
+	"clave" varchar(300),
 	"nombre" varchar(200) NOT NULL,
 	"estado" "campeonatos"."estado_seccion" DEFAULT 'EN_ESPERA' NOT NULL,
 	"created_at" timestamp DEFAULT now()

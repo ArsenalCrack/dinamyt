@@ -5,13 +5,7 @@ import {
   integer,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import {
-  camp,
-  modalidadEnum,
-  generoSeccionEnum,
-  grupoCinturonEnum,
-  estadoSeccionEnum,
-} from './_schema';
+import { camp, modalidadEnum, generoSeccionEnum, estadoSeccionEnum } from './_schema';
 import { campeonatos, tatamis } from './campeonato';
 import { inscripciones } from './competidor';
 
@@ -25,11 +19,14 @@ export const secciones = camp.table('secciones', {
     .references(() => campeonatos.id),
   modalidad: modalidadEnum('modalidad').notNull(),
   genero: generoSeccionEnum('genero'),
-  grupoCinturon: grupoCinturonEnum('grupo_cinturon'),
+  /** Agrupación de cinturón configurada por el admin (texto libre, ej. "Blanco-Naranja"). */
+  cinturon: varchar('cinturon', { length: 100 }),
   /** Ej. "12-13". */
   rangoEdad: varchar('rango_edad', { length: 30 }),
   /** Ej. "-50kg". NULL en modalidades sin peso (figuras, defensa personal). */
   rangoPeso: varchar('rango_peso', { length: 30 }),
+  /** Clave canónica única generada (para deduplicar al regenerar). */
+  clave: varchar('clave', { length: 300 }),
   /** Nombre público (ej. "Combate Masculino Intermedio 15-17"). */
   nombre: varchar('nombre', { length: 200 }).notNull(),
   estado: estadoSeccionEnum('estado').notNull().default('EN_ESPERA'),

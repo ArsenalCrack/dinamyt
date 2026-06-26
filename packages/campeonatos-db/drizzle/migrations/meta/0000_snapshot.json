@@ -1,5 +1,5 @@
 {
-  "id": "a2f7a7ad-1be2-4e66-9792-0fff7e8db196",
+  "id": "eb35d949-b794-4b4e-a7bd-c00d49f4d216",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -126,6 +126,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": true
+        },
+        "categorias": {
+          "name": "categorias",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -840,10 +846,9 @@
           "primaryKey": false,
           "notNull": false
         },
-        "grupo_cinturon": {
-          "name": "grupo_cinturon",
-          "type": "grupo_cinturon",
-          "typeSchema": "campeonatos",
+        "cinturon": {
+          "name": "cinturon",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },
@@ -856,6 +861,12 @@
         "rango_peso": {
           "name": "rango_peso",
           "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clave": {
+          "name": "clave",
+          "type": "varchar(300)",
           "primaryKey": false,
           "notNull": false
         },

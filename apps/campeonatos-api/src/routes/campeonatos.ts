@@ -6,15 +6,20 @@ import {
   competidores,
   inscripciones,
   inscripcionModalidades,
+  secciones,
   seccionInscripciones,
   llaves,
 } from '@dinamyt/campeonatos-db';
 import {
   validarRestriccion,
   generarBracket,
+  generarSecciones,
   type Modalidad,
   type Genero,
   type GrupoCinturon,
+  type CategoriasConfig,
+  type ModalidadConfig,
+  type SeccionGenerada,
 } from '@dinamyt/campeonatos-core';
 import { requireScope } from '../plugins/auth';
 
@@ -24,7 +29,18 @@ interface CrearCampeonatoBody {
   fechaInicio?: string;
   fechaFin?: string;
   costoBase?: string;
-  modalidades?: { modalidad: Modalidad; costoExtra?: string }[];
+  modalidades?: {
+    modalidad: Modalidad;
+    costoExtra?: string;
+    categorias?: CategoriasConfig;
+  }[];
+}
+
+/** Nombre legible de una sección a partir de sus componentes. */
+function nombreSeccion(s: SeccionGenerada): string {
+  return [s.modalidad, s.genero, s.cinturon, s.edad, s.peso]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 interface InscripcionBody {
@@ -87,6 +103,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           campeonatoId: camp.id,
           modalidad: m.modalidad,
           costoExtra: m.costoExtra ?? '0',
+          categorias: m.categorias ?? null,
         });
       }
 
@@ -219,6 +236,59 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         .returning();
 
       return reply.code(201).send(llave);
+    },
+  );
+
+  // ── Generar las secciones del campeonato desde la config de categorías ────
+  app.post(
+    '/campeonatos/:id/generar-secciones',
+    { preHandler: requireScope('campeonatos') },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const db = req.server.db;
+
+      const mods = await db
+        .select()
+        .from(modalidadesCampeonato)
+        .where(eq(modalidadesCampeonato.campeonatoId, id));
+
+      const config: ModalidadConfig[] = mods.map((m) => ({
+        nombre: m.modalidad,
+        activa: m.activa ?? true,
+        categorias: (m.categorias as CategoriasConfig | null) ?? { genero: 'mixto' },
+      }));
+
+      const generadas = generarSecciones(config);
+
+      // Regenera: reemplaza las secciones previas del campeonato.
+      await db.delete(secciones).where(eq(secciones.campeonatoId, id));
+      for (const s of generadas) {
+        await db.insert(secciones).values({
+          campeonatoId: id,
+          modalidad: s.modalidad as Modalidad,
+          genero: s.genero.toUpperCase() as 'MASCULINO' | 'FEMENINO' | 'MIXTO',
+          cinturon: s.cinturon,
+          rangoEdad: s.edad,
+          rangoPeso: s.peso,
+          clave: s.id,
+          nombre: nombreSeccion(s),
+        });
+      }
+
+      return reply.code(201).send({ total: generadas.length, secciones: generadas });
+    },
+  );
+
+  // ── Listar las secciones de un campeonato ─────────────────────────────────
+  app.get(
+    '/campeonatos/:id/secciones',
+    { preHandler: requireScope('campeonatos') },
+    async (req) => {
+      const { id } = req.params as { id: string };
+      return req.server.db
+        .select()
+        .from(secciones)
+        .where(eq(secciones.campeonatoId, id));
     },
   );
 
