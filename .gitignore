@@ -1,0 +1,24 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Entorno y secretos — NUNCA versionar
+.env
+.env.*.local
+**/keys/
+*.pem
+
+# OS / editores
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

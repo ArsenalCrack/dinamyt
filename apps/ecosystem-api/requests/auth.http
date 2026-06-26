@@ -1,0 +1,195 @@
+@baseUrl = http://localhost:3001
+
+### Registro de usuario
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "amirsarmiento0430@gmail.com",
+  "password": "Test1234!",
+  "fullName": "Usuario Prueba",
+  "documentId": "1093000005",
+  "dataConsent": true
+}
+
+###
+
+### Verificar email (reemplaza userId y code con los valores reales)
+POST {{baseUrl}}/auth/verify-email
+Content-Type: application/json
+
+{
+  "userId": "58bf09c3-1386-4a89-a341-2a6d6aafd0cd",
+  "code": "377561"
+}
+
+###
+
+### Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "amirsarmiento0430@gmail.com",
+  "password": "Test1234!"
+}
+
+###
+
+@token = {{login.response.body.access_token}}
+
+
+### Recuperar contraseña
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "test@gmail.com"
+}
+
+###
+
+### Clave pública JWKS
+GET {{baseUrl}}/auth/jwks
+
+###
+
+### Verificar token (reemplaza con el token real del login)
+POST {{baseUrl}}/auth/verify-token
+Content-Type: application/json
+
+{
+  "token": "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiI1OGJmMDljMy0xMzg2LTRhODktYTM0MS0yYTZkNmFhZmQwY2QiLCJlbWFpbCI6ImFtaXJzYXJtaWVudG8wNDMwQGdtYWlsLmNvbSIsImZ1bGxOYW1lIjoiVXN1YXJpbyBQcnVlYmEiLCJvcmdfaWQiOm51bGwsImFwcF9zY29wZXMiOltdLCJyb2xlX2FjYWRlbXkiOm51bGwsInJvbGVfY2FtcGVvbmF0b3MiOm51bGwsImlzX3N1cGVyX2FkbWluIjp0cnVlLCJpYXQiOjE3ODA0NTE5NjIsImV4cCI6MTc4MDUzODM2Mn0.WVBZIbaR35moz27Jz0Tibq_BvpuFKZVTRRp9e6ovhgDLYypGEqgqVbZYVSILJlWkEJvg4637GkclNAgukRjOkJegQvOt9H4sQc9V-s7cjEsT6hHeN6Q79LcxH3La1s-I3rWuwX4XveLQJMMMJR7lIaBlMGVehpC2xfJPjdJyxIq9Nq_Mvr6OW9pnUaUHDpuKmOEwVFWZ8myPy_1O-kz_acbd-x6CBpWEecu6BHLvol8BHphHxFCVlgoHLpCijIOBXcsBxirK7n2kHAtkw49lK9GjqRDQhHIDChybcnbffTmmWJ09s-AbnlPPNxTE6cTkSl0G3ZBkDxY2uAcEw3s5fw"
+}
+
+### ─── ORGANIZATIONS ─────────────────────────────────────────
+
+### Crear organización
+POST {{baseUrl}}/organizations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Club Hapkido del Cóndor",
+  "type": "CLUB",
+  "email": "condor@hapkido.com",
+  "phone": "3001234567",
+  "city": "Cúcuta",
+  "country": "Colombia"
+}
+
+###
+
+### Listar organizaciones
+GET {{baseUrl}}/organizations
+Authorization: Bearer {{token}}
+
+###
+
+### ─── PLANES DE SUSCRIPCIÓN ──────────────────────────────────
+
+### Crear plan Academy
+POST {{baseUrl}}/subscription-plans
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Plan Academy Básico",
+  "description": "Acceso a DINAMYT Academy para clubes pequeños",
+  "appsIncluded": ["academy"],
+  "maxUsers": 30,
+  "priceMonthly": 50000,
+  "priceAnnual": 500000
+}
+
+###
+
+### Crear plan Campeonatos
+POST {{baseUrl}}/subscription-plans
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Plan Campeonatos",
+  "description": "Acceso a DINAMYT Campeonatos",
+  "appsIncluded": ["campeonatos"],
+  "priceMonthly": 80000,
+  "priceAnnual": 800000
+}
+
+###
+
+### Crear plan completo
+POST {{baseUrl}}/subscription-plans
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Plan Ecosistema Completo",
+  "description": "Acceso a Academy y Campeonatos",
+  "appsIncluded": ["academy", "campeonatos"],
+  "maxUsers": 100,
+  "priceMonthly": 120000,
+  "priceAnnual": 1200000
+}
+
+###
+
+### Listar planes (público, sin token)
+GET {{baseUrl}}/subscription-plans
+
+###
+
+### ─── SUSCRIPCIONES ───────────────────────────────────────────
+
+### Crear suscripción para la organización
+### (reemplaza orgId y planId con los UUIDs reales)
+POST {{baseUrl}}/subscriptions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "orgId": "UUID-DE-LA-ORG",
+  "planId": "UUID-DEL-PLAN",
+  "startsAt": "2026-06-02T00:00:00.000Z",
+  "endsAt": "2026-12-31T23:59:59.000Z",
+  "totalAmount": 500000
+}
+
+###
+
+### Registrar abono de pago
+### (reemplaza UUID-SUSCRIPCION con el id real)
+PATCH {{baseUrl}}/subscriptions/UUID-SUSCRIPCION/payment
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "paidAmount": 250000,
+  "notes": "Primer abono del semestre"
+}
+
+###
+
+### ─── VERIFICAR SCOPES TRAS SUSCRIPCIÓN ──────────────────────
+
+### Invitar usuario a la organización
+POST {{baseUrl}}/organizations/UUID-DE-LA-ORG/invite
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "amirsarmiento0430@gmail.com"
+}
+
+###
+
+### Login de nuevo para ver scopes actualizados
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "amirsarmiento0430@gmail.com",
+  "password": "Test1234!"
+}
