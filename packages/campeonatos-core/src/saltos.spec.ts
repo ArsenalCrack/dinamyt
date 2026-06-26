@@ -28,12 +28,14 @@ describe('motor de saltos (§7.4)', () => {
     expect(b.eliminado).toBe(false); // 1 falla < maxFallas (2)
   });
 
-  it('elimina al acumular la 2.ª falla en rondas distintas', () => {
+  it('elimina al 3.er fallo (inicial + 2 repeticiones)', () => {
     let est = inicial();
     est = procesarRondaSaltos(est, 1.5, [{ competidorId: 'a', supero: false }]);
     est = procesarRondaSaltos(est, 1.6, [{ competidorId: 'a', supero: false }]);
+    expect(est.find((e) => e.competidorId === 'a')!.eliminado).toBe(false); // 2 fallas: sigue
+    est = procesarRondaSaltos(est, 1.7, [{ competidorId: 'a', supero: false }]);
     const a = est.find((e) => e.competidorId === 'a')!;
-    expect(a.fallasAcumuladas).toBe(2);
+    expect(a.fallasAcumuladas).toBe(3);
     expect(a.eliminado).toBe(true);
   });
 

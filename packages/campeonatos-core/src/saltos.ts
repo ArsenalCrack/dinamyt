@@ -6,12 +6,12 @@
 //  - Cada salto es PASA/FALLA (lo marca el juez central; los jueces de posición
 //    solo verifican condiciones y no entran al sistema).
 //
-// NOTA (a confirmar): se asume eliminación al acumular `maxFallas` fallas
-// (por defecto 2: "falla en una ronda y luego en otra → eliminado"). El detalle
-// por intento (inicial + repeticiones, RF-CAM-12) se registra fuera de este
-// reductor (en la capa que llama, sobre `resultados_figura.detalle`).
+// Eliminación al acumular `maxFallas` fallas (por defecto 3: intento inicial,
+// 1.ª repetición y 2.ª repetición; al fallar la 2.ª repetición → eliminado).
+// El detalle por intento (RF-CAM-12) se registra fuera de este reductor (en la
+// capa que llama, sobre `resultados_figura.detalle`).
 
-export const MAX_FALLAS_DEFAULT = 2;
+export const MAX_FALLAS_DEFAULT = 3;
 
 export interface EstadoSaltos {
   competidorId: string;
