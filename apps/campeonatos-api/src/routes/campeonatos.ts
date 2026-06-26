@@ -9,17 +9,20 @@ import {
   secciones,
   seccionInscripciones,
   llaves,
+  combates,
 } from '@dinamyt/campeonatos-db';
 import {
   validarRestriccion,
   generarBracket,
   generarSecciones,
+  snapshotCombate,
   type Modalidad,
   type Genero,
   type GrupoCinturon,
   type CategoriasConfig,
   type ModalidadConfig,
   type SeccionGenerada,
+  type EstadoCombate,
 } from '@dinamyt/campeonatos-core';
 import { requireScope } from '../plugins/auth';
 
@@ -289,6 +292,49 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         .select()
         .from(secciones)
         .where(eq(secciones.campeonatoId, id));
+    },
+  );
+
+  // ── Persistir el resultado de un combate (lo envía el juez de mesa) ───────
+  app.post(
+    '/secciones/:id/combates',
+    { preHandler: requireScope('campeonatos') },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const body = req.body as {
+        competidorHongId?: string;
+        competidorChungId?: string;
+        estado: EstadoCombate;
+      };
+      const snap = snapshotCombate(body.estado);
+      const [combate] = await req.server.db
+        .insert(combates)
+        .values({
+          seccionId: id,
+          competidorHongId: body.competidorHongId ?? null,
+          competidorChungId: body.competidorChungId ?? null,
+          marcadorHong: String(snap.marcadorHong),
+          marcadorChung: String(snap.marcadorChung),
+          esqHong: String(snap.esqHong),
+          esqChung: String(snap.esqChung),
+          centralHong: String(snap.centralHong),
+          centralChung: String(snap.centralChung),
+          kyongHong: snap.kyongHong,
+          kyongChung: snap.kyongChung,
+          faltasHong: snap.faltasHong,
+          faltasChung: snap.faltasChung,
+          numJueces: snap.numJueces,
+          duracionSegundos: snap.duracionSegundos,
+          ronda: snap.rondaFinal,
+          ganador: snap.ganador,
+          detalle: {
+            historial: body.estado.historial,
+            jueces: body.estado.jueces,
+            motivo: snap.motivo,
+          },
+        })
+        .returning();
+      return reply.code(201).send(combate);
     },
   );
 

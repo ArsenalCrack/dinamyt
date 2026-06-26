@@ -3,6 +3,7 @@ import {
   estadoInicialCombate,
   aplicarEvento,
   calcularMarcador,
+  snapshotCombate,
   MAX_GAMJEUM_DQ,
   type EstadoCombate,
   type EventoCombate,
@@ -101,5 +102,17 @@ describe('motor de combate en vivo (port de DINAMYT-COMBAT)', () => {
     e = aplicarEvento(e, { accion: 'reset' });
     expect(e.ganadorManualColor).toBe('');
     expect(calcularMarcador(e).total_hong).toBe(0);
+  });
+
+  it('snapshotCombate resume el resultado para persistir', () => {
+    const e = aplicar(
+      estadoInicialCombate(),
+      { accion: 'punto_juez', juez: 'j1', color: 'hong', pts: 2, nombre: 'x' },
+      { accion: 'declarar_ganador', color: 'hong', motivo: 'KO' },
+    );
+    const snap = snapshotCombate(e);
+    expect(snap.ganador).toBe('hong');
+    expect(snap.motivo).toBe('KO');
+    expect(snap.marcadorHong).toBe(0.5);
   });
 });

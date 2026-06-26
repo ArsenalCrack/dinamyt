@@ -3,6 +3,7 @@ import { generateKeyPair, SignJWT, jwtVerify } from 'jose';
 import { createTestDb } from '@dinamyt/campeonatos-db/testing';
 import type { Db } from '@dinamyt/campeonatos-db';
 import type { JwtPayload } from '@dinamyt/shared';
+import { estadoInicialCombate, aplicarEvento } from '@dinamyt/campeonatos-core';
 import { buildApp } from './app';
 
 // Integración real de la API contra una BD PGlite en memoria (sin Docker):
@@ -145,6 +146,58 @@ describe('API campeonatos (integración con PGlite)', () => {
       headers: auth,
     });
     expect(list.json()).toHaveLength(2);
+
+    await a.close();
+  });
+
+  it('persiste el resultado de un combate', async () => {
+    const a = app();
+    const auth = { authorization: `Bearer ${await token()}` };
+
+    const crear = await a.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: auth,
+      payload: {
+        nombre: 'Copa Combate',
+        modalidades: [{ modalidad: 'combate', categorias: { genero: 'mixto' } }],
+      },
+    });
+    const campId = crear.json().id as string;
+    await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${campId}/generar-secciones`,
+      headers: auth,
+    });
+    const secs = (
+      await a.inject({
+        method: 'GET',
+        url: `/campeonatos/${campId}/secciones`,
+        headers: auth,
+      })
+    ).json() as { id: string }[];
+
+    let estado = aplicarEvento(estadoInicialCombate(), {
+      accion: 'punto_juez',
+      juez: 'j1',
+      color: 'hong',
+      pts: 3,
+      nombre: 'Giratoria',
+    });
+    estado = aplicarEvento(estado, {
+      accion: 'declarar_ganador',
+      color: 'hong',
+      motivo: 'Decisión',
+    });
+
+    const res = await a.inject({
+      method: 'POST',
+      url: `/secciones/${secs[0].id}/combates`,
+      headers: auth,
+      payload: { estado },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().ganador).toBe('hong');
 
     await a.close();
   });

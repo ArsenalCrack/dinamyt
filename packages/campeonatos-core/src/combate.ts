@@ -234,6 +234,50 @@ export function calcularMarcador(estado: EstadoCombate) {
   };
 }
 
+export interface SnapshotCombate {
+  nombreHong: string;
+  nombreChung: string;
+  marcadorHong: number;
+  marcadorChung: number;
+  esqHong: number;
+  esqChung: number;
+  centralHong: number;
+  centralChung: number;
+  kyongHong: number;
+  kyongChung: number;
+  faltasHong: number;
+  faltasChung: number;
+  numJueces: number;
+  duracionSegundos: number;
+  rondaFinal: string;
+  ganador: 'hong' | 'chung' | null;
+  motivo: string | null;
+}
+
+/** Resumen persistible del combate (port de guardar_combate_snapshot de COMBAT). */
+export function snapshotCombate(estado: EstadoCombate): SnapshotCombate {
+  const m = calcularMarcador(estado);
+  return {
+    nombreHong: estado.nombreHong,
+    nombreChung: estado.nombreChung,
+    marcadorHong: m.total_hong,
+    marcadorChung: m.total_chung,
+    esqHong: m.esq_hong,
+    esqChung: m.esq_chung,
+    centralHong: estado.arbHong,
+    centralChung: estado.arbChung,
+    kyongHong: estado.kyongHong,
+    kyongChung: estado.kyongChung,
+    faltasHong: estado.faltasHong,
+    faltasChung: estado.faltasChung,
+    numJueces: estado.numJueces,
+    duracionSegundos: estado.segundosMax,
+    rondaFinal: estado.ronda,
+    ganador: (estado.ganadorManualColor as 'hong' | 'chung') || null,
+    motivo: estado.ganadorManualMotivo || null,
+  };
+}
+
 function verificarSuperioridad(estado: EstadoCombate): Alerta12 | null {
   if (estado.alerta12Lanzada || estado.ganadorManualColor) return null;
   const m = calcularMarcador(estado);
