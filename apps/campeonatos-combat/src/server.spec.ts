@@ -20,15 +20,21 @@ describe('servidor de combate (WebSocket)', () => {
 
     await new Promise<void>((r) => ws.on('open', () => r()));
     ws.send(
-      JSON.stringify({ tipo: 'accion', lado: 'hong', accion: 'patada_cabeza' }),
+      JSON.stringify({
+        accion: 'punto_juez',
+        juez: 'j1',
+        color: 'hong',
+        pts: 2,
+        nombre: 'Patada',
+      }),
     );
     await new Promise<void>((res) => {
       resolverDos = res;
       if (mensajes.length >= 2) res();
     });
 
-    expect(mensajes[0].estado.ganador).toBeNull();
-    expect(mensajes[1].estado.hong.acciones).toContain('patada_cabeza');
+    expect(mensajes[0].estado.numJueces).toBe(4);
+    expect(mensajes[1].estado.jueces.j1.hong).toBe(2);
 
     ws.close();
     await new Promise<void>((r) => wss.close(() => r()));
