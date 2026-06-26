@@ -4,22 +4,45 @@ import axios from 'axios';
 
 // La API de Campeonatos expone sus rutas en la raíz (sin prefijo /api).
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+// El login se delega al ecosystem (valida credenciales y emite el JWT).
+const ECOSYSTEM_API_URL =
+  process.env.NEXT_PUBLIC_ECOSYSTEM_API_URL || 'http://localhost:3001';
+
+const TOKEN_KEY = 'dinamyt_token';
+
+export function guardarToken(token: string) {
+  if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
+}
+export function obtenerToken(): string | null {
+  return typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+}
+export function cerrarSesion() {
+  if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);
+}
 
 const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 60000,
 });
-
-// El token lo emite el ecosystem; el portal lo guarda en localStorage.
 api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('dinamyt_token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  }
+  const t = obtenerToken();
+  if (t) config.headers.Authorization = `Bearer ${t}`;
   return config;
 });
 
+const eco = axios.create({
+  baseURL: ECOSYSTEM_API_URL,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 60000,
+});
+
+export async function loginAPI(email: string, password: string) {
+  const res = await eco.post('/auth/login', { email, password });
+  return res.data as { access_token: string };
+}
+
+// ── Tipos y catálogos (espejo de los enums del dominio) ──────────────────────
 export type EstadoCampeonato = 'BORRADOR' | 'LISTO' | 'EN_CURSO' | 'FINALIZADO';
 
 export interface CampeonatoPublico {
@@ -29,17 +52,79 @@ export interface CampeonatoPublico {
   fechaInicio: string | null;
   fechaFin: string | null;
 }
+export interface Campeonato extends CampeonatoPublico {
+  descripcion: string | null;
+  costoBase: string | null;
+}
 
-/** Pantalla pública: campeonatos en curso (no requiere autenticación). */
+export const MODALIDADES = [
+  'figura_manos_libres',
+  'figura_armas',
+  'defensa_personal',
+  'salto_altura',
+  'salto_longitud',
+  'combate',
+] as const;
+export type Modalidad = (typeof MODALIDADES)[number];
+
+export const GRUPOS_CINTURON = [
+  'BLANCO',
+  'PRINCIPIANTE',
+  'INTERMEDIO',
+  'AVANZADO',
+  'NEGRO',
+] as const;
+export const GENEROS = ['MASCULINO', 'FEMENINO'] as const;
+
+// ── Endpoints ────────────────────────────────────────────────────────────────
 export async function listCampeonatosPublicoAPI(): Promise<CampeonatoPublico[]> {
   const res = await api.get('/campeonatos/publico');
   return res.data as CampeonatoPublico[];
 }
 
-/** Listado para el panel admin (requiere token con scope campeonatos). */
-export async function listCampeonatosAPI() {
+export async function listCampeonatosAPI(): Promise<Campeonato[]> {
   const res = await api.get('/campeonatos');
+  return res.data as Campeonato[];
+}
+
+export async function crearCampeonatoAPI(data: {
+  nombre: string;
+  descripcion?: string;
+  fechaInicio?: string;
+  costoBase?: string;
+  modalidades?: { modalidad: Modalidad; costoExtra?: string }[];
+}) {
+  const res = await api.post('/campeonatos', data);
+  return res.data as Campeonato;
+}
+
+export interface InscribirInput {
+  documento: string;
+  nombreCompleto: string;
+  fechaNacimiento: string;
+  genero: (typeof GENEROS)[number];
+  grupoCinturon: (typeof GRUPOS_CINTURON)[number];
+  pesoActual?: string;
+  academiaClub?: string;
+  modalidades: Modalidad[];
+}
+export async function inscribirAPI(campId: string, data: InscribirInput) {
+  const res = await api.post(`/campeonatos/${campId}/inscripciones`, data);
   return res.data;
+}
+
+/** Mensaje de error del backend; concatena los motivos de R1-R5 si vienen. */
+export function extraerError(e: unknown, fallback: string): string {
+  if (axios.isAxiosError(e)) {
+    const data = e.response?.data as
+      | { error?: string; detalles?: { modalidad: string; motivo: string }[] }
+      | undefined;
+    if (data?.detalles?.length) {
+      return data.detalles.map((d) => d.motivo).join(' ');
+    }
+    return data?.error ?? fallback;
+  }
+  return fallback;
 }
 
 export default api;
