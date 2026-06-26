@@ -6,7 +6,8 @@ export type Modalidad =
   | 'figura_manos_libres'
   | 'figura_armas'
   | 'defensa_personal'
-  | 'saltos'
+  | 'salto_altura'
+  | 'salto_longitud'
   | 'combate';
 export type GrupoCinturon =
   | 'BLANCO'
@@ -70,8 +71,8 @@ export function validarRestriccion(
     };
   }
 
-  // R1 + R3: Saltos requiere edad >= 14 y cinturón INTERMEDIO o superior.
-  if (modalidad === 'saltos') {
+  // R1 + R3: Saltos (altura o longitud) requiere edad >= 14 y cinturón INTERMEDIO o superior.
+  if (modalidad === 'salto_altura' || modalidad === 'salto_longitud') {
     if (edad < 14) {
       return { permitido: false, motivo: 'Saltos requiere edad mínima de 14 años.' };
     }
@@ -126,7 +127,8 @@ const NOMBRE_MODALIDAD: Record<Modalidad, string> = {
   figura_manos_libres: 'Figura Manos Libres',
   figura_armas: 'Figura con Armas',
   defensa_personal: 'Defensa Personal',
-  saltos: 'Saltos',
+  salto_altura: 'Salto de Altura',
+  salto_longitud: 'Salto de Longitud',
   combate: 'Combate',
 };
 

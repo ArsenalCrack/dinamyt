@@ -22,7 +22,9 @@ export const resultadosFigura = camp.table('resultados_figura', {
   j4: decimal('j4', { precision: 6, scale: 2 }),
   total: decimal('total', { precision: 7, scale: 2 }),
   posicion: integer('posicion'),
-  /** Saltos: oportunidades por distancia/altura (intento + 2 repeticiones, §7.4). */
+  /** Saltos: máxima distancia/altura superada (para el ranking, §7.4). */
+  distanciaAlcanzada: decimal('distancia_alcanzada', { precision: 6, scale: 2 }),
+  /** Saltos: detalle de intentos por distancia (inicial + repeticiones, §7.4). */
   detalle: jsonb('detalle'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

@@ -1,5 +1,5 @@
 {
-  "id": "7e3d6b88-5d8b-40ef-99c8-5d563d93a8dc",
+  "id": "a2f7a7ad-1be2-4e66-9792-0fff7e8db196",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1317,6 +1317,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "distancia_alcanzada": {
+          "name": "distancia_alcanzada",
+          "type": "numeric(6, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "detalle": {
           "name": "detalle",
           "type": "jsonb",
@@ -1644,7 +1650,8 @@
         "figura_manos_libres",
         "figura_armas",
         "defensa_personal",
-        "saltos",
+        "salto_altura",
+        "salto_longitud",
         "combate"
       ]
     }

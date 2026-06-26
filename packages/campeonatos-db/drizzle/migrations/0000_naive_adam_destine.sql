@@ -9,7 +9,7 @@ CREATE TYPE "campeonatos"."ganador_combate" AS ENUM('hong', 'chung', 'empate');-
 CREATE TYPE "campeonatos"."genero" AS ENUM('MASCULINO', 'FEMENINO');--> statement-breakpoint
 CREATE TYPE "campeonatos"."genero_seccion" AS ENUM('MASCULINO', 'FEMENINO', 'MIXTO');--> statement-breakpoint
 CREATE TYPE "campeonatos"."grupo_cinturon" AS ENUM('BLANCO', 'PRINCIPIANTE', 'INTERMEDIO', 'AVANZADO', 'NEGRO');--> statement-breakpoint
-CREATE TYPE "campeonatos"."modalidad" AS ENUM('figura_manos_libres', 'figura_armas', 'defensa_personal', 'saltos', 'combate');--> statement-breakpoint
+CREATE TYPE "campeonatos"."modalidad" AS ENUM('figura_manos_libres', 'figura_armas', 'defensa_personal', 'salto_altura', 'salto_longitud', 'combate');--> statement-breakpoint
 CREATE TABLE "campeonatos"."campeonatos" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid,
@@ -165,6 +165,7 @@ CREATE TABLE "campeonatos"."resultados_figura" (
 	"j4" numeric(6, 2),
 	"total" numeric(7, 2),
 	"posicion" integer,
+	"distancia_alcanzada" numeric(6, 2),
 	"detalle" jsonb,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()

@@ -17,12 +17,13 @@ export const estadoCampeonatoEnum = camp.enum('estado_campeonato', [
   'FINALIZADO',
 ]);
 
-/** Modalidades de competencia (§7.1). */
+/** Modalidades de competencia (§7.1). Altura y longitud son modalidades distintas. */
 export const modalidadEnum = camp.enum('modalidad', [
   'figura_manos_libres',
   'figura_armas',
   'defensa_personal',
-  'saltos',
+  'salto_altura',
+  'salto_longitud',
   'combate',
 ]);
 

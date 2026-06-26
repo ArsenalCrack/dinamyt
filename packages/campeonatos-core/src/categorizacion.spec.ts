@@ -44,15 +44,15 @@ describe('restricciones de participación (R1-R5)', () => {
   it('R3: saltos requiere >=14 años y cinturón >= INTERMEDIO', () => {
     // 18 años, intermedio → ok
     expect(
-      validarRestriccion({ ...base, grupoCinturon: 'INTERMEDIO' }, 'saltos', ref)
+      validarRestriccion({ ...base, grupoCinturon: 'INTERMEDIO' }, 'salto_altura', ref)
         .permitido,
     ).toBe(true);
     // intermedio pero 12 años → no
     const nino = { ...base, fechaNacimiento: new Date('2014-01-01'), grupoCinturon: 'INTERMEDIO' as const };
-    expect(validarRestriccion(nino, 'saltos', ref).permitido).toBe(false);
+    expect(validarRestriccion(nino, 'salto_altura', ref).permitido).toBe(false);
     // 18 años pero principiante → no
     expect(
-      validarRestriccion({ ...base, grupoCinturon: 'PRINCIPIANTE' }, 'saltos', ref)
+      validarRestriccion({ ...base, grupoCinturon: 'PRINCIPIANTE' }, 'salto_altura', ref)
         .permitido,
     ).toBe(false);
   });
