@@ -51,21 +51,22 @@ NO tiene remoto** (rama local `master`).
 ```
 dinamyt/
 ├── packages/
-│   ├── shared/             @dinamyt/shared          ✅ contrato JWT + enums
-│   ├── campeonatos-db/      @dinamyt/campeonatos-db  ✅ schema Drizzle + migración + ./testing
-│   └── campeonatos-core/    @dinamyt/campeonatos-core ✅ dominio puro (categorización, puntuación, brackets)
+│   ├── shared/             @dinamyt/shared            ✅ contrato JWT + enums
+│   ├── campeonatos-db/      @dinamyt/campeonatos-db   ✅ schema Drizzle + migración + ./testing
+│   └── campeonatos-core/    @dinamyt/campeonatos-core ✅ dominio puro (categorización, puntuación, brackets, saltos, combate)
 └── apps/
     ├── ecosystem-api/       @dinamyt/ecosystem-api    ✅ NestJS — identidad central
+    ├── ecosystem-portal/    @dinamyt/ecosystem-portal ✅ Next 16 — login/registro/dashboard/planes
     ├── campeonatos-api/     @dinamyt/campeonatos-api  ✅ Fastify — endpoints reales
-    ├── campeonatos-web/     @dinamyt/campeonatos-web  ✅ Next 16 — pantalla pública (scaffold)
-    └── ecosystem-portal/    @dinamyt/ecosystem-portal ✅ Next 16 — login/registro/dashboard/planes
+    ├── campeonatos-web/     @dinamyt/campeonatos-web  ✅ Next 16 — pantalla pública + panel admin
+    └── campeonatos-combat/  @dinamyt/campeonatos-combat ✅ WebSocket (ws) — combate en vivo offline
 ```
 
-Estado global: **`turbo build` 6/6** · **30 tests** (db 3 · core 21 · api 6) · ✅.
+Estado global: **`turbo build` 8/8** · **43 tests** (core 32 · db 3 · api 6 · combat 2) · ✅.
 
 ### Stack y versiones
 pnpm 11.5 · Turborepo 2.10 · TypeScript 5.7 · NestJS 11 · Fastify 5 · Next 16.2.7 ·
-React 19.2.4 · Tailwind 4 · Drizzle ORM 0.45 · `jose` 6 (RS256) · Vitest 3 ·
+React 19.2.4 · Tailwind 4 · Drizzle ORM 0.45 · `jose` 6 (RS256) · `ws` 8 · Vitest 3 ·
 PGlite (tests de BD en memoria).
 
 ### Puertos (dev)
@@ -76,81 +77,72 @@ PGlite (tests de BD en memoria).
 | campeonatos-api | 3002 |
 | campeonatos-web | 3003 |
 | academy-web (futuro) | 3004 |
+| campeonatos-combat (WS) | 3005 |
 
 ---
 
 ## 4. Qué está HECHO (por paquete)
 
 ### `@dinamyt/shared`
-Contrato de integración: interfaz `JwtPayload` (`sub, email, fullName, org_id,
-app_scopes[], role_academy, role_campeonatos, is_super_admin`) + tipos `AppScope`,
-`CampeonatosRole`, `OrgType`, `SubscriptionStatus`, `PaymentStatus`.
+Contrato: interfaz `JwtPayload` + tipos `AppScope`, `CampeonatosRole`, `OrgType`,
+`SubscriptionStatus`, `PaymentStatus`.
 
 ### `@dinamyt/ecosystem-api` (NestJS)
-Servicio de identidad. Endpoints: `/auth/register|verify-email|login|forgot-password|
-reset-password|verify-token|jwks`, `/organizations*`, `/subscriptions*`,
+Identidad. Endpoints `/auth/*`, `/organizations*`, `/subscriptions*`,
 `/subscription-plans*`. `buildToken()` calcula `app_scopes` desde suscripciones
-activas. Estabilizado (commit `7fe5577` en el repo viejo, ya incluido en el monorepo):
-fix de `start:prod`, CORS, seed idempotente (super-admin + planes), README del
-contrato, `.gitignore` de `keys/`. Llaves RS256 en `apps/ecosystem-api/keys/`
-(NO versionadas; generar con openssl). Verificado: compila, arranca, sirve `/auth/jwks`.
-**Sin probar contra una BD real** (login/seed requieren Postgres).
+activas. Estabilizado (CORS, seed super-admin+planes, README, `.gitignore` de
+`keys/`). Llaves RS256 en `apps/ecosystem-api/keys/` (NO versionadas). Compila,
+arranca y sirve `/auth/jwks`. **Flujos con BD (login/seed) no probados contra una BD real.**
+
+### `@dinamyt/ecosystem-portal` (Next 16, :3000)
+Login, registro (+ consentimiento Ley 1581), verificación OTP, dashboard (accesos
+a apps según `app_scopes`), página pública de planes. `next build` OK.
 
 ### `@dinamyt/campeonatos-db` (Drizzle)
-Schema bajo el pg schema `campeonatos`, DB propia que referencia `user_id`/`org_id`
-del ecosistema por UUID (sin FK entre bases). 15 tablas: `campeonatos`,
-`modalidades_campeonato`, `tatamis`, `competidores` (perfil provisional vinculable
-por documento), `inscripciones` (+pagos), `inscripcion_modalidades`, `secciones`,
-`seccion_inscripciones`, `cola_tatami` (FIFO), `llaves`, `combates` (con competidores
-reales), `eventos_combate`, `resultados_figura`, `auditoria`, `movimientos_categoria`.
-Migración generada (`drizzle/migrations/0000_same_ezekiel.sql`). Expone `./testing`
-(`createTestDb()` con PGlite). Tests 3/3.
+Schema `campeonatos` (15 tablas; DB propia que referencia user_id/org_id por UUID).
+`modalidad` distingue `salto_altura`/`salto_longitud`; `resultados_figura` tiene
+`distancia_alcanzada`. Migración `0000_naive_adam_destine`. Expone `./testing`
+(`createTestDb` con PGlite). 3 tests.
 
-### `@dinamyt/campeonatos-core` (lógica pura, sin IO)
-- **categorización**: jerarquía de cinturones, edad, restricciones R1-R5, género de
-  sección (R4/R5), `enRango` (verificación), `claveSeccion`/`nombreSeccion`.
-- **puntuación**: combate §7.5 (+ DQ), figuras §7.2 (suma de jueces activos),
-  `desempatesPodio` §7.3.
-- **brackets** §8.3: `generarBracket` (potencia de 2, byes sin bye-vs-bye, avance
-  automático), `avanzar`. Shuffle inyectable. Tests 21/21.
+### `@dinamyt/campeonatos-core` (lógica pura)
+- categorización: cinturones, edad, restricciones R1-R5, género de sección, `enRango`,
+  clave/nombre de sección.
+- puntuación: combate §7.5 (+DQ), figuras §7.2, `desempatesPodio` §7.3.
+- brackets §8.3: `generarBracket` (byes, avance) + `avanzar`.
+- **saltos §7.4**: `procesarRondaSaltos` (rondas sincronizadas, fallas acumulativas
+  por modalidad), `todosSuperaron`, `rankingSaltos`.
+- **combate en vivo §7.5**: `aplicarEvento` (reductor puro: marcador por acción,
+  penalizaciones, DQ, alerta de superioridad a 12, deshacer, ganador, reset).
+- 32 tests.
 
-### `@dinamyt/campeonatos-api` (Fastify)
-Guard `requireScope` (verifica RS256 contra el JWKS del ecosystem con `jose`, exige
-scope `campeonatos`). Endpoints: `GET /health`, `GET /campeonatos/publico` (sin auth),
-`GET /campeonatos`, `GET /me`, `POST /campeonatos`, `POST /campeonatos/:id/
-inscripciones` (valida R1-R5 con el core + perfil provisional + monto),
-`POST /secciones/:id/bracket`. BD y verificador inyectables para tests. Tests 6/6
-(guard + integración PGlite).
+### `@dinamyt/campeonatos-api` (Fastify, :3002)
+Guard `requireScope` (RS256 vs JWKS + scope `campeonatos`). Endpoints: `GET /health`,
+`/campeonatos/publico` (público), `/campeonatos`, `/me`, `POST /campeonatos`,
+`POST /campeonatos/:id/inscripciones` (valida R1-R5 + perfil provisional + monto),
+`POST /secciones/:id/bracket`. BD y verificador inyectables. 6 tests (PGlite).
 
-### `@dinamyt/campeonatos-web` (Next 16)
-Pantalla pública (`/pantalla` → `GET /campeonatos/publico`, sin auth) + landing.
-Cliente axios → campeonatos-api. `next build` OK.
+### `@dinamyt/campeonatos-web` (Next 16, :3003)
+Pantalla pública (`/pantalla`) + **panel admin**: `/admin/login` (login delegado al
+ecosystem-api), `/admin` (listar + crear campeonato), `/admin/[id]` (inscribir
+competidor con feedback de R1-R5). `next build` OK.
 
-### `@dinamyt/ecosystem-portal` (Next 16)
-Login, registro (+ consentimiento Ley 1581), verificación de correo (OTP), dashboard
-(decodifica el token, muestra accesos a apps según `app_scopes`), página pública de
-planes. `next build` OK.
+### `@dinamyt/campeonatos-combat` (ws, :3005)
+Servidor WebSocket local (offline en WiFi). `Salas` mantiene el estado por combate
+en memoria y aplica el motor `aplicarEvento` del core; reenvía el estado a la sala.
+2 tests (sala + e2e WebSocket).
 
 ---
 
 ## 5. Qué FALTA (pendiente)
 
-**Dominio / core**
-- [ ] **Motor de Saltos §7.4** (reglas confirmadas, ver memoria `dinamyt-saltos-reglas`):
-      rondas sincronizadas, ganador por mayor distancia, fallas acumulativas por
-      modalidad, pass/fail por juez central. **Requiere cambiar el enum `modalidad`**
-      de `saltos` a `salto_altura` + `salto_longitud` (schema + migración + core).
-- [ ] **Desempate §7.3**: confirmar con Amir si aplica solo ante empate de puntaje
-      (asumido) o es siempre entre posiciones adyacentes del podio.
-- [ ] **Generación automática de secciones** a partir de inscripciones (usar
-      `claveSeccion`/`enRango`; necesita guardar los cortes de edad/peso por campeonato).
-
 **Campeonatos**
-- [ ] `apps/campeonatos-combat`: servidor WebSocket local por tatami + **motor de
-      combate en vivo event-sourced** portado de `DINAMYT-COMBAT/backend/app/engine/
-      combate_engine.py` (47KB; alertas, DQ, cronómetro). Opera offline en WiFi.
-- [ ] Panel admin/maestro/juez en `campeonatos-web` (crear campeonato, inscribir,
-      gestionar tatamis/cola, ingresar puntajes). Login vía portal del ecosystem.
+- [ ] **Generación automática de secciones** desde inscripciones (usar `claveSeccion`/
+      `enRango`; requiere guardar los cortes de edad/peso por campeonato → nueva tabla
+      o columnas de config).
+- [ ] Endpoints de la API para: gestión de tatamis y cola FIFO; secciones;
+      resultados de figuras/saltos; sincronización del combate (recibir el estado
+      final del módulo `combat` y persistir `combates`/`eventos_combate`).
+- [ ] Panel de **juez de mesa** en la web (ingresar puntajes; conectar al WS de combate).
 - [ ] Endpoint `GET /users/:id/campeonatos-summary` (perfil unificado, RF-CAM-ECO-04).
 - [ ] Reportes Excel/PDF (ExcelJS) y PWA/offline.
 
@@ -161,10 +153,18 @@ planes. `next build` OK.
 **Academy**: no iniciada.
 
 **Operación / infra (tareas de Amir)**
-- [ ] Correr migraciones contra Postgres real: ecosystem (`DATABASE_URL`) y
-      campeonatos (`CAMPEONATOS_DATABASE_URL`); luego `db:seed` del ecosystem.
+- [ ] Migraciones contra Postgres real: ecosystem (`DATABASE_URL`) y campeonatos
+      (`CAMPEONATOS_DATABASE_URL`); luego `db:seed` del ecosystem.
 - [ ] Subir el monorepo a un repo `dinamyt` en GitHub (y archivar los 4 viejos).
-- [ ] CI/CD (GitHub Actions) y despliegue (Vercel para webs, Render/Neon para APIs).
+- [ ] CI/CD (GitHub Actions) y despliegue (Vercel webs · Render/Neon APIs).
+
+### Supuestos a confirmar con Amir
+- **Combate**: el motor usa el modelo de **puntos por acción del §7.5** (réferi de
+  esquina + juez de mesa + penalizaciones), NO el de "4 jueces que votan" de COMBAT.
+- **Saltos**: se asume eliminación al acumular `maxFallas` fallas (por defecto **2**).
+- **Desempate §7.3**: se asume que solo aplica ante empate de puntaje.
+- **Login cross-origin**: en dev, `campeonatos-web` hace su propio login contra el
+  ecosystem (el token de localStorage no se comparte entre orígenes/puertos).
 
 ---
 
@@ -172,74 +172,60 @@ planes. `next build` OK.
 
 ```bash
 cd D:\Repositorios\dinamyt
-pnpm install          # instala todo el workspace
-pnpm build            # turbo: compila todos los paquetes (debe dar 6/6)
-pnpm test             # corre los tests de los paquetes que los tienen
+pnpm install
+pnpm build            # turbo: 8/8
+pnpm --filter @dinamyt/campeonatos-core test   # (y -db, -api, -combat) 
 ```
 
-Por app (desarrollo):
-```bash
-pnpm --filter @dinamyt/ecosystem-api start:dev     # :3001 (necesita keys/ y .env)
-pnpm --filter @dinamyt/campeonatos-api dev          # :3002
-pnpm --filter @dinamyt/campeonatos-web dev          # :3003
-pnpm --filter @dinamyt/ecosystem-portal dev         # :3000
-```
-
-Tests de un paquete: `pnpm --filter @dinamyt/campeonatos-core test`.
-
-Migraciones campeonatos: `pnpm --filter @dinamyt/campeonatos-db db:generate`
-(offline) / `db:migrate` (requiere BD).
-
-Claves RS256 del ecosystem (una vez, en `apps/ecosystem-api/`):
+Por app (dev): `pnpm --filter <pkg> dev` (o `start:dev` en ecosystem-api).
+Migraciones: `pnpm --filter @dinamyt/campeonatos-db db:generate|db:migrate`.
+Claves RS256 (en `apps/ecosystem-api/`):
 ```bash
 openssl genpkey -algorithm RSA -out keys/private.pem -pkeyopt rsa_keygen_bits:2048
 openssl rsa -in keys/private.pem -pubout -out keys/public.pem
 ```
-Cada app/paquete tiene su `.env.example` — copiar a `.env` y completar.
+Cada app/paquete tiene `.env.example` → copiar a `.env`.
 
 ---
 
 ## 7. Gotchas / convenciones (IMPORTANTE)
 
 - **`D:\` (raíz del disco) es un repo git.** Nunca `git add -A`/`git status` desde una
-  carpeta sin `.git` propio bajo `D:\` — git operaría sobre el disco entero. El
-  monorepo ya tiene su `.git`.
+  carpeta sin `.git` propio bajo `D:\`. El monorepo ya tiene su `.git`.
 - **El sandbox bloquea** comandos que combinan `git reset` o un `Select-String`/grep
-  con patrones tipo `\.env$` (los confunde con "Remove-Item on system path"). Commitear
-  con comandos simples: `git add <rutas> ; git commit -m '...'`. Nunca commitear `keys/`
-  ni `.env` (ya ignorados; stagear rutas explícitas).
-- **pnpm 11 bloquea build-scripts** por defecto; los aprobados están en
-  `pnpm-workspace.yaml > allowBuilds` (esbuild, unrs-resolver, sharp = true).
-- **No hay Docker ni Postgres local** en esta máquina → tests de BD con **PGlite**.
-- **Drizzle**: las columnas `decimal` vuelven como string con escala (`'0.00'`); las
-  columnas `uuid` exigen UUID válido (el `sub` del ecosystem siempre lo es).
-- Avisos `LF will be replaced by CRLF` al hacer `git add` son inocuos (Windows).
+  con patrones tipo `\.env$`. Commitear con comandos simples y rutas explícitas; nunca
+  `keys/` ni `.env` (ya ignorados).
+- **pnpm 11 bloquea build-scripts**; aprobados en `pnpm-workspace.yaml > allowBuilds`
+  (esbuild, unrs-resolver, sharp).
+- **No hay Docker ni Postgres local** → tests de BD con **PGlite**.
+- **Drizzle**: `decimal` vuelve como string con escala (`'0.00'`); `uuid` exige UUID
+  válido (el `sub` del ecosystem siempre lo es).
+- **Next 16**: la opción `eslint` ya no existe en `next.config`. Avisos `LF→CRLF` inocuos.
 
 ---
 
 ## 8. Handoff a una sesión nueva (instrucciones para mí mismo)
 
-Si retomas esto en otro chat:
-
-1. **Lee la memoria** en `...\memory\`: `MEMORY.md` (índice) +
-   `dinamyt-ecosystem-arquitectura`, `dinamyt-campeonatos-plan`, `dinamyt-saltos-reglas`.
-   (Y `dinamyt-hapkido` / `mediapipe-tasks-migration` para el proyecto Python aparte.)
-2. **Lee este HANDOFF.md** completo y las specs `.docx` si necesitas detalle de reglas.
-3. **Verifica el estado real** antes de afirmar nada: `cd D:\Repositorios\dinamyt && pnpm build && pnpm test`. Revisa `git log --oneline` (deben estar los 8 commits).
-4. **Respeta el orden y las decisiones** de la sección 1; no reintroduzcas Flask ni
-   polirepo; no toques `DINAMYT-COMBAT` (producción).
-5. **Antes de Saltos**: están las reglas confirmadas en memoria; implica partir
-   `modalidad` en `salto_altura`/`salto_longitud`.
-6. **Decisiones que aún dependen de Amir**: interpretación del desempate §7.3; cortes
-   de edad/peso por campeonato; detalles del panel admin.
-7. **Trabaja siempre en el monorepo**, una pieza a la vez, con tests (Vitest/PGlite),
-   y commitea por incremento con comandos git simples.
+1. **Lee la memoria** (`...\memory\`): `MEMORY.md` + `dinamyt-ecosystem-arquitectura`,
+   `dinamyt-campeonatos-plan`, `dinamyt-saltos-reglas`.
+2. **Lee este HANDOFF.md** y, si necesitas detalle de reglas, las specs `.docx`.
+3. **Verifica el estado**: `cd D:\Repositorios\dinamyt && pnpm build` (8/8) y los tests.
+   Revisa `git log --oneline`.
+4. **Respeta las decisiones** de la §1; no reintroduzcas Flask ni polirepo; no toques
+   `DINAMYT-COMBAT`.
+5. **Confirma con Amir** los supuestos de la §5 antes de profundizar en combate/saltos/
+   secciones.
+6. Trabaja una pieza a la vez, con tests (Vitest/PGlite), commits por incremento con
+   comandos git simples, y **actualiza este documento** a medida que avances.
 
 ---
 
 ## 9. Historial de commits (monorepo)
 
 ```
+ffc9434 feat(campeonatos-combat): servidor WebSocket + motor de combate en vivo
+d8d7f96 feat(campeonatos-web): panel admin (login + crear campeonato + inscribir)
+1a7c223 feat(campeonatos): motor de Saltos + split de modalidad (altura/longitud)
 d00a20f feat(ecosystem-portal): portal Next 16 con login/registro/verificacion
 6c379f1 feat(campeonatos-web): scaffold Next 16 + pantalla publica
 e90ae16 feat(campeonatos-api): endpoints reales con core + db (inscripcion categorizada)
@@ -248,5 +234,6 @@ bab1113 feat(campeonatos-api): esqueleto Fastify con guard JWT del ecosystem
 72cc21b test(campeonatos-db): verificacion automatica con PGlite + Vitest
 93aad49 feat(campeonatos-db): schema Drizzle inicial de DINAMYT Campeonatos
 4af622a chore(monorepo): inicializa monorepo pnpm/Turborepo + paquete @dinamyt/shared
+05833a7 docs: HANDOFF.md — estado completo del proyecto y guia de continuidad
 ```
 (El ecosystem se estabilizó antes en `D:\Repositorios\dinamyt-ecosystem`, commit `7fe5577`.)
