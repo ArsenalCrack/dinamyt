@@ -62,7 +62,7 @@ dinamyt/
     └── campeonatos-combat/  @dinamyt/campeonatos-combat ✅ WebSocket (ws) — combate en vivo offline
 ```
 
-Estado global: **`turbo build` 8/8** · **43 tests** (core 32 · db 3 · api 6 · combat 2) · ✅.
+Estado global: **`turbo build` 8/8** · **51 tests** (core 40 · db 3 · api 6 · combat 2) · ✅.
 
 ### Stack y versiones
 pnpm 11.5 · Turborepo 2.10 · TypeScript 5.7 · NestJS 11 · Fastify 5 · Next 16.2.7 ·
@@ -104,16 +104,21 @@ Schema `campeonatos` (15 tablas; DB propia que referencia user_id/org_id por UUI
 `distancia_alcanzada`. Migración `0000_naive_adam_destine`. Expone `./testing`
 (`createTestDb` con PGlite). 3 tests.
 
-### `@dinamyt/campeonatos-core` (lógica pura)
+### `@dinamyt/campeonatos-core` (lógica pura) — 40 tests
 - categorización: cinturones, edad, restricciones R1-R5, género de sección, `enRango`,
   clave/nombre de sección.
-- puntuación: combate §7.5 (+DQ), figuras §7.2, `desempatesPodio` §7.3.
+- **generación de secciones**: `generarSecciones` — árbol Modalidad→Género→Cinturón→
+  Edad→Peso (portado del proyecto Angular/Spring `DINAMYT-PROJECT/ArbolBuilder`); el
+  admin configura por modalidad listas `individual`/`rango`.
+- figuras: `totalFigura` §7.2, `desempatesPodio` §7.3. (`puntuacion.ts` aún expone la
+  tabla §7.5 por acción, pero el combate en vivo NO la usa — ver abajo.)
 - brackets §8.3: `generarBracket` (byes, avance) + `avanzar`.
 - **saltos §7.4**: `procesarRondaSaltos` (rondas sincronizadas, fallas acumulativas
-  por modalidad), `todosSuperaron`, `rankingSaltos`.
-- **combate en vivo §7.5**: `aplicarEvento` (reductor puro: marcador por acción,
-  penalizaciones, DQ, alerta de superioridad a 12, deshacer, ganador, reset).
-- 32 tests.
+  por modalidad, `maxFallas=3`: inicial + 2 repeticiones), `todosSuperaron`, `rankingSaltos`.
+- **combate en vivo**: `aplicarEvento` — **port fiel de DINAMYT-COMBAT** (4 réferis de
+  esquina j1-j4 + juez central; `calcularMarcador` = promedio de jueces activos +
+  árbitro; KyongGo/GamJeum con DQ a 6/3; alerta de superioridad a 12; punto de oro;
+  cronómetro; deshacer; declarar/descalificar ganador; reset).
 
 ### `@dinamyt/campeonatos-api` (Fastify, :3002)
 Guard `requireScope` (RS256 vs JWKS + scope `campeonatos`). Endpoints: `GET /health`,
@@ -136,9 +141,10 @@ en memoria y aplica el motor `aplicarEvento` del core; reenvía el estado a la s
 ## 5. Qué FALTA (pendiente)
 
 **Campeonatos**
-- [ ] **Generación automática de secciones** desde inscripciones (usar `claveSeccion`/
-      `enRango`; requiere guardar los cortes de edad/peso por campeonato → nueva tabla
-      o columnas de config).
+- [ ] **Persistir secciones**: la lógica de generación ya está (`generarSecciones`);
+      falta (a) guardar la config de categorías por modalidad (jsonb en
+      `modalidades_campeonato`), (b) endpoint `POST /campeonatos/:id/generar-secciones`
+      que la persista en `secciones`, y (c) asignar inscripciones a su sección.
 - [ ] Endpoints de la API para: gestión de tatamis y cola FIFO; secciones;
       resultados de figuras/saltos; sincronización del combate (recibir el estado
       final del módulo `combat` y persistir `combates`/`eventos_combate`).
@@ -158,13 +164,16 @@ en memoria y aplica el motor `aplicarEvento` del core; reenvía el estado a la s
 - [ ] Subir el monorepo a un repo `dinamyt` en GitHub (y archivar los 4 viejos).
 - [ ] CI/CD (GitHub Actions) y despliegue (Vercel webs · Render/Neon APIs).
 
-### Supuestos a confirmar con Amir
-- **Combate**: el motor usa el modelo de **puntos por acción del §7.5** (réferi de
-  esquina + juez de mesa + penalizaciones), NO el de "4 jueces que votan" de COMBAT.
-- **Saltos**: se asume eliminación al acumular `maxFallas` fallas (por defecto **2**).
+### Decisiones confirmadas por Amir (2026-06-26)
+- **Combate**: modelo **tal cual DINAMYT-COMBAT** (4 réferis de esquina + juez central) — portado.
+- **Saltos**: intento inicial + 2 repeticiones; al 3.er fallo, eliminado (`maxFallas=3`).
+- **Secciones**: el admin define los rangos al crear el campeonato (lógica del proyecto
+  Angular/Spring `D:\hapkido\DINAMYT-PROJECT`, ya portada en `generarSecciones`).
+
+### Aún por confirmar
 - **Desempate §7.3**: se asume que solo aplica ante empate de puntaje.
-- **Login cross-origin**: en dev, `campeonatos-web` hace su propio login contra el
-  ecosystem (el token de localStorage no se comparte entre orígenes/puertos).
+- **Login cross-origin**: en dev cada web hace su propio login contra el ecosystem
+  (el token de localStorage no se comparte entre orígenes/puertos).
 
 ---
 
@@ -223,6 +232,9 @@ Cada app/paquete tiene `.env.example` → copiar a `.env`.
 ## 9. Historial de commits (monorepo)
 
 ```
+2fdb19d refactor(combate): port fiel del motor de DINAMYT-COMBAT (modelo de 4 jueces)
+3787ce7 feat(campeonatos-core): generacion de secciones (arbol) + saltos maxFallas=3
+e46129c docs: actualiza HANDOFF — saltos, panel admin y combate
 ffc9434 feat(campeonatos-combat): servidor WebSocket + motor de combate en vivo
 d8d7f96 feat(campeonatos-web): panel admin (login + crear campeonato + inscribir)
 1a7c223 feat(campeonatos): motor de Saltos + split de modalidad (altura/longitud)
