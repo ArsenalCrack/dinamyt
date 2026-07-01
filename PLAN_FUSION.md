@@ -91,10 +91,15 @@ namespace `/combate` (hoy el monorepo usa `ws` crudo).
     (`Demo1234!`) con org + suscripción activa, para probar los accesos por rol.
   - Pendiente en fases siguientes: pantallas propias de coach/competitor
     (inscripción/historial) y de juez (`/juez` estilo COMBAT).
-- **Fase 2 — Creación/configuración (estilo PROJECT, tema actual)**.
-  - Estados del campeonato + editar/publicar.
-  - UI de categorías (rangos) → `generarSecciones` real (no el `mixto` por defecto).
-  - Inscripciones + invitaciones.
+- **Fase 2 — Creación/configuración (estilo PROJECT, tema actual)** ✅ *(hecha 2026-07-01, parcial)*.
+  - Estados del campeonato: core `transicionValida` + `PATCH /campeonatos/:id/estado`
+    (solo avanza un paso) + botón "→ SIGUIENTE" en `/admin`. Verificado.
+  - UI de categorías: `GET /campeonatos/:id` (detalle+modalidades) + `PUT
+    /campeonatos/:id/modalidades/:modalidad` + editor `ConfigCategorias`
+    (género, cinturón con grupos, rangos edad/peso) en la página de secciones →
+    `generar-secciones` real. Verificado end-to-end.
+  - **Pendiente de Fase 2**: inscripciones por **invitación** (email + el
+    competidor acepta y elige modalidades) — no iniciado.
 - **Fase 3 — Tatamis y flujo del evento**.
   - Endpoints/UI de tatamis, cola FIFO, asignación y robo de modalidades.
 - **Fase 4 — Evento EN VIVO idéntico a COMBAT**.
