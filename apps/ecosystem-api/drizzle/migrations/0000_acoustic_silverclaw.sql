@@ -1,3 +1,5 @@
+CREATE SCHEMA IF NOT EXISTS "ecosystem";
+--> statement-breakpoint
 CREATE TYPE "ecosystem"."org_type" AS ENUM('FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY');--> statement-breakpoint
 CREATE TYPE "ecosystem"."payment_status" AS ENUM('PAID', 'PARTIAL', 'PENDING');--> statement-breakpoint
 CREATE TYPE "ecosystem"."subscription_status" AS ENUM('ACTIVE', 'EXPIRED', 'SUSPENDED', 'PENDING_REVIEW');--> statement-breakpoint

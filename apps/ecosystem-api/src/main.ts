@@ -11,7 +11,9 @@ async function bootstrap() {
   // CORS: el portal del ecosistema y las apps (academy, campeonatos)
   // consumen esta API desde otros orígenes. Lista separada por comas en
   // CORS_ORIGINS; en desarrollo se permite localhost por defecto.
-  const origins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
+  const origins = (
+    process.env.CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:3003'
+  )
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);

@@ -10,7 +10,9 @@ export const config = {
   /** A dónde redirigir cuando falta el scope (adquirir el plan). */
   ecosystemPortalUrl:
     process.env.ECOSYSTEM_PORTAL_URL ?? 'http://localhost:3000',
-  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
+  corsOrigins: (
+    process.env.CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:3003'
+  )
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean),

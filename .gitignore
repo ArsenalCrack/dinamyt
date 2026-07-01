@@ -6,6 +6,9 @@ dist/
 .turbo/
 *.tsbuildinfo
 
+# BD local embebida (PGlite) — datos de desarrollo, nunca versionar
+.localdb/
+
 # Logs
 *.log
 npm-debug.log*
