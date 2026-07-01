@@ -68,8 +68,10 @@ dinamyt/
 ```
 
 Estado global: **`turbo build` 8/8** · **`turbo test` 8/8** (core 44 · db 3 ·
-campeonatos-api 10 · combat 2 · ecosystem-api 4) · ✅.
-**Fase 1 de la fusión (roles) HECHA** — ver `PLAN_FUSION.md`.
+campeonatos-api 13 · combat 2 · ecosystem-api 4) · ✅.
+**Fases 1-3 de la fusión HECHAS** (roles · creación/edición completa · tatamis
+con cola FIFO y robo de modalidades) — ver `PLAN_FUSION.md`. Sigue la Fase 4
+(evento en vivo estilo COMBAT) y el pendiente de invitaciones.
 
 ### Stack y versiones
 pnpm 11.5 · Turborepo 2.10 · TypeScript 5.7 · NestJS 11 · Fastify 5 · Next 16.2.7 ·
@@ -128,20 +130,31 @@ Schema `campeonatos` (15 tablas; DB propia que referencia user_id/org_id por UUI
   cronómetro; deshacer; declarar/descalificar ganador; reset).
 
 ### `@dinamyt/campeonatos-api` (Fastify, :3002)
-Guard `requireScope` (RS256 vs JWKS + scope `campeonatos`). Endpoints: `GET /health`,
-`/campeonatos/publico` (público), `/campeonatos`, `/me`, `POST /campeonatos` (con
-config de categorías por modalidad), `POST /campeonatos/:id/inscripciones` (valida
-R1-R5 + perfil provisional + monto), `POST /campeonatos/:id/generar-secciones` +
-`GET .../secciones`, `POST /campeonatos/:id/asignar-secciones` (empareja cada
-inscripción con su sección por cinturón/peso/edad/género), `POST /secciones/:id/bracket`,
-`POST /secciones/:id/combates` (persiste el snapshot). BD y verificador inyectables.
-9 tests (PGlite).
+Guard `requireScope`/`requireRole` (RS256 vs JWKS + scope `campeonatos`). Endpoints:
+`GET /health`, `/campeonatos/publico` (público), `/campeonatos`, `/me`,
+`GET/POST/PATCH /campeonatos/:id` (detalle · crear —materializa tatamis
+1..numTatamis— · **editar** solo BORRADOR/LISTO con sync de tatamis/modalidades),
+`PATCH /campeonatos/:id/estado`, `PUT /campeonatos/:id/modalidades/:modalidad`
+(config de categorías), `POST /campeonatos/:id/inscripciones` (valida R1-R5 +
+perfil provisional + monto), `generar-secciones`/`GET secciones`/
+`asignar-secciones`, `POST /secciones/:id/bracket`, `POST /secciones/:id/combates`.
+**Tatamis (`routes/tatamis.ts`)**: `GET /campeonatos/:id/tatamis` (con cola,
+auto-materializa), `POST /tatamis/:id/cola` (encolar FIFO), `POST
+/tatamis/:id/iniciar|finalizar` (admin+judge), `POST /cola/:id/promover|robar`
+(robo de modalidades entre tatamis), `DELETE /cola/:id`; UUIDs malformados → 400.
+BD y verificador inyectables. 13 tests (PGlite) + verificación E2E local.
 
 ### `@dinamyt/campeonatos-web` (Next 16, :3003)
-Pantalla pública (`/pantalla`) + **panel admin**: `/admin/login` (login delegado al
-ecosystem-api), `/admin` (listar + crear campeonato), `/admin/[id]` (inscribir
-competidor con feedback de R1-R5), `/admin/combate` (**juez de mesa**: WebSocket de
-combate en vivo, puntúa por réferi, faltas, declarar ganador). `next build` OK.
+Identidad propia: **logo** (`components/Logo.tsx`, favicon `app/icon.svg`),
+**shell de admin** (`admin/layout.tsx` + `AdminHeader`: nav sticky con rol y
+Salir) y **sistema de estilos** en `globals.css` (`.btn*`, `.card`, `.badge*`).
+Rutas: `/` (portada), `/pantalla` (pública), `/admin/login`, `/admin` (lista con
+badges de estado + acciones por rol), `/admin/crear` y `/admin/[id]/editar`
+(formulario compartido `CampeonatoForm` con validación del core), `/admin/[id]`
+(inscribir con feedback R1-R5), `/admin/[id]/secciones` (categorías → generar →
+asignar → llaves), `/admin/[id]/tatamis` (**cola FIFO por tatami: encolar,
+iniciar/finalizar, promover, robar entre tatamis**), `/admin/combate` (juez de
+mesa por WebSocket). Todo responsive (móvil→desktop). `next build` OK.
 
 ### `@dinamyt/campeonatos-combat` (ws, :3005)
 Servidor WebSocket local (offline en WiFi). `Salas` mantiene el estado por combate
@@ -165,7 +178,11 @@ todos los datos (cinturón, peso, club, edad, nombre…).
 - [ ] Perfil unificado en el portal del ecosystem (RF-ECO-10/22) que combina ambos.
 
 **Campeonatos**
-- [ ] Endpoints de gestión de tatamis y cola FIFO; resultados de figuras/saltos.
+- [x] Endpoints + UI de gestión de tatamis y cola FIFO (hecho 2026-07-01, con
+      robo de modalidades). Falta: resultados de figuras/saltos en vivo.
+- [ ] Inscripción por invitación (email + aceptación del competidor).
+- [ ] Evento en vivo estilo COMBAT (Fase 4): `/juez`, `/tatami/[id]`, `/tablero`,
+      llaves visuales; enlazar el combate desde la cola del tatami.
 - [ ] Reportes Excel/PDF (ExcelJS) y PWA/offline.
 
 > Hecho ya: generación + persistencia de secciones, **asignación de inscripciones a
@@ -269,6 +286,14 @@ Cada app/paquete tiene `.env.example` → copiar a `.env`.
 - **`CAMPEONATOS_DATABASE_URL`** puede ser **el mismo** connection string que el
   `DATABASE_URL` del ecosystem: son schemas distintos (`campeonatos` vs `ecosystem`)
   en el mismo Postgres.
+- **PGlite es MONOPROCESO**: nunca corras `db:local:setup` (ni otro proceso que
+  abra la misma carpeta `.localdb/*`) mientras la API correspondiente está
+  levantada — el segundo proceso corrompe el data-dir y ambos mueren con
+  `RuntimeError: Aborted()` en `_pg_initdb`. Remedio: parar todo, borrar la
+  carpeta afectada (p. ej. `.localdb/campeonatos`) y re-ejecutar el setup.
+- **`.claude/launch.json`** define los 3 dev-servers (ecosystem-api :3001,
+  campeonatos-api :3002, campeonatos-web :3003) para levantarlos desde el
+  asistente (preview). Los puertos son fijos por CORS.
 - **BD local sin servidor (PGlite)**: si `PGLITE_DATA` / `CAMPEONATOS_PGLITE_DATA`
   están en el `.env`, los clientes usan **PGlite embebido** (persistido en `.localdb/`,
   gitignored) en vez de postgres-js. Se activa así el arranque local sin Docker ni
@@ -303,6 +328,16 @@ Cada app/paquete tiene `.env.example` → copiar a `.env`.
 ## 9. Historial de commits (monorepo)
 
 ```
+cd438ef feat(campeonatos-web): identidad y rediseno UX (logo, shell de navegacion, responsive)
+404ec4a feat(campeonatos-web): gestion de tatamis en vivo + edicion de campeonato
+8b6794a fix(campeonatos-api): valida UUIDs en rutas de tatamis (400 en vez de 500)
+90fa338 feat(campeonatos-api): edicion del campeonato (PATCH /campeonatos/:id)
+b00ee97 feat(campeonatos-api): tatamis reales + cola FIFO + robo de modalidades
+c48e88e docs: PLAN_FUSION — creacion completa (campos/validaciones/tatamis/categorias por nombre)
+6559d16 feat(campeonatos): creacion completa estilo PROJECT — campos, tatamis, validaciones y categorias por nombre
+7f1b3ec docs: PLAN_FUSION — Fase 2 (estados + config de categorias) hecha y verificada
+09e4e35 feat(campeonatos): Fase 2 — estados del campeonato + config de categorias por modalidad
+1aa2d0f docs: RUN_LOCAL + PLAN_FUSION + HANDOFF (local, roles, plan de fusion)
 e121618 feat(campeonatos): asignacion inscripcion->seccion por cinturon + snapshot inmutable
 12ca535 feat(campeonatos-web): panel de juez de mesa (combate en vivo por WebSocket)
 7a44396 feat(campeonatos): persistencia del resultado de combate (sync)

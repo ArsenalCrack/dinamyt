@@ -106,11 +106,30 @@ namespace `/combate` (hoy el monorepo usa `ws` crudo).
     **front**; página `/admin/crear`; **cinturón por nombre fijo** (5 grupos,
     individual/rango, sin texto libre); distinción **modalidad** (en qué compite)
     vs **categoría** (cómo se agrupa). Verificado end-to-end.
+  - **Tatamis materializados** ✅ *(2026-07-01)*: al crear el campeonato se
+    insertan filas 1..`numTatamis` en `tatamis` (y `GET /campeonatos/:id/tatamis`
+    auto-materializa los campeonatos previos).
+  - **Edición completa** ✅ *(2026-07-01)*: `PATCH /campeonatos/:id` (solo
+    BORRADOR/LISTO; re-valida con el core, sincroniza tatamis —no reduce si hay
+    cola— y modalidades —no quita si hay inscripciones—) + página
+    `/admin/[id]/editar` que reusa el formulario compartido `CampeonatoForm`.
   - **Pendiente de Fase 2**: inscripción por **invitación** (email + aceptación
-    del competidor); crear registros de **tatami** desde `numTatamis` (hoy solo se
-    guarda el número); edición completa del campeonato (`/admin/[id]/editar`).
-- **Fase 3 — Tatamis y flujo del evento**.
-  - Endpoints/UI de tatamis, cola FIFO, asignación y robo de modalidades.
+    del competidor eligiendo modalidades).
+- **Fase 3 — Tatamis y flujo del evento** ✅ *(hecha 2026-07-01)*.
+  - API (`routes/tatamis.ts`, con test de integración PGlite y verificación
+    E2E contra el stack local): `GET /campeonatos/:id/tatamis` (tatamis + cola
+    con secciones), `POST /tatamis/:id/cola` (encolar FIFO; una sección solo
+    puede estar en una cola activa), `POST /tatamis/:id/iniciar|finalizar`
+    (admin+judge; sincroniza estado de sección y tatami LIBRE/OCUPADO),
+    `POST /cola/:id/promover` (al frente), `POST /cola/:id/robar` (**robo de
+    modalidades**: mover una sección EN_ESPERA a otro tatami) y
+    `DELETE /cola/:id`. IDs malformados → 400 (guard de UUID).
+  - UI `/admin/[id]/tatamis`: grid responsive de tatamis (badge EN VIVO/LIBRE,
+    sección en curso, cola numerada con promover/robar/quitar) + panel de
+    secciones disponibles para encolar.
+  - **Decisión de diseño**: se descartó la regla de PROJECT de reservar los dos
+    últimos tatamis para saltos; el admin asigna libremente cualquier sección a
+    cualquier tatami (más flexible y sin casos especiales).
 - **Fase 4 — Evento EN VIVO idéntico a COMBAT**.
   - Portar componentes y pantallas (`BracketTree`, `LlavePanel`, `PodioLlave`,
     `/juez`, `/pantalla`, `/tatami`, `/tablero`), figuras en vivo, realtime.
@@ -118,9 +137,27 @@ namespace `/combate` (hoy el monorepo usa `ws` crudo).
 
 ## 8. Próximo paso recomendado
 
-**Fase 1 (roles)**: es la columna vertebral que el usuario pidió explícitamente y de
-la que cuelga todo lo demás; está bien acotada y es testeable. Al terminar, seguir
-con Fase 2 (creación) y luego Fase 4 (clon de COMBAT en vivo).
+Fases 1-3 hechas. Sigue la **Fase 4 — evento EN VIVO idéntico a COMBAT**: portar
+`BracketTree`/`LlavePanel`/`PodioLlave` y las pantallas `/juez`, `/pantalla`,
+`/tatami/[id]`, `/tablero`, con figuras en vivo y realtime; enlazar el combate
+desde la cola del tatami (hoy el juez de mesa teclea el ID). En paralelo puede
+cerrarse el pendiente de Fase 2 (**invitaciones**).
+
+## 8b. UX/UI (2026-07-01)
+
+La web de Campeonatos ya tiene identidad y sistema de diseño propios:
+
+- **Logo** (`components/Logo.tsx` + favicon `app/icon.svg`): rayo dorado sobre
+  placa oscura, wordmark DINAMYT.
+- **Shell de admin** (`app/admin/layout.tsx` + `components/AdminHeader.tsx`):
+  header sticky con logo, navegación (Campeonatos / Juez de mesa / Pantalla),
+  usuario + rol y Salir; se oculta en `/admin/login`; responsive (nav pasa a
+  segunda fila en móvil).
+- **Sistema de estilos** (`globals.css`): tokens (`--danger/--ok/--info/--hong/
+  --chung`) y clases `.btn(-gold|-outline|-danger|-sm)`, `.card`, `.badge(-gold|
+  -live|-ok|-info)`, `.msg-error/.msg-ok` — reemplazan los estilos inline.
+- **Formulario compartido** `CampeonatoForm` (crear + editar, validación del core
+  en cliente) y páginas responsive (grids `sm:`/`md:`/`xl:`).
 
 ## 9. Convenciones al construir
 

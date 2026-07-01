@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ecosystem-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/ecosystem-api", "start:dev"],
+      "port": 3001
+    },
+    {
+      "name": "campeonatos-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/campeonatos-api", "dev"],
+      "port": 3002
+    },
+    {
+      "name": "campeonatos-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/campeonatos-web", "dev"],
+      "port": 3003
+    }
+  ]
+}

@@ -70,6 +70,12 @@ pnpm --filter @dinamyt/ecosystem-api db:local:setup
 pnpm --filter @dinamyt/campeonatos-db db:local:setup
 ```
 
+> ⚠️ **PGlite es monoproceso**: ejecuta estos setups con las APIs **apagadas**.
+> Si un segundo proceso abre la misma carpeta `.localdb/*`, el data-dir se
+> corrompe y todo muere con `RuntimeError: Aborted()` en `_pg_initdb`. Remedio:
+> parar todo, borrar la carpeta afectada y re-ejecutar el setup (los datos
+> locales son de prueba y regenerables).
+
 Esto crea/rellena las carpetas `.localdb/ecosystem` y `.localdb/campeonatos`.
 El setup del ecosystem crea el super-admin (`ADMIN_EMAIL`/`ADMIN_PASSWORD`), los
 planes Academy / Campeonatos / Completo y **usuarios demo por rol** (con org +
