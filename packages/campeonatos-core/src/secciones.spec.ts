@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generarSecciones, type ModalidadConfig } from './secciones';
+import { generarSecciones, emparejarSeccion, type ModalidadConfig } from './secciones';
 
 const ind = (valor: string) => ({ activa: true, tipo: 'individual' as const, valor });
 const rango = (desde: string, hasta: string) => ({
@@ -78,5 +78,69 @@ describe('generación de secciones (árbol del campeonato)', () => {
     ]);
     expect(secs[0].id).toContain('COMBATE');
     expect(secs[0].id).toContain('PESO(-50-60)');
+  });
+});
+
+describe('emparejarSeccion (inscripción → sección)', () => {
+  const secs = generarSecciones([
+    {
+      nombre: 'combate',
+      activa: true,
+      categorias: {
+        genero: 'separado',
+        cinturon: [
+          {
+            activa: true,
+            tipo: 'individual',
+            valor: 'Principiantes',
+            grupos: ['BLANCO', 'PRINCIPIANTE'],
+          },
+          {
+            activa: true,
+            tipo: 'individual',
+            valor: 'Avanzados',
+            grupos: ['INTERMEDIO', 'AVANZADO'],
+          },
+        ],
+        peso: [rango('40', '60'), rango('61', '80')],
+      },
+    },
+  ]);
+
+  it('empareja por género, grupo de cinturón y peso', () => {
+    const s = emparejarSeccion(secs, {
+      modalidad: 'combate',
+      genero: 'MASCULINO',
+      grupoCinturon: 'INTERMEDIO',
+      edad: 20,
+      peso: 55,
+    });
+    expect(s?.genero).toBe('Masculino');
+    expect(s?.cinturon).toBe('Avanzados'); // INTERMEDIO ∈ [INTERMEDIO, AVANZADO]
+    expect(s?.peso).toBe('40-60');
+  });
+
+  it('un BLANCO cae en la categoría Principiantes', () => {
+    const s = emparejarSeccion(secs, {
+      modalidad: 'combate',
+      genero: 'FEMENINO',
+      grupoCinturon: 'BLANCO',
+      edad: 15,
+      peso: 70,
+    });
+    expect(s?.cinturon).toBe('Principiantes');
+    expect(s?.genero).toBe('Femenino');
+    expect(s?.peso).toBe('61-80');
+  });
+
+  it('no empareja si el peso está fuera de todos los rangos', () => {
+    const s = emparejarSeccion(secs, {
+      modalidad: 'combate',
+      genero: 'MASCULINO',
+      grupoCinturon: 'BLANCO',
+      edad: 20,
+      peso: 200,
+    });
+    expect(s).toBeNull();
   });
 });

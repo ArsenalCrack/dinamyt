@@ -202,6 +202,68 @@ describe('API campeonatos (integración con PGlite)', () => {
     await a.close();
   });
 
+  it('asigna la inscripción a su sección por cinturón y peso', async () => {
+    const a = app();
+    const auth = { authorization: `Bearer ${await token()}` };
+
+    const crear = await a.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: auth,
+      payload: {
+        nombre: 'Copa Asignación',
+        modalidades: [
+          {
+            modalidad: 'combate',
+            categorias: {
+              genero: 'separado',
+              cinturon: [
+                {
+                  activa: true,
+                  tipo: 'individual',
+                  valor: 'Avanzados',
+                  grupos: ['INTERMEDIO', 'AVANZADO'],
+                },
+              ],
+              peso: [{ activa: true, tipo: 'rango', desde: '40', hasta: '60' }],
+            },
+          },
+        ],
+      },
+    });
+    const campId = crear.json().id as string;
+
+    await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${campId}/generar-secciones`,
+      headers: auth,
+    });
+    await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${campId}/inscripciones`,
+      headers: auth,
+      payload: {
+        documento: '900',
+        nombreCompleto: 'Ana Ruiz',
+        fechaNacimiento: '2005-01-01',
+        genero: 'MASCULINO',
+        grupoCinturon: 'INTERMEDIO',
+        pesoActual: '55',
+        modalidades: ['combate'],
+      },
+    });
+
+    const asg = await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${campId}/asignar-secciones`,
+      headers: auth,
+    });
+    expect(asg.statusCode).toBe(200);
+    expect(asg.json().asignadas).toBe(1);
+
+    await a.close();
+  });
+
   it('exige scope campeonatos para crear (403 con otro scope)', async () => {
     const a = app();
     const res = await a.inject({

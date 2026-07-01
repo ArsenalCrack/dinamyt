@@ -66,6 +66,9 @@ export const inscripciones = camp.table(
       .references(() => competidores.id),
     /** Peso al momento de inscribir (puede diferir del peso actual). */
     pesoInscripcion: decimal('peso_inscripcion', { precision: 5, scale: 2 }),
+    /** Snapshot del cinturón al inscribir (historial inmutable: queda el cinturón con el que participó). */
+    grupoCinturonInscripcion: grupoCinturonEnum('grupo_cinturon_inscripcion'),
+    cinturonInscripcion: varchar('cinturon_inscripcion', { length: 50 }),
     estado: estadoInscripcionEnum('estado').notNull().default('PENDIENTE'),
     /** Total = costo base + modalidades extra (calculado, §5.1). */
     montoTotal: decimal('monto_total', { precision: 10, scale: 2 }).default('0'),

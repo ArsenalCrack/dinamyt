@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import {
   campeonatos,
   modalidadesCampeonato,
@@ -15,6 +15,8 @@ import {
   validarRestriccion,
   generarBracket,
   generarSecciones,
+  emparejarSeccion,
+  calcularEdad,
   snapshotCombate,
   type Modalidad,
   type Genero,
@@ -187,6 +189,9 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           campeonatoId: id,
           competidorId: comp.id,
           pesoInscripcion: body.pesoActual ?? null,
+          // Snapshot del cinturón al inscribir (historial inmutable).
+          grupoCinturonInscripcion: body.grupoCinturon,
+          cinturonInscripcion: body.cinturon ?? null,
           montoTotal,
           inscritoPorUserId: req.user!.sub,
         })
@@ -271,6 +276,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           modalidad: s.modalidad as Modalidad,
           genero: s.genero.toUpperCase() as 'MASCULINO' | 'FEMENINO' | 'MIXTO',
           cinturon: s.cinturon,
+          cinturonGrupos: s.cinturonGrupos,
           rangoEdad: s.edad,
           rangoPeso: s.peso,
           clave: s.id,
@@ -292,6 +298,95 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         .select()
         .from(secciones)
         .where(eq(secciones.campeonatoId, id));
+    },
+  );
+
+  // ── Asignar cada inscripción a la sección que le corresponde ──────────────
+  app.post(
+    '/campeonatos/:id/asignar-secciones',
+    { preHandler: requireScope('campeonatos') },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const db = req.server.db;
+
+      const [camp] = await db
+        .select()
+        .from(campeonatos)
+        .where(eq(campeonatos.id, id))
+        .limit(1);
+      if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+      const fechaRef = camp.fechaInicio ? new Date(camp.fechaInicio) : new Date();
+
+      const secs = await db
+        .select()
+        .from(secciones)
+        .where(eq(secciones.campeonatoId, id));
+      const generadas: SeccionGenerada[] = secs.map((s) => ({
+        id: s.clave ?? s.id,
+        modalidad: s.modalidad,
+        genero: s.genero ?? 'Mixto',
+        cinturon: s.cinturon,
+        cinturonGrupos: (s.cinturonGrupos as string[] | null) ?? null,
+        edad: s.rangoEdad,
+        peso: s.rangoPeso,
+      }));
+      const uuidPorClave = new Map(secs.map((s) => [s.clave ?? s.id, s.id]));
+
+      const inss = await db
+        .select({
+          inscripcionId: inscripciones.id,
+          grupoCinturon: inscripciones.grupoCinturonInscripcion,
+          peso: inscripciones.pesoInscripcion,
+          genero: competidores.genero,
+          fechaNacimiento: competidores.fechaNacimiento,
+        })
+        .from(inscripciones)
+        .innerJoin(competidores, eq(inscripciones.competidorId, competidores.id))
+        .where(eq(inscripciones.campeonatoId, id));
+
+      let asignadas = 0;
+      for (const ins of inss) {
+        const mods = await db
+          .select()
+          .from(inscripcionModalidades)
+          .where(eq(inscripcionModalidades.inscripcionId, ins.inscripcionId));
+        const edad = ins.fechaNacimiento
+          ? calcularEdad(new Date(ins.fechaNacimiento), fechaRef)
+          : 0;
+
+        for (const m of mods) {
+          const sec = emparejarSeccion(generadas, {
+            modalidad: m.modalidad,
+            genero: ins.genero ?? 'MASCULINO',
+            grupoCinturon: ins.grupoCinturon ?? '',
+            edad,
+            peso: ins.peso != null ? parseFloat(ins.peso) : null,
+          });
+          if (!sec) continue;
+          const seccionUuid = uuidPorClave.get(sec.id);
+          if (!seccionUuid) continue;
+
+          const existe = await db
+            .select()
+            .from(seccionInscripciones)
+            .where(
+              and(
+                eq(seccionInscripciones.seccionId, seccionUuid),
+                eq(seccionInscripciones.inscripcionId, ins.inscripcionId),
+              ),
+            )
+            .limit(1);
+          if (existe[0]) continue;
+
+          await db.insert(seccionInscripciones).values({
+            seccionId: seccionUuid,
+            inscripcionId: ins.inscripcionId,
+          });
+          asignadas++;
+        }
+      }
+
+      return reply.send({ asignadas });
     },
   );
 

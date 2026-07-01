@@ -3,6 +3,7 @@ import {
   varchar,
   timestamp,
   integer,
+  jsonb,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { camp, modalidadEnum, generoSeccionEnum, estadoSeccionEnum } from './_schema';
@@ -21,6 +22,8 @@ export const secciones = camp.table('secciones', {
   genero: generoSeccionEnum('genero'),
   /** Agrupación de cinturón configurada por el admin (texto libre, ej. "Blanco-Naranja"). */
   cinturon: varchar('cinturon', { length: 100 }),
+  /** Grupos de cinturón que abarca la sección (para emparejar competidores). */
+  cinturonGrupos: jsonb('cinturon_grupos'),
   /** Ej. "12-13". */
   rangoEdad: varchar('rango_edad', { length: 30 }),
   /** Ej. "-50kg". NULL en modalidades sin peso (figuras, defensa personal). */

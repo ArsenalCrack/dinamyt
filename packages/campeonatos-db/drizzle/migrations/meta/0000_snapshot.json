@@ -1,5 +1,5 @@
 {
-  "id": "eb35d949-b794-4b4e-a7bd-c00d49f4d216",
+  "id": "0b1b4575-10c9-49b5-8fb2-76080f208d8e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -515,6 +515,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "grupo_cinturon_inscripcion": {
+          "name": "grupo_cinturon_inscripcion",
+          "type": "grupo_cinturon",
+          "typeSchema": "campeonatos",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cinturon_inscripcion": {
+          "name": "cinturon_inscripcion",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "estado": {
           "name": "estado",
           "type": "estado_inscripcion",
@@ -849,6 +862,12 @@
         "cinturon": {
           "name": "cinturon",
           "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cinturon_grupos": {
+          "name": "cinturon_grupos",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
