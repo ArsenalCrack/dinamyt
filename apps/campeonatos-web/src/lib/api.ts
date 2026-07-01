@@ -1,6 +1,7 @@
 'use client';
 
 import axios from 'axios';
+import type { EstadoCombate } from '@dinamyt/campeonatos-core';
 
 // La API de Campeonatos expone sus rutas en la raíz (sin prefijo /api).
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -110,6 +111,61 @@ export interface InscribirInput {
 }
 export async function inscribirAPI(campId: string, data: InscribirInput) {
   const res = await api.post(`/campeonatos/${campId}/inscripciones`, data);
+  return res.data;
+}
+
+// ── Secciones y llaves (brackets) ────────────────────────────────────────────
+export interface Seccion {
+  id: string;
+  campeonatoId: string;
+  modalidad: Modalidad;
+  genero: 'MASCULINO' | 'FEMENINO' | 'MIXTO' | null;
+  cinturon: string | null;
+  rangoEdad: string | null;
+  rangoPeso: string | null;
+  clave: string | null;
+  nombre: string;
+  estado: 'EN_ESPERA' | 'EN_CURSO' | 'FINALIZADA';
+}
+
+/** Genera (o regenera) las secciones del campeonato desde su config de categorías. */
+export async function generarSeccionesAPI(
+  campId: string,
+): Promise<{ total: number }> {
+  const res = await api.post(`/campeonatos/${campId}/generar-secciones`);
+  return res.data as { total: number };
+}
+
+/** Lista las secciones de un campeonato. */
+export async function listSeccionesAPI(campId: string): Promise<Seccion[]> {
+  const res = await api.get(`/campeonatos/${campId}/secciones`);
+  return res.data as Seccion[];
+}
+
+/** Asigna cada inscripción a la sección que le corresponde (por cinturón/peso/edad/género). */
+export async function asignarSeccionesAPI(
+  campId: string,
+): Promise<{ asignadas: number }> {
+  const res = await api.post(`/campeonatos/${campId}/asignar-secciones`);
+  return res.data as { asignadas: number };
+}
+
+/** Genera la llave (bracket) de una sección de combate. Requiere ≥ 2 competidores. */
+export async function generarBracketAPI(seccionId: string) {
+  const res = await api.post(`/secciones/${seccionId}/bracket`);
+  return res.data;
+}
+
+/** Persiste el resultado final de un combate (lo envía el juez de mesa al recuperar red). */
+export async function guardarCombateAPI(
+  seccionId: string,
+  data: {
+    competidorHongId?: string;
+    competidorChungId?: string;
+    estado: EstadoCombate;
+  },
+) {
+  const res = await api.post(`/secciones/${seccionId}/combates`, data);
   return res.data;
 }
 

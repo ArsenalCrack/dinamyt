@@ -8,6 +8,7 @@ import {
   type EventoCombate,
   type Color,
 } from '@dinamyt/campeonatos-core';
+import { guardarCombateAPI, obtenerToken, extraerError } from '@/lib/api';
 
 const WS_URL = process.env.NEXT_PUBLIC_COMBAT_WS_URL || 'ws://localhost:3005';
 
@@ -15,16 +16,62 @@ const gold = { background: 'var(--gold)', color: '#14141e' } as const;
 const hongColor = '#E8002A';
 const chungColor = '#2266ff';
 
+const RONDAS: { valor: string; etiqueta: string }[] = [
+  { valor: 'r1', etiqueta: 'R1' },
+  { valor: 'r2', etiqueta: 'R2' },
+  { valor: 'r3', etiqueta: 'R3' },
+  { valor: 'oro', etiqueta: 'Oro' },
+];
+
+function mmss(seg: number): string {
+  const m = Math.floor(seg / 60);
+  const s = seg % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export default function CombatePage() {
   const [combateId, setCombateId] = useState('demo');
   const [conectado, setConectado] = useState(false);
   const [estado, setEstado] = useState<EstadoCombate | null>(null);
   const [juez, setJuez] = useState<'j1' | 'j2' | 'j3' | 'j4'>('j1');
+  const [seccionId, setSeccionId] = useState<string | null>(null);
+  const [guardarMsg, setGuardarMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const estadoRef = useRef<EstadoCombate | null>(null);
+
+  // Parámetros opcionales de la URL: ?combate=<id>&seccion=<uuid> — permiten
+  // enlazar el panel desde un bracket real y persistir el resultado al final.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const c = q.get('combate');
+    const s = q.get('seccion');
+    if (c) setCombateId(c);
+    if (s) setSeccionId(s);
+  }, []);
+
+  useEffect(() => {
+    estadoRef.current = estado;
+  }, [estado]);
 
   useEffect(() => {
     return () => wsRef.current?.close();
   }, []);
+
+  // Cronómetro: la MESA es la autoridad del tiempo. Mientras el combate está
+  // activo, emite un tick por segundo (valor absoluto) para que todas las
+  // pantallas conectadas queden sincronizadas.
+  useEffect(() => {
+    if (!estado?.activo) return;
+    const t = setInterval(() => {
+      const s = estadoRef.current;
+      if (!s) return;
+      const next = Math.max(0, s.segundos - 1);
+      enviar({ accion: 'crono_seg', segundos: next, activo: next > 0 });
+      if (next === 0) enviar({ accion: 'crono_pause' });
+    }, 1000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado?.activo]);
 
   function conectar() {
     wsRef.current?.close();
@@ -42,7 +89,23 @@ export default function CombatePage() {
     wsRef.current?.send(JSON.stringify(ev));
   }
 
+  async function guardarResultado() {
+    if (!estado || !seccionId) return;
+    setGuardarMsg(null);
+    if (!obtenerToken()) {
+      setGuardarMsg({ tipo: 'error', texto: 'Inicia sesión en el panel para guardar el resultado.' });
+      return;
+    }
+    try {
+      await guardarCombateAPI(seccionId, { estado });
+      setGuardarMsg({ tipo: 'ok', texto: 'Resultado guardado en el campeonato.' });
+    } catch (e) {
+      setGuardarMsg({ tipo: 'error', texto: extraerError(e, 'No se pudo guardar el resultado.') });
+    }
+  }
+
   const marcador = estado ? calcularMarcador(estado) : null;
+  const hayGanador = !!estado?.ganadorManualColor;
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-6 py-8">
@@ -79,11 +142,69 @@ export default function CombatePage() {
             <Marcador nombre={estado.nombreChung} total={marcador!.total_chung} color={chungColor} />
           </div>
 
-          {/* Estado */}
-          {estado.ganadorManualColor && (
-            <Banner texto={`Ganador: ${estado.ganadorManualColor === 'hong' ? estado.nombreHong : estado.nombreChung} — ${estado.ganadorManualMotivo}`} />
+          {/* Cronómetro + ronda */}
+          <section
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+          >
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-4xl font-extrabold tabular-nums" style={{ color: 'var(--text)' }}>
+                {mmss(estado.segundos)}
+              </span>
+              <span className="text-sm" style={{ color: estado.activo ? 'var(--gold)' : 'var(--text-muted)' }}>
+                {estado.activo ? 'en marcha' : 'detenido'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => enviar({ accion: 'crono_start' })} disabled={hayGanador} className="rounded-lg px-3 py-1.5 text-sm font-semibold" style={gold}>
+                Iniciar
+              </button>
+              <button onClick={() => enviar({ accion: 'crono_pause' })} className="rounded-lg border px-3 py-1.5 text-sm" style={{ borderColor: 'var(--border)' }}>
+                Pausar
+              </button>
+              <button onClick={() => enviar({ accion: 'crono_reset', segundosMax: estado.segundosMax })} className="rounded-lg border px-3 py-1.5 text-sm" style={{ borderColor: 'var(--border)' }}>
+                Reiniciar
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Ronda:</span>
+              {RONDAS.map((r) => (
+                <button
+                  key={r.valor}
+                  onClick={() => enviar({ accion: 'ronda', ronda: r.valor })}
+                  disabled={hayGanador}
+                  className="rounded px-2.5 py-1 text-sm font-semibold"
+                  style={estado.ronda === r.valor ? gold : { border: '1px solid var(--border)' }}
+                >
+                  {r.etiqueta}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* Estado / banners */}
+          {estado.ganadorPendienteCierre && (
+            <Banner texto={`Ganador: ${estado.ganadorPendienteNombre} — ${estado.ganadorPendienteMotivo}`} />
           )}
-          {estado.alerta12Data && !estado.ganadorManualColor && (
+          {estado.oroPendienteAprobacion && (
+            <section
+              className="mb-4 rounded-lg border p-4"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--gold)' }}
+            >
+              <p className="mb-2 font-semibold" style={{ color: 'var(--gold)' }}>
+                Punto de Oro pendiente: {estado.oroPuntoDetalle} → {estado.oroGanadorNombre}
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => enviar({ accion: 'aprobar_oro' })} className="rounded-lg px-3 py-1.5 text-sm font-semibold" style={gold}>
+                  Aprobar
+                </button>
+                <button onClick={() => enviar({ accion: 'rechazar_oro' })} className="rounded-lg border px-3 py-1.5 text-sm" style={{ borderColor: 'var(--border)' }}>
+                  Rechazar
+                </button>
+              </div>
+            </section>
+          )}
+          {estado.alerta12Data && !hayGanador && (
             <Banner texto={`Superioridad técnica: ${estado.alerta12Data.lider} +${estado.alerta12Data.diferencia}`} />
           )}
 
@@ -102,6 +223,13 @@ export default function CombatePage() {
                   {j.toUpperCase()}
                 </button>
               ))}
+              <button
+                onClick={() => enviar({ accion: 'deshacer_juez', juez })}
+                className="ml-auto rounded px-3 py-1 text-sm"
+                style={{ border: '1px solid var(--border)' }}
+              >
+                ↶ Deshacer {juez.toUpperCase()}
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-4">
               {(['hong', 'chung'] as Color[]).map((color) => (
@@ -110,6 +238,7 @@ export default function CombatePage() {
                     <button
                       key={pts}
                       onClick={() => enviar({ accion: 'punto_juez', juez, color, pts, nombre: `+${pts}` })}
+                      disabled={hayGanador}
                       className="rounded-lg py-2 font-semibold text-white"
                       style={{ background: color === 'hong' ? hongColor : chungColor }}
                     >
@@ -125,24 +254,43 @@ export default function CombatePage() {
           <section className="grid grid-cols-2 gap-4">
             {(['hong', 'chung'] as Color[]).map((color) => (
               <div key={color} className="flex flex-col gap-2 rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-                <button onClick={() => enviar({ accion: 'kyonggo', color })} className="rounded-lg border py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+                <button onClick={() => enviar({ accion: 'kyonggo', color })} disabled={hayGanador} className="rounded-lg border py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
                   KyongGo −0.5
                 </button>
-                <button onClick={() => enviar({ accion: 'gamjeum', color })} className="rounded-lg border py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+                <button onClick={() => enviar({ accion: 'gamjeum', color })} disabled={hayGanador} className="rounded-lg border py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
                   GamJeum −1
                 </button>
-                <button onClick={() => enviar({ accion: 'declarar_ganador', color, motivo: 'Decisión del JC' })} className="rounded-lg py-2 text-sm font-semibold" style={gold}>
+                <button onClick={() => enviar({ accion: 'deshacer_arbitro', color })} className="rounded-lg border py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+                  ↶ Deshacer árbitro
+                </button>
+                <button onClick={() => enviar({ accion: 'declarar_ganador', color, motivo: 'Decisión del JC' })} disabled={hayGanador} className="rounded-lg py-2 text-sm font-semibold" style={gold}>
                   Declarar ganador
                 </button>
               </div>
             ))}
           </section>
 
-          <div className="mt-4 flex gap-3">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <button onClick={() => enviar({ accion: 'reset' })} className="rounded-lg border px-4 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
               Nuevo combate (reset)
             </button>
+            {seccionId && hayGanador && (
+              <button onClick={guardarResultado} className="rounded-lg px-4 py-2 text-sm font-semibold" style={gold}>
+                Guardar resultado
+              </button>
+            )}
+            {guardarMsg && (
+              <span className="text-sm" style={{ color: guardarMsg.tipo === 'ok' ? 'var(--gold)' : '#ff5577' }}>
+                {guardarMsg.texto}
+              </span>
+            )}
           </div>
+          {!seccionId && (
+            <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Para guardar el resultado en el campeonato, abre este panel con
+              <code> ?seccion=&lt;id&gt; </code> en la URL (se enlazará desde el bracket).
+            </p>
+          )}
         </>
       )}
     </main>

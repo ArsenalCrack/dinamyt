@@ -68,9 +68,18 @@ export default function InscribirPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-xl px-6 py-10">
-      <Link href="/admin" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-        ← Volver
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/admin" className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          ← Volver
+        </Link>
+        <Link
+          href={`/admin/${campId}/secciones`}
+          className="text-sm font-semibold"
+          style={{ color: 'var(--gold)' }}
+        >
+          Secciones y llaves →
+        </Link>
+      </div>
       <h1 className="mb-6 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
         Inscribir competidor
       </h1>
