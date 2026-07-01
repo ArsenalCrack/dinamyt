@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gt, inArray } from 'drizzle-orm';
 import {
   campeonatos,
   modalidadesCampeonato,
@@ -11,6 +11,7 @@ import {
   llaves,
   combates,
   tatamis,
+  colaTatami,
 } from '@dinamyt/campeonatos-db';
 import {
   validarRestriccion,
@@ -139,6 +140,158 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       const [upd] = await db
         .update(campeonatos)
         .set({ estado, updatedAt: new Date() })
+        .where(eq(campeonatos.id, id))
+        .returning();
+      return reply.send(upd);
+    },
+  );
+
+  // ── Editar el campeonato (solo en BORRADOR o LISTO) ───────────────────────
+  app.patch(
+    '/campeonatos/:id',
+    { preHandler: requireRole('campeonatos', ['admin']) },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const body = req.body as Partial<CrearCampeonatoBody>;
+      const db = req.server.db;
+
+      const [camp] = await db
+        .select()
+        .from(campeonatos)
+        .where(eq(campeonatos.id, id))
+        .limit(1);
+      if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+      if (camp.estado === 'EN_CURSO' || camp.estado === 'FINALIZADO') {
+        return reply.code(422).send({
+          error: 'Solo se puede editar un campeonato en BORRADOR o LISTO.',
+        });
+      }
+
+      // Valida el resultado de aplicar los cambios sobre lo existente.
+      const errores = validarDatosCampeonato({
+        nombre: body.nombre ?? camp.nombre,
+        ubicacion: body.ubicacion ?? camp.ubicacion,
+        alcance: body.alcance ?? camp.alcance,
+        numTatamis: body.numTatamis ?? camp.numTatamis,
+        maxParticipantes: body.maxParticipantes ?? camp.maxParticipantes,
+        fechaInicio: body.fechaInicio ?? camp.fechaInicio,
+        fechaFin: body.fechaFin ?? camp.fechaFin,
+      });
+      const esPublico = body.esPublico ?? camp.esPublico ?? true;
+      const codigo = body.codigo !== undefined ? body.codigo : camp.codigo;
+      if (!esPublico && !codigo?.trim()) {
+        errores.push('Un campeonato privado requiere un código de acceso.');
+      }
+      if (errores.length > 0) {
+        return reply.code(422).send({ error: 'Datos inválidos.', detalles: errores });
+      }
+
+      // Sincroniza los tatamis si cambia el número: añade los que falten y
+      // elimina los sobrantes solo si su cola está vacía.
+      const nuevoNum = body.numTatamis ?? camp.numTatamis ?? 1;
+      if (nuevoNum !== (camp.numTatamis ?? 1)) {
+        const sobrantes = await db
+          .select({ id: tatamis.id })
+          .from(tatamis)
+          .where(and(eq(tatamis.campeonatoId, id), gt(tatamis.numero, nuevoNum)));
+        if (sobrantes.length > 0) {
+          const conCola = await db
+            .select({ id: colaTatami.id })
+            .from(colaTatami)
+            .where(
+              inArray(
+                colaTatami.tatamiId,
+                sobrantes.map((t) => t.id),
+              ),
+            )
+            .limit(1);
+          if (conCola[0]) {
+            return reply.code(422).send({
+              error:
+                'No se puede reducir el número de tatamis: hay secciones encoladas en los tatamis a eliminar.',
+            });
+          }
+          await db.delete(tatamis).where(
+            inArray(
+              tatamis.id,
+              sobrantes.map((t) => t.id),
+            ),
+          );
+        }
+        for (let n = 1; n <= nuevoNum; n++) {
+          await db
+            .insert(tatamis)
+            .values({ campeonatoId: id, numero: n })
+            .onConflictDoNothing();
+        }
+      }
+
+      // Sincroniza las modalidades habilitadas (si vienen en el body): añade
+      // nuevas y quita las deseleccionadas sin inscripciones.
+      if (body.modalidades) {
+        const actuales = await db
+          .select()
+          .from(modalidadesCampeonato)
+          .where(eq(modalidadesCampeonato.campeonatoId, id));
+        const deseadas = new Set(body.modalidades.map((m) => m.modalidad));
+
+        for (const actual of actuales) {
+          if (deseadas.has(actual.modalidad)) continue;
+          const usada = await db
+            .select({ id: inscripcionModalidades.id })
+            .from(inscripcionModalidades)
+            .innerJoin(
+              inscripciones,
+              eq(inscripcionModalidades.inscripcionId, inscripciones.id),
+            )
+            .where(
+              and(
+                eq(inscripciones.campeonatoId, id),
+                eq(inscripcionModalidades.modalidad, actual.modalidad),
+              ),
+            )
+            .limit(1);
+          if (usada[0]) {
+            return reply.code(422).send({
+              error: `No se puede quitar "${actual.modalidad}": ya tiene inscripciones.`,
+            });
+          }
+          await db
+            .delete(modalidadesCampeonato)
+            .where(eq(modalidadesCampeonato.id, actual.id));
+        }
+        for (const m of body.modalidades) {
+          if (actuales.some((a) => a.modalidad === m.modalidad)) continue;
+          await db.insert(modalidadesCampeonato).values({
+            campeonatoId: id,
+            modalidad: m.modalidad,
+            costoExtra: m.costoExtra ?? '0',
+            categorias: m.categorias ?? null,
+          });
+        }
+      }
+
+      const [upd] = await db
+        .update(campeonatos)
+        .set({
+          nombre: body.nombre ?? camp.nombre,
+          descripcion: body.descripcion !== undefined ? body.descripcion : camp.descripcion,
+          ubicacion: body.ubicacion !== undefined ? body.ubicacion : camp.ubicacion,
+          pais: body.pais !== undefined ? body.pais : camp.pais,
+          ciudad: body.ciudad !== undefined ? body.ciudad : camp.ciudad,
+          alcance: body.alcance !== undefined ? body.alcance : camp.alcance,
+          numTatamis: nuevoNum,
+          maxParticipantes:
+            body.maxParticipantes !== undefined
+              ? body.maxParticipantes
+              : camp.maxParticipantes,
+          esPublico,
+          codigo: esPublico ? null : (codigo ?? null),
+          fechaInicio: body.fechaInicio !== undefined ? body.fechaInicio : camp.fechaInicio,
+          fechaFin: body.fechaFin !== undefined ? body.fechaFin : camp.fechaFin,
+          costoBase: body.costoBase !== undefined ? body.costoBase : camp.costoBase,
+          updatedAt: new Date(),
+        })
         .where(eq(campeonatos.id, id))
         .returning();
       return reply.send(upd);

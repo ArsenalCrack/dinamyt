@@ -428,6 +428,110 @@ describe('API campeonatos (integración con PGlite)', () => {
     await a.close();
   });
 
+  it('edita el campeonato en BORRADOR y sincroniza tatamis y modalidades', async () => {
+    const a = app();
+    const auth = { authorization: `Bearer ${await token()}` };
+
+    const crear = await a.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: auth,
+      payload: {
+        nombre: 'Copa Editable',
+        numTatamis: 3,
+        modalidades: [{ modalidad: 'combate' }, { modalidad: 'figura_armas' }],
+      },
+    });
+    const id = crear.json().id as string;
+
+    // Editar: nombre, menos tatamis (colas vacías) y cambiar modalidades.
+    const edit = await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}`,
+      headers: auth,
+      payload: {
+        nombre: 'Copa Editada',
+        numTatamis: 2,
+        modalidades: [{ modalidad: 'combate' }, { modalidad: 'salto_altura' }],
+      },
+    });
+    expect(edit.statusCode).toBe(200);
+    expect(edit.json().nombre).toBe('Copa Editada');
+    expect(edit.json().numTatamis).toBe(2);
+
+    const tats = (
+      await a.inject({
+        method: 'GET',
+        url: `/campeonatos/${id}/tatamis`,
+        headers: auth,
+      })
+    ).json() as { numero: number }[];
+    expect(tats.map((t) => t.numero)).toEqual([1, 2]);
+
+    const det = (
+      await a.inject({ method: 'GET', url: `/campeonatos/${id}`, headers: auth })
+    ).json() as { modalidades: { modalidad: string }[] };
+    expect(det.modalidades.map((m) => m.modalidad).sort()).toEqual([
+      'combate',
+      'salto_altura',
+    ]);
+
+    // Validación: privado sin código → 422.
+    const priv = await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}`,
+      headers: auth,
+      payload: { esPublico: false },
+    });
+    expect(priv.statusCode).toBe(422);
+
+    // No se puede quitar una modalidad con inscripciones.
+    await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${id}/inscripciones`,
+      headers: auth,
+      payload: {
+        documento: '333',
+        nombreCompleto: 'Pedro Gómez',
+        fechaNacimiento: '2007-03-03',
+        genero: 'MASCULINO',
+        grupoCinturon: 'INTERMEDIO',
+        pesoActual: '60',
+        modalidades: ['combate'],
+      },
+    });
+    const quitar = await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}`,
+      headers: auth,
+      payload: { modalidades: [{ modalidad: 'salto_altura' }] },
+    });
+    expect(quitar.statusCode).toBe(422);
+
+    // En EN_CURSO no se edita.
+    await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}/estado`,
+      headers: auth,
+      payload: { estado: 'LISTO' },
+    });
+    await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}/estado`,
+      headers: auth,
+      payload: { estado: 'EN_CURSO' },
+    });
+    const enCurso = await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}`,
+      headers: auth,
+      payload: { nombre: 'Otro nombre' },
+    });
+    expect(enCurso.statusCode).toBe(422);
+
+    await a.close();
+  });
+
   it('exige scope campeonatos para crear (403 con otro scope)', async () => {
     const a = app();
     const res = await a.inject({
