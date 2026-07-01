@@ -98,8 +98,17 @@ namespace `/combate` (hoy el monorepo usa `ws` crudo).
     /campeonatos/:id/modalidades/:modalidad` + editor `ConfigCategorias`
     (género, cinturón con grupos, rangos edad/peso) en la página de secciones →
     `generar-secciones` real. Verificado end-to-end.
-  - **Pendiente de Fase 2**: inscripciones por **invitación** (email + el
-    competidor acepta y elige modalidades) — no iniciado.
+  - **Creación completa (2026-07-01, tras feedback de Amir)** alineada con
+    DINAMYT-PROJECT: campos `ubicacion/pais/ciudad/alcance/numTatamis(1-12)/
+    maxParticipantes(2-10000)/esPublico+codigo/fechas` (migración db 0001);
+    validaciones en **core** (edad 4-100, peso 10-400, ámbito, orden de cinturón,
+    solapamientos/duplicados) usadas por **API** (422 con detalles) y por el
+    **front**; página `/admin/crear`; **cinturón por nombre fijo** (5 grupos,
+    individual/rango, sin texto libre); distinción **modalidad** (en qué compite)
+    vs **categoría** (cómo se agrupa). Verificado end-to-end.
+  - **Pendiente de Fase 2**: inscripción por **invitación** (email + aceptación
+    del competidor); crear registros de **tatami** desde `numTatamis` (hoy solo se
+    guarda el número); edición completa del campeonato (`/admin/[id]/editar`).
 - **Fase 3 — Tatamis y flujo del evento**.
   - Endpoints/UI de tatamis, cola FIFO, asignación y robo de modalidades.
 - **Fase 4 — Evento EN VIVO idéntico a COMBAT**.
