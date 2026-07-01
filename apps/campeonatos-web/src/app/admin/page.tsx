@@ -13,6 +13,14 @@ import {
   type Campeonato,
   type Modalidad,
 } from '@/lib/api';
+import {
+  getSesion,
+  esAdmin,
+  esJuez,
+  puedeInscribir,
+  etiquetaRol,
+  type Sesion,
+} from '@/lib/session';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -24,6 +32,7 @@ export default function AdminPage() {
   const [costoBase, setCostoBase] = useState('');
   const [mods, setMods] = useState<Modalidad[]>([]);
   const [creando, setCreando] = useState(false);
+  const [sesion, setSesion] = useState<Sesion | null>(null);
 
   const cargar = useCallback(async () => {
     setEstado('cargando');
@@ -39,6 +48,13 @@ export default function AdminPage() {
   useEffect(() => {
     if (!obtenerToken()) {
       router.replace('/admin/login');
+      return;
+    }
+    const s = getSesion();
+    setSesion(s);
+    // El juez no gestiona: va directo a su panel de combate.
+    if (esJuez(s)) {
+      router.replace('/admin/combate');
       return;
     }
     void cargar();
@@ -72,9 +88,17 @@ export default function AdminPage() {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-6 py-10">
       <header className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--gold)' }}>
-          Administración
-        </h1>
+        <div>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--gold)' }}>
+            Administración
+          </h1>
+          {sesion && (
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+              {sesion.fullName || sesion.email} ·{' '}
+              <span style={{ color: 'var(--gold)' }}>{etiquetaRol(sesion)}</span>
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <Link
             href="/admin/combate"
@@ -96,6 +120,7 @@ export default function AdminPage() {
         </div>
       </header>
 
+      {esAdmin(sesion) && (
       <form
         onSubmit={crear}
         className="mb-8 rounded-xl border p-5"
@@ -145,6 +170,7 @@ export default function AdminPage() {
           {creando ? 'Creando…' : 'Crear campeonato'}
         </button>
       </form>
+      )}
 
       <h2 className="mb-3 text-lg font-semibold">Campeonatos</h2>
       {estado === 'cargando' && <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>}
@@ -165,13 +191,26 @@ export default function AdminPage() {
                 {c.estado}
               </span>
             </div>
-            <Link
-              href={`/admin/${c.id}`}
-              className="rounded-lg px-4 py-2 text-sm font-semibold"
-              style={{ background: 'var(--gold)', color: '#14141e' }}
-            >
-              Inscribir
-            </Link>
+            <div className="flex items-center gap-2">
+              {esAdmin(sesion) && (
+                <Link
+                  href={`/admin/${c.id}/secciones`}
+                  className="rounded-lg border px-4 py-2 text-sm font-semibold"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  Secciones
+                </Link>
+              )}
+              {puedeInscribir(sesion) && (
+                <Link
+                  href={`/admin/${c.id}`}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold"
+                  style={{ background: 'var(--gold)', color: '#14141e' }}
+                >
+                  Inscribir
+                </Link>
+              )}
+            </div>
           </li>
         ))}
       </ul>

@@ -18,7 +18,11 @@ describe('guard JWT del ecosystem', () => {
     pub = kp.publicKey;
   });
 
-  async function firmar(scopes: string[]): Promise<string> {
+  async function firmar(
+    scopes: string[],
+    role: string | null = 'admin',
+    isSuperAdmin = false,
+  ): Promise<string> {
     const payload: JwtPayload = {
       sub: 'user-1',
       email: 'amir@dinamyt.com',
@@ -26,8 +30,8 @@ describe('guard JWT del ecosystem', () => {
       org_id: null,
       app_scopes: scopes,
       role_academy: null,
-      role_campeonatos: 'admin',
-      is_super_admin: false,
+      role_campeonatos: role,
+      is_super_admin: isSuperAdmin,
     };
     return new SignJWT({ ...payload })
       .setProtectedHeader({ alg: 'RS256' })
@@ -82,6 +86,19 @@ describe('guard JWT del ecosystem', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().role_campeonatos).toBe('admin');
+    await app.close();
+  });
+
+  it('POST /campeonatos con rol judge → 403 (requireRole)', async () => {
+    const app = makeApp();
+    const token = await firmar(['campeonatos'], 'judge');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { nombre: 'X' },
+    });
+    expect(res.statusCode).toBe(403);
     await app.close();
   });
 });

@@ -26,7 +26,7 @@ import {
   type SeccionGenerada,
   type EstadoCombate,
 } from '@dinamyt/campeonatos-core';
-import { requireScope } from '../plugins/auth';
+import { requireScope, requireRole } from '../plugins/auth';
 
 interface CrearCampeonatoBody {
   nombre: string;
@@ -82,10 +82,10 @@ export async function campeonatosRoutes(app: FastifyInstance) {
     async (req) => req.server.db.select().from(campeonatos),
   );
 
-  // ── Crear campeonato + sus modalidades habilitadas ───────────────────────
+  // ── Crear campeonato + sus modalidades habilitadas (solo admin) ──────────
   app.post(
     '/campeonatos',
-    { preHandler: requireScope('campeonatos') },
+    { preHandler: requireRole('campeonatos', ['admin']) },
     async (req, reply) => {
       const body = req.body as CrearCampeonatoBody;
       const db = req.server.db;
@@ -119,7 +119,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
   // ── Inscribir competidor (valida R1-R5 con el core y calcula el monto) ────
   app.post(
     '/campeonatos/:id/inscripciones',
-    { preHandler: requireScope('campeonatos') },
+    { preHandler: requireRole('campeonatos', ['admin', 'coach']) },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const body = req.body as InscripcionBody;
@@ -210,7 +210,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
   // ── Generar el bracket de una sección de combate (usa el core) ───────────
   app.post(
     '/secciones/:id/bracket',
-    { preHandler: requireScope('campeonatos') },
+    { preHandler: requireRole('campeonatos', ['admin']) },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const db = req.server.db;
@@ -250,7 +250,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
   // ── Generar las secciones del campeonato desde la config de categorías ────
   app.post(
     '/campeonatos/:id/generar-secciones',
-    { preHandler: requireScope('campeonatos') },
+    { preHandler: requireRole('campeonatos', ['admin']) },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const db = req.server.db;
@@ -304,7 +304,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
   // ── Asignar cada inscripción a la sección que le corresponde ──────────────
   app.post(
     '/campeonatos/:id/asignar-secciones',
-    { preHandler: requireScope('campeonatos') },
+    { preHandler: requireRole('campeonatos', ['admin']) },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const db = req.server.db;
@@ -393,7 +393,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
   // ── Persistir el resultado de un combate (lo envía el juez de mesa) ───────
   app.post(
     '/secciones/:id/combates',
-    { preHandler: requireScope('campeonatos') },
+    { preHandler: requireRole('campeonatos', ['admin', 'judge']) },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const body = req.body as {

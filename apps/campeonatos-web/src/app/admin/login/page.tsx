@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginAPI, guardarToken, extraerError } from '@/lib/api';
+import { getSesion, rutaInicio } from '@/lib/session';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -18,7 +19,8 @@ export default function AdminLoginPage() {
     try {
       const { access_token } = await loginAPI(email, password);
       guardarToken(access_token);
-      router.push('/admin');
+      // Enruta según el rol (juez → panel de combate; resto → gestión).
+      router.push(rutaInicio(getSesion()));
     } catch (err) {
       setError(extraerError(err, 'No se pudo iniciar sesión.'));
     } finally {

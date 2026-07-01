@@ -1,6 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import type { JwtPayload, AppScope } from '@dinamyt/shared';
+import type { JwtPayload, AppScope, CampeonatosRole } from '@dinamyt/shared';
 import { config } from '../config';
 
 /**
@@ -34,6 +34,13 @@ export function requireScope(scope: AppScope) {
       return reply.code(401).send({ error: 'Token inválido o expirado.' });
     }
 
+    // El super administrador de la plataforma puede acceder a cualquier app
+    // sin necesidad de una suscripción con el scope (RF-ECO: rol transversal).
+    if (payload.is_super_admin) {
+      req.user = payload;
+      return;
+    }
+
     if (!payload.app_scopes?.includes(scope)) {
       return reply.code(403).send({
         error: `Tu plan no incluye acceso a '${scope}'.`,
@@ -42,5 +49,27 @@ export function requireScope(scope: AppScope) {
     }
 
     req.user = payload;
+  };
+}
+
+/**
+ * preHandler que, además del scope, exige que el rol del usuario en Campeonatos
+ * (`role_campeonatos`) esté entre `roles`. El super administrador pasa siempre.
+ * Se apoya en `requireScope` para el token/scope y el 401/403 correspondientes.
+ */
+export function requireRole(scope: AppScope, roles: CampeonatosRole[]) {
+  const guardScope = requireScope(scope);
+  return async function (req: FastifyRequest, reply: FastifyReply) {
+    await guardScope(req, reply);
+    if (reply.sent) return; // token/scope inválido: requireScope ya respondió.
+
+    if (req.user?.is_super_admin) return;
+
+    const rol = req.user?.role_campeonatos as CampeonatosRole | null | undefined;
+    if (!rol || !roles.includes(rol)) {
+      return reply.code(403).send({
+        error: `Tu rol no permite esta acción (requiere: ${roles.join(', ')}).`,
+      });
+    }
   };
 }
