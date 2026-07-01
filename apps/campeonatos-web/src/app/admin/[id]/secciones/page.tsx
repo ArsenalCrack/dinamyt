@@ -167,6 +167,13 @@ export default function SeccionesPage() {
         >
           Inscribir competidores
         </Link>
+        <Link
+          href={`/admin/${campId}/tatamis`}
+          className="rounded-lg border px-4 py-2 text-sm font-semibold"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          3 · Tatamis (evento en vivo)
+        </Link>
       </div>
 
       {msg && (

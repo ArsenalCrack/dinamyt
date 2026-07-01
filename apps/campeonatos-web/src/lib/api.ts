@@ -139,12 +139,29 @@ export interface ModalidadCampeonato {
   categorias: CategoriasConfig | null;
 }
 export interface CampeonatoDetalle extends Campeonato {
+  ubicacion: string | null;
+  pais: string | null;
+  ciudad: string | null;
+  alcance: string | null;
+  numTatamis: number | null;
+  maxParticipantes: number | null;
+  esPublico: boolean | null;
+  codigo: string | null;
   modalidades: ModalidadCampeonato[];
 }
 
 export async function getCampeonatoAPI(id: string): Promise<CampeonatoDetalle> {
   const res = await api.get(`/campeonatos/${id}`);
   return res.data as CampeonatoDetalle;
+}
+
+/** Edita el campeonato (solo en BORRADOR o LISTO); sincroniza tatamis y modalidades. */
+export async function editarCampeonatoAPI(
+  id: string,
+  data: Partial<CrearCampeonatoInput>,
+): Promise<Campeonato> {
+  const res = await api.patch(`/campeonatos/${id}`, data);
+  return res.data as Campeonato;
 }
 
 /** Avanza el estado del campeonato (BORRADOR→LISTO→EN_CURSO→FINALIZADO). */
@@ -215,6 +232,68 @@ export async function asignarSeccionesAPI(
 export async function generarBracketAPI(seccionId: string) {
   const res = await api.post(`/secciones/${seccionId}/bracket`);
   return res.data;
+}
+
+// ── Tatamis y cola FIFO (§8.1, lógica de DINAMYT-PROJECT) ────────────────────
+export interface ColaItem {
+  id: string;
+  orden: number;
+  estado: 'EN_ESPERA' | 'EN_CURSO' | 'FINALIZADA';
+  inicio: string | null;
+  fin: string | null;
+  seccion: {
+    id: string;
+    nombre: string;
+    modalidad: Modalidad;
+    estado: 'EN_ESPERA' | 'EN_CURSO' | 'FINALIZADA';
+  };
+}
+export interface Tatami {
+  id: string;
+  numero: number;
+  estado: 'LIBRE' | 'OCUPADO';
+  cola: ColaItem[];
+}
+
+/** Tatamis del campeonato con su cola (los materializa si aún no existen). */
+export async function listTatamisAPI(campId: string): Promise<Tatami[]> {
+  const res = await api.get(`/campeonatos/${campId}/tatamis`);
+  return res.data as Tatami[];
+}
+
+/** Encola una sección al final de la cola del tatami. */
+export async function encolarSeccionAPI(tatamiId: string, seccionId: string) {
+  const res = await api.post(`/tatamis/${tatamiId}/cola`, { seccionId });
+  return res.data;
+}
+
+/** Inicia la siguiente sección en espera del tatami. */
+export async function iniciarTatamiAPI(tatamiId: string) {
+  const res = await api.post(`/tatamis/${tatamiId}/iniciar`);
+  return res.data;
+}
+
+/** Finaliza la sección en curso del tatami. */
+export async function finalizarTatamiAPI(tatamiId: string) {
+  const res = await api.post(`/tatamis/${tatamiId}/finalizar`);
+  return res.data;
+}
+
+/** Mueve una sección en espera al frente de su cola. */
+export async function promoverColaAPI(colaId: string) {
+  const res = await api.post(`/cola/${colaId}/promover`);
+  return res.data;
+}
+
+/** "Robo de modalidades": mueve una sección en espera a otro tatami. */
+export async function robarColaAPI(colaId: string, tatamiId: string) {
+  const res = await api.post(`/cola/${colaId}/robar`, { tatamiId });
+  return res.data;
+}
+
+/** Quita una sección en espera de la cola (vuelve a estar disponible). */
+export async function quitarColaAPI(colaId: string) {
+  await api.delete(`/cola/${colaId}`);
 }
 
 /** Persiste el resultado final de un combate (lo envía el juez de mesa al recuperar red). */
