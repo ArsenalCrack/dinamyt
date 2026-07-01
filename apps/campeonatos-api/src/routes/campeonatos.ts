@@ -18,6 +18,7 @@ import {
   emparejarSeccion,
   calcularEdad,
   snapshotCombate,
+  transicionValida,
   type Modalidad,
   type Genero,
   type GrupoCinturon,
@@ -25,6 +26,7 @@ import {
   type ModalidadConfig,
   type SeccionGenerada,
   type EstadoCombate,
+  type EstadoCampeonato,
 } from '@dinamyt/campeonatos-core';
 import { requireScope, requireRole } from '../plugins/auth';
 
@@ -80,6 +82,78 @@ export async function campeonatosRoutes(app: FastifyInstance) {
     '/campeonatos',
     { preHandler: requireScope('campeonatos') },
     async (req) => req.server.db.select().from(campeonatos),
+  );
+
+  // ── Detalle de un campeonato + sus modalidades (con su config) ───────────
+  app.get(
+    '/campeonatos/:id',
+    { preHandler: requireScope('campeonatos') },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const db = req.server.db;
+      const [camp] = await db
+        .select()
+        .from(campeonatos)
+        .where(eq(campeonatos.id, id))
+        .limit(1);
+      if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+      const mods = await db
+        .select()
+        .from(modalidadesCampeonato)
+        .where(eq(modalidadesCampeonato.campeonatoId, id));
+      return { ...camp, modalidades: mods };
+    },
+  );
+
+  // ── Avanzar el estado del campeonato (BORRADOR→LISTO→EN_CURSO→FINALIZADO) ─
+  app.patch(
+    '/campeonatos/:id/estado',
+    { preHandler: requireRole('campeonatos', ['admin']) },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const { estado } = req.body as { estado: EstadoCampeonato };
+      const db = req.server.db;
+      const [camp] = await db
+        .select()
+        .from(campeonatos)
+        .where(eq(campeonatos.id, id))
+        .limit(1);
+      if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+      if (!transicionValida(camp.estado as EstadoCampeonato, estado)) {
+        return reply
+          .code(422)
+          .send({ error: `Transición inválida: ${camp.estado} → ${estado}.` });
+      }
+      const [upd] = await db
+        .update(campeonatos)
+        .set({ estado, updatedAt: new Date() })
+        .where(eq(campeonatos.id, id))
+        .returning();
+      return reply.send(upd);
+    },
+  );
+
+  // ── Configurar las categorías (rangos) de una modalidad del campeonato ────
+  app.put(
+    '/campeonatos/:id/modalidades/:modalidad',
+    { preHandler: requireRole('campeonatos', ['admin']) },
+    async (req, reply) => {
+      const { id, modalidad } = req.params as { id: string; modalidad: Modalidad };
+      const { categorias } = req.body as { categorias: CategoriasConfig };
+      const db = req.server.db;
+      const [upd] = await db
+        .update(modalidadesCampeonato)
+        .set({ categorias })
+        .where(
+          and(
+            eq(modalidadesCampeonato.campeonatoId, id),
+            eq(modalidadesCampeonato.modalidad, modalidad),
+          ),
+        )
+        .returning();
+      if (!upd) return reply.code(404).send({ error: 'Modalidad no encontrada.' });
+      return reply.send(upd);
+    },
   );
 
   // ── Crear campeonato + sus modalidades habilitadas (solo admin) ──────────

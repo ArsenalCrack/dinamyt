@@ -8,6 +8,8 @@ import {
   cerrarSesion,
   listCampeonatosAPI,
   crearCampeonatoAPI,
+  cambiarEstadoAPI,
+  siguienteEstadoUI,
   extraerError,
   MODALIDADES,
   type Campeonato,
@@ -62,6 +64,17 @@ export default function AdminPage() {
 
   function toggleMod(m: Modalidad) {
     setMods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
+  }
+
+  async function avanzarEstado(c: Campeonato) {
+    const siguiente = siguienteEstadoUI(c.estado);
+    if (!siguiente) return;
+    try {
+      await cambiarEstadoAPI(c.id, siguiente);
+      await cargar();
+    } catch (e) {
+      setErrorMsg(extraerError(e, 'No se pudo cambiar el estado.'));
+    }
   }
 
   async function crear(e: React.FormEvent) {
@@ -192,6 +205,16 @@ export default function AdminPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
+              {esAdmin(sesion) && siguienteEstadoUI(c.estado) && (
+                <button
+                  onClick={() => avanzarEstado(c)}
+                  className="rounded-lg border px-3 py-2 text-xs font-semibold"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+                  title="Avanzar el estado del campeonato"
+                >
+                  → {siguienteEstadoUI(c.estado)}
+                </button>
+              )}
               {esAdmin(sesion) && (
                 <Link
                   href={`/admin/${c.id}/secciones`}

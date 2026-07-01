@@ -264,6 +264,47 @@ describe('API campeonatos (integración con PGlite)', () => {
     await a.close();
   });
 
+  it('avanza el estado del campeonato solo con transiciones válidas', async () => {
+    const a = app();
+    const auth = { authorization: `Bearer ${await token()}` };
+    const crear = await a.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: auth,
+      payload: { nombre: 'Copa Estados' },
+    });
+    const id = crear.json().id as string;
+
+    const aListo = await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}/estado`,
+      headers: auth,
+      payload: { estado: 'LISTO' },
+    });
+    expect(aListo.statusCode).toBe(200);
+    expect(aListo.json().estado).toBe('LISTO');
+
+    // Salto inválido LISTO → FINALIZADO.
+    const salto = await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}/estado`,
+      headers: auth,
+      payload: { estado: 'FINALIZADO' },
+    });
+    expect(salto.statusCode).toBe(422);
+
+    const aCurso = await a.inject({
+      method: 'PATCH',
+      url: `/campeonatos/${id}/estado`,
+      headers: auth,
+      payload: { estado: 'EN_CURSO' },
+    });
+    expect(aCurso.statusCode).toBe(200);
+    expect(aCurso.json().estado).toBe('EN_CURSO');
+
+    await a.close();
+  });
+
   it('exige scope campeonatos para crear (403 con otro scope)', async () => {
     const a = app();
     const res = await a.inject({

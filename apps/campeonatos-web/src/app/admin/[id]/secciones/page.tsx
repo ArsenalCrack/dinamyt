@@ -9,9 +9,14 @@ import {
   generarSeccionesAPI,
   asignarSeccionesAPI,
   generarBracketAPI,
+  getCampeonatoAPI,
+  guardarCategoriasAPI,
   extraerError,
   type Seccion,
+  type ModalidadCampeonato,
+  type CategoriasConfig,
 } from '@/lib/api';
+import { ConfigCategorias } from './ConfigCategorias';
 
 export default function SeccionesPage() {
   const router = useRouter();
@@ -19,6 +24,7 @@ export default function SeccionesPage() {
   const campId = params.id;
 
   const [secciones, setSecciones] = useState<Seccion[]>([]);
+  const [modalidades, setModalidades] = useState<ModalidadCampeonato[]>([]);
   const [estado, setEstado] = useState<'cargando' | 'ok' | 'error'>('cargando');
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -26,13 +32,32 @@ export default function SeccionesPage() {
   const cargar = useCallback(async () => {
     setEstado('cargando');
     try {
-      setSecciones(await listSeccionesAPI(campId));
+      const [secs, detalle] = await Promise.all([
+        listSeccionesAPI(campId),
+        getCampeonatoAPI(campId),
+      ]);
+      setSecciones(secs);
+      setModalidades(detalle.modalidades);
       setEstado('ok');
     } catch (e) {
       setMsg({ tipo: 'error', texto: extraerError(e, 'No se pudieron cargar las secciones.') });
       setEstado('error');
     }
   }, [campId]);
+
+  async function guardarCategorias(modalidad: string, categorias: CategoriasConfig) {
+    setMsg(null);
+    setOcupado(true);
+    try {
+      await guardarCategoriasAPI(campId, modalidad as ModalidadCampeonato['modalidad'], categorias);
+      setMsg({ tipo: 'ok', texto: `Categorías de ${modalidad} guardadas.` });
+      await cargar();
+    } catch (e) {
+      setMsg({ tipo: 'error', texto: extraerError(e, 'No se pudieron guardar las categorías.') });
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   useEffect(() => {
     if (!obtenerToken()) {
@@ -95,6 +120,28 @@ export default function SeccionesPage() {
         Genera las secciones del campeonato, asigna las inscripciones a la sección
         que les corresponde y crea la llave (bracket) de cada sección de combate.
       </p>
+
+      {/* Configuración de categorías por modalidad (rangos → secciones) */}
+      {modalidades.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-lg font-semibold">Categorías por modalidad</h2>
+          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Define género, categorías de cinturón (con los grupos que abarca cada
+            una) y rangos de edad/peso. Al generar secciones se usa esta config.
+          </p>
+          <div className="grid gap-3">
+            {modalidades.map((m) => (
+              <ConfigCategorias
+                key={m.id}
+                modalidad={m.modalidad}
+                inicial={m.categorias}
+                guardando={ocupado}
+                onGuardar={(c) => guardarCategorias(m.modalidad, c)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="mb-6 flex flex-wrap gap-3">
         <button

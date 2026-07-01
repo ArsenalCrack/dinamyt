@@ -1,7 +1,12 @@
 'use client';
 
 import axios from 'axios';
-import type { EstadoCombate } from '@dinamyt/campeonatos-core';
+import type {
+  EstadoCombate,
+  CategoriasConfig,
+} from '@dinamyt/campeonatos-core';
+
+export type { CategoriasConfig, CategoriaConfig } from '@dinamyt/campeonatos-core';
 
 // La API de Campeonatos expone sus rutas en la raíz (sin prefijo /api).
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -112,6 +117,52 @@ export interface InscribirInput {
 export async function inscribirAPI(campId: string, data: InscribirInput) {
   const res = await api.post(`/campeonatos/${campId}/inscripciones`, data);
   return res.data;
+}
+
+// ── Detalle, estado y configuración de categorías ────────────────────────────
+export interface ModalidadCampeonato {
+  id: string;
+  campeonatoId: string;
+  modalidad: Modalidad;
+  costoExtra: string | null;
+  activa: boolean | null;
+  categorias: CategoriasConfig | null;
+}
+export interface CampeonatoDetalle extends Campeonato {
+  modalidades: ModalidadCampeonato[];
+}
+
+export async function getCampeonatoAPI(id: string): Promise<CampeonatoDetalle> {
+  const res = await api.get(`/campeonatos/${id}`);
+  return res.data as CampeonatoDetalle;
+}
+
+/** Avanza el estado del campeonato (BORRADOR→LISTO→EN_CURSO→FINALIZADO). */
+export async function cambiarEstadoAPI(
+  id: string,
+  estado: EstadoCampeonato,
+): Promise<Campeonato> {
+  const res = await api.patch(`/campeonatos/${id}/estado`, { estado });
+  return res.data as Campeonato;
+}
+
+/** Guarda la config de categorías (rangos) de una modalidad del campeonato. */
+export async function guardarCategoriasAPI(
+  id: string,
+  modalidad: Modalidad,
+  categorias: CategoriasConfig,
+) {
+  const res = await api.put(`/campeonatos/${id}/modalidades/${modalidad}`, {
+    categorias,
+  });
+  return res.data;
+}
+
+/** Estado siguiente del ciclo de vida, o null si ya está FINALIZADO. */
+export function siguienteEstadoUI(e: EstadoCampeonato): EstadoCampeonato | null {
+  const orden: EstadoCampeonato[] = ['BORRADOR', 'LISTO', 'EN_CURSO', 'FINALIZADO'];
+  const i = orden.indexOf(e);
+  return i >= 0 && i < orden.length - 1 ? orden[i + 1] : null;
 }
 
 // ── Secciones y llaves (brackets) ────────────────────────────────────────────
