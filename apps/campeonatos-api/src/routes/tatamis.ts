@@ -16,9 +16,25 @@ import { requireScope, requireRole } from '../plugins/auth';
  * (A diferencia de PROJECT, no se reserva un tatami fijo para saltos: el
  * admin decide libremente a qué tatami va cada sección.)
  */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Las columnas uuid de Postgres lanzan 500 ante un id malformado; se corta antes. */
+function esUuid(v: unknown): v is string {
+  return typeof v === 'string' && UUID_RE.test(v);
+}
+
 export async function tatamisRoutes(app: FastifyInstance) {
   /** Estados de cola que ocupan una sección (no se puede encolar dos veces). */
   const ACTIVOS = ['EN_ESPERA', 'EN_CURSO'] as const;
+
+  // Valida el :id de todas las rutas de este plugin (tatami, cola o campeonato).
+  app.addHook('preValidation', async (req, reply) => {
+    const { id } = (req.params ?? {}) as { id?: string };
+    if (id !== undefined && !esUuid(id)) {
+      return reply.code(400).send({ error: 'Identificador inválido.' });
+    }
+  });
 
   // ── Listar los tatamis de un campeonato con su cola ────────────────────────
   app.get(
@@ -110,6 +126,9 @@ export async function tatamisRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const { seccionId } = req.body as { seccionId: string };
+      if (!esUuid(seccionId)) {
+        return reply.code(400).send({ error: 'seccionId inválido.' });
+      }
       const db = req.server.db;
 
       const [tatami] = await db
@@ -286,6 +305,9 @@ export async function tatamisRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const { tatamiId } = req.body as { tatamiId: string };
+      if (!esUuid(tatamiId)) {
+        return reply.code(400).send({ error: 'tatamiId inválido.' });
+      }
       const db = req.server.db;
 
       const [item] = await db
