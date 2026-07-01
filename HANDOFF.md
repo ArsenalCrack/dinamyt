@@ -62,7 +62,7 @@ dinamyt/
     └── campeonatos-combat/  @dinamyt/campeonatos-combat ✅ WebSocket (ws) — combate en vivo offline
 ```
 
-Estado global: **`turbo build` 8/8** · **51 tests** (core 40 · db 3 · api 6 · combat 2) · ✅.
+Estado global: **`turbo build` 8/8** · **54 tests** (core 41 · db 3 · api 8 · combat 2) · ✅.
 
 ### Stack y versiones
 pnpm 11.5 · Turborepo 2.10 · TypeScript 5.7 · NestJS 11 · Fastify 5 · Next 16.2.7 ·
@@ -104,7 +104,7 @@ Schema `campeonatos` (15 tablas; DB propia que referencia user_id/org_id por UUI
 `distancia_alcanzada`. Migración `0000_naive_adam_destine`. Expone `./testing`
 (`createTestDb` con PGlite). 3 tests.
 
-### `@dinamyt/campeonatos-core` (lógica pura) — 40 tests
+### `@dinamyt/campeonatos-core` (lógica pura) — 41 tests
 - categorización: cinturones, edad, restricciones R1-R5, género de sección, `enRango`,
   clave/nombre de sección.
 - **generación de secciones**: `generarSecciones` — árbol Modalidad→Género→Cinturón→
@@ -122,14 +122,17 @@ Schema `campeonatos` (15 tablas; DB propia que referencia user_id/org_id por UUI
 
 ### `@dinamyt/campeonatos-api` (Fastify, :3002)
 Guard `requireScope` (RS256 vs JWKS + scope `campeonatos`). Endpoints: `GET /health`,
-`/campeonatos/publico` (público), `/campeonatos`, `/me`, `POST /campeonatos`,
-`POST /campeonatos/:id/inscripciones` (valida R1-R5 + perfil provisional + monto),
-`POST /secciones/:id/bracket`. BD y verificador inyectables. 6 tests (PGlite).
+`/campeonatos/publico` (público), `/campeonatos`, `/me`, `POST /campeonatos` (con
+config de categorías por modalidad), `POST /campeonatos/:id/inscripciones` (valida
+R1-R5 + perfil provisional + monto), `POST /campeonatos/:id/generar-secciones` +
+`GET .../secciones`, `POST /secciones/:id/bracket`, `POST /secciones/:id/combates`
+(persiste el snapshot del combate). BD y verificador inyectables. 8 tests (PGlite).
 
 ### `@dinamyt/campeonatos-web` (Next 16, :3003)
 Pantalla pública (`/pantalla`) + **panel admin**: `/admin/login` (login delegado al
 ecosystem-api), `/admin` (listar + crear campeonato), `/admin/[id]` (inscribir
-competidor con feedback de R1-R5). `next build` OK.
+competidor con feedback de R1-R5), `/admin/combate` (**juez de mesa**: WebSocket de
+combate en vivo, puntúa por réferi, faltas, declarar ganador). `next build` OK.
 
 ### `@dinamyt/campeonatos-combat` (ws, :3005)
 Servidor WebSocket local (offline en WiFi). `Salas` mantiene el estado por combate
@@ -141,16 +144,16 @@ en memoria y aplica el motor `aplicarEvento` del core; reenvía el estado a la s
 ## 5. Qué FALTA (pendiente)
 
 **Campeonatos**
-- [ ] **Persistir secciones**: la lógica de generación ya está (`generarSecciones`);
-      falta (a) guardar la config de categorías por modalidad (jsonb en
-      `modalidades_campeonato`), (b) endpoint `POST /campeonatos/:id/generar-secciones`
-      que la persista en `secciones`, y (c) asignar inscripciones a su sección.
-- [ ] Endpoints de la API para: gestión de tatamis y cola FIFO; secciones;
-      resultados de figuras/saltos; sincronización del combate (recibir el estado
-      final del módulo `combat` y persistir `combates`/`eventos_combate`).
-- [ ] Panel de **juez de mesa** en la web (ingresar puntajes; conectar al WS de combate).
+- [ ] **Asignar inscripciones a su sección**: emparejar cada (competidor, modalidad)
+      con la sección que le corresponde. Requiere definir el mapeo cinturón del
+      competidor → agrupación de cinturón de la sección (config del admin).
+- [ ] Endpoints de gestión de tatamis y cola FIFO; resultados de figuras/saltos.
 - [ ] Endpoint `GET /users/:id/campeonatos-summary` (perfil unificado, RF-CAM-ECO-04).
 - [ ] Reportes Excel/PDF (ExcelJS) y PWA/offline.
+
+> Hecho ya: generación + persistencia de secciones (`POST .../generar-secciones`),
+> panel de juez de mesa (`/admin/combate`) y persistencia del combate
+> (`POST /secciones/:id/combates`).
 
 **Ecosystem**
 - [ ] Gestión de organizaciones y suscripciones desde el portal (UI; el API ya existe).
@@ -232,6 +235,9 @@ Cada app/paquete tiene `.env.example` → copiar a `.env`.
 ## 9. Historial de commits (monorepo)
 
 ```
+12ca535 feat(campeonatos-web): panel de juez de mesa (combate en vivo por WebSocket)
+7a44396 feat(campeonatos): persistencia del resultado de combate (sync)
+a504cff feat(campeonatos): config de categorias + generacion de secciones
 2fdb19d refactor(combate): port fiel del motor de DINAMYT-COMBAT (modelo de 4 jueces)
 3787ce7 feat(campeonatos-core): generacion de secciones (arbol) + saltos maxFallas=3
 e46129c docs: actualiza HANDOFF — saltos, panel admin y combate
