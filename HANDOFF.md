@@ -62,7 +62,7 @@ dinamyt/
     └── campeonatos-combat/  @dinamyt/campeonatos-combat ✅ WebSocket (ws) — combate en vivo offline
 ```
 
-Estado global: **`turbo build` 8/8** · **54 tests** (core 41 · db 3 · api 8 · combat 2) · ✅.
+Estado global: **`turbo build` 8/8** · **57 tests** (core 44 · db 3 · api 9 · combat 2) · ✅.
 
 ### Stack y versiones
 pnpm 11.5 · Turborepo 2.10 · TypeScript 5.7 · NestJS 11 · Fastify 5 · Next 16.2.7 ·
@@ -104,7 +104,7 @@ Schema `campeonatos` (15 tablas; DB propia que referencia user_id/org_id por UUI
 `distancia_alcanzada`. Migración `0000_naive_adam_destine`. Expone `./testing`
 (`createTestDb` con PGlite). 3 tests.
 
-### `@dinamyt/campeonatos-core` (lógica pura) — 41 tests
+### `@dinamyt/campeonatos-core` (lógica pura) — 44 tests
 - categorización: cinturones, edad, restricciones R1-R5, género de sección, `enRango`,
   clave/nombre de sección.
 - **generación de secciones**: `generarSecciones` — árbol Modalidad→Género→Cinturón→
@@ -125,8 +125,10 @@ Guard `requireScope` (RS256 vs JWKS + scope `campeonatos`). Endpoints: `GET /hea
 `/campeonatos/publico` (público), `/campeonatos`, `/me`, `POST /campeonatos` (con
 config de categorías por modalidad), `POST /campeonatos/:id/inscripciones` (valida
 R1-R5 + perfil provisional + monto), `POST /campeonatos/:id/generar-secciones` +
-`GET .../secciones`, `POST /secciones/:id/bracket`, `POST /secciones/:id/combates`
-(persiste el snapshot del combate). BD y verificador inyectables. 8 tests (PGlite).
+`GET .../secciones`, `POST /campeonatos/:id/asignar-secciones` (empareja cada
+inscripción con su sección por cinturón/peso/edad/género), `POST /secciones/:id/bracket`,
+`POST /secciones/:id/combates` (persiste el snapshot). BD y verificador inyectables.
+9 tests (PGlite).
 
 ### `@dinamyt/campeonatos-web` (Next 16, :3003)
 Pantalla pública (`/pantalla`) + **panel admin**: `/admin/login` (login delegado al
@@ -143,17 +145,25 @@ en memoria y aplica el motor `aplicarEvento` del core; reenvía el estado a la s
 
 ## 5. Qué FALTA (pendiente)
 
+### ⭐ Perfil e historial de progreso — INMUTABLE (transversal)
+Cada persona debe ver su historial: en qué campeonatos participó, sus resultados y su
+avance académico (Academy). **Requisito clave: el historial es INMUTABLE** — guarda el
+estado *al momento de participar*, no el actual. Ej.: si compitió con cinturón amarillo
+y hoy tiene uno superior, el historial debe seguir mostrando **amarillo**; igual con
+todos los datos (cinturón, peso, club, edad, nombre…).
+- [ ] Snapshot completo por participación (hecho: cinturón + peso en la inscripción;
+      falta club/edad/nombre y aplicar el mismo criterio a los resultados).
+- [ ] `GET /users/:id/campeonatos-summary` — historial de campeonatos del usuario.
+- [ ] Historial/progreso académico en Academy (cuando se inicie).
+- [ ] Perfil unificado en el portal del ecosystem (RF-ECO-10/22) que combina ambos.
+
 **Campeonatos**
-- [ ] **Asignar inscripciones a su sección**: emparejar cada (competidor, modalidad)
-      con la sección que le corresponde. Requiere definir el mapeo cinturón del
-      competidor → agrupación de cinturón de la sección (config del admin).
 - [ ] Endpoints de gestión de tatamis y cola FIFO; resultados de figuras/saltos.
-- [ ] Endpoint `GET /users/:id/campeonatos-summary` (perfil unificado, RF-CAM-ECO-04).
 - [ ] Reportes Excel/PDF (ExcelJS) y PWA/offline.
 
-> Hecho ya: generación + persistencia de secciones (`POST .../generar-secciones`),
-> panel de juez de mesa (`/admin/combate`) y persistencia del combate
-> (`POST /secciones/:id/combates`).
+> Hecho ya: generación + persistencia de secciones, **asignación de inscripciones a
+> secciones por cinturón/peso**, panel de juez de mesa (`/admin/combate`) y
+> persistencia del combate (`POST /secciones/:id/combates`).
 
 **Ecosystem**
 - [ ] Gestión de organizaciones y suscripciones desde el portal (UI; el API ya existe).
@@ -235,6 +245,7 @@ Cada app/paquete tiene `.env.example` → copiar a `.env`.
 ## 9. Historial de commits (monorepo)
 
 ```
+e121618 feat(campeonatos): asignacion inscripcion->seccion por cinturon + snapshot inmutable
 12ca535 feat(campeonatos-web): panel de juez de mesa (combate en vivo por WebSocket)
 7a44396 feat(campeonatos): persistencia del resultado de combate (sync)
 a504cff feat(campeonatos): config de categorias + generacion de secciones
