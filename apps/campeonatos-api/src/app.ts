@@ -6,6 +6,7 @@ import { config } from './config';
 import { createRemoteVerifier } from './plugins/auth';
 import { healthRoutes } from './routes/health';
 import { campeonatosRoutes } from './routes/campeonatos';
+import { tatamisRoutes } from './routes/tatamis';
 
 export interface BuildAppDeps {
   /** Verificador de tokens. Por defecto usa el JWKS remoto del ecosystem;
@@ -27,6 +28,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(cors, { origin: config.corsOrigins });
   void app.register(healthRoutes);
   void app.register(campeonatosRoutes);
+  void app.register(tatamisRoutes);
 
   return app;
 }

@@ -305,6 +305,129 @@ describe('API campeonatos (integración con PGlite)', () => {
     await a.close();
   });
 
+  it('gestiona tatamis: materialización, cola FIFO, inicio/fin y robo', async () => {
+    const a = app();
+    const auth = { authorization: `Bearer ${await token()}` };
+
+    // Campeonato con 2 tatamis y 2 secciones (Masculino + Femenino).
+    const crear = await a.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: auth,
+      payload: {
+        nombre: 'Copa Tatamis',
+        numTatamis: 2,
+        modalidades: [{ modalidad: 'combate', categorias: { genero: 'separado' } }],
+      },
+    });
+    const campId = crear.json().id as string;
+    await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${campId}/generar-secciones`,
+      headers: auth,
+    });
+    const secs = (
+      await a.inject({
+        method: 'GET',
+        url: `/campeonatos/${campId}/secciones`,
+        headers: auth,
+      })
+    ).json() as { id: string }[];
+    expect(secs).toHaveLength(2);
+
+    // Los tatamis se materializaron al crear (numTatamis = 2).
+    const lista = await a.inject({
+      method: 'GET',
+      url: `/campeonatos/${campId}/tatamis`,
+      headers: auth,
+    });
+    const tats = lista.json() as { id: string; numero: number; cola: unknown[] }[];
+    expect(tats).toHaveLength(2);
+    expect(tats.map((t) => t.numero)).toEqual([1, 2]);
+
+    // Encolar ambas secciones en el tatami 1 (FIFO).
+    const it1 = await a.inject({
+      method: 'POST',
+      url: `/tatamis/${tats[0].id}/cola`,
+      headers: auth,
+      payload: { seccionId: secs[0].id },
+    });
+    expect(it1.statusCode).toBe(201);
+    const it2 = await a.inject({
+      method: 'POST',
+      url: `/tatamis/${tats[0].id}/cola`,
+      headers: auth,
+      payload: { seccionId: secs[1].id },
+    });
+    expect(it2.json().orden).toBeGreaterThan(it1.json().orden);
+
+    // No se puede encolar dos veces la misma sección.
+    const dup = await a.inject({
+      method: 'POST',
+      url: `/tatamis/${tats[1].id}/cola`,
+      headers: auth,
+      payload: { seccionId: secs[0].id },
+    });
+    expect(dup.statusCode).toBe(422);
+
+    // Iniciar → toma la primera en espera y ocupa el tatami.
+    const ini = await a.inject({
+      method: 'POST',
+      url: `/tatamis/${tats[0].id}/iniciar`,
+      headers: auth,
+    });
+    expect(ini.statusCode).toBe(200);
+    expect(ini.json().estado).toBe('EN_CURSO');
+    expect(ini.json().seccionId).toBe(secs[0].id);
+
+    // Robo: la sección en espera del tatami 1 pasa al tatami 2.
+    const robo = await a.inject({
+      method: 'POST',
+      url: `/cola/${it2.json().id}/robar`,
+      headers: auth,
+      payload: { tatamiId: tats[1].id },
+    });
+    expect(robo.statusCode).toBe(200);
+    expect(robo.json().tatamiId).toBe(tats[1].id);
+
+    // No se puede robar la que está en curso.
+    const roboMalo = await a.inject({
+      method: 'POST',
+      url: `/cola/${it1.json().id}/robar`,
+      headers: auth,
+      payload: { tatamiId: tats[1].id },
+    });
+    expect(roboMalo.statusCode).toBe(422);
+
+    // Finalizar libera el tatami y marca la sección FINALIZADA.
+    const fin = await a.inject({
+      method: 'POST',
+      url: `/tatamis/${tats[0].id}/finalizar`,
+      headers: auth,
+    });
+    expect(fin.statusCode).toBe(200);
+    expect(fin.json().estado).toBe('FINALIZADA');
+
+    const despues = (
+      await a.inject({
+        method: 'GET',
+        url: `/campeonatos/${campId}/tatamis`,
+        headers: auth,
+      })
+    ).json() as {
+      numero: number;
+      estado: string;
+      cola: { estado: string; seccion: { estado: string } }[];
+    }[];
+    expect(despues[0].estado).toBe('LIBRE');
+    expect(despues[0].cola[0].estado).toBe('FINALIZADA');
+    expect(despues[0].cola[0].seccion.estado).toBe('FINALIZADA');
+    expect(despues[1].cola).toHaveLength(1);
+    expect(despues[1].cola[0].estado).toBe('EN_ESPERA');
+
+    await a.close();
+  });
+
   it('exige scope campeonatos para crear (403 con otro scope)', async () => {
     const a = app();
     const res = await a.inject({

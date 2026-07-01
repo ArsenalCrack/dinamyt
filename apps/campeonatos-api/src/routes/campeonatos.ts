@@ -10,6 +10,7 @@ import {
   seccionInscripciones,
   llaves,
   combates,
+  tatamis,
 } from '@dinamyt/campeonatos-db';
 import {
   validarRestriccion,
@@ -226,6 +227,11 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           costoExtra: m.costoExtra ?? '0',
           categorias: m.categorias ?? null,
         });
+      }
+
+      // Materializa las áreas físicas de competencia (1..numTatamis).
+      for (let n = 1; n <= (camp.numTatamis ?? 1); n++) {
+        await db.insert(tatamis).values({ campeonatoId: camp.id, numero: n });
       }
 
       return reply.code(201).send(camp);
