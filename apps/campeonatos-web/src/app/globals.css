@@ -6,11 +6,18 @@
   --bg: #14141e;
   --bg-card: #1c1c2a;
   --bg-elevated: #242436;
+  --bg-input: #0e0e18;
   --border: #2a2a3e;
   --text: #f0f0f8;
   --text-muted: #9090b0;
   --gold: #f0b800;
   --gold-dim: #c99a00;
+  --danger: #ff5577;
+  --danger-soft: #ff8899;
+  --ok: #3ecf8e;
+  --info: #4d9fff;
+  --hong: #e8002a;
+  --chung: #2266ff;
 }
 
 body {
@@ -27,8 +34,9 @@ a {
 }
 
 input,
-select {
-  background: var(--bg-input, #0e0e18);
+select,
+textarea {
+  background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 0.55rem 0.75rem;
@@ -36,10 +44,111 @@ select {
   width: 100%;
 }
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--gold);
 }
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
   width: auto;
+  accent-color: var(--gold);
+}
+
+/* ── Sistema de componentes ─────────────────────────────────────────────── */
+
+/* Botones */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.btn-gold {
+  background: var(--gold);
+  color: #14141e;
+}
+.btn-outline {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--gold);
+}
+.btn-danger {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--danger);
+}
+.btn-danger:hover:not(:disabled) {
+  border-color: var(--danger);
+}
+.btn-sm {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+/* Tarjetas */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+/* Badges de estado */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.badge-gold {
+  background: rgba(240, 184, 0, 0.12);
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+.badge-live {
+  background: rgba(232, 0, 42, 0.12);
+  border-color: var(--hong);
+  color: #ff6680;
+}
+.badge-ok {
+  background: rgba(62, 207, 142, 0.1);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.badge-info {
+  background: rgba(77, 159, 255, 0.1);
+  border-color: var(--info);
+  color: var(--info);
+}
+
+/* Mensajes de feedback */
+.msg-error {
+  color: var(--danger);
+}
+.msg-ok {
+  color: var(--ok);
 }

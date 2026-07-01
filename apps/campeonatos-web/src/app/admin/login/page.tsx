@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginAPI, guardarToken, extraerError } from '@/lib/api';
 import { getSesion, rutaInicio } from '@/lib/session';
+import { Logo } from '@/components/Logo';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -29,14 +30,14 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
+      <Logo size={48} />
       <form
         onSubmit={onSubmit}
-        className="w-full max-w-sm rounded-xl border p-6"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        className="card w-full max-w-sm p-6"
       >
         <h1 className="mb-1 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-          Panel de administración
+          Panel de gestión
         </h1>
         <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
           Inicia sesión con tu cuenta del ecosistema DINAMYT.
@@ -66,12 +67,7 @@ export default function AdminLoginPage() {
             {error}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={cargando}
-          className="w-full rounded-lg px-4 py-2 font-semibold"
-          style={{ background: 'var(--gold)', color: '#14141e' }}
-        >
+        <button type="submit" disabled={cargando} className="btn btn-gold w-full">
           {cargando ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
