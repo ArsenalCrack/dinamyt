@@ -1,6 +1,9 @@
 # DINAMYT — Estado del proyecto y Handoff
 
-> Documento vivo. Última actualización: 2026-06-26.
+> Documento vivo. Última actualización: 2026-07-01.
+> Para correr TODO en local paso a paso (portal → campeonatos desde el navegador),
+> ver **`RUN_LOCAL.md`**. Para el plan de la versión unificada (fusión de
+> COMBAT + PROJECT con roles), ver **`PLAN_FUSION.md`**.
 > Propósito: (a) registrar qué está hecho y qué falta; (b) permitir continuar el
 > trabajo en una sesión/chat nueva sin perder contexto.
 
@@ -36,13 +39,15 @@ Academy. No tocar en este trabajo.
 | Qué | Dónde |
 | --- | --- |
 | **Monorepo (canónico)** | `D:\Repositorios\dinamyt` |
-| Repos viejos (backup, NO usar) | `D:\Repositorios\dinamyt-ecosystem` · `-campeonatos` · `-academy` · `-shared` |
-| Monolito de referencia | `D:\hapkido\DINAMYT-COMBAT` |
+| Referencia — evento EN VIVO | `D:\hapkido\DINAMYT-COMBAT` (Flask+Next; **no tocar**) |
+| Referencia — creación/gestión | `D:\hapkido\DINAMYT-PROJECT` (Angular+Spring; **no tocar**) |
 | Specs (Word) | `D:\Repositorios\DINAMYT_Ecosystem_DocumentoPrincipal_v1.docx` · `DINAMYT_Campeonatos_Requerimientos_v3.docx` · `DINAMYT_Academy_DocumentoPrincipal_v2.docx` |
-| Memoria del asistente | `C:\Users\amirs\.claude\projects\D--...-Software\memory\` |
+| Memoria del asistente | `C:\Users\amirs\.claude\projects\D--Repositorios-dinamyt\memory\` |
 
-GitHub: los repos viejos están en `github.com/ArsenalCrack/*`. **El monorepo aún
-NO tiene remoto** (rama local `master`).
+GitHub: los repos viejos siguen en `github.com/ArsenalCrack/*` (academy, campeonatos,
+ecosystem, shared). **Sus carpetas locales `D:\Repositorios\dinamyt-*` fueron
+BORRADAS el 2026-07-01** tras verificar que estaban 100% pusheadas (el código ya
+vive en el monorepo). **El monorepo aún NO tiene remoto** (rama local `master`).
 
 ---
 
@@ -62,7 +67,9 @@ dinamyt/
     └── campeonatos-combat/  @dinamyt/campeonatos-combat ✅ WebSocket (ws) — combate en vivo offline
 ```
 
-Estado global: **`turbo build` 8/8** · **57 tests** (core 44 · db 3 · api 9 · combat 2) · ✅.
+Estado global: **`turbo build` 8/8** · **`turbo test` 8/8** (core 44 · db 3 ·
+campeonatos-api 10 · combat 2 · ecosystem-api 4) · ✅.
+**Fase 1 de la fusión (roles) HECHA** — ver `PLAN_FUSION.md`.
 
 ### Stack y versiones
 pnpm 11.5 · Turborepo 2.10 · TypeScript 5.7 · NestJS 11 · Fastify 5 · Next 16.2.7 ·
@@ -164,6 +171,20 @@ todos los datos (cinturón, peso, club, edad, nombre…).
 > Hecho ya: generación + persistencia de secciones, **asignación de inscripciones a
 > secciones por cinturón/peso**, panel de juez de mesa (`/admin/combate`) y
 > persistencia del combate (`POST /secciones/:id/combates`).
+>
+> Hecho el 2026-06-30 (esta sesión):
+> - **UI del flujo admin**: nueva página `/admin/[id]/secciones` que cablea
+>   generar-secciones → asignar-inscripciones → generar-llave (los endpoints ya
+>   existían; ahora se usan desde el navegador).
+> - **Panel de combate** (`/admin/combate`): cronómetro (la mesa emite el tick por
+>   WebSocket), selector de ronda (R1-R3/Oro), aprobación de Punto de Oro, botones
+>   **↶ Deshacer** (réferi y árbitro) y **Guardar resultado** (persiste vía
+>   `?seccion=<uuid>`).
+>
+> Pendiente cercano: definir rangos de categorías (cinturón/edad/peso) desde la UI
+> (hoy «Generar secciones» usa `{ genero: 'mixto' }` por defecto → 1 sección por
+> modalidad) y **enlazar el combate desde el bracket** (elegir la pelea desde la
+> llave, en vez de teclear el ID).
 
 **Ecosystem**
 - [ ] Gestión de organizaciones y suscripciones desde el portal (UI; el API ya existe).
@@ -177,16 +198,26 @@ todos los datos (cinturón, peso, club, edad, nombre…).
 - [ ] Subir el monorepo a un repo `dinamyt` en GitHub (y archivar los 4 viejos).
 - [ ] CI/CD (GitHub Actions) y despliegue (Vercel webs · Render/Neon APIs).
 
-### Decisiones confirmadas por Amir (2026-06-26)
+### Decisiones confirmadas por Amir (2026-06-26 / 2026-06-30)
 - **Combate**: modelo **tal cual DINAMYT-COMBAT** (4 réferis de esquina + juez central) — portado.
 - **Saltos**: intento inicial + 2 repeticiones; al 3.er fallo, eliminado (`maxFallas=3`).
 - **Secciones**: el admin define los rangos al crear el campeonato (lógica del proyecto
   Angular/Spring `D:\hapkido\DINAMYT-PROJECT`, ya portada en `generarSecciones`).
+- **Auth cross-origin (2026-06-30)**: la arquitectura objetivo es **SSO por
+  redirección** (login único en el portal; las apps redirigen a
+  `PORTAL/login?redirect=<callback>` y reciben el token). Razón: funciona en local
+  y en producción aunque los dominios difieran, y elimina el login duplicado y el
+  problema de CORS del login. **Aún no implementado**: por ahora cada app tiene su
+  propio login (per-app). Ver «Aún por confirmar / pendiente».
+- **Suscripciones (2026-06-30)**: se asignan **manualmente** por ahora (no hay UI de
+  compra ni pasarela). Para dar acceso a un usuario normal, insertar una suscripción
+  con scope `campeonatos` (ver `RUN_LOCAL.md` §6). El **super-admin** entra a
+  cualquier app **sin suscripción** gracias a un bypass en el guard de campeonatos.
 
-### Aún por confirmar
+### Aún por confirmar / pendiente
 - **Desempate §7.3**: se asume que solo aplica ante empate de puntaje.
-- **Login cross-origin**: en dev cada web hace su propio login contra el ecosystem
-  (el token de localStorage no se comparte entre orígenes/puertos).
+- **SSO por redirección**: decidido como objetivo (arriba), falta implementarlo
+  (login único en el portal + callback con token). Mientras tanto, login per-app.
 
 ---
 
@@ -223,6 +254,33 @@ Cada app/paquete tiene `.env.example` → copiar a `.env`.
 - **Drizzle**: `decimal` vuelve como string con escala (`'0.00'`); `uuid` exige UUID
   válido (el `sub` del ecosystem siempre lo es).
 - **Next 16**: la opción `eslint` ya no existe en `next.config`. Avisos `LF→CRLF` inocuos.
+- **Node en la terminal**: usar **PowerShell** (ahí están `node`/`pnpm`). En Git Bash
+  puede que `node` no esté en el PATH y `pnpm test` falle con "node no se reconoce".
+- **CORS en dev**: las dos APIs permiten `http://localhost:3000` **y** `:3003` por
+  defecto (código + `.env.example`). `campeonatos-web` (3003) llama a `ecosystem-api`
+  (3001) para el login; sin el 3003 en `CORS_ORIGINS` el navegador lo bloquea.
+- **Super-admin**: `requireScope` (campeonatos-api) deja pasar a `is_super_admin`
+  sin exigir el scope. Un usuario normal SÍ necesita la suscripción.
+- **Jest + ESM (ecosystem-api)**: `jose`/`uuid` son ESM puro; el `transformIgnorePatterns`
+  del `package.json` (`/node_modules/.pnpm/(?!(jose|uuid)@)`) los deja transformar.
+  Sin eso, los specs de auth fallan con `Unexpected token 'export'`.
+- **Tests flaky en frío**: `campeonatos-api` y `-combat` tienen `vitest.config.ts`
+  con `testTimeout: 20000` (el primer test de cada archivo carga fastify/ws en frío).
+- **`CAMPEONATOS_DATABASE_URL`** puede ser **el mismo** connection string que el
+  `DATABASE_URL` del ecosystem: son schemas distintos (`campeonatos` vs `ecosystem`)
+  en el mismo Postgres.
+- **BD local sin servidor (PGlite)**: si `PGLITE_DATA` / `CAMPEONATOS_PGLITE_DATA`
+  están en el `.env`, los clientes usan **PGlite embebido** (persistido en `.localdb/`,
+  gitignored) en vez de postgres-js. Se activa así el arranque local sin Docker ni
+  Postgres. Setup: `db:local:setup` en ecosystem-api y campeonatos-db. Para
+  producción se comentan esas envs y se usan `DATABASE_URL`/migraciones drizzle-kit.
+  Detalle completo en `RUN_LOCAL.md`. Los clientes de BD son **lazy** (proxy): no
+  abren conexión hasta el primer uso. **PGlite ≠ socket**: `pglite-socket` no es
+  compatible con postgres-js (se cuelga); por eso se usa PGlite **en-proceso**.
+- **Bug corregido**: la 1.ª migración del ecosystem no creaba el schema
+  (`CREATE SCHEMA "ecosystem"`), a diferencia de la de campeonatos. Ya añadido
+  `CREATE SCHEMA IF NOT EXISTS "ecosystem"` al inicio del `0000_*.sql` (habría
+  fallado también contra Supabase en un deploy limpio).
 
 ---
 
