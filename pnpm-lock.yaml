@@ -85,6 +85,9 @@ importers:
 
   apps/campeonatos-web:
     dependencies:
+      '@dinamyt/campeonatos-core':
+        specifier: workspace:*
+        version: link:../../packages/campeonatos-core
       axios:
         specifier: ^1.17.0
         version: 1.18.1

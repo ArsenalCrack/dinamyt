@@ -75,16 +75,25 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold" style={{ color: 'var(--gold)' }}>
           Administración
         </h1>
-        <button
-          onClick={() => {
-            cerrarSesion();
-            router.replace('/admin/login');
-          }}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          Salir
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/combate"
+            className="rounded-lg px-4 py-2 text-sm font-semibold"
+            style={{ background: 'var(--gold)', color: '#14141e' }}
+          >
+            Juez de mesa
+          </Link>
+          <button
+            onClick={() => {
+              cerrarSesion();
+              router.replace('/admin/login');
+            }}
+            className="rounded-lg border px-4 py-2 text-sm font-semibold"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            Salir
+          </button>
+        </div>
       </header>
 
       <form
