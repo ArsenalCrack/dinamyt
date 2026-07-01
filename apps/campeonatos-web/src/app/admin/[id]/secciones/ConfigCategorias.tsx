@@ -2,31 +2,44 @@
 
 import { useState } from 'react';
 import {
-  GRUPOS_CINTURON,
+  CINTURONES_ORDEN,
+  validarCategorias,
   type CategoriasConfig,
   type CategoriaConfig,
-  type Modalidad,
-} from '@/lib/api';
+} from '@dinamyt/campeonatos-core';
+import type { Modalidad } from '@/lib/api';
 
-interface CinturonRow {
+type Kind = 'cinturon' | 'edad' | 'peso';
+interface Fila {
+  tipo: 'individual' | 'rango';
   valor: string;
-  grupos: string[];
-}
-interface RangoRow {
   desde: string;
   hasta: string;
 }
 
-const cardStyle = {
-  background: 'var(--bg-card)',
-  borderColor: 'var(--border)',
-} as const;
+const cardStyle = { background: 'var(--bg-card)', borderColor: 'var(--border)' } as const;
+
+function desdeCategoria(cs: CategoriaConfig[] | undefined): Fila[] {
+  return (cs ?? [])
+    .filter((c) => c.activa)
+    .map((c) => ({
+      tipo: c.tipo,
+      valor: c.valor ?? '',
+      desde: c.desde ?? '',
+      hasta: c.hasta ?? '',
+    }));
+}
+
+function aCategoria(f: Fila): CategoriaConfig {
+  return f.tipo === 'individual'
+    ? { activa: true, tipo: 'individual', valor: f.valor }
+    : { activa: true, tipo: 'rango', desde: f.desde, hasta: f.hasta };
+}
 
 /**
- * Editor de categorías de una modalidad (lógica de DINAMYT-PROJECT / ArbolBuilder):
- * el admin define género, categorías de cinturón (con los grupos que abarca cada
- * una) y rangos de edad/peso. Al guardar produce un `CategoriasConfig` que la API
- * usa en `generar-secciones`.
+ * Editor de categorías de una modalidad. Cinturón por nombre fijo (5 grupos),
+ * edad/peso individual o rango. Valida con el core (mismos límites que la API)
+ * antes de guardar. Las categorías definen CÓMO se agrupa al competidor.
  */
 export function ConfigCategorias({
   modalidad,
@@ -42,58 +55,21 @@ export function ConfigCategorias({
   const [genero, setGenero] = useState<string>(
     inicial?.genero === 'mixto' ? 'mixto' : 'separado',
   );
-  const [cinturones, setCinturones] = useState<CinturonRow[]>(
-    (inicial?.cinturon ?? [])
-      .filter((c) => c.activa)
-      .map((c) => ({ valor: c.valor ?? '', grupos: c.grupos ?? [] })),
-  );
-  const [edades, setEdades] = useState<RangoRow[]>(
-    (inicial?.edad ?? [])
-      .filter((c) => c.activa && c.tipo === 'rango')
-      .map((c) => ({ desde: c.desde ?? '', hasta: c.hasta ?? '' })),
-  );
-  const [pesos, setPesos] = useState<RangoRow[]>(
-    (inicial?.peso ?? [])
-      .filter((c) => c.activa && c.tipo === 'rango')
-      .map((c) => ({ desde: c.desde ?? '', hasta: c.hasta ?? '' })),
-  );
-
-  function toggleGrupo(idx: number, grupo: string) {
-    setCinturones((cur) =>
-      cur.map((c, i) =>
-        i === idx
-          ? {
-              ...c,
-              grupos: c.grupos.includes(grupo)
-                ? c.grupos.filter((g) => g !== grupo)
-                : [...c.grupos, grupo],
-            }
-          : c,
-      ),
-    );
-  }
+  const [cinturon, setCinturon] = useState<Fila[]>(desdeCategoria(inicial?.cinturon));
+  const [edad, setEdad] = useState<Fila[]>(desdeCategoria(inicial?.edad));
+  const [peso, setPeso] = useState<Fila[]>(desdeCategoria(inicial?.peso));
+  const [errores, setErrores] = useState<string[]>([]);
 
   function guardar() {
-    const cinturon: CategoriaConfig[] = cinturones
-      .filter((c) => c.valor.trim() || c.grupos.length)
-      .map((c) => ({
-        activa: true,
-        tipo: 'individual',
-        valor: c.valor.trim() || c.grupos.join('-'),
-        grupos: c.grupos,
-      }));
-    const edad: CategoriaConfig[] = edades
-      .filter((r) => r.desde && r.hasta)
-      .map((r) => ({ activa: true, tipo: 'rango', desde: r.desde, hasta: r.hasta }));
-    const peso: CategoriaConfig[] = pesos
-      .filter((r) => r.desde && r.hasta)
-      .map((r) => ({ activa: true, tipo: 'rango', desde: r.desde, hasta: r.hasta }));
-    onGuardar({
+    const cat: CategoriasConfig = {
       genero,
-      ...(cinturon.length ? { cinturon } : {}),
-      ...(edad.length ? { edad } : {}),
-      ...(peso.length ? { peso } : {}),
-    });
+      ...(cinturon.length ? { cinturon: cinturon.map(aCategoria) } : {}),
+      ...(edad.length ? { edad: edad.map(aCategoria) } : {}),
+      ...(peso.length ? { peso: peso.map(aCategoria) } : {}),
+    };
+    const errs = validarCategorias(cat);
+    setErrores(errs);
+    if (errs.length === 0) onGuardar(cat);
   }
 
   return (
@@ -110,103 +86,78 @@ export function ConfigCategorias({
         </button>
       </div>
 
+      {errores.length > 0 && (
+        <ul className="mb-3 rounded-lg border p-2 text-xs" style={{ borderColor: '#ff5577', color: '#ff8899' }}>
+          {errores.map((e, i) => (
+            <li key={i}>• {e}</li>
+          ))}
+        </ul>
+      )}
+
       {/* Género */}
       <div className="mb-4 flex items-center gap-4 text-sm">
         <span style={{ color: 'var(--text-muted)' }}>Género:</span>
         {(['separado', 'mixto'] as const).map((g) => (
           <label key={g} className="flex items-center gap-1">
-            <input
-              type="radio"
-              name={`gen-${modalidad}`}
-              checked={genero === g}
-              onChange={() => setGenero(g)}
-            />
+            <input type="radio" name={`gen-${modalidad}`} checked={genero === g} onChange={() => setGenero(g)} />
             {g === 'separado' ? 'Masculino y Femenino' : 'Mixto'}
           </label>
         ))}
       </div>
 
-      {/* Cinturón */}
-      <fieldset className="mb-4">
-        <legend className="mb-1 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-          Categorías de cinturón
-        </legend>
-        {cinturones.map((c, i) => (
-          <div key={i} className="mb-2 rounded-lg border p-2" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center gap-2">
-              <input
-                value={c.valor}
-                placeholder="Nombre (ej. Principiantes)"
-                onChange={(e) =>
-                  setCinturones((cur) => cur.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)))
-                }
-                className="flex-1"
-              />
-              <button
-                onClick={() => setCinturones((cur) => cur.filter((_, j) => j !== i))}
-                className="rounded border px-2 py-1 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                Quitar
-              </button>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {GRUPOS_CINTURON.map((g) => (
-                <label key={g} className="flex items-center gap-1 text-xs">
-                  <input type="checkbox" checked={c.grupos.includes(g)} onChange={() => toggleGrupo(i, g)} />
-                  {g}
-                </label>
-              ))}
-            </div>
-          </div>
-        ))}
-        <button
-          onClick={() => setCinturones((cur) => [...cur, { valor: '', grupos: [] }])}
-          className="rounded border px-3 py-1 text-xs"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          + Categoría de cinturón
-        </button>
-      </fieldset>
-
-      {/* Edad y peso */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <RangoLista titulo="Rangos de edad (años)" filas={edades} setFilas={setEdades} />
-        <RangoLista titulo="Rangos de peso (kg)" filas={pesos} setFilas={setPesos} />
+      <EditorLista titulo="Cinturón" kind="cinturon" filas={cinturon} setFilas={setCinturon} />
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <EditorLista titulo="Edad (años)" kind="edad" filas={edad} setFilas={setEdad} />
+        <EditorLista titulo="Peso (kg)" kind="peso" filas={peso} setFilas={setPeso} />
       </div>
     </div>
   );
 }
 
-function RangoLista({
+function EditorLista({
   titulo,
+  kind,
   filas,
   setFilas,
 }: {
   titulo: string;
-  filas: RangoRow[];
-  setFilas: React.Dispatch<React.SetStateAction<RangoRow[]>>;
+  kind: Kind;
+  filas: Fila[];
+  setFilas: React.Dispatch<React.SetStateAction<Fila[]>>;
 }) {
+  const esCinturon = kind === 'cinturon';
+
+  function set(i: number, campo: keyof Fila, valor: string) {
+    setFilas((cur) => cur.map((f, j) => (j === i ? { ...f, [campo]: valor } : f)));
+  }
+
   return (
     <fieldset>
       <legend className="mb-1 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
         {titulo}
       </legend>
-      {filas.map((r, i) => (
-        <div key={i} className="mb-2 flex items-center gap-2">
-          <input
-            value={r.desde}
-            placeholder="desde"
-            onChange={(e) => setFilas((cur) => cur.map((x, j) => (j === i ? { ...x, desde: e.target.value } : x)))}
-            className="w-20"
-          />
-          <span style={{ color: 'var(--text-muted)' }}>–</span>
-          <input
-            value={r.hasta}
-            placeholder="hasta"
-            onChange={(e) => setFilas((cur) => cur.map((x, j) => (j === i ? { ...x, hasta: e.target.value } : x)))}
-            className="w-20"
-          />
+      {filas.map((f, i) => (
+        <div key={i} className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+          <select
+            value={f.tipo}
+            onChange={(e) => set(i, 'tipo', e.target.value)}
+            className="rounded border px-1 py-1"
+            style={{ borderColor: 'var(--border)', background: 'var(--bg-input, #0e0e18)', color: 'var(--text)' }}
+          >
+            <option value="individual">Individual</option>
+            <option value="rango">Rango</option>
+          </select>
+
+          {f.tipo === 'individual' ? (
+            <Campo esCinturon={esCinturon} value={f.valor} onChange={(v) => set(i, 'valor', v)} />
+          ) : (
+            <>
+              <Campo esCinturon={esCinturon} value={f.desde} onChange={(v) => set(i, 'desde', v)} />
+              <span style={{ color: 'var(--text-muted)' }}>–</span>
+              <Campo esCinturon={esCinturon} value={f.hasta} onChange={(v) => set(i, 'hasta', v)} />
+            </>
+          )}
+
           <button
             onClick={() => setFilas((cur) => cur.filter((_, j) => j !== i))}
             className="rounded border px-2 py-1 text-xs"
@@ -217,12 +168,47 @@ function RangoLista({
         </div>
       ))}
       <button
-        onClick={() => setFilas((cur) => [...cur, { desde: '', hasta: '' }])}
+        onClick={() => setFilas((cur) => [...cur, { tipo: 'individual', valor: '', desde: '', hasta: '' }])}
         className="rounded border px-3 py-1 text-xs"
         style={{ borderColor: 'var(--border)' }}
       >
-        + Rango
+        + {esCinturon ? 'Categoría de cinturón' : 'Rango'}
       </button>
     </fieldset>
+  );
+}
+
+function Campo({
+  esCinturon,
+  value,
+  onChange,
+}: {
+  esCinturon: boolean;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const estilo = {
+    borderColor: 'var(--border)',
+    background: 'var(--bg-input, #0e0e18)',
+    color: 'var(--text)',
+  } as const;
+  if (esCinturon) {
+    return (
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="rounded border px-1 py-1" style={estilo}>
+        <option value="">—</option>
+        {CINTURONES_ORDEN.map((c) => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+      </select>
+    );
+  }
+  return (
+    <input
+      type="number"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-20 rounded border px-2 py-1"
+      style={estilo}
+    />
   );
 }

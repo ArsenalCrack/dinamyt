@@ -19,6 +19,9 @@ import {
   calcularEdad,
   snapshotCombate,
   transicionValida,
+  validarDatosCampeonato,
+  validarCategorias,
+  normalizarCinturon,
   type Modalidad,
   type Genero,
   type GrupoCinturon,
@@ -33,6 +36,14 @@ import { requireScope, requireRole } from '../plugins/auth';
 interface CrearCampeonatoBody {
   nombre: string;
   descripcion?: string;
+  ubicacion?: string;
+  pais?: string;
+  ciudad?: string;
+  alcance?: string;
+  numTatamis?: number;
+  maxParticipantes?: number;
+  esPublico?: boolean;
+  codigo?: string;
   fechaInicio?: string;
   fechaFin?: string;
   costoBase?: string;
@@ -141,9 +152,17 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       const { id, modalidad } = req.params as { id: string; modalidad: Modalidad };
       const { categorias } = req.body as { categorias: CategoriasConfig };
       const db = req.server.db;
+
+      // Valida límites/solapamientos y normaliza los grupos de cinturón.
+      const errores = validarCategorias(categorias);
+      if (errores.length > 0) {
+        return reply.code(422).send({ error: 'Categorías inválidas.', detalles: errores });
+      }
+      const categoriasNorm = normalizarCinturon(categorias);
+
       const [upd] = await db
         .update(modalidadesCampeonato)
-        .set({ categorias })
+        .set({ categorias: categoriasNorm })
         .where(
           and(
             eq(modalidadesCampeonato.campeonatoId, id),
@@ -164,11 +183,34 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       const body = req.body as CrearCampeonatoBody;
       const db = req.server.db;
 
+      // Validación de límites (nombre, ubicación, ámbito, tatamis 1–12,
+      // participantes 2–10000, rango de fechas). Ver core/validacion.
+      const errores = validarDatosCampeonato({
+        nombre: body.nombre,
+        ubicacion: body.ubicacion,
+        alcance: body.alcance,
+        numTatamis: body.numTatamis,
+        maxParticipantes: body.maxParticipantes,
+        fechaInicio: body.fechaInicio,
+        fechaFin: body.fechaFin,
+      });
+      if (errores.length > 0) {
+        return reply.code(422).send({ error: 'Datos inválidos.', detalles: errores });
+      }
+
       const [camp] = await db
         .insert(campeonatos)
         .values({
           nombre: body.nombre,
           descripcion: body.descripcion ?? null,
+          ubicacion: body.ubicacion ?? null,
+          pais: body.pais ?? null,
+          ciudad: body.ciudad ?? null,
+          alcance: body.alcance ?? null,
+          numTatamis: body.numTatamis ?? 1,
+          maxParticipantes: body.maxParticipantes ?? null,
+          esPublico: body.esPublico ?? true,
+          codigo: body.codigo ?? null,
           fechaInicio: body.fechaInicio ?? null,
           fechaFin: body.fechaFin ?? null,
           costoBase: body.costoBase ?? '0',

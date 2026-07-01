@@ -93,13 +93,23 @@ export async function listCampeonatosAPI(): Promise<Campeonato[]> {
   return res.data as Campeonato[];
 }
 
-export async function crearCampeonatoAPI(data: {
+export interface CrearCampeonatoInput {
   nombre: string;
   descripcion?: string;
+  ubicacion?: string;
+  pais?: string;
+  ciudad?: string;
+  alcance?: string;
+  numTatamis?: number;
+  maxParticipantes?: number;
+  esPublico?: boolean;
+  codigo?: string;
   fechaInicio?: string;
+  fechaFin?: string;
   costoBase?: string;
   modalidades?: { modalidad: Modalidad; costoExtra?: string }[];
-}) {
+}
+export async function crearCampeonatoAPI(data: CrearCampeonatoInput) {
   const res = await api.post('/campeonatos', data);
   return res.data as Campeonato;
 }

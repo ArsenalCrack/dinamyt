@@ -5,3 +5,4 @@ export * from './saltos';
 export * from './combate';
 export * from './secciones';
 export * from './estados';
+export * from './validacion';
