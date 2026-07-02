@@ -160,13 +160,21 @@ suscripciones org/personales).
 
 Orden recomendado de lo que sigue:
 
-1. **Fase 4 (continuar) — en vivo estilo COMBAT**: portar `/juez` (puntuación
-   por réferi de esquina desde el móvil), `/tatami/[id]` (vista del tatami),
-   `BracketTree`/`LlavePanel`/`PodioLlave` (llaves visuales con avance), y
-   `/tablero` offline; figuras en vivo (paneles de 5-7 jueces); reconciliar
-   realtime (hoy `ws` crudo; COMBAT usa Socket.IO — mantener `ws`).
-   El acceso del juez debe gatearse con su asignación (`jueces_tatami.userEmail`
-   vs email del token).
+1. **Fase 4 (continuar) — en vivo estilo COMBAT**:
+   - ✅ *(2026-07-02)* `/juez` (home del juez: sus tatamis asignados, con cache
+     offline) y `/tatami/[id]` (panel del **juez de esquina**: columnas
+     HONG/CHUNG con técnicas +1 CUERPO / +2 GIRO-PAT. CABEZA / +3 GIRO CABEZA,
+     "mis puntos", crono de la mesa, deshacer). El **árbitro** es redirigido al
+     panel de mesa sobre la misma sala (`seccionId` en curso o `tatami-N`).
+     API: `GET /tatamis/mios` y `GET /tatamis/:id/actual` (guard `requireAuth`:
+     el acceso del juez ES su asignación por email). Mesa ajustada a COMBAT:
+     técnicas con nombre, especiales del central (Knock Down / Derribo /
+     Proyección +2), fijar nombres, nº de jueces, descalificar y cierre del
+     ganador. Verificado multi-dispositivo (esquina → WS → mesa).
+   - Pendiente: `BracketTree`/`LlavePanel`/`PodioLlave` (llaves visuales con
+     avance), `/tablero` offline, figuras en vivo (5-7 jueces), registro
+     offline de puntos del juez (COMBAT `PanelRegistroOffline`) y validar que
+     quien entra al tatami esté asignado (hoy se confía en el enlace).
 2. **Invitaciones** (cierre de Fase 2): email al competidor + aceptación
    eligiendo modalidades (RF de PROJECT).
 3. **Resultados de figuras/saltos** persistidos y visibles en la pantalla.

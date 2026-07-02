@@ -72,6 +72,7 @@ export function etiquetaRol(s: Sesion | null): string {
 
 /** Ruta de inicio según el rol tras iniciar sesión. */
 export function rutaInicio(s: Sesion | null): string {
-  if (esJuez(s)) return '/admin/combate';
+  // El juez va a su home de tatamis asignados (estilo COMBAT /juez).
+  if (esJuez(s)) return '/juez';
   return '/admin';
 }

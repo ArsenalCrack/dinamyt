@@ -53,9 +53,9 @@ export default function AdminPage() {
     }
     const s = getSesion();
     setSesion(s);
-    // El juez no gestiona: va directo a su panel de combate.
+    // El juez no gestiona: va a su home de tatamis asignados.
     if (esJuez(s)) {
-      router.replace('/admin/combate');
+      router.replace('/juez');
       return;
     }
     void cargar();

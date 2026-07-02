@@ -375,6 +375,35 @@ export interface Tatami {
   cola: ColaItem[];
 }
 
+// ── Panel del juez (estilo COMBAT /juez y /tatami/[id]) ─────────────────────
+export interface MiTatami {
+  tatamiId: string;
+  numero: number;
+  rolTatami: RolTatami;
+  campeonatoId: string;
+  campeonato: string;
+  estadoCampeonato: EstadoCampeonato;
+}
+/** Tatamis donde el admin me asignó como juez (por email del token). */
+export async function misTatamisAPI(): Promise<MiTatami[]> {
+  const res = await api.get('/tatamis/mios');
+  return res.data as MiTatami[];
+}
+
+export interface TatamiActual {
+  id: string;
+  numero: number;
+  estado: 'LIBRE' | 'OCUPADO';
+  campeonatoId: string;
+  seccionEnCurso: { seccionId: string; nombre: string; modalidad: Modalidad } | null;
+  jueces: JuezTatami[];
+}
+/** Estado actual del tatami: sección en curso + jueces asignados. */
+export async function tatamiActualAPI(tatamiId: string): Promise<TatamiActual> {
+  const res = await api.get(`/tatamis/${tatamiId}/actual`);
+  return res.data as TatamiActual;
+}
+
 /** Asigna (o reemplaza) el juez de un rol del tatami. */
 export async function asignarJuezAPI(
   tatamiId: string,

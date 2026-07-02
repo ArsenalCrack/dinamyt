@@ -7,7 +7,7 @@ import {
   colaTatami,
   juecesTatami,
 } from '@dinamyt/campeonatos-db';
-import { requireScope, requireRole } from '../plugins/auth';
+import { requireScope, requireRole, requireAuth } from '../plugins/auth';
 
 /**
  * Gestión de tatamis y su cola FIFO (§8.1) — lógica de DINAMYT-PROJECT:
@@ -376,6 +376,68 @@ export async function tatamisRoutes(app: FastifyInstance) {
       return reply.send(upd);
     },
   );
+
+  // ── Mis tatamis (home del juez, estilo COMBAT /juez) ───────────────────────
+  // Solo requiere token: el juez puede no tener suscripción propia; su acceso
+  // es la ASIGNACIÓN que le hizo el admin (jueces_tatami.userEmail).
+  app.get('/tatamis/mios', { preHandler: requireAuth() }, async (req) => {
+    const email = req.user!.email.toLowerCase();
+    return req.server.db
+      .select({
+        tatamiId: tatamis.id,
+        numero: tatamis.numero,
+        rolTatami: juecesTatami.rolTatami,
+        campeonatoId: campeonatos.id,
+        campeonato: campeonatos.nombre,
+        estadoCampeonato: campeonatos.estado,
+      })
+      .from(juecesTatami)
+      .innerJoin(tatamis, eq(juecesTatami.tatamiId, tatamis.id))
+      .innerJoin(campeonatos, eq(tatamis.campeonatoId, campeonatos.id))
+      .where(eq(juecesTatami.userEmail, email));
+  });
+
+  // ── Estado actual del tatami (para el panel del juez) ──────────────────────
+  app.get('/tatamis/:id/actual', { preHandler: requireAuth() }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const db = req.server.db;
+
+    const [tatami] = await db
+      .select()
+      .from(tatamis)
+      .where(eq(tatamis.id, id))
+      .limit(1);
+    if (!tatami) return reply.code(404).send({ error: 'Tatami no encontrado.' });
+
+    const [enCurso] = await db
+      .select({
+        seccionId: secciones.id,
+        nombre: secciones.nombre,
+        modalidad: secciones.modalidad,
+      })
+      .from(colaTatami)
+      .innerJoin(secciones, eq(colaTatami.seccionId, secciones.id))
+      .where(and(eq(colaTatami.tatamiId, id), eq(colaTatami.estado, 'EN_CURSO')))
+      .limit(1);
+
+    const jueces = await db
+      .select({
+        rolTatami: juecesTatami.rolTatami,
+        nombreDisplay: juecesTatami.nombreDisplay,
+        userEmail: juecesTatami.userEmail,
+      })
+      .from(juecesTatami)
+      .where(eq(juecesTatami.tatamiId, id));
+
+    return {
+      id: tatami.id,
+      numero: tatami.numero,
+      estado: tatami.estado,
+      campeonatoId: tatami.campeonatoId,
+      seccionEnCurso: enCurso ?? null,
+      jueces,
+    };
+  });
 
   // ── Jueces del tatami (espejo de COMBAT AsignacionJuez) ────────────────────
   const ROLES_TATAMI = ['arbitro', 'j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'j7'];

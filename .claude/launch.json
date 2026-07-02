@@ -18,6 +18,18 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dinamyt/campeonatos-web", "dev"],
       "port": 3003
+    },
+    {
+      "name": "ecosystem-portal",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/ecosystem-portal", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "campeonatos-combat",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/campeonatos-combat", "dev"],
+      "port": 3005
     }
   ]
 }
