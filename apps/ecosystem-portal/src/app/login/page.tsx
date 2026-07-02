@@ -28,7 +28,14 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
+      <Link href="/" className="flex flex-col items-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="DINAMYT" width={72} height={72} />
+        <span className="text-xl font-extrabold tracking-wide" style={{ color: 'var(--gold)' }}>
+          DINAMYT
+        </span>
+      </Link>
       <form
         onSubmit={onSubmit}
         className="w-full max-w-sm rounded-xl border p-6"

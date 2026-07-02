@@ -7,9 +7,71 @@ import {
   obtenerToken,
   misInscripcionesAPI,
   misInvitacionesAPI,
+  cambiarPasswordAPI,
+  extraerError,
   type MiInscripcion,
 } from '@/lib/api';
 import { getSesion, etiquetaRol, type Sesion } from '@/lib/session';
+
+/** Formulario de cambio de contraseña (la valida el ecosystem). */
+function CambiarPassword() {
+  const [actual, setActual] = useState('');
+  const [nueva, setNueva] = useState('');
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    setOcupado(true);
+    try {
+      await cambiarPasswordAPI(actual, nueva);
+      setMsg({ tipo: 'ok', texto: 'Contraseña actualizada.' });
+      setActual('');
+      setNueva('');
+    } catch (err) {
+      setMsg({ tipo: 'error', texto: extraerError(err, 'No se pudo cambiar la contraseña.') });
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="grid gap-3 p-4 sm:grid-cols-2">
+      <label className="block text-sm">
+        Contraseña actual
+        <input
+          type="password"
+          value={actual}
+          onChange={(e) => setActual(e.target.value)}
+          required
+          maxLength={100}
+          className="mt-1"
+        />
+      </label>
+      <label className="block text-sm">
+        Nueva contraseña (mín. 8)
+        <input
+          type="password"
+          value={nueva}
+          onChange={(e) => setNueva(e.target.value)}
+          required
+          minLength={8}
+          maxLength={100}
+          className="mt-1"
+        />
+      </label>
+      {msg && (
+        <p className={`text-sm sm:col-span-2 ${msg.tipo === 'ok' ? 'msg-ok' : 'msg-error'}`}>
+          {msg.texto}
+        </p>
+      )}
+      <button type="submit" disabled={ocupado} className="btn btn-gold sm:col-span-2">
+        {ocupado ? 'Guardando…' : 'Cambiar contraseña'}
+      </button>
+    </form>
+  );
+}
 
 const NOMBRE_MODALIDAD: Record<string, string> = {
   combate: 'Combate',
@@ -54,8 +116,20 @@ export default function PerfilPage() {
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8 sm:px-6">
       {/* ── Mi perfil ─────────────────────────────────────────────────── */}
       <section className="card mb-6 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Avatar con iniciales (foto de perfil: siguiente iteración) */}
+          <div
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-2xl font-extrabold"
+            style={{ background: 'var(--bg-elevated)', border: '2px solid var(--gold)', color: 'var(--gold)' }}
+          >
+            {(sesion.fullName || sesion.email)
+              .split(' ')
+              .map((p) => p[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold" style={{ color: 'var(--gold)' }}>
               {sesion.fullName || sesion.email}
             </h1>
@@ -65,6 +139,20 @@ export default function PerfilPage() {
           </div>
           <span className="badge badge-gold">{etiquetaRol(sesion)}</span>
         </div>
+
+        {/* Cambiar contraseña */}
+        <details className="desplegable mt-4">
+          <summary>🔐 Cambiar contraseña</summary>
+          <CambiarPassword />
+        </details>
+
+        {inscripciones.length === 0 && (
+          <p className="mt-4 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--gold-dim)', color: 'var(--text-muted)' }}>
+            ℹ Tu información de competidor (documento, nacimiento, cinturón,
+            peso, club) se completa al aceptar tu primera invitación o cuando
+            tu maestro te inscribe — sin esos datos no puedes quedar inscrito.
+          </p>
+        )}
         {sesion.role === 'coach' && (
           <p className="mt-3 text-sm" style={{ color: 'var(--text-muted)' }}>
             Como <strong>coach</strong> acompañas y representas a tus

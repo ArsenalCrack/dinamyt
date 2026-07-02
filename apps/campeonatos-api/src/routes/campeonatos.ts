@@ -360,6 +360,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
             id: t.id,
             numero: t.numero,
             estado: t.estado,
+            activo: t.activo,
             enCurso: enCurso ? { nombre: enCurso.nombre, modalidad: enCurso.modalidad } : null,
             enEspera: colas.filter(
               (c) => c.tatamiId === t.id && c.estado === 'EN_ESPERA',

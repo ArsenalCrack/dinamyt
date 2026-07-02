@@ -100,6 +100,26 @@ export class AuthService {
     return { access_token: token };
   }
 
+  // ── Cambiar contraseña (usuario autenticado, desde su perfil) ─────────────
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('Usuario no encontrado.');
+    const ok = await this.usersService.verifyPassword(
+      currentPassword,
+      user.passwordHash,
+    );
+    if (!ok) throw new UnauthorizedException('La contraseña actual no es correcta.');
+    if (!newPassword || newPassword.length < 8) {
+      throw new BadRequestException('La nueva contraseña debe tener al menos 8 caracteres.');
+    }
+    await this.usersService.updatePassword(userId, newPassword);
+    return { message: 'Contraseña actualizada.' };
+  }
+
   // ── Recuperar contraseña ──────────────────────────────────────────────────
   async forgotPassword(email: string) {
     const user = await this.usersService.findByEmail(email);

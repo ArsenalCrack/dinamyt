@@ -42,9 +42,6 @@ const NOMBRE_ROL: Record<RolTatami, string> = {
   j2: 'Juez 2',
   j3: 'Juez 3',
   j4: 'Juez 4',
-  j5: 'Juez 5',
-  j6: 'Juez 6',
-  j7: 'Juez 7',
 };
 
 /** Panel de jueces de un tatami: lista por rol + formulario de asignación. */

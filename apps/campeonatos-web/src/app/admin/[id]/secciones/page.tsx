@@ -161,7 +161,7 @@ export default function SeccionesPage() {
           </p>
           <div className="grid gap-2">
             {modalidades.map((m) => (
-              <details key={m.id} className="card p-0">
+              <details key={m.id} className="desplegable">
                 <summary
                   className="flex cursor-pointer items-center justify-between px-4 py-3 font-semibold"
                   style={{ listStyle: 'none' }}
@@ -186,7 +186,6 @@ export default function SeccionesPage() {
                           : 'Sin configurar'}
                     </span>
                   </span>
-                  <span style={{ color: 'var(--text-muted)' }}>▾</span>
                 </summary>
                 <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
                   <ConfigCategorias
@@ -265,16 +264,12 @@ export default function SeccionesPage() {
         {[...new Set(secciones.map((s) => s.modalidad))].map((mod) => {
           const deMod = secciones.filter((s) => s.modalidad === mod);
           return (
-            <details key={mod} className="card p-0" open={deMod.length <= 6}>
-              <summary
-                className="flex cursor-pointer items-center justify-between px-4 py-3 font-semibold"
-                style={{ listStyle: 'none' }}
-              >
+            <details key={mod} className="desplegable" open={deMod.length <= 6}>
+              <summary>
                 <span>
                   {mod.replaceAll('_', ' ')}
                   <span className="badge badge-gold ml-2">{deMod.length} secciones</span>
                 </span>
-                <span style={{ color: 'var(--text-muted)' }}>▾</span>
               </summary>
               <ul className="grid gap-2 border-t px-3 py-3 sm:grid-cols-2" style={{ borderColor: 'var(--border)' }}>
                 {deMod.map((s) => (

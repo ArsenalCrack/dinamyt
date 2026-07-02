@@ -142,7 +142,8 @@ export async function tatamisRoutes(app: FastifyInstance) {
   // ── Activar / desactivar un tatami (p. ej. se daña el área o sobra) ───────
   app.patch(
     '/tatamis/:id',
-    { preHandler: requireRole('campeonatos', ['admin']) },
+    // El juez central también puede activar/desactivar SU tatami.
+    { preHandler: requireRole('campeonatos', ['admin', 'judge']) },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const { activo } = req.body as { activo: boolean };
@@ -434,6 +435,7 @@ export async function tatamisRoutes(app: FastifyInstance) {
       .select({
         tatamiId: tatamis.id,
         numero: tatamis.numero,
+        activo: tatamis.activo,
         rolTatami: juecesTatami.rolTatami,
         campeonatoId: campeonatos.id,
         campeonato: campeonatos.nombre,
@@ -490,7 +492,8 @@ export async function tatamisRoutes(app: FastifyInstance) {
   });
 
   // ── Jueces del tatami (espejo de COMBAT AsignacionJuez) ────────────────────
-  const ROLES_TATAMI = ['arbitro', 'j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'j7'];
+  // Máximo 4 jueces de esquina por tatami (regla del combate).
+  const ROLES_TATAMI = ['arbitro', 'j1', 'j2', 'j3', 'j4'];
 
   app.put(
     '/tatamis/:id/jueces/:rol',

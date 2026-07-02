@@ -99,11 +99,8 @@ function InfoParticipantes({
           </div>
           <div className="grid gap-2">
             {filtradas.map((s) => (
-              <details key={s.id} className="rounded-lg border" style={{ borderColor: 'var(--border)' }}>
-                <summary
-                  className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-semibold"
-                  style={{ listStyle: 'none' }}
-                >
+              <details key={s.id} className="desplegable">
+                <summary className="text-sm">
                   <span className="min-w-0 truncate">{s.nombre}</span>
                   <span className="badge shrink-0">{s.competidores.length} competidores</span>
                 </summary>
@@ -324,11 +321,21 @@ export default function PantallaCampeonatoPage() {
           {apartado === 'tatamis' && (
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data.tatamis.map((t) => (
-              <article key={t.numero} className="card p-5">
+              <article
+                key={t.numero}
+                className="card p-5"
+                style={t.activo === false ? { opacity: 0.55 } : undefined}
+              >
                 <header className="mb-2 flex items-center justify-between">
                   <h2 className="text-xl font-bold">Tatami {t.numero}</h2>
-                  <span className={`badge ${t.estado === 'OCUPADO' ? 'badge-live' : 'badge-ok'}`}>
-                    {t.estado === 'OCUPADO' ? '● EN VIVO' : 'LIBRE'}
+                  <span
+                    className={`badge ${t.activo === false ? '' : t.estado === 'OCUPADO' ? 'badge-live' : 'badge-ok'}`}
+                  >
+                    {t.activo === false
+                      ? 'DESACTIVADO'
+                      : t.estado === 'OCUPADO'
+                        ? '● EN VIVO'
+                        : 'LIBRE'}
                   </span>
                 </header>
                 {t.enCurso ? (
@@ -348,13 +355,21 @@ export default function PantallaCampeonatoPage() {
                     En espera: {t.enEspera}
                   </p>
                 )}
-                <Link
-                  href={`/tatami/${t.id}?rol=pantalla`}
-                  className="btn btn-outline btn-sm mt-3"
-                  style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
-                >
-                  📺 Ver pantalla del tatami →
-                </Link>
+                {/* Separado de la info de arriba con su propia franja */}
+                {t.activo !== false && (
+                  <div
+                    className="mt-4 border-t pt-3"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <Link
+                      href={`/tatami/${t.id}?rol=pantalla`}
+                      className="btn btn-outline btn-sm w-full"
+                      style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+                    >
+                      📺 Ver pantalla del tatami →
+                    </Link>
+                  </div>
+                )}
               </article>
             ))}
             {data.tatamis.length === 0 && (

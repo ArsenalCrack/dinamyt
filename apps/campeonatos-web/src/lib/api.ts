@@ -48,6 +48,19 @@ export async function loginAPI(email: string, password: string) {
   return res.data as { access_token: string };
 }
 
+/** Cambia la contraseña de la cuenta (la valida el ecosystem). */
+export async function cambiarPasswordAPI(
+  currentPassword: string,
+  newPassword: string,
+) {
+  const res = await eco.post(
+    '/auth/change-password',
+    { currentPassword, newPassword },
+    { headers: { Authorization: `Bearer ${obtenerToken()}` } },
+  );
+  return res.data as { message: string };
+}
+
 // ── Tipos y catálogos (espejo de los enums del dominio) ──────────────────────
 export type EstadoCampeonato = 'BORRADOR' | 'LISTO' | 'EN_CURSO' | 'FINALIZADO';
 
@@ -243,6 +256,7 @@ export interface PantallaTatami {
   id: string;
   numero: number;
   estado: 'LIBRE' | 'OCUPADO';
+  activo?: boolean | null;
   enCurso: { nombre: string; modalidad: Modalidad } | null;
   enEspera: number;
 }
@@ -444,16 +458,8 @@ export interface ColaItem {
     estado: 'EN_ESPERA' | 'EN_CURSO' | 'FINALIZADA';
   };
 }
-export const ROLES_TATAMI = [
-  'arbitro',
-  'j1',
-  'j2',
-  'j3',
-  'j4',
-  'j5',
-  'j6',
-  'j7',
-] as const;
+/** Máximo 4 jueces de esquina por tatami + el juez central. */
+export const ROLES_TATAMI = ['arbitro', 'j1', 'j2', 'j3', 'j4'] as const;
 export type RolTatami = (typeof ROLES_TATAMI)[number];
 
 export interface JuezTatami {
@@ -481,6 +487,7 @@ export async function activarTatamiAPI(tatamiId: string, activo: boolean) {
 export interface MiTatami {
   tatamiId: string;
   numero: number;
+  activo: boolean | null;
   rolTatami: RolTatami;
   campeonatoId: string;
   campeonato: string;

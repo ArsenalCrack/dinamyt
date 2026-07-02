@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { listCampeonatosPublicoAPI, type CampeonatoPublico } from '@/lib/api';
-import { Logo } from '@/components/Logo';
 
 /**
  * Exploración pública (estilo DINAMYT-PROJECT): cualquier persona, SIN
@@ -42,15 +41,7 @@ export default function ExplorarCampeonatosPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <Link href="/">
-          <Logo size={40} />
-        </Link>
-        <Link href="/admin/login" className="btn btn-outline">
-          Iniciar sesión
-        </Link>
-      </header>
-
+      {/* La NavBar global ya trae logo y sesión: sin header duplicado. */}
       <h1 className="text-3xl font-bold" style={{ color: 'var(--gold)' }}>
         Campeonatos
       </h1>

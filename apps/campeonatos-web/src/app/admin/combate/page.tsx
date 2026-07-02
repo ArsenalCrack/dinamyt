@@ -54,13 +54,15 @@ export default function CombatePage() {
   const alertas = useAlertSystem();
   const router = useRouter();
 
-  // La MESA es del juez central (admin). Un juez de esquina va a su tatami.
+  // La MESA es del juez central: admin o rol judge (el árbitro asignado
+  // llega aquí desde su tatami). Competidores/coaches no tienen qué hacer acá.
   useEffect(() => {
     if (!obtenerToken()) {
       router.replace('/admin/login');
       return;
     }
-    if (!esAdmin(getSesion())) router.replace('/juez');
+    const s = getSesion();
+    if (!esAdmin(s) && s?.role !== 'judge') router.replace('/perfil');
   }, [router]);
   const [seccionId, setSeccionId] = useState<string | null>(null);
   const [guardarMsg, setGuardarMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);

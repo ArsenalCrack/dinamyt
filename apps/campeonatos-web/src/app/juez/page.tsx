@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { obtenerToken, misTatamisAPI, type MiTatami } from '@/lib/api';
+import { obtenerToken, misTatamisAPI, activarTatamiAPI, type MiTatami } from '@/lib/api';
 import { getSesion, type Sesion } from '@/lib/session';
 import { Logo } from '@/components/Logo';
 
@@ -97,14 +97,11 @@ export default function JuezPage() {
       {tatamis.length > 0 ? (
         <div className="flex flex-col gap-3">
           {tatamis.map((t) => (
-            <button
-              key={`${t.tatamiId}-${t.rolTatami}`}
-              onClick={() => router.push(`/tatami/${t.tatamiId}?rol=${t.rolTatami}`)}
-              className="card p-4 text-left transition hover:brightness-110"
-            >
+            <div key={`${t.tatamiId}-${t.rolTatami}`} className="card p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <span className="text-lg font-bold">Tatami {t.numero}</span>
+                  {t.activo === false && <span className="badge ml-2">DESACTIVADO</span>}
                   <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
                     {t.campeonato}
                   </div>
@@ -114,9 +111,32 @@ export default function JuezPage() {
                     {ROLES[t.rolTatami] ?? t.rolTatami}
                   </span>
                 </div>
-                <span className="btn btn-gold shrink-0">Entrar →</span>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <button
+                    onClick={() => router.push(`/tatami/${t.tatamiId}?rol=${t.rolTatami}`)}
+                    className="btn btn-gold"
+                  >
+                    Entrar →
+                  </button>
+                  {/* El JUEZ CENTRAL controla su tatami desde su dashboard. */}
+                  {t.rolTatami === 'arbitro' && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await activarTatamiAPI(t.tatamiId, t.activo === false);
+                          setTatamis(await misTatamisAPI());
+                        } catch {
+                          /* sin permiso o sin red: el estado no cambia */
+                        }
+                      }}
+                      className={`btn btn-sm ${t.activo === false ? 'btn-gold' : 'btn-danger'}`}
+                    >
+                      {t.activo === false ? 'Activar tatami' : 'Desactivar tatami'}
+                    </button>
+                  )}
+                </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       ) : (

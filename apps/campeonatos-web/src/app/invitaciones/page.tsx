@@ -186,7 +186,7 @@ export default function MisInvitacionesPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block text-sm">
                     Documento *
-                    <input value={documento} onChange={(e) => setDocumento(e.target.value)} required className="mt-1" />
+                    <input value={documento} onChange={(e) => setDocumento(e.target.value.replace(/\D/g, ''))} required maxLength={30} inputMode="numeric" placeholder="Solo números" className="mt-1" />
                   </label>
                   <label className="block text-sm">
                     Fecha de nacimiento *
@@ -214,7 +214,7 @@ export default function MisInvitacionesPage() {
                   </label>
                   <label className="block text-sm">
                     Academia / club
-                    <input value={academiaClub} onChange={(e) => setAcademiaClub(e.target.value)} className="mt-1" />
+                    <input value={academiaClub} onChange={(e) => setAcademiaClub(e.target.value)} maxLength={200} className="mt-1" />
                   </label>
                 </div>
 

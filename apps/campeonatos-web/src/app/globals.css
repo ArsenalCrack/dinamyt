@@ -153,6 +153,72 @@ input[type="radio"] {
   color: var(--ok);
 }
 
+/* ── NavBar responsive con media queries EXPLÍCITAS (a prueba de todo) ──── */
+/* En escritorio: enlaces en línea, hamburguesa y menú móvil NUNCA visibles. */
+.nav-desktop { display: none; }
+.nav-burger { display: inline-flex; }
+.nav-movil { display: block; }
+.nav-user { display: none; }
+@media (min-width: 768px) {
+  .nav-desktop { display: flex; }
+  .nav-burger { display: none !important; }
+  .nav-movil { display: none !important; }
+  .nav-user { display: flex; }
+}
+
+/* Animación de despliegue del menú móvil */
+@keyframes menu-abrir {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.nav-movil { animation: menu-abrir 0.15s ease; }
+
+/* ── Micro-animaciones globales (la app deja de sentirse estática) ──────── */
+@keyframes aparecer {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+main { animation: aparecer 0.25s ease; }
+.card {
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+a.card:hover, button.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  border-color: var(--gold-dim);
+}
+
+/* ── Menús desplegables unificados (estilo COMBAT PanelColapsable) ──────── */
+details.desplegable {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+details.desplegable > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+details.desplegable > summary::-webkit-details-marker { display: none; }
+details.desplegable > summary:hover { background: var(--bg-elevated); }
+details.desplegable > summary::after {
+  content: '▾';
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+details.desplegable[open] > summary::after { transform: rotate(180deg); }
+details.desplegable[open] > summary {
+  border-bottom: 1px solid var(--border);
+  color: var(--gold);
+}
+
 /* ── Botones de puntuación (mesa y jueces): feedback táctil visible ─────── */
 .btn-punto {
   transition: transform 0.08s ease, filter 0.12s ease, box-shadow 0.12s ease;

@@ -1,6 +1,9 @@
-import { Controller, Post, Body, Get, Headers } from '@nestjs/common';
+import { Controller, Post, Body, Get, Headers, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtTokenService } from './jwt.service';
+import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtPayload } from './jwt.service';
 
 @Controller('auth')
 export class AuthController {
@@ -32,6 +35,20 @@ export class AuthController {
   @Post('login')
   login(@Body() body: { email: string; password: string }) {
     return this.authService.login(body.email, body.password);
+  }
+
+  // ── POST /auth/change-password — cambiar contraseña (autenticado) ─────────
+  @Post('change-password')
+  @UseGuards(EcosystemJwtGuard)
+  changePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: { currentPassword: string; newPassword: string },
+  ) {
+    return this.authService.changePassword(
+      user.sub,
+      body.currentPassword,
+      body.newPassword,
+    );
   }
 
   @Post('forgot-password')

@@ -112,6 +112,20 @@ export function ConfigCategorias({
     peso: setPeso,
   };
 
+  // Validación EN VIVO de choques (duplicados, individual dentro de un rango,
+  // rangos solapados): se avisa al instante, sin esperar al Guardar. Solo se
+  // evalúan las filas completas (las "nueva" a medio llenar no chocan aún).
+  const erroresVivos = useMemo(() => {
+    const soloCompletas = (fs: Fila[]) => fs.filter(filaCompleta).map(aCategoria);
+    const cat: CategoriasConfig = {
+      genero,
+      ...(usa.cinturon ? { cinturon: soloCompletas(cinturon) } : {}),
+      ...(usa.edad ? { edad: soloCompletas(edad) } : {}),
+      ...(usa.peso ? { peso: soloCompletas(peso) } : {}),
+    };
+    return validarCategorias(cat);
+  }, [genero, cinturon, edad, peso, usa]);
+
   // ¿Hay cambios sin guardar? Se compara contra lo que vino del servidor.
   const sucio = useMemo(() => {
     const actual = JSON.stringify({
@@ -174,11 +188,31 @@ export function ConfigCategorias({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           {sucio && <span className="badge badge-gold">● Sin guardar</span>}
+          {erroresVivos.length > 0 && (
+            <span className="badge badge-live">⚠ {erroresVivos.length} choque(s)</span>
+          )}
         </span>
-        <button onClick={guardar} disabled={guardando || !sucio} className="btn btn-gold btn-sm">
+        <button
+          onClick={guardar}
+          disabled={guardando || !sucio || erroresVivos.length > 0}
+          className="btn btn-gold btn-sm"
+          title={erroresVivos.length > 0 ? 'Corrige los choques antes de guardar' : undefined}
+        >
           {sucio ? 'Guardar cambios' : 'Guardado ✓'}
         </button>
       </div>
+
+      {/* Choques detectados EN VIVO */}
+      {erroresVivos.length > 0 && (
+        <ul
+          className="mb-3 rounded-lg border p-2 text-xs"
+          style={{ borderColor: 'var(--danger)', color: 'var(--danger-soft)' }}
+        >
+          {erroresVivos.map((e, i) => (
+            <li key={i}>⚠ {e}</li>
+          ))}
+        </ul>
+      )}
 
       {errores.length > 0 && (
         <ul
