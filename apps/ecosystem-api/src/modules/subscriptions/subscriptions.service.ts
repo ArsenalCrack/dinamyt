@@ -8,6 +8,8 @@ import {
   subscriptions,
   organizations,
   subscriptionPlans,
+  userSubscriptions,
+  users,
 } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -34,6 +36,57 @@ export class SubscriptionsService {
       .returning();
 
     return result[0];
+  }
+
+  // ── Crear suscripción PERSONAL (por email del usuario) ────────────────────
+  // Para el caso "un usuario compra un plan solo para él" (p. ej. Academy):
+  // le da los apps_included del plan sin pasar por una organización.
+  async createForUser(data: {
+    userEmail: string;
+    planId: string;
+    startsAt: string;
+    endsAt: string;
+  }) {
+    const userResult = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, data.userEmail))
+      .limit(1);
+    if (!userResult[0]) {
+      throw new NotFoundException('No se encontró un usuario con ese correo.');
+    }
+    const result = await db
+      .insert(userSubscriptions)
+      .values({
+        userId: userResult[0].id,
+        planId: data.planId,
+        startsAt: new Date(data.startsAt),
+        endsAt: new Date(data.endsAt),
+        // status: default ACTIVE (schema)
+      })
+      .returning();
+    return result[0];
+  }
+
+  // ── Listar suscripciones personales (con usuario y plan) ──────────────────
+  async findAllPersonal() {
+    return db
+      .select({
+        id: userSubscriptions.id,
+        status: userSubscriptions.status,
+        startsAt: userSubscriptions.startsAt,
+        endsAt: userSubscriptions.endsAt,
+        userEmail: users.email,
+        userFullName: users.fullName,
+        planName: subscriptionPlans.name,
+        appsIncluded: subscriptionPlans.appsIncluded,
+      })
+      .from(userSubscriptions)
+      .innerJoin(users, eq(userSubscriptions.userId, users.id))
+      .innerJoin(
+        subscriptionPlans,
+        eq(userSubscriptions.planId, subscriptionPlans.id),
+      );
   }
 
   // ── Listar todas las suscripciones (con datos de org y plan) ──────────────

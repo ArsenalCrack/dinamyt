@@ -31,6 +31,28 @@ export class SubscriptionsController {
     return this.subsService.create(body);
   }
 
+  // ── POST /subscriptions/user — suscripción personal (solo super admin) ────
+  @Post('user')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  createForUser(
+    @Body()
+    body: {
+      userEmail: string;
+      planId: string;
+      startsAt: string;
+      endsAt: string;
+    },
+  ) {
+    return this.subsService.createForUser(body);
+  }
+
+  // ── GET /subscriptions/user — listar personales (solo super admin) ────────
+  @Get('user')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  findAllPersonal() {
+    return this.subsService.findAllPersonal();
+  }
+
   // ── GET /subscriptions — listar todas (solo super admin) ──────────────────
   @Get()
   @UseGuards(EcosystemJwtGuard, SuperAdminGuard)

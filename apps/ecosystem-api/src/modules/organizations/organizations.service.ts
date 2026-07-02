@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { db } from '../../db';
 import { organizations, orgMembers, users } from '../../db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 @Injectable()
 export class OrganizationsService {
@@ -105,6 +105,33 @@ export class OrganizationsService {
       .returning();
 
     return result[0];
+  }
+
+  // ── Cambiar el rol de un miembro ──────────────────────────────────────────
+  // El rol de la membresía es el que viaja en el JWT como role_campeonatos /
+  // role_academy cuando la org tiene una suscripción activa.
+  async updateMemberRole(orgId: string, userId: string, role: string) {
+    const result = await db
+      .update(orgMembers)
+      .set({ role })
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+      .returning();
+    if (!result[0]) {
+      throw new NotFoundException('Ese usuario no es miembro de la organización.');
+    }
+    return result[0];
+  }
+
+  // ── Quitar un miembro de la organización ──────────────────────────────────
+  async removeMember(orgId: string, userId: string) {
+    const result = await db
+      .delete(orgMembers)
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+      .returning();
+    if (!result[0]) {
+      throw new NotFoundException('Ese usuario no es miembro de la organización.');
+    }
+    return { ok: true };
   }
 
   // ── Listar miembros de una organización ───────────────────────────────────

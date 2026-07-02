@@ -75,7 +75,8 @@ export default function DashboardPage() {
         <h2 className="mb-4 text-lg font-semibold">Tus aplicaciones</h2>
 
         <div className="flex flex-col gap-3">
-          {payload.app_scopes.includes('campeonatos') && (
+          {(payload.is_super_admin ||
+            payload.app_scopes.includes('campeonatos')) && (
             <a
               href={CAMPEONATOS_URL}
               className="rounded-lg px-4 py-3 font-semibold"
@@ -85,7 +86,7 @@ export default function DashboardPage() {
               {payload.role_campeonatos ? ` (${payload.role_campeonatos})` : ''}
             </a>
           )}
-          {payload.app_scopes.includes('academy') && (
+          {(payload.is_super_admin || payload.app_scopes.includes('academy')) && (
             <a
               href={ACADEMY_URL}
               className="rounded-lg px-4 py-3 font-semibold"
@@ -94,7 +95,7 @@ export default function DashboardPage() {
               Entrar a Academy
             </a>
           )}
-          {payload.app_scopes.length === 0 && (
+          {!payload.is_super_admin && payload.app_scopes.length === 0 && (
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
               No tienes aplicaciones habilitadas todavía.{' '}
               <Link href="/planes" style={{ color: 'var(--gold)' }}>
@@ -104,6 +105,25 @@ export default function DashboardPage() {
           )}
         </div>
       </section>
+
+      {payload.is_super_admin && (
+        <section
+          className="mt-4 rounded-xl border p-5"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <h2 className="mb-1 text-lg font-semibold">Administración del ecosistema</h2>
+          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Organizaciones, miembros con su rol y suscripciones a planes.
+          </p>
+          <Link
+            href="/admin"
+            className="inline-block rounded-lg px-4 py-2 text-sm font-semibold"
+            style={{ background: 'var(--gold)', color: '#14141e' }}
+          >
+            Abrir panel de administración
+          </Link>
+        </section>
+      )}
     </main>
   );
 }

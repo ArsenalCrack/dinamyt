@@ -10,6 +10,11 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
   timeout: 60000,
 });
+api.interceptors.request.use((config) => {
+  const t = obtenerToken();
+  if (t) config.headers.Authorization = `Bearer ${t}`;
+  return config;
+});
 
 const TOKEN_KEY = 'dinamyt_token';
 const PENDING_USER_KEY = 'dinamyt_pending_user';
@@ -93,11 +98,97 @@ export async function listPlanesAPI(): Promise<Plan[]> {
   return res.data as Plan[];
 }
 
-/** Extrae el mensaje de error del backend (`{ error }`) o usa un fallback. */
+// ── Administración del ecosistema (solo super admin) ────────────────────────
+export interface Organizacion {
+  id: string;
+  name: string;
+  type: 'FEDERATION' | 'LEAGUE' | 'CLUB' | 'ACADEMY';
+  city: string | null;
+  country: string | null;
+}
+export interface Miembro {
+  memberId: string;
+  role: string;
+  userId: string;
+  email: string;
+  fullName: string;
+}
+export interface SuscripcionOrg {
+  id: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  totalAmount: string | null;
+  paidAmount: string | null;
+  paymentStatus: string;
+  orgId: string;
+  orgName: string;
+  planName: string;
+  appsIncluded: string[];
+}
+export interface SuscripcionPersonal {
+  id: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  userEmail: string;
+  userFullName: string;
+  planName: string;
+  appsIncluded: string[];
+}
+
+export const listOrganizacionesAPI = async (): Promise<Organizacion[]> =>
+  (await api.get('/organizations')).data;
+export const crearOrganizacionAPI = async (data: {
+  name: string;
+  type: Organizacion['type'];
+  city?: string;
+  country?: string;
+}): Promise<Organizacion> => (await api.post('/organizations', data)).data;
+export const listMiembrosAPI = async (orgId: string): Promise<Miembro[]> =>
+  (await api.get(`/organizations/${orgId}/members`)).data;
+export const invitarMiembroAPI = async (
+  orgId: string,
+  email: string,
+  role: string,
+) => (await api.post(`/organizations/${orgId}/invite`, { email, role })).data;
+export const cambiarRolMiembroAPI = async (
+  orgId: string,
+  userId: string,
+  role: string,
+) => (await api.patch(`/organizations/${orgId}/members/${userId}`, { role })).data;
+export const quitarMiembroAPI = async (orgId: string, userId: string) =>
+  (await api.delete(`/organizations/${orgId}/members/${userId}`)).data;
+export const listSuscripcionesAPI = async (): Promise<SuscripcionOrg[]> =>
+  (await api.get('/subscriptions')).data;
+export const crearSuscripcionOrgAPI = async (data: {
+  orgId: string;
+  planId: string;
+  startsAt: string;
+  endsAt: string;
+  totalAmount?: string;
+}) => (await api.post('/subscriptions', data)).data;
+export const activarSuscripcionAPI = async (id: string) =>
+  (await api.patch(`/subscriptions/${id}/status`, { status: 'ACTIVE' })).data;
+export const listSuscripcionesPersonalesAPI = async (): Promise<
+  SuscripcionPersonal[]
+> => (await api.get('/subscriptions/user')).data;
+export const crearSuscripcionPersonalAPI = async (data: {
+  userEmail: string;
+  planId: string;
+  startsAt: string;
+  endsAt: string;
+}) => (await api.post('/subscriptions/user', data)).data;
+
+/** Extrae el mensaje de error del backend ({error} propio o {message} de Nest). */
 export function extraerError(e: unknown, fallback: string): string {
   if (axios.isAxiosError(e)) {
-    const data = e.response?.data as { error?: string } | undefined;
-    return data?.error ?? fallback;
+    const data = e.response?.data as
+      | { error?: string; message?: string | string[] }
+      | undefined;
+    if (typeof data?.error === 'string') return data.error;
+    if (Array.isArray(data?.message)) return data.message.join(' ');
+    if (typeof data?.message === 'string') return data.message;
   }
   return fallback;
 }
