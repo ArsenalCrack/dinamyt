@@ -14,9 +14,13 @@ import {
   promoverColaAPI,
   robarColaAPI,
   quitarColaAPI,
+  asignarJuezAPI,
+  quitarJuezAPI,
   extraerError,
+  ROLES_TATAMI,
   type Tatami,
   type Seccion,
+  type RolTatami,
 } from '@/lib/api';
 import { getSesion, esAdmin } from '@/lib/session';
 
@@ -29,6 +33,142 @@ const NOMBRE_MODALIDAD: Record<string, string> = {
   salto_altura: 'Salto alto',
   salto_longitud: 'Salto largo',
 };
+
+/** Etiqueta legible de cada rol de juez del tatami. */
+const NOMBRE_ROL: Record<RolTatami, string> = {
+  arbitro: 'Árbitro central',
+  j1: 'Juez 1',
+  j2: 'Juez 2',
+  j3: 'Juez 3',
+  j4: 'Juez 4',
+  j5: 'Juez 5',
+  j6: 'Juez 6',
+  j7: 'Juez 7',
+};
+
+/** Panel de jueces de un tatami: lista por rol + formulario de asignación. */
+function JuecesTatami({
+  tatami,
+  ocupado,
+  onAsignar,
+  onQuitar,
+}: {
+  tatami: Tatami;
+  ocupado: boolean;
+  onAsignar: (rol: RolTatami, nombre: string, email?: string) => void;
+  onQuitar: (rol: RolTatami) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [rol, setRol] = useState<RolTatami>('arbitro');
+  const [nombre, setNombre] = useState('');
+  const [email, setEmail] = useState('');
+
+  const libres = ROLES_TATAMI.filter(
+    (r) => !tatami.jueces.some((j) => j.rolTatami === r),
+  );
+  // Si el rol elegido acaba de ser asignado, cae al primer rol libre.
+  const rolSel = libres.includes(rol) ? rol : libres[0];
+
+  function asignar() {
+    if (!nombre.trim() || !rolSel) return;
+    onAsignar(rolSel, nombre.trim(), email.trim() || undefined);
+    setNombre('');
+    setEmail('');
+  }
+
+  return (
+    <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
+      <button
+        onClick={() => setAbierto(!abierto)}
+        className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        <span>Jueces ({tatami.jueces.length})</span>
+        <span>{abierto ? '▲' : '▼'}</span>
+      </button>
+
+      {abierto && (
+        <div className="mt-2 flex flex-col gap-1.5">
+          {tatami.jueces.length === 0 && (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Sin jueces asignados.
+            </p>
+          )}
+          {[...tatami.jueces]
+            .sort(
+              (a, b) =>
+                ROLES_TATAMI.indexOf(a.rolTatami) - ROLES_TATAMI.indexOf(b.rolTatami),
+            )
+            .map((j) => (
+              <div
+                key={j.rolTatami}
+                className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-sm"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="badge badge-gold mr-1.5">{NOMBRE_ROL[j.rolTatami]}</span>
+                  {j.nombreDisplay}
+                  {j.userEmail && (
+                    <span className="ml-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      · {j.userEmail}
+                    </span>
+                  )}
+                </span>
+                <button
+                  onClick={() => onQuitar(j.rolTatami)}
+                  disabled={ocupado}
+                  className="btn btn-danger btn-sm shrink-0"
+                  title="Quitar asignación"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+
+          {libres.length > 0 && (
+            <div className="mt-1 grid gap-1.5">
+              <div className="grid grid-cols-2 gap-1.5">
+                <select
+                  value={rolSel}
+                  onChange={(e) => setRol(e.target.value as RolTatami)}
+                  className="text-sm"
+                >
+                  {libres.map((r) => (
+                    <option key={r} value={r}>
+                      {NOMBRE_ROL[r]}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  placeholder="Nombre *"
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex gap-1.5">
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email del ecosystem (opcional)"
+                  type="email"
+                  className="flex-1 text-sm"
+                />
+                <button
+                  onClick={asignar}
+                  disabled={ocupado || !nombre.trim()}
+                  className="btn btn-gold btn-sm shrink-0"
+                >
+                  + Asignar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Gestión del evento en vivo (lógica de DINAMYT-PROJECT): cada tatami tiene
@@ -158,13 +298,24 @@ export default function TatamisPage() {
                     En curso
                   </span>
                   <p className="text-sm font-semibold">{actual.seccion.nombre}</p>
-                  <button
-                    onClick={() => accion(() => finalizarTatamiAPI(t.id), 'No se pudo finalizar.')}
-                    disabled={ocupado}
-                    className="btn btn-gold btn-sm mt-2"
-                  >
-                    ✓ Finalizar sección
-                  </button>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {actual.seccion.modalidad === 'combate' && (
+                      <Link
+                        href={`/admin/combate?combate=${actual.seccion.id}&seccion=${actual.seccion.id}`}
+                        className="btn btn-outline btn-sm"
+                        title="Abrir el panel de juez de mesa de esta sección"
+                      >
+                        ⚔ Juez de mesa
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => accion(() => finalizarTatamiAPI(t.id), 'No se pudo finalizar.')}
+                      disabled={ocupado}
+                      className="btn btn-gold btn-sm"
+                    >
+                      ✓ Finalizar sección
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <button
@@ -249,6 +400,21 @@ export default function TatamisPage() {
                   </li>
                 ))}
               </ul>
+
+              {/* Jueces del tatami (modelo COMBAT: árbitro + j1..j7) */}
+              <JuecesTatami
+                tatami={t}
+                ocupado={ocupado}
+                onAsignar={(rol, nombre, email) =>
+                  accion(
+                    () => asignarJuezAPI(t.id, rol, { nombreDisplay: nombre, userEmail: email }),
+                    'No se pudo asignar el juez.',
+                  )
+                }
+                onQuitar={(rol) =>
+                  accion(() => quitarJuezAPI(t.id, rol), 'No se pudo quitar el juez.')
+                }
+              />
 
               {/* Historial del tatami */}
               {hechas.length > 0 && (

@@ -1,35 +1,17 @@
+/* eslint-disable @next/next/no-img-element */
 /**
- * Identidad visual de DINAMYT: rayo dorado (energía / impacto marcial) sobre
- * placa oscura. `LogoMark` es solo el símbolo; `Logo` añade el wordmark.
+ * Identidad visual de DINAMYT: el logo oficial (la "D" dorada con el
+ * pateador) es el mismo de DINAMYT-COMBAT (public/logo.png).
  */
 export function LogoMark({ size = 36 }: { size?: number }) {
   return (
-    <svg
+    <img
+      src="/logo.png"
+      alt="DINAMYT"
       width={size}
       height={size}
-      viewBox="0 0 48 48"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <rect x="1" y="1" width="46" height="46" rx="12" fill="#1c1c2a" />
-      <rect
-        x="1"
-        y="1"
-        width="46"
-        height="46"
-        rx="12"
-        stroke="#f0b800"
-        strokeWidth="2"
-      />
-      <path
-        d="M27 5 L13 27 h9 L19 43 L35 20 h-9 L31 5 Z"
-        fill="#f0b800"
-        stroke="#c99a00"
-        strokeWidth="1"
-        strokeLinejoin="round"
-      />
-    </svg>
+      style={{ display: 'inline-block', objectFit: 'contain' }}
+    />
   );
 }
 

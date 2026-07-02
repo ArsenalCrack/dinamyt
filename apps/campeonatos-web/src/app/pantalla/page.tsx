@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { listCampeonatosPublicoAPI, type CampeonatoPublico } from '@/lib/api';
 
 export default function PantallaPage() {
@@ -56,6 +57,13 @@ export default function PantallaPage() {
                 Inicio: {c.fechaInicio}
               </p>
             )}
+            <Link
+              href={`/pantalla/${c.id}`}
+              className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
+              style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+            >
+              Ver en vivo →
+            </Link>
           </li>
         ))}
       </ul>

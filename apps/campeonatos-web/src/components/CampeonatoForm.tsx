@@ -1,7 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { MODALIDADES, type Modalidad, type CrearCampeonatoInput } from '@/lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  MODALIDADES,
+  listPaisesAPI,
+  listCiudadesAPI,
+  type Modalidad,
+  type CrearCampeonatoInput,
+  type Pais,
+} from '@/lib/api';
 import { ALCANCES, LIMITES, validarDatosCampeonato } from '@dinamyt/campeonatos-core';
 
 /** Etiqueta legible de cada modalidad. */
@@ -86,6 +93,42 @@ export function CampeonatoForm({
   const [v, setV] = useState<CampeonatoFormValues>({ ...VACIO, ...inicial });
   const [errores, setErrores] = useState<string[]>([]);
 
+  // ── Catálogo geográfico: todos los países (nombre en español) y las
+  // ciudades del país elegido (datalist con búsqueda). Si la API no responde,
+  // los campos siguen funcionando como texto libre.
+  const [paises, setPaises] = useState<Pais[]>([]);
+  const [ciudades, setCiudades] = useState<string[]>([]);
+  const nombresEs = useMemo(() => {
+    try {
+      return new Intl.DisplayNames(['es'], { type: 'region' });
+    } catch {
+      return null;
+    }
+  }, []);
+  const paisesEs = useMemo(
+    () =>
+      paises
+        .map((p) => ({ ...p, nombre: nombresEs?.of(p.iso2) ?? p.nombre }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+    [paises, nombresEs],
+  );
+
+  useEffect(() => {
+    listPaisesAPI().then(setPaises).catch(() => setPaises([]));
+  }, []);
+
+  const paisIso = useMemo(
+    () => paisesEs.find((p) => p.nombre === v.pais)?.iso2 ?? null,
+    [paisesEs, v.pais],
+  );
+  useEffect(() => {
+    if (!paisIso) {
+      setCiudades([]);
+      return;
+    }
+    listCiudadesAPI(paisIso).then(setCiudades).catch(() => setCiudades([]));
+  }, [paisIso]);
+
   function set<K extends keyof CampeonatoFormValues>(k: K, val: CampeonatoFormValues[K]) {
     setV((cur) => ({ ...cur, [k]: val }));
   }
@@ -159,12 +202,30 @@ export function CampeonatoForm({
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block text-sm">
             País
-            <input
-              value={v.pais}
-              onChange={(e) => set('pais', e.target.value)}
-              maxLength={100}
-              className="mt-1"
-            />
+            {paisesEs.length > 0 ? (
+              <select
+                value={v.pais}
+                onChange={(e) => {
+                  set('pais', e.target.value);
+                  set('ciudad', '');
+                }}
+                className="mt-1"
+              >
+                <option value="">Selecciona…</option>
+                {paisesEs.map((p) => (
+                  <option key={p.iso2} value={p.nombre}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={v.pais}
+                onChange={(e) => set('pais', e.target.value)}
+                maxLength={100}
+                className="mt-1"
+              />
+            )}
           </label>
           <label className="block text-sm">
             Ciudad
@@ -173,7 +234,18 @@ export function CampeonatoForm({
               onChange={(e) => set('ciudad', e.target.value)}
               maxLength={100}
               className="mt-1"
+              list="ciudades-datalist"
+              placeholder={
+                ciudades.length > 0
+                  ? `Busca entre ${ciudades.length} ciudades…`
+                  : undefined
+              }
             />
+            <datalist id="ciudades-datalist">
+              {ciudades.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </label>
         </div>
         <label className="mt-3 block text-sm">

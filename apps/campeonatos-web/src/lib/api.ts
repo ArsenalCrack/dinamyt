@@ -234,6 +234,50 @@ export async function generarBracketAPI(seccionId: string) {
   return res.data;
 }
 
+// ── Pantalla pública: detalle en vivo de un campeonato ───────────────────────
+export interface PantallaTatami {
+  numero: number;
+  estado: 'LIBRE' | 'OCUPADO';
+  enCurso: { nombre: string; modalidad: Modalidad } | null;
+  enEspera: number;
+}
+export interface PantallaResultado {
+  seccion: string;
+  modalidad: Modalidad;
+  ganador: 'hong' | 'chung' | 'empate' | null;
+  marcadorHong: string | null;
+  marcadorChung: string | null;
+  hong: string | null;
+  creadoAt: string | null;
+}
+export interface PantallaDetalle {
+  campeonato: CampeonatoPublico & {
+    ubicacion: string | null;
+    ciudad: string | null;
+    pais: string | null;
+  };
+  tatamis: PantallaTatami[];
+  resultados: PantallaResultado[];
+}
+export async function pantallaAPI(campId: string): Promise<PantallaDetalle> {
+  const res = await api.get(`/campeonatos/${campId}/publico`);
+  return res.data as PantallaDetalle;
+}
+
+// ── Catálogo geográfico (país / ciudad) ──────────────────────────────────────
+export interface Pais {
+  iso2: string;
+  nombre: string;
+}
+export async function listPaisesAPI(): Promise<Pais[]> {
+  const res = await api.get('/geo/paises');
+  return res.data as Pais[];
+}
+export async function listCiudadesAPI(iso2: string): Promise<string[]> {
+  const res = await api.get('/geo/ciudades', { params: { pais: iso2 } });
+  return res.data as string[];
+}
+
 // ── Tatamis y cola FIFO (§8.1, lógica de DINAMYT-PROJECT) ────────────────────
 export interface ColaItem {
   id: string;
@@ -248,11 +292,45 @@ export interface ColaItem {
     estado: 'EN_ESPERA' | 'EN_CURSO' | 'FINALIZADA';
   };
 }
+export const ROLES_TATAMI = [
+  'arbitro',
+  'j1',
+  'j2',
+  'j3',
+  'j4',
+  'j5',
+  'j6',
+  'j7',
+] as const;
+export type RolTatami = (typeof ROLES_TATAMI)[number];
+
+export interface JuezTatami {
+  rolTatami: RolTatami;
+  nombreDisplay: string;
+  userEmail: string | null;
+}
+
 export interface Tatami {
   id: string;
   numero: number;
   estado: 'LIBRE' | 'OCUPADO';
+  jueces: JuezTatami[];
   cola: ColaItem[];
+}
+
+/** Asigna (o reemplaza) el juez de un rol del tatami. */
+export async function asignarJuezAPI(
+  tatamiId: string,
+  rol: RolTatami,
+  data: { nombreDisplay: string; userEmail?: string },
+) {
+  const res = await api.put(`/tatamis/${tatamiId}/jueces/${rol}`, data);
+  return res.data;
+}
+
+/** Quita la asignación de un rol del tatami. */
+export async function quitarJuezAPI(tatamiId: string, rol: RolTatami) {
+  await api.delete(`/tatamis/${tatamiId}/jueces/${rol}`);
 }
 
 /** Tatamis del campeonato con su cola (los materializa si aún no existen). */
