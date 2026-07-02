@@ -75,7 +75,19 @@ interface InscripcionBody {
   modalidades: Modalidad[];
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function campeonatosRoutes(app: FastifyInstance) {
+  // Las columnas uuid de Postgres lanzan 500 ante un id malformado; se corta
+  // antes (mismo guard que en las rutas de tatamis).
+  app.addHook('preValidation', async (req, reply) => {
+    const { id } = (req.params ?? {}) as { id?: string };
+    if (id !== undefined && !UUID_RE.test(id)) {
+      return reply.code(400).send({ error: 'Identificador inválido.' });
+    }
+  });
+
   // ── Público (pantalla de resultados): campeonatos en curso ───────────────
   app.get('/campeonatos/publico', async (req) => {
     return req.server.db
@@ -88,6 +100,87 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       })
       .from(campeonatos)
       .where(eq(campeonatos.estado, 'EN_CURSO'));
+  });
+
+  // ── Público (pantalla): detalle en vivo — tatamis + resultados ────────────
+  app.get('/campeonatos/:id/publico', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const db = req.server.db;
+
+    const [camp] = await db
+      .select({
+        id: campeonatos.id,
+        nombre: campeonatos.nombre,
+        estado: campeonatos.estado,
+        ubicacion: campeonatos.ubicacion,
+        ciudad: campeonatos.ciudad,
+        pais: campeonatos.pais,
+        fechaInicio: campeonatos.fechaInicio,
+        fechaFin: campeonatos.fechaFin,
+      })
+      .from(campeonatos)
+      .where(eq(campeonatos.id, id))
+      .limit(1);
+    if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+
+    // Tatamis con la sección en curso (si la hay).
+    const tats = await db
+      .select()
+      .from(tatamis)
+      .where(eq(tatamis.campeonatoId, id));
+    const colas = tats.length
+      ? await db
+          .select({
+            tatamiId: colaTatami.tatamiId,
+            estado: colaTatami.estado,
+            nombre: secciones.nombre,
+            modalidad: secciones.modalidad,
+          })
+          .from(colaTatami)
+          .innerJoin(secciones, eq(colaTatami.seccionId, secciones.id))
+          .where(
+            inArray(
+              colaTatami.tatamiId,
+              tats.map((t) => t.id),
+            ),
+          )
+      : [];
+
+    // Resultados: combates persistidos de las secciones del campeonato.
+    const resultados = await db
+      .select({
+        seccion: secciones.nombre,
+        modalidad: secciones.modalidad,
+        ganador: combates.ganador,
+        marcadorHong: combates.marcadorHong,
+        marcadorChung: combates.marcadorChung,
+        hong: competidores.nombreCompleto,
+        creadoAt: combates.createdAt,
+      })
+      .from(combates)
+      .innerJoin(secciones, eq(combates.seccionId, secciones.id))
+      .leftJoin(competidores, eq(combates.competidorHongId, competidores.id))
+      .where(eq(secciones.campeonatoId, id));
+
+    return {
+      campeonato: camp,
+      tatamis: tats
+        .sort((a, b) => a.numero - b.numero)
+        .map((t) => {
+          const enCurso = colas.find(
+            (c) => c.tatamiId === t.id && c.estado === 'EN_CURSO',
+          );
+          return {
+            numero: t.numero,
+            estado: t.estado,
+            enCurso: enCurso ? { nombre: enCurso.nombre, modalidad: enCurso.modalidad } : null,
+            enEspera: colas.filter(
+              (c) => c.tatamiId === t.id && c.estado === 'EN_ESPERA',
+            ).length,
+          };
+        }),
+      resultados,
+    };
   });
 
   // ── Listar todos (protegido) ─────────────────────────────────────────────

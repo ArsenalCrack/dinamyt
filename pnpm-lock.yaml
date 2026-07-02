@@ -29,6 +29,9 @@ importers:
       '@fastify/cors':
         specifier: ^10.0.0
         version: 10.1.0
+      country-state-city:
+        specifier: ^3.2.1
+        version: 3.2.1
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -2867,6 +2870,9 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  country-state-city@3.2.1:
+    resolution: {integrity: sha512-kxbanqMc6izjhc/EHkGPCTabSPZ2G6eG4/97akAYHJUN4stzzFEvQPZoF8oXDQ+10gM/O/yUmISCR1ZVxyb6EA==}
 
   create-require@1.1.1:
     resolution: {integrity: sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==}
@@ -7964,6 +7970,8 @@ snapshots:
       path-type: 4.0.0
     optionalDependencies:
       typescript: 5.9.3
+
+  country-state-city@3.2.1: {}
 
   create-require@1.1.1: {}
 
