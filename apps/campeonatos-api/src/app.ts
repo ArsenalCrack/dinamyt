@@ -8,6 +8,7 @@ import { healthRoutes } from './routes/health';
 import { campeonatosRoutes } from './routes/campeonatos';
 import { tatamisRoutes } from './routes/tatamis';
 import { geoRoutes } from './routes/geo';
+import { invitacionesRoutes } from './routes/invitaciones';
 
 export interface BuildAppDeps {
   /** Verificador de tokens. Por defecto usa el JWKS remoto del ecosystem;
@@ -31,6 +32,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(campeonatosRoutes);
   void app.register(tatamisRoutes);
   void app.register(geoRoutes);
+  void app.register(invitacionesRoutes);
 
   return app;
 }

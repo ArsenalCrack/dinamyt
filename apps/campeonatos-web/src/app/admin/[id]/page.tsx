@@ -1,15 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   inscribirAPI,
+  invitarAPI,
+  listInvitacionesAPI,
   extraerError,
   MODALIDADES,
   GRUPOS_CINTURON,
   GENEROS,
   type Modalidad,
+  type Invitacion,
 } from '@/lib/api';
 
 export default function InscribirPage() {
@@ -163,6 +166,95 @@ export default function InscribirPage() {
           {enviando ? 'Inscribiendo…' : 'Inscribir'}
         </button>
       </form>
+
+      <SeccionInvitaciones campId={campId} />
     </main>
+  );
+}
+
+/** Invitar competidores por email (aceptan in-app eligiendo modalidades). */
+function SeccionInvitaciones({ campId }: { campId: string }) {
+  const [email, setEmail] = useState('');
+  const [lista, setLista] = useState<Invitacion[]>([]);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  const cargar = useCallback(() => {
+    listInvitacionesAPI(campId)
+      .then(setLista)
+      .catch(() => setLista([]));
+  }, [campId]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  async function invitar(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    setOcupado(true);
+    try {
+      const inv = await invitarAPI(campId, email.trim());
+      setMsg({
+        tipo: 'ok',
+        texto: inv.correoEnviado
+          ? 'Invitación enviada por correo; también la verá al iniciar sesión.'
+          : 'Invitación creada: la verá al iniciar sesión (correo no configurado).',
+      });
+      setEmail('');
+      cargar();
+    } catch (err) {
+      setMsg({ tipo: 'error', texto: extraerError(err, 'No se pudo invitar.') });
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <section className="card mt-6 p-5">
+      <h2 className="mb-1 text-lg font-semibold">Invitar competidores</h2>
+      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+        El invitado recibe un correo y ve la invitación al entrar con su cuenta;
+        al aceptar completa sus datos y elige modalidades.
+      </p>
+      <form onSubmit={invitar} className="flex flex-wrap gap-2">
+        <input
+          type="email"
+          placeholder="email@competidor.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="min-w-0 flex-1"
+        />
+        <button type="submit" disabled={ocupado || !email.trim()} className="btn btn-gold">
+          + Invitar
+        </button>
+      </form>
+      {msg && (
+        <p className={`mt-2 text-sm ${msg.tipo === 'ok' ? 'msg-ok' : 'msg-error'}`}>
+          {msg.texto}
+        </p>
+      )}
+      {lista.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-1.5">
+          {lista.map((i) => (
+            <li
+              key={i.id}
+              className="flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <span className="truncate">{i.email}</span>
+              <span
+                className={`badge ${
+                  i.estado === 'ACEPTADA' ? 'badge-ok' : i.estado === 'PENDIENTE' ? 'badge-info' : ''
+                }`}
+              >
+                {i.estado}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

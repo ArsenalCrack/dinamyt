@@ -25,9 +25,12 @@ export default function HomePage() {
   const [enVivo, setEnVivo] = useState<CampeonatoVivo[]>([]);
 
   useEffect(() => {
+    // El endpoint público lista LISTO/EN_CURSO/FINALIZADO; aquí solo en vivo.
     fetch(`${CAMPEONATOS_API}/campeonatos/publico`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: CampeonatoVivo[]) => setEnVivo(data))
+      .then((data: CampeonatoVivo[]) =>
+        setEnVivo(data.filter((c) => c.estado === 'EN_CURSO')),
+      )
       .catch(() => setEnVivo([]));
   }, []);
 
@@ -73,10 +76,10 @@ export default function HomePage() {
             Crear cuenta gratis
           </Link>
           <a
-            href={`${CAMPEONATOS_URL}/pantalla`}
+            href={`${CAMPEONATOS_URL}/campeonatos`}
             className="btn btn-outline px-7 py-3 text-base"
           >
-            Ver resultados en vivo
+            Ver campeonatos y resultados
           </a>
         </div>
       </section>

@@ -22,7 +22,10 @@ describe('API campeonatos (integración con PGlite)', () => {
     db = (await createTestDb()) as unknown as Db;
   });
 
-  async function token(scopes: string[] = ['campeonatos']): Promise<string> {
+  async function token(
+    scopes: string[] = ['campeonatos'],
+    overrides: Partial<JwtPayload> = {},
+  ): Promise<string> {
     const payload: JwtPayload = {
       // sub del ecosystem siempre es UUID (createdByUserId es columna uuid).
       sub: '00000000-0000-0000-0000-000000000001',
@@ -33,6 +36,7 @@ describe('API campeonatos (integración con PGlite)', () => {
       role_academy: null,
       role_campeonatos: 'admin',
       is_super_admin: false,
+      ...overrides,
     };
     return new SignJWT({ ...payload })
       .setProtectedHeader({ alg: 'RS256' })
@@ -607,6 +611,103 @@ describe('API campeonatos (integración con PGlite)', () => {
       headers: auth,
     });
     expect(del2.statusCode).toBe(404);
+
+    await a.close();
+  });
+
+  it('invita por email y el competidor acepta eligiendo modalidades', async () => {
+    const a = app();
+    const auth = { authorization: `Bearer ${await token()}` };
+    // El competidor invitado NO necesita scope de campeonatos para responder.
+    const authCompe = {
+      authorization: `Bearer ${await token([], {
+        sub: '00000000-0000-0000-0000-000000000002',
+        email: 'Compe@dinamyt.com', // mayúscula a propósito: se normaliza.
+        fullName: 'Sofía Torres',
+        role_campeonatos: null,
+      })}`,
+    };
+
+    const crear = await a.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: auth,
+      payload: {
+        nombre: 'Copa Invitaciones',
+        costoBase: '20000',
+        modalidades: [{ modalidad: 'combate', costoExtra: '5000' }],
+      },
+    });
+    const campId = crear.json().id as string;
+
+    // Invitar (admin) — el correo es best-effort, no bloquea.
+    const inv = await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${campId}/invitaciones`,
+      headers: auth,
+      payload: { email: 'compe@dinamyt.com' },
+    });
+    expect(inv.statusCode).toBe(201);
+    const invId = inv.json().id as string;
+
+    // Duplicada → 422.
+    const dup = await a.inject({
+      method: 'POST',
+      url: `/campeonatos/${campId}/invitaciones`,
+      headers: auth,
+      payload: { email: 'COMPE@dinamyt.com' },
+    });
+    expect(dup.statusCode).toBe(422);
+
+    // El competidor la ve en "mis invitaciones" (in-app).
+    const mias = await a.inject({
+      method: 'GET',
+      url: '/invitaciones/mias',
+      headers: authCompe,
+    });
+    expect(mias.json()).toHaveLength(1);
+    expect(mias.json()[0].campeonato).toBe('Copa Invitaciones');
+
+    // Nadie más puede aceptarla.
+    const ajeno = await a.inject({
+      method: 'POST',
+      url: `/invitaciones/${invId}/aceptar`,
+      headers: auth,
+      payload: {
+        documento: '999',
+        fechaNacimiento: '2000-01-01',
+        genero: 'FEMENINO',
+        grupoCinturon: 'INTERMEDIO',
+        modalidades: ['combate'],
+      },
+    });
+    expect(ajeno.statusCode).toBe(403);
+
+    // Acepta: completa datos + elige modalidades → inscripción con monto.
+    const ok = await a.inject({
+      method: 'POST',
+      url: `/invitaciones/${invId}/aceptar`,
+      headers: authCompe,
+      payload: {
+        documento: '999',
+        fechaNacimiento: '2000-01-01',
+        genero: 'FEMENINO',
+        grupoCinturon: 'INTERMEDIO',
+        pesoActual: '58',
+        modalidades: ['combate'],
+      },
+    });
+    expect(ok.statusCode).toBe(201);
+    expect(ok.json().invitacion.estado).toBe('ACEPTADA');
+    expect(ok.json().inscripcion.montoTotal).toBe('25000.00');
+
+    // No se puede responder dos veces.
+    const otra = await a.inject({
+      method: 'POST',
+      url: `/invitaciones/${invId}/rechazar`,
+      headers: authCompe,
+    });
+    expect(otra.statusCode).toBe(422);
 
     await a.close();
   });

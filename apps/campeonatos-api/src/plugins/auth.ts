@@ -53,6 +53,25 @@ export function requireScope(scope: AppScope) {
 }
 
 /**
+ * preHandler que solo exige un token válido del ecosystem, SIN scope: para
+ * acciones de la persona sobre sí misma (p. ej. ver/aceptar sus invitaciones),
+ * donde el usuario puede no tener aún una suscripción de campeonatos.
+ */
+export function requireAuth() {
+  return async function (req: FastifyRequest, reply: FastifyReply) {
+    const auth = req.headers.authorization;
+    if (!auth?.startsWith('Bearer ')) {
+      return reply.code(401).send({ error: 'Token de autenticación requerido.' });
+    }
+    try {
+      req.user = await req.server.verifyToken(auth.slice(7));
+    } catch {
+      return reply.code(401).send({ error: 'Token inválido o expirado.' });
+    }
+  };
+}
+
+/**
  * preHandler que, además del scope, exige que el rol del usuario en Campeonatos
  * (`role_campeonatos`) esté entre `roles`. El super administrador pasa siempre.
  * Se apoya en `requireScope` para el token/scope y el 401/403 correspondientes.

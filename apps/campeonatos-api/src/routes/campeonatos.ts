@@ -88,18 +88,28 @@ export async function campeonatosRoutes(app: FastifyInstance) {
     }
   });
 
-  // ── Público (pantalla de resultados): campeonatos en curso ───────────────
+  // ── Público (explorar, estilo PROJECT): cualquier persona SIN registrarse
+  // ve los campeonatos públicos próximos (LISTO), en curso y finalizados.
+  // Los BORRADOR (aún configurándose) y los privados no se listan.
   app.get('/campeonatos/publico', async (req) => {
     return req.server.db
       .select({
         id: campeonatos.id,
         nombre: campeonatos.nombre,
         estado: campeonatos.estado,
+        ciudad: campeonatos.ciudad,
+        pais: campeonatos.pais,
+        alcance: campeonatos.alcance,
         fechaInicio: campeonatos.fechaInicio,
         fechaFin: campeonatos.fechaFin,
       })
       .from(campeonatos)
-      .where(eq(campeonatos.estado, 'EN_CURSO'));
+      .where(
+        and(
+          eq(campeonatos.esPublico, true),
+          inArray(campeonatos.estado, ['LISTO', 'EN_CURSO', 'FINALIZADO']),
+        ),
+      );
   });
 
   // ── Público (pantalla): detalle en vivo — tatamis + resultados ────────────
@@ -111,17 +121,33 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       .select({
         id: campeonatos.id,
         nombre: campeonatos.nombre,
+        descripcion: campeonatos.descripcion,
         estado: campeonatos.estado,
         ubicacion: campeonatos.ubicacion,
         ciudad: campeonatos.ciudad,
         pais: campeonatos.pais,
+        alcance: campeonatos.alcance,
+        costoBase: campeonatos.costoBase,
+        maxParticipantes: campeonatos.maxParticipantes,
         fechaInicio: campeonatos.fechaInicio,
         fechaFin: campeonatos.fechaFin,
+        esPublico: campeonatos.esPublico,
       })
       .from(campeonatos)
       .where(eq(campeonatos.id, id))
       .limit(1);
-    if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+    if (!camp || camp.esPublico === false || camp.estado === 'BORRADOR') {
+      return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+    }
+
+    // Modalidades habilitadas (qué se compite y su costo extra).
+    const mods = await db
+      .select({
+        modalidad: modalidadesCampeonato.modalidad,
+        costoExtra: modalidadesCampeonato.costoExtra,
+      })
+      .from(modalidadesCampeonato)
+      .where(eq(modalidadesCampeonato.campeonatoId, id));
 
     // Tatamis con la sección en curso (si la hay).
     const tats = await db
@@ -164,6 +190,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
 
     return {
       campeonato: camp,
+      modalidades: mods,
       tatamis: tats
         .sort((a, b) => a.numero - b.numero)
         .map((t) => {

@@ -55,6 +55,9 @@ export interface CampeonatoPublico {
   id: string;
   nombre: string;
   estado: EstadoCampeonato;
+  ciudad?: string | null;
+  pais?: string | null;
+  alcance?: string | null;
   fechaInicio: string | null;
   fechaFin: string | null;
 }
@@ -252,16 +255,70 @@ export interface PantallaResultado {
 }
 export interface PantallaDetalle {
   campeonato: CampeonatoPublico & {
+    descripcion: string | null;
     ubicacion: string | null;
     ciudad: string | null;
     pais: string | null;
+    alcance: string | null;
+    costoBase: string | null;
+    maxParticipantes: number | null;
   };
+  modalidades: { modalidad: Modalidad; costoExtra: string | null }[];
   tatamis: PantallaTatami[];
   resultados: PantallaResultado[];
 }
 export async function pantallaAPI(campId: string): Promise<PantallaDetalle> {
   const res = await api.get(`/campeonatos/${campId}/publico`);
   return res.data as PantallaDetalle;
+}
+
+// ── Invitaciones (flujo de PROJECT: email + aceptación in-app) ───────────────
+export interface Invitacion {
+  id: string;
+  email: string;
+  estado: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
+  createdAt: string | null;
+  correoEnviado?: boolean;
+}
+export interface MiInvitacion {
+  id: string;
+  estado: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
+  createdAt: string | null;
+  campeonatoId: string;
+  campeonato: string;
+  fechaInicio: string | null;
+  ciudad: string | null;
+  estadoCampeonato: EstadoCampeonato;
+}
+
+export async function invitarAPI(campId: string, email: string): Promise<Invitacion> {
+  const res = await api.post(`/campeonatos/${campId}/invitaciones`, { email });
+  return res.data as Invitacion;
+}
+export async function listInvitacionesAPI(campId: string): Promise<Invitacion[]> {
+  const res = await api.get(`/campeonatos/${campId}/invitaciones`);
+  return res.data as Invitacion[];
+}
+export async function misInvitacionesAPI(): Promise<MiInvitacion[]> {
+  const res = await api.get('/invitaciones/mias');
+  return res.data as MiInvitacion[];
+}
+export interface AceptarInvitacionInput {
+  documento: string;
+  fechaNacimiento: string;
+  genero: (typeof GENEROS)[number];
+  grupoCinturon: (typeof GRUPOS_CINTURON)[number];
+  pesoActual?: string;
+  academiaClub?: string;
+  modalidades: Modalidad[];
+}
+export async function aceptarInvitacionAPI(id: string, data: AceptarInvitacionInput) {
+  const res = await api.post(`/invitaciones/${id}/aceptar`, data);
+  return res.data;
+}
+export async function rechazarInvitacionAPI(id: string) {
+  const res = await api.post(`/invitaciones/${id}/rechazar`);
+  return res.data;
 }
 
 // ── Catálogo geográfico (país / ciudad) ──────────────────────────────────────

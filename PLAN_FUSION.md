@@ -113,8 +113,20 @@ namespace `/combate` (hoy el monorepo usa `ws` crudo).
     BORRADOR/LISTO; re-valida con el core, sincroniza tatamis —no reduce si hay
     cola— y modalidades —no quita si hay inscripciones—) + página
     `/admin/[id]/editar` que reusa el formulario compartido `CampeonatoForm`.
-  - **Pendiente de Fase 2**: inscripción por **invitación** (email + aceptación
-    del competidor eligiendo modalidades).
+  - **Invitaciones** ✅ *(2026-07-01, noche — confirmado por Amir: reales + in-app)*:
+    tabla `invitaciones` (migración 0003, única por campeonato+email); el
+    admin/coach invita por email (`POST /campeonatos/:id/invitaciones`, correo
+    real vía SMTP **best-effort** — sin `SMTP_HOST` queda solo in-app); el
+    competidor las ve al iniciar sesión (`GET /invitaciones/mias`, guard
+    `requireAuth` **sin scope**, badge de pendientes en el header) y al aceptar
+    completa datos + elige modalidades (validadas R1-R5 y contra las
+    habilitadas) → inscripción vinculada a su cuenta (`ecosystemUserId`).
+    Páginas: `/invitaciones` (competidor) + sección en `/admin/[id]`.
+  - **Vista pública sin registro** ✅ *(estilo PROJECT `/campeonatos` +
+    `details/:id`)*: `GET /campeonatos/publico` ahora lista LISTO/EN_CURSO/
+    FINALIZADO públicos (BORRADOR y privados no); el detalle público incluye
+    info general + modalidades; página `/campeonatos` (explorar agrupado por
+    estado) y `/pantalla/[id]` enriquecida con la ficha del evento.
 - **Fase 3 — Tatamis y flujo del evento** ✅ *(hecha 2026-07-01)*.
   - API (`routes/tatamis.ts`, con test de integración PGlite y verificación
     E2E contra el stack local): `GET /campeonatos/:id/tatamis` (tatamis + cola

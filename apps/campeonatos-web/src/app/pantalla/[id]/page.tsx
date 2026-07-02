@@ -71,6 +71,43 @@ export default function PantallaCampeonatoPage() {
 
       {data && (
         <>
+          {/* ── Información general (visible sin registro, estilo PROJECT) ── */}
+          <section className="card mb-6 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`badge ${data.campeonato.estado === 'EN_CURSO' ? 'badge-live' : data.campeonato.estado === 'FINALIZADO' ? 'badge-ok' : 'badge-info'}`}>
+                {data.campeonato.estado === 'EN_CURSO'
+                  ? '● EN CURSO'
+                  : data.campeonato.estado === 'LISTO'
+                    ? 'PRÓXIMO'
+                    : data.campeonato.estado}
+              </span>
+              {data.campeonato.alcance && <span className="badge">{data.campeonato.alcance}</span>}
+              {data.campeonato.fechaInicio && (
+                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {data.campeonato.fechaInicio}
+                  {data.campeonato.fechaFin &&
+                  data.campeonato.fechaFin !== data.campeonato.fechaInicio
+                    ? ` → ${data.campeonato.fechaFin}`
+                    : ''}
+                </span>
+              )}
+            </div>
+            {data.campeonato.descripcion && (
+              <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+                {data.campeonato.descripcion}
+              </p>
+            )}
+            {data.modalidades.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {data.modalidades.map((m) => (
+                  <span key={m.modalidad} className="badge badge-gold">
+                    {NOMBRE_MODALIDAD[m.modalidad] ?? m.modalidad}
+                  </span>
+                ))}
+              </div>
+            )}
+          </section>
+
           {/* ── Tatamis en vivo ────────────────────────────────────────── */}
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data.tatamis.map((t) => (

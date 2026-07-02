@@ -194,7 +194,11 @@ todos los datos (cinturón, peso, club, edad, nombre…).
 **Campeonatos**
 - [x] Endpoints + UI de gestión de tatamis y cola FIFO (hecho 2026-07-01, con
       robo de modalidades). Falta: resultados de figuras/saltos en vivo.
-- [ ] Inscripción por invitación (email + aceptación del competidor).
+- [x] Inscripción por invitación (2026-07-01 noche): correo real (SMTP
+      best-effort, ver `.env.example`) + in-app (`/invitaciones`, badge en el
+      header); acepta eligiendo modalidades → inscripción ligada a su cuenta.
+- [x] Vista pública sin registro (estilo PROJECT): `/campeonatos` (explorar) y
+      detalle público con info + modalidades + tatamis en vivo + resultados.
 - [ ] Evento en vivo estilo COMBAT (Fase 4): `/juez`, `/tatami/[id]`, `/tablero`,
       llaves visuales; enlazar el combate desde la cola del tatami.
 - [ ] Reportes Excel/PDF (ExcelJS) y PWA/offline.

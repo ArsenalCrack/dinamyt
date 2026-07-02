@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { cerrarSesion, obtenerToken } from '@/lib/api';
+import { cerrarSesion, obtenerToken, misInvitacionesAPI } from '@/lib/api';
 import { getSesion, esAdmin, etiquetaRol, type Sesion } from '@/lib/session';
 import { Logo } from './Logo';
 
@@ -15,9 +15,16 @@ export function AdminHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const [sesion, setSesion] = useState<Sesion | null>(null);
+  const [pendientes, setPendientes] = useState(0);
 
   useEffect(() => {
-    if (obtenerToken()) setSesion(getSesion());
+    if (obtenerToken()) {
+      setSesion(getSesion());
+      // Notificación in-app: nº de invitaciones pendientes de responder.
+      misInvitacionesAPI()
+        .then((invs) => setPendientes(invs.filter((i) => i.estado === 'PENDIENTE').length))
+        .catch(() => setPendientes(0));
+    }
   }, [pathname]);
 
   if (pathname === '/admin/login') return null;
@@ -26,6 +33,11 @@ export function AdminHeader() {
     { href: '/admin', etiqueta: 'Campeonatos', visible: true },
     { href: '/admin/combate', etiqueta: 'Juez de mesa', visible: true },
     { href: '/pantalla', etiqueta: 'Pantalla', visible: true },
+    {
+      href: '/invitaciones',
+      etiqueta: pendientes > 0 ? `Invitaciones (${pendientes})` : 'Invitaciones',
+      visible: true,
+    },
   ];
 
   function activo(href: string): boolean {

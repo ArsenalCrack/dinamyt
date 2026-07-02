@@ -21,8 +21,11 @@ export default function HomePage() {
       </div>
 
       <div className="flex flex-wrap justify-center gap-4">
-        <Link href="/pantalla" className="btn btn-gold px-6 py-3 text-base">
-          Pantalla pública
+        <Link href="/campeonatos" className="btn btn-gold px-6 py-3 text-base">
+          Ver campeonatos
+        </Link>
+        <Link href="/pantalla" className="btn btn-outline px-6 py-3 text-base">
+          Pantalla en vivo
         </Link>
         <Link href="/admin" className="btn btn-outline px-6 py-3 text-base">
           Panel de gestión
