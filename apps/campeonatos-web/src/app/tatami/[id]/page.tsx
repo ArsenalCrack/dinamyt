@@ -84,8 +84,48 @@ export default function TatamiJuezPage() {
     wsRef.current?.send(JSON.stringify(ev));
   }
 
+  // ── Registro local sin conexión (port de COMBAT PanelRegistroOffline):
+  // los puntos se guardan en el teléfono (sobreviven recargas) y luego se
+  // concilian con la mesa. Nunca se pierde un punto por un corte de red.
+  const claveOffline = `dinamyt_offline_${params.id}_${rol}`;
+  const [registroLocal, setRegistroLocal] = useState<
+    { etiqueta: string; color: 'hong' | 'chung'; pts: number; hora: string }[]
+  >([]);
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem(claveOffline);
+      if (guardado) setRegistroLocal(JSON.parse(guardado));
+    } catch {
+      /* sin registro previo */
+    }
+  }, [claveOffline]);
+  function guardarRegistro(entradas: typeof registroLocal) {
+    setRegistroLocal(entradas);
+    try {
+      localStorage.setItem(claveOffline, JSON.stringify(entradas));
+    } catch {
+      /* almacenamiento lleno: el estado en memoria sigue vivo */
+    }
+  }
+
   function anotar(color: 'hong' | 'chung', pts: number, label: string) {
-    if (!estado || cerrado) return;
+    if (cerrado) return;
+    // Sin conexión el punto NO se pierde: va al registro local del teléfono.
+    if (!conectado) {
+      guardarRegistro([
+        ...registroLocal,
+        {
+          etiqueta: `+${pts} ${label}`,
+          color,
+          pts,
+          hora: new Date().toLocaleTimeString('es', { hour12: false }),
+        },
+      ]);
+      setFlash(`📴 +${pts} guardado en el teléfono`);
+      setTimeout(() => setFlash(null), 900);
+      return;
+    }
+    if (!estado) return;
     enviar({ accion: 'punto_juez', juez: rol, color, pts, nombre: label });
     setFlash(`${color === 'hong' ? '🔴' : '🔵'} +${pts} JEUMSU`);
     setTimeout(() => setFlash(null), 900);
@@ -139,6 +179,45 @@ export default function TatamiJuezPage() {
         <p className="mb-2 truncate text-center text-xs" style={{ color: 'var(--text-muted)' }}>
           {tatami.seccionEnCurso.nombre}
         </p>
+      )}
+
+      {/* Registro local sin conexión (se concilia con la mesa al volver) */}
+      {(!conectado || registroLocal.length > 0) && (
+        <div
+          className="mb-2 rounded-lg border px-3 py-2 text-sm"
+          style={{
+            borderColor: conectado ? 'var(--ok)' : 'var(--hong)',
+            background: conectado ? 'rgba(62,207,142,0.06)' : 'rgba(232,0,42,0.08)',
+          }}
+        >
+          <p className="font-bold" style={{ color: conectado ? 'var(--ok)' : '#ff6680' }}>
+            {conectado
+              ? '✓ Conexión recuperada — muestra este registro a la mesa para conciliarlo y luego bórralo.'
+              : '📴 Sin conexión — tus puntos se guardan en este teléfono (sobreviven aunque recargues).'}
+          </p>
+          {registroLocal.length > 0 && (
+            <>
+              <ul className="mt-1.5 max-h-28 overflow-y-auto text-xs" style={{ color: 'var(--text-muted)' }}>
+                {registroLocal.map((r, i) => (
+                  <li key={i}>
+                    {r.hora} · {r.color === 'hong' ? '🔴 HONG' : '🔵 CHUNG'} {r.etiqueta}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => guardarRegistro(registroLocal.slice(0, -1))}
+                  className="btn btn-outline btn-sm"
+                >
+                  ↶ Deshacer última
+                </button>
+                <button onClick={() => guardarRegistro([])} className="btn btn-danger btn-sm">
+                  Borrar registro (conciliado)
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {/* Banners */}
@@ -196,7 +275,7 @@ export default function TatamiJuezPage() {
               <button
                 key={p.pts}
                 onClick={() => anotar(color, p.pts, p.label)}
-                disabled={!conectado || cerrado || rolInactivo}
+                disabled={cerrado || rolInactivo}
                 className="flex flex-1 flex-col items-center justify-center rounded-xl py-4 font-extrabold text-white transition active:scale-95 disabled:opacity-40"
                 style={{ background: color === 'hong' ? 'var(--hong)' : 'var(--chung)' }}
               >

@@ -9,6 +9,7 @@ import {
   type Color,
 } from '@dinamyt/campeonatos-core';
 import { guardarCombateAPI, obtenerToken, extraerError } from '@/lib/api';
+import { useAlertSystem, AlertOverlays } from '@/components/AlertSystem';
 
 const WS_URL = process.env.NEXT_PUBLIC_COMBAT_WS_URL || 'ws://localhost:3005';
 
@@ -48,6 +49,7 @@ export default function CombatePage() {
   const [juez, setJuez] = useState<'j1' | 'j2' | 'j3' | 'j4'>('j1');
   const [nombreHong, setNombreHong] = useState('');
   const [nombreChung, setNombreChung] = useState('');
+  const alertas = useAlertSystem();
   const [seccionId, setSeccionId] = useState<string | null>(null);
   const [guardarMsg, setGuardarMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -120,6 +122,32 @@ export default function CombatePage() {
 
   const marcador = estado ? calcularMarcador(estado) : null;
   const hayGanador = !!estado?.ganadorManualColor;
+
+  // Como en COMBAT: el ganador pendiente de cierre dispara el anuncio a
+  // pantalla completa; cerrarlo envía `cerrar_ganador` a la sala.
+  const { showGanador, clearGanador } = alertas;
+  useEffect(() => {
+    if (
+      estado?.ganadorPendienteCierre &&
+      estado.ganadorPendienteNombre &&
+      (estado.ganadorPendienteColor === 'hong' || estado.ganadorPendienteColor === 'chung')
+    ) {
+      showGanador({
+        nombre: estado.ganadorPendienteNombre,
+        color: estado.ganadorPendienteColor,
+        motivo: estado.ganadorPendienteMotivo,
+      });
+    } else if (!estado?.ganadorPendienteCierre) {
+      clearGanador();
+    }
+  }, [
+    estado?.ganadorPendienteCierre,
+    estado?.ganadorPendienteNombre,
+    estado?.ganadorPendienteColor,
+    estado?.ganadorPendienteMotivo,
+    showGanador,
+    clearGanador,
+  ]);
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-6 py-8">
@@ -197,16 +225,8 @@ export default function CombatePage() {
           </section>
 
           {/* Estado / banners */}
-          {estado.ganadorPendienteCierre && (
-            <section className="mb-4 rounded-lg border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--gold)' }}>
-              <p className="mb-2 font-semibold" style={{ color: 'var(--gold)' }}>
-                Ganador: {estado.ganadorPendienteNombre} — {estado.ganadorPendienteMotivo}
-              </p>
-              <button onClick={() => enviar({ accion: 'cerrar_ganador' })} className="rounded-lg px-3 py-1.5 text-sm font-semibold" style={gold}>
-                ✓ Cerrar combate
-              </button>
-            </section>
-          )}
+          {/* El ganador pendiente se anuncia con el modal a pantalla completa
+              (AlertOverlays); aquí no se repite el banner. */}
           {estado.oroPendienteAprobacion && (
             <section
               className="mb-4 rounded-lg border p-4"
@@ -352,7 +372,15 @@ export default function CombatePage() {
                   Declarar ganador
                 </button>
                 <button
-                  onClick={() => enviar({ accion: 'descalificar', color })}
+                  onClick={() =>
+                    alertas.showConfirm({
+                      titulo: 'DESCALIFICAR',
+                      mensaje: `¿Descalificar a ${color === 'hong' ? estado.nombreHong : estado.nombreChung}? El rival gana el combate.`,
+                      tipo: 'peligro',
+                      confirmLabel: 'Descalificar',
+                      onConfirm: () => enviar({ accion: 'descalificar', color }),
+                    })
+                  }
                   disabled={hayGanador}
                   className="rounded-lg border py-2 text-sm font-semibold"
                   style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
@@ -364,7 +392,19 @@ export default function CombatePage() {
           </section>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button onClick={() => enviar({ accion: 'reset' })} className="rounded-lg border px-4 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+            <button
+              onClick={() =>
+                alertas.showConfirm({
+                  titulo: 'NUEVO COMBATE',
+                  mensaje: 'Se borra el marcador, el historial y el crono de esta sala. ¿Continuar?',
+                  tipo: 'peligro',
+                  confirmLabel: 'Reset',
+                  onConfirm: () => enviar({ accion: 'reset' }),
+                })
+              }
+              className="rounded-lg border px-4 py-2 text-sm"
+              style={{ borderColor: 'var(--border)' }}
+            >
               Nuevo combate (reset)
             </button>
             {seccionId && hayGanador && (
@@ -386,6 +426,17 @@ export default function CombatePage() {
           )}
         </>
       )}
+
+      <AlertOverlays
+        confirmData={alertas.confirmData}
+        ganadorData={alertas.ganadorData}
+        onCloseConfirm={alertas.clearConfirm}
+        onCloseGanador={() => {
+          // Como en COMBAT: cerrar el anuncio confirma el cierre del combate.
+          if (estadoRef.current?.ganadorPendienteCierre) enviar({ accion: 'cerrar_ganador' });
+          alertas.clearGanador();
+        }}
+      />
     </main>
   );
 }
