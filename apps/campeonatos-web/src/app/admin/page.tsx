@@ -12,7 +12,14 @@ import {
   type Campeonato,
   type EstadoCampeonato,
 } from '@/lib/api';
-import { getSesion, esAdmin, esJuez, puedeInscribir, type Sesion } from '@/lib/session';
+import {
+  getSesion,
+  esAdmin,
+  esJuez,
+  esUsuarioComun,
+  puedeInscribir,
+  type Sesion,
+} from '@/lib/session';
 
 /** Estilo del badge según el estado del ciclo de vida. */
 function badgeEstado(e: EstadoCampeonato): string {
@@ -58,6 +65,11 @@ export default function AdminPage() {
       router.replace('/juez');
       return;
     }
+    // Competidor y coach (título) no gestionan: van a su perfil.
+    if (esUsuarioComun(s)) {
+      router.replace('/perfil');
+      return;
+    }
     void cargar();
   }, [router, cargar]);
 
@@ -80,7 +92,9 @@ export default function AdminPage() {
             Campeonatos
           </h1>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Crea, configura y dirige los eventos de tu organización.
+            {esAdmin(sesion)
+              ? 'Crea, configura y dirige los eventos de tu organización.'
+              : 'Inscribe e invita a tus competidores a los campeonatos.'}
           </p>
         </div>
         {esAdmin(sesion) && (
@@ -140,6 +154,11 @@ export default function AdminPage() {
                       Editar
                     </Link>
                   )}
+                {esAdmin(sesion) && (
+                  <Link href={`/admin/${c.id}/inscripciones`} className="btn btn-outline btn-sm">
+                    Revisión
+                  </Link>
+                )}
                 {esAdmin(sesion) && (
                   <Link href={`/admin/${c.id}/secciones`} className="btn btn-outline btn-sm">
                     Secciones

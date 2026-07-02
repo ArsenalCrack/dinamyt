@@ -16,6 +16,7 @@ import {
   quitarColaAPI,
   asignarJuezAPI,
   quitarJuezAPI,
+  activarTatamiAPI,
   extraerError,
   ROLES_TATAMI,
   type Tatami,
@@ -281,10 +282,35 @@ export default function TatamisPage() {
           const hechas = t.cola.filter((i) => i.estado === 'FINALIZADA');
           return (
             <article key={t.id} className="card flex flex-col p-4">
-              <header className="mb-3 flex items-center justify-between">
+              <header className="mb-3 flex items-center justify-between gap-2">
                 <h2 className="text-lg font-bold">Tatami {t.numero}</h2>
-                <span className={`badge ${t.estado === 'OCUPADO' ? 'badge-live' : 'badge-ok'}`}>
-                  {t.estado === 'OCUPADO' ? '● EN VIVO' : 'LIBRE'}
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className={`badge ${t.activo === false ? '' : t.estado === 'OCUPADO' ? 'badge-live' : 'badge-ok'}`}
+                  >
+                    {t.activo === false
+                      ? 'DESACTIVADO'
+                      : t.estado === 'OCUPADO'
+                        ? '● EN VIVO'
+                        : 'LIBRE'}
+                  </span>
+                  <button
+                    onClick={() =>
+                      accion(
+                        () => activarTatamiAPI(t.id, t.activo === false),
+                        'No se pudo cambiar el estado del tatami.',
+                      )
+                    }
+                    disabled={ocupado}
+                    className={`btn btn-sm ${t.activo === false ? 'btn-gold' : 'btn-danger'}`}
+                    title={
+                      t.activo === false
+                        ? 'Volver a activar este tatami'
+                        : 'Desactivar (no aceptará ni iniciará secciones)'
+                    }
+                  >
+                    {t.activo === false ? 'Activar' : 'Desactivar'}
+                  </button>
                 </span>
               </header>
 

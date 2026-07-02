@@ -49,7 +49,7 @@ export async function invitacionesRoutes(app: FastifyInstance) {
   // ── Invitar a un competidor por email (admin/coach) ───────────────────────
   app.post(
     '/campeonatos/:id/invitaciones',
-    { preHandler: requireRole('campeonatos', ['admin', 'coach']) },
+    { preHandler: requireRole('campeonatos', ['admin', 'maestro']) },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const { email } = req.body as { email: string };
@@ -106,7 +106,7 @@ export async function invitacionesRoutes(app: FastifyInstance) {
   // ── Invitaciones de un campeonato (admin/coach) ────────────────────────────
   app.get(
     '/campeonatos/:id/invitaciones',
-    { preHandler: requireRole('campeonatos', ['admin', 'coach']) },
+    { preHandler: requireRole('campeonatos', ['admin', 'maestro']) },
     async (req) => {
       const { id } = req.params as { id: string };
       return req.server.db

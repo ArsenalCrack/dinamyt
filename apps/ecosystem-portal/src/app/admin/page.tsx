@@ -27,7 +27,8 @@ import {
 } from '@/lib/api';
 
 /** Roles de membresía que viajan al JWT (role_campeonatos / role_academy). */
-const ROLES = ['admin', 'coach', 'judge', 'competitor', 'member'] as const;
+/** admin gestiona · maestro inscribe · coach es un título · judge puntúa. */
+const ROLES = ['admin', 'maestro', 'coach', 'judge', 'competitor', 'member'] as const;
 const TIPOS_ORG = ['FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY'] as const;
 
 /**

@@ -8,7 +8,9 @@ import {
   type EventoCombate,
   type Color,
 } from '@dinamyt/campeonatos-core';
+import { useRouter } from 'next/navigation';
 import { guardarCombateAPI, obtenerToken, extraerError } from '@/lib/api';
+import { getSesion, esAdmin } from '@/lib/session';
 import { useAlertSystem, AlertOverlays } from '@/components/AlertSystem';
 
 const WS_URL = process.env.NEXT_PUBLIC_COMBAT_WS_URL || 'ws://localhost:3005';
@@ -50,6 +52,16 @@ export default function CombatePage() {
   const [nombreHong, setNombreHong] = useState('');
   const [nombreChung, setNombreChung] = useState('');
   const alertas = useAlertSystem();
+  const router = useRouter();
+
+  // La MESA es del juez central (admin). Un juez de esquina va a su tatami.
+  useEffect(() => {
+    if (!obtenerToken()) {
+      router.replace('/admin/login');
+      return;
+    }
+    if (!esAdmin(getSesion())) router.replace('/juez');
+  }, [router]);
   const [seccionId, setSeccionId] = useState<string | null>(null);
   const [guardarMsg, setGuardarMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -305,8 +317,17 @@ export default function CombatePage() {
             </label>
           </section>
 
-          {/* Réferi de esquina (la mesa puede anotar por cualquiera) */}
-          <section className="mb-4 rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          {/* Modo de emergencia: anotar POR los réferis. Solo debe usarse
+              cuando los jueces de esquina pierden conexión (sin internet);
+              en operación normal cada juez puntúa desde su teléfono. */}
+          <details className="mb-4 rounded-xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <summary
+              className="cursor-pointer px-4 py-3 text-sm font-semibold"
+              style={{ color: 'var(--text-muted)', listStyle: 'none' }}
+            >
+              📴 Anotar por los réferis (solo si los jueces perdieron conexión) ▾
+            </summary>
+            <section className="border-t p-4" style={{ borderColor: 'var(--border)' }}>
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Réferi:</span>
               {(['j1', 'j2', 'j3', 'j4'] as const).map((j) => (
@@ -345,7 +366,8 @@ export default function CombatePage() {
                 </div>
               ))}
             </div>
-          </section>
+            </section>
+          </details>
 
           {/* Juez central: especiales, faltas y decisiones (estilo COMBAT) */}
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -47,9 +47,19 @@ export function esJuez(s: Sesion | null): boolean {
   return !!s && !s.isSuperAdmin && s.role === 'judge';
 }
 
-/** Admin y coach pueden inscribir competidores. */
+/** Admin y MAESTRO del club inscriben/invitan competidores.
+ *  El coach es solo un TÍTULO dentro del campeonato: no gestiona. */
 export function puedeInscribir(s: Sesion | null): boolean {
-  return !!s && (s.isSuperAdmin || s.role === 'admin' || s.role === 'coach');
+  return !!s && (s.isSuperAdmin || s.role === 'admin' || s.role === 'maestro');
+}
+
+/** Competidor o coach (título): usuarios sin funciones de gestión. */
+export function esUsuarioComun(s: Sesion | null): boolean {
+  return (
+    !!s &&
+    !s.isSuperAdmin &&
+    (s.role === 'competitor' || s.role === 'coach' || s.role === null)
+  );
 }
 
 /** Etiqueta legible del rol para la UI. */
@@ -59,8 +69,10 @@ export function etiquetaRol(s: Sesion | null): string {
   switch (s.role) {
     case 'admin':
       return 'Administrador';
+    case 'maestro':
+      return 'Maestro';
     case 'coach':
-      return 'Entrenador';
+      return 'Coach';
     case 'competitor':
       return 'Competidor';
     case 'judge':
@@ -74,5 +86,7 @@ export function etiquetaRol(s: Sesion | null): string {
 export function rutaInicio(s: Sesion | null): string {
   // El juez va a su home de tatamis asignados (estilo COMBAT /juez).
   if (esJuez(s)) return '/juez';
+  // Competidor y coach van a su perfil, no a la gestión.
+  if (esUsuarioComun(s)) return '/perfil';
   return '/admin';
 }

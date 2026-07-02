@@ -139,6 +139,42 @@ export async function tatamisRoutes(app: FastifyInstance) {
     },
   );
 
+  // ── Activar / desactivar un tatami (p. ej. se daña el área o sobra) ───────
+  app.patch(
+    '/tatamis/:id',
+    { preHandler: requireRole('campeonatos', ['admin']) },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const { activo } = req.body as { activo: boolean };
+      if (typeof activo !== 'boolean') {
+        return reply.code(422).send({ error: 'Falta el campo booleano "activo".' });
+      }
+      const db = req.server.db;
+
+      // No se desactiva con una sección EN CURSO (primero se finaliza o roba).
+      if (!activo) {
+        const enCurso = await db
+          .select({ id: colaTatami.id })
+          .from(colaTatami)
+          .where(and(eq(colaTatami.tatamiId, id), eq(colaTatami.estado, 'EN_CURSO')))
+          .limit(1);
+        if (enCurso[0]) {
+          return reply
+            .code(422)
+            .send({ error: 'El tatami tiene una sección en curso: finalízala antes.' });
+        }
+      }
+
+      const [upd] = await db
+        .update(tatamis)
+        .set({ activo })
+        .where(eq(tatamis.id, id))
+        .returning();
+      if (!upd) return reply.code(404).send({ error: 'Tatami no encontrado.' });
+      return reply.send(upd);
+    },
+  );
+
   // ── Encolar una sección al final de la cola de un tatami ──────────────────
   app.post(
     '/tatamis/:id/cola',
@@ -157,6 +193,9 @@ export async function tatamisRoutes(app: FastifyInstance) {
         .where(eq(tatamis.id, id))
         .limit(1);
       if (!tatami) return reply.code(404).send({ error: 'Tatami no encontrado.' });
+      if (tatami.activo === false) {
+        return reply.code(422).send({ error: 'El tatami está desactivado.' });
+      }
 
       const [sec] = await db
         .select()
@@ -211,6 +250,15 @@ export async function tatamisRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const db = req.server.db;
+
+      const [tatamiIni] = await db
+        .select({ activo: tatamis.activo })
+        .from(tatamis)
+        .where(eq(tatamis.id, id))
+        .limit(1);
+      if (tatamiIni?.activo === false) {
+        return reply.code(422).send({ error: 'El tatami está desactivado.' });
+      }
 
       const enCurso = await db
         .select({ id: colaTatami.id })

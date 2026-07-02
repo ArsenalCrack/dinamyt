@@ -17,6 +17,7 @@ import {
   type CategoriasConfig,
 } from '@/lib/api';
 import { ConfigCategorias } from './ConfigCategorias';
+import { getSesion, esAdmin } from '@/lib/session';
 
 export default function SeccionesPage() {
   const router = useRouter();
@@ -68,6 +69,11 @@ export default function SeccionesPage() {
   useEffect(() => {
     if (!obtenerToken()) {
       router.replace('/admin/login');
+      return;
+    }
+    // Secciones y llaves son SOLO del administrador (la API también lo exige).
+    if (!esAdmin(getSesion())) {
+      router.replace('/admin');
       return;
     }
     void cargar();
@@ -200,10 +206,17 @@ export default function SeccionesPage() {
           disabled={ocupado}
           className="rounded-lg border px-4 py-2 text-sm font-semibold"
           style={{ borderColor: 'var(--border)' }}
-          title="Coloca cada inscripción en la sección que le corresponde por cinturón, edad, peso y género"
+          title="Toma TODAS las inscripciones ya aprobadas y las coloca en su sección por cinturón, edad, peso y género (útil si generaste las secciones después de aprobar)"
         >
-          Paso 3 · Asignar inscripciones
+          Paso 3 · Colocar aprobados en sus llaves
         </button>
+        <Link
+          href={`/admin/${campId}/inscripciones`}
+          className="rounded-lg border px-4 py-2 text-sm font-semibold"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          Revisar inscripciones
+        </Link>
         <Link
           href={`/admin/${campId}`}
           className="rounded-lg border px-4 py-2 text-sm font-semibold"

@@ -333,6 +333,59 @@ export async function rechazarInvitacionAPI(id: string) {
   return res.data;
 }
 
+// ── Revisión de inscripciones (admin) y "mis inscripciones" (competidor) ────
+export interface InscripcionRevision {
+  id: string;
+  estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+  pesoInscripcion: string | null;
+  grupoCinturon: string | null;
+  montoTotal: string | null;
+  createdAt: string | null;
+  nombreCompleto: string;
+  documento: string;
+  correo: string | null;
+  fechaNacimiento: string | null;
+  genero: string | null;
+  academiaClub: string | null;
+  modalidades: Modalidad[];
+}
+export async function listInscripcionesCampAPI(
+  campId: string,
+): Promise<InscripcionRevision[]> {
+  const res = await api.get(`/campeonatos/${campId}/inscripciones`);
+  return res.data as InscripcionRevision[];
+}
+/** Aprueba (y auto-asigna a su sección) o rechaza una inscripción. */
+export async function revisarInscripcionAPI(
+  id: string,
+  estado: 'APROBADA' | 'RECHAZADA',
+) {
+  const res = await api.patch(`/inscripciones/${id}/estado`, { estado });
+  return res.data as { seccionesAsignadas: number };
+}
+
+export interface MiInscripcion {
+  id: string;
+  estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+  pesoInscripcion: string | null;
+  grupoCinturon: string | null;
+  montoTotal: string | null;
+  estadoPago: string;
+  createdAt: string | null;
+  campeonatoId: string;
+  campeonato: string;
+  estadoCampeonato: EstadoCampeonato;
+  fechaInicio: string | null;
+  ciudad: string | null;
+  modalidades: Modalidad[];
+}
+/** Historial inmutable del competidor: sus inscripciones con el cinturón y
+ *  peso DEL MOMENTO en que participó. */
+export async function misInscripcionesAPI(): Promise<MiInscripcion[]> {
+  const res = await api.get('/inscripciones/mias');
+  return res.data as MiInscripcion[];
+}
+
 // ── Catálogo geográfico (país / ciudad) ──────────────────────────────────────
 export interface Pais {
   iso2: string;
@@ -383,8 +436,15 @@ export interface Tatami {
   id: string;
   numero: number;
   estado: 'LIBRE' | 'OCUPADO';
+  activo: boolean | null;
   jueces: JuezTatami[];
   cola: ColaItem[];
+}
+
+/** Activa o desactiva un tatami (desactivado no acepta ni inicia secciones). */
+export async function activarTatamiAPI(tatamiId: string, activo: boolean) {
+  const res = await api.patch(`/tatamis/${tatamiId}`, { activo });
+  return res.data;
 }
 
 // ── Panel del juez (estilo COMBAT /juez y /tatami/[id]) ─────────────────────
