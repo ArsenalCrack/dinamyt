@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { pantallaAPI, type PantallaDetalle } from '@/lib/api';
+import { pantallaAPI, esErrorPrivado, type PantallaDetalle } from '@/lib/api';
 import { Logo } from '@/components/Logo';
+
+type Apartado = 'info' | 'tatamis' | 'resultados';
 
 const NOMBRE_MODALIDAD: Record<string, string> = {
   combate: 'Combate',
@@ -24,18 +26,30 @@ export default function PantallaCampeonatoPage() {
   const campId = params.id;
   const [data, setData] = useState<PantallaDetalle | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [apartado, setApartado] = useState<Apartado>('info');
+  // Campeonato privado: se pide el código de acceso una sola vez.
+  const [privado, setPrivado] = useState(false);
+  const [codigo, setCodigo] = useState('');
+  const [codigoOk, setCodigoOk] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     let vivo = true;
     async function cargar() {
       try {
-        const d = await pantallaAPI(campId);
+        const d = await pantallaAPI(campId, codigoOk);
         if (vivo) {
           setData(d);
+          setPrivado(false);
           setError(null);
         }
-      } catch {
-        if (vivo) setError('No se pudo conectar con el servidor.');
+      } catch (e) {
+        if (!vivo) return;
+        if (esErrorPrivado(e)) {
+          setPrivado(true);
+          setError(null);
+        } else {
+          setError('No se pudo conectar con el servidor.');
+        }
       }
     }
     void cargar();
@@ -44,7 +58,12 @@ export default function PantallaCampeonatoPage() {
       vivo = false;
       clearInterval(t);
     };
-  }, [campId]);
+  }, [campId, codigoOk]);
+
+  // Al entrar directo a un campeonato EN CURSO, lo primero son los tatamis.
+  useEffect(() => {
+    if (data?.campeonato.estado === 'EN_CURSO') setApartado('tatamis');
+  }, [data?.campeonato.estado]);
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6">
@@ -67,11 +86,65 @@ export default function PantallaCampeonatoPage() {
       </header>
 
       {error && <p className="msg-error">{error}</p>}
-      {!data && !error && <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>}
+      {privado && (
+        <div className="card mx-auto max-w-sm p-6 text-center">
+          <p className="mb-3 font-bold" style={{ color: 'var(--gold)' }}>
+            🔒 Campeonato privado
+          </p>
+          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Ingresa el código de acceso que te compartió la organización.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setCodigoOk(codigo.trim());
+            }}
+            className="flex gap-2"
+          >
+            <input
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              placeholder="Código"
+              className="flex-1"
+            />
+            <button type="submit" className="btn btn-gold">
+              Entrar
+            </button>
+          </form>
+        </div>
+      )}
+      {!data && !error && !privado && (
+        <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>
+      )}
 
       {data && (
         <>
+          {/* ── Apartados: Información | Tatamis | Resultados ─────────────── */}
+          <nav className="mb-5 flex gap-1 border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+            {(
+              [
+                ['info', 'Información'],
+                ['tatamis', `Tatamis (${data.tatamis.length})`],
+                ['resultados', `Resultados (${data.resultados.length})`],
+              ] as [Apartado, string][]
+            ).map(([id, etiqueta]) => (
+              <button
+                key={id}
+                onClick={() => setApartado(id)}
+                className="rounded-lg px-4 py-2 text-sm font-semibold"
+                style={
+                  apartado === id
+                    ? { background: 'var(--bg-elevated)', color: 'var(--gold)' }
+                    : { color: 'var(--text-muted)' }
+                }
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </nav>
+
           {/* ── Información general (visible sin registro, estilo PROJECT) ── */}
+          {apartado === 'info' && (
           <section className="card mb-6 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className={`badge ${data.campeonato.estado === 'EN_CURSO' ? 'badge-live' : data.campeonato.estado === 'FINALIZADO' ? 'badge-ok' : 'badge-info'}`}>
@@ -107,8 +180,10 @@ export default function PantallaCampeonatoPage() {
               </div>
             )}
           </section>
+          )}
 
           {/* ── Tatamis en vivo ────────────────────────────────────────── */}
+          {apartado === 'tatamis' && (
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data.tatamis.map((t) => (
               <article key={t.numero} className="card p-5">
@@ -135,15 +210,24 @@ export default function PantallaCampeonatoPage() {
                     En espera: {t.enEspera}
                   </p>
                 )}
+                <Link
+                  href={`/tatami/${t.id}?rol=pantalla`}
+                  className="btn btn-outline btn-sm mt-3"
+                  style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+                >
+                  📺 Ver pantalla del tatami →
+                </Link>
               </article>
             ))}
             {data.tatamis.length === 0 && (
               <p style={{ color: 'var(--text-muted)' }}>Aún no hay tatamis configurados.</p>
             )}
           </section>
+          )}
 
           {/* ── Resultados ─────────────────────────────────────────────── */}
-          <section className="mt-10">
+          {apartado === 'resultados' && (
+          <section>
             <h2 className="mb-3 text-xl font-bold" style={{ color: 'var(--gold)' }}>
               Resultados
             </h2>
@@ -184,6 +268,7 @@ export default function PantallaCampeonatoPage() {
               ))}
             </ul>
           </section>
+          )}
         </>
       )}
     </main>

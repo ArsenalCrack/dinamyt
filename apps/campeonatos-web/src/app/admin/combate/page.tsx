@@ -287,6 +287,22 @@ export default function CombatePage() {
                 ))}
               </select>
             </label>
+            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Tiempo de ronda
+              <select
+                value={estado.segundosMax}
+                onChange={(e) =>
+                  enviar({ accion: 'crono_reset', segundosMax: Number(e.target.value) })
+                }
+                disabled={estado.activo}
+                className="mt-1"
+                title="Reinicia el crono con la nueva duración (con el crono detenido)"
+              >
+                {[60, 90, 120, 180].map((s) => (
+                  <option key={s} value={s}>{mmss(s)}</option>
+                ))}
+              </select>
+            </label>
           </section>
 
           {/* Réferi de esquina (la mesa puede anotar por cualquiera) */}

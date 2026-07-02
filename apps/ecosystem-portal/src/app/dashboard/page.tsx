@@ -77,8 +77,11 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-3">
           {(payload.is_super_admin ||
             payload.app_scopes.includes('campeonatos')) && (
+            // SSO por redirección: el token viaja en el fragmento (#) — nunca
+            // llega al servidor — y campeonatos-web lo guarda al aterrizar.
+            // Así NO hay que iniciar sesión dos veces.
             <a
-              href={CAMPEONATOS_URL}
+              href={`${CAMPEONATOS_URL}/admin/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
               className="rounded-lg px-4 py-3 font-semibold"
               style={{ background: 'var(--gold)', color: '#14141e' }}
             >

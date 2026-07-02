@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginAPI, guardarToken, extraerError } from '@/lib/api';
 import { getSesion, rutaInicio } from '@/lib/session';
@@ -12,6 +12,21 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+
+  // SSO desde el portal del ecosystem: si llega #token=<jwt> en el fragmento,
+  // se guarda y se entra directo (sin segundo login). El fragmento nunca se
+  // envía al servidor.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#token=')) {
+      const token = decodeURIComponent(hash.slice(7));
+      if (token) {
+        guardarToken(token);
+        window.history.replaceState(null, '', window.location.pathname);
+        router.replace(rutaInicio(getSesion()));
+      }
+    }
+  }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

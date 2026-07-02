@@ -92,6 +92,8 @@ export async function campeonatosRoutes(app: FastifyInstance) {
   // ve los campeonatos públicos próximos (LISTO), en curso y finalizados.
   // Los BORRADOR (aún configurándose) y los privados no se listan.
   app.get('/campeonatos/publico', async (req) => {
+    // También se listan los privados (sin su código): el público los ve pero
+    // el detalle les pedirá el código de acceso.
     return req.server.db
       .select({
         id: campeonatos.id,
@@ -100,16 +102,12 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         ciudad: campeonatos.ciudad,
         pais: campeonatos.pais,
         alcance: campeonatos.alcance,
+        esPublico: campeonatos.esPublico,
         fechaInicio: campeonatos.fechaInicio,
         fechaFin: campeonatos.fechaFin,
       })
       .from(campeonatos)
-      .where(
-        and(
-          eq(campeonatos.esPublico, true),
-          inArray(campeonatos.estado, ['LISTO', 'EN_CURSO', 'FINALIZADO']),
-        ),
-      );
+      .where(inArray(campeonatos.estado, ['LISTO', 'EN_CURSO', 'FINALIZADO']));
   });
 
   // ── Público (pantalla): detalle en vivo — tatamis + resultados ────────────
@@ -136,8 +134,23 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       .from(campeonatos)
       .where(eq(campeonatos.id, id))
       .limit(1);
-    if (!camp || camp.esPublico === false || camp.estado === 'BORRADOR') {
+    if (!camp || camp.estado === 'BORRADOR') {
       return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+    }
+    // Privado: se puede ver solo con el código de acceso correcto.
+    if (camp.esPublico === false) {
+      const { codigo } = req.query as { codigo?: string };
+      const [conCodigo] = await db
+        .select({ codigo: campeonatos.codigo })
+        .from(campeonatos)
+        .where(eq(campeonatos.id, id))
+        .limit(1);
+      if (!codigo || codigo !== conCodigo?.codigo) {
+        return reply.code(403).send({
+          error: 'Campeonato privado: se requiere el código de acceso.',
+          privado: true,
+        });
+      }
     }
 
     // Modalidades habilitadas (qué se compite y su costo extra).
@@ -198,6 +211,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
             (c) => c.tatamiId === t.id && c.estado === 'EN_CURSO',
           );
           return {
+            id: t.id,
             numero: t.numero,
             estado: t.estado,
             enCurso: enCurso ? { nombre: enCurso.nombre, modalidad: enCurso.modalidad } : null,
@@ -427,6 +441,19 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       const { categorias } = req.body as { categorias: CategoriasConfig };
       const db = req.server.db;
 
+      // Con el evento en curso o finalizado, la configuración queda congelada.
+      const [campCat] = await db
+        .select({ estado: campeonatos.estado })
+        .from(campeonatos)
+        .where(eq(campeonatos.id, id))
+        .limit(1);
+      if (!campCat) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+      if (campCat.estado === 'EN_CURSO' || campCat.estado === 'FINALIZADO') {
+        return reply.code(422).send({
+          error: `El campeonato está ${campCat.estado}: las categorías ya no se pueden modificar.`,
+        });
+      }
+
       // Valida límites/solapamientos y normaliza los grupos de cinturón.
       const errores = validarCategorias(categorias);
       if (errores.length > 0) {
@@ -649,6 +676,20 @@ export async function campeonatosRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const db = req.server.db;
+
+      // Regenerar secciones con el evento en curso destruiría las colas de
+      // tatami y las llaves ya generadas: solo en BORRADOR/LISTO.
+      const [campGen] = await db
+        .select({ estado: campeonatos.estado })
+        .from(campeonatos)
+        .where(eq(campeonatos.id, id))
+        .limit(1);
+      if (!campGen) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+      if (campGen.estado === 'EN_CURSO' || campGen.estado === 'FINALIZADO') {
+        return reply.code(422).send({
+          error: `El campeonato está ${campGen.estado}: las secciones ya no se pueden regenerar.`,
+        });
+      }
 
       const mods = await db
         .select()

@@ -25,9 +25,14 @@ export default function SeccionesPage() {
 
   const [secciones, setSecciones] = useState<Seccion[]>([]);
   const [modalidades, setModalidades] = useState<ModalidadCampeonato[]>([]);
+  const [estadoCamp, setEstadoCamp] = useState<string | null>(null);
   const [estado, setEstado] = useState<'cargando' | 'ok' | 'error'>('cargando');
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
+
+  // Con el evento EN CURSO o FINALIZADO la configuración queda congelada
+  // (la API también lo exige): regenerar destruiría colas y llaves.
+  const congelado = estadoCamp === 'EN_CURSO' || estadoCamp === 'FINALIZADO';
 
   const cargar = useCallback(async () => {
     setEstado('cargando');
@@ -38,6 +43,7 @@ export default function SeccionesPage() {
       ]);
       setSecciones(secs);
       setModalidades(detalle.modalidades);
+      setEstadoCamp(detalle.estado);
       setEstado('ok');
     } catch (e) {
       setMsg({ tipo: 'error', texto: extraerError(e, 'No se pudieron cargar las secciones.') });
@@ -121,44 +127,82 @@ export default function SeccionesPage() {
         que les corresponde y crea la llave (bracket) de cada sección de combate.
       </p>
 
+      {/* Candado: con el evento en curso ya no se toca la configuración */}
+      {congelado && (
+        <div
+          className="mb-5 rounded-lg border px-4 py-3 text-sm font-semibold"
+          style={{ borderColor: 'var(--gold)', background: 'rgba(240,184,0,0.07)', color: 'var(--gold)' }}
+        >
+          🔒 El campeonato está {estadoCamp}: las categorías y secciones quedaron
+          congeladas. Dirige el evento desde{' '}
+          <Link href={`/admin/${campId}/tatamis`} style={{ textDecoration: 'underline' }}>
+            Tatamis
+          </Link>.
+        </div>
+      )}
+
       {/* Configuración de categorías por modalidad (rangos → secciones) */}
-      {modalidades.length > 0 && (
+      {modalidades.length > 0 && !congelado && (
         <section className="mb-6">
-          <h2 className="mb-2 text-lg font-semibold">Categorías por modalidad</h2>
+          <h2 className="mb-1 text-lg font-semibold">Paso 1 · Configura cada modalidad</h2>
           <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-            Define género, categorías de cinturón (con los grupos que abarca cada
-            una) y rangos de edad/peso. Al generar secciones se usa esta config.
+            Abre cada modalidad y responde: <strong>¿compiten géneros por
+            separado o mixto?</strong>, <strong>¿qué cinturones entran y cómo se
+            agrupan?</strong>, <strong>¿qué edades?</strong> y (si aplica){' '}
+            <strong>¿qué pesos?</strong>. Con eso el sistema genera las
+            secciones automáticamente — cada combinación es una categoría que
+            se abre en el campeonato.
           </p>
-          <div className="grid gap-3">
+          <div className="grid gap-2">
             {modalidades.map((m) => (
-              <ConfigCategorias
-                key={m.id}
-                modalidad={m.modalidad}
-                inicial={m.categorias}
-                guardando={ocupado}
-                onGuardar={(c) => guardarCategorias(m.modalidad, c)}
-              />
+              <details key={m.id} className="card p-0">
+                <summary
+                  className="flex cursor-pointer items-center justify-between px-4 py-3 font-semibold"
+                  style={{ listStyle: 'none' }}
+                >
+                  <span>
+                    ⚙ {m.modalidad.replaceAll('_', ' ')}
+                    <span
+                      className={`badge ml-2 ${m.categorias ? 'badge-ok' : 'badge-info'}`}
+                    >
+                      {m.categorias ? 'Configurada' : 'Sin configurar'}
+                    </span>
+                  </span>
+                  <span style={{ color: 'var(--text-muted)' }}>▾</span>
+                </summary>
+                <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
+                  <ConfigCategorias
+                    modalidad={m.modalidad}
+                    inicial={m.categorias}
+                    guardando={ocupado}
+                    onGuardar={(c) => guardarCategorias(m.modalidad, c)}
+                  />
+                </div>
+              </details>
             ))}
           </div>
         </section>
       )}
 
+      {!congelado && (
       <div className="mb-6 flex flex-wrap gap-3">
         <button
           onClick={generar}
           disabled={ocupado}
           className="rounded-lg px-4 py-2 text-sm font-semibold"
           style={{ background: 'var(--gold)', color: '#14141e' }}
+          title="Crea las secciones (categorías) a partir de la configuración de arriba"
         >
-          1 · Generar secciones
+          Paso 2 · Generar secciones
         </button>
         <button
           onClick={asignar}
           disabled={ocupado}
           className="rounded-lg border px-4 py-2 text-sm font-semibold"
           style={{ borderColor: 'var(--border)' }}
+          title="Coloca cada inscripción en la sección que le corresponde por cinturón, edad, peso y género"
         >
-          2 · Asignar inscripciones
+          Paso 3 · Asignar inscripciones
         </button>
         <Link
           href={`/admin/${campId}`}
@@ -172,9 +216,10 @@ export default function SeccionesPage() {
           className="rounded-lg border px-4 py-2 text-sm font-semibold"
           style={{ borderColor: 'var(--border)' }}
         >
-          3 · Tatamis (evento en vivo)
+          Paso 4 · Tatamis (evento en vivo)
         </Link>
       </div>
+      )}
 
       {msg && (
         <p className="mb-4 text-sm" style={{ color: msg.tipo === 'ok' ? 'var(--gold)' : '#ff5577' }}>
@@ -189,32 +234,56 @@ export default function SeccionesPage() {
         </p>
       )}
 
-      <ul className="grid gap-3">
-        {secciones.map((s) => (
-          <li
-            key={s.id}
-            className="flex items-center justify-between gap-3 rounded-xl border p-4"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-          >
-            <div>
-              <h3 className="font-semibold">{s.nombre}</h3>
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {s.modalidad} · {s.estado}
-              </span>
-            </div>
-            {s.modalidad === 'combate' && (
-              <button
-                onClick={() => generarLlave(s.id)}
-                disabled={ocupado}
-                className="rounded-lg px-3 py-1.5 text-sm font-semibold"
-                style={{ background: 'var(--gold)', color: '#14141e' }}
+      {/* Secciones agrupadas por modalidad: con muchas categorías abiertas,
+          cada modalidad se pliega y muestra su total. */}
+      <div className="grid gap-2">
+        {[...new Set(secciones.map((s) => s.modalidad))].map((mod) => {
+          const deMod = secciones.filter((s) => s.modalidad === mod);
+          return (
+            <details key={mod} className="card p-0" open={deMod.length <= 6}>
+              <summary
+                className="flex cursor-pointer items-center justify-between px-4 py-3 font-semibold"
+                style={{ listStyle: 'none' }}
               >
-                Generar llave
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+                <span>
+                  {mod.replaceAll('_', ' ')}
+                  <span className="badge badge-gold ml-2">{deMod.length} secciones</span>
+                </span>
+                <span style={{ color: 'var(--text-muted)' }}>▾</span>
+              </summary>
+              <ul className="grid gap-2 border-t px-3 py-3 sm:grid-cols-2" style={{ borderColor: 'var(--border)' }}>
+                {deMod.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold" title={s.nombre}>
+                        {s.nombre}
+                      </h3>
+                      <span
+                        className={`badge mt-0.5 ${s.estado === 'EN_CURSO' ? 'badge-live' : s.estado === 'FINALIZADA' ? 'badge-ok' : ''}`}
+                      >
+                        {s.estado}
+                      </span>
+                    </div>
+                    {s.modalidad === 'combate' && !congelado && (
+                      <button
+                        onClick={() => generarLlave(s.id)}
+                        disabled={ocupado}
+                        className="btn btn-gold btn-sm shrink-0"
+                      >
+                        Llave
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          );
+        })}
+      </div>
     </main>
   );
 }

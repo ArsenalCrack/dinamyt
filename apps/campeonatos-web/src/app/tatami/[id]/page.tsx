@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { calcularMarcador } from '@dinamyt/campeonatos-core';
 import type { EstadoCombate, EventoCombate } from '@dinamyt/campeonatos-core';
 import { obtenerToken, tatamiActualAPI, type TatamiActual } from '@/lib/api';
 
@@ -44,8 +45,11 @@ export default function TatamiJuezPage() {
     [tatami],
   );
 
+  const esPantalla = rol === 'pantalla';
+
   useEffect(() => {
-    if (!obtenerToken()) {
+    // La VISTA PANTALLA (proyector/público) no requiere sesión, como en COMBAT.
+    if (!esPantalla && !obtenerToken()) {
       router.replace('/admin/login');
       return;
     }
@@ -150,6 +154,73 @@ export default function TatamiJuezPage() {
     return (
       <main className="flex min-h-screen items-center justify-center px-6">
         <p style={{ color: 'var(--text-muted)' }}>Cargando tatami…</p>
+      </main>
+    );
+  }
+
+  // ── VISTA PANTALLA (proyector): lo que lanza el juez central ─────────────
+  if (esPantalla) {
+    const m = estado ? calcularMarcador(estado) : null;
+    const ganador = estado?.ganadorPendienteCierre || estado?.ganadorManualColor;
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center px-4 py-6 text-center">
+        <p className="text-lg font-bold tracking-widest" style={{ color: 'var(--gold)' }}>
+          TATAMI {tatami.numero}
+        </p>
+        {tatami.seccionEnCurso && (
+          <p className="mt-1 text-xl" style={{ color: 'var(--text-muted)' }}>
+            {tatami.seccionEnCurso.nombre}
+          </p>
+        )}
+
+        {estado ? (
+          <>
+            <div
+              className="my-6 font-mono text-7xl font-extrabold tabular-nums sm:text-8xl"
+              style={{ color: estado.activo ? 'var(--gold)' : 'var(--text)' }}
+            >
+              {mmss(estado.segundos)}
+            </div>
+            <p className="mb-4 text-lg font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
+              Ronda {estado.ronda?.toUpperCase?.() ?? estado.ronda}
+            </p>
+            <div className="grid w-full max-w-4xl grid-cols-2 gap-4">
+              <div className="card p-6" style={{ borderColor: 'var(--hong)' }}>
+                <div className="truncate text-2xl font-bold" style={{ color: '#ff6680' }}>
+                  {estado.nombreHong}
+                </div>
+                <div className="text-8xl font-extrabold sm:text-9xl" style={{ color: 'var(--hong)' }}>
+                  {m!.total_hong.toFixed(1)}
+                </div>
+                <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  KyongGo {estado.kyongHong} · GamJeum {estado.faltasHong}
+                </div>
+              </div>
+              <div className="card p-6" style={{ borderColor: 'var(--chung)' }}>
+                <div className="truncate text-2xl font-bold" style={{ color: '#7aa8ff' }}>
+                  {estado.nombreChung}
+                </div>
+                <div className="text-8xl font-extrabold sm:text-9xl" style={{ color: 'var(--chung)' }}>
+                  {m!.total_chung.toFixed(1)}
+                </div>
+                <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  KyongGo {estado.kyongChung} · GamJeum {estado.faltasChung}
+                </div>
+              </div>
+            </div>
+            {ganador && (
+              <div className="mt-6 text-4xl font-extrabold" style={{ color: 'var(--gold)' }}>
+                🏆{' '}
+                {estado.ganadorPendienteNombre ||
+                  (estado.ganadorManualColor === 'hong' ? estado.nombreHong : estado.nombreChung)}
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="mt-8 text-xl" style={{ color: 'var(--text-muted)' }}>
+            {conectado ? 'Esperando al juez central…' : 'Conectando con el tatami…'}
+          </p>
+        )}
       </main>
     );
   }

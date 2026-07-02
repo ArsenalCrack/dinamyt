@@ -58,6 +58,7 @@ export interface CampeonatoPublico {
   ciudad?: string | null;
   pais?: string | null;
   alcance?: string | null;
+  esPublico?: boolean | null;
   fechaInicio: string | null;
   fechaFin: string | null;
 }
@@ -239,6 +240,7 @@ export async function generarBracketAPI(seccionId: string) {
 
 // ── Pantalla pública: detalle en vivo de un campeonato ───────────────────────
 export interface PantallaTatami {
+  id: string;
   numero: number;
   estado: 'LIBRE' | 'OCUPADO';
   enCurso: { nombre: string; modalidad: Modalidad } | null;
@@ -267,9 +269,19 @@ export interface PantallaDetalle {
   tatamis: PantallaTatami[];
   resultados: PantallaResultado[];
 }
-export async function pantallaAPI(campId: string): Promise<PantallaDetalle> {
-  const res = await api.get(`/campeonatos/${campId}/publico`);
+export async function pantallaAPI(
+  campId: string,
+  codigo?: string,
+): Promise<PantallaDetalle> {
+  const res = await api.get(`/campeonatos/${campId}/publico`, {
+    params: codigo ? { codigo } : undefined,
+  });
   return res.data as PantallaDetalle;
+}
+
+/** True si el error del detalle público es "privado: requiere código". */
+export function esErrorPrivado(e: unknown): boolean {
+  return axios.isAxiosError(e) && (e.response?.data as { privado?: boolean })?.privado === true;
 }
 
 // ── Invitaciones (flujo de PROJECT: email + aceptación in-app) ───────────────

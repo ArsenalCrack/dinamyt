@@ -49,6 +49,12 @@ export default function HomePage() {
             </span>
           </span>
           <nav className="flex items-center gap-2">
+            <a
+              href={`${CAMPEONATOS_URL}/campeonatos`}
+              className="btn btn-outline hidden sm:inline-flex"
+            >
+              Campeonatos
+            </a>
             <Link href="/planes" className="btn btn-outline hidden sm:inline-flex">
               Planes
             </Link>
@@ -75,12 +81,6 @@ export default function HomePage() {
           <Link href="/registro" className="btn btn-gold px-7 py-3 text-base">
             Crear cuenta gratis
           </Link>
-          <a
-            href={`${CAMPEONATOS_URL}/campeonatos`}
-            className="btn btn-outline px-7 py-3 text-base"
-          >
-            Ver campeonatos y resultados
-          </a>
         </div>
       </section>
 

@@ -397,8 +397,10 @@ export async function tatamisRoutes(app: FastifyInstance) {
       .where(eq(juecesTatami.userEmail, email));
   });
 
-  // ── Estado actual del tatami (para el panel del juez) ──────────────────────
-  app.get('/tatamis/:id/actual', { preHandler: requireAuth() }, async (req, reply) => {
+  // ── Estado actual del tatami (panel del juez y VISTA PANTALLA pública) ─────
+  // Público a propósito: la "pantalla grande" del tatami (rol=pantalla, como
+  // en COMBAT) se abre en un proyector sin iniciar sesión.
+  app.get('/tatamis/:id/actual', async (req, reply) => {
     const { id } = req.params as { id: string };
     const db = req.server.db;
 

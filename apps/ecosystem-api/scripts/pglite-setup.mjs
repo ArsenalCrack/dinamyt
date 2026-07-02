@@ -101,6 +101,8 @@ if (planCamp) {
 const demos = [
   ['juez@dinamyt.com', 'Juez Demo', 'judge', '2000000001'],
   ['coach@dinamyt.com', 'Entrenador Demo', 'coach', '2000000002'],
+  ['orgadmin@dinamyt.com', 'Admin de Organización Demo', 'admin', '2000000003'],
+  ['competidor@dinamyt.com', 'Competidor Demo', 'competitor', '2000000004'],
 ];
 for (const [email, name, role, doc] of demos) {
   let u = (await pg.query('select id from ecosystem.users where email = $1', [email])).rows[0];

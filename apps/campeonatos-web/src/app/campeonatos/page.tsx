@@ -81,7 +81,10 @@ export default function ExplorarCampeonatosPage() {
               {g.items.map((c) => (
                 <li key={c.id}>
                   <Link href={`/pantalla/${c.id}`} className="card block p-5 transition hover:brightness-110">
-                    <h3 className="text-lg font-semibold">{c.nombre}</h3>
+                    <h3 className="flex items-center gap-2 text-lg font-semibold">
+                      {c.nombre}
+                      {c.esPublico === false && <span className="badge">🔒 Privado</span>}
+                    </h3>
                     <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
                       {[c.ciudad, c.pais].filter(Boolean).join(', ') || '—'}
                       {c.alcance ? ` · ${c.alcance}` : ''}
