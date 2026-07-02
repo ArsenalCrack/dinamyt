@@ -3,10 +3,134 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { pantallaAPI, esErrorPrivado, type PantallaDetalle } from '@/lib/api';
+import {
+  pantallaAPI,
+  esErrorPrivado,
+  type PantallaDetalle,
+  type PantallaJuez,
+  type PantallaSeccion,
+} from '@/lib/api';
 import { Logo } from '@/components/Logo';
 
 type Apartado = 'info' | 'tatamis' | 'resultados';
+
+const ROL_JUEZ: Record<string, string> = {
+  arbitro: 'Juez Central',
+  j1: 'Esquina 1',
+  j2: 'Esquina 2',
+  j3: 'Esquina 3',
+  j4: 'Esquina 4',
+  j5: 'Juez 5',
+  j6: 'Juez 6',
+  j7: 'Juez 7',
+};
+
+/** Jueces participantes + competidores por sección, con filtros (PROJECT). */
+function InfoParticipantes({
+  jueces,
+  secciones,
+}: {
+  jueces: PantallaJuez[];
+  secciones: PantallaSeccion[];
+}) {
+  const [modalidad, setModalidad] = useState<string>('todas');
+  const [busqueda, setBusqueda] = useState('');
+
+  const modalidades = [...new Set(secciones.map((s) => s.modalidad))];
+  const filtradas = secciones.filter((s) => {
+    if (modalidad !== 'todas' && s.modalidad !== modalidad) return false;
+    if (!busqueda.trim()) return true;
+    const q = busqueda.toLowerCase();
+    return (
+      s.nombre.toLowerCase().includes(q) ||
+      s.competidores.some(
+        (c) => c.nombre.toLowerCase().includes(q) || c.club?.toLowerCase().includes(q),
+      )
+    );
+  });
+
+  return (
+    <>
+      {/* Jueces */}
+      {jueces.length > 0 && (
+        <section className="card mb-6 p-5">
+          <h2 className="mb-3 text-lg font-semibold">Jueces del campeonato</h2>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {jueces.map((j, i) => (
+              <li
+                key={i}
+                className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <span className="min-w-0 truncate font-semibold">{j.nombre}</span>
+                <span className="badge badge-gold shrink-0">
+                  {ROL_JUEZ[j.rol] ?? j.rol}
+                  {j.tatami ? ` · T${j.tatami}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Competidores por sección, con filtros */}
+      {secciones.length > 0 && (
+        <section className="card p-5">
+          <h2 className="mb-3 text-lg font-semibold">Competidores por sección</h2>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <select
+              value={modalidad}
+              onChange={(e) => setModalidad(e.target.value)}
+              className="w-auto"
+            >
+              <option value="todas">Todas las modalidades</option>
+              {modalidades.map((m) => (
+                <option key={m} value={m}>
+                  {NOMBRE_MODALIDAD[m] ?? m}
+                </option>
+              ))}
+            </select>
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar competidor, club o sección…"
+              className="min-w-0 flex-1"
+            />
+          </div>
+          <div className="grid gap-2">
+            {filtradas.map((s) => (
+              <details key={s.id} className="rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+                <summary
+                  className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-semibold"
+                  style={{ listStyle: 'none' }}
+                >
+                  <span className="min-w-0 truncate">{s.nombre}</span>
+                  <span className="badge shrink-0">{s.competidores.length} competidores</span>
+                </summary>
+                <ul className="border-t px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+                  {s.competidores.map((c, i) => (
+                    <li key={i} className="flex justify-between gap-2 py-0.5">
+                      <span>{c.nombre}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{c.club ?? ''}</span>
+                    </li>
+                  ))}
+                  {s.competidores.length === 0 && (
+                    <li style={{ color: 'var(--text-muted)' }}>Aún sin competidores asignados.</li>
+                  )}
+                </ul>
+              </details>
+            ))}
+            {filtradas.length === 0 && (
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                Nada coincide con el filtro.
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
 
 const NOMBRE_MODALIDAD: Record<string, string> = {
   combate: 'Combate',
@@ -179,7 +303,21 @@ export default function PantallaCampeonatoPage() {
                 ))}
               </div>
             )}
+            {/* Dirección completa del evento */}
+            {(data.campeonato.ubicacion || data.campeonato.ciudad) && (
+              <p className="mt-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+                📍{' '}
+                {[data.campeonato.ubicacion, data.campeonato.ciudad, data.campeonato.pais]
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            )}
           </section>
+          )}
+
+          {/* ── Jueces + competidores por sección (estilo PROJECT) ────────── */}
+          {apartado === 'info' && (
+            <InfoParticipantes jueces={data.jueces} secciones={data.secciones} />
           )}
 
           {/* ── Tatamis en vivo ────────────────────────────────────────── */}

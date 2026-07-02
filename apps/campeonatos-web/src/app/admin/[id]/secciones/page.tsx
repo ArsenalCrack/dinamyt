@@ -16,7 +16,7 @@ import {
   type ModalidadCampeonato,
   type CategoriasConfig,
 } from '@/lib/api';
-import { ConfigCategorias } from './ConfigCategorias';
+import { ConfigCategorias, esConfigCompleta } from './ConfigCategorias';
 import { getSesion, esAdmin } from '@/lib/session';
 
 export default function SeccionesPage() {
@@ -168,10 +168,22 @@ export default function SeccionesPage() {
                 >
                   <span>
                     ⚙ {m.modalidad.replaceAll('_', ' ')}
+                    {/* "Configurada" SOLO si todas las dimensiones requeridas
+                        (cinturón, edad y peso donde aplique) están completas. */}
                     <span
-                      className={`badge ml-2 ${m.categorias ? 'badge-ok' : 'badge-info'}`}
+                      className={`badge ml-2 ${
+                        esConfigCompleta(m.modalidad, m.categorias)
+                          ? 'badge-ok'
+                          : m.categorias
+                            ? 'badge-live'
+                            : 'badge-info'
+                      }`}
                     >
-                      {m.categorias ? 'Configurada' : 'Sin configurar'}
+                      {esConfigCompleta(m.modalidad, m.categorias)
+                        ? 'Configurada'
+                        : m.categorias
+                          ? 'Incompleta'
+                          : 'Sin configurar'}
                     </span>
                   </span>
                   <span style={{ color: 'var(--text-muted)' }}>▾</span>

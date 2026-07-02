@@ -152,3 +152,38 @@ input[type="radio"] {
 .msg-ok {
   color: var(--ok);
 }
+
+/* ── Botones de puntuación (mesa y jueces): feedback táctil visible ─────── */
+.btn-punto {
+  transition: transform 0.08s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-punto:active:not(:disabled) {
+  transform: scale(0.92);
+  filter: brightness(1.35);
+  box-shadow: 0 0 0 3px rgba(240, 184, 0, 0.55);
+}
+
+/* Aviso flotante de punto marcado (aparece y se desvanece solo) */
+@keyframes flash-punto {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.8); }
+  15% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+  75% { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) scale(0.95); }
+}
+.flash-punto {
+  position: fixed;
+  top: 4.2rem;
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 1rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  animation: flash-punto 0.9s ease forwards;
+  pointer-events: none;
+  white-space: nowrap;
+}

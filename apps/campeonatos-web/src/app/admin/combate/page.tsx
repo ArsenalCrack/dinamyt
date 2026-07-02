@@ -117,6 +117,13 @@ export default function CombatePage() {
     wsRef.current?.send(JSON.stringify(ev));
   }
 
+  // Feedback visible de cada punto/falta marcado (el botón solo no basta).
+  const [flash, setFlash] = useState<{ texto: string; id: number } | null>(null);
+  function enviarConFlash(ev: EventoCombate, texto: string) {
+    enviar(ev);
+    setFlash({ texto, id: Date.now() });
+  }
+
   async function guardarResultado() {
     if (!estado || !seccionId) return;
     setGuardarMsg(null);
@@ -355,9 +362,14 @@ export default function CombatePage() {
                   {TECNICAS.map((t) => (
                     <button
                       key={t.pts}
-                      onClick={() => enviar({ accion: 'punto_juez', juez, color, pts: t.pts, nombre: t.label })}
+                      onClick={() =>
+                        enviarConFlash(
+                          { accion: 'punto_juez', juez, color, pts: t.pts, nombre: t.label },
+                          `${color === 'hong' ? '🔴' : '🔵'} +${t.pts} ${t.label} (${juez.toUpperCase()})`,
+                        )
+                      }
                       disabled={hayGanador}
-                      className="rounded-lg py-2 text-sm font-bold text-white"
+                      className="btn-punto rounded-lg py-2 text-sm font-bold text-white"
                       style={{ background: color === 'hong' ? hongColor : chungColor }}
                     >
                       +{t.pts} · {t.label}
@@ -387,19 +399,44 @@ export default function CombatePage() {
                 {ESPECIALES.map((e) => (
                   <button
                     key={e.nombre}
-                    onClick={() => enviar({ accion: 'especial', color, pts: e.pts, nombre: e.nombre })}
+                    onClick={() =>
+                      enviarConFlash(
+                        { accion: 'especial', color, pts: e.pts, nombre: e.nombre },
+                        `${color === 'hong' ? '🔴' : '🔵'} +${e.pts} ${e.nombre}`,
+                      )
+                    }
                     disabled={hayGanador}
-                    className="rounded-lg border py-2 text-sm font-semibold"
+                    className="btn-punto rounded-lg border py-2 text-sm font-semibold"
                     style={{ borderColor: 'var(--border)' }}
                   >
                     +{e.pts} {e.nombre}
                   </button>
                 ))}
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => enviar({ accion: 'kyonggo', color })} disabled={hayGanador} className="rounded-lg border py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+                  <button
+                    onClick={() =>
+                      enviarConFlash(
+                        { accion: 'kyonggo', color },
+                        `${color === 'hong' ? '🔴' : '🔵'} KyongGo −0.5`,
+                      )
+                    }
+                    disabled={hayGanador}
+                    className="btn-punto rounded-lg border py-2 text-sm"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
                     KyongGo −0.5
                   </button>
-                  <button onClick={() => enviar({ accion: 'gamjeum', color })} disabled={hayGanador} className="rounded-lg border py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+                  <button
+                    onClick={() =>
+                      enviarConFlash(
+                        { accion: 'gamjeum', color },
+                        `${color === 'hong' ? '🔴' : '🔵'} GamJeum −1`,
+                      )
+                    }
+                    disabled={hayGanador}
+                    className="btn-punto rounded-lg border py-2 text-sm"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
                     GamJeum −1
                   </button>
                 </div>
@@ -463,6 +500,13 @@ export default function CombatePage() {
             </p>
           )}
         </>
+      )}
+
+      {/* Aviso flotante del último punto/falta marcado (se desvanece solo) */}
+      {flash && (
+        <div key={flash.id} className="flash-punto" onAnimationEnd={() => setFlash(null)}>
+          {flash.texto}
+        </div>
       )}
 
       <AlertOverlays

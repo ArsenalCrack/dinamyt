@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import { cerrarSesion, obtenerToken, misInvitacionesAPI } from '@/lib/api';
 import {
   getSesion,
-  esAdmin,
   esJuez,
   puedeInscribir,
   etiquetaRol,
@@ -18,9 +17,11 @@ const PORTAL_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
 
 /**
- * Barra de navegación GLOBAL: pública (Campeonatos, En vivo) y, con sesión,
- * SOLO lo que el rol necesita. En móvil colapsa a un menú hamburguesa.
- * Incluye la vuelta a "Mis aplicaciones" (dashboard del ecosystem).
+ * Barra de navegación GLOBAL, deliberadamente corta para no perder al
+ * usuario: UN destino público (Campeonatos, que agrupa el en-vivo) y UN
+ * destino de trabajo según el rol (Gestión o Mi tatami) + Mi perfil (las
+ * invitaciones viven ahí y en su badge). El resto se alcanza navegando el
+ * flujo natural (campeonato → revisión → secciones → tatamis → mesa).
  */
 export function NavBar() {
   const router = useRouter();
@@ -50,20 +51,15 @@ export function NavBar() {
     return null;
   }
 
-  // Cada rol ve solo lo suyo: gestión (admin/maestro), mesa (admin),
-  // tatami (juez), invitaciones/perfil (todo usuario logueado).
   const links: { href: string; etiqueta: string; visible: boolean; externo?: boolean }[] = [
     { href: '/campeonatos', etiqueta: 'Campeonatos', visible: true },
-    { href: '/pantalla', etiqueta: 'En vivo', visible: true },
     { href: '/admin', etiqueta: 'Gestión', visible: puedeInscribir(sesion) },
-    { href: '/admin/combate', etiqueta: 'Juez de mesa', visible: esAdmin(sesion) },
     { href: '/juez', etiqueta: 'Mi tatami', visible: esJuez(sesion) },
     {
-      href: '/invitaciones',
-      etiqueta: pendientes > 0 ? `Invitaciones (${pendientes})` : 'Invitaciones',
+      href: '/perfil',
+      etiqueta: pendientes > 0 ? `Mi perfil (${pendientes})` : 'Mi perfil',
       visible: !!sesion,
     },
-    { href: '/perfil', etiqueta: 'Mi perfil', visible: !!sesion },
     {
       href: `${PORTAL_URL}/dashboard`,
       etiqueta: '⇱ Mis aplicaciones',
@@ -75,6 +71,10 @@ export function NavBar() {
 
   function activo(href: string): boolean {
     if (href === '/admin') return pathname === '/admin' || /^\/admin\/[0-9a-f-]{36}/.test(pathname);
+    if (href === '/perfil')
+      return pathname.startsWith('/perfil') || pathname.startsWith('/invitaciones');
+    if (href === '/campeonatos')
+      return pathname.startsWith('/campeonatos') || pathname.startsWith('/pantalla');
     return pathname === href || pathname.startsWith(href + '/');
   }
 
@@ -83,7 +83,7 @@ export function NavBar() {
       <a
         key={l.href}
         href={l.href}
-        className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${enMenu ? 'block' : ''}`}
+        className={`rounded-lg px-3 py-2 text-sm font-semibold ${enMenu ? 'block' : ''}`}
         style={{ color: 'var(--text-muted)' }}
       >
         {l.etiqueta}
@@ -92,7 +92,7 @@ export function NavBar() {
       <Link
         key={l.href}
         href={l.href}
-        className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${enMenu ? 'block' : ''}`}
+        className={`rounded-lg px-3 py-2 text-sm font-semibold ${enMenu ? 'block' : ''}`}
         style={
           activo(l.href)
             ? { background: 'var(--bg-elevated)', color: 'var(--gold)' }
@@ -113,8 +113,8 @@ export function NavBar() {
           <Logo size={30} />
         </Link>
 
-        {/* Desktop: enlaces en línea */}
-        <nav className="hidden flex-1 flex-wrap gap-1 md:flex">
+        {/* Desktop: pocos enlaces, siempre visibles (sin hamburguesa) */}
+        <nav className="hidden flex-1 gap-1 md:flex">
           {visibles.map((l) => itemNav(l))}
         </nav>
 
@@ -142,11 +142,11 @@ export function NavBar() {
             </Link>
           )}
 
-          {/* Móvil: hamburguesa */}
+          {/* Hamburguesa: SOLO móvil (en desktop los enlaces ya están a la vista) */}
           <button
             onClick={() => setAbierto(!abierto)}
             className="btn btn-outline btn-sm md:hidden"
-            aria-label="Abrir menú"
+            aria-label={abierto ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={abierto}
           >
             {abierto ? '✕' : '☰'}
@@ -154,10 +154,10 @@ export function NavBar() {
         </div>
       </div>
 
-      {/* Menú móvil desplegable */}
+      {/* Menú móvil desplegable (funciona a cualquier ancho si está abierto) */}
       {abierto && (
         <nav
-          className="border-t px-4 py-3 md:hidden"
+          className="border-t px-4 py-3"
           style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}
         >
           {sesion && (

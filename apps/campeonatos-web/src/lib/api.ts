@@ -255,7 +255,21 @@ export interface PantallaResultado {
   hong: string | null;
   creadoAt: string | null;
 }
+export interface PantallaJuez {
+  nombre: string;
+  rol: string;
+  tatami: number | null;
+}
+export interface PantallaSeccion {
+  id: string;
+  nombre: string;
+  modalidad: Modalidad;
+  estado: 'EN_ESPERA' | 'EN_CURSO' | 'FINALIZADA';
+  competidores: { nombre: string; club: string | null }[];
+}
 export interface PantallaDetalle {
+  jueces: PantallaJuez[];
+  secciones: PantallaSeccion[];
   campeonato: CampeonatoPublico & {
     descripcion: string | null;
     ubicacion: string | null;
@@ -277,6 +291,22 @@ export async function pantallaAPI(
     params: codigo ? { codigo } : undefined,
   });
   return res.data as PantallaDetalle;
+}
+
+export interface SeccionPublico {
+  seccion: {
+    id: string;
+    nombre: string;
+    modalidad: Modalidad;
+    estado: 'EN_ESPERA' | 'EN_CURSO' | 'FINALIZADA';
+  };
+  competidores: { nombre: string; club: string | null }[];
+  llave: unknown | null;
+}
+/** Detalle público de una sección: competidores + llave (árbol de combates). */
+export async function seccionPublicoAPI(seccionId: string): Promise<SeccionPublico> {
+  const res = await api.get(`/secciones/${seccionId}/publico`);
+  return res.data as SeccionPublico;
 }
 
 /** True si el error del detalle público es "privado: requiere código". */

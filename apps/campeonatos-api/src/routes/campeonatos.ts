@@ -12,6 +12,7 @@ import {
   combates,
   tatamis,
   colaTatami,
+  juecesTatami,
 } from '@dinamyt/campeonatos-db';
 import {
   validarRestriccion,
@@ -271,6 +272,54 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           )
       : [];
 
+    // Jueces que participan (asignaciones por tatami, estilo PROJECT).
+    const juecesCamp = tats.length
+      ? await db
+          .select({
+            nombreDisplay: juecesTatami.nombreDisplay,
+            rolTatami: juecesTatami.rolTatami,
+            tatamiId: juecesTatami.tatamiId,
+          })
+          .from(juecesTatami)
+          .where(
+            inArray(
+              juecesTatami.tatamiId,
+              tats.map((t) => t.id),
+            ),
+          )
+      : [];
+
+    // Competidores que participan, agrupados por su sección.
+    const secsCamp = await db
+      .select({
+        id: secciones.id,
+        nombre: secciones.nombre,
+        modalidad: secciones.modalidad,
+        estado: secciones.estado,
+      })
+      .from(secciones)
+      .where(eq(secciones.campeonatoId, id));
+    const compsPorSeccion = secsCamp.length
+      ? await db
+          .select({
+            seccionId: seccionInscripciones.seccionId,
+            nombre: competidores.nombreCompleto,
+            club: competidores.academiaClub,
+          })
+          .from(seccionInscripciones)
+          .innerJoin(
+            inscripciones,
+            eq(seccionInscripciones.inscripcionId, inscripciones.id),
+          )
+          .innerJoin(competidores, eq(inscripciones.competidorId, competidores.id))
+          .where(
+            inArray(
+              seccionInscripciones.seccionId,
+              secsCamp.map((s) => s.id),
+            ),
+          )
+      : [];
+
     // Resultados: combates persistidos de las secciones del campeonato.
     const resultados = await db
       .select({
@@ -290,6 +339,17 @@ export async function campeonatosRoutes(app: FastifyInstance) {
     return {
       campeonato: camp,
       modalidades: mods,
+      jueces: juecesCamp.map((j) => ({
+        nombre: j.nombreDisplay,
+        rol: j.rolTatami,
+        tatami: tats.find((t) => t.id === j.tatamiId)?.numero ?? null,
+      })),
+      secciones: secsCamp.map((s) => ({
+        ...s,
+        competidores: compsPorSeccion
+          .filter((c) => c.seccionId === s.id)
+          .map((c) => ({ nombre: c.nombre, club: c.club })),
+      })),
       tatamis: tats
         .sort((a, b) => a.numero - b.numero)
         .map((t) => {
@@ -307,6 +367,46 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           };
         }),
       resultados,
+    };
+  });
+
+  // ── Público: detalle de una sección — competidores + llave (bracket) ─────
+  // Alimenta la pantalla del tatami: árbol de combates, podio y el listado
+  // de competidores de figuras, como en COMBAT.
+  app.get('/secciones/:id/publico', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const db = req.server.db;
+
+    const [sec] = await db
+      .select()
+      .from(secciones)
+      .where(eq(secciones.id, id))
+      .limit(1);
+    if (!sec) return reply.code(404).send({ error: 'Sección no encontrada.' });
+
+    const comps = await db
+      .select({
+        nombre: competidores.nombreCompleto,
+        club: competidores.academiaClub,
+      })
+      .from(seccionInscripciones)
+      .innerJoin(inscripciones, eq(seccionInscripciones.inscripcionId, inscripciones.id))
+      .innerJoin(competidores, eq(inscripciones.competidorId, competidores.id))
+      .where(eq(seccionInscripciones.seccionId, id));
+
+    // Última llave generada de la sección (si existe).
+    const llavesSec = await db.select().from(llaves).where(eq(llaves.seccionId, id));
+    const llave = llavesSec.length ? llavesSec[llavesSec.length - 1] : null;
+
+    return {
+      seccion: {
+        id: sec.id,
+        nombre: sec.nombre,
+        modalidad: sec.modalidad,
+        estado: sec.estado,
+      },
+      competidores: comps,
+      llave: llave ? llave.estructura : null,
     };
   });
 

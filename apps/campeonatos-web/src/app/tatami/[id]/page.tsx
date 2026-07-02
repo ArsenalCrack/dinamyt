@@ -5,7 +5,14 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { calcularMarcador } from '@dinamyt/campeonatos-core';
 import type { EstadoCombate, EventoCombate } from '@dinamyt/campeonatos-core';
-import { obtenerToken, tatamiActualAPI, type TatamiActual } from '@/lib/api';
+import {
+  obtenerToken,
+  tatamiActualAPI,
+  seccionPublicoAPI,
+  type TatamiActual,
+  type SeccionPublico,
+} from '@/lib/api';
+import { BracketTree, type Bracket } from '@/components/BracketTree';
 
 const WS_URL = process.env.NEXT_PUBLIC_COMBAT_WS_URL || 'ws://localhost:3005';
 
@@ -46,6 +53,26 @@ export default function TatamiJuezPage() {
   );
 
   const esPantalla = rol === 'pantalla';
+
+  // Pantalla grande: detalle de la sección en curso (árbol de combates,
+  // podio o listado de competidores de figuras). Se refresca cada 10 s.
+  const [seccionPub, setSeccionPub] = useState<SeccionPublico | null>(null);
+  useEffect(() => {
+    // La pantalla siempre lo necesita; el juez, cuando NO es combate (para
+    // su planilla de notas de figuras/defensa/saltos).
+    if (!tatami?.seccionEnCurso) {
+      setSeccionPub(null);
+      return;
+    }
+    const sid = tatami.seccionEnCurso.seccionId;
+    const cargar = () =>
+      seccionPublicoAPI(sid)
+        .then(setSeccionPub)
+        .catch(() => setSeccionPub(null));
+    cargar();
+    const t = setInterval(cargar, 10000);
+    return () => clearInterval(t);
+  }, [tatami?.seccionEnCurso]);
 
   useEffect(() => {
     // La VISTA PANTALLA (proyector/público) no requiere sesión, como en COMBAT.
@@ -221,7 +248,67 @@ export default function TatamiJuezPage() {
             {conectado ? 'Esperando al juez central…' : 'Conectando con el tatami…'}
           </p>
         )}
+
+        {/* Árbol de combates + podio (combate) o listado de competidores
+            (figuras / defensa / saltos) — lo que lanza el juez central. */}
+        {seccionPub && (
+          <section className="mt-10 w-full max-w-5xl text-left">
+            {seccionPub.seccion.modalidad === 'combate' && seccionPub.llave ? (
+              <>
+                <h2
+                  className="mb-3 text-center text-sm font-extrabold uppercase tracking-widest"
+                  style={{ color: 'var(--gold)' }}
+                >
+                  Árbol de combates
+                </h2>
+                <BracketTree bracket={seccionPub.llave as Bracket} />
+              </>
+            ) : (
+              <>
+                <h2
+                  className="mb-3 text-center text-sm font-extrabold uppercase tracking-widest"
+                  style={{ color: 'var(--gold)' }}
+                >
+                  Competidores — {seccionPub.seccion.nombre}
+                </h2>
+                <ul className="mx-auto grid max-w-2xl gap-2 sm:grid-cols-2">
+                  {seccionPub.competidores.map((c, i) => (
+                    <li
+                      key={i}
+                      className="card flex items-center justify-between px-4 py-2.5"
+                    >
+                      <span className="text-lg font-semibold">{c.nombre}</span>
+                      <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                        {c.club ?? ''}
+                      </span>
+                    </li>
+                  ))}
+                  {seccionPub.competidores.length === 0 && (
+                    <li className="text-center" style={{ color: 'var(--text-muted)' }}>
+                      Sin competidores asignados todavía.
+                    </li>
+                  )}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
       </main>
+    );
+  }
+
+  // ── Juez en sección de FIGURAS / DEFENSA / SALTOS: planilla de notas
+  // manual (0.0–10.0) por competidor, guardada en el teléfono. La forma de
+  // puntuación depende de la modalidad de la llave, como en COMBAT.
+  const modalidadEnCurso = tatami.seccionEnCurso?.modalidad;
+  if (modalidadEnCurso && modalidadEnCurso !== 'combate') {
+    return (
+      <PlanillaFiguras
+        rol={rol}
+        tatami={tatami}
+        seccionPub={seccionPub}
+        claveBase={`dinamyt_notas_${params.id}_${rol}`}
+      />
     );
   }
 
@@ -347,7 +434,7 @@ export default function TatamiJuezPage() {
                 key={p.pts}
                 onClick={() => anotar(color, p.pts, p.label)}
                 disabled={cerrado || rolInactivo}
-                className="flex flex-1 flex-col items-center justify-center rounded-xl py-4 font-extrabold text-white transition active:scale-95 disabled:opacity-40"
+                className="btn-punto flex flex-1 flex-col items-center justify-center rounded-xl py-4 font-extrabold text-white disabled:opacity-40"
                 style={{ background: color === 'hong' ? 'var(--hong)' : 'var(--chung)' }}
               >
                 <span className="text-3xl">+{p.pts}</span>
@@ -374,6 +461,90 @@ export default function TatamiJuezPage() {
         className="mt-2 text-center text-xs"
         style={{ color: 'var(--text-muted)' }}
       >
+        ← Mis tatamis
+      </Link>
+    </main>
+  );
+}
+
+/** Planilla de notas del juez para figuras/defensa/saltos (0.0–10.0). Se
+ *  guarda en el teléfono y la mesa registra el resultado oficial. */
+function PlanillaFiguras({
+  rol,
+  tatami,
+  seccionPub,
+  claveBase,
+}: {
+  rol: string;
+  tatami: TatamiActual;
+  seccionPub: SeccionPublico | null;
+  claveBase: string;
+}) {
+  const [notas, setNotas] = useState<Record<string, string>>({});
+  useEffect(() => {
+    try {
+      const g = localStorage.getItem(claveBase);
+      if (g) setNotas(JSON.parse(g));
+    } catch {
+      /* sin notas previas */
+    }
+  }, [claveBase]);
+  function setNota(nombre: string, valor: string) {
+    const nuevas = { ...notas, [nombre]: valor };
+    setNotas(nuevas);
+    try {
+      localStorage.setItem(claveBase, JSON.stringify(nuevas));
+    } catch {
+      /* almacenamiento lleno */
+    }
+  }
+
+  return (
+    <main className="mx-auto flex min-h-screen max-w-lg flex-col px-3 py-3">
+      <div className="card mb-2.5 flex items-center justify-between px-3.5 py-2">
+        <span className="font-bold tracking-wider">
+          {rol.toUpperCase()} · Tatami {tatami.numero}
+        </span>
+        <span className="badge badge-gold">NOTAS</span>
+      </div>
+      <p className="mb-3 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+        {tatami.seccionEnCurso?.nombre} — anota de 0.0 a 10.0 a cada
+        competidor; tus notas quedan guardadas en este teléfono y la mesa
+        registra el resultado oficial.
+      </p>
+
+      <div className="flex flex-col gap-2">
+        {(seccionPub?.competidores ?? []).map((c) => (
+          <div key={c.nombre} className="card flex items-center gap-3 px-3.5 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-semibold">{c.nombre}</div>
+              {c.club && (
+                <div className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {c.club}
+                </div>
+              )}
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              step={0.1}
+              value={notas[c.nombre] ?? ''}
+              onChange={(e) => setNota(c.nombre, e.target.value)}
+              placeholder="0.0"
+              className="w-24 text-center text-xl font-extrabold"
+              style={{ color: 'var(--gold)' }}
+            />
+          </div>
+        ))}
+        {(seccionPub?.competidores ?? []).length === 0 && (
+          <p className="text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+            Cargando competidores de la sección…
+          </p>
+        )}
+      </div>
+
+      <Link href="/juez" className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
         ← Mis tatamis
       </Link>
     </main>
