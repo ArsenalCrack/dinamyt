@@ -68,10 +68,24 @@ dinamyt/
 ```
 
 Estado global: **`turbo build` 8/8** · **`turbo test` 8/8** (core 44 · db 3 ·
-campeonatos-api 13 · combat 2 · ecosystem-api 4) · ✅.
-**Fases 1-3 de la fusión HECHAS** (roles · creación/edición completa · tatamis
-con cola FIFO y robo de modalidades) — ver `PLAN_FUSION.md`. Sigue la Fase 4
-(evento en vivo estilo COMBAT) y el pendiente de invitaciones.
+campeonatos-api 14 · combat 2 · ecosystem-api 4) · ✅.
+**Fases 1-3 de la fusión HECHAS** + jueces por tatami, catálogo geográfico,
+pantalla pública en vivo, logo oficial (de COMBAT), landing y panel de
+administración del ecosystem — ver `PLAN_FUSION.md` §8 para el orden de lo que
+sigue (Fase 4 en vivo, invitaciones, figuras/saltos, reportes).
+
+### Modelo de acceso (cómo dar acceso a un usuario) — panel `/admin` del portal
+1. El usuario se **registra** en el portal (cuenta gratuita, sin scopes).
+2. El super-admin (o futuro admin de org) crea la **organización**, la
+   **invita por email** con su **rol** (`admin`/`coach`/`judge`/`competitor`)
+   y **activa una suscripción** de la org con el plan (apps incluidas).
+3. El JWT del usuario lleva entonces `app_scopes` (del plan) y
+   `role_campeonatos`/`role_academy` (rol de la membresía). Con eso las apps
+   gatean rutas y acciones.
+4. Caso personal (compra individual, p. ej. Academy): **suscripción personal**
+   por email (`POST /subscriptions/user`), sin org (da scopes, no rol de org).
+5. El **super-admin** entra a todo sin suscripción (bypass en guards y ahora
+   también en el dashboard del portal).
 
 ### Stack y versiones
 pnpm 11.5 · Turborepo 2.10 · TypeScript 5.7 · NestJS 11 · Fastify 5 · Next 16.2.7 ·

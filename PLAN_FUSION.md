@@ -135,13 +135,34 @@ namespace `/combate` (hoy el monorepo usa `ws` crudo).
     `/juez`, `/pantalla`, `/tatami`, `/tablero`), figuras en vivo, realtime.
 - **Fase 5 — Reportes (Excel/PDF), PWA/offline, historial inmutable, perfil unificado**.
 
-## 8. Próximo paso recomendado
+## 8. Próximo paso recomendado (actualizado 2026-07-01, tarde)
 
-Fases 1-3 hechas. Sigue la **Fase 4 — evento EN VIVO idéntico a COMBAT**: portar
-`BracketTree`/`LlavePanel`/`PodioLlave` y las pantallas `/juez`, `/pantalla`,
-`/tatami/[id]`, `/tablero`, con figuras en vivo y realtime; enlazar el combate
-desde la cola del tatami (hoy el juez de mesa teclea el ID). En paralelo puede
-cerrarse el pendiente de Fase 2 (**invitaciones**).
+Hecho hoy además de Fases 1-3: **jueces por tatami** (modelo COMBAT
+`AsignacionJuez`: tabla `jueces_tatami` con rol `arbitro`/`j1..j7` único por
+tatami + UI), **catálogo geográfico** (todos los países/ciudades en la
+creación), **pantalla pública EN VIVO** (`/pantalla/[id]`: tatamis + resultados
+con refresco 5 s + enlace al juez de mesa desde la cola), **logo oficial de
+COMBAT** en ambas webs, **landing pública del portal** y **panel de
+administración del ecosystem** (`/admin` del portal: orgs → miembros con rol →
+suscripciones org/personales).
+
+Orden recomendado de lo que sigue:
+
+1. **Fase 4 (continuar) — en vivo estilo COMBAT**: portar `/juez` (puntuación
+   por réferi de esquina desde el móvil), `/tatami/[id]` (vista del tatami),
+   `BracketTree`/`LlavePanel`/`PodioLlave` (llaves visuales con avance), y
+   `/tablero` offline; figuras en vivo (paneles de 5-7 jueces); reconciliar
+   realtime (hoy `ws` crudo; COMBAT usa Socket.IO — mantener `ws`).
+   El acceso del juez debe gatearse con su asignación (`jueces_tatami.userEmail`
+   vs email del token).
+2. **Invitaciones** (cierre de Fase 2): email al competidor + aceptación
+   eligiendo modalidades (RF de PROJECT).
+3. **Resultados de figuras/saltos** persistidos y visibles en la pantalla.
+4. **Reportes Excel/PDF** y **PWA/offline** (Fase 5) + perfil/historial
+   inmutable visible al competidor.
+5. **Ecosystem**: pasarela de pago real para planes (hoy asignación manual del
+   super-admin) y self-service del admin de org (hoy el panel es solo
+   super-admin).
 
 ## 8b. UX/UI (2026-07-01)
 
