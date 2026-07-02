@@ -15,6 +15,13 @@
       "when": 1782920403134,
       "tag": "0001_simple_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782965476813,
+      "tag": "0002_flippant_roughhouse",
+      "breakpoints": true
     }
   ]
 }

@@ -70,6 +70,19 @@ export const estadoSeccionEnum = camp.enum('estado_seccion', [
 /** Estado del tatami: OCUPADO cuando tiene una sección EN_CURSO. */
 export const estadoTatamiEnum = camp.enum('estado_tatami', ['LIBRE', 'OCUPADO']);
 
+/** Rol de un juez dentro del tatami (espejo de COMBAT AsignacionJuez):
+ *  árbitro central + hasta 7 jueces (combate usa j1-j4; figuras hasta 7). */
+export const rolTatamiEnum = camp.enum('rol_tatami', [
+  'arbitro',
+  'j1',
+  'j2',
+  'j3',
+  'j4',
+  'j5',
+  'j6',
+  'j7',
+]);
+
 /** Resultado de un combate (hong = rojo, chung = azul). */
 export const ganadorCombateEnum = camp.enum('ganador_combate', [
   'hong',

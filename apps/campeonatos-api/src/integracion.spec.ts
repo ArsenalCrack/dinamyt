@@ -532,6 +532,85 @@ describe('API campeonatos (integración con PGlite)', () => {
     await a.close();
   });
 
+  it('asigna y quita jueces del tatami (rol único, upsert por rol)', async () => {
+    const a = app();
+    const auth = { authorization: `Bearer ${await token()}` };
+
+    const crear = await a.inject({
+      method: 'POST',
+      url: '/campeonatos',
+      headers: auth,
+      payload: { nombre: 'Copa Jueces', numTatamis: 1 },
+    });
+    const campId = crear.json().id as string;
+    const tats = (
+      await a.inject({
+        method: 'GET',
+        url: `/campeonatos/${campId}/tatamis`,
+        headers: auth,
+      })
+    ).json() as { id: string }[];
+
+    // Asignar árbitro central y j1.
+    const arb = await a.inject({
+      method: 'PUT',
+      url: `/tatamis/${tats[0].id}/jueces/arbitro`,
+      headers: auth,
+      payload: { nombreDisplay: 'Carlos Ruiz', userEmail: 'juez@dinamyt.com' },
+    });
+    expect(arb.statusCode).toBe(201);
+    await a.inject({
+      method: 'PUT',
+      url: `/tatamis/${tats[0].id}/jueces/j1`,
+      headers: auth,
+      payload: { nombreDisplay: 'Ana Gómez' },
+    });
+
+    // Reasignar el mismo rol reemplaza al juez (upsert, no duplica).
+    const re = await a.inject({
+      method: 'PUT',
+      url: `/tatamis/${tats[0].id}/jueces/arbitro`,
+      headers: auth,
+      payload: { nombreDisplay: 'Pedro Díaz' },
+    });
+    expect(re.statusCode).toBe(200);
+
+    const lista = (
+      await a.inject({
+        method: 'GET',
+        url: `/campeonatos/${campId}/tatamis`,
+        headers: auth,
+      })
+    ).json() as { jueces: { rolTatami: string; nombreDisplay: string }[] }[];
+    expect(lista[0].jueces).toHaveLength(2);
+    expect(
+      lista[0].jueces.find((j) => j.rolTatami === 'arbitro')?.nombreDisplay,
+    ).toBe('Pedro Díaz');
+
+    // Rol inválido → 422; quitar → 204; quitar de nuevo → 404.
+    const malo = await a.inject({
+      method: 'PUT',
+      url: `/tatamis/${tats[0].id}/jueces/j9`,
+      headers: auth,
+      payload: { nombreDisplay: 'X' },
+    });
+    expect(malo.statusCode).toBe(422);
+    const del = await a.inject({
+      method: 'DELETE',
+      url: `/tatamis/${tats[0].id}/jueces/arbitro`,
+      headers: auth,
+    });
+    expect(del.statusCode).toBe(204);
+    const del2 = await a.inject({
+      method: 'DELETE',
+      url: `/tatamis/${tats[0].id}/jueces/arbitro`,
+      headers: auth,
+    });
+    expect(del2.statusCode).toBe(404);
+
+    await a.close();
+  });
+
   it('exige scope campeonatos para crear (403 con otro scope)', async () => {
     const a = app();
     const res = await a.inject({

@@ -5,6 +5,7 @@ import {
   tatamis,
   secciones,
   colaTatami,
+  juecesTatami,
 } from '@dinamyt/campeonatos-db';
 import { requireScope, requireRole } from '../plugins/auth';
 
@@ -73,6 +74,18 @@ export async function tatamisRoutes(app: FastifyInstance) {
           .orderBy(asc(tatamis.numero));
       }
 
+      const jueces = filas.length
+        ? await db
+            .select()
+            .from(juecesTatami)
+            .where(
+              inArray(
+                juecesTatami.tatamiId,
+                filas.map((t) => t.id),
+              ),
+            )
+        : [];
+
       const items = filas.length
         ? await db
             .select({
@@ -100,6 +113,13 @@ export async function tatamisRoutes(app: FastifyInstance) {
 
       return filas.map((t) => ({
         ...t,
+        jueces: jueces
+          .filter((j) => j.tatamiId === t.id)
+          .map((j) => ({
+            rolTatami: j.rolTatami,
+            nombreDisplay: j.nombreDisplay,
+            userEmail: j.userEmail,
+          })),
         cola: items
           .filter((i) => i.tatamiId === t.id)
           .map((i) => ({
@@ -354,6 +374,91 @@ export async function tatamisRoutes(app: FastifyInstance) {
         .where(eq(colaTatami.id, id))
         .returning();
       return reply.send(upd);
+    },
+  );
+
+  // ── Jueces del tatami (espejo de COMBAT AsignacionJuez) ────────────────────
+  const ROLES_TATAMI = ['arbitro', 'j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'j7'];
+
+  app.put(
+    '/tatamis/:id/jueces/:rol',
+    { preHandler: requireRole('campeonatos', ['admin']) },
+    async (req, reply) => {
+      const { id, rol } = req.params as { id: string; rol: string };
+      const { nombreDisplay, userEmail } = req.body as {
+        nombreDisplay: string;
+        userEmail?: string;
+      };
+      if (!ROLES_TATAMI.includes(rol)) {
+        return reply
+          .code(422)
+          .send({ error: `Rol inválido. Usa: ${ROLES_TATAMI.join(', ')}.` });
+      }
+      if (!nombreDisplay?.trim()) {
+        return reply.code(422).send({ error: 'nombreDisplay es obligatorio.' });
+      }
+      const db = req.server.db;
+
+      const [tatami] = await db
+        .select()
+        .from(tatamis)
+        .where(eq(tatamis.id, id))
+        .limit(1);
+      if (!tatami) return reply.code(404).send({ error: 'Tatami no encontrado.' });
+
+      // Upsert por (tatami, rol): reasignar un rol reemplaza al juez anterior.
+      const valores = {
+        nombreDisplay: nombreDisplay.trim(),
+        userEmail: userEmail?.trim() || null,
+        asignadoPorUserId: req.user!.sub,
+        asignadoAt: new Date(),
+      };
+      const [existente] = await db
+        .select()
+        .from(juecesTatami)
+        .where(
+          and(
+            eq(juecesTatami.tatamiId, id),
+            eq(juecesTatami.rolTatami, rol as never),
+          ),
+        )
+        .limit(1);
+      const [item] = existente
+        ? await db
+            .update(juecesTatami)
+            .set(valores)
+            .where(eq(juecesTatami.id, existente.id))
+            .returning()
+        : await db
+            .insert(juecesTatami)
+            .values({ tatamiId: id, rolTatami: rol as never, ...valores })
+            .returning();
+      return reply.code(existente ? 200 : 201).send(item);
+    },
+  );
+
+  app.delete(
+    '/tatamis/:id/jueces/:rol',
+    { preHandler: requireRole('campeonatos', ['admin']) },
+    async (req, reply) => {
+      const { id, rol } = req.params as { id: string; rol: string };
+      if (!ROLES_TATAMI.includes(rol)) {
+        return reply.code(422).send({ error: 'Rol inválido.' });
+      }
+      const db = req.server.db;
+      const borrados = await db
+        .delete(juecesTatami)
+        .where(
+          and(
+            eq(juecesTatami.tatamiId, id),
+            eq(juecesTatami.rolTatami, rol as never),
+          ),
+        )
+        .returning();
+      if (!borrados[0]) {
+        return reply.code(404).send({ error: 'Ese rol no está asignado.' });
+      }
+      return reply.code(204).send();
     },
   );
 

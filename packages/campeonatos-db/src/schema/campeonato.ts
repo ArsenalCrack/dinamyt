@@ -15,6 +15,7 @@ import {
   estadoCampeonatoEnum,
   modalidadEnum,
   estadoTatamiEnum,
+  rolTatamiEnum,
 } from './_schema';
 
 // ── Campeonato ───────────────────────────────────────────────────────────────
@@ -80,4 +81,28 @@ export const tatamis = camp.table(
     createdAt: timestamp('created_at').defaultNow(),
   },
   (t) => [uniqueIndex('uq_tatami_campeonato_numero').on(t.campeonatoId, t.numero)],
+);
+
+// ── Jueces asignados a cada tatami (espejo de COMBAT AsignacionJuez) ─────────
+// El acceso del juez es exclusivamente por asignación del administrador; se
+// referencia por email del ecosystem (sin FK entre bases) + nombre visible.
+export const juecesTatami = camp.table(
+  'jueces_tatami',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tatamiId: uuid('tatami_id')
+      .notNull()
+      .references(() => tatamis.id),
+    rolTatami: rolTatamiEnum('rol_tatami').notNull(),
+    nombreDisplay: varchar('nombre_display', { length: 150 }).notNull(),
+    /** Email de la cuenta del ecosystem (para gatear el acceso del juez). */
+    userEmail: varchar('user_email', { length: 200 }),
+    /** user_id del ecosystem del admin que asignó. */
+    asignadoPorUserId: uuid('asignado_por_user_id'),
+    asignadoAt: timestamp('asignado_at').defaultNow(),
+  },
+  (t) => [
+    // Un rol único por tatami (no puede haber dos "j1" en el mismo tatami).
+    uniqueIndex('uq_juez_tatami_rol').on(t.tatamiId, t.rolTatami),
+  ],
 );
