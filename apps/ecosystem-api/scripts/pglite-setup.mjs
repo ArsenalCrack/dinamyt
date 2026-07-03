@@ -132,5 +132,76 @@ for (const [email, name, role, doc] of demos) {
   console.log(`[ecosystem] usuario demo: ${email} (${role}) / Demo1234!`);
 }
 
+// ── Escenario demo de MEMBRESÍAS ──
+// Plan Membresías + un club con suscripción activa + un maestro (owner) y 2 alumnos.
+const exPlanMem = (
+  await pg.query("select id from ecosystem.subscription_plans where name = 'Plan Membresías'")
+).rows[0];
+let planMemId = exPlanMem?.id;
+if (!planMemId) {
+  planMemId = (
+    await pg.query(
+      `insert into ecosystem.subscription_plans (name, description, apps_included, max_users, price_monthly, price_annual)
+       values ('Plan Membresías','Acceso a DINAMYT Membresías.', ARRAY['membresias']::text[], 200, '60000','600000') returning id`,
+    )
+  ).rows[0].id;
+  console.log('[ecosystem] plan creado: Plan Membresías');
+}
+
+let orgMem = (
+  await pg.query("select id from ecosystem.organizations where name = 'Club Membresías Demo'")
+).rows[0];
+if (!orgMem) {
+  orgMem = (
+    await pg.query(
+      "insert into ecosystem.organizations (name, type) values ('Club Membresías Demo','CLUB') returning id",
+    )
+  ).rows[0];
+  console.log('[ecosystem] org demo creada: Club Membresías Demo');
+}
+const subMem = (
+  await pg.query('select 1 from ecosystem.subscriptions where org_id = $1', [orgMem.id])
+).rows[0];
+if (!subMem) {
+  await pg.query(
+    `insert into ecosystem.subscriptions (org_id, plan_id, status, starts_at, ends_at)
+     values ($1,$2,'ACTIVE', now(), now() + interval '1 year')`,
+    [orgMem.id, planMemId],
+  );
+  console.log('[ecosystem] suscripción activa (Plan Membresías) para el club');
+}
+
+const demosMem = [
+  ['owner@dinamyt.com', 'Maestro Membresías (owner)', 'owner', '3000000001'],
+  ['alumno1@dinamyt.com', 'Ana Gómez', 'student', '3000000002'],
+  ['alumno2@dinamyt.com', 'Juan Pérez', 'student', '3000000003'],
+];
+for (const [email, name, role, doc] of demosMem) {
+  let u = (await pg.query('select id from ecosystem.users where email = $1', [email])).rows[0];
+  if (!u) {
+    u = (
+      await pg.query(
+        `insert into ecosystem.users (email, document_id, full_name, password_hash, is_email_verified, is_active, data_consent_at)
+         values ($1,$2,$3,$4,true,true,now()) returning id`,
+        [email, doc, name, hashDemo],
+      )
+    ).rows[0];
+  }
+  const mem = (
+    await pg.query('select 1 from ecosystem.org_members where org_id = $1 and user_id = $2', [
+      orgMem.id,
+      u.id,
+    ])
+  ).rows[0];
+  if (!mem) {
+    await pg.query('insert into ecosystem.org_members (org_id, user_id, role) values ($1,$2,$3)', [
+      orgMem.id,
+      u.id,
+      role,
+    ]);
+  }
+  console.log(`[ecosystem] usuario demo membresías: ${email} (${role}) / Demo1234!`);
+}
+
 await pg.close();
 console.log('[ecosystem] setup completado.');
