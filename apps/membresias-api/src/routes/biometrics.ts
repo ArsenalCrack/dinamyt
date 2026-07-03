@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { biometricTemplates, pushSubscriptions } from '@dinamyt/membresias-db';
 import { requireRole, requireScope } from '../plugins/auth';
 import { ensureMembership } from '../lib/memberships';
+import { encryptField } from '../lib/crypto';
 
 /**
  * Enrolamiento biométrico y suscripciones Web Push. La plantilla de huella la
@@ -29,7 +30,7 @@ export async function biometricsRoutes(app: FastifyInstance) {
         .insert(biometricTemplates)
         .values({
           membershipId: m.id,
-          template: body.template, // TODO: cifrar en esta capa antes de persistir
+          template: encryptField(body.template) ?? body.template, // cifrado (AES-256-GCM)
           format: body.format,
           consentAt: body.consent ? new Date() : null,
         })

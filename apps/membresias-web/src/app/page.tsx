@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, obtenerToken, cerrarSesion } from '@/lib/api';
+import { activarPush } from '@/lib/push';
 
 interface RosterItem {
   userId: string;
@@ -102,10 +103,15 @@ export default function Panel() {
     setAviso('');
     try {
       const r = await api.post('/notifications/run', {});
-      setAviso(`Avisos generados: ${r.data.creados} · emails: ${r.data.emailsEnviados}`);
+      setAviso(`Avisos: ${r.data.creados} · emails: ${r.data.emailsEnviados} · push: ${r.data.pushEnviados ?? 0}`);
     } catch {
       setAviso('No se pudieron enviar los avisos.');
     }
+  }
+
+  async function activarNotis() {
+    const r = await activarPush();
+    setAviso(r.ok ? 'Notificaciones activadas en este equipo.' : `No se activaron: ${r.motivo}`);
   }
 
   function salir() {
@@ -126,6 +132,7 @@ export default function Panel() {
           <Link href="/planes" className="btn btn-outline">Planes</Link>
           <Link href="/calendario" className="btn btn-outline">Calendario</Link>
           <button className="btn btn-outline btn-sm" onClick={enviarAvisos}>Enviar avisos</button>
+          <button className="btn btn-outline btn-sm" onClick={activarNotis}>Activar push</button>
           <button className="btn btn-outline btn-sm" onClick={salir}>Salir</button>
         </div>
       </header>
@@ -170,7 +177,7 @@ export default function Panel() {
             {roster.map((a) => (
               <tr key={a.userId}>
                 <td>
-                  <div style={{ fontWeight: 600 }}>{a.fullName}</div>
+                  <Link href={`/alumnos/${a.userId}`} style={{ fontWeight: 600, color: 'var(--gold)' }}>{a.fullName}</Link>
                   <div className="muted" style={{ fontSize: '0.72rem' }}>{a.email}</div>
                 </td>
                 <td><span className={estadoBadge(a.estado)}>{estadoLabel(a.estado)}</span></td>

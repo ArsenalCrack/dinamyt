@@ -2,9 +2,16 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { config } from './config';
 import { MockReader, type ReaderAdapter, type Candidato } from './adapters/reader';
+import { DigitalPersonaReader } from './adapters/digitalpersona';
 
 export interface BuildAgentDeps {
   reader?: ReaderAdapter;
+}
+
+/** Elige el adaptador del lector según READER_VENDOR (mock por defecto). */
+function crearReader(): ReaderAdapter {
+  if (config.vendor === 'digitalpersona') return new DigitalPersonaReader();
+  return new MockReader();
 }
 
 /**
@@ -16,7 +23,7 @@ export interface BuildAgentDeps {
  */
 export function buildAgent(deps: BuildAgentDeps = {}): FastifyInstance {
   const app = Fastify({ logger: false });
-  const reader = deps.reader ?? new MockReader();
+  const reader = deps.reader ?? crearReader();
 
   void app.register(cors, { origin: config.corsOrigins });
 

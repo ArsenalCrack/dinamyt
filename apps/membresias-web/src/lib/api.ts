@@ -26,6 +26,14 @@ api.interceptors.request.use((cfg) => {
   return cfg;
 });
 
+// Cliente del ecosystem (perfil de la persona: GET /users/:id/profile).
+export const ecosystemApi = axios.create({ baseURL: ECOSYSTEM_API_URL });
+ecosystemApi.interceptors.request.use((cfg) => {
+  const t = obtenerToken();
+  if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  return cfg;
+});
+
 /** Inicia sesión contra el ecosystem y guarda el token. */
 export async function login(email: string, password: string): Promise<string> {
   const res = await axios.post(`${ECOSYSTEM_API_URL}/auth/login`, {

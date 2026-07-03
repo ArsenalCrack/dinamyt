@@ -8,6 +8,7 @@ import {
   orgMembers,
 } from '../../db/schema';
 import { eq, and, gt } from 'drizzle-orm';
+import { encryptField, decryptField } from '../../common/crypto';
 import * as bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
 
@@ -148,11 +149,13 @@ export class UsersService {
       .select()
       .from(userGuardians)
       .where(eq(userGuardians.minorUserId, id));
-    return { ...this.strip(user), disciplines, guardians };
+    const safe = this.strip(user) as Record<string, unknown> | null;
+    if (safe) safe.medicalNotes = decryptField(user.medicalNotes);
+    return { ...safe, disciplines, guardians };
   }
 
   // Actualiza los campos editables del perfil (nunca email/documento/contraseña).
-  // NOTA: medicalNotes es dato sensible → cifrar en esta capa antes de persistir.
+  // medicalNotes es dato sensible: se cifra en esta capa (AES-256-GCM) antes de persistir.
   async updateProfile(
     id: string,
     data: {
@@ -183,7 +186,7 @@ export class UsersService {
           emergencyContactRelationship: data.emergencyContactRelationship,
         }),
         ...(data.medicalNotes !== undefined && {
-          medicalNotes: data.medicalNotes,
+          medicalNotes: encryptField(data.medicalNotes),
         }),
         updatedAt: new Date(),
       })

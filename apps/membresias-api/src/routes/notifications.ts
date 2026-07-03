@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { and, eq, gte, desc } from 'drizzle-orm';
-import { memberships, notifications } from '@dinamyt/membresias-db';
+import { memberships, notifications, pushSubscriptions } from '@dinamyt/membresias-db';
 import { requireRole, requireScope } from '../plugins/auth';
 import { planNotificaciones, textoAviso } from '../lib/notifications';
 import { todayStr } from '../lib/billing';
 import { enviarCorreo } from '../lib/mailer';
+import { enviarPush } from '../lib/push';
 
 export async function notificationsRoutes(app: FastifyInstance) {
   // ── POST /notifications/run — evalúa vencimientos y encola avisos ──────────
@@ -55,13 +56,14 @@ export async function notificationsRoutes(app: FastifyInstance) {
         );
       }
 
+      const venceElPorMembership = new Map(filas.map((m) => [m.id, m.venceEl]));
+
       // Email de respaldo (best-effort): mapea userId→email desde el roster.
       let emailsEnviados = 0;
       try {
         const token = req.headers.authorization!.slice(7);
         const roster = await req.server.fetchMembers(orgId, token);
         const emailPorUser = new Map(roster.map((r) => [r.userId, r.email]));
-        const venceElPorMembership = new Map(filas.map((m) => [m.id, m.venceEl]));
         for (const n of nuevos) {
           const to = emailPorUser.get(n.userId);
           if (!to) continue;
@@ -76,7 +78,30 @@ export async function notificationsRoutes(app: FastifyInstance) {
         /* el email es best-effort: no rompe el job */
       }
 
-      return { creados: nuevos.length, emailsEnviados };
+      // Web Push (best-effort): a las suscripciones de cada usuario.
+      let pushEnviados = 0;
+      try {
+        const userIds = new Set(nuevos.map((n) => n.userId));
+        const subs = (await db.select().from(pushSubscriptions)).filter((s) =>
+          userIds.has(s.userId),
+        );
+        for (const n of nuevos) {
+          for (const s of subs.filter((x) => x.userId === n.userId)) {
+            const ok = await enviarPush(
+              { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth },
+              {
+                title: 'DINAMYT Membresías',
+                body: textoAviso(n.type, venceElPorMembership.get(n.membershipId) ?? null),
+              },
+            );
+            if (ok) pushEnviados++;
+          }
+        }
+      } catch {
+        /* push best-effort */
+      }
+
+      return { creados: nuevos.length, emailsEnviados, pushEnviados };
     },
   );
 

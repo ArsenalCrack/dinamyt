@@ -351,19 +351,22 @@ Rutas: `/kiosco` (check-in), `/` (panel maestro), `/alumnos/[id]` (ficha),
       dorado/oscuro). Login delegado al ecosystem; **panel del maestro** (resumen
       recaudo/morosos/asistencia + roster con estado/días + registrar pago) y **kiosco
       de check-in** (PIN + lista manual + tarjeta de resultado con estado/acción).
-      `next build` OK; login verificado en el navegador. Añadido: páginas de **planes**
-      (CRUD), **calendario** (días + excepciones), botón de **avisos** y **cola offline**
-      del kiosco (`/`, `/login`, `/kiosco`, `/planes`, `/calendario`). *Pendiente UI:
-      ficha del alumno, reportes detallados, enrolar huella desde el kiosco.*
+      `next build` OK; login verificado en el navegador. Páginas: **planes** (CRUD),
+      **calendario** (días + excepciones), **ficha del alumno** (`/alumnos/[id]`: perfil
+      del ecosystem + estado + pagos + asistencias + **enrolar huella** vía agente),
+      botones de **avisos** y **activar push**, y **cola offline** del kiosco.
 - [x] **H5 · Reportes + notificaciones** ✓ 2026-07-02 — reportes `revenue`/`overdue`/
-      `attendance`; **notificaciones** in-app + **Email best-effort** (`lib/mailer.ts`) con
-      `POST /notifications/run` (job diario disparable, idempotente) y `GET /notifications`.
-      Tests 27/27. *Falta: entrega Web Push real (VAPID + service worker).*
-- [x] **H6 (parcial)** ✓ 2026-07-02 — **`membresias-agent`** (Fastify local, contrato
-      `/status`·`/enroll`·`/identify` con **adaptador mock**; el SDK real por marca se
-      enchufa en `adapters/reader.ts`) + `POST /memberships/:id/biometrics` +
-      `POST /push/subscribe` + **cola offline** del kiosco. Tests agente 4/4. *Falta
-      (requiere hardware/keys): adaptador real del lector y entrega Web Push con VAPID.*
+      `attendance`; **notificaciones** in-app + **Email** (`lib/mailer.ts`) + **Web Push
+      real (VAPID)** (`lib/push.ts` + `sw.js` + `gen:vapid`) con `POST /notifications/run`
+      (job idempotente) y `GET /notifications`. Tests 27/27.
+- [x] **H6** ✓ 2026-07-02 — **`membresias-agent`** (Fastify local, contrato
+      `/status`·`/enroll`·`/identify`; adaptadores `MockReader` + **esqueleto
+      `DigitalPersonaReader`** seleccionables por `READER_VENDOR`) + `POST
+      /memberships/:id/biometrics` + `POST /push/subscribe` + **cola offline**. Web Push
+      entregado (VAPID). Tests agente 4/4. *Único pendiente real: implementar el
+      adaptador del lector con el SDK de la marca (requiere el hardware).*
+- **Seguridad:** datos sensibles cifrados en capa app (AES-256-GCM, `FIELD_ENCRYPTION_KEY`):
+  `medical_notes` (ecosystem) y plantillas biométricas (membresias). Sin clave, dev en claro.
 
 ---
 
