@@ -7,6 +7,7 @@ import {
   timestamp,
   integer,
   decimal,
+  date,
 } from 'drizzle-orm/pg-core';
 
 // ── Schema de PostgreSQL ───────────────────────────────────────────────────
@@ -62,6 +63,14 @@ export const users = eco.table('users', {
   isActive: boolean('is_active').default(true),
   isSuperAdmin: boolean('is_super_admin').default(false),
   dataConsentAt: timestamp('data_consent_at'),
+  // ── Perfil transversal (lo consume Membresías; §6 PLAN_MEMBRESIAS) ──────────
+  emergencyContactName: varchar('emergency_contact_name', { length: 200 }),
+  emergencyContactPhone: varchar('emergency_contact_phone', { length: 30 }),
+  emergencyContactRelationship: varchar('emergency_contact_relationship', {
+    length: 50,
+  }),
+  // Dato sensible (salud): cifrar en la capa de aplicación antes de persistir.
+  medicalNotes: text('medical_notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -91,6 +100,38 @@ export const orgMembers = eco.table('org_members', {
   role: varchar('role', { length: 50 }).notNull().default('member'),
   joinedAt: timestamp('joined_at').defaultNow(),
   invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
+});
+
+// ── Tabla: user_guardians (persona ↔ acudiente; §6 PLAN_MEMBRESIAS) ──────────
+// Un acudiente puede tener varios menores; habilita el consentimiento de menores
+// (también en Campeonatos). Vive en el ecosistema porque es de la persona.
+export const userGuardians = eco.table('user_guardians', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  minorUserId: uuid('minor_user_id')
+    .notNull()
+    .references(() => users.id),
+  guardianUserId: uuid('guardian_user_id')
+    .notNull()
+    .references(() => users.id),
+  relationship: varchar('relationship', { length: 50 }),
+  consentAt: timestamp('consent_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ── Tabla: user_disciplines (grado/cinturón por disciplina) ──────────────────
+// Atributo de la persona (Campeonatos también lo usa para categorizar). Las
+// promociones las hace el maestro del club. Una disciplina por ahora en la UI,
+// pero el modelo ya soporta varias.
+export const userDisciplines = eco.table('user_disciplines', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  discipline: varchar('discipline', { length: 80 }).notNull(),
+  currentGrade: varchar('current_grade', { length: 50 }),
+  since: date('since'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // ── Tabla: subscription_plans ──────────────────────────────────────────────

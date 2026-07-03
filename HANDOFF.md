@@ -224,8 +224,16 @@ todos los datos (cinturón, peso, club, edad, nombre…).
 **Ecosystem**
 - [ ] Gestión de organizaciones y suscripciones desde el portal (UI; el API ya existe).
 - [ ] Endpoints de perfil (`/users/:id/profile`) y perfil unificado.
+- [ ] **Ampliar el perfil de la persona (transversal, lo usa Membresías):** contacto de
+      emergencia y notas médicas en `users`; `user_guardians` (acudiente↔menor);
+      `user_disciplines` (grado/cinturón). Ver `PLAN_MEMBRESIAS.md` §6 y el README del
+      ecosystem-api. Falta también el scope `membresias` + `role_membresias` en el JWT.
 
 **Academy**: no iniciada.
+
+**Membresías** (nueva app — control de mensualidades/asistencia): planificada en
+`PLAN_MEMBRESIAS.md`. Servicio nuevo (`membresias-api` + `membresias-web`) federado
+sobre esta identidad. No iniciada.
 
 **Operación / infra (tareas de Amir)**
 - [ ] Migraciones contra Postgres real: ecosystem (`DATABASE_URL`) y campeonatos

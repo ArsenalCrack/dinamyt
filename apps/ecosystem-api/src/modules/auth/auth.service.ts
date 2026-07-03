@@ -100,6 +100,22 @@ export class AuthService {
     return { access_token: token };
   }
 
+  // ── Información completa de la cuenta (para el perfil) ────────────────────
+  async getCuenta(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('Usuario no encontrado.');
+    // Solo campos seguros: nunca el hash de contraseña.
+    return {
+      email: user.email,
+      fullName: user.fullName,
+      documentId: user.documentId,
+      phone: user.phone,
+      birthDate: user.birthDate,
+      isEmailVerified: user.isEmailVerified,
+      createdAt: user.createdAt,
+    };
+  }
+
   // ── Cambiar contraseña (usuario autenticado, desde su perfil) ─────────────
   async changePassword(
     userId: string,
@@ -167,7 +183,7 @@ export class AuthService {
   // payload JWT con:
   //   - app_scopes: array deduplicado de apps a las que tiene acceso
   //   - org_id: ID de la primera organización a la que pertenece
-  //   - role_academy / role_campeonatos: rol del usuario en la org
+  //   - role_academy / role_campeonatos / role_membresias: rol del usuario en la org
   //
   private async buildToken(user: User): Promise<string> {
     const now = new Date();
@@ -243,6 +259,8 @@ export class AuthService {
       uniqueScopes.includes('academy') && orgRole ? orgRole : null;
     const roleCampeonatos =
       uniqueScopes.includes('campeonatos') && orgRole ? orgRole : null;
+    const roleMembresias =
+      uniqueScopes.includes('membresias') && orgRole ? orgRole : null;
 
     // ── 5. Construir y firmar el payload ────────────────────────────────
     const payload: JwtPayload = {
@@ -253,6 +271,7 @@ export class AuthService {
       app_scopes: uniqueScopes,
       role_academy: roleAcademy,
       role_campeonatos: roleCampeonatos,
+      role_membresias: roleMembresias,
       is_super_admin: user.isSuperAdmin ?? false,
     };
 

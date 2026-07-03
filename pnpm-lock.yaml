@@ -320,6 +320,46 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  apps/membresias-api:
+    dependencies:
+      '@dinamyt/membresias-db':
+        specifier: workspace:*
+        version: link:../../packages/membresias-db
+      '@dinamyt/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@fastify/cors':
+        specifier: ^10.0.0
+        version: 10.1.0
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@electric-sql/pglite@0.2.17)(postgres@3.4.9)
+      fastify:
+        specifier: ^5.2.0
+        version: 5.8.5
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.2.17
+        version: 0.2.17
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.2
+      tsx:
+        specifier: ^4.19.0
+        version: 4.22.4
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.6(@types/node@24.13.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
+
   packages/campeonatos-core:
     devDependencies:
       typescript:
@@ -330,6 +370,31 @@ importers:
         version: 3.2.6(@types/node@24.13.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
 
   packages/campeonatos-db:
+    dependencies:
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@electric-sql/pglite@0.2.17)(postgres@3.4.9)
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.2.17
+        version: 0.2.17
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.6(@types/node@24.13.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
+
+  packages/membresias-db:
     dependencies:
       dotenv:
         specifier: ^17.4.2

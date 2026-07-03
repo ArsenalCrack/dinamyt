@@ -2,9 +2,9 @@
 
 Servicio central de **identidad, suscripciones e integración** del ecosistema
 DINAMYT. Es el único componente que gestiona el registro, el login y el control
-de acceso por aplicación. Las apps del ecosistema (**DINAMYT Academy** y
-**DINAMYT Campeonatos**) **no** tienen autenticación propia: delegan en este
-servicio y solo **verifican** los tokens que él emite.
+de acceso por aplicación. Las apps del ecosistema (**DINAMYT Academy**,
+**DINAMYT Campeonatos** y **DINAMYT Membresías**) **no** tienen autenticación
+propia: delegan en este servicio y solo **verifican** los tokens que él emite.
 
 ## Qué resuelve
 
@@ -52,6 +52,30 @@ Una app del ecosistema valida el acceso así:
    responde `403` y redirige al portal del ecosistema.
 4. Lee `sub`, `org_id` y su rol (`role_campeonatos`) **sin** llamar al ecosistema
    en cada request.
+
+## Perfil de la persona (transversal)
+
+El **perfil es de la persona, no de cada app**: vive aquí y lo consumen por igual
+Campeonatos y Membresías (por eso el maestro registra al alumno **una sola vez**).
+
+**Hoy en `users`:** `full_name`, `document_id`, `email`, `phone`, `birth_date`,
+`avatar_url` (foto), `data_consent_at`.
+
+**Pendiente de añadir (perfil de alumno del ecosistema — lo consume Membresías):**
+
+- `users`: **contacto de emergencia** (`emergency_contact_name`, `_phone`,
+  `_relationship`) y **notas médicas** (`medical_notes` — _dato sensible_, con
+  consentimiento).
+- `user_guardians` (nueva): persona ↔ **acudiente** + parentesco (un acudiente puede
+  tener varios menores; habilita el consentimiento de menores en Campeonatos).
+- `user_disciplines` (nueva): **grado/cinturón por disciplina** (`discipline`,
+  `current_grade`, `since`); las promociones las hace el club.
+- Endpoints `GET/PATCH /users/:id/profile` (perfil unificado — ver `HANDOFF.md`).
+- Para habilitar Membresías: agregar `'membresias'` a `apps_included` y
+  `role_membresias` al `JwtPayload`.
+
+> El **estado en un club** (activo/retirado, plan, vencimiento) **no** va aquí: es de
+> cada app (ej. Membresías). Aquí solo vive la persona. Detalle en `PLAN_MEMBRESIAS.md`.
 
 ## Endpoints
 

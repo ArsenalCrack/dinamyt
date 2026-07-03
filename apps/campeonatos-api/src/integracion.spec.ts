@@ -35,6 +35,7 @@ describe('API campeonatos (integración con PGlite)', () => {
       app_scopes: scopes,
       role_academy: null,
       role_campeonatos: 'admin',
+      role_membresias: null,
       is_super_admin: false,
       ...overrides,
     };
