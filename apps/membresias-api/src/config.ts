@@ -12,9 +12,9 @@ export const config = {
   /** A dónde redirigir cuando falta el scope (adquirir el plan). */
   ecosystemPortalUrl: process.env.ECOSYSTEM_PORTAL_URL ?? 'http://localhost:3000',
   /** URL pública de membresias-web (para enlaces). */
-  webUrl: process.env.MEMBRESIAS_WEB_URL ?? 'http://localhost:3005',
+  webUrl: process.env.MEMBRESIAS_WEB_URL ?? 'http://localhost:3006',
   corsOrigins: (
-    process.env.CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:3005'
+    process.env.CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:3006'
   )
     .split(',')
     .map((o) => o.trim())

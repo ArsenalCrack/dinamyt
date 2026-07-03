@@ -30,6 +30,18 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dinamyt/campeonatos-combat", "dev"],
       "port": 3005
+    },
+    {
+      "name": "membresias-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/membresias-api", "dev"],
+      "port": 3004
+    },
+    {
+      "name": "membresias-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/membresias-web", "dev"],
+      "port": 3006
     }
   ]
 }

@@ -11,6 +11,7 @@ import { membershipsRoutes } from './routes/memberships';
 import { paymentsRoutes } from './routes/payments';
 import { scheduleRoutes } from './routes/schedule';
 import { checkinRoutes } from './routes/checkin';
+import { reportsRoutes } from './routes/reports';
 
 export interface BuildAppDeps {
   /** Verificador de tokens. Por defecto usa el JWKS remoto del ecosystem;
@@ -39,6 +40,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(paymentsRoutes);
   void app.register(scheduleRoutes);
   void app.register(checkinRoutes);
+  void app.register(reportsRoutes);
 
   return app;
 }

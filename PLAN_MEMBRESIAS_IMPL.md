@@ -18,7 +18,8 @@ pnpm workspaces (`apps/*`, `packages/*`) + turbo. Se agregan:
 | `apps/ecosystem-api` *(editar)* | + `role_membresias` en el token, perfil de persona, plan/seed | — |
 
 **Puertos** (los usados hoy: ecosystem-api `3001`, portal `3000`, campeonatos-api
-`3002`, campeonatos-web `3003`): **membresias-api `3004`**, **membresias-web `3005`**.
+`3002`, campeonatos-web `3003`, campeonatos-combat `3005`): **membresias-api `3004`**,
+**membresias-web `3006`**.
 
 **Regla de oro heredada:** la BD de Membresías es **independiente**; referencia a la
 persona por `ecosystem_user_id` (UUID) **sin FK entre bases**. **No duplica el perfil**
@@ -195,7 +196,7 @@ export const biometricTemplates = mem.table('biometric_templates', {
 ### 3.1 Bootstrap (igual a campeonatos-api)
 - `app.ts`: `buildApp(deps)` con `verifyToken` (default `createRemoteVerifier(config.ecosystemJwksUrl)`) y `db` inyectables; registra rutas como plugins.
 - `config.ts`: `port 3004`, `ecosystemJwksUrl`, `ecosystemApiUrl` (para el roster),
-  `ecosystemPortalUrl`, `webUrl 3005`, `corsOrigins`, VAPID, `mail*`.
+  `ecosystemPortalUrl`, `webUrl 3006`, `corsOrigins`, VAPID, `mail*`.
 - `plugins/auth.ts`: **copiar** `requireScope('membresias')` y `requireAuth`. ⚠️
   **Generalizar `requireRole`**: el de campeonatos lee `role_campeonatos` *hardcodeado*
   → parametrizar el claim (`role_membresias`) o duplicarlo como `requireMembresiasRole`.
@@ -256,7 +257,7 @@ un **contrato estable** por `http://localhost:7070` (o WS) a la PWA:
 
 ---
 
-## 5. `apps/membresias-web` (Next PWA, :3005)
+## 5. `apps/membresias-web` (Next PWA, :3006)
 
 Patrón `campeonatos-web`: login delegado al ecosystem, token `dinamyt_token`, cliente
 axios (`NEXT_PUBLIC_API_URL=3004`, `NEXT_PUBLIC_ECOSYSTEM_API_URL=3001`). **PWA**:
@@ -318,7 +319,7 @@ Rutas: `/kiosco` (check-in), `/` (panel maestro), `/alumnos/[id]` (ficha),
 | `ECOSYSTEM_JWKS_URL` | `http://localhost:3001/auth/jwks` |
 | `ECOSYSTEM_API_URL` | `http://localhost:3001` (roster) |
 | `ECOSYSTEM_PORTAL_URL` | `http://localhost:3000` (redirección 403) |
-| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3005` |
+| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3006` |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Web Push |
 | `MAIL_*` | respaldo por correo |
 
@@ -346,8 +347,15 @@ Rutas: `/kiosco` (check-in), `/` (panel maestro), `/alumnos/[id]` (ficha),
       no-doble-marca, descuento de clases y **regla de mora** (1ª avisa / 2ª bloquea,
       contador `mora_checkins` que el pago reinicia) + `GET /attendances`. Columnas
       nuevas `checkin_pin`/`mora_checkins` (migración `0001`). Tests 21/21.
-- [ ] **H4 · `membresias-web` (MVP):** login + kiosco + panel maestro + ficha + planes.
-- [ ] **H5 · Reportes + notificaciones** in-app + **Email** + job diario.
+- [x] **H4 · `membresias-web` (MVP)** ✓ 2026-07-02 — Next 16 PWA :3006 (design system
+      dorado/oscuro). Login delegado al ecosystem; **panel del maestro** (resumen
+      recaudo/morosos/asistencia + roster con estado/días + registrar pago) y **kiosco
+      de check-in** (PIN + lista manual + tarjeta de resultado con estado/acción).
+      `next build` OK (rutas `/`, `/login`, `/kiosco`); login verificado en el navegador.
+      *Pendiente UI: ficha de alumno, CRUD de planes y calendario, reportes detallados.*
+- [x] **H5 · Reportes** ✓ 2026-07-02 — `GET /reports/revenue` (esperado vs recaudado),
+      `/reports/overdue` (cartera vencida), `/reports/attendance` (asistencia por día).
+      Tests 24/24. *Pendiente: notificaciones (in-app/Email/Push) + job diario.*
 - [ ] **H6 · Fase 2:** Web **Push** (VAPID) · **`membresias-agent`** + lector · offline.
 
 ---

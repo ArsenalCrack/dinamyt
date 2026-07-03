@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/* Paleta DINAMYT (oscuro cálido + dorado), compartida con el ecosistema. */
+:root {
+  color-scheme: dark;
+  --bg: #14141e;
+  --bg-card: #1c1c2a;
+  --bg-elevated: #242436;
+  --bg-input: #0e0e18;
+  --border: #2a2a3e;
+  --text: #f0f0f8;
+  --text-muted: #9090b0;
+  --gold: #f0b800;
+  --gold-dim: #c99a00;
+  --danger: #ff5577;
+  --ok: #3ecf8e;
+  --info: #4d9fff;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}
+a { color: inherit; text-decoration: none; }
+
+input, select, textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  color: var(--text);
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:hover:not(:disabled) { filter: brightness(1.1); }
+.btn-gold { background: var(--gold); color: #14141e; }
+.btn-outline { background: transparent; border-color: var(--border); color: var(--text); }
+.btn-outline:hover:not(:disabled) { border-color: var(--gold); }
+.btn-sm { padding: 0.3rem 0.65rem; font-size: 0.75rem; }
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.badge-ok { background: rgba(62, 207, 142, 0.1); border-color: var(--ok); color: var(--ok); }
+.badge-gold { background: rgba(240, 184, 0, 0.12); border-color: var(--gold-dim); color: var(--gold); }
+.badge-danger { background: rgba(255, 85, 119, 0.12); border-color: var(--danger); color: var(--danger); }
+
+.msg-error { color: var(--danger); }
+.msg-ok { color: var(--ok); }
+.muted { color: var(--text-muted); }
+
+main { animation: aparecer 0.25s ease; }
+@keyframes aparecer {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+th { color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
