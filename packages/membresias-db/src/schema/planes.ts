@@ -54,10 +54,17 @@ export const memberships = mem.table(
     anchorDay: integer('anchor_day'),
     /** Planes por paquete/clase: clases disponibles. */
     clasesRestantes: integer('clases_restantes'),
+    /** Código para el check-in por PIN (opcional, único por club). */
+    checkinPin: varchar('checkin_pin', { length: 12 }),
+    /** Check-ins hechos en mora desde el último pago (1=avisado; ≥2 se bloquea). */
+    moraCheckins: integer('mora_checkins').default(0),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
   },
-  (t) => [uniqueIndex('uq_membership_org_user').on(t.orgId, t.ecosystemUserId)],
+  (t) => [
+    uniqueIndex('uq_membership_org_user').on(t.orgId, t.ecosystemUserId),
+    uniqueIndex('uq_membership_pin').on(t.orgId, t.checkinPin),
+  ],
 );
 
 // ── Pagos (el cobro es externo; aquí solo se registran) ──────────────────────

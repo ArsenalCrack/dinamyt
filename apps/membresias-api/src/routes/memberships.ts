@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { and, eq } from 'drizzle-orm';
-import { memberships, plans, payments, type Db } from '@dinamyt/membresias-db';
+import { memberships, plans, payments } from '@dinamyt/membresias-db';
 import { requireRole, requireScope } from '../plugins/auth';
+import { ensureMembership } from '../lib/memberships';
 import {
   nextDue,
   estado,
@@ -17,23 +18,6 @@ const ESTADOS_PAGO = ['PAGADO', 'PARCIAL', 'PENDIENTE'] as const;
 type EstadoPago = (typeof ESTADOS_PAGO)[number];
 const ESTADOS_MEM = ['activo', 'inactivo', 'suspendido', 'retirado'] as const;
 type EstadoMem = (typeof ESTADOS_MEM)[number];
-
-// Get-or-create del estado de membresía del alumno en este club.
-async function ensureMembership(db: Db, orgId: string, userId: string) {
-  const [existing] = await db
-    .select()
-    .from(memberships)
-    .where(
-      and(eq(memberships.orgId, orgId), eq(memberships.ecosystemUserId, userId)),
-    )
-    .limit(1);
-  if (existing) return existing;
-  const [row] = await db
-    .insert(memberships)
-    .values({ orgId, ecosystemUserId: userId })
-    .returning();
-  return row;
-}
 
 export async function membershipsRoutes(app: FastifyInstance) {
   // ── GET /memberships — roster del club + estado local (owner/staff) ───────
@@ -113,6 +97,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
         statusReason?: string | null;
         payerUserId?: string | null;
         currentPlanId?: string | null;
+        checkinPin?: string | null;
       };
       const db = req.server.db;
       const m = await ensureMembership(db, orgId, userId);
@@ -131,6 +116,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
           ...(body.currentPlanId !== undefined && {
             currentPlanId: body.currentPlanId,
           }),
+          ...(body.checkinPin !== undefined && { checkinPin: body.checkinPin }),
           updatedAt: new Date(),
         })
         .where(eq(memberships.id, m.id))
@@ -224,6 +210,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
           clasesRestantes,
           matriculado,
           currentPlanId: plan.id,
+          moraCheckins: 0, // pagar restablece el acceso: reinicia la mora
           updatedAt: new Date(),
         })
         .where(eq(memberships.id, m.id))

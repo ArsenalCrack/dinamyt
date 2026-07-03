@@ -340,8 +340,12 @@ Rutas: `/kiosco` (check-in), `/` (panel maestro), `/alumnos/[id]` (ficha),
       `payments` (historial) + **`lib/billing.ts`** (mes calendario, ancla, clamp fin
       de mes) con tests. Verificado: build + tests **10/10** (6 billing + 4 integración
       PGlite).
-- [ ] **H3 · Asistencia:** `/checkin` (QR/PIN/manual) + `attendances` + `schedule` +
-      regla de mora.
+- [x] **H3 · Asistencia** ✓ 2026-07-02 — `POST /checkin` (huella/QR/PIN/manual;
+      resuelve por `ecosystem_user_id` o `checkin_pin`), día de operación
+      (`lib/schedule.ts` + `GET/PUT /schedule`, `POST/DELETE /schedule/exceptions`),
+      no-doble-marca, descuento de clases y **regla de mora** (1ª avisa / 2ª bloquea,
+      contador `mora_checkins` que el pago reinicia) + `GET /attendances`. Columnas
+      nuevas `checkin_pin`/`mora_checkins` (migración `0001`). Tests 21/21.
 - [ ] **H4 · `membresias-web` (MVP):** login + kiosco + panel maestro + ficha + planes.
 - [ ] **H5 · Reportes + notificaciones** in-app + **Email** + job diario.
 - [ ] **H6 · Fase 2:** Web **Push** (VAPID) · **`membresias-agent`** + lector · offline.
