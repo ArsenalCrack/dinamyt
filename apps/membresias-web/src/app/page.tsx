@@ -44,6 +44,7 @@ export default function Panel() {
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [planPorFila, setPlanPorFila] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const [aviso, setAviso] = useState('');
   const [cargando, setCargando] = useState(true);
 
   const cargar = useCallback(async () => {
@@ -97,6 +98,16 @@ export default function Panel() {
     }
   }
 
+  async function enviarAvisos() {
+    setAviso('');
+    try {
+      const r = await api.post('/notifications/run', {});
+      setAviso(`Avisos generados: ${r.data.creados} · emails: ${r.data.emailsEnviados}`);
+    } catch {
+      setAviso('No se pudieron enviar los avisos.');
+    }
+  }
+
   function salir() {
     cerrarSesion();
     router.push('/login');
@@ -110,13 +121,17 @@ export default function Panel() {
         <h1 style={{ fontSize: '1.4rem', fontWeight: 800 }}>
           DINAMYT <span style={{ color: 'var(--gold)' }}>Membresías</span>
         </h1>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <Link href="/kiosco" className="btn btn-outline">Kiosco de check-in</Link>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Link href="/kiosco" className="btn btn-outline">Kiosco</Link>
+          <Link href="/planes" className="btn btn-outline">Planes</Link>
+          <Link href="/calendario" className="btn btn-outline">Calendario</Link>
+          <button className="btn btn-outline btn-sm" onClick={enviarAvisos}>Enviar avisos</button>
           <button className="btn btn-outline btn-sm" onClick={salir}>Salir</button>
         </div>
       </header>
 
       {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {aviso && <p className="msg-ok" style={{ marginBottom: '1rem' }}>{aviso}</p>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div className="card" style={{ padding: '0.9rem' }}>

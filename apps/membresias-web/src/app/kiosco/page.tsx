@@ -18,11 +18,39 @@ interface Resultado {
   error?: string;
 }
 
+const QKEY = 'membresias_checkin_queue';
+interface Encolado { identifier: { type: string; value: string }; ts: number }
+
 export default function Kiosco() {
   const router = useRouter();
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [pin, setPin] = useState('');
   const [resultado, setResultado] = useState<Resultado | null>(null);
+  const [pendientes, setPendientes] = useState(0);
+
+  function encolar(identifier: { type: string; value: string }) {
+    const q: Encolado[] = JSON.parse(localStorage.getItem(QKEY) || '[]');
+    q.push({ identifier, ts: Date.now() });
+    localStorage.setItem(QKEY, JSON.stringify(q));
+    setPendientes(q.length);
+  }
+
+  // Reintenta los check-ins guardados sin conexión; descarta los rechazados por el servidor.
+  const flush = useCallback(async () => {
+    const q: Encolado[] = JSON.parse(localStorage.getItem(QKEY) || '[]');
+    if (!q.length) return;
+    const rest: Encolado[] = [];
+    for (const item of q) {
+      try {
+        await api.post('/checkin', { identifier: item.identifier });
+      } catch (e) {
+        const err = e as { response?: unknown };
+        if (!err.response) rest.push(item);
+      }
+    }
+    localStorage.setItem(QKEY, JSON.stringify(rest));
+    setPendientes(rest.length);
+  }, []);
 
   const cargar = useCallback(async () => {
     try {
@@ -39,16 +67,24 @@ export default function Kiosco() {
       return;
     }
     void cargar();
-  }, [router, cargar]);
+    setPendientes((JSON.parse(localStorage.getItem(QKEY) || '[]') as Encolado[]).length);
+    void flush();
+  }, [router, cargar, flush]);
 
   async function checkin(identifier: { type: string; value: string }) {
     setResultado(null);
     try {
       const res = await api.post('/checkin', { identifier });
       setResultado({ ok: true, ...res.data });
+      void flush();
     } catch (e) {
       const err = e as { response?: { data?: Resultado } };
-      setResultado({ ...(err.response?.data ?? { error: 'Error de conexión.' }), ok: false });
+      if (!err.response) {
+        encolar(identifier);
+        setResultado({ ok: false, error: 'Sin conexión: se guardó y se sincronizará luego.' });
+      } else {
+        setResultado({ ...(err.response.data ?? { error: 'No se pudo registrar.' }), ok: false });
+      }
     }
   }
 
@@ -68,7 +104,10 @@ export default function Kiosco() {
     <main style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem', minHeight: '100vh' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Kiosco · <span style={{ color: 'var(--gold)' }}>Check-in</span></h1>
-        <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {pendientes > 0 && <span className="badge badge-gold">{pendientes} sin sincronizar</span>}
+          <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
+        </div>
       </header>
 
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>

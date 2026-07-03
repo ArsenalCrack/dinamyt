@@ -351,12 +351,19 @@ Rutas: `/kiosco` (check-in), `/` (panel maestro), `/alumnos/[id]` (ficha),
       dorado/oscuro). Login delegado al ecosystem; **panel del maestro** (resumen
       recaudo/morosos/asistencia + roster con estado/días + registrar pago) y **kiosco
       de check-in** (PIN + lista manual + tarjeta de resultado con estado/acción).
-      `next build` OK (rutas `/`, `/login`, `/kiosco`); login verificado en el navegador.
-      *Pendiente UI: ficha de alumno, CRUD de planes y calendario, reportes detallados.*
-- [x] **H5 · Reportes** ✓ 2026-07-02 — `GET /reports/revenue` (esperado vs recaudado),
-      `/reports/overdue` (cartera vencida), `/reports/attendance` (asistencia por día).
-      Tests 24/24. *Pendiente: notificaciones (in-app/Email/Push) + job diario.*
-- [ ] **H6 · Fase 2:** Web **Push** (VAPID) · **`membresias-agent`** + lector · offline.
+      `next build` OK; login verificado en el navegador. Añadido: páginas de **planes**
+      (CRUD), **calendario** (días + excepciones), botón de **avisos** y **cola offline**
+      del kiosco (`/`, `/login`, `/kiosco`, `/planes`, `/calendario`). *Pendiente UI:
+      ficha del alumno, reportes detallados, enrolar huella desde el kiosco.*
+- [x] **H5 · Reportes + notificaciones** ✓ 2026-07-02 — reportes `revenue`/`overdue`/
+      `attendance`; **notificaciones** in-app + **Email best-effort** (`lib/mailer.ts`) con
+      `POST /notifications/run` (job diario disparable, idempotente) y `GET /notifications`.
+      Tests 27/27. *Falta: entrega Web Push real (VAPID + service worker).*
+- [x] **H6 (parcial)** ✓ 2026-07-02 — **`membresias-agent`** (Fastify local, contrato
+      `/status`·`/enroll`·`/identify` con **adaptador mock**; el SDK real por marca se
+      enchufa en `adapters/reader.ts`) + `POST /memberships/:id/biometrics` +
+      `POST /push/subscribe` + **cola offline** del kiosco. Tests agente 4/4. *Falta
+      (requiere hardware/keys): adaptador real del lector y entrega Web Push con VAPID.*
 
 ---
 

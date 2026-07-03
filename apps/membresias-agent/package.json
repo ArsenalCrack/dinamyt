@@ -1,10 +1,10 @@
 {
-  "name": "@dinamyt/membresias-api",
+  "name": "@dinamyt/membresias-agent",
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
   "main": "./dist/main.js",
-  "description": "API de DINAMYT Membresías (Fastify). Auth delegada al ecosystem.",
+  "description": "Agente local (kiosco Windows) que habla con el lector de huella y expone un contrato estable a la PWA de Membresías. La marca del lector solo afecta a este componente.",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
@@ -12,19 +12,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@dinamyt/membresias-db": "workspace:*",
-    "@dinamyt/shared": "workspace:*",
     "@fastify/cors": "^10.0.0",
     "dotenv": "^17.4.2",
-    "drizzle-orm": "^0.45.2",
-    "fastify": "^5.2.0",
-    "jose": "^6.2.3",
-    "nodemailer": "^8.0.11"
+    "fastify": "^5.2.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.2.17",
     "@types/node": "^24.0.0",
-    "@types/nodemailer": "^8.0.1",
     "tsx": "^4.19.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.0"
