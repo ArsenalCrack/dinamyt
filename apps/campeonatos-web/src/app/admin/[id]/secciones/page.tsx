@@ -35,6 +35,15 @@ export default function SeccionesPage() {
   // (la API también lo exige): regenerar destruiría colas y llaves.
   const congelado = estadoCamp === 'EN_CURSO' || estadoCamp === 'FINALIZADO';
 
+  // Asistente de 3 pasos: solo se ve UN paso a la vez (nada de scroll
+  // infinito). Al cargar cae en el paso que corresponde al avance real.
+  const [paso, setPaso] = useState<1 | 2 | 3>(1);
+  const [pasoElegido, setPasoElegido] = useState(false);
+  useEffect(() => {
+    if (pasoElegido || estado !== 'ok') return;
+    setPaso(secciones.length > 0 ? 2 : 1);
+  }, [estado, secciones.length, pasoElegido]);
+
   const cargar = useCallback(async () => {
     setEstado('cargando');
     try {
@@ -120,18 +129,68 @@ export default function SeccionesPage() {
     }
   }
 
+  const configuradas = modalidades.filter((m) =>
+    esConfigCompleta(m.modalidad, m.categorias),
+  ).length;
+
+  const PASOS: { n: 1 | 2 | 3; titulo: string; estado: string; listo: boolean }[] = [
+    {
+      n: 1,
+      titulo: 'Configurar modalidades',
+      estado: `${configuradas}/${modalidades.length} listas`,
+      listo: modalidades.length > 0 && configuradas === modalidades.length,
+    },
+    {
+      n: 2,
+      titulo: 'Generar secciones',
+      estado: secciones.length > 0 ? `${secciones.length} secciones` : 'Pendiente',
+      listo: secciones.length > 0,
+    },
+    {
+      n: 3,
+      titulo: 'Colocar aprobados',
+      estado: 'Llena las llaves',
+      listo: false,
+    },
+  ];
+
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-6 py-10">
-      <Link href="/admin" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-        ← Volver
+    <main className="mx-auto min-h-screen max-w-3xl px-4 py-8 sm:px-6">
+      <Link href={`/admin/${campId}`} className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        ← Panel del campeonato
       </Link>
-      <h1 className="mb-2 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-        Secciones y llaves
+      <h1 className="mb-4 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
+        Categorías y llaves
       </h1>
-      <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Genera las secciones del campeonato, asigna las inscripciones a la sección
-        que les corresponde y crea la llave (bracket) de cada sección de combate.
-      </p>
+
+      {/* Asistente: un paso a la vez, con el avance siempre a la vista */}
+      <nav className="mb-6 grid grid-cols-3 gap-2">
+        {PASOS.map((p) => (
+          <button
+            key={p.n}
+            onClick={() => {
+              setPaso(p.n);
+              setPasoElegido(true);
+            }}
+            className="card p-3 text-left"
+            style={
+              paso === p.n
+                ? { borderColor: 'var(--gold)', background: 'var(--bg-elevated)' }
+                : undefined
+            }
+          >
+            <span
+              className="text-xs font-extrabold"
+              style={{ color: paso === p.n ? 'var(--gold)' : 'var(--text-muted)' }}
+            >
+              {p.listo ? '✓' : p.n} · {p.titulo}
+            </span>
+            <span className="mt-0.5 block text-[0.65rem]" style={{ color: 'var(--text-muted)' }}>
+              {p.estado}
+            </span>
+          </button>
+        ))}
+      </nav>
 
       {/* Candado: con el evento en curso ya no se toca la configuración */}
       {congelado && (
@@ -147,10 +206,9 @@ export default function SeccionesPage() {
         </div>
       )}
 
-      {/* Configuración de categorías por modalidad (rangos → secciones) */}
-      {modalidades.length > 0 && !congelado && (
+      {/* ── PASO 1: configurar cada modalidad ─────────────────────────── */}
+      {paso === 1 && modalidades.length > 0 && !congelado && (
         <section className="mb-6">
-          <h2 className="mb-1 text-lg font-semibold">Paso 1 · Configura cada modalidad</h2>
           <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
             Abre cada modalidad y responde: <strong>¿compiten géneros por
             separado o mixto?</strong>, <strong>¿qué cinturones entran y cómo se
@@ -198,51 +256,67 @@ export default function SeccionesPage() {
               </details>
             ))}
           </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={() => {
+                setPaso(2);
+                setPasoElegido(true);
+              }}
+              className="btn btn-gold"
+            >
+              Continuar: generar secciones →
+            </button>
+          </div>
         </section>
       )}
 
-      {!congelado && (
-      <div className="mb-6 flex flex-wrap gap-3">
-        <button
-          onClick={generar}
-          disabled={ocupado}
-          className="rounded-lg px-4 py-2 text-sm font-semibold"
-          style={{ background: 'var(--gold)', color: '#14141e' }}
-          title="Crea las secciones (categorías) a partir de la configuración de arriba"
-        >
-          Paso 2 · Generar secciones
-        </button>
-        <button
-          onClick={asignar}
-          disabled={ocupado}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold"
-          style={{ borderColor: 'var(--border)' }}
-          title="Toma TODAS las inscripciones ya aprobadas y las coloca en su sección por cinturón, edad, peso y género (útil si generaste las secciones después de aprobar)"
-        >
-          Paso 3 · Colocar aprobados en sus llaves
-        </button>
-        <Link
-          href={`/admin/${campId}/inscripciones`}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          Revisar inscripciones
-        </Link>
-        <Link
-          href={`/admin/${campId}`}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          Inscribir competidores
-        </Link>
-        <Link
-          href={`/admin/${campId}/tatamis`}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          Paso 4 · Tatamis (evento en vivo)
-        </Link>
-      </div>
+      {/* ── PASO 2: generar secciones (y sus llaves) ──────────────────── */}
+      {paso === 2 && !congelado && (
+        <section className="card mb-4 p-4">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Con la configuración del paso 1, el sistema crea una{' '}
+            <strong>sección</strong> por cada combinación (modalidad · género ·
+            cinturón · edad · peso). Puedes regenerarlas mientras el evento no
+            arranque: se reemplazan las anteriores.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button onClick={generar} disabled={ocupado} className="btn btn-gold">
+              {secciones.length > 0 ? '↻ Regenerar secciones' : 'Generar secciones'}
+            </button>
+            {secciones.length > 0 && (
+              <button
+                onClick={() => {
+                  setPaso(3);
+                  setPasoElegido(true);
+                }}
+                className="btn btn-outline"
+              >
+                Continuar: colocar aprobados →
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── PASO 3: colocar aprobados en sus llaves ───────────────────── */}
+      {paso === 3 && (
+        <section className="card mb-4 p-4">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Toma todas las inscripciones <strong>aprobadas</strong> y coloca a
+            cada competidor en la sección que le corresponde por cinturón,
+            edad, peso y género. (Al aprobar una inscripción en «Revisión» esto
+            ya ocurre solo; este botón sirve si generaste las secciones
+            después de aprobar gente.)
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button onClick={asignar} disabled={ocupado || congelado} className="btn btn-gold">
+              Colocar aprobados en sus llaves
+            </button>
+            <Link href={`/admin/${campId}/tatamis`} className="btn btn-outline">
+              Siguiente: dirigir tatamis →
+            </Link>
+          </div>
+        </section>
       )}
 
       {msg && (
@@ -252,14 +326,15 @@ export default function SeccionesPage() {
       )}
 
       {estado === 'cargando' && <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>}
-      {estado === 'ok' && secciones.length === 0 && (
+      {estado === 'ok' && paso === 2 && secciones.length === 0 && (
         <p style={{ color: 'var(--text-muted)' }}>
           Aún no hay secciones. Pulsa «Generar secciones».
         </p>
       )}
 
-      {/* Secciones agrupadas por modalidad: con muchas categorías abiertas,
-          cada modalidad se pliega y muestra su total. */}
+      {/* Secciones agrupadas por modalidad (solo en el paso 2): con muchas
+          categorías abiertas, cada modalidad se pliega y muestra su total. */}
+      {paso === 2 && (
       <div className="grid gap-2">
         {[...new Set(secciones.map((s) => s.modalidad))].map((mod) => {
           const deMod = secciones.filter((s) => s.modalidad === mod);
@@ -304,6 +379,7 @@ export default function SeccionesPage() {
           );
         })}
       </div>
+      )}
     </main>
   );
 }

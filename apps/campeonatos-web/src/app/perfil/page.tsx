@@ -7,9 +7,11 @@ import {
   obtenerToken,
   misInscripcionesAPI,
   misInvitacionesAPI,
+  miCuentaAPI,
   cambiarPasswordAPI,
   extraerError,
   type MiInscripcion,
+  type MiCuenta,
 } from '@/lib/api';
 import { getSesion, etiquetaRol, type Sesion } from '@/lib/session';
 
@@ -90,6 +92,7 @@ const NOMBRE_MODALIDAD: Record<string, string> = {
 export default function PerfilPage() {
   const router = useRouter();
   const [sesion, setSesion] = useState<Sesion | null>(null);
+  const [cuenta, setCuenta] = useState<MiCuenta | null>(null);
   const [inscripciones, setInscripciones] = useState<MiInscripcion[]>([]);
   const [pendientes, setPendientes] = useState(0);
   const [cargando, setCargando] = useState(true);
@@ -100,11 +103,12 @@ export default function PerfilPage() {
       return;
     }
     setSesion(getSesion());
-    Promise.allSettled([misInscripcionesAPI(), misInvitacionesAPI()]).then(
-      ([ins, invs]) => {
+    Promise.allSettled([misInscripcionesAPI(), misInvitacionesAPI(), miCuentaAPI()]).then(
+      ([ins, invs, cta]) => {
         if (ins.status === 'fulfilled') setInscripciones(ins.value);
         if (invs.status === 'fulfilled')
           setPendientes(invs.value.filter((i) => i.estado === 'PENDIENTE').length);
+        if (cta.status === 'fulfilled') setCuenta(cta.value);
         setCargando(false);
       },
     );
@@ -139,6 +143,47 @@ export default function PerfilPage() {
           </div>
           <span className="badge badge-gold">{etiquetaRol(sesion)}</span>
         </div>
+
+        {/* Información completa de la cuenta */}
+        {cuenta && (
+          <dl
+            className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t pt-4 text-sm sm:grid-cols-2"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <div className="flex justify-between gap-2">
+              <dt style={{ color: 'var(--text-muted)' }}>Documento</dt>
+              <dd className="font-semibold">{cuenta.documentId}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt style={{ color: 'var(--text-muted)' }}>Teléfono</dt>
+              <dd className="font-semibold">{cuenta.phone ?? '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt style={{ color: 'var(--text-muted)' }}>Fecha de nacimiento</dt>
+              <dd className="font-semibold">
+                {cuenta.birthDate
+                  ? new Date(cuenta.birthDate).toLocaleDateString('es')
+                  : '—'}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt style={{ color: 'var(--text-muted)' }}>Correo verificado</dt>
+              <dd>
+                <span className={`badge ${cuenta.isEmailVerified ? 'badge-ok' : 'badge-live'}`}>
+                  {cuenta.isEmailVerified ? 'Sí' : 'No'}
+                </span>
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt style={{ color: 'var(--text-muted)' }}>Miembro desde</dt>
+              <dd className="font-semibold">
+                {cuenta.createdAt
+                  ? new Date(cuenta.createdAt).toLocaleDateString('es')
+                  : '—'}
+              </dd>
+            </div>
+          </dl>
+        )}
 
         {/* Cambiar contraseña */}
         <details className="desplegable mt-4">

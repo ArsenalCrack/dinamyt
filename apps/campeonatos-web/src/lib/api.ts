@@ -48,6 +48,23 @@ export async function loginAPI(email: string, password: string) {
   return res.data as { access_token: string };
 }
 
+export interface MiCuenta {
+  email: string;
+  fullName: string;
+  documentId: string;
+  phone: string | null;
+  birthDate: string | null;
+  isEmailVerified: boolean;
+  createdAt: string | null;
+}
+/** Información completa de la cuenta del ecosystem (para el perfil). */
+export async function miCuentaAPI(): Promise<MiCuenta> {
+  const res = await eco.get('/auth/me', {
+    headers: { Authorization: `Bearer ${obtenerToken()}` },
+  });
+  return res.data as MiCuenta;
+}
+
 /** Cambia la contraseña de la cuenta (la valida el ecosystem). */
 export async function cambiarPasswordAPI(
   currentPassword: string,
