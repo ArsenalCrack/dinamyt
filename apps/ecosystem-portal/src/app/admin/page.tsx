@@ -6,6 +6,8 @@ import Link from 'next/link';
 import {
   obtenerToken,
   decodificarToken,
+  buscarUsuariosAPI,
+  grantAccessAPI,
   listOrganizacionesAPI,
   crearOrganizacionAPI,
   listMiembrosAPI,
@@ -22,6 +24,7 @@ import {
   type Organizacion,
   type Miembro,
   type Plan,
+  type UsuarioBusqueda,
   type SuscripcionOrg,
   type SuscripcionPersonal,
 } from '@/lib/api';
@@ -142,6 +145,22 @@ export default function AdminEcosistemaPage() {
           {msg.texto}
         </p>
       )}
+
+      {/* ── ACCESOS RÁPIDOS: correo → app + rol → un clic ───────────────── */}
+      <AccesosRapidos
+        orgs={orgs}
+        ocupado={ocupado}
+        onGrant={async (orgId, email, role, app) => {
+          await accion(
+            async () => {
+              const r = await grantAccessAPI(orgId, { email, role, app });
+              return r;
+            },
+            `Acceso a ${app} (${role}) dado a ${email}.`,
+            'No se pudo dar el acceso (¿existe la cuenta?).',
+          );
+        }}
+      />
 
       <div className="grid gap-5 lg:grid-cols-2">
         {/* ── Organizaciones ─────────────────────────────────────────────── */}
@@ -508,6 +527,158 @@ export default function AdminEcosistemaPage() {
         </button>
       </section>
     </main>
+  );
+}
+
+/**
+ * Panel de ACCESOS: el super admin busca un correo, ve qué accesos tiene,
+ * y con un clic le da una app + rol (crea la membresía y, si hace falta,
+ * activa una suscripción de la org que incluya la app). Sin pasos manuales.
+ */
+function AccesosRapidos({
+  orgs,
+  ocupado,
+  onGrant,
+}: {
+  orgs: Organizacion[];
+  ocupado: boolean;
+  onGrant: (orgId: string, email: string, role: string, app: string) => Promise<void>;
+}) {
+  const [busqueda, setBusqueda] = useState('');
+  const [resultados, setResultados] = useState<UsuarioBusqueda[]>([]);
+  const [sel, setSel] = useState<UsuarioBusqueda | null>(null);
+  const [app, setApp] = useState('campeonatos');
+  const [rol, setRol] = useState('competitor');
+  const [orgId, setOrgId] = useState('');
+
+  useEffect(() => {
+    if (orgs.length > 0 && !orgId) setOrgId(orgs[0].id);
+  }, [orgs, orgId]);
+
+  // Búsqueda con un pequeño debounce para no disparar en cada tecla.
+  useEffect(() => {
+    if (busqueda.trim().length < 2) {
+      setResultados([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      buscarUsuariosAPI(busqueda.trim())
+        .then(setResultados)
+        .catch(() => setResultados([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
+  return (
+    <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
+      <h2 className="mb-1 text-lg font-semibold" style={{ color: 'var(--gold)' }}>
+        ⚡ Accesos rápidos
+      </h2>
+      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+        Busca el correo, elige la app y el rol, y dale acceso con un clic
+        (membresía + suscripción activa, todo en uno).
+      </p>
+
+      <input
+        placeholder="Buscar por correo (mín. 2 letras)…"
+        value={busqueda}
+        onChange={(e) => {
+          setBusqueda(e.target.value);
+          setSel(null);
+        }}
+        maxLength={200}
+      />
+
+      {/* Resultados de la búsqueda */}
+      {resultados.length > 0 && !sel && (
+        <ul className="mt-2 flex max-h-56 flex-col gap-1.5 overflow-y-auto">
+          {resultados.map((u) => (
+            <li key={u.id}>
+              <button
+                onClick={() => setSel(u)}
+                className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <span className="min-w-0">
+                  <strong>{u.fullName}</strong>
+                  <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
+                    · {u.email}
+                  </span>
+                </span>
+                <span className="flex flex-wrap gap-1">
+                  {u.membresias.length > 0 ? (
+                    u.membresias.map((m, i) => (
+                      <span key={i} className="badge">
+                        {m.org}: {m.role}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="badge">sin accesos</span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {busqueda.trim().length >= 2 && resultados.length === 0 && !sel && (
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Sin resultados para «{busqueda}».
+        </p>
+      )}
+
+      {/* Usuario elegido → dar acceso */}
+      {sel && (
+        <div
+          className="mt-3 rounded-lg border p-3"
+          style={{ borderColor: 'var(--gold)' }}
+        >
+          <p className="mb-2 text-sm">
+            <strong>{sel.fullName}</strong>{' '}
+            <span style={{ color: 'var(--text-muted)' }}>· {sel.email}</span>
+            {sel.membresias.map((m, i) => (
+              <span key={i} className="badge ml-1">
+                {m.org}: {m.role}
+              </span>
+            ))}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={app} onChange={(e) => setApp(e.target.value)} style={selectStyle}>
+              <option value="campeonatos">Campeonatos</option>
+              <option value="academy">Academy</option>
+            </select>
+            <select value={rol} onChange={(e) => setRol(e.target.value)} style={selectStyle}>
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+            <select value={orgId} onChange={(e) => setOrgId(e.target.value)} style={selectStyle}>
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={async () => {
+                await onGrant(orgId, sel.email, rol, app);
+                setSel(null);
+                setBusqueda('');
+              }}
+              disabled={ocupado || !orgId}
+              className="btn btn-gold"
+            >
+              ⚡ Dar acceso
+            </button>
+            <button onClick={() => setSel(null)} className="btn btn-outline">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

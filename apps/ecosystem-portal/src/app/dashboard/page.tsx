@@ -109,6 +109,25 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* Panel del admin de organización (federación → clubes → gente) */}
+      <section
+        className="mt-4 rounded-xl border p-5"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+      >
+        <h2 className="mb-1 text-lg font-semibold">Mi organización</h2>
+        <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Si administras una federación o club: gestiona tus clubes, maestros y
+          alumnos.
+        </p>
+        <Link
+          href="/mi-organizacion"
+          className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
+          style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+        >
+          Abrir mi organización
+        </Link>
+      </section>
+
       {payload.is_super_admin && (
         <section
           className="mt-4 rounded-xl border p-5"

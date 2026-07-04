@@ -37,6 +37,13 @@ export class AuthController {
     return this.authService.login(body.email, body.password);
   }
 
+  // ── GET /auth/me — información completa de la cuenta (autenticado) ────────
+  @Get('me')
+  @UseGuards(EcosystemJwtGuard)
+  async me(@CurrentUser() user: JwtPayload) {
+    return this.authService.getCuenta(user.sub);
+  }
+
   // ── POST /auth/change-password — cambiar contraseña (autenticado) ─────────
   @Post('change-password')
   @UseGuards(EcosystemJwtGuard)

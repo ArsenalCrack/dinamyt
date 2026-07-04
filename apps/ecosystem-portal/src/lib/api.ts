@@ -137,8 +137,37 @@ export interface SuscripcionPersonal {
   appsIncluded: string[];
 }
 
+export interface UsuarioBusqueda {
+  id: string;
+  email: string;
+  fullName: string;
+  isActive: boolean | null;
+  membresias: { org: string; role: string }[];
+}
+export interface MiOrganizacion extends Organizacion {
+  isActive: boolean | null;
+  hijas: (Organizacion & { isActive: boolean | null })[];
+}
+
 export const listOrganizacionesAPI = async (): Promise<Organizacion[]> =>
   (await api.get('/organizations')).data;
+export const misOrganizacionesAPI = async (): Promise<MiOrganizacion[]> =>
+  (await api.get('/organizations/mias')).data;
+export const buscarUsuariosAPI = async (search: string): Promise<UsuarioBusqueda[]> =>
+  (await api.get('/organizations/usuarios', { params: { search } })).data;
+export const grantAccessAPI = async (
+  orgId: string,
+  data: { email: string; role: string; app: string },
+): Promise<{ email: string; role: string; app: string; suscripcionCreada: boolean }> =>
+  (await api.post(`/organizations/${orgId}/grant-access`, data)).data;
+export const crearClubHijoAPI = async (
+  parentId: string,
+  data: { name: string; type: Organizacion['type']; city?: string },
+) => (await api.post(`/organizations/${parentId}/hijas`, data)).data;
+export const setOrgActivaAPI = async (orgId: string, isActive: boolean) =>
+  (await api.patch(`/organizations/${orgId}`, { isActive })).data;
+export const eliminarOrgAPI = async (orgId: string) =>
+  (await api.delete(`/organizations/${orgId}`)).data;
 export const crearOrganizacionAPI = async (data: {
   name: string;
   type: Organizacion['type'];
