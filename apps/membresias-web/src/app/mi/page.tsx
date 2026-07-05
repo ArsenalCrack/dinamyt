@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
 import { api, obtenerToken, cerrarSesion } from '@/lib/api';
 import { getSesion, esStaff, etiquetaRol, type Sesion } from '@/lib/session';
 import { activarPush } from '@/lib/push';
@@ -80,6 +81,7 @@ export default function MiPanel() {
   const [mi, setMi] = useState<MiEstado | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
+  const qrRef = useRef<HTMLCanvasElement | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -104,6 +106,17 @@ export default function MiPanel() {
     setSesion(s);
     void cargar();
   }, [router, cargar]);
+
+  // Carnet QR: contiene el ID de la persona en el ecosistema. Un escáner USB
+  // en el kiosco lo "teclea" en el campo de check-in y entra como método `qr`.
+  useEffect(() => {
+    if (!sesion?.sub || !qrRef.current) return;
+    void QRCode.toCanvas(qrRef.current, sesion.sub, {
+      width: 148,
+      margin: 1,
+      color: { dark: '#0e0e15', light: '#f3f1e8' },
+    });
+  }, [sesion?.sub, mi]);
 
   async function activarNotis() {
     const r = await activarPush();
@@ -242,6 +255,30 @@ export default function MiPanel() {
             (efectivo, transferencia, Nequi o Daviplata).
           </p>
         )}
+
+        {/* Carnet QR: se escanea en el kiosco del club para marcar asistencia */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '1rem',
+            alignItems: 'center',
+            marginTop: '1rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <canvas
+            ref={qrRef}
+            style={{ borderRadius: 8, border: '1px solid var(--border)' }}
+            aria-label="Carnet QR para el check-in del kiosco"
+          />
+          <div style={{ minWidth: 180, flex: 1 }}>
+            <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Mi carnet QR</p>
+            <p className="muted" style={{ fontSize: '0.8rem' }}>
+              Muéstralo en el kiosco del club: el escáner registra tu asistencia
+              al instante (también puedes usar tu PIN).
+            </p>
+          </div>
+        </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
           <button className="btn btn-outline btn-sm" onClick={activarNotis}>

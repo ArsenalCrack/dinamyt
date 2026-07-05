@@ -118,29 +118,36 @@ export default function Kiosco() {
       </header>
 
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-        <label className="muted" style={{ fontSize: '0.8rem' }}>Ingresa tu PIN</label>
+        <label className="muted" style={{ fontSize: '0.8rem' }}>
+          Ingresa tu PIN o escanea tu carnet QR
+        </label>
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (pin.trim()) {
-              void checkin({ type: 'pin', value: pin.trim() });
-              setPin('');
-            }
+            const valor = pin.trim();
+            if (!valor) return;
+            // Un escáner USB "teclea" el contenido del carnet QR (el ID de la
+            // persona, un UUID) y termina con Enter — entra como método `qr`.
+            const esCarnetQR =
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
+            void checkin({ type: esCarnetQR ? 'qr' : 'pin', value: valor });
+            setPin('');
           }}
           style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}
         >
           <input
-            inputMode="numeric"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-            placeholder="PIN"
+            placeholder="PIN o carnet"
             className="mono"
-            style={{ fontSize: '1.4rem', textAlign: 'center', letterSpacing: '0.3em' }}
+            autoFocus
+            style={{ fontSize: '1.4rem', textAlign: 'center', letterSpacing: '0.15em' }}
           />
           <button className="btn btn-gold" type="submit">Marcar</button>
         </form>
         <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.5rem' }}>
-          Con lector de huella el marcado es automático. Sin lector: PIN o toca tu nombre abajo.
+          Con lector de huella el marcado es automático. Sin lector: PIN, carnet
+          QR (el alumno lo tiene en su panel) o toca tu nombre abajo.
         </p>
       </div>
 
