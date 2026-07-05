@@ -26,7 +26,7 @@ export function cerrarSesion() {
   if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);
 }
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 60000,
