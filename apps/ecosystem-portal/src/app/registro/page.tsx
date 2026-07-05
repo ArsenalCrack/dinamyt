@@ -81,7 +81,13 @@ export default function RegistroPage() {
             onChange={(e) => setConsent(e.target.checked)}
             className="mt-0.5 w-auto"
           />
-          Acepto el tratamiento de mis datos personales (Ley 1581 de 2012).
+          <span>
+            Acepto el tratamiento de mis datos personales según la{' '}
+            <Link href="/privacidad" target="_blank" style={{ color: 'var(--gold)' }}>
+              política de privacidad
+            </Link>{' '}
+            (Ley 1581 de 2012).
+          </span>
         </label>
         {error && (
           <p className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>

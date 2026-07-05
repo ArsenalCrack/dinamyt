@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Get, Headers, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtTokenService } from './jwt.service';
 import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
@@ -12,6 +13,9 @@ export class AuthController {
     private readonly jwtService: JwtTokenService,
   ) {}
 
+  // Anti-fuerza-bruta: los endpoints con contraseña u OTP tienen límites
+  // estrictos por IP (el guard global permite 120/min para el resto).
+  @Throttle({ global: { limit: 5, ttl: 60_000 } })
   @Post('register')
   register(
     @Body()
@@ -27,11 +31,13 @@ export class AuthController {
     return this.authService.register(body);
   }
 
+  @Throttle({ global: { limit: 6, ttl: 60_000 } })
   @Post('verify-email')
   verifyEmail(@Body() body: { userId: string; code: string }) {
     return this.authService.verifyEmail(body.userId, body.code);
   }
 
+  @Throttle({ global: { limit: 10, ttl: 60_000 } })
   @Post('login')
   login(@Body() body: { email: string; password: string }) {
     return this.authService.login(body.email, body.password);
@@ -58,11 +64,13 @@ export class AuthController {
     );
   }
 
+  @Throttle({ global: { limit: 3, ttl: 60_000 } })
   @Post('forgot-password')
   forgotPassword(@Body() body: { email: string }) {
     return this.authService.forgotPassword(body.email);
   }
 
+  @Throttle({ global: { limit: 6, ttl: 60_000 } })
   @Post('reset-password')
   resetPassword(
     @Body() body: { userId: string; code: string; newPassword: string },

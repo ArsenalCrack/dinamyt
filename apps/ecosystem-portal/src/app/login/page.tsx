@@ -1,16 +1,67 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { loginAPI, guardarToken, extraerError } from '@/lib/api';
+import { loginAPI, guardarToken, obtenerToken, extraerError } from '@/lib/api';
+
+const CAMPEONATOS_URL =
+  process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
+const MEMBRESIAS_URL =
+  process.env.NEXT_PUBLIC_MEMBRESIAS_URL || 'http://localhost:3006';
+
+/**
+ * SSO por redirección: una app federada manda aquí con `?redirect=<su login>`;
+ * tras iniciar sesión se vuelve a esa URL con el token en el FRAGMENTO
+ * (`#token=` nunca viaja al servidor). Solo se permite volver a orígenes
+ * conocidos del ecosistema — jamás a un dominio arbitrario.
+ */
+function destinoSeguro(redirect: string | null): string | null {
+  if (!redirect) return null;
+  try {
+    const url = new URL(redirect);
+    const origenesPermitidos = [
+      new URL(CAMPEONATOS_URL).origin,
+      new URL(MEMBRESIAS_URL).origin,
+    ];
+    return origenesPermitidos.includes(url.origin) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const search = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+
+  const redirect = destinoSeguro(search.get('redirect'));
+
+  function entregarSesion(token: string) {
+    if (redirect) {
+      window.location.href = `${redirect}#token=${encodeURIComponent(token)}`;
+      return;
+    }
+    router.push('/dashboard');
+  }
+
+  // Si ya hay sesión y una app pide el token, se entrega sin segundo login.
+  useEffect(() => {
+    const t = obtenerToken();
+    if (t && redirect) entregarSesion(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,7 +70,7 @@ export default function LoginPage() {
     try {
       const { access_token } = await loginAPI(email, password);
       guardarToken(access_token);
-      router.push('/dashboard');
+      entregarSesion(access_token);
     } catch (err) {
       setError(extraerError(err, 'No se pudo iniciar sesión.'));
     } finally {

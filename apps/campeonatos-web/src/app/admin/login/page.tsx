@@ -6,6 +6,9 @@ import { loginAPI, guardarToken, extraerError } from '@/lib/api';
 import { getSesion, rutaInicio } from '@/lib/session';
 import { Logo } from '@/components/Logo';
 
+const PORTAL_URL =
+  process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -85,6 +88,26 @@ export default function AdminLoginPage() {
         <button type="submit" disabled={cargando} className="btn btn-gold w-full">
           {cargando ? 'Entrando…' : 'Entrar'}
         </button>
+
+        {/* SSO por redirección: el portal devuelve aquí con #token= */}
+        <div
+          className="my-4 flex items-center gap-3 text-xs"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
+          o
+          <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
+        </div>
+        <a
+          className="btn btn-outline w-full"
+          href={`${PORTAL_URL}/login?redirect=${encodeURIComponent(
+            typeof window !== 'undefined'
+              ? `${window.location.origin}/admin/login`
+              : '',
+          )}`}
+        >
+          Entrar con el portal DINAMYT
+        </a>
       </form>
     </main>
   );

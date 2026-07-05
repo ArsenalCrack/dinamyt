@@ -296,6 +296,7 @@ export default function HomePage() {
           <nav className="flex gap-4">
             <Link href="/planes">Planes</Link>
             <Link href="/registro">Registro</Link>
+            <Link href="/privacidad">Privacidad</Link>
             <a href={`${CAMPEONATOS_URL}/pantalla`}>Resultados</a>
           </nav>
         </div>
