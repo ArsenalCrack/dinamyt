@@ -147,6 +147,28 @@ export class OrganizationsService {
     }
   }
 
+  /** ¿Pertenece el usuario a la organización (cualquier rol)? */
+  async esMiembroDe(userId: string, orgId: string): Promise<boolean> {
+    const filas = await db
+      .select({ id: orgMembers.id })
+      .from(orgMembers)
+      .where(and(eq(orgMembers.userId, userId), eq(orgMembers.orgId, orgId)))
+      .limit(1);
+    return !!filas[0];
+  }
+
+  /**
+   * Lanza 403 si el usuario no tiene relación con la org: los datos de los
+   * miembros (correo, teléfono) solo los ve quien pertenece a la organización,
+   * quien la administra (o a su federación padre) o un super admin.
+   */
+  async exigirRelacionCon(userId: string, orgId: string, esSuper: boolean) {
+    if (esSuper) return;
+    if (await this.esMiembroDe(userId, orgId)) return;
+    if (await this.esAdminDe(userId, orgId)) return;
+    throw new ForbiddenException('No perteneces a esta organización.');
+  }
+
   // ── Mis organizaciones (donde soy admin) con sus hijas ─────────────────────
   async findMias(userId: string) {
     const mias = await db

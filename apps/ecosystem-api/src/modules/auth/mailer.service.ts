@@ -1,19 +1,40 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+/**
+ * Correo transaccional del ecosistema (OTP de verificación y recuperación).
+ *
+ * Configuración por variables de entorno:
+ *  - Gmail (rápido):    MAIL_USER + MAIL_PASS (contraseña de aplicación).
+ *  - SMTP genérico:     MAIL_HOST + MAIL_PORT (+ MAIL_USER/MAIL_PASS),
+ *                       p. ej. Brevo, Resend, Mailgun o el SMTP de tu dominio.
+ *  - Sin variables (dev): NO envía — imprime el código en la consola para que
+ *    el registro local funcione sin cuenta de correo.
+ */
 @Injectable()
 export class MailerService {
   private readonly logger = new Logger(MailerService.name);
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null = null;
 
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
-      },
-    });
+    const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS } = process.env;
+    if (MAIL_HOST) {
+      this.transporter = nodemailer.createTransport({
+        host: MAIL_HOST,
+        port: parseInt(MAIL_PORT ?? '587', 10),
+        secure: MAIL_PORT === '465',
+        auth: MAIL_USER ? { user: MAIL_USER, pass: MAIL_PASS } : undefined,
+      });
+    } else if (MAIL_USER && MAIL_PASS) {
+      this.transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: MAIL_USER, pass: MAIL_PASS },
+      });
+    } else {
+      this.logger.warn(
+        'MAIL_* sin configurar: los códigos OTP se imprimirán en esta consola (solo dev).',
+      );
+    }
   }
 
   async sendOtp(
@@ -21,6 +42,12 @@ export class MailerService {
     code: string,
     type: 'EMAIL_VERIFY' | 'PASSWORD_RESET',
   ) {
+    // Modo dev sin SMTP: el código sale por consola y el flujo no se rompe.
+    if (!this.transporter) {
+      this.logger.warn(`[DEV] OTP ${type} para ${to}: ${code}`);
+      return;
+    }
+
     const subject =
       type === 'EMAIL_VERIFY'
         ? 'DINAMYT — Verifica tu correo'
@@ -32,7 +59,7 @@ export class MailerService {
         : `Tu código para restablecer tu contraseña es: <b>${code}</b>. Expira en 10 minutos.`;
 
     await this.transporter.sendMail({
-      from: `"DINAMYT Ecosystem" <${process.env.MAIL_USER}>`,
+      from: `"DINAMYT Ecosystem" <${process.env.MAIL_FROM ?? process.env.MAIL_USER}>`,
       to,
       subject,
       html: `

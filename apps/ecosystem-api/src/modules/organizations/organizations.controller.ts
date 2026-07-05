@@ -171,10 +171,13 @@ export class OrganizationsController {
     return this.orgsService.removeMember(orgId, userId);
   }
 
-  // ── GET /organizations/:id/members — listar miembros (autenticado) ────────
+  // ── GET /organizations/:id/members — listar miembros ──────────────────────
+  // Datos personales (correo/teléfono): solo miembros de la org, sus admins
+  // (o de la federación padre) o el super admin.
   @Get(':id/members')
   @UseGuards(EcosystemJwtGuard)
-  getMembers(@Param('id') orgId: string) {
+  async getMembers(@Param('id') orgId: string, @CurrentUser() user: JwtPayload) {
+    await this.orgsService.exigirRelacionCon(user.sub, orgId, user.is_super_admin);
     return this.orgsService.getMembers(orgId);
   }
 }

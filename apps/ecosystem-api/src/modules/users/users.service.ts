@@ -7,7 +7,7 @@ import {
   userGuardians,
   orgMembers,
 } from '../../db/schema';
-import { eq, and, gt } from 'drizzle-orm';
+import { eq, and, gt, isNull } from 'drizzle-orm';
 import { encryptField, decryptField } from '../../common/crypto';
 import * as bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
@@ -98,6 +98,8 @@ export class UsersService {
           eq(otpCodes.code, code),
           eq(otpCodes.type, type),
           gt(otpCodes.expiresAt, new Date()),
+          isNull(otpCodes.usedAt), // un código solo se puede usar una vez
+
         ),
       )
       .limit(1);

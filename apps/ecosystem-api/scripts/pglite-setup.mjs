@@ -44,13 +44,20 @@ if (email && password) {
   console.warn('[ecosystem] ADMIN_EMAIL/ADMIN_PASSWORD no definidos: sin super-admin.');
 }
 
-// ── Planes base ──
+// ── Catálogo de planes (todas las combinaciones) ──
+// Los planes que incluyen Campeonatos NO tienen precio de lista: el alcance
+// (tatamis, número de eventos) se acuerda con un administrador → precio null.
 const planes = [
-  ['Plan Academy', 'Acceso a DINAMYT Academy.', "ARRAY['academy']::text[]", 50, '50000', '500000'],
-  ['Plan Campeonatos', 'Acceso a DINAMYT Campeonatos.', "ARRAY['campeonatos']::text[]", 100, '80000', '800000'],
-  ['Plan Completo', 'Acceso a DINAMYT Academy y Campeonatos.', "ARRAY['academy','campeonatos']::text[]", 100, '120000', '1200000'],
+  ['Plan Academy', 'Formación del practicante: planes de estudio, evaluaciones y progreso por cinturón.', ['academy'], 50, '50000', '500000'],
+  ['Plan Membresías', 'Operación del club: mensualidades, check-in de asistencia, avisos y reportes.', ['membresias'], 200, '60000', '600000'],
+  ['Plan Academy + Membresías', 'La formación del practicante y la operación del club en un solo plan.', ['academy', 'membresias'], 200, '95000', '950000'],
+  ['Plan Campeonatos', 'Torneos con puntuación en vivo. El alcance y el precio se acuerdan con un administrador.', ['campeonatos'], 100, null, null],
+  ['Plan Academy + Campeonatos', 'Formación más torneos oficiales. El precio se acuerda con un administrador.', ['academy', 'campeonatos'], 100, null, null],
+  ['Plan Campeonatos + Membresías', 'Operación del club más torneos oficiales. El precio se acuerda con un administrador.', ['campeonatos', 'membresias'], 200, null, null],
+  ['Plan Completo', 'Todo el ecosistema: Academy, Campeonatos y Membresías. El precio se acuerda con un administrador.', ['academy', 'campeonatos', 'membresias'], 200, null, null],
 ];
-for (const [name, desc, appsSql, maxU, pm, pa] of planes) {
+for (const [name, desc, apps, maxU, pm, pa] of planes) {
+  const appsSql = `ARRAY[${apps.map((a) => `'${a}'`).join(',')}]::text[]`;
   const ex = await pg.query('select 1 from ecosystem.subscription_plans where name = $1', [name]);
   if (ex.rows.length === 0) {
     await pg.query(
@@ -60,6 +67,15 @@ for (const [name, desc, appsSql, maxU, pm, pa] of planes) {
       [name, desc, maxU, pm, pa],
     );
     console.log('[ecosystem] plan creado:', name);
+  } else {
+    // Idempotente: mantiene el catálogo alineado (descripción, apps y precios).
+    await pg.query(
+      `update ecosystem.subscription_plans
+         set description = $2, apps_included = ${appsSql}, max_users = $3,
+             price_monthly = $4, price_annual = $5
+       where name = $1`,
+      [name, desc, maxU, pm, pa],
+    );
   }
 }
 
