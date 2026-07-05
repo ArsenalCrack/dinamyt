@@ -83,9 +83,15 @@ suscripción activa) para probar los accesos:
 
 | Usuario | Contraseña | Rol | Qué ve |
 | --- | --- | --- | --- |
-| `admin@dinamyt.com` | `CambiaEstaClaveFuerte123!` | super-admin | Todo (crear, secciones, inscribir, combate) |
+| `admin@dinamyt.com` | `CambiaEstaClaveFuerte123!` | super-admin | Todo (todas las apps, panel `/admin` del portal) |
+| `orgadmin@dinamyt.com` | `Demo1234!` | admin (org) | Administra el Club Demo (miembros, clubes hijos) |
 | `coach@dinamyt.com` | `Demo1234!` | coach | Listar + **Inscribir** (no crear ni secciones) |
 | `juez@dinamyt.com` | `Demo1234!` | judge | Va directo al **panel de combate** |
+| `maestro@dinamyt.com` | `Demo1234!` | maestro | Revisión de inscripciones de su club |
+| `competidor@dinamyt.com` | `Demo1234!` | competitor | Perfil, invitaciones y su historial |
+| `owner@dinamyt.com` | `Demo1234!` | owner (Membresías) | Panel del club en :3006 (roster, pagos, kiosco) |
+| `alumno1@dinamyt.com` | `Demo1234!` | student | Portal del alumno en Membresías |
+| `alumno2@dinamyt.com` | `Demo1234!` | student | Portal del alumno en Membresías |
 
 Para empezar de cero, borra `.localdb/` y vuelve a correr los dos setups.
 
@@ -106,7 +112,10 @@ pnpm --filter @dinamyt/ecosystem-api start:dev     # :3001  Identidad (NestJS)
 pnpm --filter @dinamyt/ecosystem-portal dev        # :3000  Portal (Next)
 pnpm --filter @dinamyt/campeonatos-api dev         # :3002  API Campeonatos (Fastify)
 pnpm --filter @dinamyt/campeonatos-web dev         # :3003  Web Campeonatos (Next)
+pnpm --filter @dinamyt/membresias-api dev          # :3004  API Membresías (Fastify)
 pnpm --filter @dinamyt/campeonatos-combat dev      # :3005  Combate en vivo (WebSocket)
+pnpm --filter @dinamyt/membresias-web dev          # :3006  Web Membresías (Next PWA)
+pnpm --filter @dinamyt/membresias-agent dev        # :7070  Agente del lector (mock)
 ```
 
 | App | URL |

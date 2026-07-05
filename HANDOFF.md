@@ -1,6 +1,67 @@
 # DINAMYT — Estado del proyecto y Handoff
 
-> Documento vivo. Última actualización: 2026-07-01.
+> Documento vivo. Última actualización: 2026-07-04.
+>
+> **2026-07-04 (revisión + integración + rediseño):**
+> - **Seguridad:** los OTP ya no se pueden reutilizar (`verifyOtp` exige
+>   `used_at IS NULL`); `GET /organizations/:id/members` exige pertenecer a la
+>   org / administrarla / super-admin (antes cualquier autenticado veía correos
+>   y teléfonos de cualquier org). Pendiente recomendado: rate-limiting en
+>   `/auth/login` y en verificación de OTP (hoy sin límite de intentos).
+> - **Membresías conectada al portal:** tarjeta «Entrar a Membresías» en el
+>   dashboard con SSO por fragmento (`/login#token=…`, igual que Campeonatos);
+>   membresias-web acepta el token al aterrizar. El «Plan Completo» del seed
+>   local ahora incluye `membresias` (con UPDATE para bases ya creadas).
+> - **Rediseño (skill frontend-design):** sistema visual unificado en las 3
+>   webs (tokens en `globals.css` espejados): tipografía Archivo (display
+>   deportivo, eje wdth) + Instrument Sans (cuerpo) + IBM Plex Mono (datos/
+>   marcador), paleta tinta profunda + oro de marca, focus-visible y
+>   prefers-reduced-motion. Landing nueva del portal: hero con marcador de
+>   combate en vivo (cronómetro corriendo) y franja de cinturones como firma;
+>   sección de apps con Membresías. `launch.json` ahora incluye
+>   membresias-api/web y el agente (:7070).
+> - **Planes (catálogo completo):** 7 combinaciones sembradas (Academy,
+>   Membresías, Academy+Membresías con precio; Campeonatos y todo combo que lo
+>   incluya SIN precio de lista → «Contactar con un administrador», mailto en
+>   `/planes`). El seed local ahora hace upsert del catálogo (idempotente).
+> - **Landing multi-sistema:** se eliminó la sección de historial inmutable;
+>   en su lugar «El día a día del deporte, resuelto» cuenta las funciones de
+>   Membresías, Campeonatos y Academy en la voz del usuario; el hero suma el
+>   toast de check-in del kiosco junto al marcador.
+> - **Responsive auditado a 375px** en las 3 webs (landing/planes/login/
+>   registro/dashboard/admin/mi-organización del portal; portada, públicos y
+>   panel admin+combate de campeonatos; panel/kiosco/planes/calendario/ficha
+>   de membresías — sin desborde horizontal). Causa raíz corregida: las clases
+>   de componentes de los `globals.css` ahora viven en `@layer components`,
+>   así las utilidades de Tailwind (`hidden`, `w-full`, `px-*`) pueden
+>   sobreescribirlas. ⚠️ Gotcha: una clase declarada dentro de
+>   `@layer components` que Tailwind no reconoce puede NO emitirse (pasó con
+>   `.tabla-scroll`) → declararla fuera de la capa. Las tablas del panel de
+>   membresías se deslizan horizontalmente (`.tabla-scroll`).
+> **2026-07-04 (tarde) — pantallas COMBAT, RBAC y panel del alumno:**
+> - **Pantallas públicas estilo COMBAT** en campeonatos-web (`/tatami/[id]?rol=pantalla`):
+>   marcador a pantalla completa (HONG|centro|CHUNG, crono con urgencia, ronda
+>   con glow de oro, ESQ/ARB, K/G, gong opcional, animación boom), árbol de la
+>   llave + podio grande entre combates, y vista de figuras/defensa con
+>   competidores en tipografía de cartel. `GET /tatamis/:id/actual` ahora trae
+>   el nombre del campeonato.
+> - **RBAC auditado en las 3 apps**: membresias-web enruta por rol (staff→`/`,
+>   alumno/acudiente→`/mi`) y TODAS las páginas de staff redirigen al alumno;
+>   campeonatos ya enrutaba (juez→/juez, común→/perfil, gestión→/admin).
+> - **Panel del alumno `/mi`** (membresias-web): su plan/estado/vencimiento,
+>   PIN del kiosco, pagos, asistencias, push y enlace a su perfil. `GET /mi`
+>   ampliado (plan + pagos + asistencias propios).
+> - **Campana de avisos** (`components/Avisos.tsx`): staff ve el club
+>   (`?all=1`), el alumno lo suyo.
+> - **Perfil en el portal** (`/perfil`): datos personales, contacto de
+>   emergencia, notas médicas (cifradas), avatarUrl, disciplinas (solo lectura)
+>   y cambio de contraseña; enlazado desde el dashboard.
+> - **Mailer configurable** (Gmail o SMTP genérico por `MAIL_HOST/PORT`); sin
+>   variables imprime el OTP en consola (antes el registro local rompía).
+> - **`DESPLIEGUE_Y_PENDIENTES.md`** (nuevo): veredicto Hostinger (VPS KVM 2 sí,
+>   compartido no), paso a paso VPS y administrado, correos, BD, R2 para
+>   archivos, checklist y pendientes completos.
+>
 > Para correr TODO en local paso a paso (portal → campeonatos desde el navegador),
 > ver **`RUN_LOCAL.md`**. Para el plan de la versión unificada (fusión de
 > COMBAT + PROJECT con roles), ver **`PLAN_FUSION.md`**.

@@ -42,6 +42,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dinamyt/membresias-web", "dev"],
       "port": 3006
+    },
+    {
+      "name": "membresias-agent",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/membresias-agent", "dev"],
+      "port": 7070
     }
   ]
 }
