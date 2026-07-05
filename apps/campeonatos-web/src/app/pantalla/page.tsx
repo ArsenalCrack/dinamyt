@@ -19,11 +19,14 @@ export default function PantallaPage() {
 
   return (
     <main className="min-h-screen px-6 py-10">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--gold)' }}>
+      <header className="mb-8 text-center">
+        <p className="eyebrow mb-1">Pantalla pública · sin registro</p>
+        <h1 className="display text-3xl sm:text-4xl" style={{ color: 'var(--gold)' }}>
           Campeonatos en vivo
         </h1>
-        <p style={{ color: 'var(--text-muted)' }}>Resultados en tiempo real</p>
+        <p className="mt-1" style={{ color: 'var(--text-muted)' }}>
+          Elige el campeonato y proyecta el tatami en la TV.
+        </p>
       </header>
 
       {estado === 'cargando' && (

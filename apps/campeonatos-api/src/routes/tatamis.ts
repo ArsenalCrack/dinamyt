@@ -481,11 +481,19 @@ export async function tatamisRoutes(app: FastifyInstance) {
       .from(juecesTatami)
       .where(eq(juecesTatami.tatamiId, id));
 
+    // El nombre del campeonato encabeza la pantalla pública (como en COMBAT).
+    const [camp] = await db
+      .select({ nombre: campeonatos.nombre })
+      .from(campeonatos)
+      .where(eq(campeonatos.id, tatami.campeonatoId))
+      .limit(1);
+
     return {
       id: tatami.id,
       numero: tatami.numero,
       estado: tatami.estado,
       campeonatoId: tatami.campeonatoId,
+      campeonato: camp?.nombre ?? null,
       seccionEnCurso: enCurso ?? null,
       jueces,
     };

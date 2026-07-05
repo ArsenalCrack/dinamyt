@@ -6,19 +6,17 @@ export default function HomePage() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6 text-center">
       <div className="flex flex-col items-center">
         <LogoMark size={88} />
-        <h1
-          className="mt-5 text-5xl font-extrabold tracking-tight sm:text-6xl"
-          style={{ color: 'var(--gold)' }}
-        >
-          DINAMYT
+        <p className="eyebrow mt-6">Ecosistema DINAMYT · Hapkido</p>
+        <h1 className="display mt-3 text-4xl sm:text-7xl" style={{ color: 'var(--gold)' }}>
+          Campeonatos
         </h1>
-        <p className="mt-2 text-xl font-semibold sm:text-2xl">
-          Campeonatos de Hapkido
-        </p>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Gestión, puntuación en vivo y resultados — ecosistema DINAMYT
+        <p className="mt-3 max-w-md text-lg" style={{ color: 'var(--text-muted)' }}>
+          Inscripción, llaves, tatamis y puntuación de combate en vivo, con
+          resultados públicos al instante.
         </p>
       </div>
+
+      <div className="cinturon w-40 rounded-full" aria-hidden="true" />
 
       <div className="flex flex-wrap justify-center gap-4">
         <Link href="/campeonatos" className="btn btn-gold px-6 py-3 text-base">

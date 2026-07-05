@@ -521,6 +521,7 @@ export interface TatamiActual {
   numero: number;
   estado: 'LIBRE' | 'OCUPADO';
   campeonatoId: string;
+  campeonato: string | null;
   seccionEnCurso: { seccionId: string; nombre: string; modalidad: Modalidad } | null;
   jueces: JuezTatami[];
 }
