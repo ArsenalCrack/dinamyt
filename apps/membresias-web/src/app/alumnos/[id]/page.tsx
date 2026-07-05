@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, ecosystemApi, obtenerToken } from '@/lib/api';
+import { getSesion, esStaff } from '@/lib/session';
 import { agentEnroll } from '@/lib/agent';
 
 interface Discipline { discipline: string; currentGrade: string | null }
@@ -76,6 +77,10 @@ export default function Ficha() {
       router.push('/login');
       return;
     }
+    if (!esStaff(getSesion())) {
+      router.replace('/mi');
+      return;
+    }
     if (id) void cargar();
   }, [id, router, cargar]);
 
@@ -130,7 +135,7 @@ export default function Ficha() {
         </div>
       </div>
 
-      <div className="card" style={{ padding: '0.5rem 1rem', marginBottom: '1.25rem' }}>
+      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem', marginBottom: '1.25rem' }}>
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>Pagos</h2>
         <table>
           <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th><th>Estado</th></tr></thead>
@@ -148,7 +153,7 @@ export default function Ficha() {
         </table>
       </div>
 
-      <div className="card" style={{ padding: '0.5rem 1rem' }}>
+      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>Asistencias recientes</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', paddingBottom: '0.75rem' }}>
           {attendances.length === 0 && <span className="muted" style={{ fontSize: '0.85rem' }}>Sin asistencias.</span>}

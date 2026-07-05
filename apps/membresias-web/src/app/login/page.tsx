@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '@/lib/api';
+import { login, guardarToken } from '@/lib/api';
+import { getSesion, rutaInicio } from '@/lib/session';
 
 export default function Login() {
   const router = useRouter();
@@ -11,13 +12,28 @@ export default function Login() {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
+  // SSO desde el portal del ecosystem: si llega #token=<jwt> en el fragmento,
+  // se guarda y se entra directo (el fragmento nunca viaja al servidor).
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#token=')) {
+      const token = decodeURIComponent(hash.slice(7));
+      if (token) {
+        guardarToken(token);
+        window.history.replaceState(null, '', window.location.pathname);
+        // El staff entra al panel del club; el alumno/acudiente a SU estado.
+        router.replace(rutaInicio(getSesion()));
+      }
+    }
+  }, [router]);
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError('');
     setCargando(true);
     try {
       await login(email, password);
-      router.push('/');
+      router.push(rutaInicio(getSesion()));
     } catch {
       setError('Correo o contraseña incorrectos.');
     } finally {
@@ -36,8 +52,9 @@ export default function Login() {
       }}
     >
       <form onSubmit={submit} className="card" style={{ padding: '1.75rem', width: '100%', maxWidth: 380 }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.25rem' }}>
-          DINAMYT <span style={{ color: 'var(--gold)' }}>Membresías</span>
+        <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>Ecosistema DINAMYT</p>
+        <h1 className="display" style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
+          Membresías <span style={{ color: 'var(--gold)' }}>del club</span>
         </h1>
         <p className="muted" style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>
           Ingresa con tu cuenta del ecosistema.

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, obtenerToken, cerrarSesion } from '@/lib/api';
 import { activarPush } from '@/lib/push';
+import { getSesion, esStaff } from '@/lib/session';
+import { Avisos } from '@/components/Avisos';
 
 interface RosterItem {
   userId: string;
@@ -79,6 +81,11 @@ export default function Panel() {
       router.push('/login');
       return;
     }
+    // El panel del club es SOLO para el staff; el alumno tiene su propia vista.
+    if (!esStaff(getSesion())) {
+      router.replace('/mi');
+      return;
+    }
     void cargar();
   }, [router, cargar]);
 
@@ -124,13 +131,17 @@ export default function Panel() {
   return (
     <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 800 }}>
-          DINAMYT <span style={{ color: 'var(--gold)' }}>Membresías</span>
-        </h1>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div>
+          <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Ecosistema DINAMYT</p>
+          <h1 className="display" style={{ fontSize: '1.5rem' }}>
+            Membresías <span style={{ color: 'var(--gold)' }}>del club</span>
+          </h1>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <Link href="/kiosco" className="btn btn-outline">Kiosco</Link>
           <Link href="/planes" className="btn btn-outline">Planes</Link>
           <Link href="/calendario" className="btn btn-outline">Calendario</Link>
+          <Avisos deTodoElClub />
           <button className="btn btn-outline btn-sm" onClick={enviarAvisos}>Enviar avisos</button>
           <button className="btn btn-outline btn-sm" onClick={activarNotis}>Activar push</button>
           <button className="btn btn-outline btn-sm" onClick={salir}>Salir</button>
@@ -143,20 +154,20 @@ export default function Panel() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div className="card" style={{ padding: '0.9rem' }}>
           <div className="muted" style={{ fontSize: '0.75rem' }}>Recaudado ({revenue?.month})</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--gold)' }}>{fmtCOP(revenue?.recaudado ?? 0)}</div>
+          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--gold)' }}>{fmtCOP(revenue?.recaudado ?? 0)}</div>
           <div className="muted" style={{ fontSize: '0.72rem' }}>Esperado {fmtCOP(revenue?.esperadoMensual ?? 0)}</div>
         </div>
         <div className="card" style={{ padding: '0.9rem' }}>
           <div className="muted" style={{ fontSize: '0.75rem' }}>Morosos</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--danger)' }}>{overdue.length}</div>
+          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--danger)' }}>{overdue.length}</div>
         </div>
         <div className="card" style={{ padding: '0.9rem' }}>
           <div className="muted" style={{ fontSize: '0.75rem' }}>Asistieron hoy</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--ok)' }}>{attendance?.hoy ?? 0}</div>
+          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--ok)' }}>{attendance?.hoy ?? 0}</div>
         </div>
       </div>
 
-      <div className="card" style={{ padding: '0.5rem 1rem' }}>
+      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <table>
           <thead>
             <tr>

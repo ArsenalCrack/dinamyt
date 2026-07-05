@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, obtenerToken } from '@/lib/api';
+import { getSesion, esStaff } from '@/lib/session';
 
 interface Plan {
   id: string;
@@ -37,6 +38,10 @@ export default function Planes() {
   useEffect(() => {
     if (!obtenerToken()) {
       router.push('/login');
+      return;
+    }
+    if (!esStaff(getSesion())) {
+      router.replace('/mi');
       return;
     }
     void cargar();
@@ -100,7 +105,7 @@ export default function Planes() {
 
       {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
 
-      <div className="card" style={{ padding: '0.5rem 1rem' }}>
+      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <table>
           <thead><tr><th>Plan</th><th>Tipo</th><th>Precio</th><th></th></tr></thead>
           <tbody>

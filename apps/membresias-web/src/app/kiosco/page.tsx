@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, obtenerToken } from '@/lib/api';
+import { getSesion, esStaff } from '@/lib/session';
 
 interface RosterItem { userId: string; fullName: string; estado: string }
 interface Resultado {
@@ -66,6 +67,10 @@ export default function Kiosco() {
       router.push('/login');
       return;
     }
+    if (!esStaff(getSesion())) {
+      router.replace('/mi');
+      return;
+    }
     void cargar();
     setPendientes((JSON.parse(localStorage.getItem(QKEY) || '[]') as Encolado[]).length);
     void flush();
@@ -103,7 +108,9 @@ export default function Kiosco() {
   return (
     <main style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem', minHeight: '100vh' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Kiosco · <span style={{ color: 'var(--gold)' }}>Check-in</span></h1>
+        <h1 className="display" style={{ fontSize: '1.5rem' }}>
+          Kiosco · <span style={{ color: 'var(--gold)' }}>Check-in</span>
+        </h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           {pendientes > 0 && <span className="badge badge-gold">{pendientes} sin sincronizar</span>}
           <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
@@ -127,6 +134,7 @@ export default function Kiosco() {
             value={pin}
             onChange={(e) => setPin(e.target.value)}
             placeholder="PIN"
+            className="mono"
             style={{ fontSize: '1.4rem', textAlign: 'center', letterSpacing: '0.3em' }}
           />
           <button className="btn btn-gold" type="submit">Marcar</button>
@@ -141,8 +149,8 @@ export default function Kiosco() {
           {resultado.ok || resultado.bloqueado ? (
             <>
               <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{nombreDe(resultado.ecosystemUserId)}</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color }}>
-                {resultado.bloqueado ? 'ACCESO BLOQUEADO' : resultado.accionSugerida === 'avisar' ? '¡Atención!' : '¡Adelante!'}
+              <div className="display" style={{ fontSize: '1.8rem', color }}>
+                {resultado.bloqueado ? 'Acceso bloqueado' : resultado.accionSugerida === 'avisar' ? '¡Atención!' : '¡Adelante!'}
               </div>
               <div className="muted" style={{ marginTop: '0.3rem' }}>
                 {resultado.estado === 'vencido'

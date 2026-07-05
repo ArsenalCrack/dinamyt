@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { and, eq } from 'drizzle-orm';
-import { memberships, plans, payments } from '@dinamyt/membresias-db';
+import { and, eq, desc } from 'drizzle-orm';
+import { memberships, plans, payments, attendances } from '@dinamyt/membresias-db';
 import { requireRole, requireScope } from '../plugins/auth';
 import { ensureMembership } from '../lib/memberships';
 import {
@@ -56,13 +56,16 @@ export async function membershipsRoutes(app: FastifyInstance) {
   );
 
   // ── GET /mi — estado del propio alumno (cualquiera con scope) ─────────────
+  // Devuelve además su plan vigente, sus últimos pagos y asistencias: es el
+  // panel personal del alumno/acudiente (NO ve datos de otros miembros).
   app.get(
     '/mi',
     { preHandler: requireScope('membresias') },
     async (req, reply) => {
       const orgId = req.user!.org_id;
       if (!orgId) return reply.code(400).send({ error: 'Sin organización activa.' });
-      const [m] = await req.server.db
+      const db = req.server.db;
+      const [m] = await db
         .select()
         .from(memberships)
         .where(
@@ -74,12 +77,55 @@ export async function membershipsRoutes(app: FastifyInstance) {
         .limit(1);
       const today = todayStr();
       if (!m) {
-        return { status: null, estado: 'sin_plan', venceEl: null, diasFaltantes: null };
+        return {
+          status: null,
+          estado: 'sin_plan',
+          venceEl: null,
+          diasFaltantes: null,
+          plan: null,
+          pagos: [],
+          asistencias: [],
+        };
       }
+
+      const [plan] = m.currentPlanId
+        ? await db.select().from(plans).where(eq(plans.id, m.currentPlanId)).limit(1)
+        : [];
+
+      const pagos = await db
+        .select({
+          id: payments.id,
+          amount: payments.amount,
+          method: payments.method,
+          status: payments.status,
+          paidAt: payments.paidAt,
+          planName: plans.name,
+        })
+        .from(payments)
+        .innerJoin(plans, eq(payments.planId, plans.id))
+        .where(eq(payments.membershipId, m.id))
+        .orderBy(desc(payments.paidAt))
+        .limit(10);
+
+      const asistencias = await db
+        .select({
+          id: attendances.id,
+          checkinDate: attendances.checkinDate,
+          checkedInAt: attendances.checkedInAt,
+          method: attendances.method,
+        })
+        .from(attendances)
+        .where(eq(attendances.membershipId, m.id))
+        .orderBy(desc(attendances.checkedInAt))
+        .limit(15);
+
       return {
         ...m,
         diasFaltantes: diasFaltantes(m.venceEl, today),
         estado: estado(m.venceEl, today),
+        plan: plan ? { id: plan.id, name: plan.name, type: plan.type, price: plan.price } : null,
+        pagos,
+        asistencias,
       };
     },
   );

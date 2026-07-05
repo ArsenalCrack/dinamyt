@@ -41,3 +41,31 @@ export function getSesion(): Sesion | null {
 export function esStaff(s: Sesion | null): boolean {
   return !!s && (s.isSuperAdmin || s.role === 'owner' || s.role === 'staff');
 }
+
+/** Alumno o acudiente: solo ven SU estado (nunca el panel del club). */
+export function esAlumno(s: Sesion | null): boolean {
+  return !!s && !esStaff(s);
+}
+
+/** Ruta de inicio según el rol tras iniciar sesión. */
+export function rutaInicio(s: Sesion | null): string {
+  return esStaff(s) ? '/' : '/mi';
+}
+
+/** Etiqueta legible del rol para la UI. */
+export function etiquetaRol(s: Sesion | null): string {
+  if (!s) return '';
+  if (s.isSuperAdmin) return 'Super admin';
+  switch (s.role) {
+    case 'owner':
+      return 'Maestro (owner)';
+    case 'staff':
+      return 'Staff del club';
+    case 'guardian':
+      return 'Acudiente';
+    case 'student':
+      return 'Alumno';
+    default:
+      return 'Miembro';
+  }
+}

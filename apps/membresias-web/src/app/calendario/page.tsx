@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, obtenerToken } from '@/lib/api';
+import { getSesion, esStaff } from '@/lib/session';
 
 const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 interface Exc { id: string; date: string; isClosed: boolean; note: string | null }
@@ -29,6 +30,10 @@ export default function Calendario() {
   useEffect(() => {
     if (!obtenerToken()) {
       router.push('/login');
+      return;
+    }
+    if (!esStaff(getSesion())) {
+      router.replace('/mi');
       return;
     }
     void cargar();
