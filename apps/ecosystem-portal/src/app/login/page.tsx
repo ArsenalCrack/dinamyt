@@ -32,18 +32,15 @@ export default function LoginPage() {
       <Link href="/" className="flex flex-col items-center gap-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="DINAMYT" width={72} height={72} />
-        <span className="text-xl font-extrabold tracking-wide" style={{ color: 'var(--gold)' }}>
+        <span className="display text-xl" style={{ color: 'var(--gold)' }}>
           DINAMYT
         </span>
       </Link>
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm rounded-xl border p-6"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-      >
-        <h1 className="mb-6 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-          Iniciar sesión
-        </h1>
+      <form onSubmit={onSubmit} className="card w-full max-w-sm p-6">
+        <h1 className="display mb-1 text-2xl">Iniciar sesión</h1>
+        <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Una cuenta para todo el ecosistema.
+        </p>
         <label className="mb-3 block text-sm">
           Correo
           <input
@@ -69,12 +66,7 @@ export default function LoginPage() {
             {error}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={cargando}
-          className="w-full rounded-lg px-4 py-2 font-semibold"
-          style={{ background: 'var(--gold)', color: '#14141e' }}
-        >
+        <button type="submit" disabled={cargando} className="btn btn-gold w-full">
           {cargando ? 'Entrando…' : 'Entrar'}
         </button>
         <p className="mt-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>

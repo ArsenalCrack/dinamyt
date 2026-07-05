@@ -4,6 +4,27 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { listPlanesAPI, type Plan } from '@/lib/api';
 
+const CONTACTO_ADMIN =
+  process.env.NEXT_PUBLIC_ADMIN_CONTACT_EMAIL || 'admin@dinamyt.com';
+
+const NOMBRE_APP: Record<string, string> = {
+  academy: 'Academy',
+  campeonatos: 'Campeonatos',
+  membresias: 'Membresías',
+};
+
+const fmtCOP = (v: string) =>
+  parseFloat(v).toLocaleString('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0,
+  });
+
+/** Los planes con Campeonatos no tienen precio de lista: el alcance del evento
+ *  (tatamis, fechas) se cotiza con un administrador. */
+const requiereAsesor = (p: Plan) =>
+  p.appsIncluded.includes('campeonatos') || !p.priceMonthly;
+
 export default function PlanesPage() {
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [estado, setEstado] = useState<'cargando' | 'ok' | 'error'>('cargando');
@@ -11,18 +32,26 @@ export default function PlanesPage() {
   useEffect(() => {
     listPlanesAPI()
       .then((p) => {
-        setPlanes(p);
+        // Primero los de precio de lista; luego los que se cotizan con asesor.
+        setPlanes(
+          [...p].sort(
+            (a, b) =>
+              Number(requiereAsesor(a)) - Number(requiereAsesor(b)) ||
+              a.appsIncluded.length - b.appsIncluded.length,
+          ),
+        );
         setEstado('ok');
       })
       .catch(() => setEstado('error'));
   }, []);
 
   return (
-    <main className="mx-auto min-h-screen max-w-4xl px-6 py-10">
-      <header className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--gold)' }}>
-          Planes
-        </h1>
+    <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
+      <header className="mb-8 flex items-center justify-between gap-4">
+        <div>
+          <p className="eyebrow mb-1">Suscripciones por organización</p>
+          <h1 className="display text-3xl">Planes</h1>
+        </div>
         <Link href="/" className="text-sm" style={{ color: 'var(--text-muted)' }}>
           ← Inicio
         </Link>
@@ -35,37 +64,60 @@ export default function PlanesPage() {
 
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {planes.map((plan) => (
-          <li
-            key={plan.id}
-            className="rounded-xl border p-5"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-          >
-            <h2 className="text-xl font-semibold">{plan.name}</h2>
-            {plan.description && (
-              <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-                {plan.description}
-              </p>
-            )}
-            <div className="mt-3 flex flex-wrap gap-1">
+          <li key={plan.id} className="card flex flex-col p-5">
+            <div className="flex flex-wrap gap-1.5">
               {plan.appsIncluded.map((app) => (
-                <span
-                  key={app}
-                  className="rounded px-2 py-0.5 text-xs font-bold"
-                  style={{ background: 'var(--gold)', color: '#14141e' }}
-                >
-                  {app}
+                <span key={app} className="badge badge-gold">
+                  {NOMBRE_APP[app] ?? app}
                 </span>
               ))}
             </div>
-            {plan.priceMonthly && (
-              <p className="mt-3 text-sm">
-                <strong>${plan.priceMonthly}</strong>
-                <span style={{ color: 'var(--text-muted)' }}> / mes</span>
+            <h2 className="mt-3 text-xl font-semibold">{plan.name}</h2>
+            {plan.description && (
+              <p className="mt-1 flex-1 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                {plan.description}
               </p>
+            )}
+
+            {requiereAsesor(plan) ? (
+              <div className="mt-4">
+                <p className="text-sm font-semibold">Precio a la medida del evento</p>
+                <a
+                  className="btn btn-outline mt-2 w-full"
+                  href={`mailto:${CONTACTO_ADMIN}?subject=${encodeURIComponent(
+                    `DINAMYT — Cotización: ${plan.name}`,
+                  )}`}
+                >
+                  Contactar con un administrador
+                </a>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <p className="mono text-lg font-semibold" style={{ color: 'var(--gold)' }}>
+                  {fmtCOP(plan.priceMonthly!)}
+                  <span className="text-sm font-normal" style={{ color: 'var(--text-muted)' }}>
+                    {' '}/ mes
+                  </span>
+                </p>
+                {plan.priceAnnual && (
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    o {fmtCOP(plan.priceAnnual)} / año
+                  </p>
+                )}
+              </div>
             )}
           </li>
         ))}
       </ul>
+
+      <p className="mt-8 text-sm" style={{ color: 'var(--text-muted)' }}>
+        Las suscripciones se activan por organización (club, liga o federación).
+        ¿Dudas sobre cuál te conviene?{' '}
+        <a href={`mailto:${CONTACTO_ADMIN}`} style={{ color: 'var(--gold)' }}>
+          Escríbenos
+        </a>
+        .
+      </p>
     </main>
   );
 }

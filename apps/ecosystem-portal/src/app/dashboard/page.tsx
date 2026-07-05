@@ -12,8 +12,8 @@ import {
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
-const ACADEMY_URL =
-  process.env.NEXT_PUBLIC_ACADEMY_URL || 'http://localhost:3004';
+const MEMBRESIAS_URL =
+  process.env.NEXT_PUBLIC_MEMBRESIAS_URL || 'http://localhost:3006';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -49,23 +49,23 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
-      <header className="mb-8 flex items-center justify-between">
+      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--gold)' }}>
-            Hola, {payload.fullName}
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="eyebrow mb-1">Tu cuenta DINAMYT</p>
+          <h1 className="display text-3xl">Hola, {payload.fullName}</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
             {payload.email}
             {payload.is_super_admin ? ' · Super administrador' : ''}
           </p>
         </div>
-        <button
-          onClick={salir}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          Salir
-        </button>
+        <div className="flex items-center gap-2">
+          <Link href="/perfil" className="btn btn-outline">
+            Mi perfil
+          </Link>
+          <button onClick={salir} className="btn btn-outline">
+            Salir
+          </button>
+        </div>
       </header>
 
       <section
@@ -89,14 +89,26 @@ export default function DashboardPage() {
               {payload.role_campeonatos ? ` (${payload.role_campeonatos})` : ''}
             </a>
           )}
-          {(payload.is_super_admin || payload.app_scopes.includes('academy')) && (
+          {(payload.is_super_admin ||
+            payload.app_scopes.includes('membresias')) && (
+            // Mismo SSO por fragmento que Campeonatos: membresias-web guarda el
+            // token al aterrizar en /login#token=… sin segundo formulario.
             <a
-              href={ACADEMY_URL}
+              href={`${MEMBRESIAS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
               className="rounded-lg px-4 py-3 font-semibold"
               style={{ background: 'var(--gold)', color: '#14141e' }}
             >
-              Entrar a Academy
+              Entrar a Membresías
+              {payload.role_membresias ? ` (${payload.role_membresias})` : ''}
             </a>
+          )}
+          {payload.app_scopes.includes('academy') && (
+            <span
+              className="rounded-lg border px-4 py-3 font-semibold opacity-60"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              Academy — próximamente
+            </span>
           )}
           {!payload.is_super_admin && payload.app_scopes.length === 0 && (
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>

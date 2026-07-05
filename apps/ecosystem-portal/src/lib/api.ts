@@ -46,6 +46,7 @@ export interface TokenPayload {
   app_scopes: string[];
   role_academy: string | null;
   role_campeonatos: string | null;
+  role_membresias: string | null;
   is_super_admin: boolean;
   exp?: number;
 }
