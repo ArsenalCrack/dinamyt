@@ -223,33 +223,39 @@ apps, panel del alumno `/mi` en Membresías, campana de avisos, perfil editable
 en el portal, catálogo completo de planes con «contactar administrador»,
 mailer configurable, fixes de seguridad (OTP un solo uso, PII de orgs).
 
+**Resuelto el 2026-07-04 (noche):** rate-limiting en auth (`@nestjs/throttler`:
+login 10/min, OTP 6/min, forgot 3/min, global 120/min) · **SSO por redirección
+completo** (las apps mandan a `portal/login?redirect=` y el portal devuelve con
+`#token=` solo a orígenes del ecosistema) · **reporte Excel del campeonato**
+(`GET /campeonatos/:id/reporte`: inscripciones con snapshot, secciones y
+podios; botón «⬇ Reporte Excel» en el hub) · **carnet QR del alumno** (en `/mi`;
+el kiosco distingue PIN vs carnet y un escáner USB funciona de una) · **página
+de privacidad** (`/privacidad`, enlazada del registro y el footer) · **CI de
+GitHub Actions** (`.github/workflows/ci.yml`, corre al subir el repo).
+
 **Pendiente (orden sugerido):**
 1. **Operación (bloqueante para salir a la web)** — subir el monorepo a GitHub
-   (hoy NO tiene remoto), rotar secretos, migrar a Postgres real, CI/CD
-   (GitHub Actions: build+test en cada push).
-2. **Seguridad** — rate-limiting en `/auth/login` y verificación de OTP
-   (`@nestjs/throttler`, ~1 h de trabajo); límite de intentos por OTP.
-3. **Campeonatos** —
-   - Reportes **Excel/PDF** (planillas, podios, medallería) — `exceljs` +
-     `pdfkit`/`reportlab`-like; COMBAT ya define qué reportes.
+   (hoy NO tiene remoto; el workflow de CI ya está listo), rotar secretos,
+   migrar a Postgres real.
+2. **Campeonatos** —
+   - Reporte **PDF** (el Excel ya está); medallería por club.
    - **Figuras/saltos EN VIVO** con motor sincronizado (hoy: planilla local
      del juez + registro de la mesa; falta el equivalente WS de combate).
    - Enlazar cada combate del bracket con su sala WS con un clic (hoy la mesa
      abre `?seccion=`).
    - Snapshot inmutable COMPLETO en resultados (falta club/edad/nombre en el
-     momento de competir) + `GET /users/:id/campeonatos-summary` (historial).
+     momento de competir; requiere migración de BD) +
+     `GET /users/:id/campeonatos-summary` (historial).
    - PWA/offline completo de la pantalla pública.
-4. **SSO por redirección completo** — hoy el portal ya entrega el token a las
-   apps por fragmento (`#token=`); falta el camino inverso: que las apps
-   rediriján a `portal/login?redirect=` cuando no hay sesión, y logout global.
-5. **Membresías** — adaptador REAL del lector (requiere el hardware
-   DigitalPersona/ZKTeco; el esqueleto ya está), generador de carnets con QR
-   para check-in `qr` (el endpoint ya lo acepta), UI de vinculación
+   - Logout global del SSO (cerrar sesión en una app cierra las demás).
+3. **Membresías** — adaptador REAL del lector (requiere el hardware
+   DigitalPersona/ZKTeco; el esqueleto ya está), UI de vinculación
    acudiente↔menor (el endpoint `POST /users/:id/guardians` ya existe).
-6. **Pagos en línea** — pasarela (Wompi/MercadoPago) para comprar planes desde
-   el portal; hoy la suscripción la activa el super-admin manualmente.
-7. **Subida de archivos** — avatar con URL prefirmada (§6); hoy solo URL.
-8. **Academy** — no iniciada (0%): plataforma de enseñanza + el microservicio
+4. **Pagos**: NO hay pasarela por decisión de producto — todo el cobro es en
+   efectivo/transferencia y el sistema solo lo REGISTRA. La activación de
+   suscripciones de organizaciones la hace el super-admin desde `/admin`.
+5. **Subida de archivos** — avatar con URL prefirmada (§6); hoy solo URL.
+6. **Academy** — no iniciada (0%): plataforma de enseñanza + el microservicio
    de visión por computador (Sistema Inteligente Hapkido, proyecto Python aparte).
 
 ---

@@ -62,6 +62,25 @@
 >   compartido no), paso a paso VPS y administrado, correos, BD, R2 para
 >   archivos, checklist y pendientes completos.
 >
+> **2026-07-04 (noche) — faltantes ejecutados** (verificados en vivo):
+> - **Rate-limiting** (`@nestjs/throttler`): login 10/min, verify-email y
+>   reset 6/min, forgot 3/min, global 120/min (probado: intento 11 → 429).
+> - **SSO por redirección completo**: las apps ofrecen «Entrar con el portal
+>   DINAMYT» (`portal/login?redirect=…`) y el portal devuelve `#token=` SOLO a
+>   orígenes del ecosistema; con sesión previa el rebote es inmediato y cada
+>   app enruta por rol (probado: portal→membresías→/mi).
+> - **Reporte Excel** (`GET /campeonatos/:id/reporte`, admin/maestro):
+>   Inscripciones (snapshot), Secciones y Podios (llave o posiciones de
+>   figuras); botón «⬇ Reporte Excel» en el hub (probado: xlsx válido).
+> - **Carnet QR** del alumno en `/mi` (contiene su ecosystem_user_id); el
+>   kiosco distingue PIN vs carnet (UUID → método `qr`) — un escáner USB
+>   "teclea" y funciona sin código extra.
+> - **/privacidad** en el portal (Ley 1581) enlazada del registro y el footer.
+> - **CI**: `.github/workflows/ci.yml` (pnpm + turbo build/test + claves RS256
+>   efímeras) — corre al subir el repo a GitHub.
+> - Decisión de producto: **NO hay pasarela de pagos** — el cobro es externo
+>   (efectivo/transferencia) y el sistema solo lo registra.
+>
 > Para correr TODO en local paso a paso (portal → campeonatos desde el navegador),
 > ver **`RUN_LOCAL.md`**. Para el plan de la versión unificada (fusión de
 > COMBAT + PROJECT con roles), ver **`PLAN_FUSION.md`**.
