@@ -44,6 +44,11 @@ export const organizations = eco.table('organizations', {
   phone: varchar('phone', { length: 30 }),
   city: varchar('city', { length: 100 }),
   country: varchar('country', { length: 100 }).default('Colombia'),
+  // ── Ficha pública del club (la llena el maestro/admin del club; la ven sus
+  //    miembros desde el portal — «Mi club») ─────────────────────────────────
+  description: text('description'),
+  address: varchar('address', { length: 200 }),
+  schedule: text('schedule'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -63,6 +68,10 @@ export const users = eco.table('users', {
   isActive: boolean('is_active').default(true),
   isSuperAdmin: boolean('is_super_admin').default(false),
   dataConsentAt: timestamp('data_consent_at'),
+  // ── Anti fuerza-bruta: contador de intentos fallidos y bloqueo temporal ────
+  // (el super-admin puede desbloquear desde el panel /admin del portal)
+  failedLoginAttempts: integer('failed_login_attempts').default(0),
+  lockedUntil: timestamp('locked_until'),
   // ── Perfil transversal (lo consume Membresías; §6 PLAN_MEMBRESIAS) ──────────
   emergencyContactName: varchar('emergency_contact_name', { length: 200 }),
   emergencyContactPhone: varchar('emergency_contact_phone', { length: 30 }),
@@ -179,6 +188,23 @@ export const userSubscriptions = eco.table('user_subscriptions', {
   status: subscriptionStatusEnum('status').default('ACTIVE'),
   startsAt: timestamp('starts_at').notNull(),
   endsAt: timestamp('ends_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ── Tabla: org_club_invitations (federación/liga → club) ────────────────────
+// Una organización invita a un club existente a ser su hijo; el maestro/dueño
+// del club acepta o rechaza. Al aceptar, el club queda con parent_id de la org.
+export const orgClubInvitations = eco.table('org_club_invitations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orgId: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
+  clubId: uuid('club_id')
+    .notNull()
+    .references(() => organizations.id),
+  status: varchar('status', { length: 20 }).notNull().default('PENDIENTE'),
+  invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
+  respondedAt: timestamp('responded_at'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

@@ -11,8 +11,23 @@ import {
   users,
   subscriptions,
   subscriptionPlans,
+  orgClubInvitations,
 } from '../../db/schema';
-import { and, eq, gt, ilike, inArray } from 'drizzle-orm';
+import { and, eq, gt, ilike, inArray, isNull } from 'drizzle-orm';
+
+// Quién puede GESTIONAR una organización (editar su ficha, invitar gente,
+// responder invitaciones): el admin, el dueño o el maestro del club.
+const ROLES_GESTOR = ['admin', 'owner', 'maestro'];
+
+// Reparto de roles según el tipo de organización (decisión de producto):
+// la federación/liga agrega jueces y administradores; el club agrega
+// competidores y coaches (además de su propio staff).
+const ROLES_POR_TIPO: Record<string, string[]> = {
+  FEDERATION: ['admin', 'judge'],
+  LEAGUE: ['admin', 'judge'],
+  CLUB: ['maestro', 'owner', 'coach', 'competitor', 'student'],
+  ACADEMY: ['maestro', 'owner', 'coach', 'competitor', 'student'],
+};
 
 @Injectable()
 export class OrganizationsService {
@@ -71,7 +86,19 @@ export class OrganizationsService {
     invitedByUserId: string,
   ) {
     // Verificar que la organización existe
-    await this.findById(orgId);
+    const org = await this.findById(orgId);
+
+    // Reparto de roles: la organización (federación/liga) agrega jueces y
+    // administradores; el club agrega competidores y coaches.
+    const permitidos = ROLES_POR_TIPO[org.type] ?? [];
+    if (permitidos.length > 0 && !permitidos.includes(role)) {
+      const esOrg = org.type === 'FEDERATION' || org.type === 'LEAGUE';
+      throw new BadRequestException(
+        esOrg
+          ? 'Una organización solo agrega administradores y jueces. Los competidores y coaches los agrega cada club.'
+          : 'Un club agrega maestros, coaches y competidores. Los jueces y administradores los agrega la organización.',
+      );
+    }
 
     // Buscar el usuario por email
     const userResult = await db
@@ -169,7 +196,7 @@ export class OrganizationsService {
     throw new ForbiddenException('No perteneces a esta organización.');
   }
 
-  // ── Mis organizaciones (donde soy admin) con sus hijas ─────────────────────
+  // ── Mis organizaciones (donde soy gestor: admin/owner/maestro) con hijas ───
   async findMias(userId: string) {
     const mias = await db
       .select({
@@ -180,10 +207,21 @@ export class OrganizationsService {
         city: organizations.city,
         country: organizations.country,
         isActive: organizations.isActive,
+        description: organizations.description,
+        address: organizations.address,
+        schedule: organizations.schedule,
+        phone: organizations.phone,
+        email: organizations.email,
+        myRole: orgMembers.role,
       })
       .from(orgMembers)
       .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
-      .where(and(eq(orgMembers.userId, userId), eq(orgMembers.role, 'admin')));
+      .where(
+        and(
+          eq(orgMembers.userId, userId),
+          inArray(orgMembers.role, ROLES_GESTOR),
+        ),
+      );
     if (mias.length === 0) return [];
     const hijas = await db
       .select()
@@ -395,6 +433,310 @@ export class OrganizationsService {
       throw new NotFoundException('Ese usuario no es miembro de la organización.');
     }
     return { ok: true };
+  }
+
+  // ── ¿Gestiona el usuario esta organización? (admin, owner o maestro) ───────
+  // El admin de la federación padre también gestiona sus clubes.
+  async esGestorDe(userId: string, orgId: string): Promise<boolean> {
+    const [org] = await db
+      .select({ parentId: organizations.parentId })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    if (!org) return false;
+    const propia = await db
+      .select({ id: orgMembers.id })
+      .from(orgMembers)
+      .where(
+        and(
+          eq(orgMembers.userId, userId),
+          eq(orgMembers.orgId, orgId),
+          inArray(orgMembers.role, ROLES_GESTOR),
+        ),
+      )
+      .limit(1);
+    if (propia[0]) return true;
+    if (!org.parentId) return false;
+    return this.esAdminDe(userId, org.parentId);
+  }
+
+  /** Lanza 403 si el usuario no es super admin ni gestor de la org. */
+  async exigirGestorDe(userId: string, orgId: string, esSuper: boolean) {
+    if (esSuper) return;
+    if (!(await this.esGestorDe(userId, orgId))) {
+      throw new ForbiddenException('No gestionas esta organización.');
+    }
+  }
+
+  // ── Ficha de la organización (la llena el maestro/admin del club) ─────────
+  async actualizarInfo(
+    orgId: string,
+    data: {
+      name?: string;
+      description?: string | null;
+      address?: string | null;
+      schedule?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      city?: string | null;
+    },
+  ) {
+    const result = await db
+      .update(organizations)
+      .set({
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.address !== undefined && { address: data.address }),
+        ...(data.schedule !== undefined && { schedule: data.schedule }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.email !== undefined && { email: data.email }),
+        ...(data.city !== undefined && { city: data.city }),
+        updatedAt: new Date(),
+      })
+      .where(eq(organizations.id, orgId))
+      .returning();
+    if (!result[0]) throw new NotFoundException('Organización no encontrada.');
+    return result[0];
+  }
+
+  // ── Mi club: la información del club al que pertenezco (cualquier rol) ─────
+  // La ve todo miembro; la llena el maestro o el admin del club.
+  async miClub(userId: string) {
+    const filas = await db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        type: organizations.type,
+        parentId: organizations.parentId,
+        city: organizations.city,
+        country: organizations.country,
+        description: organizations.description,
+        address: organizations.address,
+        schedule: organizations.schedule,
+        phone: organizations.phone,
+        email: organizations.email,
+        isActive: organizations.isActive,
+        myRole: orgMembers.role,
+      })
+      .from(orgMembers)
+      .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
+      .where(eq(orgMembers.userId, userId));
+    if (filas.length === 0) return [];
+
+    // Contactos del club: sus gestores (maestro/owner/admin), nombre y correo.
+    const gestores = await db
+      .select({
+        orgId: orgMembers.orgId,
+        role: orgMembers.role,
+        fullName: users.fullName,
+        email: users.email,
+        phone: users.phone,
+      })
+      .from(orgMembers)
+      .innerJoin(users, eq(orgMembers.userId, users.id))
+      .where(
+        and(
+          inArray(
+            orgMembers.orgId,
+            filas.map((f) => f.id),
+          ),
+          inArray(orgMembers.role, ROLES_GESTOR),
+        ),
+      );
+
+    // La org padre (federación/liga) de cada club, para mostrar la afiliación.
+    const padreIds = filas.map((f) => f.parentId).filter(Boolean) as string[];
+    const padres = padreIds.length
+      ? await db
+          .select({ id: organizations.id, name: organizations.name })
+          .from(organizations)
+          .where(inArray(organizations.id, padreIds))
+      : [];
+
+    return filas.map((f) => ({
+      ...f,
+      gestores: gestores.filter((g) => g.orgId === f.id),
+      organizacionPadre:
+        padres.find((p) => p.id === f.parentId)?.name ?? null,
+    }));
+  }
+
+  // ── Crear MI club (un maestro funda su propio club) ────────────────────────
+  // Cualquier usuario autenticado puede fundar un club; queda como su maestro.
+  async crearMiClub(
+    userId: string,
+    data: { name: string; city?: string; description?: string },
+  ) {
+    if (!data.name?.trim()) {
+      throw new BadRequestException('El club necesita un nombre.');
+    }
+    const [club] = await db
+      .insert(organizations)
+      .values({
+        name: data.name.trim(),
+        type: 'CLUB',
+        city: data.city ?? null,
+        description: data.description ?? null,
+      })
+      .returning();
+    await db.insert(orgMembers).values({
+      orgId: club.id,
+      userId,
+      role: 'maestro',
+    });
+    return club;
+  }
+
+  // ── Clubes/academias del sistema (buscador para invitar o inscribirse) ─────
+  async listarClubes(search?: string) {
+    return db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        type: organizations.type,
+        city: organizations.city,
+        parentId: organizations.parentId,
+      })
+      .from(organizations)
+      .where(
+        and(
+          inArray(organizations.type, ['CLUB', 'ACADEMY']),
+          eq(organizations.isActive, true),
+          search ? ilike(organizations.name, `%${search}%`) : undefined,
+        ),
+      )
+      .orderBy(organizations.name)
+      .limit(100);
+  }
+
+  // ── Invitar a un club a la organización (federación/liga → club) ───────────
+  async invitarClub(orgId: string, clubId: string, invitedByUserId: string) {
+    const org = await this.findById(orgId);
+    if (org.type !== 'FEDERATION' && org.type !== 'LEAGUE') {
+      throw new BadRequestException(
+        'Solo una federación o liga puede invitar clubes.',
+      );
+    }
+    const club = await this.findById(clubId);
+    if (club.type !== 'CLUB' && club.type !== 'ACADEMY') {
+      throw new BadRequestException('Solo se pueden invitar clubes o academias.');
+    }
+    if (club.parentId === orgId) {
+      throw new BadRequestException('Ese club ya pertenece a tu organización.');
+    }
+    if (club.parentId) {
+      throw new BadRequestException(
+        'Ese club ya pertenece a otra organización.',
+      );
+    }
+    const [pendiente] = await db
+      .select({ id: orgClubInvitations.id })
+      .from(orgClubInvitations)
+      .where(
+        and(
+          eq(orgClubInvitations.orgId, orgId),
+          eq(orgClubInvitations.clubId, clubId),
+          eq(orgClubInvitations.status, 'PENDIENTE'),
+        ),
+      )
+      .limit(1);
+    if (pendiente) {
+      throw new BadRequestException('Ese club ya tiene una invitación pendiente.');
+    }
+    const [inv] = await db
+      .insert(orgClubInvitations)
+      .values({ orgId, clubId, invitedByUserId })
+      .returning();
+    return inv;
+  }
+
+  // ── Invitaciones enviadas por una organización ─────────────────────────────
+  async invitacionesClubEnviadas(orgId: string) {
+    return db
+      .select({
+        id: orgClubInvitations.id,
+        status: orgClubInvitations.status,
+        createdAt: orgClubInvitations.createdAt,
+        respondedAt: orgClubInvitations.respondedAt,
+        clubId: organizations.id,
+        clubName: organizations.name,
+        clubCity: organizations.city,
+      })
+      .from(orgClubInvitations)
+      .innerJoin(organizations, eq(orgClubInvitations.clubId, organizations.id))
+      .where(eq(orgClubInvitations.orgId, orgId));
+  }
+
+  // ── Invitaciones pendientes para los clubes que gestiono ───────────────────
+  async misInvitacionesClub(userId: string) {
+    const gestionadas = await db
+      .select({ orgId: orgMembers.orgId })
+      .from(orgMembers)
+      .where(
+        and(
+          eq(orgMembers.userId, userId),
+          inArray(orgMembers.role, ROLES_GESTOR),
+        ),
+      );
+    if (gestionadas.length === 0) return [];
+    return db
+      .select({
+        id: orgClubInvitations.id,
+        status: orgClubInvitations.status,
+        createdAt: orgClubInvitations.createdAt,
+        clubId: orgClubInvitations.clubId,
+        orgId: organizations.id,
+        orgName: organizations.name,
+        orgType: organizations.type,
+      })
+      .from(orgClubInvitations)
+      .innerJoin(organizations, eq(orgClubInvitations.orgId, organizations.id))
+      .where(
+        and(
+          inArray(
+            orgClubInvitations.clubId,
+            gestionadas.map((g) => g.orgId),
+          ),
+          eq(orgClubInvitations.status, 'PENDIENTE'),
+        ),
+      );
+  }
+
+  // ── Responder la invitación (maestro/dueño del club acepta o rechaza) ──────
+  async responderInvitacionClub(
+    invitacionId: string,
+    userId: string,
+    esSuper: boolean,
+    aceptar: boolean,
+  ) {
+    const [inv] = await db
+      .select()
+      .from(orgClubInvitations)
+      .where(eq(orgClubInvitations.id, invitacionId))
+      .limit(1);
+    if (!inv) throw new NotFoundException('Invitación no encontrada.');
+    if (inv.status !== 'PENDIENTE') {
+      throw new BadRequestException('Esta invitación ya fue respondida.');
+    }
+    await this.exigirGestorDe(userId, inv.clubId, esSuper);
+
+    await db
+      .update(orgClubInvitations)
+      .set({
+        status: aceptar ? 'ACEPTADA' : 'RECHAZADA',
+        respondedAt: new Date(),
+      })
+      .where(eq(orgClubInvitations.id, invitacionId));
+
+    if (aceptar) {
+      await db
+        .update(organizations)
+        .set({ parentId: inv.orgId, updatedAt: new Date() })
+        .where(
+          and(eq(organizations.id, inv.clubId), isNull(organizations.parentId)),
+        );
+    }
+    return { ok: true, aceptada: aceptar };
   }
 
   // ── Listar miembros de una organización ───────────────────────────────────

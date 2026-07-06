@@ -7,6 +7,8 @@ import {
   obtenerToken,
   decodificarToken,
   cerrarSesion,
+  misOrganizacionesAPI,
+  miClubAPI,
   type TokenPayload,
 } from '@/lib/api';
 
@@ -18,6 +20,9 @@ const MEMBRESIAS_URL =
 export default function DashboardPage() {
   const router = useRouter();
   const [payload, setPayload] = useState<TokenPayload | null>(null);
+  // ¿Gestiona alguna organización (admin/maestro)? ¿Pertenece a algún club?
+  const [gestiona, setGestiona] = useState<boolean | null>(null);
+  const [nombreClub, setNombreClub] = useState<string | null>(null);
 
   useEffect(() => {
     const t = obtenerToken();
@@ -32,6 +37,17 @@ export default function DashboardPage() {
       return;
     }
     setPayload(p);
+
+    // Decide qué tarjeta mostrar: «Mi organización» (la gestiona) o
+    // «Mi club» (solo pertenece). Ambas consultas fallan sin romper la página.
+    Promise.allSettled([misOrganizacionesAPI(), miClubAPI()]).then(
+      ([orgs, club]) => {
+        setGestiona(orgs.status === 'fulfilled' && orgs.value.length > 0);
+        if (club.status === 'fulfilled' && club.value.length > 0) {
+          setNombreClub(club.value[0].name);
+        }
+      },
+    );
   }, [router]);
 
   function salir() {
@@ -121,24 +137,46 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Panel del admin de organización (federación → clubes → gente) */}
-      <section
-        className="mt-4 rounded-xl border p-5"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-      >
-        <h2 className="mb-1 text-lg font-semibold">Mi organización</h2>
-        <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Si administras una federación o club: gestiona tus clubes, maestros y
-          alumnos.
-        </p>
-        <Link
-          href="/mi-organizacion"
-          className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
-          style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+      {/* «Mi organización» si la gestiona; si solo pertenece a un club,
+          «Mi club» con su información (la llena el maestro/admin del club). */}
+      {gestiona ? (
+        <section
+          className="mt-4 rounded-xl border p-5"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          Abrir mi organización
-        </Link>
-      </section>
+          <h2 className="mb-1 text-lg font-semibold">Mi organización</h2>
+          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Gestiona tus clubes y tu gente, la ficha de tu club y las
+            invitaciones entre organización y clubes.
+          </p>
+          <Link
+            href="/mi-organizacion"
+            className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
+            style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+          >
+            Abrir mi organización
+          </Link>
+        </section>
+      ) : gestiona === false ? (
+        <section
+          className="mt-4 rounded-xl border p-5"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <h2 className="mb-1 text-lg font-semibold">Mi club</h2>
+          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            {nombreClub
+              ? `Perteneces a ${nombreClub}: mira sus horarios, sede y contactos.`
+              : 'Cuando tu maestro te agregue a su club, aquí verás su información. ¿Eres maestro? Funda tu club.'}
+          </p>
+          <Link
+            href="/mi-club"
+            className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
+            style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+          >
+            {nombreClub ? 'Ver la información de mi club' : 'Mi club'}
+          </Link>
+        </section>
+      ) : null}
 
       {payload.is_super_admin && (
         <section

@@ -15,6 +15,13 @@
       "when": 1783051519867,
       "tag": "0001_next_ser_duncan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783353297996,
+      "tag": "0002_glamorous_bedlam",
+      "breakpoints": true
     }
   ]
 }

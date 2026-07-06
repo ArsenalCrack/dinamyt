@@ -115,11 +115,14 @@ if (planCamp) {
 }
 
 const demos = [
-  ['juez@dinamyt.com', 'Juez Demo', 'judge', '2000000001'],
-  ['coach@dinamyt.com', 'Coach Demo (título)', 'coach', '2000000002'],
-  ['orgadmin@dinamyt.com', 'Admin de Organización Demo', 'admin', '2000000003'],
-  ['competidor@dinamyt.com', 'Competidor Demo', 'competitor', '2000000004'],
-  ['maestro@dinamyt.com', 'Maestro del Club Demo', 'maestro', '2000000005'],
+  ['juez@dinamyt.com', 'JUEZ DEMO', 'judge', '2000000001'],
+  ['coach@dinamyt.com', 'COACH DEMO (TÍTULO)', 'coach', '2000000002'],
+  ['orgadmin@dinamyt.com', 'ADMIN DE ORGANIZACIÓN DEMO', 'admin', '2000000003'],
+  ['competidor@dinamyt.com', 'COMPETIDOR DEMO', 'competitor', '2000000004'],
+  ['maestro@dinamyt.com', 'MAESTRO DEL CLUB DEMO', 'maestro', '2000000005'],
+  // Juez de esquina de prueba: mismo rol `judge` del ecosistema; su función
+  // (esquina/central/mesa) se define al asignarlo a un tatami en Campeonatos.
+  ['juezesquina@dinamyt.com', 'JUEZ DE ESQUINA DEMO', 'judge', '2000000006'],
 ];
 for (const [email, name, role, doc] of demos) {
   let u = (await pg.query('select id from ecosystem.users where email = $1', [email])).rows[0];

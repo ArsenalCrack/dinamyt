@@ -12,8 +12,15 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
+import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt.service';
+import {
+  validarNombre,
+  validarTelefono,
+  validarFechaNacimiento,
+  validarAvatar,
+} from '../../common/validacion';
 
 /**
  * Perfil de la persona (transversal). El maestro edita el perfil de sus alumnos
@@ -53,6 +60,27 @@ export class UsersController {
     },
   ) {
     await this.assertCanManage(user, id);
+
+    // Validación de datos de la persona (el front también valida, pero la
+    // última palabra la tiene el servidor).
+    if (body.fullName !== undefined) {
+      body.fullName = validarNombre(body.fullName, 'nombre completo');
+    }
+    if (body.phone) body.phone = validarTelefono(body.phone);
+    if (body.emergencyContactName) {
+      body.emergencyContactName = validarNombre(
+        body.emergencyContactName,
+        'nombre del contacto de emergencia',
+      );
+    }
+    if (body.emergencyContactPhone) {
+      body.emergencyContactPhone = validarTelefono(
+        body.emergencyContactPhone,
+        'teléfono del contacto de emergencia',
+      );
+    }
+    if (body.avatarUrl) body.avatarUrl = validarAvatar(body.avatarUrl);
+
     return this.usersService.updateProfile(id, {
       ...body,
       birthDate:
@@ -60,8 +88,23 @@ export class UsersController {
           ? undefined
           : body.birthDate === null
             ? null
-            : new Date(body.birthDate),
+            : validarFechaNacimiento(new Date(body.birthDate)),
     });
+  }
+
+  // ── GET /users/bloqueados — cuentas bloqueadas por intentos (super admin) ──
+  @Get('bloqueados')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  listarBloqueadas() {
+    return this.usersService.listarBloqueadas();
+  }
+
+  // ── POST /users/:id/desbloquear — desbloquear cuenta (super admin) ─────────
+  @Post(':id/desbloquear')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  async desbloquear(@Param('id') id: string) {
+    await this.usersService.desbloquearCuenta(id);
+    return { ok: true, message: 'Cuenta desbloqueada.' };
   }
 
   // ── PUT /users/:id/disciplines — fijar disciplina/grado (solo maestro) ────

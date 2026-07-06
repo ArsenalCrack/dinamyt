@@ -15,6 +15,12 @@ import {
   userSubscriptions,
 } from '../../db/schema';
 import { eq, and, gt, InferSelectModel } from 'drizzle-orm';
+import {
+  validarNombre,
+  validarDocumento,
+  validarTelefono,
+  validarFechaNacimiento,
+} from '../../common/validacion';
 
 type User = InferSelectModel<typeof users>;
 
@@ -41,6 +47,14 @@ export class AuthService {
         'Debes aceptar el tratamiento de datos personales.',
       );
     }
+
+    // Validación + normalización: el nombre se guarda SIEMPRE en mayúsculas
+    // (así aparece igual en carnets, llaves y planillas de todas las apps).
+    data.fullName = validarNombre(data.fullName, 'nombre completo')
+      .toLocaleUpperCase('es');
+    data.documentId = validarDocumento(data.documentId);
+    if (data.phone) data.phone = validarTelefono(data.phone);
+    if (data.birthDate) validarFechaNacimiento(data.birthDate);
 
     const existing = await this.usersService.findByEmail(data.email);
     if (existing) {
@@ -72,10 +86,30 @@ export class AuthService {
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
+  // Mensajes específicos (decisión de producto: se le dice al usuario si el
+  // correo no existe o si la contraseña es incorrecta) + bloqueo temporal de
+  // la cuenta tras MAX_INTENTOS fallidos. El super-admin puede desbloquear
+  // desde el panel del portal sin esperar a que venza el bloqueo.
+  static readonly MAX_INTENTOS = 5;
+  static readonly BLOQUEO_MINUTOS = 15;
+
   async login(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('Credenciales incorrectas.');
+      throw new UnauthorizedException(
+        'No existe una cuenta con ese correo. Revísalo o regístrate.',
+      );
+    }
+
+    // ¿Cuenta bloqueada por intentos fallidos?
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutos = Math.max(
+        1,
+        Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000),
+      );
+      throw new UnauthorizedException(
+        `Cuenta bloqueada por demasiados intentos fallidos. Inténtalo en ${minutos} min o pide a un administrador que la desbloquee.`,
+      );
     }
 
     const validPassword = await this.usersService.verifyPassword(
@@ -83,7 +117,22 @@ export class AuthService {
       user.passwordHash,
     );
     if (!validPassword) {
-      throw new UnauthorizedException('Credenciales incorrectas.');
+      const intentos = (user.failedLoginAttempts ?? 0) + 1;
+      if (intentos >= AuthService.MAX_INTENTOS) {
+        await this.usersService.registrarIntentoFallido(
+          user.id,
+          intentos,
+          new Date(Date.now() + AuthService.BLOQUEO_MINUTOS * 60_000),
+        );
+        throw new UnauthorizedException(
+          `Contraseña incorrecta. Por seguridad la cuenta quedó bloqueada ${AuthService.BLOQUEO_MINUTOS} minutos.`,
+        );
+      }
+      await this.usersService.registrarIntentoFallido(user.id, intentos, null);
+      const restantes = AuthService.MAX_INTENTOS - intentos;
+      throw new UnauthorizedException(
+        `Contraseña incorrecta. Te queda${restantes === 1 ? '' : 'n'} ${restantes} intento${restantes === 1 ? '' : 's'} antes de que la cuenta se bloquee.`,
+      );
     }
 
     if (!user.isEmailVerified) {
@@ -94,6 +143,11 @@ export class AuthService {
 
     if (!user.isActive) {
       throw new UnauthorizedException('Tu cuenta está suspendida.');
+    }
+
+    // Login correcto: limpia el contador de intentos y cualquier bloqueo vencido.
+    if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
+      await this.usersService.desbloquearCuenta(user.id);
     }
 
     const token = await this.buildToken(user);

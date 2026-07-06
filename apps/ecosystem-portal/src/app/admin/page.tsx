@@ -20,6 +20,8 @@ import {
   activarSuscripcionAPI,
   listSuscripcionesPersonalesAPI,
   crearSuscripcionPersonalAPI,
+  listarBloqueadosAPI,
+  desbloquearUsuarioAPI,
   extraerError,
   type Organizacion,
   type Miembro,
@@ -27,6 +29,7 @@ import {
   type UsuarioBusqueda,
   type SuscripcionOrg,
   type SuscripcionPersonal,
+  type CuentaBloqueada,
 } from '@/lib/api';
 
 /** Roles de membresía que viajan al JWT (role_campeonatos / role_academy). */
@@ -161,6 +164,9 @@ export default function AdminEcosistemaPage() {
           );
         }}
       />
+
+      {/* ── CUENTAS BLOQUEADAS por intentos fallidos ────────────────────── */}
+      <CuentasBloqueadas ocupado={ocupado} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         {/* ── Organizaciones ─────────────────────────────────────────────── */}
@@ -535,6 +541,88 @@ export default function AdminEcosistemaPage() {
  * y con un clic le da una app + rol (crea la membresía y, si hace falta,
  * activa una suscripción de la org que incluya la app). Sin pasos manuales.
  */
+/**
+ * Cuentas bloqueadas por agotar los intentos de inicio de sesión.
+ * El super-admin las desbloquea desde aquí sin esperar a que venza el tiempo.
+ */
+function CuentasBloqueadas({ ocupado }: { ocupado: boolean }) {
+  const [bloqueadas, setBloqueadas] = useState<CuentaBloqueada[]>([]);
+  const [msg, setMsg] = useState('');
+
+  const refrescar = useCallback(() => {
+    listarBloqueadosAPI()
+      .then(setBloqueadas)
+      .catch(() => setBloqueadas([]));
+  }, []);
+
+  useEffect(() => {
+    refrescar();
+  }, [refrescar]);
+
+  async function desbloquear(cuenta: CuentaBloqueada) {
+    setMsg('');
+    try {
+      await desbloquearUsuarioAPI(cuenta.id);
+      setMsg(`${cuenta.email} desbloqueada: ya puede iniciar sesión.`);
+      refrescar();
+    } catch (e) {
+      setMsg(extraerError(e, 'No se pudo desbloquear la cuenta.'));
+    }
+  }
+
+  return (
+    <section className="card mb-5 p-5">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Cuentas bloqueadas</h2>
+        <button onClick={refrescar} className="btn btn-outline" disabled={ocupado}>
+          ⟳ Refrescar
+        </button>
+      </div>
+      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+        Una cuenta se bloquea 15 minutos tras 5 contraseñas incorrectas.
+        Desde aquí la desbloqueas de inmediato.
+      </p>
+      {msg && (
+        <p className="mb-3 text-sm" style={{ color: 'var(--gold)' }}>
+          {msg}
+        </p>
+      )}
+      {bloqueadas.length === 0 ? (
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          No hay cuentas bloqueadas en este momento.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {bloqueadas.map((c) => (
+            <li
+              key={c.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--danger)' }}
+            >
+              <span className="min-w-0 flex-1">
+                <strong>{c.fullName}</strong>
+                <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
+                  · {c.email} · {c.failedLoginAttempts ?? 0} intentos
+                  {c.lockedUntil
+                    ? ` · hasta ${new Date(c.lockedUntil).toLocaleTimeString('es')}`
+                    : ''}
+                </span>
+              </span>
+              <button
+                onClick={() => void desbloquear(c)}
+                disabled={ocupado}
+                className="btn btn-gold"
+              >
+                Desbloquear
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function AccesosRapidos({
   orgs,
   ocupado,

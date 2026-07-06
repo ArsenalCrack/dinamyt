@@ -147,6 +147,12 @@ export interface UsuarioBusqueda {
 }
 export interface MiOrganizacion extends Organizacion {
   isActive: boolean | null;
+  myRole: string;
+  description: string | null;
+  address: string | null;
+  schedule: string | null;
+  phone: string | null;
+  email: string | null;
   hijas: (Organizacion & { isActive: boolean | null })[];
 }
 
@@ -209,6 +215,89 @@ export const crearSuscripcionPersonalAPI = async (data: {
   startsAt: string;
   endsAt: string;
 }) => (await api.post('/subscriptions/user', data)).data;
+
+// ── Mi club (la ficha la llena el maestro; la ven todos sus miembros) ───────
+export interface GestorClub {
+  role: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+}
+export interface MiClub extends Organizacion {
+  description: string | null;
+  address: string | null;
+  schedule: string | null;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean | null;
+  myRole: string;
+  gestores: GestorClub[];
+  organizacionPadre: string | null;
+}
+export interface ClubBusqueda {
+  id: string;
+  name: string;
+  type: string;
+  city: string | null;
+  parentId: string | null;
+}
+export interface InvitacionClub {
+  id: string;
+  status: string;
+  createdAt: string;
+  orgId?: string;
+  orgName?: string;
+  orgType?: string;
+  clubId?: string;
+  clubName?: string;
+  clubCity?: string;
+  respondedAt?: string | null;
+}
+
+export const miClubAPI = async (): Promise<MiClub[]> =>
+  (await api.get('/organizations/mi-club')).data;
+export const crearMiClubAPI = async (data: {
+  name: string;
+  city?: string;
+  description?: string;
+}) => (await api.post('/organizations/mi-club', data)).data;
+export const listarClubesAPI = async (search?: string): Promise<ClubBusqueda[]> =>
+  (await api.get('/organizations/clubes', { params: { search } })).data;
+export const actualizarOrgInfoAPI = async (
+  orgId: string,
+  data: {
+    name?: string;
+    description?: string | null;
+    address?: string | null;
+    schedule?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    city?: string | null;
+  },
+) => (await api.patch(`/organizations/${orgId}`, data)).data;
+export const invitarClubAPI = async (orgId: string, clubId: string) =>
+  (await api.post(`/organizations/${orgId}/invitar-club`, { clubId })).data;
+export const invitacionesClubEnviadasAPI = async (
+  orgId: string,
+): Promise<InvitacionClub[]> =>
+  (await api.get(`/organizations/${orgId}/invitaciones-club`)).data;
+export const misInvitacionesClubAPI = async (): Promise<InvitacionClub[]> =>
+  (await api.get('/organizations/invitaciones-club/mias')).data;
+export const responderInvitacionClubAPI = async (id: string, aceptar: boolean) =>
+  (await api.post(`/organizations/invitaciones-club/${id}/responder`, { aceptar })).data;
+
+// ── Cuentas bloqueadas por intentos fallidos (panel super admin) ────────────
+export interface CuentaBloqueada {
+  id: string;
+  email: string;
+  fullName: string;
+  failedLoginAttempts: number | null;
+  lockedUntil: string | null;
+}
+export const listarBloqueadosAPI = async (): Promise<CuentaBloqueada[]> =>
+  (await api.get('/users/bloqueados')).data;
+export const desbloquearUsuarioAPI = async (userId: string) =>
+  (await api.post(`/users/${userId}/desbloquear`)).data;
 
 /** Extrae el mensaje de error del backend ({error} propio o {message} de Nest). */
 export function extraerError(e: unknown, fallback: string): string {

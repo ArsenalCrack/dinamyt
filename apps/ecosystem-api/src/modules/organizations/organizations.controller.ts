@@ -44,11 +44,58 @@ export class OrganizationsController {
     return this.orgsService.findAll();
   }
 
-  // ── GET /organizations/mias — las que administro, con sus clubes hijos ────
+  // ── GET /organizations/mias — las que gestiono, con sus clubes hijos ──────
   @Get('mias')
   @UseGuards(EcosystemJwtGuard)
   findMias(@CurrentUser() user: JwtPayload) {
     return this.orgsService.findMias(user.sub);
+  }
+
+  // ── GET /organizations/mi-club — info del club al que pertenezco ──────────
+  @Get('mi-club')
+  @UseGuards(EcosystemJwtGuard)
+  miClub(@CurrentUser() user: JwtPayload) {
+    return this.orgsService.miClub(user.sub);
+  }
+
+  // ── POST /organizations/mi-club — fundar mi propio club (maestro) ─────────
+  @Post('mi-club')
+  @UseGuards(EcosystemJwtGuard)
+  crearMiClub(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: { name: string; city?: string; description?: string },
+  ) {
+    return this.orgsService.crearMiClub(user.sub, body);
+  }
+
+  // ── GET /organizations/clubes — clubes/academias del sistema (buscador) ───
+  @Get('clubes')
+  @UseGuards(EcosystemJwtGuard)
+  listarClubes(@Query('search') search?: string) {
+    return this.orgsService.listarClubes(search);
+  }
+
+  // ── GET /organizations/invitaciones-club/mias — pendientes de mis clubes ──
+  @Get('invitaciones-club/mias')
+  @UseGuards(EcosystemJwtGuard)
+  misInvitacionesClub(@CurrentUser() user: JwtPayload) {
+    return this.orgsService.misInvitacionesClub(user.sub);
+  }
+
+  // ── POST /organizations/invitaciones-club/:id/responder ───────────────────
+  @Post('invitaciones-club/:id/responder')
+  @UseGuards(EcosystemJwtGuard)
+  responderInvitacionClub(
+    @Param('id') id: string,
+    @Body() body: { aceptar: boolean },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orgsService.responderInvitacionClub(
+      id,
+      user.sub,
+      user.is_super_admin,
+      body.aceptar === true,
+    );
   }
 
   // ── GET /organizations/usuarios — buscador para el panel de Accesos ───────
@@ -83,16 +130,59 @@ export class OrganizationsController {
     return this.orgsService.create({ ...body, parentId });
   }
 
-  // ── PATCH /organizations/:id — activar/desactivar (admin del padre) ───────
+  // ── PATCH /organizations/:id — activar/desactivar o editar la ficha ───────
+  // isActive: solo el admin (o del padre). La ficha (descripción, dirección,
+  // horarios, contacto): cualquier gestor del club (maestro/owner/admin).
   @Patch(':id')
   @UseGuards(EcosystemJwtGuard)
-  async setActiva(
+  async patchOrganizacion(
     @Param('id') id: string,
-    @Body() body: { isActive: boolean },
+    @Body()
+    body: {
+      isActive?: boolean;
+      name?: string;
+      description?: string | null;
+      address?: string | null;
+      schedule?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      city?: string | null;
+    },
     @CurrentUser() user: JwtPayload,
   ) {
-    await this.orgsService.exigirAdminDe(user.sub, id, user.is_super_admin);
-    return this.orgsService.setActiva(id, body.isActive === true);
+    const { isActive, ...info } = body;
+    if (isActive !== undefined) {
+      await this.orgsService.exigirAdminDe(user.sub, id, user.is_super_admin);
+      await this.orgsService.setActiva(id, isActive === true);
+    }
+    if (Object.keys(info).length > 0) {
+      await this.orgsService.exigirGestorDe(user.sub, id, user.is_super_admin);
+      return this.orgsService.actualizarInfo(id, info);
+    }
+    return this.orgsService.findById(id);
+  }
+
+  // ── POST /organizations/:id/invitar-club — federación/liga invita un club ─
+  @Post(':id/invitar-club')
+  @UseGuards(EcosystemJwtGuard)
+  async invitarClub(
+    @Param('id') orgId: string,
+    @Body() body: { clubId: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    await this.orgsService.exigirAdminDe(user.sub, orgId, user.is_super_admin);
+    return this.orgsService.invitarClub(orgId, body.clubId, user.sub);
+  }
+
+  // ── GET /organizations/:id/invitaciones-club — enviadas por la org ────────
+  @Get(':id/invitaciones-club')
+  @UseGuards(EcosystemJwtGuard)
+  async invitacionesClubEnviadas(
+    @Param('id') orgId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    await this.orgsService.exigirAdminDe(user.sub, orgId, user.is_super_admin);
+    return this.orgsService.invitacionesClubEnviadas(orgId);
   }
 
   // ── DELETE /organizations/:id — eliminar si está vacía (admin del padre) ──
@@ -137,7 +227,7 @@ export class OrganizationsController {
     @Body() body: { email: string; role?: string },
     @CurrentUser() user: JwtPayload,
   ) {
-    await this.orgsService.exigirAdminDe(user.sub, orgId, user.is_super_admin);
+    await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
     return this.orgsService.inviteMember(
       orgId,
       body.email,
@@ -155,7 +245,7 @@ export class OrganizationsController {
     @Body() body: { role: string },
     @CurrentUser() user: JwtPayload,
   ) {
-    await this.orgsService.exigirAdminDe(user.sub, orgId, user.is_super_admin);
+    await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
     return this.orgsService.updateMemberRole(orgId, userId, body.role);
   }
 
@@ -167,7 +257,7 @@ export class OrganizationsController {
     @Param('userId') userId: string,
     @CurrentUser() user: JwtPayload,
   ) {
-    await this.orgsService.exigirAdminDe(user.sub, orgId, user.is_super_admin);
+    await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
     return this.orgsService.removeMember(orgId, userId);
   }
 

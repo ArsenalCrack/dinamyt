@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { registerAPI, guardarUsuarioPendiente, extraerError } from '@/lib/api';
+import { soloLetras, soloDigitos } from '@/lib/validacion';
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -17,9 +18,15 @@ export default function RegistroPage() {
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
+  // Saneo por campo: el nombre solo letras (y se guarda en MAYÚSCULAS),
+  // el documento solo números.
   function set(k: keyof typeof form) {
-    return (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm({ ...form, [k]: e.target.value });
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      let v = e.target.value;
+      if (k === 'fullName') v = soloLetras(v).toLocaleUpperCase('es');
+      if (k === 'documentId') v = soloDigitos(v);
+      setForm({ ...form, [k]: v });
+    };
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -59,20 +66,44 @@ export default function RegistroPage() {
           Crear cuenta
         </h1>
         <label className="mb-3 block text-sm">
-          Nombre completo
-          <input value={form.fullName} onChange={set('fullName')} required className="mt-1" />
+          Nombre completo (como en tu documento)
+          <input
+            value={form.fullName}
+            onChange={set('fullName')}
+            required
+            autoComplete="name"
+            placeholder="NOMBRE APELLIDO"
+            className="mt-1"
+          />
         </label>
         <label className="mb-3 block text-sm">
-          Documento de identidad
-          <input value={form.documentId} onChange={set('documentId')} required className="mt-1" />
+          Documento de identidad (solo números)
+          <input
+            value={form.documentId}
+            onChange={set('documentId')}
+            required
+            inputMode="numeric"
+            minLength={4}
+            maxLength={20}
+            placeholder="1000000000"
+            className="mt-1"
+          />
         </label>
         <label className="mb-3 block text-sm">
           Correo
           <input type="email" value={form.email} onChange={set('email')} required className="mt-1" />
         </label>
         <label className="mb-3 block text-sm">
-          Contraseña
-          <input type="password" value={form.password} onChange={set('password')} required className="mt-1" />
+          Contraseña (mín. 8 caracteres)
+          <input
+            type="password"
+            value={form.password}
+            onChange={set('password')}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            className="mt-1"
+          />
         </label>
         <label className="mb-4 flex items-start gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
           <input

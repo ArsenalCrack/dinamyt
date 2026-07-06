@@ -129,6 +129,43 @@ export class UsersService {
     await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
   }
 
+  // ── Bloqueo por intentos fallidos (anti fuerza-bruta) ──────────────────────
+
+  // Registra un intento fallido; si lockedUntil viene, bloquea la cuenta.
+  async registrarIntentoFallido(
+    userId: string,
+    intentos: number,
+    lockedUntil: Date | null,
+  ) {
+    await db
+      .update(users)
+      .set({ failedLoginAttempts: intentos, lockedUntil })
+      .where(eq(users.id, userId));
+  }
+
+  // Limpia contador y bloqueo (login correcto o desbloqueo del admin).
+  async desbloquearCuenta(userId: string) {
+    await db
+      .update(users)
+      .set({ failedLoginAttempts: 0, lockedUntil: null })
+      .where(eq(users.id, userId));
+  }
+
+  // Cuentas actualmente bloqueadas (para el panel del super-admin).
+  async listarBloqueadas() {
+    const filas = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        fullName: users.fullName,
+        failedLoginAttempts: users.failedLoginAttempts,
+        lockedUntil: users.lockedUntil,
+      })
+      .from(users)
+      .where(gt(users.lockedUntil, new Date()));
+    return filas;
+  }
+
   // ── Perfil de la persona (transversal; lo consume Membresías) ───────────────
 
   // Quita el hash de contraseña antes de exponer un usuario.
