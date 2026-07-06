@@ -1,6 +1,52 @@
 # DINAMYT — Estado del proyecto y Handoff
 
-> Documento vivo. Última actualización: 2026-07-04.
+> Documento vivo. Última actualización: 2026-07-06.
+>
+> **2026-07-06 — lote de 24 ajustes de producto (verificados en vivo):**
+> - **Perfil del ecosystem**: nombre solo letras (se guarda en MAYÚSCULAS),
+>   teléfono solo números, nacimiento entre 3 y 100 años, parentesco por
+>   desplegable y FOTO subida desde el dispositivo (comprimida en el cliente a
+>   data-URL; `main.ts` acepta body de 2 MB). Validación espejo en
+>   `common/validacion.ts` (probada por API). La contraseña se cambia SOLO aquí.
+> - **Login**: mensajes específicos (correo inexistente / contraseña
+>   incorrecta con intentos restantes), bloqueo 15 min tras 5 fallos
+>   (migración 0002: `failed_login_attempts`, `locked_until`) y sección
+>   «Cuentas bloqueadas» en `/admin` del portal para desbloquear.
+> - **Org vs club**: `findMias` ahora incluye gestores (admin/owner/maestro);
+>   la federación/liga agrega SOLO admins y jueces e invita clubes
+>   (`org_club_invitations`, aceptar/rechazar del maestro); el club agrega
+>   maestro/coach/competidores; un maestro funda su club en «Mi club».
+>   Dashboard: «Mi organización» (gestores) o «Mi club» (miembros) con la
+>   ficha del club (sede/horarios/contacto) editable por sus gestores.
+> - **Campeonatos**: auto-inscripción de cualquier usuario con AUTOLLENADO
+>   (documento/nombre/nacimiento/género/cinturón/academia/foto del perfil;
+>   solo digita peso y modalidades) en `/campeonatos/[id]/inscribirme`;
+>   cinturón REAL (Amarillo…Negro, mapeo de PROJECT) → grupo competitivo;
+>   academia como desplegable de clubes del sistema + «Otra». EN_CURSO: solo
+>   el admin añade/invita (su invitación queda aprobada directo) con AVISO si
+>   la sección ya arrancó/finalizó. Secciones AUTOMÁTICAS: se materializan al
+>   aprobar cada inscripción (`asignarInscripcion`); «generar» quedó como
+>   pre-creación opcional. Config de categorías: cinturones por checkbox,
+>   rangos en una línea con «+ Añadir», todo congelado con el evento en curso.
+>   Nuevo `/panel` del usuario (estadísticas + inscripciones + invitaciones);
+>   `/perfil` enlaza al portal (sin cambio de contraseña en la app). Pantalla
+>   pública: filtros granulares estilo PROJECT, fecha SIEMPRE visible, botón
+>   «Inscribirme» y fotos (`?fotos=1` para no engordar el sondeo).
+> - **Membresías**: página `/asistencia` (el maestro pasa lista manual y ve
+>   en vivo huella/QR/PIN del kiosco, con estado del lector), barra global con
+>   hamburguesa (adiós botones amontonados), logo/favicon DINAMYT, login con
+>   motivo real y enlaces al portal.
+> - **Fotos de perfil en todo el ecosistema**: componente `Avatar` (foto o
+>   iniciales) en portal (dashboard, miembros, gestores), campeonatos
+>   (revisión, pantalla pública, panel) y membresías (roster, asistencia,
+>   ficha del alumno, /mi). Campeonatos guarda snapshot en
+>   `competidores.foto_url` (migración 0005).
+> - **Salir** diferenciado (rojo, `.btn-danger`) en las tres webs.
+> - Seed: `juezesquina@dinamyt.com` (judge) + script
+>   `packages/campeonatos-db/scripts/asignar-juez-demo.mjs` que lo asigna como
+>   J1 del último campeonato local.
+> - Verificado: `turbo build` 12/12 · `turbo test` 12/12 (15 campeonatos-api,
+>   27 membresias-api, 7 ecosystem-api) · endpoints probados en vivo.
 >
 > **2026-07-04 (revisión + integración + rediseño):**
 > - **Seguridad:** los OTP ya no se pueden reutilizar (`verifyOtp` exige
