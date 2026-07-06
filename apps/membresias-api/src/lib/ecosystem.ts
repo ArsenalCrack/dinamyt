@@ -7,6 +7,8 @@ export interface OrgMember {
   fullName: string;
   phone: string | null;
   role: string;
+  /** Foto de perfil de la persona (data-URL o http) — la ve el maestro. */
+  avatarUrl: string | null;
 }
 
 export type FetchMembers = (orgId: string, token: string) => Promise<OrgMember[]>;
@@ -27,6 +29,7 @@ export const fetchMembersFromEcosystem: FetchMembers = async (orgId, token) => {
     fullName: string;
     phone: string | null;
     role: string;
+    avatarUrl?: string | null;
   }>;
   return data.map((m) => ({
     userId: m.userId,
@@ -34,5 +37,6 @@ export const fetchMembersFromEcosystem: FetchMembers = async (orgId, token) => {
     fullName: m.fullName,
     phone: m.phone ?? null,
     role: m.role,
+    avatarUrl: m.avatarUrl ?? null,
   }));
 };

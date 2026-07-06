@@ -44,6 +44,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
           fullName: mem.fullName,
           email: mem.email,
           phone: mem.phone,
+          avatarUrl: mem.avatarUrl,
           status: m?.status ?? null,
           matriculado: m?.matriculado ?? false,
           venceEl: m?.venceEl ?? null,

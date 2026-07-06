@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, ecosystemApi, obtenerToken } from '@/lib/api';
 import { getSesion, esStaff } from '@/lib/session';
 import { agentEnroll } from '@/lib/agent';
+import { Avatar } from '@/components/Avatar';
 
 interface Discipline { discipline: string; currentGrade: string | null }
 interface Profile {
@@ -13,6 +14,7 @@ interface Profile {
   email?: string;
   phone?: string | null;
   birthDate?: string | null;
+  avatarUrl?: string | null;
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   medicalNotes?: string | null;
@@ -107,8 +109,11 @@ export default function Ficha() {
 
   return (
     <main style={{ maxWidth: 820, margin: '0 auto', padding: '1.5rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-        <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>{nombre}</h1>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+          <Avatar src={profile?.avatarUrl} nombre={nombre} size={52} />
+          <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>{nombre}</h1>
+        </div>
         <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
       </header>
 

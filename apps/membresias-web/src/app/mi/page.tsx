@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
-import { api, obtenerToken, cerrarSesion } from '@/lib/api';
-import { getSesion, esStaff, etiquetaRol, type Sesion } from '@/lib/session';
+import { api, ecosystemApi, obtenerToken } from '@/lib/api';
+import { getSesion, etiquetaRol, type Sesion } from '@/lib/session';
 import { activarPush } from '@/lib/push';
 import { Avisos } from '@/components/Avisos';
+import { Avatar } from '@/components/Avatar';
 
 const PORTAL_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
@@ -97,6 +98,8 @@ export default function MiPanel() {
     }
   }, [router]);
 
+  const [foto, setFoto] = useState<string | null>(null);
+
   useEffect(() => {
     if (!obtenerToken()) {
       router.push('/login');
@@ -105,6 +108,13 @@ export default function MiPanel() {
     const s = getSesion();
     setSesion(s);
     void cargar();
+    // Foto de perfil desde el ecosystem (best-effort).
+    if (s?.sub) {
+      ecosystemApi
+        .get(`/users/${s.sub}/profile`)
+        .then((r) => setFoto((r.data as { avatarUrl: string | null }).avatarUrl))
+        .catch(() => setFoto(null));
+    }
   }, [router, cargar]);
 
   // Carnet QR: contiene el ID de la persona en el ecosistema. Un escáner USB
@@ -127,11 +137,6 @@ export default function MiPanel() {
     );
   }
 
-  function salir() {
-    cerrarSesion();
-    router.push('/login');
-  }
-
   if (!mi) {
     return (
       <main style={{ padding: '2rem' }} className="muted">
@@ -152,25 +157,18 @@ export default function MiPanel() {
           marginBottom: '1.25rem',
         }}
       >
-        <div>
-          <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>
-            {etiquetaRol(sesion)} · Membresías
-          </p>
-          <h1 className="display" style={{ fontSize: '1.5rem' }}>
-            Hola, {sesion?.fullName?.split(' ')[0] ?? 'deportista'}
-          </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <Avatar src={foto} nombre={sesion?.fullName ?? '?'} size={52} />
+          <div>
+            <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>
+              {etiquetaRol(sesion)} · Membresías
+            </p>
+            <h1 className="display" style={{ fontSize: '1.5rem' }}>
+              Hola, {sesion?.fullName?.split(' ')[0] ?? 'deportista'}
+            </h1>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <Avisos />
-          {esStaff(sesion) && (
-            <a href="/" className="btn btn-outline btn-sm">
-              Panel del club
-            </a>
-          )}
-          <button className="btn btn-outline btn-sm" onClick={salir}>
-            Salir
-          </button>
-        </div>
+        <Avisos />
       </header>
 
       {aviso && <p className="msg-ok" style={{ marginBottom: '1rem' }}>{aviso}</p>}

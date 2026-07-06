@@ -113,6 +113,7 @@ export interface Miembro {
   userId: string;
   email: string;
   fullName: string;
+  avatarUrl?: string | null;
 }
 export interface SuscripcionOrg {
   id: string;
@@ -222,6 +223,7 @@ export interface GestorClub {
   fullName: string;
   email: string;
   phone: string | null;
+  avatarUrl?: string | null;
 }
 export interface MiClub extends Organizacion {
   description: string | null;

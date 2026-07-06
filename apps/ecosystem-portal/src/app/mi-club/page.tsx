@@ -10,6 +10,7 @@ import {
   extraerError,
   type MiClub,
 } from '@/lib/api';
+import { Avatar } from '@/components/Avatar';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -222,6 +223,7 @@ export default function MiClubPage() {
               <ul className="flex flex-col gap-1.5 text-sm">
                 {club.gestores.map((g, i) => (
                   <li key={i} className="flex flex-wrap items-center gap-2">
+                    <Avatar src={g.avatarUrl} nombre={g.fullName} size={32} />
                     <span className="badge">{ROL[g.role] ?? g.role}</span>
                     <strong>{g.fullName}</strong>
                     <span style={{ color: 'var(--text-muted)' }}>

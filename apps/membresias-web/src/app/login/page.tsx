@@ -37,8 +37,16 @@ export default function Login() {
     try {
       await login(email, password);
       router.push(rutaInicio(getSesion()));
-    } catch {
-      setError('Correo o contraseña incorrectos.');
+    } catch (err) {
+      // El ecosystem explica el motivo real (correo inexistente, contraseña
+      // incorrecta, intentos restantes, cuenta bloqueada…): se muestra tal cual.
+      const e2 = err as { response?: { data?: { message?: string | string[]; error?: string } } };
+      const m = e2.response?.data?.message;
+      setError(
+        (Array.isArray(m) ? m.join(' ') : m) ??
+          e2.response?.data?.error ??
+          'No se pudo iniciar sesión.',
+      );
     } finally {
       setCargando(false);
     }
@@ -55,6 +63,8 @@ export default function Login() {
       }}
     >
       <form onSubmit={submit} className="card" style={{ padding: '1.75rem', width: '100%', maxWidth: 380 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="DINAMYT" width={56} height={56} style={{ marginBottom: '0.75rem' }} />
         <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>Ecosistema DINAMYT</p>
         <h1 className="display" style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
           Membresías <span style={{ color: 'var(--gold)' }}>del club</span>
@@ -99,6 +109,19 @@ export default function Login() {
         >
           Entrar con el portal DINAMYT
         </a>
+
+        {/* Salidas al ecosistema: registro y panel principal */}
+        <p className="muted" style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.85rem' }}>
+          ¿No tienes cuenta?{' '}
+          <a href={`${PORTAL_URL}/registro`} style={{ color: 'var(--gold)' }}>
+            Regístrate en el portal
+          </a>
+        </p>
+        <p style={{ marginTop: '0.25rem', textAlign: 'center', fontSize: '0.85rem' }}>
+          <a href={`${PORTAL_URL}/dashboard`} className="muted">
+            ⇱ Ir al panel principal DINAMYT
+          </a>
+        </p>
       </form>
     </main>
   );

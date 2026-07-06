@@ -61,6 +61,7 @@ describe('membresias-api (integración con PGlite)', () => {
           fullName: 'Alumno Uno',
           phone: null,
           role: 'student',
+          avatarUrl: null,
         },
       ],
     });

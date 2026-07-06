@@ -3,16 +3,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, obtenerToken, cerrarSesion } from '@/lib/api';
+import { api, obtenerToken } from '@/lib/api';
 import { activarPush } from '@/lib/push';
 import { getSesion, esStaff } from '@/lib/session';
 import { Avisos } from '@/components/Avisos';
+import { Avatar } from '@/components/Avatar';
 
 interface RosterItem {
   userId: string;
   fullName: string;
   email: string;
   phone: string | null;
+  avatarUrl: string | null;
   status: string | null;
   venceEl: string | null;
   clasesRestantes: number | null;
@@ -121,15 +123,12 @@ export default function Panel() {
     setAviso(r.ok ? 'Notificaciones activadas en este equipo.' : `No se activaron: ${r.motivo}`);
   }
 
-  function salir() {
-    cerrarSesion();
-    router.push('/login');
-  }
-
   if (cargando) return <main style={{ padding: '2rem' }} className="muted">Cargando…</main>;
 
   return (
     <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}>
+      {/* La navegación (Kiosco, Planes, Calendario, Salir…) vive en la barra
+          global con menú de hamburguesa; aquí solo las acciones del panel. */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '0.5rem', flexWrap: 'wrap' }}>
         <div>
           <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Ecosistema DINAMYT</p>
@@ -138,13 +137,9 @@ export default function Panel() {
           </h1>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Link href="/kiosco" className="btn btn-outline">Kiosco</Link>
-          <Link href="/planes" className="btn btn-outline">Planes</Link>
-          <Link href="/calendario" className="btn btn-outline">Calendario</Link>
           <Avisos deTodoElClub />
           <button className="btn btn-outline btn-sm" onClick={enviarAvisos}>Enviar avisos</button>
           <button className="btn btn-outline btn-sm" onClick={activarNotis}>Activar push</button>
-          <button className="btn btn-outline btn-sm" onClick={salir}>Salir</button>
         </div>
       </header>
 
@@ -161,10 +156,11 @@ export default function Panel() {
           <div className="muted" style={{ fontSize: '0.75rem' }}>Morosos</div>
           <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--danger)' }}>{overdue.length}</div>
         </div>
-        <div className="card" style={{ padding: '0.9rem' }}>
+        <Link href="/asistencia" className="card" style={{ padding: '0.9rem' }}>
           <div className="muted" style={{ fontSize: '0.75rem' }}>Asistieron hoy</div>
           <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--ok)' }}>{attendance?.hoy ?? 0}</div>
-        </div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--gold)' }}>Pasar lista →</div>
+        </Link>
       </div>
 
       <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
@@ -188,8 +184,13 @@ export default function Panel() {
             {roster.map((a) => (
               <tr key={a.userId}>
                 <td>
-                  <Link href={`/alumnos/${a.userId}`} style={{ fontWeight: 600, color: 'var(--gold)' }}>{a.fullName}</Link>
-                  <div className="muted" style={{ fontSize: '0.72rem' }}>{a.email}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Avatar src={a.avatarUrl} nombre={a.fullName} size={36} />
+                    <div style={{ minWidth: 0 }}>
+                      <Link href={`/alumnos/${a.userId}`} style={{ fontWeight: 600, color: 'var(--gold)' }}>{a.fullName}</Link>
+                      <div className="muted" style={{ fontSize: '0.72rem' }}>{a.email}</div>
+                    </div>
+                  </div>
                 </td>
                 <td><span className={estadoBadge(a.estado)}>{estadoLabel(a.estado)}</span></td>
                 <td className="muted">

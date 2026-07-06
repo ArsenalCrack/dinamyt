@@ -122,6 +122,16 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   }
   .btn-outline { background: transparent; border-color: var(--border-strong); color: var(--text); }
   .btn-outline:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  /* Acción destructiva (cerrar sesión, eliminar): SIEMPRE distinta del resto */
+  .btn-danger {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: rgba(255, 85, 119, 0.12);
+    filter: none;
+  }
   .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.75rem; }
 
   /* ── Tarjetas ───────────────────────────────────────────────────────── */
@@ -165,6 +175,19 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
    tarjeta en lugar de romper el layout. (Fuera de @layer: Tailwind no emite
    dentro de la capa las clases que no reconoce en el contenido escaneado.) */
 .tabla-scroll { overflow-x: auto; }
+
+/* ── Navegación responsive (fuera de @layer, misma razón que .tabla-scroll):
+   en PC los enlaces van en línea; en móvil, un menú de hamburguesa. ── */
+.nav-desktop { display: none; }
+.nav-user { display: none; }
+.nav-burger { display: inline-flex; }
+.nav-movil { display: block; }
+@media (min-width: 768px) {
+  .nav-desktop { display: flex; }
+  .nav-user { display: flex; }
+  .nav-burger { display: none; }
+  .nav-movil { display: none; }
+}
 
 main { animation: aparecer 0.25s ease; }
 @keyframes aparecer {

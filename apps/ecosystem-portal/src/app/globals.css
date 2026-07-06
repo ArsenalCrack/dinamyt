@@ -124,6 +124,16 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   }
   .btn-outline { background: transparent; border-color: var(--border-strong); color: var(--text); }
   .btn-outline:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  /* Accion destructiva (cerrar sesion, eliminar): SIEMPRE distinta del resto */
+  .btn-danger {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: rgba(255, 85, 119, 0.12);
+    filter: none;
+  }
 
   /* ── Tarjetas ───────────────────────────────────────────────────────── */
   .card {

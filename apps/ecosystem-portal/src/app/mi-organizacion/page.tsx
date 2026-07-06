@@ -26,6 +26,7 @@ import {
   type InvitacionClub,
 } from '@/lib/api';
 import { soloTelefono } from '@/lib/validacion';
+import { Avatar } from '@/components/Avatar';
 
 // Reparto de roles (decisión de producto): la organización (federación/liga)
 // agrega administradores y jueces; el club agrega maestros, coaches y
@@ -481,10 +482,13 @@ export default function MiOrganizacionPage() {
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
                 style={{ borderColor: 'var(--border)' }}
               >
-                <span className="min-w-0 flex-1">
-                  <strong>{m.fullName}</strong>
-                  <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
-                    · {m.email}
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <Avatar src={m.avatarUrl} nombre={m.fullName} size={32} />
+                  <span className="min-w-0">
+                    <strong>{m.fullName}</strong>
+                    <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
+                      · {m.email}
+                    </span>
                   </span>
                 </span>
                 <span className="flex items-center gap-1.5">

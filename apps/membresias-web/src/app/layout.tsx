@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import { NavBar } from '@/components/NavBar';
 
 // Tipografía del ecosistema (espejo del portal): display deportivo, cuerpo
 // humanista y mono de marcador para PIN, fechas y montos.
@@ -33,7 +34,12 @@ export default function RootLayout({
       lang="es"
       className={`${display.variable} ${cuerpo.variable} ${mono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {/* Barra global: enlaces por rol + hamburguesa en móvil (se oculta
+            sola en /login y /kiosco). */}
+        <NavBar />
+        {children}
+      </body>
     </html>
   );
 }

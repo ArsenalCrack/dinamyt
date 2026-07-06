@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
+import api, {
   obtenerToken,
   decodificarToken,
   cerrarSesion,
@@ -11,6 +11,7 @@ import {
   miClubAPI,
   type TokenPayload,
 } from '@/lib/api';
+import { Avatar } from '@/components/Avatar';
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   // ¿Gestiona alguna organización (admin/maestro)? ¿Pertenece a algún club?
   const [gestiona, setGestiona] = useState<boolean | null>(null);
   const [nombreClub, setNombreClub] = useState<string | null>(null);
+  const [foto, setFoto] = useState<string | null>(null);
 
   useEffect(() => {
     const t = obtenerToken();
@@ -40,14 +42,19 @@ export default function DashboardPage() {
 
     // Decide qué tarjeta mostrar: «Mi organización» (la gestiona) o
     // «Mi club» (solo pertenece). Ambas consultas fallan sin romper la página.
-    Promise.allSettled([misOrganizacionesAPI(), miClubAPI()]).then(
-      ([orgs, club]) => {
-        setGestiona(orgs.status === 'fulfilled' && orgs.value.length > 0);
-        if (club.status === 'fulfilled' && club.value.length > 0) {
-          setNombreClub(club.value[0].name);
-        }
-      },
-    );
+    Promise.allSettled([
+      misOrganizacionesAPI(),
+      miClubAPI(),
+      api.get(`/users/${p.sub}/profile`),
+    ]).then(([orgs, club, perfil]) => {
+      setGestiona(orgs.status === 'fulfilled' && orgs.value.length > 0);
+      if (club.status === 'fulfilled' && club.value.length > 0) {
+        setNombreClub(club.value[0].name);
+      }
+      if (perfil.status === 'fulfilled') {
+        setFoto((perfil.value.data as { avatarUrl: string | null }).avatarUrl);
+      }
+    });
   }, [router]);
 
   function salir() {
@@ -66,20 +73,24 @@ export default function DashboardPage() {
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="eyebrow mb-1">Tu cuenta DINAMYT</p>
-          <h1 className="display text-3xl">Hola, {payload.fullName}</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {payload.email}
-            {payload.is_super_admin ? ' · Super administrador' : ''}
-          </p>
+        <div className="flex min-w-0 items-center gap-4">
+          <Avatar src={foto} nombre={payload.fullName} size={56} />
+          <div className="min-w-0">
+            <p className="eyebrow mb-1">Tu cuenta DINAMYT</p>
+            <h1 className="display text-3xl">Hola, {payload.fullName}</h1>
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+              {payload.email}
+              {payload.is_super_admin ? ' · Super administrador' : ''}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/perfil" className="btn btn-outline">
             Mi perfil
           </Link>
-          <button onClick={salir} className="btn btn-outline">
-            Salir
+          {/* Salir se distingue: es la única acción destructiva */}
+          <button onClick={salir} className="btn btn-danger">
+            ⏻ Salir
           </button>
         </div>
       </header>
