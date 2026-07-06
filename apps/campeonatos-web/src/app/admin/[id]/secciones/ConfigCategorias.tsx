@@ -15,6 +15,8 @@ interface Fila {
   valor: string;
   desde: string;
   hasta: string;
+  /** Solo cinturón: grupos que abarca la categoría (checkboxes). */
+  grupos: string[];
 }
 
 /** Qué dimensiones REQUIERE cada modalidad para estar bien configurada:
@@ -27,7 +29,10 @@ export function dimensionesRequeridas(modalidad: Modalidad): Kind[] {
 
 /** Una fila está completa si tiene todos sus valores diligenciados. */
 function filaCompleta(f: Fila): boolean {
-  return f.tipo === 'individual' ? !!f.valor : !!f.desde && !!f.hasta;
+  if (f.tipo === 'individual') {
+    return f.grupos.length > 0 ? true : !!f.valor;
+  }
+  return !!f.desde && !!f.hasta;
 }
 
 /**
@@ -57,13 +62,22 @@ function desdeCategoria(cs: CategoriaConfig[] | undefined): Fila[] {
       valor: c.valor ?? '',
       desde: c.desde ?? '',
       hasta: c.hasta ?? '',
+      grupos: c.grupos ?? [],
     }));
 }
 
-function aCategoria(f: Fila): CategoriaConfig {
-  return f.tipo === 'individual'
-    ? { activa: true, tipo: 'individual', valor: f.valor }
-    : { activa: true, tipo: 'rango', desde: f.desde, hasta: f.hasta };
+function aCategoria(f: Fila, esCinturon: boolean): CategoriaConfig {
+  if (f.tipo === 'individual') {
+    return esCinturon
+      ? {
+          activa: true,
+          tipo: 'individual',
+          valor: f.valor || f.grupos.join('-'),
+          grupos: f.grupos,
+        }
+      : { activa: true, tipo: 'individual', valor: f.valor };
+  }
+  return { activa: true, tipo: 'rango', desde: f.desde, hasta: f.hasta };
 }
 
 const ETIQUETA: Record<Kind, string> = {
@@ -72,21 +86,39 @@ const ETIQUETA: Record<Kind, string> = {
   peso: '¿Qué pesos entran? (kg)',
 };
 
+const FILA_VACIA: Fila = { tipo: 'individual', valor: '', desde: '', hasta: '', grupos: [] };
+
+/** Texto legible de una categoría ya añadida. */
+function textoFila(f: Fila, kind: Kind): string {
+  if (f.tipo === 'rango') {
+    return kind === 'peso' ? `${f.desde}–${f.hasta} kg` : `${f.desde}–${f.hasta}`;
+  }
+  if (kind === 'cinturon') {
+    const grupos = f.grupos.join(' + ');
+    return f.valor && f.valor !== grupos ? `${f.valor} (${grupos})` : grupos || f.valor;
+  }
+  return f.valor;
+}
+
 /**
  * Editor de categorías de una modalidad. Cada dimensión (cinturón, edad,
- * peso) se puede ACTIVAR o DESACTIVAR; una dimensión activa exige al menos
- * una categoría completa. Los cambios sin guardar se marcan claramente.
+ * peso) se puede ACTIVAR o DESACTIVAR mientras el evento no haya comenzado;
+ * las categorías se agregan con un editor en línea + botón «Añadir» (lo
+ * añadido queda como una lista confirmada, sin filas a medio llenar).
  */
 export function ConfigCategorias({
   modalidad,
   inicial,
   onGuardar,
   guardando,
+  congelado = false,
 }: {
   modalidad: Modalidad;
   inicial: CategoriasConfig | null;
   onGuardar: (c: CategoriasConfig) => void;
   guardando: boolean;
+  /** true cuando el campeonato ya comenzó (EN_CURSO/FINALIZADO): solo lectura. */
+  congelado?: boolean;
 }) {
   const requeridas = dimensionesRequeridas(modalidad);
 
@@ -113,15 +145,13 @@ export function ConfigCategorias({
   };
 
   // Validación EN VIVO de choques (duplicados, individual dentro de un rango,
-  // rangos solapados): se avisa al instante, sin esperar al Guardar. Solo se
-  // evalúan las filas completas (las "nueva" a medio llenar no chocan aún).
+  // rangos solapados): se avisa al instante, sin esperar al Guardar.
   const erroresVivos = useMemo(() => {
-    const soloCompletas = (fs: Fila[]) => fs.filter(filaCompleta).map(aCategoria);
     const cat: CategoriasConfig = {
       genero,
-      ...(usa.cinturon ? { cinturon: soloCompletas(cinturon) } : {}),
-      ...(usa.edad ? { edad: soloCompletas(edad) } : {}),
-      ...(usa.peso ? { peso: soloCompletas(peso) } : {}),
+      ...(usa.cinturon ? { cinturon: cinturon.map((f) => aCategoria(f, true)) } : {}),
+      ...(usa.edad ? { edad: edad.map((f) => aCategoria(f, false)) } : {}),
+      ...(usa.peso ? { peso: peso.map((f) => aCategoria(f, false)) } : {}),
     };
     return validarCategorias(cat);
   }, [genero, cinturon, edad, peso, usa]);
@@ -145,16 +175,13 @@ export function ConfigCategorias({
 
   function guardar() {
     const errs: string[] = [];
-    // Dimensión activa ⇒ al menos una categoría COMPLETA.
+    // Dimensión activa ⇒ al menos una categoría.
     (['cinturon', 'edad', 'peso'] as Kind[]).forEach((k) => {
       if (!usa[k]) return;
-      const completas = filasDe[k].filter(filaCompleta);
-      if (completas.length === 0) {
+      if (filasDe[k].length === 0) {
         errs.push(
-          `${ETIQUETA[k]} — añade al menos una categoría completa o desactiva esta dimensión.`,
+          `${ETIQUETA[k]} — añade al menos una categoría o desactiva esta dimensión.`,
         );
-      } else if (filasDe[k].some((f) => !filaCompleta(f))) {
-        errs.push(`Hay categorías de ${k} a medio llenar: complétalas o elimínalas.`);
       }
     });
     // Requeridas por la modalidad no pueden desactivarse.
@@ -168,9 +195,11 @@ export function ConfigCategorias({
 
     const cat: CategoriasConfig = {
       genero,
-      ...(usa.cinturon && cinturon.length ? { cinturon: cinturon.map(aCategoria) } : {}),
-      ...(usa.edad && edad.length ? { edad: edad.map(aCategoria) } : {}),
-      ...(usa.peso && peso.length ? { peso: peso.map(aCategoria) } : {}),
+      ...(usa.cinturon && cinturon.length
+        ? { cinturon: cinturon.map((f) => aCategoria(f, true)) }
+        : {}),
+      ...(usa.edad && edad.length ? { edad: edad.map((f) => aCategoria(f, false)) } : {}),
+      ...(usa.peso && peso.length ? { peso: peso.map((f) => aCategoria(f, false)) } : {}),
     };
     const errsCore = validarCategorias(cat);
     setErrores(errsCore);
@@ -183,23 +212,27 @@ export function ConfigCategorias({
       style={{
         background: 'var(--bg-card)',
         borderColor: sucio ? 'var(--gold-dim)' : 'var(--border)',
+        opacity: congelado ? 0.75 : 1,
       }}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2">
-          {sucio && <span className="badge badge-gold">● Sin guardar</span>}
+          {congelado && <span className="badge">🔒 Solo lectura (el evento comenzó)</span>}
+          {!congelado && sucio && <span className="badge badge-gold">● Sin guardar</span>}
           {erroresVivos.length > 0 && (
             <span className="badge badge-live">⚠ {erroresVivos.length} choque(s)</span>
           )}
         </span>
-        <button
-          onClick={guardar}
-          disabled={guardando || !sucio || erroresVivos.length > 0}
-          className="btn btn-gold btn-sm"
-          title={erroresVivos.length > 0 ? 'Corrige los choques antes de guardar' : undefined}
-        >
-          {sucio ? 'Guardar cambios' : 'Guardado ✓'}
-        </button>
+        {!congelado && (
+          <button
+            onClick={guardar}
+            disabled={guardando || !sucio || erroresVivos.length > 0}
+            className="btn btn-gold btn-sm"
+            title={erroresVivos.length > 0 ? 'Corrige los choques antes de guardar' : undefined}
+          >
+            {sucio ? 'Guardar cambios' : 'Guardado ✓'}
+          </button>
+        )}
       </div>
 
       {/* Choques detectados EN VIVO */}
@@ -236,6 +269,7 @@ export function ConfigCategorias({
               type="radio"
               name={`gen-${modalidad}`}
               checked={genero === g}
+              disabled={congelado}
               onChange={() => setGenero(g)}
             />
             {g === 'separado' ? 'Masculino y Femenino' : 'Mixto'}
@@ -253,6 +287,7 @@ export function ConfigCategorias({
           onUsar={(v) => setUsa((cur) => ({ ...cur, [k]: v }))}
           filas={filasDe[k]}
           setFilas={setDe[k]}
+          congelado={congelado}
         />
       ))}
     </div>
@@ -267,6 +302,7 @@ function Dimension({
   onUsar,
   filas,
   setFilas,
+  congelado,
 }: {
   kind: Kind;
   etiqueta: string;
@@ -275,11 +311,29 @@ function Dimension({
   onUsar: (v: boolean) => void;
   filas: Fila[];
   setFilas: React.Dispatch<React.SetStateAction<Fila[]>>;
+  congelado: boolean;
 }) {
   const esCinturon = kind === 'cinturon';
+  // Editor en línea de la NUEVA categoría: se confirma con «Añadir».
+  const [nueva, setNueva] = useState<Fila>(FILA_VACIA);
 
-  function set(i: number, campo: keyof Fila, valor: string) {
-    setFilas((cur) => cur.map((f, j) => (j === i ? { ...f, [campo]: valor } : f)));
+  function set(campo: keyof Fila, valor: string | string[]) {
+    setNueva((cur) => ({ ...cur, [campo]: valor }));
+  }
+
+  function toggleGrupo(g: string) {
+    setNueva((cur) => ({
+      ...cur,
+      grupos: cur.grupos.includes(g)
+        ? cur.grupos.filter((x) => x !== g)
+        : [...cur.grupos, g],
+    }));
+  }
+
+  function anadir() {
+    if (!filaCompleta(nueva)) return;
+    setFilas((cur) => [...cur, nueva]);
+    setNueva(FILA_VACIA);
   }
 
   return (
@@ -289,15 +343,18 @@ function Dimension({
     >
       <legend className="flex items-center gap-2 px-1 text-sm font-semibold">
         <label className="flex cursor-pointer items-center gap-1.5">
+          {/* Los interruptores se congelan cuando el evento ya comenzó */}
           <input
             type="checkbox"
             checked={usada}
-            disabled={requerida}
+            disabled={requerida || congelado}
             onChange={(e) => onUsar(e.target.checked)}
             title={
-              requerida
-                ? 'Esta modalidad requiere esta dimensión'
-                : 'Activar o desactivar esta dimensión'
+              congelado
+                ? 'El evento ya comenzó: la configuración quedó congelada'
+                : requerida
+                  ? 'Esta modalidad requiere esta dimensión'
+                  : 'Activar o desactivar esta dimensión'
             }
           />
           {etiqueta}
@@ -311,96 +368,156 @@ function Dimension({
 
       {usada && (
         <>
+          {/* Categorías YA añadidas: lista confirmada */}
           {filas.map((f, i) => (
             <div
               key={i}
-              className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border px-2 py-1.5 text-sm"
-              style={{
-                // Una fila incompleta se marca: es lo "precargado" sin llenar.
-                borderColor: filaCompleta(f) ? 'var(--border)' : 'var(--gold-dim)',
-                background: filaCompleta(f) ? 'transparent' : 'rgba(240,184,0,0.05)',
-              }}
+              className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--border)' }}
             >
-              {!filaCompleta(f) && (
-                <span className="badge badge-gold" title="Completa los valores de esta categoría">
-                  nueva
-                </span>
+              <span className="badge badge-ok">✓</span>
+              <span className="badge">{f.tipo === 'rango' ? 'Rango' : 'Individual'}</span>
+              <span className="min-w-0 flex-1 font-semibold">{textoFila(f, kind)}</span>
+              {!congelado && (
+                <button
+                  onClick={() => setFilas((cur) => cur.filter((_, j) => j !== i))}
+                  className="btn btn-danger btn-sm"
+                  title="Eliminar esta categoría"
+                >
+                  ✕
+                </button>
               )}
+            </div>
+          ))}
+          {filas.length === 0 && (
+            <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Sin categorías todavía: arma la primera y pulsa «Añadir».
+            </p>
+          )}
+
+          {/* Editor de la nueva categoría: TODO en una línea + botón Añadir */}
+          {!congelado && (
+            <div
+              className="flex flex-wrap items-center gap-2 rounded-lg border px-2 py-2 text-sm"
+              style={{ borderColor: 'var(--gold-dim)', background: 'rgba(240,184,0,0.04)' }}
+            >
               <select
-                value={f.tipo}
-                onChange={(e) => set(i, 'tipo', e.target.value)}
+                value={nueva.tipo}
+                onChange={(e) => set('tipo', e.target.value)}
                 className="w-auto"
               >
                 <option value="individual">Individual</option>
                 <option value="rango">Rango</option>
               </select>
 
-              {f.tipo === 'individual' ? (
-                <Campo esCinturon={esCinturon} value={f.valor} onChange={(v) => set(i, 'valor', v)} />
+              {nueva.tipo === 'individual' ? (
+                esCinturon ? (
+                  <>
+                    {/* Selección INDIVIDUAL de cinturones = checkboxes */}
+                    <span className="flex flex-wrap items-center gap-2">
+                      {CINTURONES_ORDEN.map((c) => (
+                        <label
+                          key={c}
+                          className="flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                          style={{
+                            borderColor: nueva.grupos.includes(c)
+                              ? 'var(--gold)'
+                              : 'var(--border)',
+                            color: nueva.grupos.includes(c) ? 'var(--gold)' : undefined,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={nueva.grupos.includes(c)}
+                            onChange={() => toggleGrupo(c)}
+                          />
+                          {c}
+                        </label>
+                      ))}
+                    </span>
+                    <input
+                      value={nueva.valor}
+                      onChange={(e) => set('valor', e.target.value)}
+                      className="w-36"
+                      placeholder="Nombre (opcional)"
+                      title="Nombre de la categoría, ej. Principiantes"
+                    />
+                  </>
+                ) : (
+                  <input
+                    type="number"
+                    value={nueva.valor}
+                    onChange={(e) => set('valor', e.target.value)}
+                    className="w-24"
+                    placeholder={kind === 'peso' ? 'kg' : 'años'}
+                  />
+                )
               ) : (
-                <>
-                  <Campo esCinturon={esCinturon} value={f.desde} onChange={(v) => set(i, 'desde', v)} />
-                  <span style={{ color: 'var(--text-muted)' }}>–</span>
-                  <Campo esCinturon={esCinturon} value={f.hasta} onChange={(v) => set(i, 'hasta', v)} />
-                </>
+                // Rango: desde y hasta EN LA MISMA LÍNEA
+                <span className="flex items-center gap-2">
+                  {esCinturon ? (
+                    <>
+                      <CampoCinturon value={nueva.desde} onChange={(v) => set('desde', v)} />
+                      <span style={{ color: 'var(--text-muted)' }}>–</span>
+                      <CampoCinturon value={nueva.hasta} onChange={(v) => set('hasta', v)} />
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="number"
+                        value={nueva.desde}
+                        onChange={(e) => set('desde', e.target.value)}
+                        className="w-20"
+                        placeholder="Desde"
+                      />
+                      <span style={{ color: 'var(--text-muted)' }}>–</span>
+                      <input
+                        type="number"
+                        value={nueva.hasta}
+                        onChange={(e) => set('hasta', e.target.value)}
+                        className="w-20"
+                        placeholder="Hasta"
+                      />
+                    </>
+                  )}
+                </span>
               )}
 
               <button
-                onClick={() => setFilas((cur) => cur.filter((_, j) => j !== i))}
-                className="btn btn-danger btn-sm ml-auto"
-                title="Eliminar esta categoría"
+                onClick={anadir}
+                disabled={!filaCompleta(nueva)}
+                className="btn btn-gold btn-sm ml-auto"
+                title={
+                  filaCompleta(nueva)
+                    ? 'Añadir esta categoría a la lista'
+                    : 'Completa los valores para añadir'
+                }
               >
-                ✕
+                + Añadir
               </button>
             </div>
-          ))}
-          {filas.length === 0 && (
-            <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-              Sin categorías todavía: añade la primera.
-            </p>
           )}
-          <button
-            onClick={() =>
-              setFilas((cur) => [...cur, { tipo: 'individual', valor: '', desde: '', hasta: '' }])
-            }
-            className="btn btn-outline btn-sm"
-          >
-            + Añadir {esCinturon ? 'categoría de cinturón' : 'categoría'}
-          </button>
         </>
       )}
     </fieldset>
   );
 }
 
-function Campo({
-  esCinturon,
+function CampoCinturon({
   value,
   onChange,
 }: {
-  esCinturon: boolean;
   value: string;
   onChange: (v: string) => void;
 }) {
-  if (esCinturon) {
-    return (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-auto">
-        <option value="">Elige…</option>
-        {CINTURONES_ORDEN.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
-    );
-  }
   return (
-    <input
-      type="number"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-20"
-      placeholder="—"
-    />
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="w-auto">
+      <option value="">Elige…</option>
+      {CINTURONES_ORDEN.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+    </select>
   );
 }

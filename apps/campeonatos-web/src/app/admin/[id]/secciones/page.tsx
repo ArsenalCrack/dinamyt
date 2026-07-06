@@ -142,14 +142,14 @@ export default function SeccionesPage() {
     },
     {
       n: 2,
-      titulo: 'Generar secciones',
-      estado: secciones.length > 0 ? `${secciones.length} secciones` : 'Pendiente',
+      titulo: 'Secciones (automáticas)',
+      estado: secciones.length > 0 ? `${secciones.length} abiertas` : 'Nacen al inscribir',
       listo: secciones.length > 0,
     },
     {
       n: 3,
-      titulo: 'Colocar aprobados',
-      estado: 'Llena las llaves',
+      titulo: 'Llaves y tatamis',
+      estado: 'Brackets y colas',
       listo: false,
     },
   ];
@@ -250,6 +250,7 @@ export default function SeccionesPage() {
                     modalidad={m.modalidad}
                     inicial={m.categorias}
                     guardando={ocupado}
+                    congelado={congelado}
                     onGuardar={(c) => guardarCategorias(m.modalidad, c)}
                   />
                 </div>
@@ -270,18 +271,30 @@ export default function SeccionesPage() {
         </section>
       )}
 
-      {/* ── PASO 2: generar secciones (y sus llaves) ──────────────────── */}
+      {/* ── PASO 2: las secciones nacen SOLAS con los competidores ─────── */}
       {paso === 2 && !congelado && (
         <section className="card mb-4 p-4">
+          <h2 className="mb-1 font-semibold">Las secciones se crean solas</h2>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Con la configuración del paso 1, el sistema crea una{' '}
-            <strong>sección</strong> por cada combinación (modalidad · género ·
-            cinturón · edad · peso). Puedes regenerarlas mientras el evento no
-            arranque: se reemplazan las anteriores.
+            Una <strong>sección</strong> es cada categoría que se abre en el
+            campeonato (modalidad · género · cinturón · edad · peso). Con la
+            configuración del paso 1, cada vez que{' '}
+            <strong>apruebas una inscripción</strong> el sistema abre
+            automáticamente la sección que le corresponde a ese competidor y lo
+            coloca en ella. Tu trabajo aquí es solo revisar lo abierto y, en
+            combate, generar la <strong>llave</strong> cuando la sección tenga a
+            su gente; luego asignas cada sección a un tatami en «Tatamis».
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button onClick={generar} disabled={ocupado} className="btn btn-gold">
-              {secciones.length > 0 ? '↻ Regenerar secciones' : 'Generar secciones'}
+            <button
+              onClick={generar}
+              disabled={ocupado}
+              className="btn btn-outline"
+              title="Opcional: pre-crear TODAS las combinaciones posibles aunque aún no tengan competidores (reemplaza las existentes)"
+            >
+              {secciones.length > 0
+                ? '↻ Regenerar todas (vacía y pre-crea)'
+                : 'Pre-crear todas las secciones (opcional)'}
             </button>
             {secciones.length > 0 && (
               <button
@@ -289,31 +302,32 @@ export default function SeccionesPage() {
                   setPaso(3);
                   setPasoElegido(true);
                 }}
-                className="btn btn-outline"
+                className="btn btn-gold"
               >
-                Continuar: colocar aprobados →
+                Continuar: llaves y tatamis →
               </button>
             )}
           </div>
         </section>
       )}
 
-      {/* ── PASO 3: colocar aprobados en sus llaves ───────────────────── */}
+      {/* ── PASO 3: llaves y reasignación ─────────────────────────────── */}
       {paso === 3 && (
         <section className="card mb-4 p-4">
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Toma todas las inscripciones <strong>aprobadas</strong> y coloca a
-            cada competidor en la sección que le corresponde por cinturón,
-            edad, peso y género. (Al aprobar una inscripción en «Revisión» esto
-            ya ocurre solo; este botón sirve si generaste las secciones
-            después de aprobar gente.)
+            Cada inscripción <strong>aprobada ya quedó en su sección</strong>{' '}
+            automáticamente. Este botón re-verifica todas las aprobadas (útil
+            si cambiaste la configuración de categorías después de aprobar
+            gente). El paso final es asignar cada sección a la{' '}
+            <strong>cola de un tatami</strong>: allí puedes encolar varias,
+            quitarlas o pasarlas a otro tatami.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button onClick={asignar} disabled={ocupado || congelado} className="btn btn-gold">
-              Colocar aprobados en sus llaves
+            <button onClick={asignar} disabled={ocupado || congelado} className="btn btn-outline">
+              ↻ Re-verificar aprobados
             </button>
-            <Link href={`/admin/${campId}/tatamis`} className="btn btn-outline">
-              Siguiente: dirigir tatamis →
+            <Link href={`/admin/${campId}/tatamis`} className="btn btn-gold">
+              Asignar secciones a tatamis →
             </Link>
           </div>
         </section>
@@ -328,7 +342,8 @@ export default function SeccionesPage() {
       {estado === 'cargando' && <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>}
       {estado === 'ok' && paso === 2 && secciones.length === 0 && (
         <p style={{ color: 'var(--text-muted)' }}>
-          Aún no hay secciones. Pulsa «Generar secciones».
+          Aún no hay secciones abiertas: se abrirán solas al aprobar
+          inscripciones (o pre-créalas todas con el botón de arriba).
         </p>
       )}
 

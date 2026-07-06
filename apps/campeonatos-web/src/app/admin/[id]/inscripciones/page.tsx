@@ -11,6 +11,7 @@ import {
   type InscripcionRevision,
 } from '@/lib/api';
 import { getSesion, esAdmin } from '@/lib/session';
+import { Avatar } from '@/components/Avatar';
 
 /** Edad a partir de la fecha de nacimiento (para mostrar en la revisión). */
 function edadDe(fecha: string | null): string {
@@ -63,12 +64,16 @@ export default function RevisionInscripcionesPage() {
     setMsg(null);
     setOcupado(true);
     try {
-      const r = await revisarInscripcionAPI(ins.id, estado);
+      const r = (await revisarInscripcionAPI(ins.id, estado)) as {
+        seccionesAsignadas: number;
+        avisos?: string[];
+      };
+      const avisos = r.avisos?.length ? ` ${r.avisos.join(' ')}` : '';
       setMsg({
         tipo: 'ok',
         texto:
           estado === 'APROBADA'
-            ? `${ins.nombreCompleto} aprobado y colocado en ${r.seccionesAsignadas} sección(es).${r.seccionesAsignadas === 0 ? ' (Genera las secciones primero para que caiga en su llave.)' : ''}`
+            ? `${ins.nombreCompleto} aprobado y colocado en ${r.seccionesAsignadas} sección(es).${r.seccionesAsignadas === 0 ? ' (Su combinación no coincide con ninguna categoría configurada.)' : ''}${avisos}`
             : `${ins.nombreCompleto} rechazado.`,
       });
       cargar();
@@ -133,7 +138,9 @@ export default function RevisionInscripcionesPage() {
         {visibles.map((i) => (
           <li key={i.id} className="card p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-start gap-3">
+                <Avatar src={i.foto} nombre={i.nombreCompleto} size={44} />
+                <div className="min-w-0">
                 <h3 className="font-semibold">{i.nombreCompleto}</h3>
                 <dl className="mt-1 grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs sm:grid-cols-3" style={{ color: 'var(--text-muted)' }}>
                   <div>Documento: <strong>{i.documento}</strong></div>
@@ -151,6 +158,7 @@ export default function RevisionInscripcionesPage() {
                       {m.replaceAll('_', ' ')}
                     </span>
                   ))}
+                </div>
                 </div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2">

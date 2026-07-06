@@ -1,36 +1,80 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   inscribirAPI,
   invitarAPI,
   listInvitacionesAPI,
+  getCampeonatoAPI,
+  clubesEcosistemaAPI,
   extraerError,
-  MODALIDADES,
-  GRUPOS_CINTURON,
+  CINTURONES,
   GENEROS,
   type Modalidad,
   type Invitacion,
+  type CampeonatoDetalle,
+  type ClubEcosistema,
 } from '@/lib/api';
+import { getSesion, esAdmin, puedeInscribir } from '@/lib/session';
+
+const NOMBRE_MODALIDAD: Record<string, string> = {
+  combate: 'Combate',
+  figura_armas: 'Figura con armas',
+  figura_manos_libres: 'Figura a manos libres',
+  defensa_personal: 'Defensa personal',
+  salto_altura: 'Salto alto',
+  salto_longitud: 'Salto largo',
+};
+
+const OTRA_ACADEMIA = '__otra__';
 
 export default function InscribirPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const campId = params.id;
+  const admin = esAdmin(getSesion());
+
+  // Inscribir a TERCEROS (y ver invitaciones) es de admin y maestro; el
+  // usuario común se inscribe a sí mismo desde el campeonato público.
+  useEffect(() => {
+    if (!puedeInscribir(getSesion())) {
+      router.replace(`/campeonatos/${campId}/inscribirme`);
+    }
+  }, [router, campId]);
+
+  const [camp, setCamp] = useState<CampeonatoDetalle | null>(null);
+  const [clubes, setClubes] = useState<ClubEcosistema[]>([]);
 
   const [documento, setDocumento] = useState('');
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [genero, setGenero] = useState<(typeof GENEROS)[number]>('MASCULINO');
-  const [grupoCinturon, setGrupoCinturon] =
-    useState<(typeof GRUPOS_CINTURON)[number]>('BLANCO');
+  // El staff elige el CINTURÓN REAL; el sistema lo asocia a su grupo.
+  const [cinturon, setCinturon] = useState(CINTURONES[0].nombre);
   const [pesoActual, setPesoActual] = useState('');
-  const [academiaClub, setAcademiaClub] = useState('');
+  const [academiaSel, setAcademiaSel] = useState('');
+  const [academiaOtra, setAcademiaOtra] = useState('');
   const [mods, setMods] = useState<Modalidad[]>([]);
 
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [avisos, setAvisos] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    getCampeonatoAPI(campId).then(setCamp).catch(() => setCamp(null));
+    clubesEcosistemaAPI().then(setClubes).catch(() => setClubes([]));
+  }, [campId]);
+
+  const grupoDelCinturon =
+    CINTURONES.find((c) => c.nombre === cinturon)?.grupo ?? 'BLANCO';
+  const enCurso = camp?.estado === 'EN_CURSO';
+  const finalizado = camp?.estado === 'FINALIZADO';
+  // Con el evento EN VIVO solo el admin añade competidores (tarea del flujo
+  // del evento); el maestro ve el porqué, no un formulario muerto.
+  const bloqueado = finalizado || (enCurso && !admin);
+  const modalidadesCamp = (camp?.modalidades ?? []).map((m) => m.modalidad);
 
   function toggleMod(m: Modalidad) {
     setMods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
@@ -39,28 +83,34 @@ export default function InscribirPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
+    setAvisos([]);
     if (mods.length === 0) {
       setMsg({ tipo: 'error', texto: 'Selecciona al menos una modalidad.' });
       return;
     }
+    const academiaClub =
+      academiaSel === OTRA_ACADEMIA ? academiaOtra.trim() : academiaSel;
     setEnviando(true);
     try {
-      await inscribirAPI(campId, {
+      const r = (await inscribirAPI(campId, {
         documento,
         nombreCompleto,
         fechaNacimiento,
         genero,
-        grupoCinturon,
+        grupoCinturon: grupoDelCinturon,
+        cinturon,
         pesoActual: pesoActual || undefined,
         academiaClub: academiaClub || undefined,
         modalidades: mods,
-      });
+      })) as { avisos?: string[] };
       setMsg({ tipo: 'ok', texto: 'Competidor inscrito correctamente.' });
+      setAvisos(r.avisos ?? []);
       setDocumento('');
       setNombreCompleto('');
       setFechaNacimiento('');
       setPesoActual('');
-      setAcademiaClub('');
+      setAcademiaSel('');
+      setAcademiaOtra('');
       setMods([]);
     } catch (err) {
       setMsg({ tipo: 'error', texto: extraerError(err, 'No se pudo inscribir.') });
@@ -70,110 +120,217 @@ export default function InscribirPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-6 py-10">
+    <main className="mx-auto min-h-screen max-w-xl px-4 py-10 sm:px-6">
       <div className="flex items-center justify-between">
         <Link href="/admin" className="text-sm" style={{ color: 'var(--text-muted)' }}>
           ← Volver
         </Link>
-        <Link
-          href={`/admin/${campId}/secciones`}
-          className="text-sm font-semibold"
-          style={{ color: 'var(--gold)' }}
-        >
-          Secciones y llaves →
-        </Link>
+        {/* Secciones y llaves es SOLO del administrador */}
+        {admin && (
+          <Link
+            href={`/admin/${campId}/secciones`}
+            className="text-sm font-semibold"
+            style={{ color: 'var(--gold)' }}
+          >
+            Secciones y llaves →
+          </Link>
+        )}
       </div>
-      <h1 className="mb-6 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
+      <h1 className="mb-2 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
         Inscribir competidor
       </h1>
+      {camp && (
+        <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+          {camp.nombre}
+          {camp.fechaInicio ? ` · ${camp.fechaInicio}` : ''}
+        </p>
+      )}
 
-      <form
-        onSubmit={onSubmit}
-        className="rounded-xl border p-5"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            Documento
-            <input value={documento} onChange={(e) => setDocumento(e.target.value.replace(/\D/g, ''))} required maxLength={30} inputMode="numeric" placeholder="Solo números" className="mt-1" />
-          </label>
-          <label className="block text-sm">
-            Nombre completo
-            <input value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} required maxLength={200} className="mt-1" />
-          </label>
-          <label className="block text-sm">
-            Fecha de nacimiento
-            <input type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} required className="mt-1" />
-          </label>
-          <label className="block text-sm">
-            Peso actual (kg)
-            <input type="number" step="0.1" min={10} max={400} value={pesoActual} onChange={(e) => setPesoActual(e.target.value)} className="mt-1" />
-          </label>
-          <label className="block text-sm">
-            Género
-            <select value={genero} onChange={(e) => setGenero(e.target.value as (typeof GENEROS)[number])} className="mt-1">
-              {GENEROS.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            Grupo de cinturón
+      {enCurso && (
+        <div
+          className="mb-4 rounded-lg border px-4 py-3 text-sm font-semibold"
+          style={{ borderColor: 'var(--gold)', background: 'rgba(240,184,0,0.07)', color: 'var(--gold)' }}
+        >
+          ● El campeonato está EN CURSO:{' '}
+          {admin
+            ? 'solo tú como administrador puedes añadir competidores. Revisa el aviso si su sección ya arrancó.'
+            : 'las inscripciones quedaron cerradas. Solo el administrador puede añadir competidores.'}
+        </div>
+      )}
+      {finalizado && (
+        <div className="mb-4 rounded-lg border px-4 py-3 text-sm font-semibold" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+          El campeonato finalizó: las inscripciones están cerradas.
+        </div>
+      )}
+
+      {!bloqueado && (
+        <form
+          onSubmit={onSubmit}
+          className="rounded-xl border p-5"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              Documento (solo números)
+              <input
+                value={documento}
+                onChange={(e) => setDocumento(e.target.value.replace(/\D/g, ''))}
+                required
+                maxLength={30}
+                inputMode="numeric"
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Nombre completo (solo letras)
+              <input
+                value={nombreCompleto}
+                onChange={(e) =>
+                  setNombreCompleto(
+                    e.target.value
+                      .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .\-]/g, '')
+                      .toLocaleUpperCase('es'),
+                  )
+                }
+                required
+                maxLength={200}
+                placeholder="NOMBRE APELLIDO"
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Fecha de nacimiento
+              <input
+                type="date"
+                value={fechaNacimiento}
+                onChange={(e) => setFechaNacimiento(e.target.value)}
+                required
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Peso actual (kg)
+              <input
+                type="number"
+                step="0.1"
+                min={10}
+                max={400}
+                value={pesoActual}
+                onChange={(e) => setPesoActual(e.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Género
+              <select
+                value={genero}
+                onChange={(e) => setGenero(e.target.value as (typeof GENEROS)[number])}
+                className="mt-1"
+              >
+                {GENEROS.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Cinturón
+              <select
+                value={cinturon}
+                onChange={(e) => setCinturon(e.target.value)}
+                className="mt-1"
+              >
+                {CINTURONES.map((c) => (
+                  <option key={c.nombre} value={c.nombre}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs" style={{ color: 'var(--gold)' }}>
+                Grupo competitivo: {grupoDelCinturon}
+              </span>
+            </label>
+          </div>
+
+          {/* Academia: las registradas en el sistema, u «Otra» a mano */}
+          <label className="mt-3 block text-sm">
+            Academia / club
             <select
-              value={grupoCinturon}
-              onChange={(e) => setGrupoCinturon(e.target.value as (typeof GRUPOS_CINTURON)[number])}
+              value={academiaSel}
+              onChange={(e) => setAcademiaSel(e.target.value)}
               className="mt-1"
             >
-              {GRUPOS_CINTURON.map((g) => (
-                <option key={g} value={g}>{g}</option>
+              <option value="">— Sin academia —</option>
+              {clubes.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                  {c.city ? ` (${c.city})` : ''}
+                </option>
               ))}
+              <option value={OTRA_ACADEMIA}>Otra (escribirla)…</option>
             </select>
           </label>
-        </div>
-        <label className="mt-3 block text-sm">
-          Academia / club
-          <input value={academiaClub} onChange={(e) => setAcademiaClub(e.target.value)} maxLength={200} className="mt-1" />
-        </label>
+          {academiaSel === OTRA_ACADEMIA && (
+            <input
+              value={academiaOtra}
+              onChange={(e) => setAcademiaOtra(e.target.value)}
+              maxLength={200}
+              placeholder="Nombre de la academia"
+              className="mt-2"
+            />
+          )}
 
-        <fieldset className="mt-3">
-          <legend className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Modalidades
-          </legend>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {MODALIDADES.map((m) => (
-              <label key={m} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={mods.includes(m)} onChange={() => toggleMod(m)} />
-                {m}
-              </label>
-            ))}
-          </div>
-        </fieldset>
+          <fieldset className="mt-3">
+            <legend className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Modalidades del campeonato
+            </legend>
+            <div className="mt-2 flex flex-wrap gap-3">
+              {(modalidadesCamp.length > 0 ? modalidadesCamp : []).map((m) => (
+                <label key={m} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={mods.includes(m)} onChange={() => toggleMod(m)} />
+                  {NOMBRE_MODALIDAD[m] ?? m}
+                </label>
+              ))}
+              {modalidadesCamp.length === 0 && (
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Cargando modalidades…
+                </p>
+              )}
+            </div>
+          </fieldset>
 
-        {msg && (
-          <p
-            className="mt-3 text-sm"
-            style={{ color: msg.tipo === 'ok' ? 'var(--gold)' : '#ff5577' }}
+          {msg && (
+            <p
+              className="mt-3 text-sm"
+              style={{ color: msg.tipo === 'ok' ? 'var(--gold)' : '#ff5577' }}
+            >
+              {msg.texto}
+            </p>
+          )}
+          {avisos.map((a, i) => (
+            <p key={i} className="mt-1 text-sm font-semibold" style={{ color: '#ff9f43' }}>
+              {a}
+            </p>
+          ))}
+          <button
+            type="submit"
+            disabled={enviando}
+            className="btn btn-gold mt-4"
           >
-            {msg.texto}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={enviando}
-          className="mt-4 rounded-lg px-5 py-2 font-semibold"
-          style={{ background: 'var(--gold)', color: '#14141e' }}
-        >
-          {enviando ? 'Inscribiendo…' : 'Inscribir'}
-        </button>
-      </form>
+            {enviando ? 'Inscribiendo…' : 'Inscribir'}
+          </button>
+        </form>
+      )}
 
-      <SeccionInvitaciones campId={campId} />
+      {/* Invitar: en BORRADOR/LISTO admin y maestro; EN_CURSO solo el admin */}
+      {!finalizado && (admin || !enCurso) && (
+        <SeccionInvitaciones campId={campId} enCurso={enCurso} />
+      )}
     </main>
   );
 }
 
 /** Invitar competidores por email (aceptan in-app eligiendo modalidades). */
-function SeccionInvitaciones({ campId }: { campId: string }) {
+function SeccionInvitaciones({ campId, enCurso }: { campId: string; enCurso: boolean }) {
   const [email, setEmail] = useState('');
   const [lista, setLista] = useState<Invitacion[]>([]);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
@@ -214,8 +371,9 @@ function SeccionInvitaciones({ campId }: { campId: string }) {
     <section className="card mt-6 p-5">
       <h2 className="mb-1 text-lg font-semibold">Invitar competidores</h2>
       <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-        El invitado recibe un correo y ve la invitación al entrar con su cuenta;
-        al aceptar completa sus datos y elige modalidades.
+        {enCurso
+          ? 'Con el evento en curso, TU invitación es la única forma de que alguien se inscriba por su cuenta.'
+          : 'El invitado recibe un correo y ve la invitación al entrar con su cuenta; al aceptar completa sus datos y elige modalidades.'}
       </p>
       <form onSubmit={invitar} className="flex flex-wrap gap-2">
         <input

@@ -11,6 +11,7 @@ import {
   type PantallaSeccion,
 } from '@/lib/api';
 import { Logo } from '@/components/Logo';
+import { Avatar } from '@/components/Avatar';
 
 type Apartado = 'info' | 'tatamis' | 'resultados';
 
@@ -25,7 +26,12 @@ const ROL_JUEZ: Record<string, string> = {
   j7: 'Juez 7',
 };
 
-/** Jueces participantes + competidores por sección, con filtros (PROJECT). */
+/**
+ * Jueces participantes + competidores por sección, con los filtros granulares
+ * de DINAMYT-PROJECT: búsqueda + modalidad + género + cinturón + edad + peso.
+ * Los sub-filtros se derivan de las secciones reales y se REINICIAN al cambiar
+ * de modalidad (para no dejar combinaciones imposibles).
+ */
 function InfoParticipantes({
   jueces,
   secciones,
@@ -34,11 +40,37 @@ function InfoParticipantes({
   secciones: PantallaSeccion[];
 }) {
   const [modalidad, setModalidad] = useState<string>('todas');
+  const [genero, setGenero] = useState<string>('todos');
+  const [cinturon, setCinturon] = useState<string>('todos');
+  const [edad, setEdad] = useState<string>('todas');
+  const [peso, setPeso] = useState<string>('todos');
   const [busqueda, setBusqueda] = useState('');
 
-  const modalidades = [...new Set(secciones.map((s) => s.modalidad))];
-  const filtradas = secciones.filter((s) => {
-    if (modalidad !== 'todas' && s.modalidad !== modalidad) return false;
+  // Al cambiar de modalidad se reinician los sub-filtros (estilo PROJECT).
+  function cambiarModalidad(m: string) {
+    setModalidad(m);
+    setGenero('todos');
+    setCinturon('todos');
+    setEdad('todas');
+    setPeso('todos');
+  }
+
+  const base =
+    modalidad === 'todas' ? secciones : secciones.filter((s) => s.modalidad === modalidad);
+  const unicos = (vals: (string | null)[]) =>
+    [...new Set(vals.filter(Boolean) as string[])].sort();
+
+  const modalidades = unicos(secciones.map((s) => s.modalidad));
+  const generos = unicos(base.map((s) => s.genero));
+  const cinturones = unicos(base.map((s) => s.cinturon));
+  const edades = unicos(base.map((s) => s.rangoEdad));
+  const pesos = unicos(base.map((s) => s.rangoPeso));
+
+  const filtradas = base.filter((s) => {
+    if (genero !== 'todos' && s.genero !== genero) return false;
+    if (cinturon !== 'todos' && s.cinturon !== cinturon) return false;
+    if (edad !== 'todas' && s.rangoEdad !== edad) return false;
+    if (peso !== 'todos' && s.rangoPeso !== peso) return false;
     if (!busqueda.trim()) return true;
     const q = busqueda.toLowerCase();
     return (
@@ -48,6 +80,25 @@ function InfoParticipantes({
       )
     );
   });
+  const totalCompetidores = filtradas.reduce((n, s) => n + s.competidores.length, 0);
+
+  const selectFiltro = (
+    valor: string,
+    onChange: (v: string) => void,
+    opciones: string[],
+    todos: string,
+    etiquetas?: Record<string, string>,
+  ) =>
+    opciones.length > 0 && (
+      <select value={valor} onChange={(e) => onChange(e.target.value)} className="w-auto">
+        <option value={todos.startsWith('Todas') ? 'todas' : 'todos'}>{todos}</option>
+        {opciones.map((o) => (
+          <option key={o} value={o}>
+            {etiquetas?.[o] ?? o}
+          </option>
+        ))}
+      </select>
+    );
 
   return (
     <>
@@ -73,29 +124,27 @@ function InfoParticipantes({
         </section>
       )}
 
-      {/* Competidores por sección, con filtros */}
+      {/* Competidores por sección, con filtros granulares */}
       {secciones.length > 0 && (
         <section className="card p-5">
           <h2 className="mb-3 text-lg font-semibold">Competidores por sección</h2>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <select
-              value={modalidad}
-              onChange={(e) => setModalidad(e.target.value)}
-              className="w-auto"
-            >
-              <option value="todas">Todas las modalidades</option>
-              {modalidades.map((m) => (
-                <option key={m} value={m}>
-                  {NOMBRE_MODALIDAD[m] ?? m}
-                </option>
-              ))}
-            </select>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {selectFiltro(modalidad, cambiarModalidad, modalidades, 'Todas las modalidades', NOMBRE_MODALIDAD)}
+            {selectFiltro(genero, setGenero, generos, 'Todos los géneros')}
+            {selectFiltro(cinturon, setCinturon, cinturones, 'Todos los cinturones')}
+            {selectFiltro(edad, setEdad, edades, 'Todas las edades')}
+            {selectFiltro(peso, setPeso, pesos, 'Todos los pesos')}
+          </div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar competidor, club o sección…"
               className="min-w-0 flex-1"
             />
+            <span className="badge shrink-0">
+              {filtradas.length} secciones · {totalCompetidores} competidores
+            </span>
           </div>
           <div className="grid gap-2">
             {filtradas.map((s) => (
@@ -106,9 +155,12 @@ function InfoParticipantes({
                 </summary>
                 <ul className="border-t px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
                   {s.competidores.map((c, i) => (
-                    <li key={i} className="flex justify-between gap-2 py-0.5">
-                      <span>{c.nombre}</span>
-                      <span style={{ color: 'var(--text-muted)' }}>{c.club ?? ''}</span>
+                    <li key={i} className="flex items-center gap-2 py-1">
+                      <Avatar src={c.foto} nombre={c.nombre} size={28} />
+                      <span className="min-w-0 flex-1 truncate">{c.nombre}</span>
+                      <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        {c.club ?? ''}
+                      </span>
                     </li>
                   ))}
                   {s.competidores.length === 0 && (
@@ -155,9 +207,11 @@ export default function PantallaCampeonatoPage() {
 
   useEffect(() => {
     let vivo = true;
-    async function cargar() {
+    // Las FOTOS solo se piden para la vista de información (pesan); el
+    // sondeo de tatamis/resultados cada 5 s viaja liviano.
+    async function cargar(conFotos: boolean) {
       try {
-        const d = await pantallaAPI(campId, codigoOk);
+        const d = await pantallaAPI(campId, codigoOk, conFotos);
         if (vivo) {
           setData(d);
           setPrivado(false);
@@ -173,13 +227,13 @@ export default function PantallaCampeonatoPage() {
         }
       }
     }
-    void cargar();
-    const t = setInterval(cargar, 5000);
+    void cargar(apartado === 'info');
+    const t = setInterval(() => void cargar(apartado === 'info'), 5000);
     return () => {
       vivo = false;
       clearInterval(t);
     };
-  }, [campId, codigoOk]);
+  }, [campId, codigoOk, apartado]);
 
   // Al entrar directo a un campeonato EN CURSO, lo primero son los tatamis.
   useEffect(() => {
@@ -276,16 +330,35 @@ export default function PantallaCampeonatoPage() {
                     : data.campeonato.estado}
               </span>
               {data.campeonato.alcance && <span className="badge">{data.campeonato.alcance}</span>}
-              {data.campeonato.fechaInicio && (
-                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  {data.campeonato.fechaInicio}
-                  {data.campeonato.fechaFin &&
-                  data.campeonato.fechaFin !== data.campeonato.fechaInicio
-                    ? ` → ${data.campeonato.fechaFin}`
-                    : ''}
-                </span>
-              )}
             </div>
+            {/* Fecha del campeonato, SIEMPRE visible en la información */}
+            <p className="mt-3 text-sm font-semibold">
+              📅{' '}
+              {data.campeonato.fechaInicio ? (
+                <>
+                  {new Date(`${data.campeonato.fechaInicio}T12:00:00`).toLocaleDateString('es', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                  {data.campeonato.fechaFin &&
+                    data.campeonato.fechaFin !== data.campeonato.fechaInicio && (
+                      <>
+                        {' '}
+                        →{' '}
+                        {new Date(`${data.campeonato.fechaFin}T12:00:00`).toLocaleDateString('es', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </>
+                    )}
+                </>
+              ) : (
+                <span style={{ color: 'var(--text-muted)' }}>Fecha por confirmar</span>
+              )}
+            </p>
             {data.campeonato.descripcion && (
               <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
                 {data.campeonato.descripcion}
@@ -308,6 +381,15 @@ export default function PantallaCampeonatoPage() {
                   .filter(Boolean)
                   .join(', ')}
               </p>
+            )}
+            {/* Inscripción abierta: cualquier persona con cuenta DINAMYT */}
+            {(data.campeonato.estado === 'LISTO' || data.campeonato.estado === 'BORRADOR') && (
+              <Link
+                href={`/campeonatos/${campId}/inscribirme`}
+                className="btn btn-gold mt-4 inline-block"
+              >
+                🥋 Inscribirme en este campeonato →
+              </Link>
             )}
           </section>
           )}
@@ -407,12 +489,17 @@ export default function PantallaCampeonatoPage() {
                       <span style={{ color: 'var(--text-muted)' }}>:</span>
                       <span style={{ color: 'var(--chung)' }}>{r.marcadorChung ?? '–'}</span>
                       {r.ganador && (
-                        <span className={`badge ${r.ganador === 'empate' ? '' : 'badge-gold'}`}>
-                          {r.ganador === 'hong'
-                            ? `Gana rojo${r.hong ? ` · ${r.hong}` : ''}`
-                            : r.ganador === 'chung'
-                              ? 'Gana azul'
-                              : 'Empate'}
+                        <span className="flex items-center gap-1.5">
+                          {r.ganador === 'hong' && r.hong && (
+                            <Avatar src={r.fotoHong} nombre={r.hong} size={26} />
+                          )}
+                          <span className={`badge ${r.ganador === 'empate' ? '' : 'badge-gold'}`}>
+                            {r.ganador === 'hong'
+                              ? `Gana rojo${r.hong ? ` · ${r.hong}` : ''}`
+                              : r.ganador === 'chung'
+                                ? 'Gana azul'
+                                : 'Empate'}
+                          </span>
                         </span>
                       )}
                     </div>

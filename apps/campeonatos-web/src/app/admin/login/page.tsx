@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { loginAPI, guardarToken, extraerError } from '@/lib/api';
 import { getSesion, rutaInicio } from '@/lib/session';
 import { Logo } from '@/components/Logo';
@@ -10,11 +10,25 @@ const PORTAL_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
 
 export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const search = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+
+  // ¿A dónde volver tras entrar? Solo rutas internas (nunca URLs externas).
+  const volver = search.get('volver');
+  const destino = (): string =>
+    volver && volver.startsWith('/') ? volver : rutaInicio(getSesion());
 
   // SSO desde el portal del ecosystem: si llega #token=<jwt> en el fragmento,
   // se guarda y se entra directo (sin segundo login). El fragmento nunca se
@@ -26,9 +40,10 @@ export default function AdminLoginPage() {
       if (token) {
         guardarToken(token);
         window.history.replaceState(null, '', window.location.pathname);
-        router.replace(rutaInicio(getSesion()));
+        router.replace(destino());
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -38,8 +53,8 @@ export default function AdminLoginPage() {
     try {
       const { access_token } = await loginAPI(email, password);
       guardarToken(access_token);
-      // Enruta según el rol (juez → panel de combate; resto → gestión).
-      router.push(rutaInicio(getSesion()));
+      // Enruta según el rol (juez → su tatami; usuario → su panel).
+      router.push(destino());
     } catch (err) {
       setError(extraerError(err, 'No se pudo iniciar sesión.'));
     } finally {
@@ -48,17 +63,14 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 py-10">
       <Logo size={48} />
-      <form
-        onSubmit={onSubmit}
-        className="card w-full max-w-sm p-6"
-      >
+      <form onSubmit={onSubmit} className="card w-full max-w-sm p-6">
         <h1 className="mb-1 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-          Panel de gestión
+          DINAMYT Campeonatos
         </h1>
         <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Inicia sesión con tu cuenta del ecosistema DINAMYT.
+          Una cuenta para todo el ecosistema.
         </p>
         <label className="mb-3 block text-sm">
           Correo
@@ -67,7 +79,8 @@ export default function AdminLoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={inputStyle}
+            autoComplete="email"
+            className="mt-1"
           />
         </label>
         <label className="mb-4 block text-sm">
@@ -77,7 +90,8 @@ export default function AdminLoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={inputStyle}
+            autoComplete="current-password"
+            className="mt-1"
           />
         </label>
         {error && (
@@ -108,17 +122,20 @@ export default function AdminLoginPage() {
         >
           Entrar con el portal DINAMYT
         </a>
+
+        {/* Salidas al ecosistema: registro y panel principal */}
+        <p className="mt-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+          ¿No tienes cuenta?{' '}
+          <a href={`${PORTAL_URL}/registro`} style={{ color: 'var(--gold)' }}>
+            Regístrate en el portal
+          </a>
+        </p>
+        <p className="mt-1 text-center text-sm">
+          <a href={`${PORTAL_URL}/dashboard`} style={{ color: 'var(--text-muted)' }}>
+            ⇱ Ir al panel principal DINAMYT
+          </a>
+        </p>
       </form>
     </main>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  marginTop: '0.25rem',
-  width: '100%',
-  background: 'var(--bg-input, #0e0e18)',
-  border: '1px solid var(--border)',
-  borderRadius: '0.5rem',
-  padding: '0.6rem 0.8rem',
-  color: 'var(--text)',
-};

@@ -137,8 +137,15 @@ export default function HubCampeonatoPage() {
       href: `/admin/${campId}/inscribir`,
       accion: 'Inscribir / Invitar',
       extra: { href: `/admin/${campId}/inscripciones`, etiqueta: 'Revisar' },
-      deshabilitado: congelado,
-      nota: congelado ? 'Cerradas: el evento ya arrancó.' : null,
+      // Con el evento EN VIVO, el admin sigue pudiendo añadir/invitar (es la
+      // única vía de entrada); recién FINALIZADO se cierra del todo.
+      deshabilitado: camp.estado === 'FINALIZADO',
+      nota:
+        camp.estado === 'EN_CURSO'
+          ? 'En vivo: solo tú puedes añadir o invitar competidores.'
+          : camp.estado === 'FINALIZADO'
+            ? 'Cerradas: el evento terminó.'
+            : null,
     },
     {
       n: 3,

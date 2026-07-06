@@ -39,22 +39,30 @@ import type { Db } from '@dinamyt/campeonatos-db';
 
 /**
  * Coloca UNA inscripción en la(s) sección(es) que le corresponde(n) por
- * modalidad + cinturón + edad + peso + género. Devuelve cuántas asignó.
- * (Misma lógica del paso masivo "asignar-secciones", por inscripción.)
+ * modalidad + cinturón + edad + peso + género.
+ *
+ * Las secciones se MATERIALIZAN AUTOMÁTICAMENTE con la llegada de los
+ * competidores: si la sección que le corresponde (según la config de
+ * categorías de la modalidad) aún no existe en BD, se crea aquí mismo.
+ * El administrador ya no "genera" secciones: solo las asigna a tatamis.
+ *
+ * Devuelve cuántas asignó y AVISOS si el competidor cayó en una sección que
+ * ya está EN_CURSO o FINALIZADA (importa al añadir gente con el evento vivo).
  */
-async function asignarInscripcion(
+export async function asignarInscripcion(
   db: Db,
   campeonatoId: string,
   inscripcionId: string,
-): Promise<number> {
+): Promise<{ asignadas: number; avisos: string[] }> {
   const [camp] = await db
     .select()
     .from(campeonatos)
     .where(eq(campeonatos.id, campeonatoId))
     .limit(1);
-  if (!camp) return 0;
+  if (!camp) return { asignadas: 0, avisos: [] };
   const fechaRef = camp.fechaInicio ? new Date(camp.fechaInicio) : new Date();
 
+  // Secciones ya materializadas en BD.
   const secs = await db
     .select()
     .from(secciones)
@@ -69,6 +77,21 @@ async function asignarInscripcion(
     peso: s.rangoPeso,
   }));
   const uuidPorClave = new Map(secs.map((s) => [s.clave ?? s.id, s.id]));
+  const estadoPorClave = new Map(secs.map((s) => [s.clave ?? s.id, s.estado]));
+
+  // Secciones POSIBLES según la config de categorías (aún no materializadas).
+  const modsCamp = await db
+    .select()
+    .from(modalidadesCampeonato)
+    .where(eq(modalidadesCampeonato.campeonatoId, campeonatoId));
+  const config: ModalidadConfig[] = modsCamp.map((m) => ({
+    nombre: m.modalidad,
+    activa: m.activa ?? true,
+    categorias: (m.categorias as CategoriasConfig | null) ?? { genero: 'mixto' },
+  }));
+  for (const p of generarSecciones(config)) {
+    if (!uuidPorClave.has(p.id)) generadas.push(p);
+  }
 
   const [ins] = await db
     .select({
@@ -81,7 +104,7 @@ async function asignarInscripcion(
     .innerJoin(competidores, eq(inscripciones.competidorId, competidores.id))
     .where(eq(inscripciones.id, inscripcionId))
     .limit(1);
-  if (!ins) return 0;
+  if (!ins) return { asignadas: 0, avisos: [] };
 
   const mods = await db
     .select()
@@ -92,6 +115,7 @@ async function asignarInscripcion(
     : 0;
 
   let asignadas = 0;
+  const avisos: string[] = [];
   for (const m of mods) {
     const sec = emparejarSeccion(generadas, {
       modalidad: m.modalidad,
@@ -101,8 +125,37 @@ async function asignarInscripcion(
       peso: ins.peso != null ? parseFloat(ins.peso) : null,
     });
     if (!sec) continue;
-    const seccionUuid = uuidPorClave.get(sec.id);
-    if (!seccionUuid) continue;
+
+    // Materializa la sección si aún no existe (nace con los competidores).
+    let seccionUuid = uuidPorClave.get(sec.id);
+    if (!seccionUuid) {
+      const [nueva] = await db
+        .insert(secciones)
+        .values({
+          campeonatoId,
+          modalidad: sec.modalidad as Modalidad,
+          genero: sec.genero.toUpperCase() as 'MASCULINO' | 'FEMENINO' | 'MIXTO',
+          cinturon: sec.cinturon,
+          cinturonGrupos: sec.cinturonGrupos,
+          rangoEdad: sec.edad,
+          rangoPeso: sec.peso,
+          clave: sec.id,
+          nombre: nombreSeccion(sec),
+        })
+        .returning();
+      seccionUuid = nueva.id;
+      uuidPorClave.set(sec.id, nueva.id);
+      estadoPorClave.set(sec.id, nueva.estado);
+    }
+
+    // Aviso clave con el evento en vivo: la sección donde cae ya arrancó.
+    const estadoSec = estadoPorClave.get(sec.id);
+    if (estadoSec === 'EN_CURSO' || estadoSec === 'FINALIZADA') {
+      avisos.push(
+        `⚠ El competidor cae en «${nombreSeccion(sec)}», que ya está ${estadoSec === 'EN_CURSO' ? 'EN CURSO' : 'FINALIZADA'}.`,
+      );
+    }
+
     const existe = await db
       .select()
       .from(seccionInscripciones)
@@ -119,7 +172,7 @@ async function asignarInscripcion(
       .values({ seccionId: seccionUuid, inscripcionId });
     asignadas++;
   }
-  return asignadas;
+  return { asignadas, avisos };
 }
 
 interface CrearCampeonatoBody {
@@ -159,6 +212,8 @@ interface InscripcionBody {
   pesoActual?: string;
   cinturon?: string;
   academiaClub?: string;
+  /** Foto de perfil (avatar del ecosystem) para credenciales y pantallas. */
+  fotoUrl?: string;
   modalidades: Modalidad[];
 }
 
@@ -289,22 +344,33 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           )
       : [];
 
-    // Competidores que participan, agrupados por su sección.
+    // Competidores que participan, agrupados por su sección (con los
+    // atributos de la sección para los filtros granulares estilo PROJECT).
     const secsCamp = await db
       .select({
         id: secciones.id,
         nombre: secciones.nombre,
         modalidad: secciones.modalidad,
         estado: secciones.estado,
+        genero: secciones.genero,
+        cinturon: secciones.cinturon,
+        rangoEdad: secciones.rangoEdad,
+        rangoPeso: secciones.rangoPeso,
       })
       .from(secciones)
       .where(eq(secciones.campeonatoId, id));
+    // Las fotos (data-URL) pesan: solo se incluyen si la vista las pide
+    // (?fotos=1); el sondeo de tatamis cada 5 s viaja liviano.
+    const { fotos } = req.query as { fotos?: string };
+    const conFotos = fotos === '1';
+
     const compsPorSeccion = secsCamp.length
       ? await db
           .select({
             seccionId: seccionInscripciones.seccionId,
             nombre: competidores.nombreCompleto,
             club: competidores.academiaClub,
+            ...(conFotos ? { foto: competidores.fotoUrl } : {}),
           })
           .from(seccionInscripciones)
           .innerJoin(
@@ -330,6 +396,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         marcadorChung: combates.marcadorChung,
         hong: competidores.nombreCompleto,
         creadoAt: combates.createdAt,
+        ...(conFotos ? { fotoHong: competidores.fotoUrl } : {}),
       })
       .from(combates)
       .innerJoin(secciones, eq(combates.seccionId, secciones.id))
@@ -726,13 +793,20 @@ export async function campeonatosRoutes(app: FastifyInstance) {
   );
 
   // ── Inscribir competidor (valida R1-R5 con el core y calcula el monto) ────
+  // Quién puede: el ADMIN y el MAESTRO inscriben a terceros; cualquier
+  // usuario autenticado puede inscribirse A SÍ MISMO (estilo PROJECT).
   app.post(
     '/campeonatos/:id/inscripciones',
-    { preHandler: requireRole('campeonatos', ['admin', 'maestro']) },
+    { preHandler: requireAuth() },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const body = req.body as InscripcionBody;
       const db = req.server.db;
+
+      const esAdminQuienInscribe =
+        req.user!.is_super_admin || req.user!.role_campeonatos === 'admin';
+      const esGestor =
+        esAdminQuienInscribe || req.user!.role_campeonatos === 'maestro';
 
       const [camp] = await db
         .select()
@@ -740,6 +814,34 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         .where(eq(campeonatos.id, id))
         .limit(1);
       if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+
+      // Reglas por estado del evento: FINALIZADO cierra todo; EN_CURSO solo
+      // deja añadir al ADMIN del campeonato (nadie se inscribe por su cuenta).
+      if (camp.estado === 'FINALIZADO') {
+        return reply
+          .code(422)
+          .send({ error: 'El campeonato finalizó: las inscripciones están cerradas.' });
+      }
+      if (camp.estado === 'EN_CURSO' && !esAdminQuienInscribe) {
+        return reply.code(422).send({
+          error:
+            'El campeonato está EN CURSO: solo el administrador puede añadir competidores (o invitarte directamente).',
+        });
+      }
+
+      // Saneo de los datos del competidor (el front también valida).
+      body.documento = (body.documento ?? '').replace(/\D/g, '');
+      if (body.documento.length < 3) {
+        return reply.code(422).send({ error: 'El documento debe tener solo números.' });
+      }
+      body.nombreCompleto = (body.nombreCompleto ?? '')
+        .trim()
+        .toLocaleUpperCase('es');
+      if (!body.nombreCompleto || /\d/.test(body.nombreCompleto)) {
+        return reply
+          .code(422)
+          .send({ error: 'El nombre es obligatorio y no puede contener números.' });
+      }
 
       // 1. Validar restricciones de participación (R1-R5) por modalidad.
       const competidorCat = {
@@ -759,11 +861,21 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       }
 
       // 2. Perfil del competidor: buscar por documento o crear provisional.
+      // Si la persona se inscribe A SÍ MISMA, el perfil queda vinculado a su
+      // cuenta del ecosystem (así el sistema la detecta la próxima vez).
       let [comp] = await db
         .select()
         .from(competidores)
         .where(eq(competidores.documento, body.documento))
         .limit(1);
+      if (!comp && !esGestor) {
+        // Quizá ya tiene perfil vinculado a su cuenta con otro documento.
+        [comp] = await db
+          .select()
+          .from(competidores)
+          .where(eq(competidores.ecosystemUserId, req.user!.sub))
+          .limit(1);
+      }
       if (!comp) {
         [comp] = await db
           .insert(competidores)
@@ -776,7 +888,24 @@ export async function campeonatosRoutes(app: FastifyInstance) {
             pesoActual: body.pesoActual ?? null,
             cinturon: body.cinturon ?? null,
             academiaClub: body.academiaClub ?? null,
+            fotoUrl: body.fotoUrl ?? null,
+            ecosystemUserId: esGestor ? null : req.user!.sub,
           })
+          .returning();
+      } else if (!esGestor) {
+        // Auto-inscripción: actualiza sus datos competitivos y vincula cuenta.
+        [comp] = await db
+          .update(competidores)
+          .set({
+            ecosystemUserId: comp.ecosystemUserId ?? req.user!.sub,
+            grupoCinturon: body.grupoCinturon,
+            cinturon: body.cinturon ?? comp.cinturon,
+            pesoActual: body.pesoActual ?? comp.pesoActual,
+            academiaClub: body.academiaClub ?? comp.academiaClub,
+            fotoUrl: body.fotoUrl ?? comp.fotoUrl,
+            updatedAt: new Date(),
+          })
+          .where(eq(competidores.id, comp.id))
           .returning();
       }
 
@@ -792,9 +921,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       const montoTotal = (parseFloat(camp.costoBase ?? '0') + extra).toFixed(2);
 
       // 4. Crear inscripción + modalidades. La del ADMIN nace aprobada; la
-      // del maestro queda PENDIENTE hasta que el admin la revise (§6.2).
-      const esAdminQuienInscribe =
-        req.user!.is_super_admin || req.user!.role_campeonatos === 'admin';
+      // del maestro o la auto-inscripción queda PENDIENTE hasta la revisión.
       const [ins] = await db
         .insert(inscripciones)
         .values({
@@ -816,9 +943,105 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         });
       }
 
-      return reply.code(201).send({ inscripcion: ins, competidor: comp });
+      // El aprobado directo (admin) queda de una vez en su sección; si esa
+      // sección ya arrancó o finalizó, se le avisa al admin en la respuesta.
+      let avisos: string[] = [];
+      if (esAdminQuienInscribe) {
+        const r = await asignarInscripcion(db, id, ins.id);
+        avisos = r.avisos;
+      }
+
+      return reply.code(201).send({ inscripcion: ins, competidor: comp, avisos });
     },
   );
+
+  // ── Mi perfil de competidor (autollenado de la auto-inscripción) ──────────
+  // Devuelve el perfil de competidor vinculado a la cuenta (o null): con esto
+  // el formulario detecta documento, nombre, nacimiento, género, cinturón y
+  // academia — la persona solo digita su peso y elige modalidades.
+  app.get('/competidores/mi-perfil', { preHandler: requireAuth() }, async (req) => {
+    const [comp] = await req.server.db
+      .select()
+      .from(competidores)
+      .where(eq(competidores.ecosystemUserId, req.user!.sub))
+      .limit(1);
+    return comp ?? null;
+  });
+
+  // ── Mis estadísticas (dashboard del usuario) ───────────────────────────────
+  // Resumen de la trayectoria del competidor: campeonatos, modalidades y su
+  // marca en combate (sobre el historial inmutable).
+  app.get('/me/estadisticas', { preHandler: requireAuth() }, async (req) => {
+    const db = req.server.db;
+    const [comp] = await db
+      .select()
+      .from(competidores)
+      .where(eq(competidores.ecosystemUserId, req.user!.sub))
+      .limit(1);
+    if (!comp) {
+      return {
+        campeonatos: 0,
+        inscripciones: 0,
+        modalidades: {},
+        combates: { total: 0, ganados: 0, perdidos: 0, empates: 0 },
+      };
+    }
+
+    const inss = await db
+      .select({
+        id: inscripciones.id,
+        estado: inscripciones.estado,
+        campeonatoId: inscripciones.campeonatoId,
+      })
+      .from(inscripciones)
+      .where(eq(inscripciones.competidorId, comp.id));
+
+    const mods = inss.length
+      ? await db
+          .select()
+          .from(inscripcionModalidades)
+          .where(
+            inArray(
+              inscripcionModalidades.inscripcionId,
+              inss.map((i) => i.id),
+            ),
+          )
+      : [];
+    const porModalidad: Record<string, number> = {};
+    for (const m of mods) {
+      porModalidad[m.modalidad] = (porModalidad[m.modalidad] ?? 0) + 1;
+    }
+
+    // Marca en combate: victorias/derrotas del competidor (hong o chung).
+    const comoHong = await db
+      .select({ ganador: combates.ganador })
+      .from(combates)
+      .where(eq(combates.competidorHongId, comp.id));
+    const comoChung = await db
+      .select({ ganador: combates.ganador })
+      .from(combates)
+      .where(eq(combates.competidorChungId, comp.id));
+    const ganados =
+      comoHong.filter((c) => c.ganador === 'hong').length +
+      comoChung.filter((c) => c.ganador === 'chung').length;
+    const empates =
+      comoHong.filter((c) => c.ganador === 'empate').length +
+      comoChung.filter((c) => c.ganador === 'empate').length;
+    const total = comoHong.length + comoChung.length;
+
+    return {
+      campeonatos: new Set(inss.map((i) => i.campeonatoId)).size,
+      inscripciones: inss.length,
+      aprobadas: inss.filter((i) => i.estado === 'APROBADA').length,
+      modalidades: porModalidad,
+      combates: {
+        total,
+        ganados,
+        empates,
+        perdidos: total - ganados - empates,
+      },
+    };
+  });
 
   // ── Revisión de inscripciones (aprobar/rechazar) ──────────────────────────
   // Lista con TODA la información que envió el competidor para que el admin
@@ -844,6 +1067,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           fechaNacimiento: competidores.fechaNacimiento,
           genero: competidores.genero,
           academiaClub: competidores.academiaClub,
+          foto: competidores.fotoUrl,
         })
         .from(inscripciones)
         .innerJoin(competidores, eq(inscripciones.competidorId, competidores.id))
@@ -890,17 +1114,21 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         .where(eq(inscripciones.id, id))
         .returning();
 
-      // Al aprobar, colocarlo de una vez en su sección correspondiente.
+      // Al aprobar, colocarlo de una vez en su sección correspondiente
+      // (materializándola si aún no existe) y avisar si esa sección ya arrancó.
       let asignadas = 0;
+      let avisos: string[] = [];
       if (estado === 'APROBADA') {
-        asignadas = await asignarInscripcion(db, ins.campeonatoId, id);
+        const r = await asignarInscripcion(db, ins.campeonatoId, id);
+        asignadas = r.asignadas;
+        avisos = r.avisos;
       } else {
         // Al rechazar, sale de cualquier sección donde estuviera.
         await db
           .delete(seccionInscripciones)
           .where(eq(seccionInscripciones.inscripcionId, id));
       }
-      return reply.send({ ...upd, seccionesAsignadas: asignadas });
+      return reply.send({ ...upd, seccionesAsignadas: asignadas, avisos });
     },
   );
 

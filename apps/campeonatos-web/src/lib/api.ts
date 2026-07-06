@@ -116,6 +116,30 @@ export const GRUPOS_CINTURON = [
 ] as const;
 export const GENEROS = ['MASCULINO', 'FEMENINO'] as const;
 
+/**
+ * Cinturones REALES de Hapkido → grupo competitivo (misma escala de
+ * DINAMYT-PROJECT). El usuario elige su cinturón; el sistema lo asocia al
+ * grupo con el que se categoriza.
+ */
+export const CINTURONES: { nombre: string; grupo: (typeof GRUPOS_CINTURON)[number] }[] = [
+  { nombre: 'Blanco', grupo: 'BLANCO' },
+  { nombre: 'Amarillo', grupo: 'PRINCIPIANTE' },
+  { nombre: 'Naranja', grupo: 'PRINCIPIANTE' },
+  { nombre: 'Naranja/Verde', grupo: 'PRINCIPIANTE' },
+  { nombre: 'Verde', grupo: 'INTERMEDIO' },
+  { nombre: 'Verde/Azul', grupo: 'INTERMEDIO' },
+  { nombre: 'Azul', grupo: 'INTERMEDIO' },
+  { nombre: 'Rojo', grupo: 'AVANZADO' },
+  { nombre: 'Marrón', grupo: 'AVANZADO' },
+  { nombre: 'Marrón/Negro', grupo: 'AVANZADO' },
+  { nombre: 'Negro', grupo: 'NEGRO' },
+];
+export function grupoDeCinturon(nombre: string | null | undefined) {
+  return CINTURONES.find(
+    (c) => c.nombre.toLowerCase() === (nombre ?? '').toLowerCase(),
+  )?.grupo;
+}
+
 // ── Endpoints ────────────────────────────────────────────────────────────────
 export async function listCampeonatosPublicoAPI(): Promise<CampeonatoPublico[]> {
   const res = await api.get('/campeonatos/publico');
@@ -154,8 +178,12 @@ export interface InscribirInput {
   fechaNacimiento: string;
   genero: (typeof GENEROS)[number];
   grupoCinturon: (typeof GRUPOS_CINTURON)[number];
+  /** Cinturón real (Amarillo, Verde…); el grupo sale de CINTURONES. */
+  cinturon?: string;
   pesoActual?: string;
   academiaClub?: string;
+  /** Avatar del ecosystem (auto-inscripción): credencial y pantallas. */
+  fotoUrl?: string;
   modalidades: Modalidad[];
 }
 export async function inscribirAPI(campId: string, data: InscribirInput) {
@@ -284,6 +312,7 @@ export interface PantallaResultado {
   marcadorHong: string | null;
   marcadorChung: string | null;
   hong: string | null;
+  fotoHong?: string | null;
   creadoAt: string | null;
 }
 export interface PantallaJuez {
@@ -296,7 +325,11 @@ export interface PantallaSeccion {
   nombre: string;
   modalidad: Modalidad;
   estado: 'EN_ESPERA' | 'EN_CURSO' | 'FINALIZADA';
-  competidores: { nombre: string; club: string | null }[];
+  genero: 'MASCULINO' | 'FEMENINO' | 'MIXTO' | null;
+  cinturon: string | null;
+  rangoEdad: string | null;
+  rangoPeso: string | null;
+  competidores: { nombre: string; club: string | null; foto?: string | null }[];
 }
 export interface PantallaDetalle {
   jueces: PantallaJuez[];
@@ -317,9 +350,15 @@ export interface PantallaDetalle {
 export async function pantallaAPI(
   campId: string,
   codigo?: string,
+  fotos = false,
 ): Promise<PantallaDetalle> {
   const res = await api.get(`/campeonatos/${campId}/publico`, {
-    params: codigo ? { codigo } : undefined,
+    params: {
+      ...(codigo ? { codigo } : {}),
+      // Las fotos pesan: solo se piden para la vista de información,
+      // no en el sondeo de tatamis cada 5 s.
+      ...(fotos ? { fotos: '1' } : {}),
+    },
   });
   return res.data as PantallaDetalle;
 }
@@ -381,8 +420,10 @@ export interface AceptarInvitacionInput {
   fechaNacimiento: string;
   genero: (typeof GENEROS)[number];
   grupoCinturon: (typeof GRUPOS_CINTURON)[number];
+  cinturon?: string;
   pesoActual?: string;
   academiaClub?: string;
+  fotoUrl?: string;
   modalidades: Modalidad[];
 }
 export async function aceptarInvitacionAPI(id: string, data: AceptarInvitacionInput) {
@@ -408,6 +449,7 @@ export interface InscripcionRevision {
   fechaNacimiento: string | null;
   genero: string | null;
   academiaClub: string | null;
+  foto: string | null;
   modalidades: Modalidad[];
 }
 export async function listInscripcionesCampAPI(
@@ -598,6 +640,77 @@ export async function guardarCombateAPI(
 ) {
   const res = await api.post(`/secciones/${seccionId}/combates`, data);
   return res.data;
+}
+
+// ── Perfil de competidor y estadísticas (dashboard del usuario) ─────────────
+export interface MiPerfilCompetidor {
+  id: string;
+  documento: string;
+  nombreCompleto: string;
+  fechaNacimiento: string | null;
+  genero: (typeof GENEROS)[number] | null;
+  cinturon: string | null;
+  grupoCinturon: (typeof GRUPOS_CINTURON)[number] | null;
+  pesoActual: string | null;
+  academiaClub: string | null;
+  fotoUrl: string | null;
+}
+/** Perfil de competidor vinculado a mi cuenta (o null si nunca he competido). */
+export async function miPerfilCompetidorAPI(): Promise<MiPerfilCompetidor | null> {
+  const res = await api.get('/competidores/mi-perfil');
+  return (res.data ?? null) as MiPerfilCompetidor | null;
+}
+
+export interface MisEstadisticas {
+  campeonatos: number;
+  inscripciones: number;
+  aprobadas?: number;
+  modalidades: Record<string, number>;
+  combates: { total: number; ganados: number; perdidos: number; empates: number };
+}
+export async function misEstadisticasAPI(): Promise<MisEstadisticas> {
+  const res = await api.get('/me/estadisticas');
+  return res.data as MisEstadisticas;
+}
+
+// ── Datos del ecosystem para el autollenado ─────────────────────────────────
+export interface PerfilEcosistema {
+  id: string;
+  fullName: string;
+  documentId: string;
+  birthDate: string | null;
+  avatarUrl: string | null;
+  disciplines: { discipline: string; currentGrade: string | null }[];
+}
+/** Perfil de la persona en el ecosystem (documento, nombre, nacimiento, foto, grado). */
+export async function miPerfilEcosistemaAPI(userId: string): Promise<PerfilEcosistema> {
+  const res = await eco.get(`/users/${userId}/profile`, {
+    headers: { Authorization: `Bearer ${obtenerToken()}` },
+  });
+  return res.data as PerfilEcosistema;
+}
+
+export interface ClubEcosistema {
+  id: string;
+  name: string;
+  type: string;
+  city: string | null;
+}
+/** Clubes/academias registrados en el sistema (para el desplegable de academia). */
+export async function clubesEcosistemaAPI(search?: string): Promise<ClubEcosistema[]> {
+  const res = await eco.get('/organizations/clubes', {
+    params: search ? { search } : undefined,
+    headers: { Authorization: `Bearer ${obtenerToken()}` },
+  });
+  return res.data as ClubEcosistema[];
+}
+
+/** Mi club en el ecosystem (para autodetectar la academia del competidor). */
+export async function miClubEcosistemaAPI(): Promise<{ name: string }[]> {
+  const res = await eco.get('/organizations/mi-club', {
+    headers: { Authorization: `Bearer ${obtenerToken()}` },
+  });
+  return res.data as { name: string }[];
 }
 
 /** Mensaje de error del backend; concatena los motivos de R1-R5 si vienen. */

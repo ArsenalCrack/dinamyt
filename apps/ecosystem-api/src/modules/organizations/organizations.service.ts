@@ -531,6 +531,7 @@ export class OrganizationsService {
         fullName: users.fullName,
         email: users.email,
         phone: users.phone,
+        avatarUrl: users.avatarUrl,
       })
       .from(orgMembers)
       .innerJoin(users, eq(orgMembers.userId, users.id))
@@ -754,6 +755,7 @@ export class OrganizationsService {
         email: users.email,
         fullName: users.fullName,
         phone: users.phone,
+        avatarUrl: users.avatarUrl,
       })
       .from(orgMembers)
       .innerJoin(users, eq(orgMembers.userId, users.id))

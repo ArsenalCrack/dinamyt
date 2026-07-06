@@ -56,8 +56,8 @@ export function NavBar() {
     { href: '/admin', etiqueta: 'Gestión', visible: puedeInscribir(sesion) },
     { href: '/juez', etiqueta: 'Mi tatami', visible: esJuez(sesion) },
     {
-      href: '/perfil',
-      etiqueta: pendientes > 0 ? `Mi perfil (${pendientes})` : 'Mi perfil',
+      href: '/panel',
+      etiqueta: pendientes > 0 ? `Mi panel (${pendientes})` : 'Mi panel',
       visible: !!sesion,
     },
   ];
@@ -65,8 +65,12 @@ export function NavBar() {
 
   function activo(href: string): boolean {
     if (href === '/admin') return pathname === '/admin' || /^\/admin\/[0-9a-f-]{36}/.test(pathname);
-    if (href === '/perfil')
-      return pathname.startsWith('/perfil') || pathname.startsWith('/invitaciones');
+    if (href === '/panel')
+      return (
+        pathname.startsWith('/panel') ||
+        pathname.startsWith('/perfil') ||
+        pathname.startsWith('/invitaciones')
+      );
     if (href === '/campeonatos')
       return pathname.startsWith('/campeonatos') || pathname.startsWith('/pantalla');
     return pathname === href || pathname.startsWith(href + '/');
@@ -135,8 +139,9 @@ export function NavBar() {
                   style={{ background: 'var(--border)' }}
                 />
                 {linkApps()}
-                <button onClick={salir} className="btn btn-outline btn-sm">
-                  Salir
+                {/* Salir se distingue del resto: es la única acción destructiva */}
+                <button onClick={salir} className="btn btn-danger btn-sm" title="Cerrar sesión">
+                  ⏻ Salir
                 </button>
               </>
             ) : (
@@ -175,8 +180,8 @@ export function NavBar() {
             <div className="my-2 h-px" style={{ background: 'var(--border)' }} />
             {linkApps(true)}
             {sesion ? (
-              <button onClick={salir} className="btn btn-outline mt-1">
-                Salir
+              <button onClick={salir} className="btn btn-danger mt-1">
+                ⏻ Salir
               </button>
             ) : (
               <Link href="/admin/login" className="btn btn-gold mt-1">

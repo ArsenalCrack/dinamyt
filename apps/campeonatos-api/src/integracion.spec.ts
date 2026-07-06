@@ -238,12 +238,10 @@ describe('API campeonatos (integración con PGlite)', () => {
     });
     const campId = crear.json().id as string;
 
-    await a.inject({
-      method: 'POST',
-      url: `/campeonatos/${campId}/generar-secciones`,
-      headers: auth,
-    });
-    await a.inject({
+    // La inscripción del ADMIN nace aprobada y queda asignada a su sección
+    // DE INMEDIATO (la sección se materializa sola con la llegada del
+    // competidor: no hace falta "generar secciones" antes).
+    const ins = await a.inject({
       method: 'POST',
       url: `/campeonatos/${campId}/inscripciones`,
       headers: auth,
@@ -257,6 +255,16 @@ describe('API campeonatos (integración con PGlite)', () => {
         modalidades: ['combate'],
       },
     });
+    expect(ins.statusCode).toBe(201);
+
+    // La sección correspondiente existe (auto-materializada) y el paso manual
+    // de asignación es idempotente (ya no hay nada nuevo que asignar).
+    const secs = await a.inject({
+      method: 'GET',
+      url: `/campeonatos/${campId}/secciones`,
+      headers: auth,
+    });
+    expect((secs.json() as { nombre: string }[]).length).toBeGreaterThan(0);
 
     const asg = await a.inject({
       method: 'POST',
@@ -264,7 +272,7 @@ describe('API campeonatos (integración con PGlite)', () => {
       headers: auth,
     });
     expect(asg.statusCode).toBe(200);
-    expect(asg.json().asignadas).toBe(1);
+    expect(asg.json().asignadas).toBe(0);
 
     await a.close();
   });

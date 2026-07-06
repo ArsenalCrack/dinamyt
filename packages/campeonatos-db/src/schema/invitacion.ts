@@ -32,6 +32,9 @@ export const invitaciones = camp.table(
     estado: estadoInvitacionEnum('estado').notNull().default('PENDIENTE'),
     /** user_id del ecosystem del admin/coach que invitó. */
     invitadoPorUserId: uuid('invitado_por_user_id'),
+    /** Rol de quien invitó (admin | maestro): con el evento EN_CURSO solo se
+     *  pueden aceptar las invitaciones hechas por el ADMIN. */
+    invitadoPorRol: varchar('invitado_por_rol', { length: 20 }),
     /** Inscripción creada al aceptar (null mientras esté pendiente). */
     inscripcionId: uuid('inscripcion_id').references(() => inscripciones.id),
     /** Modalidades elegidas al aceptar (string[]). */

@@ -17,6 +17,7 @@ import {
 import { requireRole, requireAuth } from '../plugins/auth';
 import { enviarCorreo, plantillaInvitacion } from '../lib/mailer';
 import { config } from '../config';
+import { asignarInscripcion } from './campeonatos';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,6 +30,8 @@ interface AceptarBody {
   pesoActual?: string;
   cinturon?: string;
   academiaClub?: string;
+  /** Foto de perfil (avatar del ecosystem). */
+  fotoUrl?: string;
   modalidades: Modalidad[];
 }
 
@@ -60,16 +63,27 @@ export async function invitacionesRoutes(app: FastifyInstance) {
         return reply.code(422).send({ error: 'Email inválido.' });
       }
 
+      const esAdmin =
+        req.user!.is_super_admin || req.user!.role_campeonatos === 'admin';
+
       const [camp] = await db
         .select()
         .from(campeonatos)
         .where(eq(campeonatos.id, id))
         .limit(1);
       if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
-      if (camp.estado === 'EN_CURSO' || camp.estado === 'FINALIZADO') {
+      if (camp.estado === 'FINALIZADO') {
         return reply
           .code(422)
-          .send({ error: 'Las inscripciones de este campeonato ya cerraron.' });
+          .send({ error: 'El campeonato finalizó: las invitaciones están cerradas.' });
+      }
+      // Con el evento EN VIVO solo el ADMIN puede invitar (es la única vía
+      // para que alguien se inscriba por su cuenta en ese momento).
+      if (camp.estado === 'EN_CURSO' && !esAdmin) {
+        return reply.code(422).send({
+          error:
+            'El campeonato está EN CURSO: solo el administrador puede invitar competidores.',
+        });
       }
 
       const [previa] = await db
@@ -89,6 +103,8 @@ export async function invitacionesRoutes(app: FastifyInstance) {
           campeonatoId: id,
           email: limpio,
           invitadoPorUserId: req.user!.sub,
+          // Se guarda el rol: con el evento EN_CURSO solo valen las del admin.
+          invitadoPorRol: esAdmin ? 'admin' : 'maestro',
         })
         .returning();
 
@@ -167,10 +183,18 @@ export async function invitacionesRoutes(app: FastifyInstance) {
         .from(campeonatos)
         .where(eq(campeonatos.id, inv.campeonatoId))
         .limit(1);
-      if (!camp || camp.estado === 'EN_CURSO' || camp.estado === 'FINALIZADO') {
+      if (!camp || camp.estado === 'FINALIZADO') {
         return reply
           .code(422)
           .send({ error: 'Las inscripciones de este campeonato ya cerraron.' });
+      }
+      // EN_CURSO: solo se aceptan invitaciones hechas por el ADMIN — es la
+      // única forma de entrar con el evento en vivo.
+      if (camp.estado === 'EN_CURSO' && inv.invitadoPorRol !== 'admin') {
+        return reply.code(422).send({
+          error:
+            'El campeonato está EN CURSO: solo puedes entrar con una invitación del administrador.',
+        });
       }
 
       // Solo modalidades habilitadas en el campeonato.
@@ -222,13 +246,17 @@ export async function invitacionesRoutes(app: FastifyInstance) {
             pesoActual: body.pesoActual ?? null,
             cinturon: body.cinturon ?? null,
             academiaClub: body.academiaClub ?? null,
+            fotoUrl: body.fotoUrl ?? null,
             ecosystemUserId: req.user!.sub,
           })
           .returning();
-      } else if (!comp.ecosystemUserId) {
+      } else if (!comp.ecosystemUserId || (body.fotoUrl && !comp.fotoUrl)) {
         [comp] = await db
           .update(competidores)
-          .set({ ecosystemUserId: req.user!.sub })
+          .set({
+            ecosystemUserId: comp.ecosystemUserId ?? req.user!.sub,
+            fotoUrl: comp.fotoUrl ?? body.fotoUrl ?? null,
+          })
           .where(eq(competidores.id, comp.id))
           .returning();
       }
@@ -240,6 +268,9 @@ export async function invitacionesRoutes(app: FastifyInstance) {
       }, 0);
       const montoTotal = (parseFloat(camp.costoBase ?? '0') + extra).toFixed(2);
 
+      // La invitación del ADMIN nace aprobada (él ya decidió que entra); la
+      // del maestro queda PENDIENTE para la revisión normal.
+      const aprobadaDirecto = inv.invitadoPorRol === 'admin';
       const [ins] = await db
         .insert(inscripciones)
         .values({
@@ -248,6 +279,7 @@ export async function invitacionesRoutes(app: FastifyInstance) {
           pesoInscripcion: body.pesoActual ?? null,
           grupoCinturonInscripcion: body.grupoCinturon,
           cinturonInscripcion: body.cinturon ?? null,
+          estado: aprobadaDirecto ? 'APROBADA' : 'PENDIENTE',
           montoTotal,
           inscritoPorUserId: req.user!.sub,
         })
@@ -256,6 +288,13 @@ export async function invitacionesRoutes(app: FastifyInstance) {
         await db
           .insert(inscripcionModalidades)
           .values({ inscripcionId: ins.id, modalidad: m });
+      }
+
+      // Aprobada directo → a su sección de una vez (avisa si ya arrancó).
+      let avisos: string[] = [];
+      if (aprobadaDirecto) {
+        const r = await asignarInscripcion(db, camp.id, ins.id);
+        avisos = r.avisos;
       }
 
       const [upd] = await db
@@ -269,7 +308,7 @@ export async function invitacionesRoutes(app: FastifyInstance) {
         .where(eq(invitaciones.id, id))
         .returning();
 
-      return reply.code(201).send({ invitacion: upd, inscripcion: ins });
+      return reply.code(201).send({ invitacion: upd, inscripcion: ins, avisos });
     },
   );
 
