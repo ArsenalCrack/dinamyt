@@ -50,9 +50,11 @@ export function NavBar() {
       className={enMenu ? 'block' : ''}
       style={{
         borderRadius: '0.5rem',
-        padding: '0.45rem 0.75rem',
+        padding: '0.45rem 0.7rem',
         fontSize: '0.85rem',
         fontWeight: 600,
+        // Nunca partir una etiqueta en dos líneas (evita el texto "atrapado").
+        whiteSpace: 'nowrap',
         display: enMenu ? 'block' : undefined,
         ...(activo(l.href)
           ? { background: 'var(--bg-elevated, rgba(255,255,255,0.06))', color: 'var(--gold)' }
@@ -93,30 +95,34 @@ export function NavBar() {
     >
       <div
         style={{
-          maxWidth: 1000,
+          maxWidth: 1180,
           margin: '0 auto',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem',
+          gap: '0.6rem',
           padding: '0.6rem 1rem',
         }}
       >
         <Link href={staff ? '/' : '/mi'} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="DINAMYT" width={30} height={30} />
-          <span className="display" style={{ fontSize: '1rem' }}>
+          <span className="display" style={{ fontSize: '1rem', whiteSpace: 'nowrap' }}>
             Membresías
           </span>
         </Link>
 
-        {/* Escritorio: enlaces en línea */}
-        <nav className="nav-desktop" style={{ flex: 1, alignItems: 'center', gap: '0.25rem' }}>
+        {/* Escritorio: enlaces en línea, ocupando el espacio disponible sin
+            partir palabras (nowrap por item). */}
+        <nav
+          className="nav-desktop"
+          style={{ flex: 1, alignItems: 'center', gap: '0.15rem', flexWrap: 'nowrap' }}
+        >
           {visibles.map((l) => itemNav(l))}
         </nav>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div className="nav-user" style={{ alignItems: 'center', gap: '0.5rem' }}>
-            <span className="muted" style={{ fontSize: '0.72rem', textAlign: 'right' }}>
+            <span className="muted" style={{ fontSize: '0.72rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
               <span style={{ display: 'block', fontWeight: 600, color: 'var(--text)' }}>
                 {sesion.fullName || sesion.email}
               </span>
@@ -124,7 +130,12 @@ export function NavBar() {
             </span>
             {linkApps()}
             {/* Salir se distingue del resto: única acción destructiva */}
-            <button onClick={salir} className="btn btn-danger btn-sm" title="Cerrar sesión">
+            <button
+              onClick={salir}
+              className="btn btn-danger btn-sm"
+              title="Cerrar sesión"
+              style={{ whiteSpace: 'nowrap' }}
+            >
               ⏻ Salir
             </button>
           </div>

@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, obtenerToken } from '@/lib/api';
 import { getSesion, esStaff } from '@/lib/session';
+import { EscanerQR } from '@/components/EscanerQR';
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface RosterItem { userId: string; fullName: string; estado: string }
 interface Resultado {
@@ -28,6 +32,7 @@ export default function Kiosco() {
   const [pin, setPin] = useState('');
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [pendientes, setPendientes] = useState(0);
+  const [escaneando, setEscaneando] = useState(false);
 
   function encolar(identifier: { type: string; value: string }) {
     const q: Encolado[] = JSON.parse(localStorage.getItem(QKEY) || '[]');
@@ -107,10 +112,31 @@ export default function Kiosco() {
 
   return (
     <main style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem', minHeight: '100vh' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1 className="display" style={{ fontSize: '1.5rem' }}>
-          Kiosco · <span style={{ color: 'var(--gold)' }}>Check-in</span>
-        </h1>
+      {escaneando && (
+        <EscanerQR
+          onDetectado={(valor) => {
+            setEscaneando(false);
+            const tipo = UUID_RE.test(valor) ? 'qr' : 'pin';
+            void checkin({ type: tipo, value: valor });
+          }}
+          onCerrar={() => setEscaneando(false)}
+        />
+      )}
+
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div>
+          <h1 className="display" style={{ fontSize: '1.5rem' }}>
+            Kiosco · <span style={{ color: 'var(--gold)' }}>Asistencia</span>
+          </h1>
+          <p className="muted" style={{ fontSize: '0.78rem' }}>
+            Marca la ASISTENCIA a clase. Los pagos de mensualidad se registran
+            en el{' '}
+            <Link href="/" style={{ color: 'var(--gold)' }}>
+              panel del club
+            </Link>
+            .
+          </p>
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           {pendientes > 0 && <span className="badge badge-gold">{pendientes} sin sincronizar</span>}
           <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
@@ -119,7 +145,7 @@ export default function Kiosco() {
 
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
         <label className="muted" style={{ fontSize: '0.8rem' }}>
-          Ingresa tu PIN o escanea tu carnet QR
+          Escanea el carnet QR, o ingresa el PIN del alumno
         </label>
         <form
           onSubmit={(e) => {
@@ -128,9 +154,7 @@ export default function Kiosco() {
             if (!valor) return;
             // Un escáner USB "teclea" el contenido del carnet QR (el ID de la
             // persona, un UUID) y termina con Enter — entra como método `qr`.
-            const esCarnetQR =
-              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
-            void checkin({ type: esCarnetQR ? 'qr' : 'pin', value: valor });
+            void checkin({ type: UUID_RE.test(valor) ? 'qr' : 'pin', value: valor });
             setPin('');
           }}
           style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}
@@ -145,9 +169,18 @@ export default function Kiosco() {
           />
           <button className="btn btn-gold" type="submit">Marcar</button>
         </form>
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => setEscaneando(true)}
+          >
+            📷 Escanear carnet con la cámara
+          </button>
+        </div>
         <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.5rem' }}>
-          Con lector de huella el marcado es automático. Sin lector: PIN, carnet
-          QR (el alumno lo tiene en su panel) o toca tu nombre abajo.
+          Con lector de huella el marcado es automático. Sin lector: cámara, PIN,
+          carnet QR (el alumno lo tiene en su panel) o toca tu nombre abajo.
         </p>
       </div>
 

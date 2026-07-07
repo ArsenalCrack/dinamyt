@@ -92,6 +92,14 @@ suscripción activa) para probar los accesos:
 | `owner@dinamyt.com` | `Demo1234!` | owner (Membresías) | Panel del club en :3006 (roster, pagos, kiosco) |
 | `alumno1@dinamyt.com` | `Demo1234!` | student | Portal del alumno en Membresías |
 | `alumno2@dinamyt.com` | `Demo1234!` | student | Portal del alumno en Membresías |
+| `juezesquina@dinamyt.com` | `Demo1234!` | judge | Juez de esquina de prueba (se asigna a tatamis) |
+
+> **Datos de prueba de un campeonato** (secciones por modalidad + competidores
+> + jueces asignados): con la **API de campeonatos apagada** (PGlite es
+> monoproceso) corre `node scripts/sembrar-prueba.mjs` desde
+> `packages/campeonatos-db`. Usa el campeonato más reciente de la base local,
+> crea una sección por cada modalidad, inscribe 6 competidores (aprobados) y
+> asigna `juezesquina@`/`juez@` al Tatami 1.
 
 Para empezar de cero, borra `.localdb/` y vuelve a correr los dos setups.
 
