@@ -39,10 +39,29 @@ interface Perfil {
   emergencyContactPhone: string | null;
   emergencyContactRelationship: string | null;
   medicalNotes: string | null;
+  bloodType: string | null;
   isEmailVerified: boolean | null;
   createdAt: string | null;
   disciplines: Disciplina[];
   guardians: Acudiente[];
+}
+
+/**
+ * Progreso del perfil: qué tan completo está (orienta al usuario y es lo que
+ * Campeonatos exige antes de inscribirse).
+ */
+function progresoPerfil(p: Perfil, avatarActual: string) {
+  const items: { etiqueta: string; ok: boolean }[] = [
+    { etiqueta: 'Foto de perfil', ok: !!avatarActual },
+    { etiqueta: 'Teléfono', ok: !!p.phone },
+    { etiqueta: 'Fecha de nacimiento', ok: !!p.birthDate },
+    { etiqueta: 'Contacto de emergencia', ok: !!p.emergencyContactName && !!p.emergencyContactPhone },
+    { etiqueta: 'Parentesco del contacto', ok: !!p.emergencyContactRelationship },
+    { etiqueta: 'Tipo de sangre (lo registra tu maestro)', ok: !!p.bloodType },
+    { etiqueta: 'Disciplina y grado (los asigna tu maestro)', ok: p.disciplines.length > 0 },
+  ];
+  const hechos = items.filter((i) => i.ok).length;
+  return { items, pct: Math.round((hechos / items.length) * 100) };
 }
 
 /**
@@ -134,10 +153,11 @@ export default function PerfilPage() {
     setError('');
     setOk('');
     try {
+      // El nombre y la fecha ya registrada NO se envían: son campos protegidos
+      // que solo corrige el maestro del club o un administrador.
       await api.patch(`/users/${perfil.id}/profile`, {
-        fullName: form.fullName.trim().toLocaleUpperCase('es'),
+        ...(perfil.birthDate ? {} : { birthDate: form.birthDate || null }),
         phone: form.phone || null,
-        birthDate: form.birthDate || null,
         avatarUrl: form.avatarUrl || null,
         emergencyContactName: form.emergencyContactName || null,
         emergencyContactPhone: form.emergencyContactPhone || null,
@@ -210,6 +230,46 @@ export default function PerfilPage() {
           ← Mis aplicaciones
         </Link>
       </header>
+
+      {/* ── Progreso del perfil (Campeonatos exige el perfil completo) ── */}
+      {(() => {
+        const prog = progresoPerfil(perfil, form.avatarUrl);
+        const faltan = prog.items.filter((i) => !i.ok);
+        return (
+          <section className="card mb-4 p-5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold">Tu perfil está al {prog.pct}%</h2>
+              {prog.pct === 100 ? (
+                <span className="badge badge-ok">✓ Completo</span>
+              ) : (
+                <span className="badge badge-gold">{faltan.length} pendiente(s)</span>
+              )}
+            </div>
+            <div
+              className="h-2.5 w-full overflow-hidden rounded-full"
+              role="progressbar"
+              aria-valuenow={prog.pct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              style={{ background: 'var(--bg-elevated)' }}
+            >
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${prog.pct}%`,
+                  background: prog.pct === 100 ? 'var(--ok)' : 'var(--gold)',
+                }}
+              />
+            </div>
+            {faltan.length > 0 && (
+              <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Te falta: {faltan.map((f) => f.etiqueta).join(' · ')}. Un perfil
+                completo es requisito para inscribirte a campeonatos.
+              </p>
+            )}
+          </section>
+        );
+      })()}
 
       {/* ── Foto + datos de cuenta ── */}
       <section className="card mb-4 p-5">
@@ -312,24 +372,49 @@ export default function PerfilPage() {
       <form onSubmit={guardar} className="card flex flex-col gap-4 p-5">
         <h2 className="text-lg font-semibold">Datos personales</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          {campo(
-            'Nombre completo (solo letras)',
-            form.fullName,
-            (v) => setForm({ ...form, fullName: soloLetras(v).toLocaleUpperCase('es') }),
-            { required: true, autoComplete: 'name' },
-          )}
+          <label className="block text-sm">
+            <span style={{ color: 'var(--text-muted)' }}>Nombre completo</span>
+            <input className="mt-1" value={form.fullName} readOnly style={{ opacity: 0.7 }} />
+            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+              Solo tu maestro o un administrador puede corregirlo.
+            </span>
+          </label>
           {campo(
             'Teléfono (solo números)',
             form.phone,
             (v) => setForm({ ...form, phone: soloTelefono(v) }),
             { type: 'tel', inputMode: 'tel', placeholder: '300 123 4567' },
           )}
-          {campo(
-            'Fecha de nacimiento',
-            form.birthDate,
-            (v) => setForm({ ...form, birthDate: v }),
-            { type: 'date', min: fechas.min, max: fechas.max },
-          )}
+          <label className="block text-sm">
+            <span style={{ color: 'var(--text-muted)' }}>Fecha de nacimiento</span>
+            <input
+              className="mt-1"
+              type="date"
+              value={form.birthDate}
+              min={fechas.min}
+              max={fechas.max}
+              readOnly={!!perfil.birthDate}
+              onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+              style={perfil.birthDate ? { opacity: 0.7 } : undefined}
+            />
+            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+              {perfil.birthDate
+                ? 'Ya registrada: solo tu maestro o un administrador puede corregirla.'
+                : 'Regístrala con cuidado: después solo la corrige tu maestro.'}
+            </span>
+          </label>
+          <label className="block text-sm">
+            <span style={{ color: 'var(--text-muted)' }}>Tipo de sangre</span>
+            <input
+              className="mt-1"
+              value={perfil.bloodType ?? 'Por registrar'}
+              readOnly
+              style={{ opacity: 0.7 }}
+            />
+            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+              Lo registra tu maestro o un administrador.
+            </span>
+          </label>
         </div>
 
         <h2 className="mt-2 text-lg font-semibold">Contacto de emergencia</h2>

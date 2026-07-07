@@ -43,6 +43,13 @@
       "when": 1783368932360,
       "tag": "0005_melodic_mesmero",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783396442302,
+      "tag": "0006_nifty_oracle",
+      "breakpoints": true
     }
   ]
 }

@@ -45,6 +45,7 @@ function InfoParticipantes({
   const [edad, setEdad] = useState<string>('todas');
   const [peso, setPeso] = useState<string>('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
   // Al cambiar de modalidad se reinician los sub-filtros (estilo PROJECT).
   function cambiarModalidad(m: string) {
@@ -128,14 +129,25 @@ function InfoParticipantes({
       {secciones.length > 0 && (
         <section className="card p-5">
           <h2 className="mb-3 text-lg font-semibold">Competidores por sección</h2>
-          <div className="mb-2 flex flex-wrap gap-2">
+          {/* En móvil, un botón «Filtros» abre la caja (estilo PROJECT); en
+              escritorio los filtros van SIEMPRE en una sola línea. */}
+          <button
+            onClick={() => setFiltrosAbiertos((v) => !v)}
+            className="filtros-toggle btn btn-outline btn-sm mb-2 w-full"
+            aria-expanded={filtrosAbiertos}
+          >
+            {filtrosAbiertos ? '▲ Ocultar filtros' : '▼ Filtros y búsqueda'}
+          </button>
+          <div className={`filtros-caja ${filtrosAbiertos ? 'abierta' : ''} mb-2 flex-wrap gap-2`}>
             {selectFiltro(modalidad, cambiarModalidad, modalidades, 'Todas las modalidades', NOMBRE_MODALIDAD)}
             {selectFiltro(genero, setGenero, generos, 'Todos los géneros')}
             {selectFiltro(cinturon, setCinturon, cinturones, 'Todos los cinturones')}
             {selectFiltro(edad, setEdad, edades, 'Todas las edades')}
             {selectFiltro(peso, setPeso, pesos, 'Todos los pesos')}
           </div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div
+            className={`filtros-caja ${filtrosAbiertos ? 'abierta' : ''} mb-3 items-center gap-2`}
+          >
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
@@ -437,8 +449,9 @@ export default function PantallaCampeonatoPage() {
                     En espera: {t.enEspera}
                   </p>
                 )}
-                {/* Separado de la info de arriba con su propia franja */}
-                {t.activo !== false && (
+                {/* La pantalla del tatami solo tiene sentido con el evento EN
+                    CURSO: en «próximo» aún no hay nada que proyectar. */}
+                {t.activo !== false && data.campeonato.estado === 'EN_CURSO' && (
                   <div
                     className="mt-4 border-t pt-3"
                     style={{ borderColor: 'var(--border)' }}

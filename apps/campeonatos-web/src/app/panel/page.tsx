@@ -115,26 +115,37 @@ export default function PanelUsuarioPage() {
         </Link>
       )}
 
-      {/* ── Mis estadísticas ── */}
+      {/* ── Mis estadísticas (resumen + medallero) ── */}
       <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold">Mis estadísticas</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">Mis estadísticas</h2>
+          <Link href="/panel/estadisticas" className="btn btn-outline btn-sm">
+            Ver a fondo por campeonato →
+          </Link>
+        </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { valor: stats?.campeonatos ?? '—', etiqueta: 'Campeonatos' },
-            { valor: stats?.inscripciones ?? '—', etiqueta: 'Inscripciones' },
+            { valor: stats?.campeonatos ?? '—', etiqueta: 'Campeonatos', color: 'var(--gold)' },
+            {
+              valor: stats ? `${stats.podios.oros}🥇 ${stats.podios.platas}🥈 ${stats.podios.bronces}🥉` : '—',
+              etiqueta: 'Medallero',
+              color: 'var(--gold)',
+            },
             {
               valor: stats ? stats.combates.ganados : '—',
               etiqueta: 'Combates ganados',
+              color: 'var(--ok)',
             },
             {
               valor: stats
                 ? `${stats.combates.perdidos}${stats.combates.empates ? ` · ${stats.combates.empates}E` : ''}`
                 : '—',
               etiqueta: 'Combates perdidos',
+              color: 'var(--text)',
             },
           ].map((c, i) => (
             <div key={i} className="card p-4 text-center">
-              <p className="text-3xl font-extrabold" style={{ color: 'var(--gold)' }}>
+              <p className="text-2xl font-extrabold" style={{ color: c.color }}>
                 {c.valor}
               </p>
               <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -147,7 +158,8 @@ export default function PanelUsuarioPage() {
           <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
             Tu modalidad más competida:{' '}
             <strong>{NOMBRE_MODALIDAD[modalidadTop[0]] ?? modalidadTop[0]}</strong>{' '}
-            ({modalidadTop[1]} {modalidadTop[1] === 1 ? 'vez' : 'veces'}).
+            ({modalidadTop[1]} {modalidadTop[1] === 1 ? 'vez' : 'veces'}). Los
+            resultados incluyen combate, figuras y saltos.
           </p>
         )}
       </section>

@@ -268,9 +268,10 @@ export async function invitacionesRoutes(app: FastifyInstance) {
       }, 0);
       const montoTotal = (parseFloat(camp.costoBase ?? '0') + extra).toFixed(2);
 
-      // La invitación del ADMIN nace aprobada (él ya decidió que entra); la
-      // del maestro queda PENDIENTE para la revisión normal.
-      const aprobadaDirecto = inv.invitadoPorRol === 'admin';
+      // Invitar YA es la decisión de que entra: el invitado igualmente pasa
+      // por este formulario (peso + modalidades + datos que falten), pero su
+      // inscripción nace APROBADA automáticamente, sin revisión extra.
+      const aprobadaDirecto = true;
       const [ins] = await db
         .insert(inscripciones)
         .values({

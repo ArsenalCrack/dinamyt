@@ -63,7 +63,16 @@ export class OrganizationsController {
   @UseGuards(EcosystemJwtGuard)
   crearMiClub(
     @CurrentUser() user: JwtPayload,
-    @Body() body: { name: string; city?: string; description?: string },
+    @Body()
+    body: {
+      name: string;
+      city?: string;
+      country?: string;
+      description?: string;
+      phone?: string;
+      logoUrl?: string;
+      socialLinks?: string[];
+    },
   ) {
     return this.orgsService.crearMiClub(user.sub, body);
   }
@@ -147,6 +156,9 @@ export class OrganizationsController {
       phone?: string | null;
       email?: string | null;
       city?: string | null;
+      country?: string | null;
+      logoUrl?: string | null;
+      socialLinks?: string[] | null;
     },
     @CurrentUser() user: JwtPayload,
   ) {

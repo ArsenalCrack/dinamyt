@@ -22,11 +22,13 @@ const ROLES_GESTOR = ['admin', 'owner', 'maestro'];
 // Reparto de roles según el tipo de organización (decisión de producto):
 // la federación/liga agrega jueces y administradores; el club agrega
 // competidores y coaches (además de su propio staff).
+// El club JAMÁS asigna jueces (eso es de la federación/liga). 'competitor' y
+// 'student' son la misma persona en la práctica: el ALUMNO del club.
 const ROLES_POR_TIPO: Record<string, string[]> = {
   FEDERATION: ['admin', 'judge'],
   LEAGUE: ['admin', 'judge'],
-  CLUB: ['maestro', 'owner', 'coach', 'competitor', 'student'],
-  ACADEMY: ['maestro', 'owner', 'coach', 'competitor', 'student'],
+  CLUB: ['maestro', 'owner', 'staff', 'coach', 'competitor', 'student'],
+  ACADEMY: ['maestro', 'owner', 'staff', 'coach', 'competitor', 'student'],
 };
 
 @Injectable()
@@ -212,6 +214,8 @@ export class OrganizationsService {
         schedule: organizations.schedule,
         phone: organizations.phone,
         email: organizations.email,
+        logoUrl: organizations.logoUrl,
+        socialLinks: organizations.socialLinks,
         myRole: orgMembers.role,
       })
       .from(orgMembers)
@@ -479,6 +483,9 @@ export class OrganizationsService {
       phone?: string | null;
       email?: string | null;
       city?: string | null;
+      country?: string | null;
+      logoUrl?: string | null;
+      socialLinks?: string[] | null;
     },
   ) {
     const result = await db
@@ -491,6 +498,9 @@ export class OrganizationsService {
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.email !== undefined && { email: data.email }),
         ...(data.city !== undefined && { city: data.city }),
+        ...(data.country !== undefined && { country: data.country }),
+        ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
+        ...(data.socialLinks !== undefined && { socialLinks: data.socialLinks }),
         updatedAt: new Date(),
       })
       .where(eq(organizations.id, orgId))
@@ -515,6 +525,8 @@ export class OrganizationsService {
         schedule: organizations.schedule,
         phone: organizations.phone,
         email: organizations.email,
+        logoUrl: organizations.logoUrl,
+        socialLinks: organizations.socialLinks,
         isActive: organizations.isActive,
         myRole: orgMembers.role,
       })
@@ -566,7 +578,15 @@ export class OrganizationsService {
   // Cualquier usuario autenticado puede fundar un club; queda como su maestro.
   async crearMiClub(
     userId: string,
-    data: { name: string; city?: string; description?: string },
+    data: {
+      name: string;
+      city?: string;
+      country?: string;
+      description?: string;
+      phone?: string;
+      logoUrl?: string;
+      socialLinks?: string[];
+    },
   ) {
     if (!data.name?.trim()) {
       throw new BadRequestException('El club necesita un nombre.');
@@ -577,7 +597,11 @@ export class OrganizationsService {
         name: data.name.trim(),
         type: 'CLUB',
         city: data.city ?? null,
+        country: data.country ?? 'Colombia',
         description: data.description ?? null,
+        phone: data.phone ?? null,
+        logoUrl: data.logoUrl ?? null,
+        socialLinks: data.socialLinks?.filter(Boolean) ?? null,
       })
       .returning();
     await db.insert(orgMembers).values({

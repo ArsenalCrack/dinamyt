@@ -1,15 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   obtenerToken,
   miClubAPI,
   crearMiClubAPI,
+  listPaisesAPI,
+  listCiudadesAPI,
   extraerError,
   type MiClub,
+  type Pais,
 } from '@/lib/api';
+import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
 import { Avatar } from '@/components/Avatar';
 
 const TIPO: Record<string, string> = {
@@ -25,10 +29,35 @@ const ROL: Record<string, string> = {
   admin: 'Administrador',
   coach: 'Coach',
   judge: 'Juez',
-  competitor: 'Competidor',
+  competitor: 'Alumno',
   student: 'Alumno',
   member: 'Miembro',
 };
+
+/** Nombre del país en español a partir del iso2 (el catálogo viene en inglés). */
+const nombrePais = (iso2: string, fallback: string) => {
+  try {
+    return new Intl.DisplayNames(['es'], { type: 'region' }).of(iso2) ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+/** Etiqueta corta de un enlace de red social (instagram.com/club → Instagram). */
+function etiquetaRed(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace('www.', '');
+    if (host.includes('instagram')) return 'Instagram';
+    if (host.includes('facebook')) return 'Facebook';
+    if (host.includes('tiktok')) return 'TikTok';
+    if (host.includes('youtube')) return 'YouTube';
+    if (host.includes('wa.me') || host.includes('whatsapp')) return 'WhatsApp';
+    if (host.includes('x.com') || host.includes('twitter')) return 'X';
+    return host;
+  } catch {
+    return url;
+  }
+}
 
 /**
  * Mi club — la información del club al que pertenece la persona: sede,
@@ -42,8 +71,20 @@ export default function MiClubPage() {
   const [msg, setMsg] = useState('');
 
   // Fundar mi propio club (flujo del maestro sin club).
-  const [nuevo, setNuevo] = useState({ name: '', city: '', description: '' });
+  const [nuevo, setNuevo] = useState({
+    name: '',
+    city: '',
+    paisIso: 'CO',
+    description: '',
+    phone: '',
+    logoUrl: '',
+    red1: '',
+    red2: '',
+  });
+  const [paises, setPaises] = useState<Pais[]>([]);
+  const [ciudades, setCiudades] = useState<string[]>([]);
   const [creando, setCreando] = useState(false);
+  const inputLogo = useRef<HTMLInputElement>(null);
 
   const cargar = useCallback(async () => {
     if (!obtenerToken()) {
@@ -60,20 +101,50 @@ export default function MiClubPage() {
 
   useEffect(() => {
     void cargar();
+    // Catálogo geográfico (mismo desplegable que al crear un campeonato).
+    listPaisesAPI().then(setPaises).catch(() => setPaises([]));
   }, [cargar]);
+
+  useEffect(() => {
+    if (!nuevo.paisIso) {
+      setCiudades([]);
+      return;
+    }
+    listCiudadesAPI(nuevo.paisIso)
+      .then(setCiudades)
+      .catch(() => setCiudades([]));
+  }, [nuevo.paisIso]);
+
+  async function elegirLogo(file: File | undefined) {
+    if (!file) return;
+    try {
+      const dataUrl = await comprimirAvatar(file, 256);
+      setNuevo((n) => ({ ...n, logoUrl: dataUrl }));
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'No se pudo procesar el logo.');
+    }
+  }
 
   async function fundarClub(e: React.FormEvent) {
     e.preventDefault();
     setCreando(true);
     setMsg('');
     try {
+      const pais = paises.find((p) => p.iso2 === nuevo.paisIso);
       await crearMiClubAPI({
         name: nuevo.name.trim(),
         city: nuevo.city.trim() || undefined,
+        country: pais ? nombrePais(pais.iso2, pais.nombre) : undefined,
         description: nuevo.description.trim() || undefined,
+        phone: nuevo.phone.trim() || undefined,
+        logoUrl: nuevo.logoUrl || undefined,
+        socialLinks: [nuevo.red1.trim(), nuevo.red2.trim()].filter(Boolean),
       });
       setMsg('Club creado: ya eres su maestro. Complétalo en «Mi organización».');
-      setNuevo({ name: '', city: '', description: '' });
+      setNuevo({
+        name: '', city: '', paisIso: 'CO', description: '',
+        phone: '', logoUrl: '', red1: '', red2: '',
+      });
       await cargar();
     } catch (e2) {
       setMsg(extraerError(e2, 'No se pudo crear el club.'));
@@ -123,6 +194,52 @@ export default function MiClubPage() {
               coaches, llenar su información y aceptar la invitación de una
               federación o liga.
             </p>
+
+            {/* Identidad visual: logo + nombre */}
+            <div className="flex flex-wrap items-center gap-4">
+              {nuevo.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={nuevo.logoUrl}
+                  alt="Logo del club"
+                  className="h-20 w-20 rounded-xl object-cover"
+                  style={{ border: '2px solid var(--gold-dim)' }}
+                />
+              ) : (
+                <div
+                  className="flex h-20 w-20 items-center justify-center rounded-xl text-3xl"
+                  style={{ background: 'var(--bg-elevated)', border: '2px dashed var(--border)' }}
+                >
+                  🛡
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <input
+                  ref={inputLogo}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => void elegirLogo(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onClick={() => inputLogo.current?.click()}
+                  className="btn btn-outline btn-sm"
+                >
+                  {nuevo.logoUrl ? 'Cambiar logo' : 'Subir logo del club'}
+                </button>
+                {nuevo.logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setNuevo((n) => ({ ...n, logoUrl: '' }))}
+                    className="btn btn-outline btn-sm"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm">
                 <span style={{ color: 'var(--text-muted)' }}>Nombre del club *</span>
@@ -135,12 +252,64 @@ export default function MiClubPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>Ciudad</span>
+                <span style={{ color: 'var(--text-muted)' }}>Teléfono de contacto</span>
                 <input
                   className="mt-1"
+                  type="tel"
+                  inputMode="tel"
+                  value={nuevo.phone}
+                  onChange={(e) => setNuevo({ ...nuevo, phone: soloTelefono(e.target.value) })}
+                  placeholder="300 123 4567"
+                />
+              </label>
+              <label className="block text-sm">
+                <span style={{ color: 'var(--text-muted)' }}>País</span>
+                <select
+                  className="mt-1 w-full"
+                  value={nuevo.paisIso}
+                  onChange={(e) => setNuevo({ ...nuevo, paisIso: e.target.value, city: '' })}
+                >
+                  {paises.length === 0 && <option value="CO">Colombia</option>}
+                  {paises.map((p) => (
+                    <option key={p.iso2} value={p.iso2}>
+                      {nombrePais(p.iso2, p.nombre)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span style={{ color: 'var(--text-muted)' }}>Ciudad</span>
+                <select
+                  className="mt-1 w-full"
                   value={nuevo.city}
                   onChange={(e) => setNuevo({ ...nuevo, city: e.target.value })}
-                  maxLength={100}
+                >
+                  <option value="">— Elige la ciudad —</option>
+                  {ciudades.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span style={{ color: 'var(--text-muted)' }}>Red social (enlace)</span>
+                <input
+                  className="mt-1"
+                  type="url"
+                  value={nuevo.red1}
+                  onChange={(e) => setNuevo({ ...nuevo, red1: e.target.value })}
+                  placeholder="https://instagram.com/tuclub"
+                />
+              </label>
+              <label className="block text-sm">
+                <span style={{ color: 'var(--text-muted)' }}>Otra red social (enlace)</span>
+                <input
+                  className="mt-1"
+                  type="url"
+                  value={nuevo.red2}
+                  onChange={(e) => setNuevo({ ...nuevo, red2: e.target.value })}
+                  placeholder="https://facebook.com/tuclub"
                 />
               </label>
             </div>
@@ -167,9 +336,29 @@ export default function MiClubPage() {
       )}
 
       {clubes.map((club) => (
-        <section key={club.id} className="card mb-4 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
+        <section key={club.id} className="card mb-4 overflow-hidden">
+          {/* Cabecera con el escudo/logo del club como identidad */}
+          <div
+            className="flex flex-wrap items-center gap-4 border-b p-5"
+            style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}
+          >
+            {club.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={club.logoUrl}
+                alt={`Logo de ${club.name}`}
+                className="h-20 w-20 shrink-0 rounded-xl object-cover"
+                style={{ border: '2px solid var(--gold-dim)' }}
+              />
+            ) : (
+              <div
+                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl text-3xl font-extrabold"
+                style={{ background: 'var(--bg-card)', border: '2px solid var(--gold-dim)', color: 'var(--gold)' }}
+              >
+                {club.name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
               <h2 className="text-xl font-bold" style={{ color: 'var(--gold)' }}>
                 {club.name}
               </h2>
@@ -178,69 +367,85 @@ export default function MiClubPage() {
                   .filter(Boolean)
                   .join(' · ')}
               </p>
+              {club.organizacionPadre && (
+                <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Afiliado a <strong>{club.organizacionPadre}</strong>
+                </p>
+              )}
             </div>
             <span className="badge badge-gold">{ROL[club.myRole] ?? club.myRole}</span>
           </div>
 
-          {club.organizacionPadre && (
-            <p className="mt-2 text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Afiliado a</span>{' '}
-              <strong>{club.organizacionPadre}</strong>
-            </p>
-          )}
+          <div className="p-5">
+            {club.description && <p className="text-sm">{club.description}</p>}
 
-          {club.description && <p className="mt-3 text-sm">{club.description}</p>}
+            <dl
+              className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2"
+            >
+              <div>
+                <dt style={{ color: 'var(--text-muted)' }}>Sede / dirección</dt>
+                <dd className="font-semibold">{club.address ?? 'Por definir'}</dd>
+              </div>
+              <div>
+                <dt style={{ color: 'var(--text-muted)' }}>Horarios de clase</dt>
+                <dd className="whitespace-pre-line font-semibold">
+                  {club.schedule ?? 'Por definir'}
+                </dd>
+              </div>
+              <div>
+                <dt style={{ color: 'var(--text-muted)' }}>Teléfono</dt>
+                <dd className="font-semibold">{club.phone ?? '—'}</dd>
+              </div>
+              <div>
+                <dt style={{ color: 'var(--text-muted)' }}>Correo</dt>
+                <dd className="font-semibold">{club.email ?? '—'}</dd>
+              </div>
+            </dl>
 
-          <dl
-            className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t pt-4 text-sm sm:grid-cols-2"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <div>
-              <dt style={{ color: 'var(--text-muted)' }}>Sede / dirección</dt>
-              <dd className="font-semibold">{club.address ?? 'Por definir'}</dd>
-            </div>
-            <div>
-              <dt style={{ color: 'var(--text-muted)' }}>Horarios de clase</dt>
-              <dd className="whitespace-pre-line font-semibold">
-                {club.schedule ?? 'Por definir'}
-              </dd>
-            </div>
-            <div>
-              <dt style={{ color: 'var(--text-muted)' }}>Teléfono</dt>
-              <dd className="font-semibold">{club.phone ?? '—'}</dd>
-            </div>
-            <div>
-              <dt style={{ color: 'var(--text-muted)' }}>Correo</dt>
-              <dd className="font-semibold">{club.email ?? '—'}</dd>
-            </div>
-          </dl>
-
-          {club.gestores.length > 0 && (
-            <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-              <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-                Maestros y administradores
-              </h3>
-              <ul className="flex flex-col gap-1.5 text-sm">
-                {club.gestores.map((g, i) => (
-                  <li key={i} className="flex flex-wrap items-center gap-2">
-                    <Avatar src={g.avatarUrl} nombre={g.fullName} size={32} />
-                    <span className="badge">{ROL[g.role] ?? g.role}</span>
-                    <strong>{g.fullName}</strong>
-                    <span style={{ color: 'var(--text-muted)' }}>
-                      {g.email}
-                      {g.phone ? ` · ${g.phone}` : ''}
-                    </span>
-                  </li>
+            {/* Redes sociales del club */}
+            {(club.socialLinks?.length ?? 0) > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {club.socialLinks!.map((url, i) => (
+                  <a
+                    key={i}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline btn-sm"
+                  >
+                    🔗 {etiquetaRed(url)}
+                  </a>
                 ))}
-              </ul>
-            </div>
-          )}
+              </div>
+            )}
 
-          {['maestro', 'owner', 'admin'].includes(club.myRole) && (
-            <Link href="/mi-organizacion" className="btn btn-gold mt-4 inline-block">
-              Editar la información del club
-            </Link>
-          )}
+            {club.gestores.length > 0 && (
+              <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
+                <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  Maestros y administradores
+                </h3>
+                <ul className="flex flex-col gap-1.5 text-sm">
+                  {club.gestores.map((g, i) => (
+                    <li key={i} className="flex flex-wrap items-center gap-2">
+                      <Avatar src={g.avatarUrl} nombre={g.fullName} size={32} />
+                      <span className="badge">{ROL[g.role] ?? g.role}</span>
+                      <strong>{g.fullName}</strong>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {g.email}
+                        {g.phone ? ` · ${g.phone}` : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {['maestro', 'owner', 'admin'].includes(club.myRole) && (
+              <Link href="/mi-organizacion" className="btn btn-gold mt-4 inline-block">
+                Editar la información del club
+              </Link>
+            )}
+          </div>
         </section>
       ))}
     </main>

@@ -18,6 +18,10 @@
   --text: #f3f1e8;
   --text-muted: #a19db8;
   --gold: #f0b800;
+  /* Accion primaria del dia a dia: jade profundo, legible y sin neon.
+     El oro queda como color de MARCA (acentos, badges y CTA del login). */
+  --accion: #1f8f63;
+  --accion-texto: #eafff4;
   --gold-dim: #c99a00;
   --gold-soft: rgba(240, 184, 0, 0.12);
   --danger: #ff5577;
@@ -117,7 +121,15 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn:hover:not(:disabled) { filter: brightness(1.12); }
   .btn:active:not(:disabled) { transform: translateY(1px); }
+  /* Accion primaria (antes oro neon): jade profundo legible. La clase
+     conserva su nombre historico para no tocar cada pagina. */
   .btn-gold {
+    background: var(--accion);
+    color: var(--accion-texto);
+    border-color: rgba(234, 255, 244, 0.12);
+  }
+  /* CTA de marca (login "Ingresar" y portadas): el oro original. */
+  .btn-cta {
     background: var(--gold);
     color: #14141e;
     box-shadow: 0 2px 14px rgba(240, 184, 0, 0.25);

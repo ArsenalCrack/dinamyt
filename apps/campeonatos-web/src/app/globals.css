@@ -17,6 +17,10 @@
   --text: #f3f1e8;
   --text-muted: #a19db8;
   --gold: #f0b800;
+  /* Accion primaria del dia a dia: jade profundo, legible y sin neon.
+     El oro queda como color de MARCA (acentos, badges y CTA del login). */
+  --accion: #1f8f63;
+  --accion-texto: #eafff4;
   --gold-dim: #c99a00;
   --gold-soft: rgba(240, 184, 0, 0.12);
   --danger: #ff5577;
@@ -133,7 +137,15 @@ input[type="radio"] {
   .btn:active:not(:disabled) {
     transform: translateY(1px);
   }
+  /* Accion primaria (antes oro neon): jade profundo legible. La clase
+     conserva su nombre historico para no tocar cada pagina. */
   .btn-gold {
+    background: var(--accion);
+    color: var(--accion-texto);
+    border-color: rgba(234, 255, 244, 0.12);
+  }
+  /* CTA de marca (login "Ingresar" y portadas): el oro original. */
+  .btn-cta {
     background: var(--gold);
     color: #14141e;
     box-shadow: 0 2px 14px rgba(240, 184, 0, 0.25);
@@ -356,6 +368,17 @@ input[type="radio"] {
   .nav-burger { display: none !important; }
   .nav-movil { display: none !important; }
   .nav-user { display: flex; }
+}
+
+/* ── Filtros de pantalla: en línea en escritorio, caja plegable en móvil ── */
+/* En escritorio se muestran SIEMPRE en una sola fila (con scroll si sobran) y
+   el botón «Filtros» se oculta. En móvil van dentro de una caja que se abre. */
+.filtros-toggle { display: inline-flex; }
+.filtros-caja { display: none; }
+.filtros-caja.abierta { display: flex; }
+@media (min-width: 768px) {
+  .filtros-toggle { display: none !important; }
+  .filtros-caja { display: flex !important; flex-wrap: nowrap; overflow-x: auto; }
 }
 
 /* Animación de despliegue del menú móvil */

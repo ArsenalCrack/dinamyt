@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  api,
   obtenerToken,
   getCampeonatoAPI,
   cambiarEstadoAPI,
@@ -46,7 +45,6 @@ export default function HubCampeonatoPage() {
   const [camp, setCamp] = useState<CampeonatoDetalle | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [descargando, setDescargando] = useState(false);
 
   const cargar = useCallback(() => {
     getCampeonatoAPI(campId)
@@ -61,7 +59,7 @@ export default function HubCampeonatoPage() {
     }
     const s = getSesion();
     if (!puedeInscribir(s)) {
-      router.replace('/perfil');
+      router.replace('/panel');
       return;
     }
     // El maestro no gestiona: va directo a inscribir/invitar.
@@ -71,27 +69,6 @@ export default function HubCampeonatoPage() {
     }
     cargar();
   }, [router, campId, cargar]);
-
-  // Descarga el reporte Excel (inscripciones + secciones + podios).
-  async function descargarReporte() {
-    setMsg(null);
-    setDescargando(true);
-    try {
-      const res = await api.get(`/campeonatos/${campId}/reporte`, {
-        responseType: 'blob',
-      });
-      const url = URL.createObjectURL(res.data as Blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte-${(camp?.nombre ?? 'campeonato').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-')}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      setMsg(extraerError(e, 'No se pudo generar el reporte.'));
-    } finally {
-      setDescargando(false);
-    }
-  }
 
   async function avanzar() {
     if (!camp) return;
@@ -198,14 +175,13 @@ export default function HubCampeonatoPage() {
                 Pasar a {sig} →
               </button>
             )}
-            <button
-              onClick={descargarReporte}
-              disabled={descargando}
+            <Link
+              href={`/admin/${campId}/reportes`}
               className="btn btn-outline btn-sm"
-              title="Inscripciones, secciones y podios en Excel"
+              title="Resumen, registros, podios y descarga a gusto"
             >
-              {descargando ? 'Generando…' : '⬇ Reporte Excel'}
-            </button>
+              📊 Reportes
+            </Link>
           </div>
         </div>
         {msg && <p className="msg-error mt-2 text-sm">{msg}</p>}

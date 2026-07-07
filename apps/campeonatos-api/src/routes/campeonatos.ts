@@ -13,7 +13,9 @@ import {
   tatamis,
   colaTatami,
   juecesTatami,
+  resultadosFigura,
 } from '@dinamyt/campeonatos-db';
+import { podioDeLlave, type EstructuraLlave } from './reportes';
 import {
   validarRestriccion,
   generarBracket,
@@ -570,6 +572,17 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       if (!esPublico && !codigo?.trim()) {
         errores.push('Un campeonato privado requiere un código de acceso.');
       }
+      // Si el admin CAMBIA la fecha de inicio, la nueva no puede estar en el
+      // pasado (la ya guardada puede seguir tal cual).
+      const hoyEd = new Date().toISOString().slice(0, 10);
+      if (
+        body.fechaInicio !== undefined &&
+        body.fechaInicio &&
+        body.fechaInicio !== camp.fechaInicio &&
+        body.fechaInicio < hoyEd
+      ) {
+        errores.push('La fecha de inicio no puede ser anterior a hoy.');
+      }
       if (errores.length > 0) {
         return reply.code(422).send({ error: 'Datos inválidos.', detalles: errores });
       }
@@ -749,6 +762,11 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         fechaInicio: body.fechaInicio,
         fechaFin: body.fechaFin,
       });
+      // Un campeonato nuevo no puede empezar en el pasado.
+      const hoy = new Date().toISOString().slice(0, 10);
+      if (body.fechaInicio && body.fechaInicio < hoy) {
+        errores.push('La fecha de inicio no puede ser anterior a hoy.');
+      }
       if (errores.length > 0) {
         return reply.code(422).send({ error: 'Datos inválidos.', detalles: errores });
       }
@@ -969,65 +987,188 @@ export async function campeonatosRoutes(app: FastifyInstance) {
   });
 
   // ── Mis estadísticas (dashboard del usuario) ───────────────────────────────
-  // Resumen de la trayectoria del competidor: campeonatos, modalidades y su
-  // marca en combate (sobre el historial inmutable).
+  // La trayectoria COMPLETA del competidor sobre el historial inmutable:
+  // combates, PODIOS de todas las modalidades (llave en combate; posiciones en
+  // figuras/saltos/defensa) y el detalle por campeonato participado.
   app.get('/me/estadisticas', { preHandler: requireAuth() }, async (req) => {
     const db = req.server.db;
+    const vacio = {
+      campeonatos: 0,
+      inscripciones: 0,
+      aprobadas: 0,
+      modalidades: {} as Record<string, number>,
+      combates: { total: 0, ganados: 0, perdidos: 0, empates: 0 },
+      podios: { oros: 0, platas: 0, bronces: 0 },
+      porCampeonato: [] as unknown[],
+    };
     const [comp] = await db
       .select()
       .from(competidores)
       .where(eq(competidores.ecosystemUserId, req.user!.sub))
       .limit(1);
-    if (!comp) {
-      return {
-        campeonatos: 0,
-        inscripciones: 0,
-        modalidades: {},
-        combates: { total: 0, ganados: 0, perdidos: 0, empates: 0 },
-      };
-    }
+    if (!comp) return vacio;
 
     const inss = await db
       .select({
         id: inscripciones.id,
         estado: inscripciones.estado,
-        campeonatoId: inscripciones.campeonatoId,
+        motivoRechazo: inscripciones.motivoRechazo,
+        peso: inscripciones.pesoInscripcion,
+        cinturon: inscripciones.cinturonInscripcion,
+        grupoCinturon: inscripciones.grupoCinturonInscripcion,
+        campeonatoId: campeonatos.id,
+        campeonato: campeonatos.nombre,
+        estadoCampeonato: campeonatos.estado,
+        fechaInicio: campeonatos.fechaInicio,
+        ciudad: campeonatos.ciudad,
       })
       .from(inscripciones)
+      .innerJoin(campeonatos, eq(inscripciones.campeonatoId, campeonatos.id))
       .where(eq(inscripciones.competidorId, comp.id));
+    if (inss.length === 0) return vacio;
+    const insIds = inss.map((i) => i.id);
 
-    const mods = inss.length
-      ? await db
-          .select()
-          .from(inscripcionModalidades)
-          .where(
-            inArray(
-              inscripcionModalidades.inscripcionId,
-              inss.map((i) => i.id),
-            ),
-          )
-      : [];
+    const mods = await db
+      .select()
+      .from(inscripcionModalidades)
+      .where(inArray(inscripcionModalidades.inscripcionId, insIds));
     const porModalidad: Record<string, number> = {};
     for (const m of mods) {
       porModalidad[m.modalidad] = (porModalidad[m.modalidad] ?? 0) + 1;
     }
 
-    // Marca en combate: victorias/derrotas del competidor (hong o chung).
-    const comoHong = await db
-      .select({ ganador: combates.ganador })
+    // Mis secciones (para podios de llave y contexto por campeonato).
+    const misSecciones = await db
+      .select({
+        inscripcionId: seccionInscripciones.inscripcionId,
+        seccionId: secciones.id,
+        nombre: secciones.nombre,
+        modalidad: secciones.modalidad,
+        estado: secciones.estado,
+        campeonatoId: secciones.campeonatoId,
+      })
+      .from(seccionInscripciones)
+      .innerJoin(secciones, eq(seccionInscripciones.seccionId, secciones.id))
+      .where(inArray(seccionInscripciones.inscripcionId, insIds));
+    const misSeccionIds = [...new Set(misSecciones.map((s) => s.seccionId))];
+
+    // Podios en COMBATE: por la llave (los slots llevan el id del competidor).
+    const cuadros = misSeccionIds.length
+      ? await db.select().from(llaves).where(inArray(llaves.seccionId, misSeccionIds))
+      : [];
+    const misPodios: {
+      campeonatoId: string;
+      seccion: string;
+      modalidad: string;
+      puesto: number;
+    }[] = [];
+    for (const llave of cuadros) {
+      const sec = misSecciones.find((s) => s.seccionId === llave.seccionId);
+      if (!sec) continue;
+      const item = podioDeLlave(llave.estructura as EstructuraLlave).find(
+        (p) => p.id === comp.id,
+      );
+      if (item) {
+        misPodios.push({
+          campeonatoId: sec.campeonatoId,
+          seccion: sec.nombre,
+          modalidad: sec.modalidad,
+          puesto: item.puesto,
+        });
+      }
+    }
+
+    // Podios y marcas en FIGURAS / SALTOS / DEFENSA: mis posiciones.
+    const misResultados = await db
+      .select({
+        inscripcionId: resultadosFigura.inscripcionId,
+        seccionId: resultadosFigura.seccionId,
+        posicion: resultadosFigura.posicion,
+        total: resultadosFigura.total,
+        distancia: resultadosFigura.distanciaAlcanzada,
+      })
+      .from(resultadosFigura)
+      .where(inArray(resultadosFigura.inscripcionId, insIds));
+    for (const r of misResultados) {
+      if (r.posicion == null || r.posicion > 3) continue;
+      const sec = misSecciones.find((s) => s.seccionId === r.seccionId);
+      const ins = inss.find((i) => i.id === r.inscripcionId);
+      misPodios.push({
+        campeonatoId: sec?.campeonatoId ?? ins?.campeonatoId ?? '',
+        seccion: sec?.nombre ?? '—',
+        modalidad: sec?.modalidad ?? 'figura_manos_libres',
+        puesto: r.posicion,
+      });
+    }
+
+    // Marca en combate (por combate persistido).
+    const misCombates = await db
+      .select()
       .from(combates)
-      .where(eq(combates.competidorHongId, comp.id));
-    const comoChung = await db
-      .select({ ganador: combates.ganador })
-      .from(combates)
-      .where(eq(combates.competidorChungId, comp.id));
-    const ganados =
-      comoHong.filter((c) => c.ganador === 'hong').length +
-      comoChung.filter((c) => c.ganador === 'chung').length;
-    const empates =
-      comoHong.filter((c) => c.ganador === 'empate').length +
-      comoChung.filter((c) => c.ganador === 'empate').length;
-    const total = comoHong.length + comoChung.length;
+      .where(
+        misSeccionIds.length
+          ? inArray(combates.seccionId, misSeccionIds)
+          : eq(combates.competidorHongId, comp.id),
+      );
+    const propios = misCombates.filter(
+      (c) => c.competidorHongId === comp.id || c.competidorChungId === comp.id,
+    );
+    const resultadoDe = (c: (typeof propios)[number]) => {
+      if (c.ganador === 'empate') return 'empate';
+      const soyHong = c.competidorHongId === comp.id;
+      return (c.ganador === 'hong') === soyHong ? 'ganado' : 'perdido';
+    };
+    const ganados = propios.filter((c) => resultadoDe(c) === 'ganado').length;
+    const empates = propios.filter((c) => resultadoDe(c) === 'empate').length;
+
+    // Detalle POR CAMPEONATO participado.
+    const porCampeonato = inss
+      .map((i) => {
+        const seccionesDe = misSecciones.filter(
+          (s) => s.inscripcionId === i.id,
+        );
+        const combatesDe = propios
+          .filter((c) => seccionesDe.some((s) => s.seccionId === c.seccionId))
+          .map((c) => ({
+            seccion:
+              seccionesDe.find((s) => s.seccionId === c.seccionId)?.nombre ?? '—',
+            marcador: `${c.marcadorHong ?? '–'} : ${c.marcadorChung ?? '–'}`,
+            resultado: resultadoDe(c),
+            ronda: c.ronda,
+          }));
+        const marcasDe = misResultados
+          .filter((r) => r.inscripcionId === i.id)
+          .map((r) => ({
+            seccion:
+              misSecciones.find((s) => s.seccionId === r.seccionId)?.nombre ?? '—',
+            posicion: r.posicion,
+            total: r.total,
+            distancia: r.distancia,
+          }));
+        return {
+          campeonatoId: i.campeonatoId,
+          campeonato: i.campeonato,
+          fechaInicio: i.fechaInicio,
+          ciudad: i.ciudad,
+          estadoCampeonato: i.estadoCampeonato,
+          estadoInscripcion: i.estado,
+          motivoRechazo: i.motivoRechazo,
+          cinturon: i.cinturon ?? i.grupoCinturon,
+          peso: i.peso,
+          modalidades: mods
+            .filter((m) => m.inscripcionId === i.id)
+            .map((m) => m.modalidad),
+          secciones: seccionesDe.map((s) => ({
+            nombre: s.nombre,
+            modalidad: s.modalidad,
+            estado: s.estado,
+          })),
+          combates: combatesDe,
+          marcas: marcasDe,
+          podios: misPodios.filter((p) => p.campeonatoId === i.campeonatoId),
+        };
+      })
+      .sort((a, b) => String(b.fechaInicio ?? '').localeCompare(String(a.fechaInicio ?? '')));
 
     return {
       campeonatos: new Set(inss.map((i) => i.campeonatoId)).size,
@@ -1035,11 +1176,17 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       aprobadas: inss.filter((i) => i.estado === 'APROBADA').length,
       modalidades: porModalidad,
       combates: {
-        total,
+        total: propios.length,
         ganados,
         empates,
-        perdidos: total - ganados - empates,
+        perdidos: propios.length - ganados - empates,
       },
+      podios: {
+        oros: misPodios.filter((p) => p.puesto === 1).length,
+        platas: misPodios.filter((p) => p.puesto === 2).length,
+        bronces: misPodios.filter((p) => p.puesto === 3).length,
+      },
+      porCampeonato,
     };
   });
 
@@ -1057,6 +1204,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
         .select({
           id: inscripciones.id,
           estado: inscripciones.estado,
+          motivoRechazo: inscripciones.motivoRechazo,
           pesoInscripcion: inscripciones.pesoInscripcion,
           grupoCinturon: inscripciones.grupoCinturonInscripcion,
           montoTotal: inscripciones.montoTotal,
@@ -1090,12 +1238,17 @@ export async function campeonatosRoutes(app: FastifyInstance) {
     },
   );
 
+  // Aprobar o DESAPROBAR (con motivo opcional que el competidor ve en su
+  // panel). Una APROBADA puede volver a RECHAZADA y viceversa.
   app.patch(
     '/inscripciones/:id/estado',
     { preHandler: requireRole('campeonatos', ['admin']) },
     async (req, reply) => {
       const { id } = req.params as { id: string };
-      const { estado } = req.body as { estado: 'APROBADA' | 'RECHAZADA' };
+      const { estado, motivo } = req.body as {
+        estado: 'APROBADA' | 'RECHAZADA';
+        motivo?: string;
+      };
       if (estado !== 'APROBADA' && estado !== 'RECHAZADA') {
         return reply.code(422).send({ error: 'Estado inválido (APROBADA o RECHAZADA).' });
       }
@@ -1110,7 +1263,12 @@ export async function campeonatosRoutes(app: FastifyInstance) {
 
       const [upd] = await db
         .update(inscripciones)
-        .set({ estado, updatedAt: new Date() })
+        .set({
+          estado,
+          // Al aprobar se limpia el motivo; al rechazar se guarda (si vino).
+          motivoRechazo: estado === 'RECHAZADA' ? (motivo?.trim() || null) : null,
+          updatedAt: new Date(),
+        })
         .where(eq(inscripciones.id, id))
         .returning();
 
@@ -1139,6 +1297,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       .select({
         id: inscripciones.id,
         estado: inscripciones.estado,
+        motivoRechazo: inscripciones.motivoRechazo,
         pesoInscripcion: inscripciones.pesoInscripcion,
         grupoCinturon: inscripciones.grupoCinturonInscripcion,
         montoTotal: inscripciones.montoTotal,

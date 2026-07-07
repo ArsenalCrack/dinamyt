@@ -72,6 +72,8 @@ export const inscripciones = camp.table(
     grupoCinturonInscripcion: grupoCinturonEnum('grupo_cinturon_inscripcion'),
     cinturonInscripcion: varchar('cinturon_inscripcion', { length: 50 }),
     estado: estadoInscripcionEnum('estado').notNull().default('PENDIENTE'),
+    /** Motivo del rechazo/desaprobación (visible para el competidor). */
+    motivoRechazo: text('motivo_rechazo'),
     /** Total = costo base + modalidades extra (calculado, §5.1). */
     montoTotal: decimal('monto_total', { precision: 10, scale: 2 }).default('0'),
     montoAbonado: decimal('monto_abonado', { precision: 10, scale: 2 }).default('0'),

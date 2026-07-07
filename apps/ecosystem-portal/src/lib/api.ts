@@ -154,6 +154,8 @@ export interface MiOrganizacion extends Organizacion {
   schedule: string | null;
   phone: string | null;
   email: string | null;
+  logoUrl: string | null;
+  socialLinks: string[] | null;
   hijas: (Organizacion & { isActive: boolean | null })[];
 }
 
@@ -231,6 +233,8 @@ export interface MiClub extends Organizacion {
   schedule: string | null;
   email: string | null;
   phone: string | null;
+  logoUrl: string | null;
+  socialLinks: string[] | null;
   isActive: boolean | null;
   myRole: string;
   gestores: GestorClub[];
@@ -261,8 +265,25 @@ export const miClubAPI = async (): Promise<MiClub[]> =>
 export const crearMiClubAPI = async (data: {
   name: string;
   city?: string;
+  country?: string;
   description?: string;
+  phone?: string;
+  logoUrl?: string;
+  socialLinks?: string[];
 }) => (await api.post('/organizations/mi-club', data)).data;
+
+// ── Catálogo geográfico (lo sirve campeonatos-api; endpoint público) ────────
+const CAMPEONATOS_API_URL =
+  process.env.NEXT_PUBLIC_CAMPEONATOS_API_URL || 'http://localhost:3002';
+export interface Pais {
+  iso2: string;
+  nombre: string;
+}
+export const listPaisesAPI = async (): Promise<Pais[]> =>
+  (await axios.get(`${CAMPEONATOS_API_URL}/geo/paises`)).data;
+export const listCiudadesAPI = async (iso2: string): Promise<string[]> =>
+  (await axios.get(`${CAMPEONATOS_API_URL}/geo/ciudades`, { params: { pais: iso2 } }))
+    .data;
 export const listarClubesAPI = async (search?: string): Promise<ClubBusqueda[]> =>
   (await api.get('/organizations/clubes', { params: { search } })).data;
 export const actualizarOrgInfoAPI = async (
@@ -275,6 +296,9 @@ export const actualizarOrgInfoAPI = async (
     phone?: string | null;
     email?: string | null;
     city?: string | null;
+    country?: string | null;
+    logoUrl?: string | null;
+    socialLinks?: string[] | null;
   },
 ) => (await api.patch(`/organizations/${orgId}`, data)).data;
 export const invitarClubAPI = async (orgId: string, clubId: string) =>

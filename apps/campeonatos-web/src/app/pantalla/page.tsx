@@ -51,7 +51,7 @@ export default function PantallaPage() {
             <h2 className="text-xl font-semibold">{c.nombre}</h2>
             <span
               className="mt-2 inline-block rounded px-2 py-1 text-xs font-bold"
-              style={{ background: 'var(--gold)', color: '#14141e' }}
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               {c.estado}
             </span>

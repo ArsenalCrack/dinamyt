@@ -8,12 +8,15 @@ import {
   secciones,
   seccionInscripciones,
   llaves,
+  combates,
+  colaTatami,
+  tatamis,
   resultadosFigura,
 } from '@dinamyt/campeonatos-db';
 import { requireRole } from '../plugins/auth';
 
 /** Estructura del bracket guardada en `llaves.estructura` (igual que la web). */
-interface SlotLlave {
+export interface SlotLlave {
   id: string;
   nombre: string;
   club?: string;
@@ -23,14 +26,16 @@ interface PartidoLlave {
   comp2: SlotLlave | null;
   ganador: 1 | 2 | null;
 }
-interface EstructuraLlave {
+export interface EstructuraLlave {
   competidores: SlotLlave[];
   rondas: PartidoLlave[][];
   campeon: SlotLlave | null;
 }
 
 /** Podio 1º/2º/3º (bronce compartido) desde el cuadro de eliminación. */
-function podioDeLlave(e: EstructuraLlave): { puesto: number; nombre: string; club: string }[] {
+export function podioDeLlave(
+  e: EstructuraLlave,
+): { puesto: number; nombre: string; club: string; id?: string }[] {
   if (!e.campeon) return [];
   const final = e.rondas[e.rondas.length - 1]?.[0];
   const segundo =
@@ -41,9 +46,11 @@ function podioDeLlave(e: EstructuraLlave): { puesto: number; nombre: string; clu
     .map((p) => (p.ganador === 1 ? p.comp2 : p.comp1))
     .filter((s): s is SlotLlave => !!s);
   return [
-    { puesto: 1, nombre: e.campeon.nombre, club: e.campeon.club ?? '' },
-    ...(segundo ? [{ puesto: 2, nombre: segundo.nombre, club: segundo.club ?? '' }] : []),
-    ...terceros.map((t) => ({ puesto: 3, nombre: t.nombre, club: t.club ?? '' })),
+    { puesto: 1, nombre: e.campeon.nombre, club: e.campeon.club ?? '', id: e.campeon.id },
+    ...(segundo
+      ? [{ puesto: 2, nombre: segundo.nombre, club: segundo.club ?? '', id: segundo.id }]
+      : []),
+    ...terceros.map((t) => ({ puesto: 3, nombre: t.nombre, club: t.club ?? '', id: t.id })),
   ];
 }
 
@@ -53,6 +60,222 @@ function podioDeLlave(e: EstructuraLlave): { puesto: number; nombre: string; clu
  * saltos por posición registrada). Port del alcance de reportes de COMBAT.
  */
 export async function reportesRoutes(app: FastifyInstance) {
+  // ── Panel de reportes (estilo COMBAT): registros + resumen en JSON ────────
+  // La web filtra, selecciona y exporta a gusto; el Excel completo sigue en
+  // GET /campeonatos/:id/reporte.
+  app.get(
+    '/campeonatos/:id/reportes',
+    { preHandler: requireRole('campeonatos', ['admin']) },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const db = req.server.db;
+
+      const [camp] = await db
+        .select()
+        .from(campeonatos)
+        .where(eq(campeonatos.id, id))
+        .limit(1);
+      if (!camp) return reply.code(404).send({ error: 'Campeonato no encontrado.' });
+
+      // Resumen de inscripciones y recaudo.
+      const insc = await db
+        .select({
+          estado: inscripciones.estado,
+          montoTotal: inscripciones.montoTotal,
+          montoAbonado: inscripciones.montoAbonado,
+        })
+        .from(inscripciones)
+        .where(eq(inscripciones.campeonatoId, id));
+      const suma = (vals: (string | null)[]) =>
+        vals.reduce((s, v) => s + (v ? parseFloat(v) : 0), 0);
+
+      // Secciones + su tatami (por la cola) + conteo de competidores.
+      const secs = await db
+        .select()
+        .from(secciones)
+        .where(eq(secciones.campeonatoId, id));
+      const secIds = secs.map((s) => s.id);
+
+      const colas = secIds.length
+        ? await db
+            .select({
+              seccionId: colaTatami.seccionId,
+              numero: tatamis.numero,
+            })
+            .from(colaTatami)
+            .innerJoin(tatamis, eq(colaTatami.tatamiId, tatamis.id))
+            .where(inArray(colaTatami.seccionId, secIds))
+        : [];
+      const tatamiPorSeccion = new Map(colas.map((c) => [c.seccionId, c.numero]));
+
+      const asignadas = secIds.length
+        ? await db
+            .select({ seccionId: seccionInscripciones.seccionId })
+            .from(seccionInscripciones)
+            .where(inArray(seccionInscripciones.seccionId, secIds))
+        : [];
+      const conteo = new Map<string, number>();
+      for (const a of asignadas) {
+        conteo.set(a.seccionId, (conteo.get(a.seccionId) ?? 0) + 1);
+      }
+
+      const secPorId = new Map(secs.map((s) => [s.id, s]));
+
+      // Registros de COMBATE (persistidos por la mesa).
+      const combs = secIds.length
+        ? await db
+            .select()
+            .from(combates)
+            .where(inArray(combates.seccionId, secIds))
+        : [];
+      const compIds = [
+        ...new Set(
+          combs.flatMap((c) =>
+            [c.competidorHongId, c.competidorChungId].filter(Boolean),
+          ) as string[],
+        ),
+      ];
+      const comps = compIds.length
+        ? await db
+            .select({
+              id: competidores.id,
+              nombre: competidores.nombreCompleto,
+              club: competidores.academiaClub,
+            })
+            .from(competidores)
+            .where(inArray(competidores.id, compIds))
+        : [];
+      const compPorId = new Map(comps.map((c) => [c.id, c]));
+
+      const registrosCombate = combs.map((c) => {
+        const sid = c.seccionId ?? '';
+        const s = secPorId.get(sid);
+        return {
+          id: c.id,
+          tipo: 'combate' as const,
+          seccion: s?.nombre ?? '—',
+          seccionId: sid,
+          modalidad: s?.modalidad ?? 'combate',
+          tatami: tatamiPorSeccion.get(sid) ?? null,
+          fecha: c.createdAt,
+          hong: c.competidorHongId
+            ? (compPorId.get(c.competidorHongId)?.nombre ?? 'HONG')
+            : 'HONG',
+          chung: c.competidorChungId
+            ? (compPorId.get(c.competidorChungId)?.nombre ?? 'CHUNG')
+            : 'CHUNG',
+          marcadorHong: c.marcadorHong,
+          marcadorChung: c.marcadorChung,
+          ganador: c.ganador,
+          ronda: c.ronda,
+          numJueces: c.numJueces,
+          duracionSegundos: c.duracionSegundos,
+        };
+      });
+
+      // Registros de FIGURAS / SALTOS / DEFENSA: ranking por sección.
+      const resultados = secIds.length
+        ? await db
+            .select({
+              seccionId: resultadosFigura.seccionId,
+              posicion: resultadosFigura.posicion,
+              total: resultadosFigura.total,
+              distancia: resultadosFigura.distanciaAlcanzada,
+              creado: resultadosFigura.createdAt,
+              nombre: competidores.nombreCompleto,
+              club: competidores.academiaClub,
+            })
+            .from(resultadosFigura)
+            .innerJoin(inscripciones, eq(resultadosFigura.inscripcionId, inscripciones.id))
+            .innerJoin(competidores, eq(inscripciones.competidorId, competidores.id))
+            .where(inArray(resultadosFigura.seccionId, secIds))
+        : [];
+      const porSeccion = new Map<string, typeof resultados>();
+      for (const r of resultados) {
+        const lista = porSeccion.get(r.seccionId) ?? [];
+        lista.push(r);
+        porSeccion.set(r.seccionId, lista);
+      }
+      const registrosFiguras = [...porSeccion.entries()].map(([sid, lista]) => {
+        const s = secPorId.get(sid);
+        return {
+          id: sid,
+          tipo: 'figuras' as const,
+          seccion: s?.nombre ?? '—',
+          seccionId: sid,
+          modalidad: s?.modalidad ?? 'figura_manos_libres',
+          tatami: tatamiPorSeccion.get(sid) ?? null,
+          fecha: lista[0]?.creado ?? null,
+          ranking: lista
+            .sort((a, b) => (a.posicion ?? 99) - (b.posicion ?? 99))
+            .map((r) => ({
+              posicion: r.posicion,
+              nombre: r.nombre,
+              club: r.club,
+              total: r.total,
+              distancia: r.distancia,
+            })),
+        };
+      });
+
+      // Podios por sección (combate por llave; resto por posiciones).
+      const cuadros = secIds.length
+        ? await db.select().from(llaves).where(inArray(llaves.seccionId, secIds))
+        : [];
+      const podios = [];
+      for (const s of secs) {
+        if (s.modalidad === 'combate') {
+          const llave = cuadros.filter((l) => l.seccionId === s.id).pop();
+          if (!llave) continue;
+          const items = podioDeLlave(llave.estructura as EstructuraLlave);
+          if (items.length) {
+            podios.push({ seccion: s.nombre, modalidad: s.modalidad, items });
+          }
+        } else {
+          const items = (porSeccion.get(s.id) ?? [])
+            .filter((r) => r.posicion != null && r.posicion <= 3)
+            .sort((a, b) => (a.posicion ?? 9) - (b.posicion ?? 9))
+            .map((r) => ({ puesto: r.posicion!, nombre: r.nombre, club: r.club ?? '' }));
+          if (items.length) {
+            podios.push({ seccion: s.nombre, modalidad: s.modalidad, items });
+          }
+        }
+      }
+
+      return {
+        campeonato: { id: camp.id, nombre: camp.nombre, estado: camp.estado },
+        resumen: {
+          inscripciones: {
+            total: insc.length,
+            aprobadas: insc.filter((i) => i.estado === 'APROBADA').length,
+            pendientes: insc.filter((i) => i.estado === 'PENDIENTE').length,
+            rechazadas: insc.filter((i) => i.estado === 'RECHAZADA').length,
+          },
+          recaudo: {
+            esperado: suma(insc.map((i) => i.montoTotal)),
+            abonado: suma(insc.map((i) => i.montoAbonado)),
+          },
+          secciones: {
+            total: secs.length,
+            finalizadas: secs.filter((s) => s.estado === 'FINALIZADA').length,
+            enCurso: secs.filter((s) => s.estado === 'EN_CURSO').length,
+          },
+          categorias: secs.map((s) => ({
+            nombre: s.nombre,
+            modalidad: s.modalidad,
+            estado: s.estado,
+            competidores: conteo.get(s.id) ?? 0,
+            tatami: tatamiPorSeccion.get(s.id) ?? null,
+          })),
+        },
+        registros: [...registrosCombate, ...registrosFiguras].sort((a, b) =>
+          String(b.fecha ?? '').localeCompare(String(a.fecha ?? '')),
+        ),
+        podios,
+      };
+    },
+  );
+
   app.get(
     '/campeonatos/:id/reporte',
     { preHandler: requireRole('campeonatos', ['admin', 'maestro']) },

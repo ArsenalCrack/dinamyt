@@ -20,6 +20,7 @@ import {
   validarTelefono,
   validarFechaNacimiento,
   validarAvatar,
+  validarTipoSangre,
 } from '../../common/validacion';
 
 /**
@@ -57,15 +58,59 @@ export class UsersController {
       emergencyContactPhone?: string | null;
       emergencyContactRelationship?: string | null;
       medicalNotes?: string | null;
+      bloodType?: string | null;
     },
   ) {
     await this.assertCanManage(user, id);
 
+    // ── Campos PROTEGIDOS: identidad de la persona ─────────────────────────
+    // El nombre y la fecha de nacimiento solo los corrige el maestro del club
+    // o un administrador. El propio usuario fija su fecha UNA sola vez (la
+    // primera), y su nombre nunca (viene del registro). El tipo de sangre
+    // también es del editor del staff.
+    const esGestor =
+      user.is_super_admin ||
+      (user.sub !== id
+        ? true // assertCanManage ya validó que gestiona al usuario objetivo
+        : await this.usersService.isOrgManagerOf(user.sub, id));
+    if (!esGestor) {
+      const actual = await this.usersService.findById(id);
+      if (
+        body.fullName !== undefined &&
+        body.fullName.trim().toLocaleUpperCase('es') !==
+          (actual?.fullName ?? '').toLocaleUpperCase('es')
+      ) {
+        throw new ForbiddenException(
+          'Tu nombre solo lo puede corregir el maestro de tu club o un administrador.',
+        );
+      }
+      delete body.fullName;
+      if (body.birthDate !== undefined && actual?.birthDate) {
+        const nueva = body.birthDate
+          ? new Date(body.birthDate).toISOString().slice(0, 10)
+          : null;
+        const vigente = new Date(actual.birthDate).toISOString().slice(0, 10);
+        if (nueva !== vigente) {
+          throw new ForbiddenException(
+            'Tu fecha de nacimiento ya quedó registrada: solo el maestro de tu club o un administrador puede corregirla.',
+          );
+        }
+        delete body.birthDate;
+      }
+      if (body.bloodType !== undefined) {
+        throw new ForbiddenException(
+          'El tipo de sangre lo registra el maestro de tu club o un administrador.',
+        );
+      }
+    }
+
     // Validación de datos de la persona (el front también valida, pero la
     // última palabra la tiene el servidor).
     if (body.fullName !== undefined) {
-      body.fullName = validarNombre(body.fullName, 'nombre completo');
+      body.fullName = validarNombre(body.fullName, 'nombre completo')
+        .toLocaleUpperCase('es');
     }
+    if (body.bloodType) body.bloodType = validarTipoSangre(body.bloodType);
     if (body.phone) body.phone = validarTelefono(body.phone);
     if (body.emergencyContactName) {
       body.emergencyContactName = validarNombre(

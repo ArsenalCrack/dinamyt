@@ -81,7 +81,7 @@ export default function Login() {
 
         {error && <p className="msg-error" style={{ marginBottom: '0.8rem', fontSize: '0.85rem' }}>{error}</p>}
 
-        <button className="btn btn-gold" type="submit" disabled={cargando} style={{ width: '100%' }}>
+        <button className="btn btn-cta" type="submit" disabled={cargando} style={{ width: '100%' }}>
           {cargando ? 'Ingresando…' : 'Ingresar'}
         </button>
 

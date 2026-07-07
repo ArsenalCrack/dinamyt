@@ -32,6 +32,24 @@ export function limitesFechaNacimiento(): { min: string; max: string } {
   };
 }
 
+// Tipos de sangre (desplegable; lo registra el maestro/admin del club).
+export const TIPOS_SANGRE = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
+
+// Cinturones de Hapkido (grado de la disciplina; lo promueve el maestro).
+export const CINTURONES_GRADO = [
+  'Blanco',
+  'Amarillo',
+  'Naranja',
+  'Naranja/Verde',
+  'Verde',
+  'Verde/Azul',
+  'Azul',
+  'Rojo',
+  'Marrón',
+  'Marrón/Negro',
+  'Negro',
+] as const;
+
 // Parentescos del contacto de emergencia (menú desplegable).
 export const PARENTESCOS = [
   'Madre',

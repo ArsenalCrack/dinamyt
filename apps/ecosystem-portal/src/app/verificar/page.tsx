@@ -45,7 +45,7 @@ export default function VerificarPage() {
             <Link
               href="/login"
               className="inline-block rounded-lg px-4 py-2 font-semibold"
-              style={{ background: 'var(--gold)', color: '#14141e' }}
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               Ir a iniciar sesión
             </Link>
@@ -72,7 +72,7 @@ export default function VerificarPage() {
               type="submit"
               disabled={cargando}
               className="w-full rounded-lg px-4 py-2 font-semibold"
-              style={{ background: 'var(--gold)', color: '#14141e' }}
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               {cargando ? 'Verificando…' : 'Verificar'}
             </button>

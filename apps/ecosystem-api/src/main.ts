@@ -1,13 +1,15 @@
 import { NestFactory } from '@nestjs/core';
-import { json, urlencoded } from 'express';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  // bodyParser propio: la foto de perfil viaja como data-URL (base64) en el
+  // bodyParser ampliado: la foto de perfil viaja como data-URL (base64) en el
   // PATCH del perfil y supera el límite por defecto de 100 KB de express.
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
-  app.use(json({ limit: '2mb' }));
-  app.use(urlencoded({ extended: true, limit: '2mb' }));
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
+  app.useBodyParser('json', { limit: '2mb' });
+  app.useBodyParser('urlencoded', { extended: true, limit: '2mb' });
 
   // NOTA: cuando se introduzcan DTOs con class-validator, registrar aquí un
   // ValidationPipe global (requiere instalar `class-validator` y

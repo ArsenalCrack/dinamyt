@@ -83,10 +83,11 @@ export default function TatamiJuezPage() {
     tatamiActualAPI(params.id)
       .then((t) => {
         // El juez central usa el panel de mesa completo sobre la misma sala.
+        // Le pasamos su tatami para que pueda FINALIZAR la sección desde allí.
         if (rol === 'arbitro') {
           const s = t.seccionEnCurso?.seccionId ?? `tatami-${t.numero}`;
           router.replace(
-            `/admin/combate?combate=${encodeURIComponent(s)}${
+            `/admin/combate?combate=${encodeURIComponent(s)}&tatami=${t.id}${
               t.seccionEnCurso ? `&seccion=${t.seccionEnCurso.seccionId}` : ''
             }`,
           );

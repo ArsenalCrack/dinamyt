@@ -99,7 +99,7 @@ function LoginForm() {
             {error}
           </p>
         )}
-        <button type="submit" disabled={cargando} className="btn btn-gold w-full">
+        <button type="submit" disabled={cargando} className="btn btn-cta w-full">
           {cargando ? 'Entrando…' : 'Entrar'}
         </button>
 

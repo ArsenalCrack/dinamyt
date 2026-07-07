@@ -206,6 +206,7 @@ export class UsersService {
       emergencyContactPhone?: string | null;
       emergencyContactRelationship?: string | null;
       medicalNotes?: string | null;
+      bloodType?: string | null;
     },
   ) {
     const [row] = await db
@@ -227,6 +228,7 @@ export class UsersService {
         ...(data.medicalNotes !== undefined && {
           medicalNotes: encryptField(data.medicalNotes),
         }),
+        ...(data.bloodType !== undefined && { bloodType: data.bloodType }),
         updatedAt: new Date(),
       })
       .where(eq(users.id, id))

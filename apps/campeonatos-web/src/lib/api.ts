@@ -439,6 +439,7 @@ export async function rechazarInvitacionAPI(id: string) {
 export interface InscripcionRevision {
   id: string;
   estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+  motivoRechazo: string | null;
   pesoInscripcion: string | null;
   grupoCinturon: string | null;
   montoTotal: string | null;
@@ -458,13 +459,15 @@ export async function listInscripcionesCampAPI(
   const res = await api.get(`/campeonatos/${campId}/inscripciones`);
   return res.data as InscripcionRevision[];
 }
-/** Aprueba (y auto-asigna a su sección) o rechaza una inscripción. */
+/** Aprueba (y auto-asigna a su sección) o desaprueba una inscripción; al
+ *  desaprobar, el motivo (opcional) lo verá el competidor en su panel. */
 export async function revisarInscripcionAPI(
   id: string,
   estado: 'APROBADA' | 'RECHAZADA',
+  motivo?: string,
 ) {
-  const res = await api.patch(`/inscripciones/${id}/estado`, { estado });
-  return res.data as { seccionesAsignadas: number };
+  const res = await api.patch(`/inscripciones/${id}/estado`, { estado, motivo });
+  return res.data as { seccionesAsignadas: number; avisos?: string[] };
 }
 
 export interface MiInscripcion {
@@ -661,16 +664,69 @@ export async function miPerfilCompetidorAPI(): Promise<MiPerfilCompetidor | null
   return (res.data ?? null) as MiPerfilCompetidor | null;
 }
 
+export interface CampeonatoStat {
+  campeonatoId: string;
+  campeonato: string;
+  fechaInicio: string | null;
+  ciudad: string | null;
+  estadoCampeonato: EstadoCampeonato;
+  estadoInscripcion: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+  motivoRechazo: string | null;
+  cinturon: string | null;
+  peso: string | null;
+  modalidades: Modalidad[];
+  secciones: { nombre: string; modalidad: Modalidad; estado: string }[];
+  combates: { seccion: string; marcador: string; resultado: string; ronda: string | null }[];
+  marcas: { seccion: string; posicion: number | null; total: string | null; distancia: string | null }[];
+  podios: { seccion: string; modalidad: Modalidad; puesto: number }[];
+}
 export interface MisEstadisticas {
   campeonatos: number;
   inscripciones: number;
   aprobadas?: number;
   modalidades: Record<string, number>;
   combates: { total: number; ganados: number; perdidos: number; empates: number };
+  podios: { oros: number; platas: number; bronces: number };
+  porCampeonato: CampeonatoStat[];
 }
 export async function misEstadisticasAPI(): Promise<MisEstadisticas> {
   const res = await api.get('/me/estadisticas');
   return res.data as MisEstadisticas;
+}
+
+// ── Panel de reportes del admin (estilo COMBAT) ─────────────────────────────
+export interface RegistroReporte {
+  id: string;
+  tipo: 'combate' | 'figuras';
+  seccion: string;
+  seccionId: string;
+  modalidad: Modalidad;
+  tatami: number | null;
+  fecha: string | null;
+  hong?: string;
+  chung?: string;
+  marcadorHong?: string | null;
+  marcadorChung?: string | null;
+  ganador?: 'hong' | 'chung' | 'empate' | null;
+  ronda?: string | null;
+  numJueces?: number | null;
+  duracionSegundos?: number | null;
+  ranking?: { posicion: number | null; nombre: string; club: string | null; total: string | null; distancia: string | null }[];
+}
+export interface ReportePanel {
+  campeonato: { id: string; nombre: string; estado: EstadoCampeonato };
+  resumen: {
+    inscripciones: { total: number; aprobadas: number; pendientes: number; rechazadas: number };
+    recaudo: { esperado: number; abonado: number };
+    secciones: { total: number; finalizadas: number; enCurso: number };
+    categorias: { nombre: string; modalidad: Modalidad; estado: string; competidores: number; tatami: number | null }[];
+  };
+  registros: RegistroReporte[];
+  podios: { seccion: string; modalidad: Modalidad; items: { puesto: number; nombre: string; club: string }[] }[];
+}
+export async function reportePanelAPI(campId: string): Promise<ReportePanel> {
+  const res = await api.get(`/campeonatos/${campId}/reportes`);
+  return res.data as ReportePanel;
 }
 
 // ── Datos del ecosystem para el autollenado ─────────────────────────────────

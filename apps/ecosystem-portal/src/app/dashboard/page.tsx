@@ -110,7 +110,7 @@ export default function DashboardPage() {
             <a
               href={`${CAMPEONATOS_URL}/admin/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
               className="rounded-lg px-4 py-3 font-semibold"
-              style={{ background: 'var(--gold)', color: '#14141e' }}
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               Entrar a Campeonatos
               {payload.role_campeonatos ? ` (${payload.role_campeonatos})` : ''}
@@ -123,7 +123,7 @@ export default function DashboardPage() {
             <a
               href={`${MEMBRESIAS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
               className="rounded-lg px-4 py-3 font-semibold"
-              style={{ background: 'var(--gold)', color: '#14141e' }}
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               Entrar a Membresías
               {payload.role_membresias ? ` (${payload.role_membresias})` : ''}
@@ -201,7 +201,7 @@ export default function DashboardPage() {
           <Link
             href="/admin"
             className="inline-block rounded-lg px-4 py-2 text-sm font-semibold"
-            style={{ background: 'var(--gold)', color: '#14141e' }}
+            style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
           >
             Abrir panel de administración
           </Link>

@@ -8,6 +8,7 @@ import {
   integer,
   decimal,
   date,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 
 // ── Schema de PostgreSQL ───────────────────────────────────────────────────
@@ -49,6 +50,10 @@ export const organizations = eco.table('organizations', {
   description: text('description'),
   address: varchar('address', { length: 200 }),
   schedule: text('schedule'),
+  /** Logo del club (data-URL comprimida en el cliente o http). */
+  logoUrl: text('logo_url'),
+  /** Enlaces de redes sociales (array de URLs). */
+  socialLinks: jsonb('social_links'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -78,6 +83,8 @@ export const users = eco.table('users', {
   emergencyContactRelationship: varchar('emergency_contact_relationship', {
     length: 50,
   }),
+  /** Tipo de sangre (A+, O-, …): lo fija el maestro/admin del club. */
+  bloodType: varchar('blood_type', { length: 5 }),
   // Dato sensible (salud): cifrar en la capa de aplicación antes de persistir.
   medicalNotes: text('medical_notes'),
   createdAt: timestamp('created_at').defaultNow(),

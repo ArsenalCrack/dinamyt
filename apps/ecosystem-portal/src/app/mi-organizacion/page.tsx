@@ -25,14 +25,16 @@ import {
   type ClubBusqueda,
   type InvitacionClub,
 } from '@/lib/api';
-import { soloTelefono } from '@/lib/validacion';
+import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
 import { Avatar } from '@/components/Avatar';
 
 // Reparto de roles (decisión de producto): la organización (federación/liga)
 // agrega administradores y jueces; el club agrega maestros, coaches y
 // competidores. El backend valida lo mismo.
 const ROLES_ORG = ['admin', 'judge'] as const;
-const ROLES_CLUB = ['maestro', 'coach', 'competitor', 'student'] as const;
+// El club agrega a su gente: maestro, coach y ALUMNOS (el alumno ES el
+// competidor — una sola etiqueta para no confundir). Jueces: solo la org.
+const ROLES_CLUB = ['maestro', 'coach', 'competitor'] as const;
 
 const NOMBRE_ROL: Record<string, string> = {
   admin: 'Administrador',
@@ -40,7 +42,7 @@ const NOMBRE_ROL: Record<string, string> = {
   maestro: 'Maestro',
   owner: 'Dueño',
   coach: 'Coach',
-  competitor: 'Competidor',
+  competitor: 'Alumno',
   student: 'Alumno',
   member: 'Miembro',
 };
@@ -83,6 +85,9 @@ export default function MiOrganizacionPage() {
     phone: '',
     email: '',
     city: '',
+    logoUrl: '',
+    red1: '',
+    red2: '',
   });
 
   // Invitaciones organización ↔ club.
@@ -137,6 +142,9 @@ export default function MiOrganizacionPage() {
       phone: o?.phone ?? '',
       email: o?.email ?? '',
       city: o?.city ?? '',
+      logoUrl: o?.logoUrl ?? '',
+      red1: o?.socialLinks?.[0] ?? '',
+      red2: o?.socialLinks?.[1] ?? '',
     });
     setInvitacion((inv) => ({
       ...inv,
@@ -207,6 +215,9 @@ export default function MiOrganizacionPage() {
   }
 
   const federaciones = orgs.filter((o) => esOrgGrande(o.type) && o.myRole === 'admin');
+  // Un maestro que solo gestiona su club no "administra una organización":
+  // su panel se llama por lo que es.
+  const soloClubes = orgs.every((o) => !esOrgGrande(o.type));
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6">
@@ -214,11 +225,12 @@ export default function MiOrganizacionPage() {
         ← Dashboard
       </Link>
       <h1 className="mb-1 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-        Mi organización
+        {soloClubes ? 'Mi club' : 'Mi organización'}
       </h1>
       <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-        La organización afilia clubes y agrega administradores y jueces; cada
-        club agrega a sus maestros, coaches y competidores.
+        {soloClubes
+          ? 'Tu club agrega a sus maestros, coaches y alumnos, y llena su ficha. Los jueces los asigna la organización o federación.'
+          : 'La organización afilia clubes y agrega administradores y jueces; cada club agrega a sus maestros, coaches y alumnos.'}
       </p>
 
       {msg && (
@@ -492,6 +504,15 @@ export default function MiOrganizacionPage() {
                   </span>
                 </span>
                 <span className="flex items-center gap-1.5">
+                  {/* El gestor edita el perfil del miembro (nombre, nacimiento,
+                      cinturón, tipo de sangre…) */}
+                  <Link
+                    href={`/mi-organizacion/miembro/${m.userId}`}
+                    className="btn btn-outline btn-sm"
+                    title="Editar el perfil de esta persona"
+                  >
+                    ✎ Perfil
+                  </Link>
                   <select
                     value={m.role}
                     onChange={(e) =>
@@ -503,8 +524,17 @@ export default function MiOrganizacionPage() {
                     }
                     disabled={ocupado}
                   >
-                    {/* El rol actual siempre aparece aunque no sea asignable aquí */}
-                    {[...new Set([m.role, ...rolesPermitidos])].map((r) => (
+                    {/* El rol actual siempre aparece aunque no sea asignable aquí.
+                        student y competitor son la misma etiqueta (Alumno):
+                        no se ofrecen los dos a la vez. */}
+                    {[
+                      ...new Set([
+                        m.role,
+                        ...rolesPermitidos.filter(
+                          (r) => !(r === 'competitor' && m.role === 'student'),
+                        ),
+                      ]),
+                    ].map((r) => (
                       <option key={r} value={r}>
                         {NOMBRE_ROL[r] ?? r}
                       </option>
@@ -573,9 +603,54 @@ export default function MiOrganizacionPage() {
             <div className="mt-6 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
               <h3 className="mb-1 text-sm font-semibold">Ficha de {orgSel.name}</h3>
               <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Esta información la ven todos los miembros en «Mi club»: sede,
-                horarios y contacto.
+                Esta información la ven todos los miembros en «Mi club»: logo,
+                sede, horarios, contacto y redes.
               </p>
+
+              {/* Logo del club */}
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                {ficha.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={ficha.logoUrl}
+                    alt="Logo"
+                    className="h-14 w-14 rounded-xl object-cover"
+                    style={{ border: '2px solid var(--gold-dim)' }}
+                  />
+                ) : (
+                  <div
+                    className="flex h-14 w-14 items-center justify-center rounded-xl text-xl"
+                    style={{ background: 'var(--bg-elevated)', border: '2px dashed var(--border)' }}
+                  >
+                    🛡
+                  </div>
+                )}
+                <label className="btn btn-outline btn-sm cursor-pointer">
+                  {ficha.logoUrl ? 'Cambiar logo' : 'Subir logo'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      void comprimirAvatar(f, 256).then((data) =>
+                        setFicha((cur) => ({ ...cur, logoUrl: data })),
+                      );
+                    }}
+                  />
+                </label>
+                {ficha.logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setFicha((cur) => ({ ...cur, logoUrl: '' }))}
+                    className="btn btn-outline btn-sm"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm">
                   <span style={{ color: 'var(--text-muted)' }}>Dirección / sede</span>
@@ -635,6 +710,28 @@ export default function MiOrganizacionPage() {
                   onChange={(e) => setFicha({ ...ficha, description: e.target.value })}
                 />
               </label>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Red social (enlace)</span>
+                  <input
+                    className="mt-1"
+                    type="url"
+                    value={ficha.red1}
+                    onChange={(e) => setFicha({ ...ficha, red1: e.target.value })}
+                    placeholder="https://instagram.com/tuclub"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Otra red social (enlace)</span>
+                  <input
+                    className="mt-1"
+                    type="url"
+                    value={ficha.red2}
+                    onChange={(e) => setFicha({ ...ficha, red2: e.target.value })}
+                    placeholder="https://facebook.com/tuclub"
+                  />
+                </label>
+              </div>
               <button
                 onClick={() =>
                   accion(
@@ -646,6 +743,8 @@ export default function MiOrganizacionPage() {
                         phone: ficha.phone || null,
                         email: ficha.email || null,
                         city: ficha.city || null,
+                        logoUrl: ficha.logoUrl || null,
+                        socialLinks: [ficha.red1.trim(), ficha.red2.trim()].filter(Boolean),
                       }),
                     'Ficha guardada: tus miembros ya la ven en «Mi club».',
                     'No se pudo guardar la ficha.',

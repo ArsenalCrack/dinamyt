@@ -117,7 +117,7 @@ function LoginForm() {
             {error}
           </p>
         )}
-        <button type="submit" disabled={cargando} className="btn btn-gold w-full">
+        <button type="submit" disabled={cargando} className="btn btn-cta w-full">
           {cargando ? 'Entrando…' : 'Entrar'}
         </button>
         <p className="mt-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>

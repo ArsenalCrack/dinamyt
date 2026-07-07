@@ -64,6 +64,28 @@ export function validarFechaNacimiento(fecha: Date) {
   return fecha;
 }
 
+// Tipos de sangre válidos (desplegable en la UI).
+export const TIPOS_SANGRE = [
+  'A+',
+  'A-',
+  'B+',
+  'B-',
+  'AB+',
+  'AB-',
+  'O+',
+  'O-',
+] as const;
+
+export function validarTipoSangre(tipo: string) {
+  const limpio = (tipo ?? '').trim().toUpperCase();
+  if (!TIPOS_SANGRE.includes(limpio as (typeof TIPOS_SANGRE)[number])) {
+    throw new BadRequestException(
+      `Tipo de sangre inválido. Usa: ${TIPOS_SANGRE.join(', ')}.`,
+    );
+  }
+  return limpio;
+}
+
 // La foto se guarda como data-URL (subida desde el dispositivo y comprimida en
 // el cliente) o como URL http(s). Límite ~700 KB para no inflar la fila.
 export function validarAvatar(avatar: string) {
