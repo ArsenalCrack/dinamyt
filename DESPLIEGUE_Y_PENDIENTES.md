@@ -1,9 +1,44 @@
 # DINAMYT — Guía de despliegue y pendientes
 
-> Creado 2026-07-04. Responde: ¿sirve Hostinger?, ¿qué plan?, paso a paso para
-> montar TODO en la web (correos reales, BD, imágenes, conexiones), y qué
-> partes del software faltan según los documentos (HANDOFF, PLAN_FUSION,
-> PLAN_MEMBRESIAS). Léelo junto a `RUN_LOCAL.md` §8.
+> Creado 2026-07-04 · **Actualizado 2026-07-08.** Responde: ¿sirve Hostinger?,
+> ¿qué plan?, paso a paso para montar TODO en la web (correos reales, BD,
+> imágenes, conexiones), y qué partes del software faltan. Léelo junto a
+> `RUN_LOCAL.md` §8.
+
+> ## ⚡ TL;DR — lo que falta ANTES de salir a internet (en orden)
+> 1. **Subir el código a GitHub** (hoy el repo es solo local, sin remoto). Ver §0.
+> 2. **Base de datos real** (Neon/Supabase): correr migraciones + seed. Ver §4.
+> 3. **Secretos nuevos**: par RS256, `FIELD_ENCRYPTION_KEY`, VAPID, contraseña
+>    del super-admin, y **rotar** la clave de Gmail/Supabase que se usó en dev. §5.
+> 4. **Correo real** (Gmail/Brevo/Resend) para verificación de cuenta y avisos. §7.
+> 5. **Desplegar** por Ruta A (VPS) o Ruta B (Vercel+Render+Neon) con HTTPS. §3.
+> 6. **CORS y `NEXT_PUBLIC_*`** con los dominios reales; **subir el límite de
+>    body del proxy a ≥2 MB** (los avatares/logos viajan como data-URL). §5.
+>
+> Todo lo demás del producto (perfil, clubes, campeonatos, membresías,
+> reportes, estadísticas) **ya está implementado y probado en local** — ver §8.
+
+---
+
+## 0. Subir el código a GitHub (primer paso, hoy PENDIENTE)
+
+El monorepo está **100% commiteado en local pero no tiene remoto** (`git remote -v`
+sale vacío). El working tree está limpio y **ningún `.env`, `keys/` ni `.localdb/`
+está trackeado** (verificado). Para subirlo:
+
+```bash
+# 1) Crea un repo VACÍO y PRIVADO en GitHub llamado "dinamyt" (sin README).
+# 2) Desde D:\Repositorios\dinamyt:
+git remote add origin https://github.com/<tu-usuario>/dinamyt.git
+git push -u origin feat/membresias        # sube la rama de trabajo
+# (opcional) fusiona a main cuando quieras:
+#   git checkout main && git merge feat/membresias && git push -u origin main
+```
+
+> Necesitas autenticarte con TU cuenta de GitHub (token/credencial) — por eso
+> este paso lo haces tú. Con `gh` instalado sería: `gh repo create dinamyt
+> --private --source=. --push`. El workflow de CI (`.github/workflows/ci.yml`)
+> ya está en el repo y corre solo al primer push.
 
 ---
 
@@ -173,10 +208,18 @@ producción, y NUNCA reutilices el par RS256 de dev.
 
 ## 6. Imágenes de perfil y archivos (Academy)
 
-**Hoy**: el perfil guarda `avatarUrl` (una URL) — editable desde el portal
-(`/perfil`). No hay subida directa de archivos todavía.
+**Hoy (actualizado 2026-07-08)**: la **foto de perfil y el logo del club SÍ se
+suben desde el dispositivo** (PC/Android). El navegador la recorta y comprime a
+un **data-URL JPEG (~320px, <700 KB)** y se guarda directo en la BD
+(`users.avatar_url`, `organizations.logo_url`) — sin servicio de archivos
+externo. Por eso:
+- El body de la API acepta hasta **2 MB** (`ecosystem-api/src/main.ts`); en el
+  reverse proxy pon `client_max_body_size 2m` (nginx) o su equivalente. Caddy no
+  limita por defecto.
+- Es suficiente para avatares/logos. **Para media pesada de Academy** (videos,
+  PDF de planes de estudio) sí conviene object storage:
 
-**Para subir archivos de verdad (recomendado: Cloudflare R2 — 10 GB gratis,
+**Para subir archivos pesados (recomendado: Cloudflare R2 — 10 GB gratis,
 compatible S3, sin costo de salida):**
 1. Crea el bucket `dinamyt-media` en R2 y un token de API (Access Key/Secret).
 2. En ecosystem-api añade un endpoint `POST /users/:id/avatar-upload-url` que
@@ -223,40 +266,68 @@ apps, panel del alumno `/mi` en Membresías, campana de avisos, perfil editable
 en el portal, catálogo completo de planes con «contactar administrador»,
 mailer configurable, fixes de seguridad (OTP un solo uso, PII de orgs).
 
-**Resuelto el 2026-07-04 (noche):** rate-limiting en auth (`@nestjs/throttler`:
-login 10/min, OTP 6/min, forgot 3/min, global 120/min) · **SSO por redirección
-completo** (las apps mandan a `portal/login?redirect=` y el portal devuelve con
-`#token=` solo a orígenes del ecosistema) · **reporte Excel del campeonato**
-(`GET /campeonatos/:id/reporte`: inscripciones con snapshot, secciones y
-podios; botón «⬇ Reporte Excel» en el hub) · **carnet QR del alumno** (en `/mi`;
-el kiosco distingue PIN vs carnet y un escáner USB funciona de una) · **página
-de privacidad** (`/privacidad`, enlazada del registro y el footer) · **CI de
-GitHub Actions** (`.github/workflows/ci.yml`, corre al subir el repo).
+**Resuelto el 2026-07-04 (noche):** rate-limiting en auth · SSO por redirección
+completo · reporte Excel del campeonato · carnet QR del alumno · página de
+privacidad · CI de GitHub Actions.
+
+**Resuelto el 2026-07-06 → 07-08 (dos grandes lotes, ~40 ajustes):**
+- **Perfil (ecosystem)**: subida de foto desde el dispositivo (data-URL);
+  validación estricta (nombre solo letras y en MAYÚSCULAS, teléfono solo
+  números, edad 3–100, parentesco y tipo de sangre por desplegable); el
+  **nombre y la fecha son inmutables** para el usuario (los corrige el
+  maestro/admin en `/mi-organizacion/miembro/[id]`); **barra de progreso** del
+  perfil; el perfil (y la contraseña) viven SOLO en el portal.
+- **Login/seguridad**: mensajes específicos (correo inexistente vs contraseña
+  incorrecta con intentos restantes), **bloqueo de cuenta** tras 5 fallos y
+  panel de desbloqueo en `/admin`; **interceptor global de 401** (token
+  vencido → al login) en las 3 webs.
+- **Organización vs Club**: la federación/liga agrega admins y jueces e
+  **invita clubes** (el maestro acepta/rechaza); el club agrega maestros,
+  coaches y **alumnos** (competidor/alumno unificado; el club NO asigna
+  jueces); un maestro **funda su club** con logo, país/ciudad (desplegables),
+  teléfono y redes; ficha del club visible en «Mi club».
+- **Campeonatos**: **auto-inscripción** con autollenado del perfil (cinturón
+  real → grupo; academia desplegable); **secciones automáticas** al aprobar;
+  config de categorías con checkboxes y rangos con «+ Añadir», congelada con el
+  evento en curso; reglas de **EN_CURSO** (solo el admin añade/invita);
+  **desaprobar con motivo** (visible al competidor) y re-aprobar; fechas
+  validadas (inicio ≥ hoy, fin ≥ inicio); el **juez central finaliza** su
+  sección desde la mesa; jueces por tatami estilo COMBAT; «Ver pantalla del
+  tatami» solo EN_CURSO; **clubes asistentes** en la info; filtros de la
+  pantalla en línea/plegable.
+- **Panel del usuario** `/panel` + `/panel/estadisticas`: inscripciones,
+  **estadísticas completas** (combate + figuras + saltos, medallero) y
+  **detalle por campeonato participado**.
+- **Reportes estilo COMBAT** `/admin/[id]/reportes`: resumen, registros con
+  filtros, podios y descarga Excel.
+- **Membresías**: página de **asistencia** del maestro (huella/QR/PIN/manual),
+  **escáner QR con la cámara** en el kiosco (BarcodeDetector), menú hamburguesa
+  responsivo, botón Salir diferenciado, logo/favicon DINAMYT.
+- **UI**: paleta de acción jade (se retiró el amarillo neón; el oro queda como
+  marca y CTA del login). Fotos de perfil visibles en todo el ecosistema.
 
 **Pendiente (orden sugerido):**
-1. **Operación (bloqueante para salir a la web)** — subir el monorepo a GitHub
-   (hoy NO tiene remoto; el workflow de CI ya está listo), rotar secretos,
-   migrar a Postgres real.
+1. **Operación (bloqueante para salir a la web)** — **subir el monorepo a
+   GitHub** (§0), rotar secretos, migrar a Postgres real (§4).
 2. **Campeonatos** —
-   - Reporte **PDF** (el Excel ya está); medallería por club.
+   - Reporte **PDF** (el Excel y el panel de reportes ya están).
    - **Figuras/saltos EN VIVO** con motor sincronizado (hoy: planilla local
      del juez + registro de la mesa; falta el equivalente WS de combate).
    - Enlazar cada combate del bracket con su sala WS con un clic (hoy la mesa
      abre `?seccion=`).
-   - Snapshot inmutable COMPLETO en resultados (falta club/edad/nombre en el
-     momento de competir; requiere migración de BD) +
-     `GET /users/:id/campeonatos-summary` (historial).
+   - Snapshot inmutable COMPLETO en los resultados de figuras/saltos
+     (el de combate ya lleva nombre/club por la llave).
    - PWA/offline completo de la pantalla pública.
    - Logout global del SSO (cerrar sesión en una app cierra las demás).
 3. **Membresías** — adaptador REAL del lector (requiere el hardware
    DigitalPersona/ZKTeco; el esqueleto ya está), UI de vinculación
    acudiente↔menor (el endpoint `POST /users/:id/guardians` ya existe).
-4. **Pagos**: NO hay pasarela por decisión de producto — todo el cobro es en
-   efectivo/transferencia y el sistema solo lo REGISTRA. La activación de
-   suscripciones de organizaciones la hace el super-admin desde `/admin`.
-5. **Subida de archivos** — avatar con URL prefirmada (§6); hoy solo URL.
-6. **Academy** — no iniciada (0%): plataforma de enseñanza + el microservicio
-   de visión por computador (Sistema Inteligente Hapkido, proyecto Python aparte).
+4. **Pagos**: NO hay pasarela por decisión de producto — el cobro es
+   efectivo/transferencia y el sistema solo lo REGISTRA.
+5. **Media pesada de Academy** — object storage con URL prefirmada (§6); los
+   avatares/logos ya se suben desde el dispositivo.
+6. **Academy** — no iniciada (0%): plataforma de enseñanza + microservicio de
+   visión por computador (Sistema Inteligente Hapkido, Python aparte).
 
 ---
 
@@ -278,8 +349,8 @@ GitHub Actions** (`.github/workflows/ci.yml`, corre al subir el repo).
 
 ## 10. Checklist para ti (en orden)
 
+- [ ] **Subir el monorepo a GitHub** (privado) — comandos en §0. Es el 1.er paso.
 - [ ] Comprar dominio y decidir ruta A (VPS KVM 2) o B (Vercel+Render+Neon).
-- [ ] Subir el monorepo a GitHub (privado) y archivar los repos viejos.
 - [ ] Crear Postgres (Neon/Supabase) y correr migraciones + seed (§4).
 - [ ] Generar: par RS256 nuevo, `FIELD_ENCRYPTION_KEY`, VAPID, contraseña
       fuerte del super-admin (§5). Rotar la clave de Gmail expuesta en dev.
