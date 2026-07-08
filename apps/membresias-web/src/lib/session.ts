@@ -42,11 +42,6 @@ export function esStaff(s: Sesion | null): boolean {
   return !!s && (s.isSuperAdmin || s.role === 'owner' || s.role === 'staff');
 }
 
-/** Alumno o acudiente: solo ven SU estado (nunca el panel del club). */
-export function esAlumno(s: Sesion | null): boolean {
-  return !!s && !esStaff(s);
-}
-
 /** Ruta de inicio según el rol tras iniciar sesión. */
 export function rutaInicio(s: Sesion | null): string {
   return esStaff(s) ? '/' : '/mi';

@@ -43,6 +43,28 @@ const eco = axios.create({
   timeout: 60000,
 });
 
+/**
+ * Sesión expirada / token inválido: se limpia la sesión y se envía al login.
+ * Se aplica a las dos APIs, pero NUNCA al propio /auth/login (ahí un 401 es
+ * "credenciales incorrectas", no una sesión vencida) ni si ya estás en login.
+ */
+function manejar401(error: unknown) {
+  if (
+    axios.isAxiosError(error) &&
+    error.response?.status === 401 &&
+    !error.config?.url?.includes('/auth/login') &&
+    typeof window !== 'undefined' &&
+    !window.location.pathname.includes('/login')
+  ) {
+    cerrarSesion();
+    const volver = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = `/admin/login?volver=${volver}`;
+  }
+  return Promise.reject(error);
+}
+api.interceptors.response.use((r) => r, manejar401);
+eco.interceptors.response.use((r) => r, manejar401);
+
 export async function loginAPI(email: string, password: string) {
   const res = await eco.post('/auth/login', { email, password });
   return res.data as { access_token: string };
@@ -65,18 +87,6 @@ export async function miCuentaAPI(): Promise<MiCuenta> {
   return res.data as MiCuenta;
 }
 
-/** Cambia la contraseña de la cuenta (la valida el ecosystem). */
-export async function cambiarPasswordAPI(
-  currentPassword: string,
-  newPassword: string,
-) {
-  const res = await eco.post(
-    '/auth/change-password',
-    { currentPassword, newPassword },
-    { headers: { Authorization: `Bearer ${obtenerToken()}` } },
-  );
-  return res.data as { message: string };
-}
 
 // ── Tipos y catálogos (espejo de los enums del dominio) ──────────────────────
 export type EstadoCampeonato = 'BORRADOR' | 'LISTO' | 'EN_CURSO' | 'FINALIZADO';
@@ -334,6 +344,7 @@ export interface PantallaSeccion {
 export interface PantallaDetalle {
   jueces: PantallaJuez[];
   secciones: PantallaSeccion[];
+  clubes: { nombre: string; competidores: number }[];
   campeonato: CampeonatoPublico & {
     descripcion: string | null;
     ubicacion: string | null;

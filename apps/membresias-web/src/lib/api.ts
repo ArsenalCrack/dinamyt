@@ -34,6 +34,26 @@ ecosystemApi.interceptors.request.use((cfg) => {
   return cfg;
 });
 
+/**
+ * Sesión expirada / token inválido → limpiar sesión y volver al login (nunca
+ * en el propio /auth/login ni si ya estás en /login).
+ */
+function manejar401(error: unknown) {
+  if (
+    axios.isAxiosError(error) &&
+    error.response?.status === 401 &&
+    !error.config?.url?.includes('/auth/login') &&
+    typeof window !== 'undefined' &&
+    window.location.pathname !== '/login'
+  ) {
+    cerrarSesion();
+    window.location.href = '/login';
+  }
+  return Promise.reject(error);
+}
+api.interceptors.response.use((r) => r, manejar401);
+ecosystemApi.interceptors.response.use((r) => r, manejar401);
+
 /** Inicia sesión contra el ecosystem y guarda el token. */
 export async function login(email: string, password: string): Promise<string> {
   const res = await axios.post(`${ECOSYSTEM_API_URL}/auth/login`, {

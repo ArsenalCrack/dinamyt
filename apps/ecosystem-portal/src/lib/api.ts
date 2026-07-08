@@ -16,6 +16,27 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Sesión expirada / token inválido → limpiar sesión y volver al login (nunca
+ * en el propio /auth/login ni si ya estás en /login).
+ */
+api.interceptors.response.use(
+  (r) => r,
+  (error: unknown) => {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      !error.config?.url?.includes('/auth/login') &&
+      typeof window !== 'undefined' &&
+      window.location.pathname !== '/login'
+    ) {
+      cerrarSesion();
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  },
+);
+
 const TOKEN_KEY = 'dinamyt_token';
 const PENDING_USER_KEY = 'dinamyt_pending_user';
 

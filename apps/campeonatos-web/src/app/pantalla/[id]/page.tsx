@@ -406,6 +406,30 @@ export default function PantallaCampeonatoPage() {
           </section>
           )}
 
+          {/* ── Clubes asistentes ──────────────────────────────────────── */}
+          {apartado === 'info' && data.clubes.length > 0 && (
+            <section className="card mb-6 p-5">
+              <h2 className="mb-3 text-lg font-semibold">
+                Clubes asistentes{' '}
+                <span className="badge badge-gold">{data.clubes.length}</span>
+              </h2>
+              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {data.clubes.map((c) => (
+                  <li
+                    key={c.nombre}
+                    className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <span className="min-w-0 truncate font-semibold">{c.nombre}</span>
+                    <span className="badge shrink-0">
+                      {c.competidores} {c.competidores === 1 ? 'competidor' : 'competidores'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {/* ── Jueces + competidores por sección (estilo PROJECT) ────────── */}
           {apartado === 'info' && (
             <InfoParticipantes jueces={data.jueces} secciones={data.secciones} />

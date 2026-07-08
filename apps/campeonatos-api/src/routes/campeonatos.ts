@@ -405,6 +405,26 @@ export async function campeonatosRoutes(app: FastifyInstance) {
       .leftJoin(competidores, eq(combates.competidorHongId, competidores.id))
       .where(eq(secciones.campeonatoId, id));
 
+    // Clubes/academias que asistieron: cada club con ≥ 1 inscrito (no
+    // rechazado), con su número de competidores. Se muestra en la info.
+    const inscritosClub = await db
+      .select({
+        club: competidores.academiaClub,
+        estado: inscripciones.estado,
+      })
+      .from(inscripciones)
+      .innerJoin(competidores, eq(inscripciones.competidorId, competidores.id))
+      .where(eq(inscripciones.campeonatoId, id));
+    const conteoClub = new Map<string, number>();
+    for (const r of inscritosClub) {
+      if (r.estado === 'RECHAZADA') continue;
+      const nombre = (r.club ?? '').trim() || 'Sin academia';
+      conteoClub.set(nombre, (conteoClub.get(nombre) ?? 0) + 1);
+    }
+    const clubes = [...conteoClub.entries()]
+      .map(([nombre, competidores]) => ({ nombre, competidores }))
+      .sort((a, b) => b.competidores - a.competidores);
+
     return {
       campeonato: camp,
       modalidades: mods,
@@ -419,6 +439,7 @@ export async function campeonatosRoutes(app: FastifyInstance) {
           .filter((c) => c.seccionId === s.id)
           .map((c) => ({ nombre: c.nombre, club: c.club })),
       })),
+      clubes,
       tatamis: tats
         .sort((a, b) => a.numero - b.numero)
         .map((t) => {
