@@ -557,6 +557,7 @@ export async function evaluationsRoutes(app: FastifyInstance) {
           submittedAt: attempts.submittedAt,
           fullName: academyUsers.fullName,
           email: academyUsers.email,
+          avatarUrl: academyUsers.avatarUrl,
         })
         .from(attempts)
         .leftJoin(academyUsers, eq(academyUsers.ecosystemUserId, attempts.studentUserId))
@@ -608,10 +609,13 @@ export async function evaluationsRoutes(app: FastifyInstance) {
       if (!esUuid(id)) return reply.code(400).send({ error: 'Id inválido.' });
       const body = req.body as {
         calificaciones?: { answerId: string; score: number; feedback?: string }[];
+        /** Observación GENERAL del maestro sobre el intento. */
+        comentario?: string;
       };
-      if (!body.calificaciones?.length) {
+      if (!body.calificaciones?.length && !body.comentario?.trim()) {
         return reply.code(422).send({ error: 'Envía al menos una calificación.' });
       }
+      body.calificaciones ??= [];
       const db = req.server.db;
 
       const [intento] = await db
@@ -679,6 +683,9 @@ export async function evaluationsRoutes(app: FastifyInstance) {
         .update(attempts)
         .set({
           evidenceScore: evidenceScore === null ? null : evidenceScore.toFixed(2),
+          ...(body.comentario !== undefined && {
+            teacherComment: body.comentario?.trim() || null,
+          }),
           ...(todasCalificadas && {
             finalScore: final === null ? null : final.toFixed(2),
             status: 'CALIFICADO' as const,

@@ -148,6 +148,7 @@ export async function martialArtsRoutes(app: FastifyInstance) {
           createdAt: teacherMartialArts.createdAt,
           fullName: academyUsers.fullName,
           email: academyUsers.email,
+          avatarUrl: academyUsers.avatarUrl,
         })
         .from(teacherMartialArts)
         .leftJoin(

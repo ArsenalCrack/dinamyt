@@ -8,6 +8,8 @@ export const config = {
   /** JWKS del ecosystem para verificar la firma RS256 de los tokens. */
   ecosystemJwksUrl:
     process.env.ECOSYSTEM_JWKS_URL ?? 'http://localhost:3001/auth/jwks',
+  /** API del ecosystem (perfil de la persona: foto, nombre). */
+  ecosystemApiUrl: process.env.ECOSYSTEM_API_URL ?? 'http://localhost:3001',
   /** A dónde redirigir cuando falta el scope (adquirir el plan). */
   ecosystemPortalUrl: process.env.ECOSYSTEM_PORTAL_URL ?? 'http://localhost:3000',
   /** URL pública de academy-web (para enlaces). */

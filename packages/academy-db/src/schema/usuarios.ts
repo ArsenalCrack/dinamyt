@@ -23,6 +23,8 @@ export const academyUsers = aca.table(
     fullName: varchar('full_name', { length: 160 }),
     email: varchar('email', { length: 160 }),
     localRole: rolAcademyEnum('local_role'),
+    /** Foto de perfil (data-URL comprimida), sincronizada del ecosystem. */
+    avatarUrl: text('avatar_url'),
     suspended: boolean('suspended').notNull().default(false),
     /** Soft delete local (RNF-ACA-06): no toca la cuenta del ecosistema. */
     deletedAt: timestamp('deleted_at'),

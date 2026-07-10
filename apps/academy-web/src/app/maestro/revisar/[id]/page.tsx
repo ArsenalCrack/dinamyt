@@ -31,6 +31,7 @@ export default function Revisar({ params }: { params: Promise<{ id: string }> })
   const router = useRouter();
   const [detalle, setDetalle] = useState<Detalle | null>(null);
   const [notas, setNotas] = useState<Record<string, { score: string; feedback: string }>>({});
+  const [comentario, setComentario] = useState('');
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -70,13 +71,13 @@ export default function Revisar({ params }: { params: Promise<{ id: string }> })
         score: parseFloat(v.score),
         feedback: v.feedback || undefined,
       }));
-    if (calificaciones.length === 0) {
+    if (calificaciones.length === 0 && !comentario.trim()) {
       setError('Asigna nota al menos a una evidencia.');
       return;
     }
     setEnviando(true);
     try {
-      await calificarAPI(detalle.id, calificaciones);
+      await calificarAPI(detalle.id, calificaciones, comentario || undefined);
       setOk('Calificación guardada.');
       await cargar();
     } catch (err) {
@@ -252,6 +253,20 @@ export default function Revisar({ params }: { params: Promise<{ id: string }> })
               </div>
             );
           })}
+
+          {/* Observación GENERAL del intento: el alumno la ve en «Mis notas». */}
+          <div className="card" style={{ padding: '1rem 1.2rem', marginBottom: '0.9rem' }}>
+            <label className="eyebrow" style={{ display: 'block', marginBottom: '0.4rem' }}>
+              Observación general para el estudiante (opcional)
+            </label>
+            <textarea
+              rows={3}
+              maxLength={600}
+              placeholder="Ej.: Buen dominio de las caídas; trabaja la guardia alta y repite el examen del bloque 2…"
+              value={comentario || detalle.teacherComment || ''}
+              onChange={(e) => setComentario(e.target.value)}
+            />
+          </div>
 
           {error && <p className="msg-error" style={{ marginBottom: '0.75rem' }}>{error}</p>}
           {ok && <p className="msg-ok" style={{ marginBottom: '0.75rem' }}>{ok}</p>}

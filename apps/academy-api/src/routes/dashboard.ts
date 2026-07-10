@@ -182,6 +182,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
               martialArtId: evaluations.martialArtId,
               estudiante: academyUsers.fullName,
               email: academyUsers.email,
+              avatarUrl: academyUsers.avatarUrl,
             })
             .from(attempts)
             .innerJoin(evaluations, eq(evaluations.id, attempts.evaluationId))

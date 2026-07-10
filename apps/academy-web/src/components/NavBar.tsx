@@ -8,8 +8,10 @@ import {
   obtenerToken,
   getNotificacionesAPI,
   marcarLeidasAPI,
+  getMeAPI,
   type Notificacion,
 } from '@/lib/api';
+import { Avatar } from '@/components/Avatar';
 import {
   getSesion,
   getRolEfectivo,
@@ -35,14 +37,20 @@ export function NavBar() {
   const [notifs, setNotifs] = useState<Notificacion[]>([]);
   const [noLeidas, setNoLeidas] = useState(0);
   const [campana, setCampana] = useState(false);
+  const [masAbierto, setMasAbierto] = useState(false);
+  const [miFoto, setMiFoto] = useState<string | null>(null);
 
   useEffect(() => {
     setAbierto(false); // al navegar se cierra el menú móvil
     setCampana(false);
+    setMasAbierto(false);
     const s = obtenerToken() ? getSesion() : null;
     setSesion(s);
     if (s) {
       void getRolEfectivo().then(setRol);
+      void getMeAPI()
+        .then((me) => setMiFoto(me.usuario.avatarUrl ?? null))
+        .catch(() => undefined);
       getNotificacionesAPI()
         .then((r) => {
           setNotifs(r.notificaciones);
@@ -70,16 +78,21 @@ export function NavBar() {
 
   const esMaestro = rol === 'teacher' || rol === 'admin';
   const esAdmin = rol === 'admin';
-  const links: { href: string; etiqueta: string; visible: boolean }[] = [
-    { href: '/tablero', etiqueta: 'Tablero', visible: true },
-    { href: '/aprender', etiqueta: 'Aprender', visible: true },
-    { href: '/evaluaciones', etiqueta: 'Evaluaciones', visible: true },
-    { href: '/figuras', etiqueta: 'Figuras', visible: true },
-    { href: '/progreso', etiqueta: 'Mi progreso', visible: true },
-    { href: '/maestro', etiqueta: 'Panel del maestro', visible: esMaestro },
-    { href: '/admin', etiqueta: 'Administración', visible: esAdmin },
+  // La barra muestra POCOS enlaces primarios según el rol; el resto vive en el
+  // menú «Más ▾» (escritorio) o en la hamburguesa (móvil): nadie se pierde.
+  const links: { href: string; etiqueta: string; visible: boolean; primario: boolean }[] = [
+    { href: '/tablero', etiqueta: 'Tablero', visible: true, primario: true },
+    { href: '/maestro', etiqueta: 'Panel del maestro', visible: esMaestro, primario: true },
+    { href: '/admin', etiqueta: 'Administración', visible: esAdmin, primario: true },
+    { href: '/aprender', etiqueta: 'Aprender', visible: true, primario: !esMaestro },
+    { href: '/evaluaciones', etiqueta: 'Evaluaciones', visible: true, primario: !esMaestro },
+    { href: '/figuras', etiqueta: 'Figuras', visible: true, primario: false },
+    { href: '/notas', etiqueta: 'Mis notas', visible: true, primario: false },
+    { href: '/progreso', etiqueta: 'Mi progreso', visible: true, primario: false },
   ];
   const visibles = links.filter((l) => l.visible);
+  const primarios = visibles.filter((l) => l.primario);
+  const secundarios = visibles.filter((l) => !l.primario);
 
   const activo = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href);
@@ -159,7 +172,42 @@ export function NavBar() {
           className="nav-desktop"
           style={{ flex: 1, alignItems: 'center', gap: '0.15rem', flexWrap: 'nowrap' }}
         >
-          {visibles.map((l) => itemNav(l))}
+          {primarios.map((l) => itemNav(l))}
+          {secundarios.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setMasAbierto(!masAbierto)}
+                className="btn btn-outline btn-sm"
+                aria-expanded={masAbierto}
+                style={{
+                  border: 'none',
+                  color: secundarios.some((l) => activo(l.href))
+                    ? 'var(--gold)'
+                    : 'var(--text-muted)',
+                  fontWeight: 600,
+                }}
+              >
+                Más ▾
+              </button>
+              {masAbierto && (
+                <div
+                  className="card"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    left: 0,
+                    minWidth: 180,
+                    padding: '0.4rem',
+                    zIndex: 40,
+                    display: 'grid',
+                    gap: '0.15rem',
+                  }}
+                >
+                  {secundarios.map((l) => itemNav(l, true))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -246,6 +294,7 @@ export function NavBar() {
             )}
           </div>
           <div className="nav-user" style={{ alignItems: 'center', gap: '0.5rem' }}>
+            <Avatar src={miFoto} nombre={sesion.fullName || sesion.email} size={32} />
             <span className="muted" style={{ fontSize: '0.72rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
               <span style={{ display: 'block', fontWeight: 600, color: 'var(--text)' }}>
                 {sesion.fullName || sesion.email}

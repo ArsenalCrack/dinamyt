@@ -81,6 +81,9 @@ export const attempts = aca.table(
     evidenceScore: decimal('evidence_score', { precision: 5, scale: 2 }),
     finalScore: decimal('final_score', { precision: 5, scale: 2 }),
     gradeNameSnapshot: varchar('grade_name_snapshot', { length: 80 }),
+    /** Observación GENERAL del maestro sobre el intento (además del feedback
+     *  por pregunta). */
+    teacherComment: text('teacher_comment'),
     startedAt: timestamp('started_at').defaultNow(),
     submittedAt: timestamp('submitted_at'),
     gradedAt: timestamp('graded_at'),

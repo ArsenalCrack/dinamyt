@@ -21,6 +21,7 @@ import {
   type SolicitudMaestro,
 } from '@/lib/api';
 import { getRolEfectivo } from '@/lib/session';
+import { Avatar } from '@/components/Avatar';
 
 type Tab = 'artes' | 'usuarios' | 'solicitudes' | 'reportes';
 
@@ -196,6 +197,7 @@ function TabArtes({ artes, recargar }: { artes: Arte[]; recargar: () => Promise<
                 <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '0.35rem' }}>
                   {maestros.map((m) => (
                     <li key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                      <Avatar src={m.avatarUrl} nombre={m.fullName ?? m.email ?? '?'} size={28} />
                       <span>{m.fullName ?? m.email ?? m.teacherUserId.slice(0, 8)}</span>
                       <span className="muted" style={{ fontSize: '0.78rem' }}>{m.email}</span>
                       <button

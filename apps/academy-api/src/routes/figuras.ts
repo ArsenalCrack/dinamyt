@@ -332,6 +332,7 @@ export async function figurasRoutes(app: FastifyInstance) {
         nombre: referenceFigures.name,
         estudiante: academyUsers.fullName,
         email: academyUsers.email,
+        avatarUrl: academyUsers.avatarUrl,
       })
       .from(figureAttempts)
       .innerJoin(referenceFigures, eq(referenceFigures.id, figureAttempts.referenceFigureId))

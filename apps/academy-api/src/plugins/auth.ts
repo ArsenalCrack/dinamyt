@@ -2,7 +2,11 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { JwtPayload, AcademyRole } from '@dinamyt/shared';
 import { config } from '../config';
-import { sincronizarUsuarioLocal, rolEfectivo } from '../lib/users';
+import {
+  sincronizarUsuarioLocal,
+  rolEfectivo,
+  refrescarPerfilEcosystem,
+} from '../lib/users';
 import { registrarIngreso } from '../lib/activity';
 
 /**
@@ -79,6 +83,8 @@ export function requireAcademy(roles?: AcademyRole[]) {
 
     // Bitácora: «entró a la plataforma» (una vez por sesión de ~30 min).
     await registrarIngreso(req.server.db, payload.sub);
+    // Foto de perfil desde el ecosystem (misma cadencia, sin bloquear la request).
+    void refrescarPerfilEcosystem(req.server.db, payload.sub, auth.slice(7));
 
     req.user = payload;
     req.academy = { usuario, rol };

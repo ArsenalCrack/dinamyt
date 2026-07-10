@@ -12,6 +12,7 @@ export interface Sesion {
   role: string | null;
   isSuperAdmin: boolean;
   scopes: string[];
+  orgId: string | null;
 }
 
 function decodificar(token: string): Sesion | null {
@@ -25,6 +26,7 @@ function decodificar(token: string): Sesion | null {
       fullName: String(p.fullName ?? ''),
       role: (p.role_academy as string | null) ?? null,
       isSuperAdmin: Boolean(p.is_super_admin),
+      orgId: (p.org_id as string | null) ?? null,
       scopes: (p.app_scopes as string[]) ?? [],
     };
   } catch {

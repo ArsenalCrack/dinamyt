@@ -142,9 +142,11 @@ export interface Intento {
   evidenceScore: string | null;
   finalScore: string | null;
   gradeNameSnapshot: string | null;
+  teacherComment?: string | null;
   submittedAt: string | null;
   fullName?: string | null;
   email?: string | null;
+  avatarUrl?: string | null;
 }
 export interface Respuesta {
   id: string;
@@ -161,6 +163,7 @@ export interface UsuarioLocal {
   fullName: string | null;
   email: string | null;
   localRole: 'admin' | 'teacher' | 'student' | null;
+  avatarUrl?: string | null;
   suspended: boolean;
   matriculas?: string[];
 }
@@ -198,6 +201,7 @@ export const getMaestrosAPI = async (arteId: string) =>
     teacherUserId: string;
     fullName: string | null;
     email: string | null;
+    avatarUrl: string | null;
   }[];
 export const asignarMaestroAPI = async (arteId: string, email: string) =>
   (await api.post(`/martial-arts/${arteId}/teachers`, { email })).data;
@@ -246,7 +250,30 @@ export const getIntentoAPI = async (id: string) =>
 export const calificarAPI = async (
   attemptId: string,
   calificaciones: { answerId: string; score: number; feedback?: string }[],
-) => (await api.post(`/attempts/${attemptId}/grade`, { calificaciones })).data as Intento;
+  comentario?: string,
+) =>
+  (await api.post(`/attempts/${attemptId}/grade`, { calificaciones, comentario }))
+    .data as Intento;
+
+// ── Libreta de notas del estudiante ──────────────────────────────────────────
+export interface NotaFila {
+  id: string;
+  attemptNumber: number;
+  status: 'EN_CURSO' | 'ENVIADO' | 'CALIFICADO';
+  mcScore: string | null;
+  evidenceScore: string | null;
+  finalScore: string | null;
+  teacherComment: string | null;
+  gradeNameSnapshot: string | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  evaluacion: string;
+  kind: 'cuestionario' | 'tarea' | 'actividad';
+  maxAttempts: number;
+  arteNombre: string;
+}
+export const getNotasAPI = async () =>
+  (await api.get('/notas')).data as { evaluaciones: NotaFila[] };
 
 export interface ProgresoArte {
   matriculaId: string;
@@ -287,6 +314,7 @@ export interface EstudiantePanel {
   studentUserId: string;
   fullName: string | null;
   email: string | null;
+  avatarUrl: string | null;
   gradoNombre: string;
   gradoOrden: number;
   progresoContenido: { total: number; vistos: number; pct: number };
@@ -480,6 +508,7 @@ export interface IntentoFigura {
   createdAt: string;
   nombre?: string;
   estudiante?: string | null;
+  avatarUrl?: string | null;
   figura?: FiguraRef;
 }
 export const getFigurasRefAPI = async (martialArtId: string) =>
@@ -530,6 +559,7 @@ export interface EventoHistorial {
   createdAt: string;
   fullName: string | null;
   email: string | null;
+  avatarUrl: string | null;
 }
 export const getHistorialAPI = async (
   martialArtId: string,

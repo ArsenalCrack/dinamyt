@@ -1,6 +1,35 @@
 import { eq, and } from 'drizzle-orm';
 import type { JwtPayload, AcademyRole } from '@dinamyt/shared';
 import { academyUsers, teacherMartialArts, type Db } from '@dinamyt/academy-db';
+import { config } from '../config';
+
+// Foto de perfil: se refresca desde el ecosystem UNA vez por sesión (~30 min),
+// con el token del propio usuario. Best-effort: si el ecosystem no responde,
+// Academy sigue funcionando con la foto que tenga.
+const VENTANA_AVATAR_MS = 30 * 60 * 1000;
+const ultimoRefresco = new Map<string, number>();
+
+export async function refrescarPerfilEcosystem(db: Db, sub: string, token: string) {
+  const ahora = Date.now();
+  const previo = ultimoRefresco.get(sub);
+  if (previo && ahora - previo < VENTANA_AVATAR_MS) return;
+  ultimoRefresco.set(sub, ahora);
+  try {
+    const res = await fetch(`${config.ecosystemApiUrl}/users/${sub}/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+    const perfil = (await res.json()) as { avatarUrl?: string | null };
+    if (perfil.avatarUrl !== undefined) {
+      await db
+        .update(academyUsers)
+        .set({ avatarUrl: perfil.avatarUrl ?? null, updatedAt: new Date() })
+        .where(eq(academyUsers.ecosystemUserId, sub));
+    }
+  } catch {
+    /* sin red hacia el ecosystem: se conserva la foto local */
+  }
+}
 
 export type UsuarioLocal = typeof academyUsers.$inferSelect;
 

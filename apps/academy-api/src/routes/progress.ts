@@ -376,6 +376,7 @@ export async function progressRoutes(app: FastifyInstance) {
           createdAt: enrollments.createdAt,
           fullName: academyUsers.fullName,
           email: academyUsers.email,
+          avatarUrl: academyUsers.avatarUrl,
           gradoNombre: grades.name,
           gradoOrden: grades.orderIndex,
         })
@@ -425,6 +426,37 @@ export async function progressRoutes(app: FastifyInstance) {
       return filas;
     },
   );
+
+  // ── GET /notas — libreta de calificaciones del PROPIO estudiante ──────────
+  // Todas sus notas: intentos de evaluaciones (con la observación general del
+  // maestro) y análisis de figuras, en un solo lugar.
+  app.get('/notas', { preHandler: requireAcademy() }, async (req) => {
+    const db = req.server.db;
+    const sub = req.user!.sub;
+    const filas = await db
+      .select({
+        id: attempts.id,
+        attemptNumber: attempts.attemptNumber,
+        status: attempts.status,
+        mcScore: attempts.mcScore,
+        evidenceScore: attempts.evidenceScore,
+        finalScore: attempts.finalScore,
+        teacherComment: attempts.teacherComment,
+        gradeNameSnapshot: attempts.gradeNameSnapshot,
+        submittedAt: attempts.submittedAt,
+        gradedAt: attempts.gradedAt,
+        evaluacion: evaluations.title,
+        kind: evaluations.kind,
+        maxAttempts: evaluations.maxAttempts,
+        arteNombre: martialArts.name,
+      })
+      .from(attempts)
+      .innerJoin(evaluations, eq(evaluations.id, attempts.evaluationId))
+      .innerJoin(martialArts, eq(martialArts.id, evaluations.martialArtId))
+      .where(eq(attempts.studentUserId, sub))
+      .orderBy(desc(attempts.submittedAt));
+    return { evaluaciones: filas };
+  });
 
   // ── GET /users/:id/academy-summary — perfil unificado (RF-ACA-04) ─────────
   // Lo consume el portal del ecosystem. Acceso: el propio usuario, el super

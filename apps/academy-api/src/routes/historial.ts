@@ -75,6 +75,7 @@ export async function historialRoutes(app: FastifyInstance) {
           createdAt: activityLog.createdAt,
           fullName: academyUsers.fullName,
           email: academyUsers.email,
+          avatarUrl: academyUsers.avatarUrl,
         })
         .from(activityLog)
         .leftJoin(academyUsers, eq(academyUsers.ecosystemUserId, activityLog.userId))

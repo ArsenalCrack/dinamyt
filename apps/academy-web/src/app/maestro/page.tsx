@@ -40,6 +40,7 @@ import {
   type EventoHistorial,
 } from '@/lib/api';
 import { getRolEfectivo } from '@/lib/session';
+import { Avatar } from '@/components/Avatar';
 
 type Tab =
   | 'contenidos'
@@ -818,8 +819,13 @@ function TabEstudiantes({ arte }: { arte: Arte }) {
                 {filas.map((f) => (
                   <tr key={f.id}>
                     <td>
-                      {f.fullName ?? '—'}
-                      <span className="muted" style={{ display: 'block', fontSize: '0.75rem' }}>{f.email}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Avatar src={f.avatarUrl} nombre={f.fullName ?? f.email ?? '?'} size={30} />
+                        <span>
+                          {f.fullName ?? '—'}
+                          <span className="muted" style={{ display: 'block', fontSize: '0.75rem' }}>{f.email}</span>
+                        </span>
+                      </span>
                     </td>
                     <td>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1283,9 +1289,12 @@ function TabHistorial({ arte }: { arte: Arte }) {
                       {fechaHora(e.createdAt)}
                     </td>
                     <td>
-                      {e.fullName ?? '—'}
-                      <span className="muted" style={{ display: 'block', fontSize: '0.72rem' }}>
-                        {e.email}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Avatar src={e.avatarUrl} nombre={e.fullName ?? e.email ?? '?'} size={28} />
+                        <span>
+                          {e.fullName ?? '—'}
+                          <span className="muted" style={{ display: 'block', fontSize: '0.72rem' }}>{e.email}</span>
+                        </span>
                       </span>
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
