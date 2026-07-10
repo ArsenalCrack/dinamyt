@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { obtenerToken, getDashboardAPI, extraerError, type Anuncio } from '@/lib/api';
+import { ClubBadge } from '@/components/ClubBadge';
 
 const ETIQUETA: Record<string, string> = {
   cuestionario: 'Cuestionario',
@@ -60,7 +61,10 @@ export default function Tablero() {
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem 1rem 3rem' }}>
       <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>Tu bandeja</p>
-      <h1 className="display" style={{ fontSize: '1.7rem', marginBottom: '1.25rem' }}>Tablero</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+        <h1 className="display" style={{ fontSize: '1.7rem' }}>Tablero</h1>
+        <ClubBadge />
+      </div>
       {error && <p className="msg-error">{error}</p>}
       {!datos && !error && <p className="muted">Cargando pendientes…</p>}
 

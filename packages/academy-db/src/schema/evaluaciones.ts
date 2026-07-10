@@ -7,6 +7,7 @@ import {
   decimal,
   timestamp,
   uniqueIndex,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { aca, tipoPreguntaEnum, estadoIntentoEnum, tipoEvaluacionEnum } from './_schema';
 import { martialArts, grades } from './artes';
@@ -112,6 +113,8 @@ export const answers = aca.table(
     /** Evidencia: puntos otorgados por el maestro (0..points de la pregunta). */
     score: decimal('score', { precision: 5, scale: 2 }),
     feedback: text('feedback'),
+    /** Desglose de rúbrica calificada: [{label, score, max}] (snapshot). */
+    criteriaScores: jsonb('criteria_scores'),
     gradedByUserId: uuid('graded_by_user_id'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),

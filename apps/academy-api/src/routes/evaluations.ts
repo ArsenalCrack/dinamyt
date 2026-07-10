@@ -4,6 +4,7 @@ import {
   evaluations,
   questions,
   questionOptions,
+  questionCriteria,
   attempts,
   answers,
   academyUsers,
@@ -27,6 +28,8 @@ interface PreguntaInput {
   prompt: string;
   points?: number;
   opciones?: { text: string; isCorrect?: boolean }[];
+  /** Rúbrica (solo evidencia): la nota de la pregunta es la suma de criterios. */
+  criterios?: { label: string; maxPoints?: number }[];
 }
 
 interface EvaluacionBody {
@@ -63,11 +66,19 @@ async function cargarPreguntas(
         .where(inArray(questionOptions.questionId, pregs.map((p) => p.id)))
         .orderBy(asc(questionOptions.orderIndex))
     : [];
+  const criterios = pregs.length
+    ? await db
+        .select()
+        .from(questionCriteria)
+        .where(inArray(questionCriteria.questionId, pregs.map((p) => p.id)))
+        .orderBy(asc(questionCriteria.orderIndex))
+    : [];
   return pregs.map((p) => ({
     ...p,
     opciones: opciones
       .filter((o) => o.questionId === p.id)
       .map((o) => (ocultarCorrectas ? { ...o, isCorrect: null } : o)),
+    criterios: criterios.filter((c) => c.questionId === p.id),
   }));
 }
 
@@ -260,6 +271,22 @@ export async function evaluationsRoutes(app: FastifyInstance) {
               orderIndex: j,
             })),
           );
+        }
+        // Rúbrica de la evidencia: los puntos de la pregunta = suma de criterios.
+        if (p.type === 'evidencia' && p.criterios?.length) {
+          await db.insert(questionCriteria).values(
+            p.criterios.map((c, j) => ({
+              questionId: pregunta.id,
+              label: c.label.trim(),
+              maxPoints: Math.max(1, c.maxPoints ?? 1),
+              orderIndex: j,
+            })),
+          );
+          const suma = p.criterios.reduce((s, c) => s + Math.max(1, c.maxPoints ?? 1), 0);
+          await db
+            .update(questions)
+            .set({ points: suma })
+            .where(eq(questions.id, pregunta.id));
         }
       }
 
@@ -608,7 +635,13 @@ export async function evaluationsRoutes(app: FastifyInstance) {
       const { id } = req.params as { id: string };
       if (!esUuid(id)) return reply.code(400).send({ error: 'Id inválido.' });
       const body = req.body as {
-        calificaciones?: { answerId: string; score: number; feedback?: string }[];
+        calificaciones?: {
+          answerId: string;
+          score: number;
+          feedback?: string;
+          /** Rúbrica calificada: si viene, la nota es la SUMA de criterios. */
+          criterios?: { label: string; score: number; max: number }[];
+        }[];
         /** Observación GENERAL del maestro sobre el intento. */
         comentario?: string;
       };
@@ -645,7 +678,19 @@ export async function evaluationsRoutes(app: FastifyInstance) {
           return reply.code(422).send({ error: 'Calificación a una respuesta inexistente.' });
         }
         const max = puntosPorPregunta.get(respuesta.questionId) ?? 1;
-        if (typeof c.score !== 'number' || c.score < 0 || c.score > max) {
+        // Con rúbrica, la nota autoritativa es la suma de sus criterios.
+        let nota = c.score;
+        if (c.criterios?.length) {
+          for (const cr of c.criterios) {
+            if (typeof cr.score !== 'number' || cr.score < 0 || cr.score > cr.max) {
+              return reply
+                .code(422)
+                .send({ error: `«${cr.label}» va de 0 a ${cr.max} puntos.` });
+            }
+          }
+          nota = c.criterios.reduce((s, cr) => s + cr.score, 0);
+        }
+        if (typeof nota !== 'number' || nota < 0 || nota > max) {
           return reply
             .code(422)
             .send({ error: `La nota de cada evidencia va de 0 a sus puntos (${max}).` });
@@ -653,8 +698,9 @@ export async function evaluationsRoutes(app: FastifyInstance) {
         await db
           .update(answers)
           .set({
-            score: c.score.toFixed(2),
+            score: nota.toFixed(2),
             feedback: c.feedback ?? null,
+            criteriaScores: c.criterios ?? null,
             gradedByUserId: req.user!.sub,
             updatedAt: new Date(),
           })

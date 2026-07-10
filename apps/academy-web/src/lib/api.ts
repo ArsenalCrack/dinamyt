@@ -101,6 +101,11 @@ export interface OpcionPregunta {
   isCorrect: boolean | null;
   orderIndex: number;
 }
+export interface Criterio {
+  id?: string;
+  label: string;
+  maxPoints: number;
+}
 export interface Pregunta {
   id: string;
   type: 'opcion_multiple' | 'evidencia';
@@ -108,6 +113,7 @@ export interface Pregunta {
   points: number;
   orderIndex: number;
   opciones: OpcionPregunta[];
+  criterios?: Criterio[];
 }
 export interface Evaluacion {
   id: string;
@@ -587,3 +593,20 @@ export function colorCinturon(nombre: string): string {
   if (n.includes('amarillo')) return '#f0b800';
   return '#f3f1e8';
 }
+
+// ── Banco de preguntas del maestro ───────────────────────────────────────────
+export interface PreguntaBanco {
+  id: string;
+  type: 'opcion_multiple' | 'evidencia';
+  prompt: string;
+  points: number;
+  opciones: { text: string; isCorrect?: boolean }[] | null;
+  criterios: { label: string; maxPoints?: number }[] | null;
+}
+export const getBancoAPI = async (martialArtId: string) =>
+  (await api.get('/banco', { params: { martialArtId } })).data as PreguntaBanco[];
+export const guardarEnBancoAPI = async (body: Record<string, unknown>) =>
+  (await api.post('/banco', body)).data as PreguntaBanco;
+export const borrarDelBancoAPI = async (id: string) =>
+  (await api.delete(`/banco/${id}`)).data;
+export const getAvanceAPI = async (id: string) => (await api.get(`/avances/${id}`)).data;

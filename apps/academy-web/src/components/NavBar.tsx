@@ -88,6 +88,7 @@ export function NavBar() {
     { href: '/evaluaciones', etiqueta: 'Evaluaciones', visible: true, primario: !esMaestro },
     { href: '/figuras', etiqueta: 'Figuras', visible: true, primario: false },
     { href: '/notas', etiqueta: 'Mis notas', visible: true, primario: false },
+    { href: '/calendario', etiqueta: 'Calendario', visible: true, primario: false },
     { href: '/progreso', etiqueta: 'Mi progreso', visible: true, primario: false },
   ];
   const visibles = links.filter((l) => l.visible);

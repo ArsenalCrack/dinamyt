@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ClubBadge } from '@/components/ClubBadge';
 import {
   obtenerToken,
   getProgresoAPI,
@@ -63,9 +64,10 @@ export default function Progreso() {
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem 1rem 3rem' }}>
       <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>Tu camino marcial</p>
-      <h1 className="display" style={{ fontSize: '1.7rem', marginBottom: '1.25rem' }}>
-        Mi progreso
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+        <h1 className="display" style={{ fontSize: '1.7rem' }}>Mi progreso</h1>
+        <ClubBadge />
+      </div>
 
       {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
       {cargando && <p className="muted">Cargando progreso…</p>}
@@ -185,6 +187,7 @@ export default function Progreso() {
                     </span>
                   )}
                   {h.notes && <span className="muted" style={{ fontSize: '0.8rem' }}>· {h.notes}</span>}
+                  <a href={`/certificados/${h.id}`} className="btn btn-outline btn-sm">🎓 Certificado</a>
                 </li>
               ))}
             </ul>
