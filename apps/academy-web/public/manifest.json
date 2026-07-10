@@ -1,0 +1,12 @@
+{
+  "name": "DINAMYT Academy",
+  "short_name": "Academy",
+  "description": "Plataforma de enseñanza de artes marciales del ecosistema DINAMYT.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#14141e",
+  "theme_color": "#f0b800",
+  "icons": [
+    { "src": "/logo.png", "sizes": "any", "type": "image/png", "purpose": "any" }
+  ]
+}

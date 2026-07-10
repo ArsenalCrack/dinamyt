@@ -1,0 +1,824 @@
+'use client';
+
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import {
+  obtenerToken,
+  getArtesAPI,
+  getContenidosAPI,
+  crearContenidoAPI,
+  editarContenidoAPI,
+  borrarContenidoAPI,
+  getEvaluacionesAPI,
+  crearEvaluacionAPI,
+  borrarEvaluacionAPI,
+  getIntentosAPI,
+  getEstudiantesAPI,
+  matricularAPI,
+  avanzarGradoAPI,
+  extraerError,
+  colorCinturon,
+  type Arte,
+  type Contenido,
+  type Evaluacion,
+  type Intento,
+  type EstudiantePanel,
+} from '@/lib/api';
+import { getRolEfectivo } from '@/lib/session';
+
+type Tab = 'contenidos' | 'evaluaciones' | 'estudiantes';
+
+const TIPOS = [
+  { valor: 'texto', etiqueta: '📖 Lectura (texto)' },
+  { valor: 'video', etiqueta: '🎬 Video (YouTube/Drive)' },
+  { valor: 'documento', etiqueta: '📄 Documento (URL)' },
+  { valor: 'imagen', etiqueta: '🖼️ Imagen (URL)' },
+] as const;
+
+// ── Pestaña: Contenidos (RF-ACA-10..13) ──────────────────────────────────────
+function TabContenidos({ arte }: { arte: Arte }) {
+  const [gradoId, setGradoId] = useState(arte.grados[0]?.id ?? '');
+  const [lista, setLista] = useState<Contenido[]>([]);
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState('');
+  // Formulario (sirve para crear y para editar)
+  const [editando, setEditando] = useState<string | null>(null);
+  const [titulo, setTitulo] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [tipo, setTipo] = useState<Contenido['type']>('texto');
+  const [url, setUrl] = useState('');
+  const [cuerpo, setCuerpo] = useState('');
+  const [orden, setOrden] = useState(0);
+
+  const cargar = useCallback(async () => {
+    try {
+      const data = await getContenidosAPI(arte.id, gradoId || undefined);
+      setLista(data.contenidos);
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }, [arte.id, gradoId]);
+
+  useEffect(() => {
+    setGradoId(arte.grados[0]?.id ?? '');
+  }, [arte]);
+  useEffect(() => {
+    void cargar();
+  }, [cargar]);
+
+  function limpiar() {
+    setEditando(null);
+    setTitulo('');
+    setDescripcion('');
+    setTipo('texto');
+    setUrl('');
+    setCuerpo('');
+    setOrden(0);
+  }
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setOk('');
+    try {
+      const body = {
+        martialArtId: arte.id,
+        gradeId: gradoId,
+        title: titulo,
+        description: descripcion || null,
+        type: tipo,
+        url: url || null,
+        body: cuerpo || null,
+        orderIndex: orden,
+      };
+      if (editando) {
+        await editarContenidoAPI(editando, body);
+        setOk('Unidad actualizada.');
+      } else {
+        await crearContenidoAPI(body);
+        setOk('Unidad publicada.');
+      }
+      limpiar();
+      await cargar();
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }
+
+  async function eliminar(id: string) {
+    if (!confirm('¿Eliminar esta unidad? El historial de evaluaciones no se toca.')) return;
+    try {
+      await borrarContenidoAPI(id);
+      await cargar();
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }
+
+  function editar(u: Contenido) {
+    setEditando(u.id);
+    setTitulo(u.title);
+    setDescripcion(u.description ?? '');
+    setTipo(u.type);
+    setUrl(u.url ?? '');
+    setCuerpo(u.body ?? '');
+    setOrden(u.orderIndex);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <form onSubmit={guardar} className="card" style={{ padding: '1.1rem 1.25rem' }}>
+        <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>
+          {editando ? 'Editar unidad' : 'Publicar unidad de contenido'}
+        </h3>
+        <div style={{ display: 'grid', gap: '0.7rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+          <div>
+            <label className="muted" style={{ fontSize: '0.78rem' }}>Grado</label>
+            <select value={gradoId} onChange={(e) => setGradoId(e.target.value)} style={{ marginTop: '0.25rem' }}>
+              {arte.grados.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="muted" style={{ fontSize: '0.78rem' }}>Tipo</label>
+            <select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as Contenido['type'])}
+              style={{ marginTop: '0.25rem' }}
+            >
+              {TIPOS.map((t) => (
+                <option key={t.valor} value={t.valor}>{t.etiqueta}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="muted" style={{ fontSize: '0.78rem' }}>Orden</label>
+            <input
+              type="number"
+              value={orden}
+              onChange={(e) => setOrden(parseInt(e.target.value, 10) || 0)}
+              style={{ marginTop: '0.25rem' }}
+            />
+          </div>
+        </div>
+        <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Título</label>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} required style={{ marginTop: '0.25rem' }} />
+        <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Descripción (opcional)</label>
+        <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ marginTop: '0.25rem' }} />
+        {tipo === 'texto' ? (
+          <>
+            <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Contenido</label>
+            <textarea rows={5} value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} style={{ marginTop: '0.25rem' }} />
+          </>
+        ) : (
+          <>
+            <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>
+              URL {tipo === 'video' ? '(YouTube o Google Drive)' : '(Storage/Drive, máx. 50 MB por archivo)'}
+            </label>
+            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} style={{ marginTop: '0.25rem' }} />
+          </>
+        )}
+        {error && <p className="msg-error" style={{ marginTop: '0.7rem', fontSize: '0.85rem' }}>{error}</p>}
+        {ok && <p className="msg-ok" style={{ marginTop: '0.7rem', fontSize: '0.85rem' }}>{ok}</p>}
+        <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.9rem' }}>
+          <button className="btn btn-gold" type="submit">
+            {editando ? 'Guardar cambios' : 'Publicar'}
+          </button>
+          {editando && (
+            <button type="button" className="btn btn-outline" onClick={limpiar}>
+              Cancelar edición
+            </button>
+          )}
+        </div>
+      </form>
+
+      <div className="card" style={{ padding: '1.1rem 1.25rem' }}>
+        <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>
+          Unidades del grado {arte.grados.find((g) => g.id === gradoId)?.name ?? ''}
+        </h3>
+        {lista.length === 0 ? (
+          <p className="muted" style={{ fontSize: '0.85rem' }}>Sin unidades en este grado.</p>
+        ) : (
+          <div className="tabla-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Orden</th>
+                  <th>Título</th>
+                  <th>Tipo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lista.map((u) => (
+                  <tr key={u.id}>
+                    <td className="mono">{u.orderIndex}</td>
+                    <td>{u.title}</td>
+                    <td><span className="badge">{u.type}</span></td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button className="btn btn-outline btn-sm" onClick={() => editar(u)}>Editar</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => void eliminar(u.id)}>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Pestaña: Evaluaciones (RF-ACA-16..18, 20) ────────────────────────────────
+interface PreguntaForm {
+  type: 'opcion_multiple' | 'evidencia';
+  prompt: string;
+  points: number;
+  opciones: { text: string; isCorrect: boolean }[];
+}
+
+function TabEvaluaciones({ arte }: { arte: Arte }) {
+  const [lista, setLista] = useState<Evaluacion[]>([]);
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState('');
+  const [creando, setCreando] = useState(false);
+  const [intentosDe, setIntentosDe] = useState<string | null>(null);
+  const [intentos, setIntentos] = useState<Intento[]>([]);
+  // Formulario
+  const [titulo, setTitulo] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [gradoId, setGradoId] = useState(arte.grados[0]?.id ?? '');
+  const [maxIntentos, setMaxIntentos] = useState(1);
+  const [pesoMC, setPesoMC] = useState(50);
+  const [preguntas, setPreguntas] = useState<PreguntaForm[]>([]);
+
+  const cargar = useCallback(async () => {
+    try {
+      setLista(await getEvaluacionesAPI(arte.id));
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }, [arte.id]);
+
+  useEffect(() => {
+    setGradoId(arte.grados[0]?.id ?? '');
+    setIntentosDe(null);
+    void cargar();
+  }, [arte, cargar]);
+
+  function agregarPregunta(type: PreguntaForm['type']) {
+    setPreguntas([
+      ...preguntas,
+      {
+        type,
+        prompt: '',
+        points: type === 'evidencia' ? 2 : 1,
+        opciones:
+          type === 'opcion_multiple'
+            ? [
+                { text: '', isCorrect: true },
+                { text: '', isCorrect: false },
+              ]
+            : [],
+      },
+    ]);
+  }
+  function actualizarPregunta(i: number, cambio: Partial<PreguntaForm>) {
+    setPreguntas(preguntas.map((p, j) => (j === i ? { ...p, ...cambio } : p)));
+  }
+
+  async function crear(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setOk('');
+    try {
+      await crearEvaluacionAPI({
+        martialArtId: arte.id,
+        gradeId: gradoId,
+        title: titulo,
+        description: descripcion || null,
+        maxAttempts: maxIntentos,
+        mcWeight: pesoMC,
+        preguntas,
+      });
+      setOk('Evaluación publicada.');
+      setTitulo('');
+      setDescripcion('');
+      setPreguntas([]);
+      setCreando(false);
+      await cargar();
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }
+
+  async function verIntentos(id: string) {
+    if (intentosDe === id) {
+      setIntentosDe(null);
+      return;
+    }
+    try {
+      setIntentos(await getIntentosAPI(id));
+      setIntentosDe(id);
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }
+
+  async function eliminar(id: string) {
+    if (!confirm('¿Eliminar esta evaluación? Los intentos previos se conservan.')) return;
+    try {
+      await borrarEvaluacionAPI(id);
+      await cargar();
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }
+
+  const nombreGrado = (id: string) => arte.grados.find((g) => g.id === id)?.name ?? '';
+
+  return (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      {!creando ? (
+        <button className="btn btn-gold" style={{ justifySelf: 'start' }} onClick={() => setCreando(true)}>
+          ＋ Nueva evaluación
+        </button>
+      ) : (
+        <form onSubmit={crear} className="card" style={{ padding: '1.1rem 1.25rem' }}>
+          <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Nueva evaluación</h3>
+          <div style={{ display: 'grid', gap: '0.7rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            <div>
+              <label className="muted" style={{ fontSize: '0.78rem' }}>Grado</label>
+              <select value={gradoId} onChange={(e) => setGradoId(e.target.value)} style={{ marginTop: '0.25rem' }}>
+                {arte.grados.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="muted" style={{ fontSize: '0.78rem' }}>Intentos máximos</label>
+              <input
+                type="number"
+                min={1}
+                value={maxIntentos}
+                onChange={(e) => setMaxIntentos(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                style={{ marginTop: '0.25rem' }}
+              />
+            </div>
+            <div>
+              <label className="muted" style={{ fontSize: '0.78rem' }}>Peso opción múltiple (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={pesoMC}
+                onChange={(e) => setPesoMC(Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                style={{ marginTop: '0.25rem' }}
+              />
+            </div>
+          </div>
+          <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Título</label>
+          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} required style={{ marginTop: '0.25rem' }} />
+          <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Descripción (opcional)</label>
+          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ marginTop: '0.25rem' }} />
+
+          {preguntas.map((p, i) => (
+            <div key={i} className="card" style={{ padding: '0.9rem 1rem', marginTop: '0.9rem', background: 'var(--bg-elevated)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                <span className="badge badge-gold">
+                  {p.type === 'opcion_multiple' ? 'Opción múltiple' : 'Evidencia multimedia'}
+                </span>
+                <label className="muted" style={{ fontSize: '0.75rem', marginLeft: 'auto' }}>
+                  Puntos{' '}
+                  <input
+                    type="number"
+                    min={1}
+                    value={p.points}
+                    onChange={(e) => actualizarPregunta(i, { points: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                    style={{ width: 70, display: 'inline-block', marginLeft: '0.3rem' }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-danger btn-sm"
+                  onClick={() => setPreguntas(preguntas.filter((_, j) => j !== i))}
+                >
+                  Quitar
+                </button>
+              </div>
+              <input
+                placeholder="Enunciado de la pregunta…"
+                value={p.prompt}
+                onChange={(e) => actualizarPregunta(i, { prompt: e.target.value })}
+                required
+              />
+              {p.type === 'opcion_multiple' && (
+                <div style={{ display: 'grid', gap: '0.4rem', marginTop: '0.6rem' }}>
+                  {p.opciones.map((o, j) => (
+                    <div key={j} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="radio"
+                        name={`correcta-${i}`}
+                        title="Opción correcta"
+                        checked={o.isCorrect}
+                        onChange={() =>
+                          actualizarPregunta(i, {
+                            opciones: p.opciones.map((op, k) => ({ ...op, isCorrect: k === j })),
+                          })
+                        }
+                      />
+                      <input
+                        placeholder={`Opción ${j + 1}`}
+                        value={o.text}
+                        onChange={(e) =>
+                          actualizarPregunta(i, {
+                            opciones: p.opciones.map((op, k) =>
+                              k === j ? { ...op, text: e.target.value } : op,
+                            ),
+                          })
+                        }
+                        required
+                      />
+                      {p.opciones.length > 2 && (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() =>
+                            actualizarPregunta(i, { opciones: p.opciones.filter((_, k) => k !== j) })
+                          }
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={{ justifySelf: 'start' }}
+                    onClick={() =>
+                      actualizarPregunta(i, {
+                        opciones: [...p.opciones, { text: '', isCorrect: false }],
+                      })
+                    }
+                  >
+                    ＋ Opción
+                  </button>
+                  <p className="muted" style={{ fontSize: '0.72rem' }}>
+                    Marca con el círculo la opción correcta (calificación automática).
+                  </p>
+                </div>
+              )}
+              {p.type === 'evidencia' && (
+                <p className="muted" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
+                  El estudiante enviará la URL de un video o imagen; tú la calificas de 0 a {p.points}.
+                </p>
+              )}
+            </div>
+          ))}
+
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginTop: '0.9rem' }}>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => agregarPregunta('opcion_multiple')}>
+              ＋ Pregunta de opción múltiple
+            </button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => agregarPregunta('evidencia')}>
+              ＋ Pregunta de evidencia
+            </button>
+          </div>
+
+          {error && <p className="msg-error" style={{ marginTop: '0.7rem', fontSize: '0.85rem' }}>{error}</p>}
+          <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.9rem' }}>
+            <button className="btn btn-gold" type="submit">Publicar evaluación</button>
+            <button type="button" className="btn btn-outline" onClick={() => setCreando(false)}>Cancelar</button>
+          </div>
+        </form>
+      )}
+      {ok && <p className="msg-ok" style={{ fontSize: '0.85rem' }}>{ok}</p>}
+      {error && !creando && <p className="msg-error" style={{ fontSize: '0.85rem' }}>{error}</p>}
+
+      <div style={{ display: 'grid', gap: '0.75rem' }}>
+        {lista.map((e) => (
+          <div key={e.id} className="card" style={{ padding: '1rem 1.2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <span className="badge badge-gold">{nombreGrado(e.gradeId)}</span>
+              <span style={{ fontWeight: 600 }}>{e.title}</span>
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {(e.porRevisar ?? 0) > 0 && (
+                  <span className="badge badge-danger">⏳ {e.porRevisar} por revisar</span>
+                )}
+                <span className="badge mono">{e.intentos ?? 0} intento(s)</span>
+                <button className="btn btn-outline btn-sm" onClick={() => void verIntentos(e.id)}>
+                  {intentosDe === e.id ? 'Ocultar' : 'Ver intentos'}
+                </button>
+                <button className="btn btn-danger btn-sm" onClick={() => void eliminar(e.id)}>
+                  Eliminar
+                </button>
+              </span>
+            </div>
+            {intentosDe === e.id && (
+              <div className="tabla-scroll" style={{ marginTop: '0.8rem' }}>
+                {intentos.length === 0 ? (
+                  <p className="muted" style={{ fontSize: '0.85rem' }}>Nadie la ha rendido aún.</p>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Estudiante</th>
+                        <th>Cinturón</th>
+                        <th>MC</th>
+                        <th>Final</th>
+                        <th>Estado</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {intentos.map((a) => (
+                        <tr key={a.id}>
+                          <td>{a.fullName ?? a.email ?? a.studentUserId.slice(0, 8)}</td>
+                          <td>{a.gradeNameSnapshot ?? '—'}</td>
+                          <td className="mono">{a.mcScore ?? '—'}</td>
+                          <td className="mono">{a.finalScore ?? '—'}</td>
+                          <td>
+                            {a.status === 'ENVIADO' ? (
+                              <span className="badge badge-danger">Por revisar</span>
+                            ) : (
+                              <span className="badge badge-ok">Calificado</span>
+                            )}
+                          </td>
+                          <td>
+                            <Link href={`/maestro/revisar/${a.id}`} className="btn btn-outline btn-sm">
+                              {a.status === 'ENVIADO' ? 'Calificar' : 'Ver'}
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        {lista.length === 0 && <p className="muted">Aún no has creado evaluaciones en esta arte.</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── Pestaña: Estudiantes (RF-ACA-23/25) ──────────────────────────────────────
+function TabEstudiantes({ arte }: { arte: Arte }) {
+  const [filas, setFilas] = useState<EstudiantePanel[]>([]);
+  const [filtroGrado, setFiltroGrado] = useState('');
+  const [email, setEmail] = useState('');
+  const [gradoInicial, setGradoInicial] = useState('');
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState('');
+
+  const cargar = useCallback(async () => {
+    try {
+      setFilas(await getEstudiantesAPI(arte.id, filtroGrado || undefined));
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }, [arte.id, filtroGrado]);
+
+  useEffect(() => {
+    setFiltroGrado('');
+    setGradoInicial('');
+  }, [arte]);
+  useEffect(() => {
+    void cargar();
+  }, [cargar]);
+
+  async function matricular(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setOk('');
+    try {
+      await matricularAPI({
+        martialArtId: arte.id,
+        email,
+        gradeId: gradoInicial || undefined,
+      });
+      setOk(`Estudiante matriculado.`);
+      setEmail('');
+      await cargar();
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }
+
+  async function avanzar(fila: EstudiantePanel) {
+    const notas = prompt(
+      `Certificar avance de grado de ${fila.fullName ?? fila.email ?? 'estudiante'} (actualmente ${fila.gradoNombre}). Notas del examen (opcional):`,
+    );
+    if (notas === null) return;
+    setError('');
+    try {
+      await avanzarGradoAPI(fila.id, notas || undefined);
+      setOk('Avance certificado: el historial guarda el grado anterior.');
+      await cargar();
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <form onSubmit={matricular} className="card" style={{ padding: '1.1rem 1.25rem' }}>
+        <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Matricular estudiante</h3>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <input
+            type="email"
+            placeholder="correo@delestudiante.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={{ flex: 2, minWidth: 200 }}
+          />
+          <select
+            value={gradoInicial}
+            onChange={(e) => setGradoInicial(e.target.value)}
+            style={{ flex: 1, minWidth: 140 }}
+          >
+            <option value="">Grado inicial: {arte.grados[0]?.name ?? '—'}</option>
+            {arte.grados.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+          <button className="btn btn-gold" type="submit">Matricular</button>
+        </div>
+        <p className="muted" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
+          La persona debe haber entrado a Academy al menos una vez con su cuenta del
+          ecosistema.
+        </p>
+        {error && <p className="msg-error" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>{error}</p>}
+        {ok && <p className="msg-ok" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>{ok}</p>}
+      </form>
+
+      <div className="card" style={{ padding: '1.1rem 1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '0.7rem' }}>
+          <h3 className="eyebrow">Seguimiento grupal</h3>
+          <select
+            value={filtroGrado}
+            onChange={(e) => setFiltroGrado(e.target.value)}
+            style={{ maxWidth: 200, marginLeft: 'auto' }}
+          >
+            <option value="">Todos los grados</option>
+            {arte.grados.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+        </div>
+        {filas.length === 0 ? (
+          <p className="muted" style={{ fontSize: '0.85rem' }}>Sin estudiantes matriculados.</p>
+        ) : (
+          <div className="tabla-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estudiante</th>
+                  <th>Grado</th>
+                  <th>Material visto</th>
+                  <th>Evaluaciones</th>
+                  <th>Último avance</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filas.map((f) => (
+                  <tr key={f.id}>
+                    <td>
+                      {f.fullName ?? '—'}
+                      <span className="muted" style={{ display: 'block', fontSize: '0.75rem' }}>{f.email}</span>
+                    </td>
+                    <td>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 18,
+                            height: 8,
+                            borderRadius: 2,
+                            background: colorCinturon(f.gradoNombre),
+                            border: '1px solid var(--border-strong)',
+                          }}
+                        />
+                        {f.gradoNombre}
+                      </span>
+                    </td>
+                    <td className="mono">{f.progresoContenido.pct}%</td>
+                    <td className="mono">{f.evaluacionesCompletadas}</td>
+                    <td className="mono" style={{ fontSize: '0.8rem' }}>
+                      {f.ultimoAvance ? new Date(f.ultimoAvance).toLocaleDateString('es-CO') : '—'}
+                    </td>
+                    <td>
+                      <button className="btn btn-gold btn-sm" onClick={() => void avanzar(f)}>
+                        ⬆ Avanzar grado
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Página ────────────────────────────────────────────────────────────────────
+export default function Maestro() {
+  const router = useRouter();
+  const [rol, setRol] = useState<string | null>(null);
+  const [artes, setArtes] = useState<Arte[]>([]);
+  const [arteSel, setArteSel] = useState<Arte | null>(null);
+  const [tab, setTab] = useState<Tab>('contenidos');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!obtenerToken()) {
+      router.replace('/login');
+      return;
+    }
+    void (async () => {
+      const r = await getRolEfectivo();
+      setRol(r);
+      if (r !== 'teacher' && r !== 'admin') {
+        router.replace('/aprender');
+        return;
+      }
+      try {
+        const lista = (await getArtesAPI()).filter((a) => a.asignada);
+        setArtes(lista);
+        setArteSel(lista[0] ?? null);
+      } catch (err) {
+        setError(extraerError(err));
+      }
+    })();
+  }, [router]);
+
+  if (rol !== 'teacher' && rol !== 'admin') return null;
+
+  return (
+    <main style={{ maxWidth: 980, margin: '0 auto', padding: '1.5rem 1rem 3rem' }}>
+      <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>Gestión académica</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <h1 className="display" style={{ fontSize: '1.7rem' }}>Panel del maestro</h1>
+        {artes.length > 1 && (
+          <select
+            value={arteSel?.id ?? ''}
+            onChange={(e) => setArteSel(artes.find((a) => a.id === e.target.value) ?? null)}
+            style={{ maxWidth: 240 }}
+          >
+            {artes.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {!arteSel && !error && (
+        <div className="card" style={{ padding: '1.25rem' }}>
+          <p className="muted">
+            No tienes artes marciales asignadas todavía. Pide al administrador que te
+            asigne una (RF-ACA-09).
+          </p>
+        </div>
+      )}
+
+      {arteSel && (
+        <>
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.1rem' }}>
+            {(
+              [
+                ['contenidos', 'Contenidos'],
+                ['evaluaciones', 'Evaluaciones'],
+                ['estudiantes', 'Estudiantes'],
+              ] as [Tab, string][]
+            ).map(([t, etiqueta]) => (
+              <button
+                key={t}
+                className={tab === t ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
+                onClick={() => setTab(t)}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+          {tab === 'contenidos' && <TabContenidos arte={arteSel} />}
+          {tab === 'evaluaciones' && <TabEvaluaciones arte={arteSel} />}
+          {tab === 'estudiantes' && <TabEstudiantes arte={arteSel} />}
+        </>
+      )}
+    </main>
+  );
+}
