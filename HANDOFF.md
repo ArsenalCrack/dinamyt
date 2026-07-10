@@ -24,6 +24,12 @@
 >   como referencia: la copia canónica ahora vive en el monorepo.
 > - Verificado: `turbo build` 15/15 · `turbo test` 15/15 (academy-api 16) ·
 >   tablero/notificaciones/anuncios probados EN VIVO en el navegador.
+> - **Historial de actividad** (mismo día, tarde): tabla `activity_log`
+>   (migración 0002) que se llena sola — ingreso a la plataforma (1 por sesión
+>   de ~30 min), material visto (solo 1.ª vez), entregas con n.º de intento,
+>   figuras enviadas y ascensos. `GET /historial` (maestro del arte/admin,
+>   filtra por estudiante y tipo) + pestaña **Historial** en el panel del
+>   maestro. Verificado en vivo; academy-api 17 tests.
 >
 > **2026-07-09 — DINAMYT Academy MONTADA (rama `feat/academy`):**
 > - **`@dinamyt/academy-db`**: schema Postgres `academy` (13 tablas): artes

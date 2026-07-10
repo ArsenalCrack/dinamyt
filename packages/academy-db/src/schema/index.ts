@@ -5,3 +5,4 @@ export * from './contenidos';
 export * from './evaluaciones';
 export * from './comunicacion';
 export * from './figuras';
+export * from './actividad';

@@ -24,6 +24,7 @@ import {
   subirFiguraRefAPI,
   borrarFiguraRefAPI,
   getIntentosFiguraAPI,
+  getHistorialAPI,
   archivoUrl,
   extraerError,
   colorCinturon,
@@ -35,10 +36,17 @@ import {
   type Anuncio,
   type FiguraRef,
   type IntentoFigura,
+  type EventoHistorial,
 } from '@/lib/api';
 import { getRolEfectivo } from '@/lib/session';
 
-type Tab = 'contenidos' | 'evaluaciones' | 'estudiantes' | 'anuncios' | 'figuras';
+type Tab =
+  | 'contenidos'
+  | 'evaluaciones'
+  | 'estudiantes'
+  | 'anuncios'
+  | 'figuras'
+  | 'historial';
 
 const TIPOS = [
   { valor: 'texto', etiqueta: '📖 Lectura (texto)' },
@@ -1066,6 +1074,143 @@ function TabFiguras({ arte }: { arte: Arte }) {
   );
 }
 
+// ── Pestaña: Historial (bitácora de actividad de los estudiantes) ────────────
+const EVENTO_HISTORIAL: Record<string, { icono: string; etiqueta: string }> = {
+  ingreso: { icono: '🚪', etiqueta: 'Ingreso' },
+  contenido_visto: { icono: '👁️', etiqueta: 'Material visto' },
+  entrega: { icono: '📤', etiqueta: 'Entrega' },
+  intento_figura: { icono: '🥋', etiqueta: 'Figura' },
+  avance_grado: { icono: '⬆️', etiqueta: 'Ascenso' },
+};
+
+function TabHistorial({ arte }: { arte: Arte }) {
+  const [eventos, setEventos] = useState<EventoHistorial[]>([]);
+  const [estudiantes, setEstudiantes] = useState<EstudiantePanel[]>([]);
+  const [filtroEstudiante, setFiltroEstudiante] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(true);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      setEventos(
+        await getHistorialAPI(arte.id, {
+          studentUserId: filtroEstudiante || undefined,
+          type: filtroTipo || undefined,
+        }),
+      );
+      setError('');
+    } catch (err) {
+      setEventos([]);
+      setError(extraerError(err));
+    } finally {
+      setCargando(false);
+    }
+  }, [arte.id, filtroEstudiante, filtroTipo]);
+
+  useEffect(() => {
+    setFiltroEstudiante('');
+    setFiltroTipo('');
+    getEstudiantesAPI(arte.id).then(setEstudiantes).catch(() => setEstudiantes([]));
+  }, [arte]);
+  useEffect(() => {
+    void cargar();
+  }, [cargar]);
+
+  const fechaHora = (iso: string) =>
+    new Date(iso).toLocaleString('es-CO', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  return (
+    <div className="card" style={{ padding: '1.1rem 1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+        <h3 className="eyebrow">Actividad de tus estudiantes</h3>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <select
+            value={filtroEstudiante}
+            onChange={(e) => setFiltroEstudiante(e.target.value)}
+            style={{ maxWidth: 210 }}
+          >
+            <option value="">Todos los estudiantes</option>
+            {estudiantes.map((s) => (
+              <option key={s.studentUserId} value={s.studentUserId}>
+                {s.fullName ?? s.email ?? s.studentUserId.slice(0, 8)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value)}
+            style={{ maxWidth: 180 }}
+          >
+            <option value="">Todos los eventos</option>
+            <option value="ingreso">🚪 Ingresos</option>
+            <option value="contenido_visto">👁️ Material visto</option>
+            <option value="entrega">📤 Entregas</option>
+            <option value="intento_figura">🥋 Figuras</option>
+            <option value="avance_grado">⬆️ Ascensos</option>
+          </select>
+        </div>
+      </div>
+      <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.8rem' }}>
+        Cuándo entran a la plataforma, ven el material, entregan tareas, envían
+        figuras o ascienden de grado. Los ingresos se registran una vez por sesión
+        (~30 min); las vistas de material solo la primera vez.
+      </p>
+
+      {error && <p className="msg-error" style={{ fontSize: '0.85rem' }}>{error}</p>}
+      {cargando && <p className="muted" style={{ fontSize: '0.85rem' }}>Cargando historial…</p>}
+      {!cargando && eventos.length === 0 && !error && (
+        <p className="muted" style={{ fontSize: '0.85rem' }}>
+          Sin actividad registrada todavía (la bitácora empieza a llenarse desde hoy).
+        </p>
+      )}
+
+      {eventos.length > 0 && (
+        <div className="tabla-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Cuándo</th>
+                <th>Estudiante</th>
+                <th>Evento</th>
+                <th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eventos.map((e) => {
+                const meta = EVENTO_HISTORIAL[e.type] ?? { icono: '•', etiqueta: e.type };
+                return (
+                  <tr key={e.id}>
+                    <td className="mono" style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                      {fechaHora(e.createdAt)}
+                    </td>
+                    <td>
+                      {e.fullName ?? '—'}
+                      <span className="muted" style={{ display: 'block', fontSize: '0.72rem' }}>
+                        {e.email}
+                      </span>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <span className="badge">{meta.icono} {meta.etiqueta}</span>
+                    </td>
+                    <td style={{ fontSize: '0.85rem' }}>{e.detail ?? '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 export default function Maestro() {
   const router = useRouter();
@@ -1137,6 +1282,7 @@ export default function Maestro() {
                 ['estudiantes', 'Estudiantes'],
                 ['anuncios', 'Anuncios'],
                 ['figuras', 'Figuras'],
+                ['historial', 'Historial'],
               ] as [Tab, string][]
             ).map(([t, etiqueta]) => (
               <button
@@ -1153,6 +1299,7 @@ export default function Maestro() {
           {tab === 'estudiantes' && <TabEstudiantes arte={arteSel} />}
           {tab === 'anuncios' && <TabAnuncios arte={arteSel} />}
           {tab === 'figuras' && <TabFiguras arte={arteSel} />}
+          {tab === 'historial' && <TabHistorial arte={arteSel} />}
         </>
       )}
     </main>

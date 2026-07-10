@@ -13,6 +13,7 @@ import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
 import { notaBloque, notaFinal } from '../lib/scoring';
 import { notificar, estudiantesDe, maestrosDe } from '../lib/notify';
+import { registrarActividad } from '../lib/activity';
 
 const KINDS = ['cuestionario', 'tarea', 'actividad'] as const;
 const ETIQUETA_KIND: Record<string, string> = {
@@ -496,6 +497,15 @@ export async function evaluationsRoutes(app: FastifyInstance) {
           .insert(answers)
           .values(filasRespuesta.map((f) => ({ ...f, attemptId: intento.id })));
       }
+
+      // Bitácora: entrega registrada con número de intento.
+      await registrarActividad(db, {
+        userId: req.user!.sub,
+        type: 'entrega',
+        detail: `Entregó «${evaluacion.title}» (intento ${previos.length + 1}/${evaluacion.maxAttempts})`,
+        martialArtId: evaluacion.martialArtId,
+        refId: intento.id,
+      });
 
       // Con evidencias por revisar, avisar a los maestros del arte (bandeja).
       if (hayEvidencias) {

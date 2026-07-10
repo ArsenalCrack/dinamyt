@@ -18,6 +18,7 @@ import { notificationsRoutes } from './routes/notifications';
 import { announcementsRoutes } from './routes/announcements';
 import { dashboardRoutes } from './routes/dashboard';
 import { figurasRoutes } from './routes/figuras';
+import { historialRoutes } from './routes/historial';
 
 export interface BuildAppDeps {
   /** Verificador de tokens. Por defecto usa el JWKS remoto del ecosystem;
@@ -59,6 +60,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(announcementsRoutes);
   void app.register(dashboardRoutes);
   void app.register(figurasRoutes);
+  void app.register(historialRoutes);
 
   return app;
 }

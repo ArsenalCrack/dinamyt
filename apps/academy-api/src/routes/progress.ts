@@ -15,6 +15,7 @@ import { requireAcademy, requireAuth } from '../plugins/auth';
 import { esMaestroDe } from '../lib/users';
 import { esUuid } from '../lib/enrollments';
 import { notificar } from '../lib/notify';
+import { registrarActividad } from '../lib/activity';
 
 /** % de contenido visto por un estudiante en un grado concreto. */
 async function progresoContenido(
@@ -324,6 +325,15 @@ export async function progressRoutes(app: FastifyInstance) {
         .set({ currentGradeId: siguiente.id, updatedAt: new Date() })
         .where(eq(enrollments.id, matricula.id))
         .returning();
+
+      // Bitácora del ascenso (queda en el historial del maestro).
+      await registrarActividad(db, {
+        userId: matricula.studentUserId,
+        type: 'avance_grado',
+        detail: `Ascendió de ${gradoActual.name} a ${siguiente.name}`,
+        martialArtId: matricula.martialArtId,
+        refId: avance.id,
+      });
 
       // ¡Nuevo cinturón! El estudiante se entera al instante.
       await notificar(db, [matricula.studentUserId], {

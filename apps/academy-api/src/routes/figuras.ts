@@ -15,6 +15,7 @@ import { requireAcademy } from '../plugins/auth';
 import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
 import { notificar } from '../lib/notify';
+import { registrarActividad } from '../lib/activity';
 import { config } from '../config';
 
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.webm', '.avi', '.mkv']);
@@ -213,6 +214,15 @@ export async function figurasRoutes(app: FastifyInstance) {
           gradeNameSnapshot: mat.gradoActual.name,
         })
         .returning();
+
+      // Bitácora: figura enviada al análisis.
+      await registrarActividad(db, {
+        userId: req.user!.sub,
+        type: 'intento_figura',
+        detail: `Envió su figura «${fig.name}» al análisis`,
+        martialArtId: fig.martialArtId,
+        refId: intento.id,
+      });
 
       // Análisis en segundo plano: el estudiante consulta el estado por polling.
       const outDir = join('figuras/resultados', intento.id).replaceAll('\\', '/');

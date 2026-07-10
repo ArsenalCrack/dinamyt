@@ -5,6 +5,7 @@ import { requireAcademy } from '../plugins/auth';
 import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
 import { notificar, estudiantesDe } from '../lib/notify';
+import { registrarActividad } from '../lib/activity';
 
 const TIPOS = ['documento', 'video', 'imagen', 'texto'] as const;
 type TipoContenido = (typeof TIPOS)[number];
@@ -273,10 +274,21 @@ export async function contentsRoutes(app: FastifyInstance) {
       }
 
       // Idempotente: la restricción única ignora vistas repetidas.
-      await db
+      const insertadas = await db
         .insert(contentViews)
         .values({ contentId: id, studentUserId: req.user!.sub })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning();
+      // Bitácora solo en la PRIMERA vista (las repetidas no cuentan).
+      if (insertadas.length > 0) {
+        await registrarActividad(db, {
+          userId: req.user!.sub,
+          type: 'contenido_visto',
+          detail: `Vio «${unidad.title}»`,
+          martialArtId: unidad.martialArtId,
+          refId: unidad.id,
+        });
+      }
       return { ok: true };
     },
   );

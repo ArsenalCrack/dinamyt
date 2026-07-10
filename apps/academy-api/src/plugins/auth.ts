@@ -3,6 +3,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { JwtPayload, AcademyRole } from '@dinamyt/shared';
 import { config } from '../config';
 import { sincronizarUsuarioLocal, rolEfectivo } from '../lib/users';
+import { registrarIngreso } from '../lib/activity';
 
 /**
  * Verificador por defecto: descarga y cachea el JWKS del ecosystem y valida la
@@ -75,6 +76,9 @@ export function requireAcademy(roles?: AcademyRole[]) {
         error: `Tu rol no permite esta acción (requiere: ${roles.join(', ')}).`,
       });
     }
+
+    // Bitácora: «entró a la plataforma» (una vez por sesión de ~30 min).
+    await registrarIngreso(req.server.db, payload.sub);
 
     req.user = payload;
     req.academy = { usuario, rol };

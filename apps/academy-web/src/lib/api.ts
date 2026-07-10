@@ -483,6 +483,31 @@ export const getIntentosFiguraAPI = async (params: {
     })
   ).data as IntentoFigura[];
 
+// ── Historial de actividad (bitácora del maestro) ────────────────────────────
+export interface EventoHistorial {
+  id: string;
+  userId: string;
+  type: 'ingreso' | 'contenido_visto' | 'entrega' | 'intento_figura' | 'avance_grado';
+  detail: string | null;
+  refId: string | null;
+  createdAt: string;
+  fullName: string | null;
+  email: string | null;
+}
+export const getHistorialAPI = async (
+  martialArtId: string,
+  filtros: { studentUserId?: string; type?: string } = {},
+) =>
+  (
+    await api.get('/historial', {
+      params: {
+        martialArtId,
+        studentUserId: filtros.studentUserId || undefined,
+        type: filtros.type || undefined,
+      },
+    })
+  ).data as EventoHistorial[];
+
 /** Color aproximado del cinturón para la franja de grado. */
 export function colorCinturon(nombre: string): string {
   const n = nombre.toLowerCase();

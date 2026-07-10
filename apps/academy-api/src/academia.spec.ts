@@ -7,6 +7,7 @@ import type { Db } from '@dinamyt/academy-db';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app';
 import type { FigurasClient } from './lib/figuras-client';
+import { _resetVentanaIngresos } from './lib/activity';
 
 // Funciones académicas nuevas: notificaciones, anuncios, dashboard, fecha
 // límite de tareas y el módulo de figuras (con el microservicio SIMULADO).
@@ -208,6 +209,91 @@ describe('academy-api — académico + figuras', () => {
     expect(
       notifs.json().notificaciones.some((n: { type: string }) => n.type === 'anuncio'),
     ).toBe(true);
+    await app.close();
+  });
+
+  it('historial del maestro: ingreso, contenido visto y entrega quedan en la bitácora', async () => {
+    _resetVentanaIngresos(); // la ventana de sesión es global al proceso
+    const app = await makeApp();
+    const { maestro, alumno, hapkido, blanco } = await escenario(app);
+
+    // El maestro publica material y una tarea.
+    const unidad = (
+      await app.inject({
+        method: 'POST',
+        url: '/contents',
+        headers: maestro,
+        payload: {
+          martialArtId: hapkido.id,
+          gradeId: blanco.id,
+          title: 'Saludo tradicional',
+          type: 'texto',
+          body: 'Kyong-rye.',
+        },
+      })
+    ).json();
+    const tarea = (
+      await app.inject({
+        method: 'POST',
+        url: '/evaluations',
+        headers: maestro,
+        payload: {
+          martialArtId: hapkido.id,
+          gradeId: blanco.id,
+          title: 'Tarea del saludo',
+          kind: 'tarea',
+          preguntas: [{ type: 'evidencia', prompt: 'Video del saludo.', points: 1 }],
+        },
+      })
+    ).json();
+
+    // Actividad del alumno: entra (guard), ve la unidad DOS veces y entrega.
+    await app.inject({ method: 'GET', url: '/me', headers: alumno });
+    await app.inject({ method: 'POST', url: `/contents/${unidad.id}/view`, headers: alumno });
+    await app.inject({ method: 'POST', url: `/contents/${unidad.id}/view`, headers: alumno });
+    const detalle = (
+      await app.inject({ method: 'GET', url: `/evaluations/${tarea.id}`, headers: alumno })
+    ).json();
+    await app.inject({
+      method: 'POST',
+      url: `/evaluations/${tarea.id}/attempts`,
+      headers: alumno,
+      payload: {
+        respuestas: [{ questionId: detalle.preguntas[0].id, evidenceUrl: 'https://youtu.be/x' }],
+      },
+    });
+
+    // El maestro consulta el historial de SU arte.
+    const res = await app.inject({
+      method: 'GET',
+      url: `/historial?martialArtId=${hapkido.id}`,
+      headers: maestro,
+    });
+    expect(res.statusCode).toBe(200);
+    const eventos = res.json() as { type: string; detail: string; fullName: string | null }[];
+    const tipos = eventos.map((e) => e.type);
+    expect(tipos).toContain('ingreso');
+    expect(tipos).toContain('entrega');
+    // La vista repetida NO duplica el evento.
+    expect(tipos.filter((t) => t === 'contenido_visto')).toHaveLength(1);
+    expect(eventos.find((e) => e.type === 'entrega')!.detail).toContain('Tarea del saludo');
+    expect(eventos.find((e) => e.type === 'ingreso')!.fullName).toBe('Alumno Uno');
+
+    // Filtro por tipo.
+    const soloEntregas = await app.inject({
+      method: 'GET',
+      url: `/historial?martialArtId=${hapkido.id}&type=entrega`,
+      headers: maestro,
+    });
+    expect(soloEntregas.json().every((e: { type: string }) => e.type === 'entrega')).toBe(true);
+
+    // El alumno NO puede ver el historial.
+    const prohibido = await app.inject({
+      method: 'GET',
+      url: `/historial?martialArtId=${hapkido.id}`,
+      headers: alumno,
+    });
+    expect(prohibido.statusCode).toBe(403);
     await app.close();
   });
 
