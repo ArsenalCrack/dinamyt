@@ -202,6 +202,7 @@ export default function Progreso() {
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
           <input
             placeholder="Cuéntanos tu experiencia (grado, academia)…"
+            maxLength={500}
             value={msgSolicitud}
             onChange={(e) => setMsgSolicitud(e.target.value)}
             style={{ flex: 1, minWidth: 220 }}

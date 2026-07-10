@@ -162,6 +162,7 @@ export default function RendirEvaluacion({
                   <input
                     type="url"
                     placeholder="https://youtu.be/…"
+                    maxLength={300}
                     value={respuestas[p.id] ?? ''}
                     onChange={(e) => setRespuestas({ ...respuestas, [p.id]: e.target.value })}
                     style={{ marginTop: '0.35rem' }}

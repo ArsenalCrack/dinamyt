@@ -203,6 +203,7 @@ export default function Revisar({ params }: { params: Promise<{ id: string }> })
                             Retroalimentación
                             <input
                               value={notas[r.id]?.feedback ?? ''}
+                              maxLength={300}
                               onChange={(e) =>
                                 setNotas({
                                   ...notas,

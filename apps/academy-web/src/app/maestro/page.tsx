@@ -184,20 +184,20 @@ function TabContenidos({ arte }: { arte: Arte }) {
           </div>
         </div>
         <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Título</label>
-        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} required style={{ marginTop: '0.25rem' }} />
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} required maxLength={160} style={{ marginTop: '0.25rem' }} />
         <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Descripción (opcional)</label>
-        <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ marginTop: '0.25rem' }} />
+        <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={300} style={{ marginTop: '0.25rem' }} />
         {tipo === 'texto' ? (
           <>
             <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Contenido</label>
-            <textarea rows={5} value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} style={{ marginTop: '0.25rem' }} />
+            <textarea rows={5} value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} maxLength={8000} style={{ marginTop: '0.25rem' }} />
           </>
         ) : (
           <>
             <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>
               URL {tipo === 'video' ? '(YouTube o Google Drive)' : '(Storage/Drive, máx. 50 MB por archivo)'}
             </label>
-            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} style={{ marginTop: '0.25rem' }} />
+            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={300} style={{ marginTop: '0.25rem' }} />
           </>
         )}
         {error && <p className="msg-error" style={{ marginTop: '0.7rem', fontSize: '0.85rem' }}>{error}</p>}
@@ -428,9 +428,9 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
             </div>
           </div>
           <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Título</label>
-          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} required style={{ marginTop: '0.25rem' }} />
+          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} required maxLength={160} style={{ marginTop: '0.25rem' }} />
           <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>Descripción (opcional)</label>
-          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ marginTop: '0.25rem' }} />
+          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={300} style={{ marginTop: '0.25rem' }} />
 
           {preguntas.map((p, i) => (
             <div key={i} className="card" style={{ padding: '0.9rem 1rem', marginTop: '0.9rem', background: 'var(--bg-elevated)' }}>
@@ -458,6 +458,7 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
               </div>
               <input
                 placeholder="Enunciado de la pregunta…"
+                maxLength={500}
                 value={p.prompt}
                 onChange={(e) => actualizarPregunta(i, { prompt: e.target.value })}
                 required
@@ -479,6 +480,7 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
                       />
                       <input
                         placeholder={`Opción ${j + 1}`}
+                        maxLength={200}
                         value={o.text}
                         onChange={(e) =>
                           actualizarPregunta(i, {
@@ -681,6 +683,7 @@ function TabEstudiantes({ arte }: { arte: Arte }) {
           <input
             type="email"
             placeholder="correo@delestudiante.com"
+            maxLength={160}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -826,6 +829,7 @@ function TabAnuncios({ arte }: { arte: Arte }) {
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
           <input
             placeholder="Título (ej. Examen de ascenso el sábado)"
+            maxLength={160}
             value={titulo}
             onChange={(e) => setTitulo(e.target.value)}
             required
@@ -841,6 +845,7 @@ function TabAnuncios({ arte }: { arte: Arte }) {
         <textarea
           rows={3}
           placeholder="Detalles (opcional)…"
+          maxLength={2000}
           value={cuerpo}
           onChange={(e) => setCuerpo(e.target.value)}
         />
@@ -949,6 +954,7 @@ function TabFiguras({ arte }: { arte: Arte }) {
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
           <input
             placeholder="Nombre (ej. Figura 1 — Il Bon)"
+            maxLength={160}
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             required
@@ -962,6 +968,7 @@ function TabFiguras({ arte }: { arte: Arte }) {
         </div>
         <input
           placeholder="Descripción (opcional)"
+          maxLength={300}
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
           style={{ marginBottom: '0.6rem' }}
@@ -1083,11 +1090,22 @@ const EVENTO_HISTORIAL: Record<string, { icono: string; etiqueta: string }> = {
   avance_grado: { icono: '⬆️', etiqueta: 'Ascenso' },
 };
 
+/** Apartados del historial: el maestro abre directo en ENTREGAS para no
+ *  perderse ninguna tarea entregada. */
+const APARTADOS_HISTORIAL: [string, string][] = [
+  ['entrega', '📤 Entregas'],
+  ['contenido_visto', '👁️ Material visto'],
+  ['ingreso', '🚪 Ingresos'],
+  ['intento_figura', '🥋 Figuras'],
+  ['avance_grado', '⬆️ Ascensos'],
+  ['', 'Todo'],
+];
+
 function TabHistorial({ arte }: { arte: Arte }) {
   const [eventos, setEventos] = useState<EventoHistorial[]>([]);
   const [estudiantes, setEstudiantes] = useState<EstudiantePanel[]>([]);
   const [filtroEstudiante, setFiltroEstudiante] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('entrega');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(true);
 
@@ -1111,7 +1129,7 @@ function TabHistorial({ arte }: { arte: Arte }) {
 
   useEffect(() => {
     setFiltroEstudiante('');
-    setFiltroTipo('');
+    setFiltroTipo('entrega');
     getEstudiantesAPI(arte.id).then(setEstudiantes).catch(() => setEstudiantes([]));
   }, [arte]);
   useEffect(() => {
@@ -1128,34 +1146,32 @@ function TabHistorial({ arte }: { arte: Arte }) {
 
   return (
     <div className="card" style={{ padding: '1.1rem 1.25rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
         <h3 className="eyebrow">Actividad de tus estudiantes</h3>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <select
-            value={filtroEstudiante}
-            onChange={(e) => setFiltroEstudiante(e.target.value)}
-            style={{ maxWidth: 210 }}
+        <select
+          value={filtroEstudiante}
+          onChange={(e) => setFiltroEstudiante(e.target.value)}
+          style={{ maxWidth: 210, marginLeft: 'auto' }}
+        >
+          <option value="">Todos los estudiantes</option>
+          {estudiantes.map((s) => (
+            <option key={s.studentUserId} value={s.studentUserId}>
+              {s.fullName ?? s.email ?? s.studentUserId.slice(0, 8)}
+            </option>
+          ))}
+        </select>
+      </div>
+      {/* Apartados separados por tipo: el maestro no se pierde una entrega. */}
+      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+        {APARTADOS_HISTORIAL.map(([valor, etiqueta]) => (
+          <button
+            key={valor}
+            className={filtroTipo === valor ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
+            onClick={() => setFiltroTipo(valor)}
           >
-            <option value="">Todos los estudiantes</option>
-            {estudiantes.map((s) => (
-              <option key={s.studentUserId} value={s.studentUserId}>
-                {s.fullName ?? s.email ?? s.studentUserId.slice(0, 8)}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filtroTipo}
-            onChange={(e) => setFiltroTipo(e.target.value)}
-            style={{ maxWidth: 180 }}
-          >
-            <option value="">Todos los eventos</option>
-            <option value="ingreso">🚪 Ingresos</option>
-            <option value="contenido_visto">👁️ Material visto</option>
-            <option value="entrega">📤 Entregas</option>
-            <option value="intento_figura">🥋 Figuras</option>
-            <option value="avance_grado">⬆️ Ascensos</option>
-          </select>
-        </div>
+            {etiqueta}
+          </button>
+        ))}
       </div>
       <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.8rem' }}>
         Cuándo entran a la plataforma, ven el material, entregan tareas, envían

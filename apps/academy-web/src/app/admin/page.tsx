@@ -122,11 +122,11 @@ function TabArtes({ artes, recargar }: { artes: Arte[]; recargar: () => Promise<
         <form onSubmit={crear} className="card" style={{ padding: '1.1rem 1.25rem' }}>
           <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Nueva arte marcial</h3>
           <label className="muted" style={{ fontSize: '0.78rem' }}>Nombre</label>
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} required style={{ margin: '0.25rem 0 0.7rem' }} />
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)} required maxLength={120} style={{ margin: '0.25rem 0 0.7rem' }} />
           <label className="muted" style={{ fontSize: '0.78rem' }}>Descripción</label>
-          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ margin: '0.25rem 0 0.7rem' }} />
+          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={300} style={{ margin: '0.25rem 0 0.7rem' }} />
           <label className="muted" style={{ fontSize: '0.78rem' }}>Federación de referencia</label>
-          <input value={federacion} onChange={(e) => setFederacion(e.target.value)} style={{ margin: '0.25rem 0 0.7rem' }} />
+          <input value={federacion} onChange={(e) => setFederacion(e.target.value)} maxLength={160} style={{ margin: '0.25rem 0 0.7rem' }} />
           <label className="muted" style={{ fontSize: '0.78rem' }}>
             Sistema de grados: uno por línea, en orden (opcional «Nombre | GRUPO»)
           </label>
@@ -135,6 +135,7 @@ function TabArtes({ artes, recargar }: { artes: Arte[]; recargar: () => Promise<
             placeholder={'Blanco | BLANCO\nAmarillo | PRINCIPIANTE\n…'}
             value={gradosTexto}
             onChange={(e) => setGradosTexto(e.target.value)}
+            maxLength={2000}
             required
             style={{ margin: '0.25rem 0 0.7rem', fontFamily: 'var(--font-mono)' }}
           />
@@ -180,6 +181,7 @@ function TabArtes({ artes, recargar }: { artes: Arte[]; recargar: () => Promise<
                 <input
                   type="email"
                   placeholder="correo@delmaestro.com"
+                  maxLength={160}
                   value={emailMaestro}
                   onChange={(e) => setEmailMaestro(e.target.value)}
                   style={{ flex: 1, minWidth: 200 }}
