@@ -1,0 +1,10 @@
+# Dependencias del microservicio de figuras (SIN torch: no se usa la CNN-LSTM;
+# el estudiante elige la figura → basta MediaPipe + DTW).
+mediapipe>=0.10.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+scipy>=1.11.0
+dtw-python>=1.3.0
+matplotlib>=3.7.0
+fastapi>=0.110.0
+uvicorn>=0.29.0

@@ -26,3 +26,11 @@ pnpm-debug.log*
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Almacen local de archivos de Academy (videos de figuras, reportes)
+.uploads/
+
+# Python (microservicio de figuras)
+.venv/
+__pycache__/
+*.pyc

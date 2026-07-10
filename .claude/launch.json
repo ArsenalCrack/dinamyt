@@ -60,6 +60,16 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dinamyt/academy-web", "dev"],
       "port": 3008
+    },
+    {
+      "name": "academy-figuras",
+      "runtimeExecutable": "apps/academy-figuras/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m", "uvicorn", "service.main:app",
+        "--port", "3009",
+        "--app-dir", "apps/academy-figuras"
+      ],
+      "port": 3009
     }
   ]
 }
