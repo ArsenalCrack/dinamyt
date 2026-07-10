@@ -1,4 +1,6 @@
 import { eq } from 'drizzle-orm';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { martialArts, grades } from './schema';
 
 /**
@@ -20,35 +22,22 @@ export const HAPKIDO_GRADOS: { nombre: string; grupo: string }[] = [
   { nombre: 'Negro', grupo: 'NEGRO' },
 ];
 
-/** BD mínima que el seed necesita (sirve el client real, PGlite o el de tests). */
-type DbLike = {
-  select: (...args: never[]) => unknown;
-  insert: (...args: never[]) => unknown;
-};
+/** Base común de Drizzle sobre Postgres: cubre postgres-js Y PGlite. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPgDb = PgDatabase<PgQueryResultHKT, any, any>;
 
 /**
  * Siembra idempotente del arte marcial inicial: Hapkido con sus 11 cinturones
  * (RF-ACA-07). Si Hapkido ya existe, no hace nada.
  */
-export async function seedAcademy(db: unknown): Promise<void> {
-  const d = db as {
-    select: () => {
-      from: (t: typeof martialArts) => {
-        where: (c: unknown) => Promise<{ id: string }[]>;
-      };
-    };
-    insert: (t: typeof martialArts | typeof grades) => {
-      values: (v: unknown) => { returning: () => Promise<{ id: string }[]> };
-    };
-  };
-
-  const existentes = await d
-    .select()
+export async function seedAcademy(db: AnyPgDb): Promise<void> {
+  const existentes = await db
+    .select({ id: martialArts.id })
     .from(martialArts)
     .where(eq(martialArts.name, 'Hapkido'));
   if (existentes.length > 0) return;
 
-  const [hapkido] = await d
+  const [hapkido] = await db
     .insert(martialArts)
     .values({
       name: 'Hapkido',
@@ -57,17 +46,14 @@ export async function seedAcademy(db: unknown): Promise<void> {
         'Global Hapkido Association y la academia Hapkido del Cóndor.',
       federation: 'Global Hapkido Association (GHA)',
     })
-    .returning();
+    .returning({ id: martialArts.id });
 
-  await d
-    .insert(grades)
-    .values(
-      HAPKIDO_GRADOS.map((g, i) => ({
-        martialArtId: hapkido.id,
-        name: g.nombre,
-        groupName: g.grupo,
-        orderIndex: i + 1,
-      })),
-    )
-    .returning();
+  await db.insert(grades).values(
+    HAPKIDO_GRADOS.map((g, i) => ({
+      martialArtId: hapkido.id,
+      name: g.nombre,
+      groupName: g.grupo,
+      orderIndex: i + 1,
+    })),
+  );
 }
