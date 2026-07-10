@@ -1,6 +1,35 @@
 # DINAMYT — Estado del proyecto y Handoff
 
-> Documento vivo. Última actualización: 2026-07-06.
+> Documento vivo. Última actualización: 2026-07-09.
+>
+> **2026-07-09 — DINAMYT Academy MONTADA (rama `feat/academy`):**
+> - **`@dinamyt/academy-db`**: schema Postgres `academy` (13 tablas): artes
+>   marciales + grados, usuarios locales espejo, matrículas con avance de grado
+>   (historial INMUTABLE por snapshots de texto), contenidos por grado con
+>   vistas, evaluaciones (opción múltiple + evidencias) con intentos/respuestas.
+>   Seed idempotente de **Hapkido GHA con los 11 cinturones** (mismo catálogo de
+>   Campeonatos). Migración 0000 + `./testing` (PGlite) + 4 tests.
+> - **`@dinamyt/academy-api`** (Fastify :3007): guard RS256 vs JWKS + scope
+>   `academy` (RF-ACA-01/02); sincroniza perfil local (RF-ACA-05) y resuelve el
+>   rol efectivo — rol local del admin > `role_academy` del token (normaliza
+>   maestro/owner→teacher/admin) > student. Módulos: artes marciales y
+>   asignación de maestros (RF-ACA-06..09), contenidos con bloqueo por grado y
+>   marcado de vista (RF-ACA-10..15), evaluaciones con auto-calificación MC +
+>   evidencias del maestro y nota ponderada (RF-ACA-16..21), progreso/matrícula/
+>   avance de grado (RF-ACA-22..25), `GET /users/:id/academy-summary`
+>   (RF-ACA-04) y administración: roles locales, suspensión/soft-delete,
+>   solicitudes de maestro, reportes (RF-ACA-26..28). **12 tests** (PGlite).
+> - **`@dinamyt/academy-web`** (Next 16 PWA :3008): SSO por fragmento desde el
+>   portal + login per-app; estudiante (Aprender con grados bloqueados, rendir
+>   evaluaciones, Mi progreso con historial), maestro (contenidos, constructor
+>   de evaluaciones, revisión de evidencias con feedback, matrícula, avance de
+>   grado, seguimiento grupal) y admin (artes, usuarios, solicitudes, reportes).
+> - **Integración**: dashboard del portal con «Entrar a Academy» (SSO real, ya
+>   no «próximamente»), origen 3008 permitido en el redirect del login y en
+>   CORS del ecosystem; `launch.json` con academy-api/web; seed local con
+>   `profesor@dinamyt.com` / `estudiante@dinamyt.com` (org ACADEMY + Plan
+>   Academy). `AcademyRole` en `@dinamyt/shared`.
+> - Verificado: `turbo build` 15/15 · `turbo test` 15/15 · flujo E2E en vivo.
 >
 > **2026-07-06 — lote de 24 ajustes de producto (verificados en vivo):**
 > - **Perfil del ecosystem**: nombre solo letras (se guarda en MAYÚSCULAS),
@@ -144,7 +173,9 @@
    propia: delegan en él y solo **verifican** el token + exigen su `app_scope`.
 2. **DINAMYT Campeonatos** — gestión de campeonatos de Hapkido (inscripción,
    categorización, puntuación en vivo, resultados públicos).
-3. **DINAMYT Academy** — plataforma de enseñanza (aún no iniciada).
+3. **DINAMYT Academy** — plataforma de enseñanza por grado de cinturón
+   (contenidos, evaluaciones con evidencias, progreso y certificación de grado).
+   **Montada el 2026-07-09** (api :3007 + web :3008).
 
 Existe además, **fuera del ecosistema TS**, el **Sistema Inteligente Hapkido**
 (visión por computador + DTW, Python) — proyecto aparte; futuro microservicio de
@@ -184,17 +215,25 @@ dinamyt/
 ├── packages/
 │   ├── shared/             @dinamyt/shared            ✅ contrato JWT + enums
 │   ├── campeonatos-db/      @dinamyt/campeonatos-db   ✅ schema Drizzle + migración + ./testing
-│   └── campeonatos-core/    @dinamyt/campeonatos-core ✅ dominio puro (categorización, puntuación, brackets, saltos, combate)
+│   ├── campeonatos-core/    @dinamyt/campeonatos-core ✅ dominio puro (categorización, puntuación, brackets, saltos, combate)
+│   ├── membresias-db/       @dinamyt/membresias-db    ✅ schema `membresias` (planes, pagos, asistencia, avisos)
+│   └── academy-db/          @dinamyt/academy-db       ✅ schema `academy` (artes, grados, contenidos, evaluaciones, progreso)
 └── apps/
     ├── ecosystem-api/       @dinamyt/ecosystem-api    ✅ NestJS — identidad central
     ├── ecosystem-portal/    @dinamyt/ecosystem-portal ✅ Next 16 — login/registro/dashboard/planes
     ├── campeonatos-api/     @dinamyt/campeonatos-api  ✅ Fastify — endpoints reales
     ├── campeonatos-web/     @dinamyt/campeonatos-web  ✅ Next 16 — pantalla pública + panel admin
-    └── campeonatos-combat/  @dinamyt/campeonatos-combat ✅ WebSocket (ws) — combate en vivo offline
+    ├── campeonatos-combat/  @dinamyt/campeonatos-combat ✅ WebSocket (ws) — combate en vivo offline
+    ├── membresias-api/      @dinamyt/membresias-api   ✅ Fastify — mensualidades/asistencia/avisos
+    ├── membresias-web/      @dinamyt/membresias-web   ✅ Next 16 PWA — panel del club + kiosco + /mi
+    ├── membresias-agent/    @dinamyt/membresias-agent ✅ agente local del lector (mock)
+    ├── academy-api/         @dinamyt/academy-api      ✅ Fastify — enseñanza por grado (RF-ACA)
+    └── academy-web/         @dinamyt/academy-web      ✅ Next 16 PWA — aprender/maestro/admin
 ```
 
-Estado global: **`turbo build` 8/8** · **`turbo test` 8/8** (core 44 · db 3 ·
-campeonatos-api 14 · combat 2 · ecosystem-api 4) · ✅.
+Estado global: **`turbo build` 15/15** · **`turbo test` 15/15** (core 44 ·
+campeonatos-api 15 · membresias-api 27 · academy-api 12 · academy-db 4 ·
+ecosystem-api 7 · …) · ✅.
 **Fases 1-3 de la fusión HECHAS** + jueces por tatami, catálogo geográfico,
 pantalla pública en vivo, logo oficial (de COMBAT), landing y panel de
 administración del ecosystem — ver `PLAN_FUSION.md` §8 para el orden de lo que
@@ -225,8 +264,12 @@ PGlite (tests de BD en memoria).
 | ecosystem-api | 3001 |
 | campeonatos-api | 3002 |
 | campeonatos-web | 3003 |
-| academy-web (futuro) | 3004 |
+| membresias-api | 3004 |
 | campeonatos-combat (WS) | 3005 |
+| membresias-web | 3006 |
+| academy-api | 3007 |
+| academy-web | 3008 |
+| membresias-agent (lector) | 7070 |
 
 ---
 
@@ -314,7 +357,9 @@ todos los datos (cinturón, peso, club, edad, nombre…).
 - [ ] Snapshot completo por participación (hecho: cinturón + peso en la inscripción;
       falta club/edad/nombre y aplicar el mismo criterio a los resultados).
 - [ ] `GET /users/:id/campeonatos-summary` — historial de campeonatos del usuario.
-- [ ] Historial/progreso académico en Academy (cuando se inicie).
+- [x] Historial/progreso académico en Academy (2026-07-09): avances de grado con
+      snapshot de texto (`grade_advancements`) e intentos con el cinturón del
+      momento (`attempts.grade_name_snapshot`).
 - [ ] Perfil unificado en el portal del ecosystem (RF-ECO-10/22) que combina ambos.
 
 **Campeonatos**
@@ -355,11 +400,16 @@ todos los datos (cinturón, peso, club, edad, nombre…).
       `user_disciplines` (grado/cinturón). Ver `PLAN_MEMBRESIAS.md` §6 y el README del
       ecosystem-api. Falta también el scope `membresias` + `role_membresias` en el JWT.
 
-**Academy**: no iniciada.
+**Academy** — MONTADA el 2026-07-09 (ver entrada al inicio del doc). Pendiente:
+- [ ] Subida real de archivos a Supabase Storage (RF-ACA-11); hoy documentos/
+      imágenes van por URL (Drive/Storage externo) y videos embebidos (RF-ACA-12 ✅).
+- [ ] Consumir `GET /users/:id/academy-summary` desde el perfil unificado del
+      portal (el endpoint ya existe).
+- [ ] PWA offline (Service Worker) — el manifest instalable ya está.
+- [ ] Editar preguntas de una evaluación ya publicada (hoy: eliminar y recrear).
 
-**Membresías** (nueva app — control de mensualidades/asistencia): planificada en
-`PLAN_MEMBRESIAS.md`. Servicio nuevo (`membresias-api` + `membresias-web`) federado
-sobre esta identidad. No iniciada.
+**Membresías** (control de mensualidades/asistencia): MONTADA (ver entradas
+2026-07-04/06). Plan original en `PLAN_MEMBRESIAS.md`.
 
 **Operación / infra (tareas de Amir)**
 - [ ] Migraciones contra Postgres real: ecosystem (`DATABASE_URL`) y campeonatos

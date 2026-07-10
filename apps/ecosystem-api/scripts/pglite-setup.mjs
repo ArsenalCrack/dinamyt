@@ -222,5 +222,69 @@ for (const [email, name, role, doc] of demosMem) {
   console.log(`[ecosystem] usuario demo membresías: ${email} (${role}) / Demo1234!`);
 }
 
+// ── Escenario demo de ACADEMY ──
+// Academia con Plan Academy activo + un maestro y un estudiante. Sus tokens
+// traen scope 'academy' y role_academy (maestro/student); academy-api lo
+// normaliza a teacher/student.
+const planAca = (
+  await pg.query("select id from ecosystem.subscription_plans where name = 'Plan Academy'")
+).rows[0];
+
+let orgAca = (
+  await pg.query("select id from ecosystem.organizations where name = 'Academia Academy Demo'")
+).rows[0];
+if (!orgAca) {
+  orgAca = (
+    await pg.query(
+      "insert into ecosystem.organizations (name, type) values ('Academia Academy Demo','ACADEMY') returning id",
+    )
+  ).rows[0];
+  console.log('[ecosystem] org demo creada: Academia Academy Demo');
+}
+if (planAca) {
+  const subAca = (
+    await pg.query('select 1 from ecosystem.subscriptions where org_id = $1', [orgAca.id])
+  ).rows[0];
+  if (!subAca) {
+    await pg.query(
+      `insert into ecosystem.subscriptions (org_id, plan_id, status, starts_at, ends_at)
+       values ($1,$2,'ACTIVE', now(), now() + interval '1 year')`,
+      [orgAca.id, planAca.id],
+    );
+    console.log('[ecosystem] suscripción activa (Plan Academy) para la academia');
+  }
+}
+
+const demosAca = [
+  ['profesor@dinamyt.com', 'Maestro Academy (Hapkido)', 'maestro', '4000000001'],
+  ['estudiante@dinamyt.com', 'Estudiante Academy', 'student', '4000000002'],
+];
+for (const [email, name, role, doc] of demosAca) {
+  let u = (await pg.query('select id from ecosystem.users where email = $1', [email])).rows[0];
+  if (!u) {
+    u = (
+      await pg.query(
+        `insert into ecosystem.users (email, document_id, full_name, password_hash, is_email_verified, is_active, data_consent_at)
+         values ($1,$2,$3,$4,true,true,now()) returning id`,
+        [email, doc, name, hashDemo],
+      )
+    ).rows[0];
+  }
+  const mem = (
+    await pg.query('select 1 from ecosystem.org_members where org_id = $1 and user_id = $2', [
+      orgAca.id,
+      u.id,
+    ])
+  ).rows[0];
+  if (!mem) {
+    await pg.query('insert into ecosystem.org_members (org_id, user_id, role) values ($1,$2,$3)', [
+      orgAca.id,
+      u.id,
+      role,
+    ]);
+  }
+  console.log(`[ecosystem] usuario demo academy: ${email} (${role}) / Demo1234!`);
+}
+
 await pg.close();
 console.log('[ecosystem] setup completado.');

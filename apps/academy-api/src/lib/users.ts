@@ -55,13 +55,21 @@ export async function sincronizarUsuarioLocal(
 /**
  * Rol efectivo en Academy: el rol LOCAL asignado por el admin prevalece sobre
  * el `role_academy` del token; sin ninguno, se asume estudiante. El super
- * admin del ecosistema opera como admin de Academy.
+ * admin del ecosistema opera como admin de Academy. El ecosystem emite como
+ * `role_academy` el rol de la MEMBRESÍA de la org (maestro/owner/student…),
+ * así que aquí se normaliza al catálogo local (admin/teacher/student).
  */
 export function rolEfectivo(payload: JwtPayload, usuario: UsuarioLocal): AcademyRole {
   if (payload.is_super_admin) return 'admin';
   if (usuario.localRole) return usuario.localRole;
-  const delToken = payload.role_academy as AcademyRole | null;
-  return delToken && ROLES_VALIDOS.includes(delToken) ? delToken : 'student';
+  const delToken = (payload.role_academy ?? '').toLowerCase();
+  if (delToken === 'admin' || delToken === 'owner') return 'admin';
+  if (delToken === 'teacher' || delToken === 'maestro' || delToken === 'coach') {
+    return 'teacher';
+  }
+  return ROLES_VALIDOS.includes(delToken as AcademyRole)
+    ? (delToken as AcademyRole)
+    : 'student';
 }
 
 /**

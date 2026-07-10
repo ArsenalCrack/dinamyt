@@ -46,6 +46,9 @@ Las líneas clave (ya puestas):
 | `apps/campeonatos-api/.env` | `CAMPEONATOS_PGLITE_DATA` | `D:/Repositorios/dinamyt/.localdb/campeonatos` |
 | `apps/campeonatos-api/.env` | `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3003` |
 | `packages/campeonatos-db/.env` | `CAMPEONATOS_PGLITE_DATA` | `D:/Repositorios/dinamyt/.localdb/campeonatos` |
+| `apps/academy-api/.env` | `ACADEMY_PGLITE_DATA` | `D:/Repositorios/dinamyt/.localdb/academy` |
+| `apps/academy-api/.env` | `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3008` |
+| `packages/academy-db/.env` | `ACADEMY_PGLITE_DATA` | `D:/Repositorios/dinamyt/.localdb/academy` |
 
 Cuando `PGLITE_DATA` / `CAMPEONATOS_PGLITE_DATA` están definidas, los clientes de
 BD usan PGlite embebido y **ignoran** `DATABASE_URL` / `CAMPEONATOS_DATABASE_URL`.
@@ -68,6 +71,9 @@ pnpm --filter @dinamyt/ecosystem-api db:local:setup
 
 # Campeonatos: migraciones
 pnpm --filter @dinamyt/campeonatos-db db:local:setup
+
+# Academy: migraciones + seed de Hapkido (11 cinturones)
+pnpm --filter @dinamyt/academy-db db:local:setup
 ```
 
 > ⚠️ **PGlite es monoproceso**: ejecuta estos setups con las APIs **apagadas**.
@@ -93,6 +99,8 @@ suscripción activa) para probar los accesos:
 | `alumno1@dinamyt.com` | `Demo1234!` | student | Portal del alumno en Membresías |
 | `alumno2@dinamyt.com` | `Demo1234!` | student | Portal del alumno en Membresías |
 | `juezesquina@dinamyt.com` | `Demo1234!` | judge | Juez de esquina de prueba (se asigna a tatamis) |
+| `profesor@dinamyt.com` | `Demo1234!` | maestro (Academy) | Panel del maestro en :3008 (contenidos, evaluaciones, avances) |
+| `estudiante@dinamyt.com` | `Demo1234!` | student (Academy) | Aprender / evaluaciones / progreso en :3008 |
 
 > **Datos de prueba de un campeonato** (secciones por modalidad + competidores
 > + jueces asignados): con la **API de campeonatos apagada** (PGlite es
@@ -123,6 +131,8 @@ pnpm --filter @dinamyt/campeonatos-web dev         # :3003  Web Campeonatos (Nex
 pnpm --filter @dinamyt/membresias-api dev          # :3004  API Membresías (Fastify)
 pnpm --filter @dinamyt/campeonatos-combat dev      # :3005  Combate en vivo (WebSocket)
 pnpm --filter @dinamyt/membresias-web dev          # :3006  Web Membresías (Next PWA)
+pnpm --filter @dinamyt/academy-api dev             # :3007  API Academy (Fastify)
+pnpm --filter @dinamyt/academy-web dev             # :3008  Web Academy (Next PWA)
 pnpm --filter @dinamyt/membresias-agent dev        # :7070  Agente del lector (mock)
 ```
 
@@ -130,8 +140,10 @@ pnpm --filter @dinamyt/membresias-agent dev        # :7070  Agente del lector (m
 | --- | --- |
 | Portal del ecosistema | http://localhost:3000 |
 | Web de Campeonatos (admin + pantalla) | http://localhost:3003 |
+| Web de Academy (aprender + maestro + admin) | http://localhost:3008 |
 | API ecosystem / JWKS | http://localhost:3001/auth/jwks |
 | API campeonatos / health | http://localhost:3002/health |
+| API academy / health | http://localhost:3007/health |
 
 ---
 
@@ -162,6 +174,29 @@ pnpm --filter @dinamyt/membresias-agent dev        # :7070  Agente del lector (m
      resultado** persiste el combate en el campeonato.
 7. **Pantalla pública** → http://localhost:3003/pantalla (campeonatos `EN_CURSO`).
 
+**Recorrido de Academy** (con `ecosystem-api`, `academy-api` y `academy-web` arriba):
+
+1. **Maestro** → http://localhost:3008/login con `profesor@dinamyt.com` (o entra
+   por el dashboard del portal: «Entrar a Academy», SSO sin segundo login).
+   El seed ya trae **Hapkido con 11 cinturones**; el super-admin debe asignarle
+   el arte al maestro una vez (Administración → Artes marciales → Maestros →
+   `profesor@dinamyt.com`).
+2. **Publicar material** → Panel del maestro → Contenidos: publica una lectura o
+   un video de YouTube para el cinturón Blanco.
+3. **Crear evaluación** → pestaña Evaluaciones: preguntas de opción múltiple
+   (auto-calificadas) y/o de evidencia (URL de video), con peso configurable.
+4. **Matricular** → pestaña Estudiantes: matricula a `estudiante@dinamyt.com`
+   (grado inicial Blanco).
+5. **Estudiante** → entra con `estudiante@dinamyt.com`: en «Aprender» ve SOLO
+   Blanco (los demás grados aparecen bloqueados), abre el material (queda
+   «visto»), rinde la evaluación en «Evaluaciones» y revisa «Mi progreso».
+6. **Calificar y avanzar** → el maestro revisa evidencias (pestaña
+   Evaluaciones → Ver intentos → Calificar) y certifica el avance de grado
+   (Estudiantes → ⬆ Avanzar grado). El historial del estudiante conserva el
+   cinturón con el que rindió (inmutable).
+7. **Perfil unificado** → `GET :3007/users/{id}/academy-summary` alimenta al
+   portal con arte, cinturón actual y último avance.
+
 > **Atajo para probar solo el combate (sin BD ni login):** levanta únicamente
 > `campeonatos-combat` (:3005) y `campeonatos-web` (:3003) y entra directo a
 > http://localhost:3003/admin/combate. El motor de combate es 100% offline
@@ -172,8 +207,8 @@ pnpm --filter @dinamyt/membresias-agent dev        # :7070  Agente del lector (m
 ## 5. Verificar que todo está sano
 
 ```powershell
-pnpm build     # turbo 8/8
-pnpm test      # core + db + api + combat verdes
+pnpm build     # turbo 15/15
+pnpm test      # core + db + api + combat + membresias + academy verdes (15/15)
 ```
 
 ---
