@@ -1,36 +1,21 @@
-# DINAMYT — Monorepo
+# DINAMYT — Ecosistema digital del deporte marcial
 
-Ecosistema digital para la gestión del deporte marcial (Hapkido). Monorepo
-gestionado con **pnpm workspaces** + **Turborepo**. Cada app es independiente y
-desplegable por separado; comparten un único **contrato de identidad**.
+Monorepo (pnpm + Turborepo, TypeScript full-stack) del ecosistema DINAMYT:
+identidad única + apps federadas por suscripción (JWT RS256 verificado contra
+`/auth/jwks`; ninguna app tiene login propio).
 
-## Estructura
+| App | Puerto dev | Qué es |
+| --- | --- | --- |
+| `apps/ecosystem-api` | 3001 | Identidad y suscripciones (NestJS) |
+| `apps/ecosystem-portal` | 3000 | Portal: login/registro, dashboard, planes, admin (Next) |
+| `apps/campeonatos-api` / `-web` / `-combat` | 3002 / 3003 / 3005 | Torneos con puntuación en vivo (Fastify / Next / WebSocket) |
+| `apps/membresias-api` / `-web` / `-agent` | 3004 / 3006 / 7070 | Mensualidades, asistencia y kiosco del club |
+| `apps/academy-api` / `-web` | 3007 / 3008 | Enseñanza por cinturón: contenidos, tareas, notas, historial (PWA) |
+| `apps/academy-figuras` | 3009 | IA de figuras: MediaPipe + DTW, correcciones con timestamps (Python) |
+| `packages/shared` · `*-db` · `campeonatos-core` | — | Contrato JWT, esquemas Drizzle y dominio puro |
 
-```
-dinamyt/
-├── apps/
-│   └── ecosystem-api/    Servicio central de identidad y suscripciones (NestJS)
-│       (próximamente: ecosystem-portal, campeonatos-web/api/combat, academy-*)
-└── packages/
-    └── shared/           @dinamyt/shared — contrato compartido (tipos del JWT, enums)
-```
+- **Correr en local**: ver [RUN_LOCAL.md](RUN_LOCAL.md) (PGlite embebido, sin Docker).
+- **Desplegar gratis en la web**: ver [DESPLIEGUE_WEB.md](DESPLIEGUE_WEB.md).
+- **Estado del proyecto / handoff**: ver [HANDOFF.md](HANDOFF.md).
 
-> Las apps **delegan la autenticación** en `ecosystem-api`: este firma un JWT
-> RS256 y publica la clave en `/auth/jwks`; las demás solo lo verifican y exigen
-> su `app_scope` (`academy`, `campeonatos`). El contrato vive en `@dinamyt/shared`
-> para que emisor y consumidores no se desincronicen.
-
-## Requisitos
-
-- Node.js 18+
-- pnpm 11+ (`corepack enable` activa la versión fijada en `packageManager`)
-
-## Uso
-
-```bash
-pnpm install          # instala todas las workspaces
-pnpm build            # build de todo el grafo (turbo respeta dependencias)
-pnpm dev              # modo desarrollo
-```
-
-Para correr una app concreta, ver su README (ej. `apps/ecosystem-api/README.md`).
+Verificación: `pnpm build` y `pnpm test` (Turbo, 15/15).
