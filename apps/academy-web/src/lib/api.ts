@@ -352,6 +352,43 @@ export function archivoUrl(rel: string | null | undefined): string | null {
   return rel ? `${API_URL}/files/${rel}` : null;
 }
 
+/** ¿La URL es una ruta local del almacén (archivo subido) o un enlace externo? */
+export function esArchivoLocal(url: string | null | undefined): boolean {
+  return !!url && !/^https?:\/\//i.test(url);
+}
+
+/** URL final de un contenido/evidencia: externa tal cual, local vía /files. */
+export function resolverArchivo(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return esArchivoLocal(url) ? archivoUrl(url) : url;
+}
+
+/** Sube la evidencia de una tarea (video/imagen/PDF) y devuelve su ruta. */
+export const subirEvidenciaAPI = async (file: File) => {
+  const fd = new FormData();
+  fd.append('archivo', file, file.name);
+  return (await api.post('/uploads/evidencia', fd)).data as { url: string };
+};
+
+/** Crea una unidad de contenido SUBIENDO el archivo desde el dispositivo. */
+export const crearContenidoArchivoAPI = async (datos: {
+  martialArtId: string;
+  gradeId: string;
+  title: string;
+  description?: string;
+  orderIndex?: number;
+  file: File;
+}) => {
+  const fd = new FormData();
+  fd.append('martialArtId', datos.martialArtId);
+  fd.append('gradeId', datos.gradeId);
+  fd.append('title', datos.title);
+  if (datos.description) fd.append('description', datos.description);
+  fd.append('orderIndex', String(datos.orderIndex ?? 0));
+  fd.append('archivo', datos.file, datos.file.name);
+  return (await api.post('/contents/upload', fd)).data as Contenido;
+};
+
 // ── Notificaciones, tablero y anuncios ───────────────────────────────────────
 export interface Notificacion {
   id: string;

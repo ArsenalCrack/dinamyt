@@ -10,6 +10,8 @@ import {
   marcarVistoAPI,
   extraerError,
   urlEmbed,
+  esArchivoLocal,
+  resolverArchivo,
   colorCinturon,
   type Arte,
   type Grado,
@@ -35,9 +37,20 @@ function Visor({ unidad }: { unidad: Contenido }) {
   }
   if (unidad.type === 'imagen' && unidad.url) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={unidad.url} alt={unidad.title} style={{ maxWidth: '100%', borderRadius: '0.5rem' }} />;
+    return <img src={resolverArchivo(unidad.url)!} alt={unidad.title} style={{ maxWidth: '100%', borderRadius: '0.5rem' }} />;
   }
   if (unidad.type === 'video' && unidad.url) {
+    // Video SUBIDO al almacén: reproductor nativo (sirve desde /files).
+    if (esArchivoLocal(unidad.url)) {
+      return (
+        <video
+          controls
+          preload="metadata"
+          src={resolverArchivo(unidad.url)!}
+          style={{ width: '100%', borderRadius: '0.5rem' }}
+        />
+      );
+    }
     const embed = urlEmbed(unidad.url);
     if (embed) {
       return (
@@ -60,8 +73,8 @@ function Visor({ unidad }: { unidad: Contenido }) {
     }
   }
   return (
-    <a className="btn btn-gold" href={unidad.url ?? '#'} target="_blank" rel="noreferrer">
-      Abrir {unidad.type === 'documento' ? 'documento' : 'recurso'} ↗
+    <a className="btn btn-gold" href={resolverArchivo(unidad.url) ?? '#'} target="_blank" rel="noreferrer">
+      Abrir {unidad.type === 'documento' ? 'documento (PDF)' : 'recurso'} ↗
     </a>
   );
 }

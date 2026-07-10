@@ -1,9 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { createWriteStream } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
-import { pipeline } from 'node:stream/promises';
-import { join, extname } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import {
   referenceFigures,
@@ -16,12 +12,11 @@ import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
 import { notificar } from '../lib/notify';
 import { registrarActividad } from '../lib/activity';
+import { guardarArchivoSeguro, ErrorSubida } from '../lib/uploads';
 import { config } from '../config';
 
-const VIDEO_EXTS = new Set(['.mp4', '.mov', '.webm', '.avi', '.mkv']);
-
-/** Lee un multipart: campos de texto + UN archivo de video guardado en disco.
- *  Devuelve los campos y la ruta RELATIVA del video dentro de uploads. */
+/** Lee un multipart: campos de texto + UN video validado por la capa de
+ *  seguridad de subidas (extensión + firma + tamaño). Lanza ErrorSubida. */
 async function recibirVideo(
   req: FastifyRequest,
   subcarpeta: string,
@@ -30,16 +25,8 @@ async function recibirVideo(
   let videoRel: string | null = null;
   for await (const parte of req.parts()) {
     if (parte.type === 'file') {
-      const ext = extname(parte.filename ?? '').toLowerCase();
-      if (!VIDEO_EXTS.has(ext)) {
-        parte.file.resume(); // descartar el stream
-        continue;
-      }
-      const rel = join(subcarpeta, `${randomUUID()}${ext}`);
-      const abs = join(config.uploadsDir, rel);
-      await mkdir(join(config.uploadsDir, subcarpeta), { recursive: true });
-      await pipeline(parte.file, createWriteStream(abs));
-      videoRel = rel.replaceAll('\\', '/');
+      const { rel } = await guardarArchivoSeguro(parte, subcarpeta, ['video']);
+      videoRel = rel;
     } else {
       campos[parte.fieldname] = String(parte.value ?? '');
     }
@@ -54,7 +41,14 @@ export async function figurasRoutes(app: FastifyInstance) {
     '/figuras/references',
     { preHandler: requireAcademy(['teacher', 'admin']) },
     async (req, reply) => {
-      const { campos, videoRel } = await recibirVideo(req, 'figuras/referencias');
+      let campos: Record<string, string>;
+      let videoRel: string | null;
+      try {
+        ({ campos, videoRel } = await recibirVideo(req, 'figuras/referencias'));
+      } catch (err) {
+        if (err instanceof ErrorSubida) return reply.code(422).send({ error: err.message });
+        throw err;
+      }
       const { martialArtId, gradeId, name, description } = campos;
       if (!esUuid(martialArtId) || !esUuid(gradeId)) {
         return reply.code(422).send({ error: 'martialArtId y gradeId son obligatorios.' });
@@ -200,7 +194,13 @@ export async function figurasRoutes(app: FastifyInstance) {
           .send({ error: 'Esta figura pertenece a un grado superior (bloqueada).' });
       }
 
-      const { videoRel } = await recibirVideo(req, 'figuras/intentos');
+      let videoRel: string | null;
+      try {
+        ({ videoRel } = await recibirVideo(req, 'figuras/intentos'));
+      } catch (err) {
+        if (err instanceof ErrorSubida) return reply.code(422).send({ error: err.message });
+        throw err;
+      }
       if (!videoRel) {
         return reply.code(422).send({ error: 'Adjunta el video de tu ejecución (mp4/webm).' });
       }

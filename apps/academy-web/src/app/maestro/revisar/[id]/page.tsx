@@ -10,6 +10,8 @@ import {
   calificarAPI,
   extraerError,
   urlEmbed,
+  esArchivoLocal,
+  resolverArchivo,
   type Intento,
   type Pregunta,
   type Respuesta,
@@ -161,7 +163,34 @@ export default function Revisar({ params }: { params: Promise<{ id: string }> })
                   <>
                     {r?.evidenceUrl ? (
                       <>
-                        {urlEmbed(r.evidenceUrl) ? (
+                        {esArchivoLocal(r.evidenceUrl) ? (
+                          // Evidencia SUBIDA al almacén: se muestra según su tipo.
+                          /\.(mp4|webm|mov)$/i.test(r.evidenceUrl) ? (
+                            <video
+                              controls
+                              preload="metadata"
+                              src={resolverArchivo(r.evidenceUrl)!}
+                              style={{ width: '100%', borderRadius: '0.5rem', marginBottom: '0.7rem' }}
+                            />
+                          ) : /\.(jpe?g|png|webp|gif)$/i.test(r.evidenceUrl) ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={resolverArchivo(r.evidenceUrl)!}
+                              alt="Evidencia"
+                              style={{ maxWidth: '100%', borderRadius: '0.5rem', marginBottom: '0.7rem' }}
+                            />
+                          ) : (
+                            <a
+                              className="btn btn-outline btn-sm"
+                              href={resolverArchivo(r.evidenceUrl)!}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ marginBottom: '0.7rem' }}
+                            >
+                              Abrir evidencia (PDF) ↗
+                            </a>
+                          )
+                        ) : urlEmbed(r.evidenceUrl) ? (
                           <div style={{ position: 'relative', paddingTop: '56.25%', marginBottom: '0.7rem' }}>
                             <iframe
                               src={urlEmbed(r.evidenceUrl)!}

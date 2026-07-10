@@ -8,6 +8,7 @@ import {
   getArtesAPI,
   getContenidosAPI,
   crearContenidoAPI,
+  crearContenidoArchivoAPI,
   editarContenidoAPI,
   borrarContenidoAPI,
   getEvaluacionesAPI,
@@ -69,6 +70,16 @@ function TabContenidos({ arte }: { arte: Arte }) {
   const [url, setUrl] = useState('');
   const [cuerpo, setCuerpo] = useState('');
   const [orden, setOrden] = useState(0);
+  // Origen del recurso: enlace externo o archivo subido desde el dispositivo.
+  const [origen, setOrigen] = useState<'url' | 'archivo'>('url');
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+
+  const ACCEPT: Record<string, string> = {
+    video: 'video/mp4,video/webm,video/quicktime',
+    imagen: 'image/jpeg,image/png,image/webp,image/gif',
+    documento: 'application/pdf',
+  };
 
   const cargar = useCallback(async () => {
     try {
@@ -94,12 +105,40 @@ function TabContenidos({ arte }: { arte: Arte }) {
     setUrl('');
     setCuerpo('');
     setOrden(0);
+    setOrigen('url');
+    setArchivo(null);
   }
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError('');
     setOk('');
+    // Publicar SUBIENDO el archivo (video/imagen/PDF) desde el dispositivo.
+    if (!editando && tipo !== 'texto' && origen === 'archivo') {
+      if (!archivo) {
+        setError('Adjunta el archivo que quieres publicar.');
+        return;
+      }
+      setSubiendo(true);
+      try {
+        await crearContenidoArchivoAPI({
+          martialArtId: arte.id,
+          gradeId: gradoId,
+          title: titulo,
+          description: descripcion || undefined,
+          orderIndex: orden,
+          file: archivo,
+        });
+        setOk('Archivo subido y unidad publicada (validado por seguridad).');
+        limpiar();
+        await cargar();
+      } catch (err) {
+        setError(extraerError(err));
+      } finally {
+        setSubiendo(false);
+      }
+      return;
+    }
     try {
       const body = {
         martialArtId: arte.id,
@@ -194,17 +233,54 @@ function TabContenidos({ arte }: { arte: Arte }) {
           </>
         ) : (
           <>
-            <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>
-              URL {tipo === 'video' ? '(YouTube o Google Drive)' : '(Storage/Drive, máx. 50 MB por archivo)'}
-            </label>
-            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={300} style={{ marginTop: '0.25rem' }} />
+            {!editando && (
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.7rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={origen === 'archivo' ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
+                  onClick={() => setOrigen('archivo')}
+                >
+                  ⬆ Subir desde mi dispositivo
+                </button>
+                <button
+                  type="button"
+                  className={origen === 'url' ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
+                  onClick={() => setOrigen('url')}
+                >
+                  🔗 Enlace externo
+                </button>
+              </div>
+            )}
+            {!editando && origen === 'archivo' ? (
+              <>
+                <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>
+                  Archivo ({tipo === 'video' ? 'MP4/WebM/MOV, máx. 300 MB' : tipo === 'imagen' ? 'JPG/PNG/WebP/GIF, máx. 10 MB' : 'PDF, máx. 25 MB'})
+                </label>
+                <input
+                  type="file"
+                  accept={ACCEPT[tipo]}
+                  onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+                  style={{ marginTop: '0.25rem' }}
+                />
+                <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.3rem' }}>
+                  Cada archivo se valida por seguridad (tipo real y tamaño) antes de publicarse.
+                </p>
+              </>
+            ) : (
+              <>
+                <label className="muted" style={{ fontSize: '0.78rem', display: 'block', marginTop: '0.7rem' }}>
+                  URL {tipo === 'video' ? '(YouTube o Google Drive)' : '(enlace externo)'}
+                </label>
+                <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={300} style={{ marginTop: '0.25rem' }} />
+              </>
+            )}
           </>
         )}
         {error && <p className="msg-error" style={{ marginTop: '0.7rem', fontSize: '0.85rem' }}>{error}</p>}
         {ok && <p className="msg-ok" style={{ marginTop: '0.7rem', fontSize: '0.85rem' }}>{ok}</p>}
         <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.9rem' }}>
-          <button className="btn btn-gold" type="submit">
-            {editando ? 'Guardar cambios' : 'Publicar'}
+          <button className="btn btn-gold" type="submit" disabled={subiendo}>
+            {subiendo ? '⏳ Subiendo…' : editando ? 'Guardar cambios' : 'Publicar'}
           </button>
           {editando && (
             <button type="button" className="btn btn-outline" onClick={limpiar}>

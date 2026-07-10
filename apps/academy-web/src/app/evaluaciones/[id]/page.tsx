@@ -7,6 +7,7 @@ import {
   obtenerToken,
   getEvaluacionAPI,
   rendirAPI,
+  subirEvidenciaAPI,
   extraerError,
   type Evaluacion,
   type Pregunta,
@@ -27,6 +28,23 @@ export default function RendirEvaluacion({
   const [resultado, setResultado] = useState<(Intento & { mensaje: string }) | null>(null);
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
+  // Evidencias subidas desde el dispositivo: nombre visible por pregunta.
+  const [archivoSubido, setArchivoSubido] = useState<Record<string, string>>({});
+  const [subiendoDe, setSubiendoDe] = useState<string | null>(null);
+
+  async function subirEvidencia(preguntaId: string, file: File) {
+    setError('');
+    setSubiendoDe(preguntaId);
+    try {
+      const { url } = await subirEvidenciaAPI(file);
+      setRespuestas((prev) => ({ ...prev, [preguntaId]: url }));
+      setArchivoSubido((prev) => ({ ...prev, [preguntaId]: file.name }));
+    } catch (err) {
+      setError(extraerError(err));
+    } finally {
+      setSubiendoDe(null);
+    }
+  }
 
   useEffect(() => {
     if (!obtenerToken()) {
@@ -156,16 +174,38 @@ export default function RendirEvaluacion({
                 </div>
               ) : (
                 <>
-                  <label className="muted" style={{ fontSize: '0.8rem' }}>
-                    URL de tu evidencia (video de YouTube/Drive o imagen)
-                  </label>
+                  {/* Subir desde el dispositivo (PC o celular) — validado por seguridad */}
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <label className="btn btn-gold btn-sm" style={{ cursor: 'pointer' }}>
+                      {subiendoDe === p.id ? '⏳ Subiendo…' : '⬆ Subir archivo'}
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                        hidden
+                        disabled={subiendoDe !== null}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void subirEvidencia(p.id, f);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {archivoSubido[p.id] && (
+                      <span className="badge badge-ok" style={{ maxWidth: '100%', overflow: 'hidden' }}>
+                        ✓ {archivoSubido[p.id]}
+                      </span>
+                    )}
+                  </div>
+                  <p className="muted" style={{ fontSize: '0.72rem', margin: '0.4rem 0' }}>
+                    Video (MP4/WebM/MOV), imagen (JPG/PNG/WebP/GIF) o PDF — o pega un enlace:
+                  </p>
                   <input
                     type="url"
                     placeholder="https://youtu.be/…"
                     maxLength={300}
-                    value={respuestas[p.id] ?? ''}
+                    value={archivoSubido[p.id] ? '' : (respuestas[p.id] ?? '')}
+                    disabled={!!archivoSubido[p.id]}
                     onChange={(e) => setRespuestas({ ...respuestas, [p.id]: e.target.value })}
-                    style={{ marginTop: '0.35rem' }}
                   />
                 </>
               )}

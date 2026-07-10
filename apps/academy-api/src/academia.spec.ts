@@ -301,14 +301,20 @@ describe('academy-api — académico + figuras', () => {
     const app = await makeApp();
     const { maestro, alumno, hapkido, blanco } = await escenario(app);
 
-    // multipart armado a mano (video diminuto de mentira: el servicio es mock).
+    // multipart armado a mano. El «video» lleva la FIRMA real de un MP4
+    // (los 4 bytes de tamaño + 'ftyp'): sin ella, la seguridad lo rechaza.
     const boundary = '----prueba';
-    const multipart = (campos: Record<string, string>) => {
+    const FIRMA_MP4 = '   ftypmp42VIDEODEPRUEBA';
+    const multipart = (
+      campos: Record<string, string>,
+      nombre = 'fig.mp4',
+      contenido = FIRMA_MP4,
+    ) => {
       let cuerpo = '';
       for (const [k, v] of Object.entries(campos)) {
         cuerpo += `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`;
       }
-      cuerpo += `--${boundary}\r\nContent-Disposition: form-data; name="video"; filename="fig.mp4"\r\nContent-Type: video/mp4\r\n\r\nVIDEOFALSO\r\n--${boundary}--\r\n`;
+      cuerpo += `--${boundary}\r\nContent-Disposition: form-data; name="video"; filename="${nombre}"\r\nContent-Type: application/octet-stream\r\n\r\n${contenido}\r\n--${boundary}--\r\n`;
       return cuerpo;
     };
 
@@ -371,6 +377,37 @@ describe('academy-api — académico + figuras', () => {
     expect(
       notifs.json().notificaciones.some((n: { type: string }) => n.type === 'figura_lista'),
     ).toBe(true);
+
+    // ── Seguridad de subidas ──
+    // 1) Un ejecutable renombrado a .mp4 (firma MZ) se rechaza por magic bytes.
+    const conFirmaFalsa = await app.inject({
+      method: 'POST',
+      url: `/figuras/references/${figura.id}/attempts`,
+      headers: { ...alumno, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: multipart({}, 'virus.mp4', 'MZ programa-malicioso'),
+    });
+    expect(conFirmaFalsa.statusCode).toBe(422);
+    expect(conFirmaFalsa.json().error).toMatch(/seguridad/);
+
+    // 2) Una extensión fuera de la allowlist (.svg puede llevar scripts) se rechaza.
+    const extProhibida = await app.inject({
+      method: 'POST',
+      url: '/uploads/evidencia',
+      headers: { ...alumno, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: multipart({}, 'imagen.svg', '<svg onload="alert(1)"/>'),
+    });
+    expect(extProhibida.statusCode).toBe(422);
+
+    // 3) Una evidencia PDF legítima (firma %PDF) sí entra y devuelve su ruta.
+    const pdfOk = await app.inject({
+      method: 'POST',
+      url: '/uploads/evidencia',
+      headers: { ...alumno, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: multipart({}, 'tarea.pdf', '%PDF-1.4 contenido de prueba'),
+    });
+    expect(pdfOk.statusCode).toBe(201);
+    expect(pdfOk.json().url).toMatch(/^evidencias\//);
+
     await app.close();
   });
 });

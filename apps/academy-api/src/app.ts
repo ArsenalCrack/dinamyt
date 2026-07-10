@@ -19,6 +19,7 @@ import { announcementsRoutes } from './routes/announcements';
 import { dashboardRoutes } from './routes/dashboard';
 import { figurasRoutes } from './routes/figuras';
 import { historialRoutes } from './routes/historial';
+import { uploadsRoutes } from './routes/uploads';
 
 export interface BuildAppDeps {
   /** Verificador de tokens. Por defecto usa el JWKS remoto del ecosystem;
@@ -46,9 +47,19 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(cors, { origin: config.corsOrigins });
   // Videos de figuras: hasta 300 MB por archivo.
   void app.register(multipart, { limits: { fileSize: 300 * 1024 * 1024 } });
-  // Archivos generados (videos, reportes, imágenes comparativas).
+  // Archivos generados y subidos (videos, reportes, evidencias). Se sirven
+  // como datos inertes: nosniff + CSP nula → aunque algo malicioso burlara la
+  // validación de subida, el navegador jamás lo ejecutaría desde aquí.
   mkdirSync(config.uploadsDir, { recursive: true });
-  void app.register(fastifyStatic, { root: config.uploadsDir, prefix: '/files/' });
+  void app.register(fastifyStatic, {
+    root: config.uploadsDir,
+    prefix: '/files/',
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  });
 
   void app.register(healthRoutes);
   void app.register(martialArtsRoutes);
@@ -61,6 +72,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(dashboardRoutes);
   void app.register(figurasRoutes);
   void app.register(historialRoutes);
+  void app.register(uploadsRoutes);
 
   return app;
 }
