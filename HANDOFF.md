@@ -1,6 +1,29 @@
 # DINAMYT — Estado del proyecto y Handoff
 
-> Documento vivo. Última actualización: 2026-07-09.
+> Documento vivo. Última actualización: 2026-07-10.
+>
+> **2026-07-10 — Academy ampliada (académico completo + FIGURAS con IA):**
+> - **Académico:** evaluaciones con TIPO (cuestionario/tarea/actividad) y FECHA
+>   LÍMITE (bloquea entregas vencidas); **notificaciones in-app** (campana en la
+>   web, eventos: material/tarea nueva, por revisar, calificado, avance de
+>   grado, anuncio, solicitud resuelta, figura lista); **anuncios** del maestro
+>   por arte o grado; **/tablero** = bandeja de pendientes por rol (alumno:
+>   entregas con vencimiento, en revisión, material por ver, figuras, anuncios;
+>   maestro: por calificar, próximas a vencer, figuras recientes).
+> - **Figuras (dinamyt-figuras integrado):** `apps/academy-figuras` = micro-
+>   servicio FastAPI :3009 (MediaPipe + DTW, SIN torch — el alumno elige la
+>   figura). El maestro sube la referencia por cinturón (pose precalculada
+>   `.npz`); el alumno se GRABA con la cámara o sube video; el análisis corre en
+>   segundo plano y devuelve: score global y por articulación, correcciones con
+>   **timestamps mm:ss** (inicio/pico/fin del desvío), **imágenes comparativas**
+>   alumno|referencia con esqueleto (líneas/puntos, articulación en rojo) y
+>   **video anotado** («CORRIGE: …»). Verificado con videos reales de
+>   `D:\hapkido` (detección 99.6%). Archivos en `.uploads/academy` (gitignored),
+>   servidos por academy-api en `/files/`. Nuevo módulo Python:
+>   `src/utils/correcciones.py`. El repo `ArsenalCrack/dinamyt-figuras` queda
+>   como referencia: la copia canónica ahora vive en el monorepo.
+> - Verificado: `turbo build` 15/15 · `turbo test` 15/15 (academy-api 16) ·
+>   tablero/notificaciones/anuncios probados EN VIVO en el navegador.
 >
 > **2026-07-09 — DINAMYT Academy MONTADA (rama `feat/academy`):**
 > - **`@dinamyt/academy-db`**: schema Postgres `academy` (13 tablas): artes

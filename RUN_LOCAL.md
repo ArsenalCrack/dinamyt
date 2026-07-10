@@ -136,6 +136,14 @@ pnpm --filter @dinamyt/academy-web dev             # :3008  Web Academy (Next PW
 pnpm --filter @dinamyt/membresias-agent dev        # :7070  Agente del lector (mock)
 ```
 
+**Figuras con IA (opcional, para el módulo /figuras):** microservicio Python.
+La primera vez: `cd apps/academy-figuras && python -m venv .venv &&
+.venv\Scripts\pip install -r requirements-service.txt`. Luego:
+
+```powershell
+apps\academy-figuras\.venv\Scripts\python -m uvicorn service.main:app --port 3009 --app-dir apps/academy-figuras
+```
+
 | App | URL |
 | --- | --- |
 | Portal del ecosistema | http://localhost:3000 |
