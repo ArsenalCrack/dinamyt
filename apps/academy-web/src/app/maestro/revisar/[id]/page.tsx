@@ -31,6 +31,8 @@ export default function Revisar({ params }: { params: Promise<{ id: string }> })
   const router = useRouter();
   const [detalle, setDetalle] = useState<Detalle | null>(null);
   const [notas, setNotas] = useState<Record<string, { score: string; feedback: string }>>({});
+  /** Rúbricas: puntaje por criterio, por respuesta (answerId → números). */
+  const [rubricas, setRubricas] = useState<Record<string, number[]>>({});
   const [comentario, setComentario] = useState('');
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
@@ -64,13 +66,35 @@ export default function Revisar({ params }: { params: Promise<{ id: string }> })
     if (!detalle) return;
     setError('');
     setOk('');
-    const calificaciones = Object.entries(notas)
-      .filter(([, v]) => v.score !== '')
-      .map(([answerId, v]) => ({
-        answerId,
-        score: parseFloat(v.score),
-        feedback: v.feedback || undefined,
-      }));
+    const calificaciones = detalle.respuestas
+      .filter((r) => r.evidenceUrl)
+      .map((r) => {
+        const preg = detalle.preguntas.find((p) => p.id === r.questionId);
+        const criterios = preg?.criterios ?? [];
+        // Con rúbrica: la nota es la suma de criterios (autoritativa en el API).
+        if (criterios.length > 0 && rubricas[r.id]) {
+          const detalleCrit = criterios.map((c, j) => ({
+            label: c.label,
+            score: rubricas[r.id]?.[j] ?? 0,
+            max: c.maxPoints,
+          }));
+          return {
+            answerId: r.id,
+            score: detalleCrit.reduce((s, c) => s + c.score, 0),
+            feedback: notas[r.id]?.feedback || undefined,
+            criterios: detalleCrit,
+          };
+        }
+        if (notas[r.id]?.score !== '' && notas[r.id]?.score !== undefined) {
+          return {
+            answerId: r.id,
+            score: parseFloat(notas[r.id].score),
+            feedback: notas[r.id]?.feedback || undefined,
+          };
+        }
+        return null;
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null);
     if (calificaciones.length === 0 && !comentario.trim()) {
       setError('Asigna nota al menos a una evidencia.');
       return;
@@ -211,7 +235,48 @@ export default function Revisar({ params }: { params: Promise<{ id: string }> })
                             Abrir evidencia ↗
                           </a>
                         )}
-                        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {/* Rúbrica: un puntaje por criterio; la nota es la suma. */}
+                        {(p.criterios?.length ?? 0) > 0 && (
+                          <div style={{ display: 'grid', gap: '0.35rem', marginBottom: '0.6rem' }}>
+                            {p.criterios!.map((c, j) => (
+                              <div key={j} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.85rem', flex: 1, minWidth: 160 }}>{c.label}</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={c.maxPoints}
+                                  step={0.5}
+                                  value={rubricas[r.id]?.[j] ?? ''}
+                                  onChange={(e) => {
+                                    const v = Math.min(c.maxPoints, Math.max(0, parseFloat(e.target.value) || 0));
+                                    setRubricas((prev) => {
+                                      const arr = [...(prev[r.id] ?? p.criterios!.map(() => 0))];
+                                      arr[j] = v;
+                                      return { ...prev, [r.id]: arr };
+                                    });
+                                  }}
+                                  style={{ width: 82 }}
+                                />
+                                <span className="muted mono" style={{ fontSize: '0.75rem' }}>/ {c.maxPoints}</span>
+                              </div>
+                            ))}
+                            <p className="mono" style={{ fontSize: '0.8rem', color: 'var(--gold)' }}>
+                              Suma: {(rubricas[r.id] ?? []).reduce((s, v) => s + (v || 0), 0)} / {p.points}
+                            </p>
+                            <input
+                              placeholder="Retroalimentación de esta evidencia (opcional)"
+                              maxLength={300}
+                              value={notas[r.id]?.feedback ?? ''}
+                              onChange={(e) =>
+                                setNotas({
+                                  ...notas,
+                                  [r.id]: { ...(notas[r.id] ?? { score: '' }), feedback: e.target.value },
+                                })
+                              }
+                            />
+                          </div>
+                        )}
+                        <div style={{ display: (p.criterios?.length ?? 0) > 0 ? 'none' : 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
                           <label className="muted" style={{ fontSize: '0.8rem' }}>
                             Nota (0–{p.points})
                             <input

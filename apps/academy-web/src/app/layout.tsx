@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { NavBar } from '@/components/NavBar';
+import { PwaRegister } from '@/components/PwaRegister';
 
 // Tipografía del ecosistema (espejo del portal): display deportivo, cuerpo
 // humanista y mono de marcador para grados, fechas y notas.
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body>
         {/* Barra global: enlaces por rol + hamburguesa en móvil (se oculta
             sola en /login). */}
+        <PwaRegister />
         <NavBar />
         {children}
       </body>

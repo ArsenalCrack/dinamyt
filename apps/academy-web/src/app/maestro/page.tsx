@@ -26,6 +26,9 @@ import {
   borrarFiguraRefAPI,
   getIntentosFiguraAPI,
   getHistorialAPI,
+  getBancoAPI,
+  guardarEnBancoAPI,
+  borrarDelBancoAPI,
   archivoUrl,
   extraerError,
   colorCinturon,
@@ -38,6 +41,7 @@ import {
   type FiguraRef,
   type IntentoFigura,
   type EventoHistorial,
+  type PreguntaBanco,
 } from '@/lib/api';
 import { getRolEfectivo } from '@/lib/session';
 import { Avatar } from '@/components/Avatar';
@@ -337,6 +341,8 @@ interface PreguntaForm {
   prompt: string;
   points: number;
   opciones: { text: string; isCorrect: boolean }[];
+  /** Rúbrica (evidencia): la nota de la pregunta = suma de criterios. */
+  criterios: { label: string; maxPoints: number }[];
 }
 
 function TabEvaluaciones({ arte }: { arte: Arte }) {
@@ -355,6 +361,8 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
   const [tipo, setTipo] = useState<'cuestionario' | 'tarea' | 'actividad'>('cuestionario');
   const [vence, setVence] = useState('');
   const [preguntas, setPreguntas] = useState<PreguntaForm[]>([]);
+  const [banco, setBanco] = useState<PreguntaBanco[]>([]);
+  const [bancoAbierto, setBancoAbierto] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -370,20 +378,25 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
     void cargar();
   }, [arte, cargar]);
 
-  function agregarPregunta(type: PreguntaForm['type']) {
+  function agregarPregunta(
+    type: PreguntaForm['type'],
+    base?: Partial<PreguntaForm>,
+  ) {
     setPreguntas([
       ...preguntas,
       {
         type,
-        prompt: '',
-        points: type === 'evidencia' ? 2 : 1,
+        prompt: base?.prompt ?? '',
+        points: base?.points ?? (type === 'evidencia' ? 2 : 1),
         opciones:
-          type === 'opcion_multiple'
+          base?.opciones ??
+          (type === 'opcion_multiple'
             ? [
                 { text: '', isCorrect: true },
                 { text: '', isCorrect: false },
               ]
-            : [],
+            : []),
+        criterios: base?.criterios ?? [],
       },
     ]);
   }
@@ -599,10 +612,91 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
                 </div>
               )}
               {p.type === 'evidencia' && (
-                <p className="muted" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                  El estudiante enviará la URL de un video o imagen; tú la calificas de 0 a {p.points}.
-                </p>
+                <div style={{ marginTop: '0.6rem' }}>
+                  {/* Rúbrica: criterios con puntaje; la nota = suma. */}
+                  {p.criterios.map((c, j) => (
+                    <div key={j} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <input
+                        placeholder={`Criterio ${j + 1} (ej. Postura y equilibrio)`}
+                        maxLength={160}
+                        value={c.label}
+                        onChange={(e) =>
+                          actualizarPregunta(i, {
+                            criterios: p.criterios.map((cr, k) =>
+                              k === j ? { ...cr, label: e.target.value } : cr,
+                            ),
+                          })
+                        }
+                        required
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        title="Puntos del criterio"
+                        value={c.maxPoints}
+                        onChange={(e) =>
+                          actualizarPregunta(i, {
+                            criterios: p.criterios.map((cr, k) =>
+                              k === j
+                                ? { ...cr, maxPoints: Math.max(1, parseInt(e.target.value, 10) || 1) }
+                                : cr,
+                            ),
+                          })
+                        }
+                        style={{ width: 74 }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() =>
+                          actualizarPregunta(i, { criterios: p.criterios.filter((_, k) => k !== j) })
+                        }
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() =>
+                      actualizarPregunta(i, {
+                        criterios: [...p.criterios, { label: '', maxPoints: 1 }],
+                      })
+                    }
+                  >
+                    ＋ Criterio de rúbrica
+                  </button>
+                  <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.4rem' }}>
+                    {p.criterios.length > 0
+                      ? `Con rúbrica: la pregunta vale ${p.criterios.reduce((s, c) => s + c.maxPoints, 0)} pts (suma de criterios) y calificas criterio por criterio.`
+                      : `Sin rúbrica: calificas la evidencia de 0 a ${p.points} directamente.`}
+                  </p>
+                </div>
               )}
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ marginTop: '0.5rem' }}
+                title="Guardar esta pregunta en tu banco para reutilizarla"
+                onClick={async () => {
+                  try {
+                    await guardarEnBancoAPI({
+                      martialArtId: arte.id,
+                      type: p.type,
+                      prompt: p.prompt,
+                      points: p.points,
+                      opciones: p.type === 'opcion_multiple' ? p.opciones : undefined,
+                      criterios: p.type === 'evidencia' ? p.criterios : undefined,
+                    });
+                    setOk('Pregunta guardada en tu banco.');
+                  } catch (err) {
+                    setError(extraerError(err));
+                  }
+                }}
+              >
+                🏦 Guardar en mi banco
+              </button>
             </div>
           ))}
 
@@ -613,7 +707,67 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
             <button type="button" className="btn btn-outline btn-sm" onClick={() => agregarPregunta('evidencia')}>
               ＋ Pregunta de evidencia
             </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={async () => {
+                try {
+                  setBanco(await getBancoAPI(arte.id));
+                  setBancoAbierto(!bancoAbierto);
+                } catch (err) {
+                  setError(extraerError(err));
+                }
+              }}
+            >
+              🏦 Desde mi banco ({bancoAbierto ? 'ocultar' : 'ver'})
+            </button>
           </div>
+          {bancoAbierto && (
+            <div className="card" style={{ padding: '0.8rem 1rem', marginTop: '0.7rem', background: 'var(--bg-elevated)' }}>
+              {banco.length === 0 ? (
+                <p className="muted" style={{ fontSize: '0.8rem' }}>
+                  Tu banco está vacío: guarda preguntas con «🏦 Guardar en mi banco».
+                </p>
+              ) : (
+                banco.map((b) => (
+                  <div key={b.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                    <span className="badge">{b.type === 'opcion_multiple' ? 'MC' : 'Evidencia'}</span>
+                    <span style={{ fontSize: '0.85rem', flex: 1, minWidth: 160 }}>{b.prompt}</span>
+                    <button
+                      type="button"
+                      className="btn btn-gold btn-sm"
+                      onClick={() =>
+                        agregarPregunta(b.type, {
+                          prompt: b.prompt,
+                          points: b.points,
+                          opciones: (b.opciones ?? []).map((o) => ({
+                            text: o.text,
+                            isCorrect: !!o.isCorrect,
+                          })),
+                          criterios: (b.criterios ?? []).map((c) => ({
+                            label: c.label,
+                            maxPoints: Math.max(1, c.maxPoints ?? 1),
+                          })),
+                        })
+                      }
+                    >
+                      Añadir
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      onClick={async () => {
+                        await borrarDelBancoAPI(b.id).catch(() => undefined);
+                        setBanco(await getBancoAPI(arte.id));
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
 
           {error && <p className="msg-error" style={{ marginTop: '0.7rem', fontSize: '0.85rem' }}>{error}</p>}
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.9rem' }}>
