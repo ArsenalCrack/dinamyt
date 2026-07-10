@@ -14,6 +14,7 @@ import {
 import { requireAcademy, requireAuth } from '../plugins/auth';
 import { esMaestroDe } from '../lib/users';
 import { esUuid } from '../lib/enrollments';
+import { notificar } from '../lib/notify';
 
 /** % de contenido visto por un estudiante en un grado concreto. */
 async function progresoContenido(
@@ -324,6 +325,13 @@ export async function progressRoutes(app: FastifyInstance) {
         .where(eq(enrollments.id, matricula.id))
         .returning();
 
+      // ¡Nuevo cinturón! El estudiante se entera al instante.
+      await notificar(db, [matricula.studentUserId], {
+        type: 'avance_grado',
+        title: `🥋 ¡Ascendiste a cinturón ${siguiente.name}!`,
+        body: avance.notes,
+        link: '/progreso',
+      });
       return reply.code(201).send({ avance, matricula: actualizada });
     },
   );

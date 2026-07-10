@@ -3,3 +3,5 @@ export * from './artes';
 export * from './usuarios';
 export * from './contenidos';
 export * from './evaluaciones';
+export * from './comunicacion';
+export * from './figuras';

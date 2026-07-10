@@ -4,6 +4,7 @@ import { contents, contentViews, grades } from '@dinamyt/academy-db';
 import { requireAcademy } from '../plugins/auth';
 import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
+import { notificar, estudiantesDe } from '../lib/notify';
 
 const TIPOS = ['documento', 'video', 'imagen', 'texto'] as const;
 type TipoContenido = (typeof TIPOS)[number];
@@ -160,6 +161,13 @@ export async function contentsRoutes(app: FastifyInstance) {
           createdByUserId: req.user!.sub,
         })
         .returning();
+
+      // Aviso a los estudiantes del grado: material nuevo.
+      await notificar(db, await estudiantesDe(db, body.martialArtId, body.gradeId), {
+        type: 'material_nuevo',
+        title: `📚 Material nuevo: ${unidad.title}`,
+        link: '/aprender',
+      });
       return reply.code(201).send(unidad);
     },
   );

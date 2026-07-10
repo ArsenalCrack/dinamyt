@@ -12,6 +12,14 @@ import { requireAcademy } from '../plugins/auth';
 import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
 import { notaBloque, notaFinal } from '../lib/scoring';
+import { notificar, estudiantesDe, maestrosDe } from '../lib/notify';
+
+const KINDS = ['cuestionario', 'tarea', 'actividad'] as const;
+const ETIQUETA_KIND: Record<string, string> = {
+  cuestionario: 'Cuestionario',
+  tarea: 'Tarea',
+  actividad: 'Actividad',
+};
 
 interface PreguntaInput {
   type: 'opcion_multiple' | 'evidencia';
@@ -25,8 +33,10 @@ interface EvaluacionBody {
   gradeId: string;
   title: string;
   description?: string | null;
+  kind?: (typeof KINDS)[number];
   maxAttempts?: number;
   availableFrom?: string | null;
+  dueAt?: string | null;
   mcWeight?: number;
   preguntas: PreguntaInput[];
 }
@@ -111,13 +121,15 @@ export async function evaluationsRoutes(app: FastifyInstance) {
           .map((a) => (a.finalScore === null ? null : parseFloat(a.finalScore)))
           .filter((n): n is number => n !== null);
         const disponible = !e.availableFrom || new Date(e.availableFrom) <= ahora;
+        const vencida = !!e.dueAt && new Date(e.dueAt) < ahora;
         return {
           ...e,
           intentosUsados: propios.length,
           mejorNota: notas.length ? Math.max(...notas) : null,
           pendienteRevision: propios.some((a) => a.status === 'ENVIADO'),
           disponible,
-          puedeIntentar: disponible && propios.length < e.maxAttempts,
+          vencida,
+          puedeIntentar: disponible && !vencida && propios.length < e.maxAttempts,
         };
       });
     }
@@ -188,6 +200,10 @@ export async function evaluationsRoutes(app: FastifyInstance) {
       if (mcWeight < 0 || mcWeight > 100) {
         return reply.code(422).send({ error: 'mcWeight debe estar entre 0 y 100.' });
       }
+      const kind = body.kind ?? 'cuestionario';
+      if (!KINDS.includes(kind)) {
+        return reply.code(422).send({ error: 'Tipo de evaluación inválido.' });
+      }
 
       const db = req.server.db;
       if (!(await esMaestroDe(db, req.academy!.rol, req.user!.sub, body.martialArtId))) {
@@ -203,12 +219,24 @@ export async function evaluationsRoutes(app: FastifyInstance) {
           gradeId: body.gradeId,
           title: body.title.trim(),
           description: body.description ?? null,
+          kind,
           maxAttempts: body.maxAttempts ?? 1,
           availableFrom: body.availableFrom ? new Date(body.availableFrom) : null,
+          dueAt: body.dueAt ? new Date(body.dueAt) : null,
           mcWeight,
           createdByUserId: req.user!.sub,
         })
         .returning();
+
+      // Aviso a los estudiantes del grado: nueva tarea/cuestionario/actividad.
+      await notificar(db, await estudiantesDe(db, body.martialArtId, body.gradeId), {
+        type: 'tarea_nueva',
+        title: `📝 ${ETIQUETA_KIND[kind]} nueva: ${evaluacion.title}`,
+        body: evaluacion.dueAt
+          ? `Vence el ${new Date(evaluacion.dueAt).toLocaleDateString('es-CO')}.`
+          : null,
+        link: `/evaluaciones/${evaluacion.id}`,
+      });
 
       for (let i = 0; i < body.preguntas.length; i++) {
         const p = body.preguntas[i];
@@ -369,6 +397,9 @@ export async function evaluationsRoutes(app: FastifyInstance) {
       if (evaluacion.availableFrom && new Date(evaluacion.availableFrom) > new Date()) {
         return reply.code(403).send({ error: 'La evaluación aún no está disponible.' });
       }
+      if (evaluacion.dueAt && new Date(evaluacion.dueAt) < new Date()) {
+        return reply.code(403).send({ error: 'La fecha límite de entrega ya pasó.' });
+      }
 
       const mat = await matriculaDe(db, req.user!.sub, evaluacion.martialArtId);
       if (!mat) return reply.code(403).send({ error: 'No estás matriculado.' });
@@ -464,6 +495,15 @@ export async function evaluationsRoutes(app: FastifyInstance) {
         await db
           .insert(answers)
           .values(filasRespuesta.map((f) => ({ ...f, attemptId: intento.id })));
+      }
+
+      // Con evidencias por revisar, avisar a los maestros del arte (bandeja).
+      if (hayEvidencias) {
+        await notificar(db, await maestrosDe(db, evaluacion.martialArtId), {
+          type: 'por_revisar',
+          title: `📥 ${req.user!.fullName ?? 'Un estudiante'} entregó «${evaluacion.title}»`,
+          link: `/maestro/revisar/${intento.id}`,
+        });
       }
 
       return reply.code(201).send({
@@ -637,6 +677,15 @@ export async function evaluationsRoutes(app: FastifyInstance) {
         })
         .where(eq(attempts.id, id))
         .returning();
+
+      // Nota lista → avisar al estudiante.
+      if (todasCalificadas) {
+        await notificar(db, [intento.studentUserId], {
+          type: 'calificado',
+          title: `✅ «${evaluacion.title}» calificada: ${final ?? '—'}/100`,
+          link: '/progreso',
+        });
+      }
       return actualizado;
     },
   );

@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+import { resolve } from 'node:path';
 
 dotenv.config();
 
@@ -17,4 +18,10 @@ export const config = {
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean),
+  /** Almacén local de archivos (videos de figuras, reportes). Servido en /files. */
+  uploadsDir: resolve(
+    process.env.ACADEMY_UPLOADS_DIR ?? resolve(process.cwd(), '../../.uploads/academy'),
+  ),
+  /** Microservicio Python de figuras (MediaPipe + DTW). */
+  figurasServiceUrl: process.env.FIGURAS_SERVICE_URL ?? 'http://localhost:3009',
 };

@@ -43,3 +43,19 @@ export const estadoSolicitudEnum = aca.enum('estado_solicitud', [
   'APROBADA',
   'RECHAZADA',
 ]);
+
+/** Naturaleza de una evaluación: cuestionario (opción múltiple), tarea
+ *  (entregable/evidencia) o actividad (mixta). Etiqueta pedagógica: el motor
+ *  de preguntas es el mismo. */
+export const tipoEvaluacionEnum = aca.enum('tipo_evaluacion', [
+  'cuestionario',
+  'tarea',
+  'actividad',
+]);
+
+/** Ciclo de vida del análisis de una figura (visión por computador). */
+export const estadoFiguraEnum = aca.enum('estado_figura', [
+  'PROCESANDO',
+  'COMPLETADO',
+  'ERROR',
+]);

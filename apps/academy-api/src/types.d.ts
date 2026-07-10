@@ -2,6 +2,7 @@ import 'fastify';
 import type { JwtPayload, AcademyRole } from '@dinamyt/shared';
 import type { Db } from '@dinamyt/academy-db';
 import type { UsuarioLocal } from './lib/users';
+import type { FigurasClient } from './lib/figuras-client';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -9,6 +10,8 @@ declare module 'fastify' {
     verifyToken: (token: string) => Promise<JwtPayload>;
     /** Conexión a la BD de Academy (inyectable para tests). */
     db: Db;
+    /** Cliente del microservicio de figuras (inyectable para tests). */
+    figurasClient: FigurasClient;
   }
   interface FastifyRequest {
     /** Payload del token, presente tras pasar un guard. */

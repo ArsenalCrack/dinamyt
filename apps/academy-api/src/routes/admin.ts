@@ -13,6 +13,7 @@ import {
 } from '@dinamyt/academy-db';
 import { requireAcademy } from '../plugins/auth';
 import { esUuid } from '../lib/enrollments';
+import { notificar } from '../lib/notify';
 
 const ROLES = ['admin', 'teacher', 'student'] as const;
 
@@ -203,6 +204,15 @@ export async function adminRoutes(app: FastifyInstance) {
           }
         }
       }
+
+      // Avisar al solicitante el resultado.
+      await notificar(db, [solicitud.userId], {
+        type: 'solicitud_resuelta',
+        title: body.aprobar
+          ? '🎓 Tu solicitud de maestro fue APROBADA'
+          : 'Tu solicitud de maestro fue rechazada',
+        link: body.aprobar ? '/maestro' : '/progreso',
+      });
       return resuelta;
     },
   );

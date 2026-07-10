@@ -8,7 +8,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { aca, tipoPreguntaEnum, estadoIntentoEnum } from './_schema';
+import { aca, tipoPreguntaEnum, estadoIntentoEnum, tipoEvaluacionEnum } from './_schema';
 import { martialArts, grades } from './artes';
 
 // ── Evaluaciones por grado (RF-ACA-16..21) ───────────────────────────────────
@@ -27,9 +27,13 @@ export const evaluations = aca.table('evaluations', {
     .references(() => grades.id),
   title: varchar('title', { length: 160 }).notNull(),
   description: text('description'),
+  /** Cuestionario / tarea / actividad (etiqueta pedagógica). */
+  kind: tipoEvaluacionEnum('kind').notNull().default('cuestionario'),
   maxAttempts: integer('max_attempts').notNull().default(1),
   /** Desde cuándo está disponible (RF-ACA-16); null = ya disponible. */
   availableFrom: timestamp('available_from'),
+  /** Fecha límite de entrega; null = sin vencimiento. */
+  dueAt: timestamp('due_at'),
   /** Peso (0-100) del bloque de opción múltiple en la nota final. */
   mcWeight: integer('mc_weight').notNull().default(50),
   createdByUserId: uuid('created_by_user_id').notNull(),
