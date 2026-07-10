@@ -61,11 +61,10 @@ export function limpiarRolCache() {
   rolCache = null;
 }
 
-/** Ruta de inicio según el rol efectivo. */
+/** Ruta de inicio según el rol efectivo: todos aterrizan en su bandeja. */
 export function rutaInicio(rol: string | null): string {
   if (rol === 'admin') return '/admin';
-  if (rol === 'teacher') return '/maestro';
-  return '/aprender';
+  return '/tablero';
 }
 
 /** Etiqueta legible del rol para la UI. */

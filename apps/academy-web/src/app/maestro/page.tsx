@@ -17,6 +17,14 @@ import {
   getEstudiantesAPI,
   matricularAPI,
   avanzarGradoAPI,
+  getAnunciosAPI,
+  crearAnuncioAPI,
+  borrarAnuncioAPI,
+  getFigurasRefAPI,
+  subirFiguraRefAPI,
+  borrarFiguraRefAPI,
+  getIntentosFiguraAPI,
+  archivoUrl,
   extraerError,
   colorCinturon,
   type Arte,
@@ -24,10 +32,13 @@ import {
   type Evaluacion,
   type Intento,
   type EstudiantePanel,
+  type Anuncio,
+  type FiguraRef,
+  type IntentoFigura,
 } from '@/lib/api';
 import { getRolEfectivo } from '@/lib/session';
 
-type Tab = 'contenidos' | 'evaluaciones' | 'estudiantes';
+type Tab = 'contenidos' | 'evaluaciones' | 'estudiantes' | 'anuncios' | 'figuras';
 
 const TIPOS = [
   { valor: 'texto', etiqueta: '📖 Lectura (texto)' },
@@ -256,6 +267,8 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
   const [gradoId, setGradoId] = useState(arte.grados[0]?.id ?? '');
   const [maxIntentos, setMaxIntentos] = useState(1);
   const [pesoMC, setPesoMC] = useState(50);
+  const [tipo, setTipo] = useState<'cuestionario' | 'tarea' | 'actividad'>('cuestionario');
+  const [vence, setVence] = useState('');
   const [preguntas, setPreguntas] = useState<PreguntaForm[]>([]);
 
   const cargar = useCallback(async () => {
@@ -303,6 +316,8 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
         gradeId: gradoId,
         title: titulo,
         description: descripcion || null,
+        kind: tipo,
+        dueAt: vence ? new Date(vence).toISOString() : null,
         maxAttempts: maxIntentos,
         mcWeight: pesoMC,
         preguntas,
@@ -353,6 +368,27 @@ function TabEvaluaciones({ arte }: { arte: Arte }) {
         <form onSubmit={crear} className="card" style={{ padding: '1.1rem 1.25rem' }}>
           <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Nueva evaluación</h3>
           <div style={{ display: 'grid', gap: '0.7rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            <div>
+              <label className="muted" style={{ fontSize: '0.78rem' }}>Tipo</label>
+              <select
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value as typeof tipo)}
+                style={{ marginTop: '0.25rem' }}
+              >
+                <option value="cuestionario">Cuestionario (opción múltiple)</option>
+                <option value="tarea">Tarea (entregable)</option>
+                <option value="actividad">Actividad (mixta)</option>
+              </select>
+            </div>
+            <div>
+              <label className="muted" style={{ fontSize: '0.78rem' }}>Fecha límite (opcional)</label>
+              <input
+                type="datetime-local"
+                value={vence}
+                onChange={(e) => setVence(e.target.value)}
+                style={{ marginTop: '0.25rem' }}
+              />
+            </div>
             <div>
               <label className="muted" style={{ fontSize: '0.78rem' }}>Grado</label>
               <select value={gradoId} onChange={(e) => setGradoId(e.target.value)} style={{ marginTop: '0.25rem' }}>
@@ -734,6 +770,302 @@ function TabEstudiantes({ arte }: { arte: Arte }) {
   );
 }
 
+// ── Pestaña: Anuncios ────────────────────────────────────────────────────────
+function TabAnuncios({ arte }: { arte: Arte }) {
+  const [lista, setLista] = useState<Anuncio[]>([]);
+  const [titulo, setTitulo] = useState('');
+  const [cuerpo, setCuerpo] = useState('');
+  const [gradoId, setGradoId] = useState('');
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState('');
+
+  const cargar = useCallback(async () => {
+    try {
+      setLista(await getAnunciosAPI(arte.id));
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }, [arte.id]);
+  useEffect(() => {
+    setGradoId('');
+    void cargar();
+  }, [arte, cargar]);
+
+  async function publicar(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setOk('');
+    try {
+      await crearAnuncioAPI({
+        martialArtId: arte.id,
+        gradeId: gradoId || null,
+        title: titulo,
+        body: cuerpo || undefined,
+      });
+      setOk('Anuncio publicado: los estudiantes reciben la notificación.');
+      setTitulo('');
+      setCuerpo('');
+      await cargar();
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <form onSubmit={publicar} className="card" style={{ padding: '1.1rem 1.25rem' }}>
+        <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Publicar anuncio</h3>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+          <input
+            placeholder="Título (ej. Examen de ascenso el sábado)"
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            required
+            style={{ flex: 2, minWidth: 220 }}
+          />
+          <select value={gradoId} onChange={(e) => setGradoId(e.target.value)} style={{ flex: 1, minWidth: 160 }}>
+            <option value="">Para toda el arte</option>
+            {arte.grados.map((g) => (
+              <option key={g.id} value={g.id}>Solo cinturón {g.name}</option>
+            ))}
+          </select>
+        </div>
+        <textarea
+          rows={3}
+          placeholder="Detalles (opcional)…"
+          value={cuerpo}
+          onChange={(e) => setCuerpo(e.target.value)}
+        />
+        {error && <p className="msg-error" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>{error}</p>}
+        {ok && <p className="msg-ok" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>{ok}</p>}
+        <button className="btn btn-gold" type="submit" style={{ marginTop: '0.7rem' }}>📣 Publicar</button>
+      </form>
+
+      <div style={{ display: 'grid', gap: '0.5rem' }}>
+        {lista.map((a) => (
+          <div key={a.id} className="card" style={{ padding: '0.9rem 1.1rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 600 }}>📣 {a.title}</span>
+              {a.gradeId && (
+                <span className="badge badge-gold">
+                  {arte.grados.find((g) => g.id === a.gradeId)?.name ?? 'grado'}
+                </span>
+              )}
+              <span className="muted mono" style={{ fontSize: '0.72rem' }}>
+                {new Date(a.createdAt).toLocaleDateString('es-CO')}
+              </span>
+              <button
+                className="btn btn-danger btn-sm"
+                style={{ marginLeft: 'auto' }}
+                onClick={async () => {
+                  await borrarAnuncioAPI(a.id).catch((err) => setError(extraerError(err)));
+                  await cargar();
+                }}
+              >
+                Eliminar
+              </button>
+            </div>
+            {a.body && <p className="muted" style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>{a.body}</p>}
+          </div>
+        ))}
+        {lista.length === 0 && <p className="muted">Sin anuncios publicados.</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── Pestaña: Figuras (referencias del maestro + intentos recientes) ─────────
+function TabFiguras({ arte }: { arte: Arte }) {
+  const [refs, setRefs] = useState<FiguraRef[]>([]);
+  const [intentos, setIntentos] = useState<IntentoFigura[]>([]);
+  const [nombre, setNombre] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [gradoId, setGradoId] = useState(arte.grados[0]?.id ?? '');
+  const [video, setVideo] = useState<File | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState('');
+
+  const cargar = useCallback(async () => {
+    try {
+      setRefs(await getFigurasRefAPI(arte.id));
+      setIntentos(await getIntentosFiguraAPI({ martialArtId: arte.id }));
+    } catch (err) {
+      setError(extraerError(err));
+    }
+  }, [arte.id]);
+  useEffect(() => {
+    setGradoId(arte.grados[0]?.id ?? '');
+    void cargar();
+  }, [arte, cargar]);
+
+  async function subir(e: FormEvent) {
+    e.preventDefault();
+    if (!video) {
+      setError('Adjunta el video de la figura.');
+      return;
+    }
+    setError('');
+    setOk('');
+    setSubiendo(true);
+    try {
+      await subirFiguraRefAPI({
+        martialArtId: arte.id,
+        gradeId: gradoId,
+        name: nombre,
+        description: descripcion || undefined,
+        video,
+      });
+      setOk('Referencia subida y procesada (pose extraída).');
+      setNombre('');
+      setDescripcion('');
+      setVideo(null);
+      await cargar();
+    } catch (err) {
+      setError(extraerError(err));
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <form onSubmit={subir} className="card" style={{ padding: '1.1rem 1.25rem' }}>
+        <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Subir figura de referencia</h3>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.7rem' }}>
+          Graba la ejecución correcta con el cuerpo completo visible y buena luz: el
+          sistema extrae la pose una sola vez y luego compara a cada estudiante contra
+          ella. Los del programa oficial están en
+          «D:\hapkido\Programa Cambio de Cinturones - Alfa y Omega».
+        </p>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+          <input
+            placeholder="Nombre (ej. Figura 1 — Il Bon)"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            required
+            style={{ flex: 2, minWidth: 200 }}
+          />
+          <select value={gradoId} onChange={(e) => setGradoId(e.target.value)} style={{ flex: 1, minWidth: 150 }}>
+            {arte.grados.map((g) => (
+              <option key={g.id} value={g.id}>Cinturón {g.name}</option>
+            ))}
+          </select>
+        </div>
+        <input
+          placeholder="Descripción (opcional)"
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          style={{ marginBottom: '0.6rem' }}
+        />
+        <input
+          type="file"
+          accept="video/*"
+          onChange={(e) => setVideo(e.target.files?.[0] ?? null)}
+          style={{ marginBottom: '0.6rem' }}
+        />
+        {error && <p className="msg-error" style={{ fontSize: '0.85rem' }}>{error}</p>}
+        {ok && <p className="msg-ok" style={{ fontSize: '0.85rem' }}>{ok}</p>}
+        <button className="btn btn-gold" type="submit" disabled={subiendo}>
+          {subiendo ? '⏳ Subiendo y extrayendo pose…' : '⬆ Subir referencia'}
+        </button>
+      </form>
+
+      <div className="card" style={{ padding: '1.1rem 1.25rem' }}>
+        <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Referencias publicadas</h3>
+        {refs.length === 0 ? (
+          <p className="muted" style={{ fontSize: '0.85rem' }}>Sin referencias aún.</p>
+        ) : (
+          <div className="tabla-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Figura</th>
+                  <th>Grado</th>
+                  <th>Detección</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {refs.map((f) => (
+                  <tr key={f.id}>
+                    <td>
+                      {f.name}
+                      <a
+                        className="muted"
+                        style={{ display: 'block', fontSize: '0.72rem', color: 'var(--gold)' }}
+                        href={archivoUrl(f.videoPath)!}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        ver video ↗
+                      </a>
+                    </td>
+                    <td>{arte.grados.find((g) => g.id === f.gradeId)?.name ?? '—'}</td>
+                    <td className="mono">{f.detectionRate ?? '—'}%</td>
+                    <td>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={async () => {
+                          if (!confirm('¿Eliminar esta referencia?')) return;
+                          await borrarFiguraRefAPI(f.id).catch((err) => setError(extraerError(err)));
+                          await cargar();
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: '1.1rem 1.25rem' }}>
+        <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Intentos de estudiantes</h3>
+        {intentos.length === 0 ? (
+          <p className="muted" style={{ fontSize: '0.85rem' }}>Nadie ha enviado figuras todavía.</p>
+        ) : (
+          <div className="tabla-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estudiante</th>
+                  <th>Figura</th>
+                  <th>Cinturón</th>
+                  <th>Nota</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {intentos.map((i) => (
+                  <tr key={i.id}>
+                    <td>{i.estudiante ?? '—'}</td>
+                    <td>{i.nombre}</td>
+                    <td>{i.gradeNameSnapshot ?? '—'}</td>
+                    <td className="mono">{i.score ? Math.round(parseFloat(i.score)) : '—'}</td>
+                    <td>
+                      {i.status === 'COMPLETADO' ? (
+                        <span className="badge badge-ok">Completado</span>
+                      ) : i.status === 'PROCESANDO' ? (
+                        <span className="badge">⏳ Procesando</span>
+                      ) : (
+                        <span className="badge badge-danger">Error</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 export default function Maestro() {
   const router = useRouter();
@@ -803,6 +1135,8 @@ export default function Maestro() {
                 ['contenidos', 'Contenidos'],
                 ['evaluaciones', 'Evaluaciones'],
                 ['estudiantes', 'Estudiantes'],
+                ['anuncios', 'Anuncios'],
+                ['figuras', 'Figuras'],
               ] as [Tab, string][]
             ).map(([t, etiqueta]) => (
               <button
@@ -817,6 +1151,8 @@ export default function Maestro() {
           {tab === 'contenidos' && <TabContenidos arte={arteSel} />}
           {tab === 'evaluaciones' && <TabEvaluaciones arte={arteSel} />}
           {tab === 'estudiantes' && <TabEstudiantes arte={arteSel} />}
+          {tab === 'anuncios' && <TabAnuncios arte={arteSel} />}
+          {tab === 'figuras' && <TabFiguras arte={arteSel} />}
         </>
       )}
     </main>

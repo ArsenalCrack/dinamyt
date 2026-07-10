@@ -115,8 +115,11 @@ export interface Evaluacion {
   gradeId: string;
   title: string;
   description: string | null;
+  kind: 'cuestionario' | 'tarea' | 'actividad';
   maxAttempts: number;
   availableFrom: string | null;
+  dueAt: string | null;
+  vencida?: boolean;
   mcWeight: number;
   preguntas?: Pregunta[];
   // extras del estudiante
@@ -343,6 +346,142 @@ export function urlEmbed(url: string): string | null {
   if (drive) return `https://drive.google.com/file/d/${drive[1]}/preview`;
   return null;
 }
+
+/** URL pública de un archivo del almacén de Academy (videos, imágenes). */
+export function archivoUrl(rel: string | null | undefined): string | null {
+  return rel ? `${API_URL}/files/${rel}` : null;
+}
+
+// ── Notificaciones, tablero y anuncios ───────────────────────────────────────
+export interface Notificacion {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+export const getNotificacionesAPI = async () =>
+  (await api.get('/notifications')).data as {
+    notificaciones: Notificacion[];
+    noLeidas: number;
+  };
+export const marcarLeidasAPI = async (ids?: string[]) =>
+  (await api.post('/notifications/read', { ids })).data;
+
+export const getDashboardAPI = async () => (await api.get('/dashboard')).data;
+
+export interface Anuncio {
+  id: string;
+  martialArtId: string;
+  gradeId: string | null;
+  title: string;
+  body: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  arte?: string;
+}
+export const getAnunciosAPI = async (martialArtId: string) =>
+  (await api.get('/announcements', { params: { martialArtId } })).data as Anuncio[];
+export const crearAnuncioAPI = async (body: {
+  martialArtId: string;
+  gradeId?: string | null;
+  title: string;
+  body?: string;
+}) => (await api.post('/announcements', body)).data as Anuncio;
+export const borrarAnuncioAPI = async (id: string) =>
+  (await api.delete(`/announcements/${id}`)).data;
+
+// ── Figuras (visión por computador) ──────────────────────────────────────────
+export interface FiguraRef {
+  id: string;
+  martialArtId: string;
+  gradeId: string;
+  name: string;
+  description: string | null;
+  videoPath: string;
+  detectionRate: string | null;
+  createdAt: string;
+}
+export interface MomentoCorreccion {
+  time: number;
+  label: string;
+  startLabel?: string;
+  endLabel?: string;
+  maxDiff: number;
+  image: string | null;
+}
+export interface CorreccionFigura {
+  joint: string;
+  jointLabel: string;
+  message: string;
+  avgDiff: number;
+  momentos: MomentoCorreccion[];
+}
+export interface ResultadoFigura {
+  overallScore: number;
+  qualityLabel: string;
+  detectionRate: number;
+  warning?: string | null;
+  joints: Record<string, { score: number; avgDiff: number; quality: string }>;
+  corrections: CorreccionFigura[];
+  reportImg: string | null;
+  annotatedVideo: string | null;
+}
+export interface IntentoFigura {
+  id: string;
+  referenceFigureId: string;
+  status: 'PROCESANDO' | 'COMPLETADO' | 'ERROR';
+  score: string | null;
+  resultJson?: ResultadoFigura | null;
+  videoPath?: string;
+  reportImgPath?: string | null;
+  annotatedVideoPath?: string | null;
+  errorMsg?: string | null;
+  gradeNameSnapshot: string | null;
+  createdAt: string;
+  nombre?: string;
+  estudiante?: string | null;
+  figura?: FiguraRef;
+}
+export const getFigurasRefAPI = async (martialArtId: string) =>
+  (await api.get('/figuras/references', { params: { martialArtId } })).data as FiguraRef[];
+export const subirFiguraRefAPI = async (datos: {
+  martialArtId: string;
+  gradeId: string;
+  name: string;
+  description?: string;
+  video: File | Blob;
+}) => {
+  const fd = new FormData();
+  fd.append('martialArtId', datos.martialArtId);
+  fd.append('gradeId', datos.gradeId);
+  fd.append('name', datos.name);
+  if (datos.description) fd.append('description', datos.description);
+  const nombre = datos.video instanceof File ? datos.video.name : 'figura.mp4';
+  fd.append('video', datos.video, nombre);
+  return (await api.post('/figuras/references', fd)).data as FiguraRef;
+};
+export const borrarFiguraRefAPI = async (id: string) =>
+  (await api.delete(`/figuras/references/${id}`)).data;
+export const intentarFiguraAPI = async (referenceId: string, video: File | Blob) => {
+  const fd = new FormData();
+  fd.append('video', video, video instanceof File ? video.name : 'intento.webm');
+  return (await api.post(`/figuras/references/${referenceId}/attempts`, fd))
+    .data as IntentoFigura;
+};
+export const getIntentoFiguraAPI = async (id: string) =>
+  (await api.get(`/figuras/attempts/${id}`)).data as IntentoFigura;
+export const getIntentosFiguraAPI = async (params: {
+  martialArtId?: string;
+  mine?: boolean;
+}) =>
+  (
+    await api.get('/figuras/attempts', {
+      params: { martialArtId: params.martialArtId, mine: params.mine ? '1' : undefined },
+    })
+  ).data as IntentoFigura[];
 
 /** Color aproximado del cinturón para la franja de grado. */
 export function colorCinturon(nombre: string): string {

@@ -98,7 +98,16 @@ export default function Evaluaciones() {
           <div key={e.id} className="card" style={{ padding: '1rem 1.2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
               <span className="badge badge-gold">{nombreGrado(e.gradeId)}</span>
+              <span className="badge">
+                {e.kind === 'tarea' ? '📤 Tarea' : e.kind === 'actividad' ? '🧩 Actividad' : '📝 Cuestionario'}
+              </span>
               <span style={{ fontWeight: 600 }}>{e.title}</span>
+              {e.dueAt && !e.vencida && (
+                <span className="badge badge-danger mono">
+                  ⏰ vence {new Date(e.dueAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                </span>
+              )}
+              {e.vencida && <span className="badge">Vencida</span>}
               <span style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 {e.mejorNota !== null && e.mejorNota !== undefined && (
                   <span className="badge badge-ok mono">Mejor nota: {e.mejorNota}</span>
