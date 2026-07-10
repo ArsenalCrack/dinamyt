@@ -9,6 +9,8 @@ const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
 const MEMBRESIAS_URL =
   process.env.NEXT_PUBLIC_MEMBRESIAS_URL || 'http://localhost:3006';
+const ACADEMY_URL =
+  process.env.NEXT_PUBLIC_ACADEMY_URL || 'http://localhost:3008';
 
 /**
  * SSO por redirección: una app federada manda aquí con `?redirect=<su login>`;
@@ -23,6 +25,7 @@ function destinoSeguro(redirect: string | null): string | null {
     const origenesPermitidos = [
       new URL(CAMPEONATOS_URL).origin,
       new URL(MEMBRESIAS_URL).origin,
+      new URL(ACADEMY_URL).origin,
     ];
     return origenesPermitidos.includes(url.origin) ? url.toString() : null;
   } catch {

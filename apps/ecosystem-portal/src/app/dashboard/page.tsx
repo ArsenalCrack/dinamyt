@@ -17,6 +17,8 @@ const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
 const MEMBRESIAS_URL =
   process.env.NEXT_PUBLIC_MEMBRESIAS_URL || 'http://localhost:3006';
+const ACADEMY_URL =
+  process.env.NEXT_PUBLIC_ACADEMY_URL || 'http://localhost:3008';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -129,13 +131,17 @@ export default function DashboardPage() {
               {payload.role_membresias ? ` (${payload.role_membresias})` : ''}
             </a>
           )}
-          {payload.app_scopes.includes('academy') && (
-            <span
-              className="rounded-lg border px-4 py-3 font-semibold opacity-60"
-              style={{ borderColor: 'var(--border)' }}
+          {(payload.is_super_admin || payload.app_scopes.includes('academy')) && (
+            // Mismo SSO por fragmento: academy-web guarda el token al aterrizar
+            // en /login#token=… sin segundo formulario.
+            <a
+              href={`${ACADEMY_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
+              className="rounded-lg px-4 py-3 font-semibold"
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
-              Academy — próximamente
-            </span>
+              Entrar a Academy
+              {payload.role_academy ? ` (${payload.role_academy})` : ''}
+            </a>
           )}
           {!payload.is_super_admin && payload.app_scopes.length === 0 && (
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>

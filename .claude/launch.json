@@ -48,6 +48,18 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dinamyt/membresias-agent", "dev"],
       "port": 7070
+    },
+    {
+      "name": "academy-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/academy-api", "dev"],
+      "port": 3007
+    },
+    {
+      "name": "academy-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/academy-web", "dev"],
+      "port": 3008
     }
   ]
 }
