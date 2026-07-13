@@ -1,0 +1,1 @@
+ALTER TABLE "academy"."grade_advancements" ADD COLUMN "certificate_url" text;

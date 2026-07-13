@@ -315,6 +315,17 @@ export const matricularAPI = async (body: {
 export const avanzarGradoAPI = async (enrollmentId: string, notes?: string) =>
   (await api.post(`/enrollments/${enrollmentId}/advance`, { notes })).data;
 
+/** Sube el certificado oficial (PDF o imagen) de un avance de grado. */
+export const subirCertificadoAPI = async (avanceId: string, file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return (
+    await api.post(`/avances/${avanceId}/certificado`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  ).data as { certificateUrl: string };
+};
+
 export interface EstudiantePanel {
   id: string;
   studentUserId: string;

@@ -10,6 +10,7 @@ import {
 import { requireAcademy } from '../plugins/auth';
 import { esMaestroDe } from '../lib/users';
 import { esUuid } from '../lib/enrollments';
+import { guardarArchivoSeguro, ErrorSubida } from '../lib/uploads';
 
 /** Banco personal de preguntas del maestro + certificado de ascenso. */
 export async function bancoRoutes(app: FastifyInstance) {
@@ -109,6 +110,7 @@ export async function bancoRoutes(app: FastifyInstance) {
         toGradeName: gradeAdvancements.toGradeName,
         approvedByName: gradeAdvancements.approvedByName,
         notes: gradeAdvancements.notes,
+        certificateUrl: gradeAdvancements.certificateUrl,
         advancedAt: gradeAdvancements.advancedAt,
         studentUserId: enrollments.studentUserId,
         martialArtId: enrollments.martialArtId,
@@ -136,4 +138,56 @@ export async function bancoRoutes(app: FastifyInstance) {
       .limit(1);
     return { ...fila, estudianteNombre: estudiante?.fullName ?? null };
   });
+
+  // ── POST /avances/:id/certificado — subir certificado oficial (maestro) ────
+  // El maestro sube un PDF o imagen como certificado oficial de ascenso.
+  // Reemplaza cualquier certificado anterior para este avance.
+  app.post(
+    '/avances/:id/certificado',
+    { preHandler: requireAcademy(['teacher', 'admin']) },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      if (!esUuid(id)) return reply.code(400).send({ error: 'Id inválido.' });
+      const db = req.server.db;
+
+      // Buscar el avance y verificar permisos.
+      const [avance] = await db
+        .select({
+          id: gradeAdvancements.id,
+          martialArtId: enrollments.martialArtId,
+        })
+        .from(gradeAdvancements)
+        .innerJoin(enrollments, eq(enrollments.id, gradeAdvancements.enrollmentId))
+        .where(eq(gradeAdvancements.id, id))
+        .limit(1);
+      if (!avance) return reply.code(404).send({ error: 'Avance no encontrado.' });
+      if (
+        !(await esMaestroDe(db, req.academy!.rol, req.user!.sub, avance.martialArtId))
+      ) {
+        return reply.code(403).send({ error: 'No tienes asignada esta arte marcial.' });
+      }
+
+      // Procesar el archivo (PDF o imagen).
+      for await (const parte of req.parts()) {
+        if (parte.type !== 'file') continue;
+        try {
+          const { rel } = await guardarArchivoSeguro(parte, 'certificados', [
+            'documento',
+            'imagen',
+          ]);
+          await db
+            .update(gradeAdvancements)
+            .set({ certificateUrl: rel })
+            .where(eq(gradeAdvancements.id, id));
+          return reply.code(200).send({ certificateUrl: rel });
+        } catch (err) {
+          if (err instanceof ErrorSubida) {
+            return reply.code(422).send({ error: err.message });
+          }
+          throw err;
+        }
+      }
+      return reply.code(422).send({ error: 'Adjunta un archivo PDF o imagen.' });
+    },
+  );
 }

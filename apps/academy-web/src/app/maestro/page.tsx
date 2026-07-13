@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
+  api,
   obtenerToken,
   getArtesAPI,
   getContenidosAPI,
@@ -18,6 +19,7 @@ import {
   getEstudiantesAPI,
   matricularAPI,
   avanzarGradoAPI,
+  subirCertificadoAPI,
   getAnunciosAPI,
   crearAnuncioAPI,
   borrarAnuncioAPI,
@@ -856,6 +858,10 @@ function TabEstudiantes({ arte }: { arte: Arte }) {
   const [gradoInicial, setGradoInicial] = useState('');
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
+  // Subida de certificado oficial.
+  const certInputRef = useRef<HTMLInputElement>(null);
+  const [certTarget, setCertTarget] = useState<string | null>(null);
+  const [subiendoCert, setSubiendoCert] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -898,16 +904,53 @@ function TabEstudiantes({ arte }: { arte: Arte }) {
     if (notas === null) return;
     setError('');
     try {
-      await avanzarGradoAPI(fila.id, notas || undefined);
-      setOk('Avance certificado: el historial guarda el grado anterior.');
+      const res = await avanzarGradoAPI(fila.id, notas || undefined);
+      setOk('Avance certificado. Puedes subir el certificado oficial.');
       await cargar();
+      // Ofrecer subir certificado inmediatamente después del avance.
+      if (res.avance?.id) {
+        setCertTarget(res.avance.id);
+        certInputRef.current?.click();
+      }
     } catch (err) {
       setError(extraerError(err));
     }
   }
 
+  /** Dispara la selección de archivo para un avance específico. */
+  function iniciarSubidaCert(avanceId: string) {
+    setCertTarget(avanceId);
+    certInputRef.current?.click();
+  }
+
+  /** Sube el archivo seleccionado al endpoint de certificado. */
+  async function handleCertFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !certTarget) return;
+    setSubiendoCert(true);
+    setError('');
+    try {
+      await subirCertificadoAPI(certTarget, file);
+      setOk('✅ Certificado oficial subido correctamente.');
+    } catch (err) {
+      setError(extraerError(err));
+    } finally {
+      setSubiendoCert(false);
+      setCertTarget(null);
+      e.target.value = '';
+    }
+  }
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      {/* Input oculto para subir certificado oficial (PDF o imagen). */}
+      <input
+        ref={certInputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png,.webp"
+        style={{ display: 'none' }}
+        onChange={handleCertFile}
+      />
       <form onSubmit={matricular} className="card" style={{ padding: '1.1rem 1.25rem' }}>
         <h3 className="eyebrow" style={{ marginBottom: '0.7rem' }}>Matricular estudiante</h3>
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -1001,10 +1044,35 @@ function TabEstudiantes({ arte }: { arte: Arte }) {
                     <td className="mono" style={{ fontSize: '0.8rem' }}>
                       {f.ultimoAvance ? new Date(f.ultimoAvance).toLocaleDateString('es-CO') : '—'}
                     </td>
-                    <td>
+                    <td style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                       <button className="btn btn-gold btn-sm" onClick={() => void avanzar(f)}>
-                        ⬆ Avanzar grado
+                        ⬆ Avanzar
                       </button>
+                      {f.ultimoAvance && (
+                        <button
+                          className="btn btn-outline btn-sm"
+                          disabled={subiendoCert}
+                          onClick={() => {
+                            // Usar el último avance del estudiante.
+                            // Se necesita obtener el ID del avance; lo pasamos vía la API.
+                            api.get(`/progress/students`, { params: { martialArtId: arte.id } })
+                              .then(async (res) => {
+                                // Buscar los avances del estudiante vía el historial.
+                                const histRes = await api.get(`/historial`, { params: { martialArtId: arte.id, studentUserId: f.studentUserId } });
+                                const eventos = histRes.data as { refId?: string; type: string }[];
+                                const ultimo = eventos.find((ev) => ev.type === 'avance_grado' && ev.refId);
+                                if (ultimo?.refId) {
+                                  iniciarSubidaCert(ultimo.refId);
+                                } else {
+                                  setError('No se encontró el avance para subir el certificado.');
+                                }
+                              })
+                              .catch(() => setError('Error al buscar el avance.'));
+                          }}
+                        >
+                          📄 {subiendoCert ? 'Subiendo…' : 'Certificado'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

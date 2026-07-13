@@ -1,5 +1,7 @@
-# CI del monorepo DINAMYT: compila y prueba los 12 paquetes con Turbo.
-# Los tests de BD usan PGlite (Postgres embebido) — no necesitan servicios.
+# CI del monorepo DINAMYT: compila y prueba los 15 paquetes con Turbo.
+# Los tests de BD usan PGlite (Postgres embebido en WASM) — no necesitan
+# Docker ni servicios externos. PGlite requiere hookTimeout >= 30s en CI
+# porque el cold-start de WASM es más lento en los runners de GitHub.
 name: CI
 
 on:
@@ -10,7 +12,10 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+    env:
+      # Evitar OOM en builds de Next.js (4 webs compilan en paralelo).
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v4
 

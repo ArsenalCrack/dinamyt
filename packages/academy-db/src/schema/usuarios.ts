@@ -70,6 +70,9 @@ export const gradeAdvancements = aca.table('grade_advancements', {
   approvedByUserId: uuid('approved_by_user_id').notNull(),
   approvedByName: varchar('approved_by_name', { length: 160 }),
   notes: text('notes'),
+  /** Ruta relativa del certificado oficial subido por el maestro (PDF/imagen).
+   *  Null si aún no se ha subido. Se sirve vía /files/<ruta>. */
+  certificateUrl: text('certificate_url'),
   advancedAt: timestamp('advanced_at').defaultNow(),
 });
 

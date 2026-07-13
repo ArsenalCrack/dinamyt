@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, obtenerToken, extraerError } from '@/lib/api';
+import { api, obtenerToken, extraerError, archivoUrl } from '@/lib/api';
 
 interface Avance {
   id: string;
@@ -10,6 +10,7 @@ interface Avance {
   toGradeName: string;
   approvedByName: string | null;
   notes: string | null;
+  certificateUrl: string | null;
   advancedAt: string;
   arteNombre: string;
   federation: string | null;
@@ -110,9 +111,23 @@ export default function Certificado({ params }: { params: Promise<{ id: string }
             </div>
           </div>
 
-          <button className="btn btn-cta" onClick={() => window.print()} style={{ width: '100%' }}>
-            🖨 Imprimir / Guardar como PDF
-          </button>
+          <div style={{ display: 'grid', gap: '0.6rem' }}>
+            <button className="btn btn-cta" onClick={() => window.print()} style={{ width: '100%' }}>
+              🖨 Imprimir / Guardar como PDF
+            </button>
+            {avance.certificateUrl && (
+              <a
+                href={archivoUrl(avance.certificateUrl) ?? ''}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                className="btn btn-gold"
+                style={{ width: '100%', textAlign: 'center', textDecoration: 'none' }}
+              >
+                📥 Descargar certificado oficial
+              </a>
+            )}
+          </div>
         </>
       )}
     </main>
