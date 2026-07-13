@@ -9,7 +9,7 @@ export class PlansService {
   async create(data: {
     name: string;
     description?: string;
-    appsIncluded: string[]; // valores válidos: "academy", "campeonatos"
+    appsIncluded: string[]; // valores válidos: "academy", "campeonatos", "membresias"
     maxUsers?: number;
     priceMonthly?: string;
     priceAnnual?: string;

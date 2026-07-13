@@ -54,31 +54,72 @@ async function seedSuperAdmin() {
   console.log(`[seed] Super admin creado: ${email}`);
 }
 
-// ── 2. Planes de suscripción base ────────────────────────────────────────────
+// ── 2. Planes de suscripción base (todas las combinaciones) ─────────────────
+// Los planes que incluyen Campeonatos NO tienen precio de lista: el alcance
+// (tatamis, número de eventos) se acuerda con un administrador → precio null.
 const PLANES_BASE = [
   {
     name: 'Plan Academy',
-    description: 'Acceso a DINAMYT Academy.',
+    description:
+      'Formación del practicante: planes de estudio, evaluaciones y progreso por cinturón.',
     appsIncluded: ['academy'],
     maxUsers: 50,
     priceMonthly: '50000',
     priceAnnual: '500000',
   },
   {
+    name: 'Plan Membresías',
+    description:
+      'Operación del club: mensualidades, check-in de asistencia, avisos y reportes.',
+    appsIncluded: ['membresias'],
+    maxUsers: 200,
+    priceMonthly: '60000',
+    priceAnnual: '600000',
+  },
+  {
+    name: 'Plan Academy + Membresías',
+    description:
+      'La formación del practicante y la operación del club en un solo plan.',
+    appsIncluded: ['academy', 'membresias'],
+    maxUsers: 200,
+    priceMonthly: '95000',
+    priceAnnual: '950000',
+  },
+  {
     name: 'Plan Campeonatos',
-    description: 'Acceso a DINAMYT Campeonatos.',
+    description:
+      'Torneos con puntuación en vivo. El alcance y el precio se acuerdan con un administrador.',
     appsIncluded: ['campeonatos'],
     maxUsers: 100,
-    priceMonthly: '80000',
-    priceAnnual: '800000',
+    priceMonthly: null,
+    priceAnnual: null,
+  },
+  {
+    name: 'Plan Academy + Campeonatos',
+    description:
+      'Formación más torneos oficiales. El precio se acuerda con un administrador.',
+    appsIncluded: ['academy', 'campeonatos'],
+    maxUsers: 100,
+    priceMonthly: null,
+    priceAnnual: null,
+  },
+  {
+    name: 'Plan Campeonatos + Membresías',
+    description:
+      'Operación del club más torneos oficiales. El precio se acuerda con un administrador.',
+    appsIncluded: ['campeonatos', 'membresias'],
+    maxUsers: 200,
+    priceMonthly: null,
+    priceAnnual: null,
   },
   {
     name: 'Plan Completo',
-    description: 'Acceso a DINAMYT Academy y Campeonatos.',
-    appsIncluded: ['academy', 'campeonatos'],
-    maxUsers: 100,
-    priceMonthly: '120000',
-    priceAnnual: '1200000',
+    description:
+      'Todo el ecosistema: Academy, Campeonatos y Membresías. El precio se acuerda con un administrador.',
+    appsIncluded: ['academy', 'campeonatos', 'membresias'],
+    maxUsers: 200,
+    priceMonthly: null,
+    priceAnnual: null,
   },
 ];
 

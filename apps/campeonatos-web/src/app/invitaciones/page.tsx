@@ -9,12 +9,17 @@ import {
   aceptarInvitacionAPI,
   rechazarInvitacionAPI,
   getCampeonatoAPI,
+  miPerfilCompetidorAPI,
+  miCuentaAPI,
+  miPerfilEcosistemaAPI,
+  grupoDeCinturon,
   extraerError,
   GENEROS,
-  GRUPOS_CINTURON,
+  CINTURONES,
   type MiInvitacion,
   type Modalidad,
 } from '@/lib/api';
+import { getSesion } from '@/lib/session';
 import { Logo } from '@/components/Logo';
 
 const NOMBRE_MODALIDAD: Record<string, string> = {
@@ -40,15 +45,47 @@ export default function MisInvitacionesPage() {
   const [modsCamp, setModsCamp] = useState<Modalidad[]>([]);
   const [ocupado, setOcupado] = useState(false);
 
-  // Formulario de aceptación
+  // Formulario de aceptación (se autollena desde el perfil DINAMYT).
   const [documento, setDocumento] = useState('');
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [genero, setGenero] = useState<(typeof GENEROS)[number]>('MASCULINO');
-  const [grupoCinturon, setGrupoCinturon] =
-    useState<(typeof GRUPOS_CINTURON)[number]>('BLANCO');
+  const [cinturon, setCinturon] = useState(CINTURONES[0].nombre);
   const [pesoActual, setPesoActual] = useState('');
   const [academiaClub, setAcademiaClub] = useState('');
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [mods, setMods] = useState<Modalidad[]>([]);
+
+  // Autollenado: perfil de competidor previo > cuenta/perfil del ecosystem.
+  useEffect(() => {
+    if (!obtenerToken()) return;
+    const sesion = getSesion();
+    Promise.allSettled([
+      miPerfilCompetidorAPI(),
+      miCuentaAPI(),
+      sesion ? miPerfilEcosistemaAPI(sesion.sub) : Promise.reject(),
+    ]).then(([comp, cuenta, eco]) => {
+      if (comp.status === 'fulfilled' && comp.value) {
+        const p = comp.value;
+        setDocumento(p.documento);
+        if (p.fechaNacimiento) setFechaNacimiento(p.fechaNacimiento.slice(0, 10));
+        if (p.genero) setGenero(p.genero);
+        if (p.cinturon) setCinturon(p.cinturon);
+        if (p.academiaClub) setAcademiaClub(p.academiaClub);
+        if (p.pesoActual) setPesoActual(p.pesoActual);
+        if (p.fotoUrl) setFotoUrl(p.fotoUrl);
+        return;
+      }
+      if (cuenta.status === 'fulfilled') {
+        if (cuenta.value.documentId) setDocumento(cuenta.value.documentId);
+        if (cuenta.value.birthDate) setFechaNacimiento(cuenta.value.birthDate.slice(0, 10));
+      }
+      if (eco.status === 'fulfilled') {
+        if (eco.value.avatarUrl) setFotoUrl(eco.value.avatarUrl);
+        const grado = eco.value.disciplines?.[0]?.currentGrade;
+        if (grado && grupoDeCinturon(grado)) setCinturon(grado);
+      }
+    });
+  }, []);
 
   const cargar = useCallback(async () => {
     try {
@@ -90,9 +127,11 @@ export default function MisInvitacionesPage() {
         documento,
         fechaNacimiento,
         genero,
-        grupoCinturon,
+        grupoCinturon: grupoDeCinturon(cinturon) ?? 'BLANCO',
+        cinturon,
         pesoActual: pesoActual || undefined,
         academiaClub: academiaClub || undefined,
+        fotoUrl: fotoUrl ?? undefined,
         modalidades: mods,
       });
       setMsg({ tipo: 'ok', texto: `¡Inscrito en ${aceptando.campeonato}! 🥋` });
@@ -201,12 +240,20 @@ export default function MisInvitacionesPage() {
                     </select>
                   </label>
                   <label className="block text-sm">
-                    Grupo de cinturón *
-                    <select value={grupoCinturon} onChange={(e) => setGrupoCinturon(e.target.value as (typeof GRUPOS_CINTURON)[number])} className="mt-1">
-                      {GRUPOS_CINTURON.map((g) => (
-                        <option key={g} value={g}>{g}</option>
+                    Cinturón *
+                    <select value={cinturon} onChange={(e) => setCinturon(e.target.value)} className="mt-1">
+                      {cinturon && !CINTURONES.some((c) => c.nombre === cinturon) && (
+                        <option value={cinturon}>{cinturon}</option>
+                      )}
+                      {CINTURONES.map((c) => (
+                        <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
                       ))}
                     </select>
+                    {grupoDeCinturon(cinturon) && (
+                      <span className="mt-1 block text-xs" style={{ color: 'var(--gold)' }}>
+                        Grupo competitivo: {grupoDeCinturon(cinturon)}
+                      </span>
+                    )}
                   </label>
                   <label className="block text-sm">
                     Peso (kg)

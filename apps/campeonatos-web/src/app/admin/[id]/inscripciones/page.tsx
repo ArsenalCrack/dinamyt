@@ -11,6 +11,7 @@ import {
   type InscripcionRevision,
 } from '@/lib/api';
 import { getSesion, esAdmin } from '@/lib/session';
+import { Avatar } from '@/components/Avatar';
 
 /** Edad a partir de la fecha de nacimiento (para mostrar en la revisión). */
 function edadDe(fecha: string | null): string {
@@ -38,6 +39,9 @@ export default function RevisionInscripcionesPage() {
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [filtro, setFiltro] = useState<'PENDIENTE' | 'TODAS'>('PENDIENTE');
+  // Cuál inscripción se está desaprobando (para pedir el motivo).
+  const [rechazando, setRechazando] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState('');
 
   const cargar = useCallback(() => {
     listInscripcionesCampAPI(campId)
@@ -59,18 +63,25 @@ export default function RevisionInscripcionesPage() {
     cargar();
   }, [router, cargar]);
 
-  async function revisar(ins: InscripcionRevision, estado: 'APROBADA' | 'RECHAZADA') {
+  async function revisar(
+    ins: InscripcionRevision,
+    estado: 'APROBADA' | 'RECHAZADA',
+    motivo?: string,
+  ) {
     setMsg(null);
     setOcupado(true);
     try {
-      const r = await revisarInscripcionAPI(ins.id, estado);
+      const r = await revisarInscripcionAPI(ins.id, estado, motivo);
+      const avisos = r.avisos?.length ? ` ${r.avisos.join(' ')}` : '';
       setMsg({
         tipo: 'ok',
         texto:
           estado === 'APROBADA'
-            ? `${ins.nombreCompleto} aprobado y colocado en ${r.seccionesAsignadas} sección(es).${r.seccionesAsignadas === 0 ? ' (Genera las secciones primero para que caiga en su llave.)' : ''}`
-            : `${ins.nombreCompleto} rechazado.`,
+            ? `${ins.nombreCompleto} aprobado y colocado en ${r.seccionesAsignadas} sección(es).${r.seccionesAsignadas === 0 ? ' (Su combinación no coincide con ninguna categoría configurada.)' : ''}${avisos}`
+            : `${ins.nombreCompleto} desaprobado.`,
       });
+      setRechazando(null);
+      setMotivo('');
       cargar();
     } catch (e) {
       setMsg({ tipo: 'error', texto: extraerError(e, 'No se pudo actualizar.') });
@@ -133,7 +144,9 @@ export default function RevisionInscripcionesPage() {
         {visibles.map((i) => (
           <li key={i.id} className="card p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-start gap-3">
+                <Avatar src={i.foto} nombre={i.nombreCompleto} size={44} />
+                <div className="min-w-0">
                 <h3 className="font-semibold">{i.nombreCompleto}</h3>
                 <dl className="mt-1 grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs sm:grid-cols-3" style={{ color: 'var(--text-muted)' }}>
                   <div>Documento: <strong>{i.documento}</strong></div>
@@ -152,31 +165,78 @@ export default function RevisionInscripcionesPage() {
                     </span>
                   ))}
                 </div>
+                {/* Motivo de la desaprobación (lo verá también el competidor) */}
+                {i.estado === 'RECHAZADA' && i.motivoRechazo && (
+                  <p className="mt-2 text-xs" style={{ color: 'var(--danger)' }}>
+                    Motivo: {i.motivoRechazo}
+                  </p>
+                )}
+                </div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2">
                 <span
                   className={`badge ${
-                    i.estado === 'APROBADA' ? 'badge-ok' : i.estado === 'PENDIENTE' ? 'badge-info' : ''
+                    i.estado === 'APROBADA'
+                      ? 'badge-ok'
+                      : i.estado === 'PENDIENTE'
+                        ? 'badge-info'
+                        : 'badge-danger'
                   }`}
                 >
                   {i.estado}
                 </span>
-                {i.estado === 'PENDIENTE' && (
-                  <div className="flex gap-2">
+                {/* Acciones: aprobar / desaprobar, y también CAMBIAR de opinión
+                    (una aprobada se puede desaprobar y una rechazada re-aprobar) */}
+                <div className="flex flex-wrap justify-end gap-2">
+                  {i.estado !== 'APROBADA' && (
                     <button
                       onClick={() => revisar(i, 'APROBADA')}
                       disabled={ocupado}
                       className="btn btn-gold btn-sm"
                     >
-                      ✓ Aprobar
+                      ✓ {i.estado === 'RECHAZADA' ? 'Re-aprobar' : 'Aprobar'}
                     </button>
+                  )}
+                  {i.estado !== 'RECHAZADA' && (
                     <button
-                      onClick={() => revisar(i, 'RECHAZADA')}
+                      onClick={() => {
+                        setRechazando(i.id);
+                        setMotivo('');
+                      }}
                       disabled={ocupado}
                       className="btn btn-danger btn-sm"
                     >
-                      ✕ Rechazar
+                      ✕ Desaprobar
                     </button>
+                  )}
+                </div>
+                {/* Panel para escribir el motivo antes de desaprobar */}
+                {rechazando === i.id && (
+                  <div className="mt-1 flex w-full max-w-xs flex-col items-end gap-1.5">
+                    <textarea
+                      value={motivo}
+                      onChange={(e) => setMotivo(e.target.value)}
+                      rows={2}
+                      maxLength={300}
+                      placeholder="Motivo (opcional): p. ej. peso fuera de rango, cinturón no coincide…"
+                      className="w-full text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => revisar(i, 'RECHAZADA', motivo)}
+                        disabled={ocupado}
+                        className="btn btn-danger btn-sm"
+                      >
+                        Confirmar desaprobación
+                      </button>
+                      <button
+                        onClick={() => setRechazando(null)}
+                        disabled={ocupado}
+                        className="btn btn-outline btn-sm"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

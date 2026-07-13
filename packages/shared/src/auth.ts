@@ -23,5 +23,7 @@ export interface JwtPayload {
   role_academy: string | null;
   /** Rol del usuario en Campeonatos. Ver `CampeonatosRole` para los valores previstos. */
   role_campeonatos: string | null;
+  /** Rol del usuario en Membresías. Ver `MembresiasRole` para los valores previstos. */
+  role_membresias: string | null;
   is_super_admin: boolean;
 }

@@ -86,7 +86,7 @@ export function etiquetaRol(s: Sesion | null): string {
 export function rutaInicio(s: Sesion | null): string {
   // El juez va a su home de tatamis asignados (estilo COMBAT /juez).
   if (esJuez(s)) return '/juez';
-  // Competidor y coach van a su perfil, no a la gestión.
-  if (esUsuarioComun(s)) return '/perfil';
+  // Competidor y coach van a SU dashboard (inscripciones + estadísticas).
+  if (esUsuarioComun(s)) return '/panel';
   return '/admin';
 }

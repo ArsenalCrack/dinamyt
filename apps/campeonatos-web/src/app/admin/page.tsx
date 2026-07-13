@@ -6,8 +6,6 @@ import Link from 'next/link';
 import {
   obtenerToken,
   listCampeonatosAPI,
-  cambiarEstadoAPI,
-  siguienteEstadoUI,
   extraerError,
   type Campeonato,
   type EstadoCampeonato,
@@ -73,17 +71,6 @@ export default function AdminPage() {
     void cargar();
   }, [router, cargar]);
 
-  async function avanzarEstado(c: Campeonato) {
-    const siguiente = siguienteEstadoUI(c.estado);
-    if (!siguiente) return;
-    try {
-      await cambiarEstadoAPI(c.id, siguiente);
-      await cargar();
-    } catch (e) {
-      setErrorMsg(extraerError(e, 'No se pudo cambiar el estado.'));
-    }
-  }
-
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -138,40 +125,16 @@ export default function AdminPage() {
                 )}
               </div>
 
+              {/* UN solo botón por campeonato: todo lo demás vive dentro
+                  del hub (configurar, inscribir, revisar, llaves, tatamis). */}
               <div className="flex flex-wrap items-center gap-2">
-                {esAdmin(sesion) && siguienteEstadoUI(c.estado) && (
-                  <button
-                    onClick={() => avanzarEstado(c)}
-                    className="btn btn-outline btn-sm"
-                    title="Avanzar el estado del campeonato"
-                  >
-                    → {siguienteEstadoUI(c.estado)}
-                  </button>
-                )}
-                {esAdmin(sesion) &&
-                  (c.estado === 'BORRADOR' || c.estado === 'LISTO') && (
-                    <Link href={`/admin/${c.id}/editar`} className="btn btn-outline btn-sm">
-                      Editar
-                    </Link>
-                  )}
-                {esAdmin(sesion) && (
-                  <Link href={`/admin/${c.id}/inscripciones`} className="btn btn-outline btn-sm">
-                    Revisión
+                {esAdmin(sesion) ? (
+                  <Link href={`/admin/${c.id}`} className="btn btn-gold">
+                    Gestionar →
                   </Link>
-                )}
-                {esAdmin(sesion) && (
-                  <Link href={`/admin/${c.id}/secciones`} className="btn btn-outline btn-sm">
-                    Secciones
-                  </Link>
-                )}
-                {esAdmin(sesion) && (
-                  <Link href={`/admin/${c.id}/tatamis`} className="btn btn-outline btn-sm">
-                    Tatamis
-                  </Link>
-                )}
-                {puedeInscribir(sesion) && (
-                  <Link href={`/admin/${c.id}`} className="btn btn-gold btn-sm">
-                    Inscribir
+                ) : (
+                  <Link href={`/admin/${c.id}/inscribir`} className="btn btn-gold">
+                    Inscribir →
                   </Link>
                 )}
               </div>

@@ -1,0 +1,49 @@
+# CI del monorepo DINAMYT: compila y prueba los 15 paquetes con Turbo.
+# Los tests de BD usan PGlite (Postgres embebido en WASM) — no necesitan
+# Docker ni servicios externos. PGlite requiere hookTimeout >= 30s en CI
+# porque el cold-start de WASM es más lento en los runners de GitHub.
+name: CI
+
+on:
+  push:
+    branches: [main, master, 'feat/**', 'fix/**']
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Evitar OOM en builds de Next.js (4 webs compilan en paralelo).
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      # El ecosystem-api firma JWT con RS256: en CI se genera un par efímero
+      # (NUNCA el de producción) para que los specs de auth puedan correr.
+      - name: Generar claves RS256 efímeras
+        run: |
+          mkdir -p apps/ecosystem-api/keys
+          openssl genpkey -algorithm RSA -out apps/ecosystem-api/keys/private.pem -pkeyopt rsa_keygen_bits:2048
+          openssl rsa -in apps/ecosystem-api/keys/private.pem -pubout -out apps/ecosystem-api/keys/public.pem
+
+      - name: Build (turbo)
+        run: pnpm build
+
+      - name: Tests (turbo)
+        run: pnpm test
+        env:
+          ADMIN_EMAIL: ci@dinamyt.test
+          ADMIN_PASSWORD: SoloParaCI-123!

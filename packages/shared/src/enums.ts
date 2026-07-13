@@ -6,7 +6,24 @@
  */
 
 /** Aplicaciones del ecosistema que una suscripción puede habilitar. */
-export type AppScope = 'academy' | 'campeonatos';
+export type AppScope = 'academy' | 'campeonatos' | 'membresias';
+
+/**
+ * Roles de un usuario dentro de DINAMYT Academy (§2.2 de la spec):
+ * - admin: gestión global de la plataforma — artes marciales, maestros, reportes.
+ * - teacher: publica contenidos, crea evaluaciones y certifica avances de grado.
+ * - student: accede al material de su grado, rinde evaluaciones y ve su progreso.
+ */
+export type AcademyRole = 'admin' | 'teacher' | 'student';
+
+/**
+ * Roles de un usuario dentro de DINAMYT Membresías:
+ * - owner: maestro/dueño del club — gestiona alumnos, planes, pagos y configuración.
+ * - staff: auxiliar/recepción — registra pagos y asistencia; sin borrar ni configurar.
+ * - guardian: acudiente — ve el estado/historial de sus alumnos y recibe avisos.
+ * - student: alumno — ve su propio estado, días faltantes e historial.
+ */
+export type MembresiasRole = 'owner' | 'staff' | 'guardian' | 'student';
 
 /**
  * Roles de un usuario dentro de DINAMYT Campeonatos (§4.1):

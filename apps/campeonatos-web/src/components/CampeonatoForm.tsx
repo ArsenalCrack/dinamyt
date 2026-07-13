@@ -137,6 +137,9 @@ export function CampeonatoForm({
     set('mods', v.mods.includes(m) ? v.mods.filter((x) => x !== m) : [...v.mods, m]);
   }
 
+  // Hoy en ISO (YYYY-MM-DD) para el `min` del calendario y la validación.
+  const hoyISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   function validar(): string[] {
     const errs = validarDatosCampeonato({
       nombre: v.nombre,
@@ -147,6 +150,11 @@ export function CampeonatoForm({
       fechaInicio: v.fechaInicio,
       fechaFin: v.fechaFin,
     });
+    // La fecha de inicio no puede estar en el pasado (solo al crear o al
+    // cambiarla: si es la misma que ya estaba, no se re-valida en el server).
+    if (v.fechaInicio && v.fechaInicio < hoyISO && v.fechaInicio !== inicial?.fechaInicio) {
+      errs.push('La fecha de inicio no puede ser anterior a hoy.');
+    }
     if (v.mods.length === 0) errs.push('Selecciona al menos una modalidad.');
     if (!v.esPublico && !v.codigo.trim())
       errs.push('Un campeonato privado requiere un código de acceso.');
@@ -293,6 +301,8 @@ export function CampeonatoForm({
             <input
               type="date"
               value={v.fechaInicio}
+              // No permite fechas pasadas (salvo conservar la ya guardada al editar).
+              min={inicial?.fechaInicio && inicial.fechaInicio < hoyISO ? inicial.fechaInicio : hoyISO}
               onChange={(e) => set('fechaInicio', e.target.value)}
               className="mt-1"
             />
@@ -302,6 +312,8 @@ export function CampeonatoForm({
             <input
               type="date"
               value={v.fechaFin}
+              // La fecha de fin nunca antes de la de inicio.
+              min={v.fechaInicio || hoyISO}
               onChange={(e) => set('fechaFin', e.target.value)}
               className="mt-1"
             />

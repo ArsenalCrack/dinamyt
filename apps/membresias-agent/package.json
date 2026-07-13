@@ -1,0 +1,25 @@
+{
+  "name": "@dinamyt/membresias-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./dist/main.js",
+  "description": "Agente local (kiosco Windows) que habla con el lector de huella y expone un contrato estable a la PWA de Membresías. La marca del lector solo afecta a este componente.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "dev": "tsx watch src/main.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
+  }
+}

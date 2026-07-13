@@ -1,4 +1,10 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "compilerOptions": {
+    "rootDir": "./src",
+    // deleteOutDir borra dist en cada build: con incremental el tsbuildinfo
+    // diria "todo al dia" y tsc no emitiria NADA (dist/main ausente).
+    "incremental": false
+  },
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "drizzle.config.ts"]
 }

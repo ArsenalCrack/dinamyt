@@ -1,0 +1,127 @@
+'use client';
+
+import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { login, guardarToken, extraerError } from '@/lib/api';
+import { getRolEfectivo, limpiarRolCache, rutaInicio } from '@/lib/session';
+
+const PORTAL_URL =
+  process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
+
+export default function Login() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+
+  async function entrar() {
+    limpiarRolCache();
+    const rol = await getRolEfectivo();
+    router.replace(rutaInicio(rol));
+  }
+
+  // SSO desde el portal del ecosystem: si llega #token=<jwt> en el fragmento,
+  // se guarda y se entra directo (el fragmento nunca viaja al servidor).
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#token=')) {
+      const token = decodeURIComponent(hash.slice(7));
+      if (token) {
+        guardarToken(token);
+        window.history.replaceState(null, '', window.location.pathname);
+        void entrar();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setCargando(true);
+    try {
+      await login(email, password);
+      await entrar();
+    } catch (err) {
+      // El ecosystem explica el motivo real (correo inexistente, contraseña
+      // incorrecta, intentos restantes…): se muestra tal cual.
+      setError(extraerError(err, 'No se pudo iniciar sesión.'));
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  return (
+    <main
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem',
+      }}
+    >
+      <form onSubmit={submit} className="card" style={{ padding: '1.75rem', width: '100%', maxWidth: 380 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="DINAMYT" width={56} height={56} style={{ marginBottom: '0.75rem' }} />
+        <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>Ecosistema DINAMYT</p>
+        <h1 className="display" style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
+          Academy <span style={{ color: 'var(--gold)' }}>del practicante</span>
+        </h1>
+        <p className="muted" style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+          Ingresa con tu cuenta del ecosistema.
+        </p>
+
+        <label className="muted" style={{ fontSize: '0.8rem' }}>Correo</label>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ margin: '0.3rem 0 0.9rem' }} />
+
+        <label className="muted" style={{ fontSize: '0.8rem' }}>Contraseña</label>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ margin: '0.3rem 0 1.1rem' }} />
+
+        {error && <p className="msg-error" style={{ marginBottom: '0.8rem', fontSize: '0.85rem' }}>{error}</p>}
+
+        <button className="btn btn-cta" type="submit" disabled={cargando} style={{ width: '100%' }}>
+          {cargando ? 'Ingresando…' : 'Ingresar'}
+        </button>
+
+        {/* SSO por redirección: el portal devuelve aquí con #token= */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            margin: '1rem 0',
+            fontSize: '0.75rem',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <span style={{ height: 1, flex: 1, background: 'var(--border)' }} />
+          o
+          <span style={{ height: 1, flex: 1, background: 'var(--border)' }} />
+        </div>
+        <a
+          className="btn btn-outline"
+          style={{ width: '100%' }}
+          href={`${PORTAL_URL}/login?redirect=${encodeURIComponent(
+            typeof window !== 'undefined' ? `${window.location.origin}/login` : '',
+          )}`}
+        >
+          Entrar con el portal DINAMYT
+        </a>
+
+        <p className="muted" style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.85rem' }}>
+          ¿No tienes cuenta?{' '}
+          <a href={`${PORTAL_URL}/registro`} style={{ color: 'var(--gold)' }}>
+            Regístrate en el portal
+          </a>
+        </p>
+        <p style={{ marginTop: '0.25rem', textAlign: 'center', fontSize: '0.85rem' }}>
+          <a href={`${PORTAL_URL}/dashboard`} className="muted">
+            ⇱ Ir al panel principal DINAMYT
+          </a>
+        </p>
+      </form>
+    </main>
+  );
+}

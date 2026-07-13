@@ -9,13 +9,13 @@ import {
   type Color,
 } from '@dinamyt/campeonatos-core';
 import { useRouter } from 'next/navigation';
-import { guardarCombateAPI, obtenerToken, extraerError } from '@/lib/api';
+import { guardarCombateAPI, finalizarTatamiAPI, obtenerToken, extraerError } from '@/lib/api';
 import { getSesion, esAdmin } from '@/lib/session';
 import { useAlertSystem, AlertOverlays } from '@/components/AlertSystem';
 
 const WS_URL = process.env.NEXT_PUBLIC_COMBAT_WS_URL || 'ws://localhost:3005';
 
-const gold = { background: 'var(--gold)', color: '#14141e' } as const;
+const gold = { background: 'var(--accion)', color: 'var(--accion-texto)' } as const;
 const hongColor = '#E8002A';
 const chungColor = '#2266ff';
 
@@ -65,18 +65,22 @@ export default function CombatePage() {
     if (!esAdmin(s) && s?.role !== 'judge') router.replace('/perfil');
   }, [router]);
   const [seccionId, setSeccionId] = useState<string | null>(null);
+  const [tatamiId, setTatamiId] = useState<string | null>(null);
   const [guardarMsg, setGuardarMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const estadoRef = useRef<EstadoCombate | null>(null);
 
-  // Parámetros opcionales de la URL: ?combate=<id>&seccion=<uuid> — permiten
-  // enlazar el panel desde un bracket real y persistir el resultado al final.
+  // Parámetros opcionales de la URL: ?combate=<id>&seccion=<uuid>&tatami=<uuid>
+  // — permiten enlazar el panel desde un bracket real, persistir el resultado
+  // y (si el JUEZ CENTRAL llegó desde su tatami) FINALIZAR la sección en curso.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const c = q.get('combate');
     const s = q.get('seccion');
+    const t = q.get('tatami');
     if (c) setCombateId(c);
     if (s) setSeccionId(s);
+    if (t) setTatamiId(t);
   }, []);
 
   useEffect(() => {
@@ -138,6 +142,19 @@ export default function CombatePage() {
       setGuardarMsg({ tipo: 'ok', texto: 'Resultado guardado en el campeonato.' });
     } catch (e) {
       setGuardarMsg({ tipo: 'error', texto: extraerError(e, 'No se pudo guardar el resultado.') });
+    }
+  }
+
+  // El JUEZ CENTRAL cierra su sección desde la mesa: finaliza la que está
+  // EN_CURSO en su tatami (libera el área y marca la sección como terminada).
+  async function finalizarSeccion() {
+    if (!tatamiId) return;
+    setGuardarMsg(null);
+    try {
+      await finalizarTatamiAPI(tatamiId);
+      setGuardarMsg({ tipo: 'ok', texto: 'Sección finalizada: el tatami quedó libre.' });
+    } catch (e) {
+      setGuardarMsg({ tipo: 'error', texto: extraerError(e, 'No se pudo finalizar la sección.') });
     }
   }
 
@@ -489,6 +506,25 @@ export default function CombatePage() {
                 Guardar resultado
               </button>
             )}
+            {/* El JUEZ CENTRAL cierra su sección desde la mesa (llegó por su
+                tatami con ?tatami=<uuid>): finaliza la sección en curso. */}
+            {tatamiId && (
+              <button
+                onClick={() =>
+                  alertas.showConfirm({
+                    titulo: 'FINALIZAR SECCIÓN',
+                    mensaje:
+                      'Se marca la sección en curso como finalizada y el tatami queda libre. ¿Continuar?',
+                    tipo: 'peligro',
+                    confirmLabel: 'Finalizar',
+                    onConfirm: () => void finalizarSeccion(),
+                  })
+                }
+                className="btn btn-danger btn-sm"
+              >
+                Finalizar sección
+              </button>
+            )}
             {guardarMsg && (
               <span className="text-sm" style={{ color: guardarMsg.tipo === 'ok' ? 'var(--gold)' : '#ff5577' }}>
                 {guardarMsg.texto}
@@ -536,7 +572,7 @@ function Marcador({ nombre, total, color }: { nombre: string; total: number; col
 
 function Banner({ texto }: { texto: string }) {
   return (
-    <div className="mb-4 rounded-lg px-4 py-3 font-semibold" style={{ background: 'var(--gold)', color: '#14141e' }}>
+    <div className="mb-4 rounded-lg px-4 py-3 font-semibold" style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}>
       {texto}
     </div>
   );

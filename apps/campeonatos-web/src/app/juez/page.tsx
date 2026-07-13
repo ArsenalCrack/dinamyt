@@ -92,6 +92,8 @@ export default function JuezPage() {
       <h1 className="mb-1 text-lg font-semibold">Mis tatamis asignados</h1>
       <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
         Toca tu tatami para entrar con el rol que te asignó el administrador.
+        Como juez de esquina verás <strong>tus puntos personales</strong> por
+        color y tu registro local sin conexión; el juez central entra a la mesa.
       </p>
 
       {tatamis.length > 0 ? (

@@ -35,6 +35,8 @@ export const competidores = camp.table(
     correo: varchar('correo', { length: 200 }),
     celular: varchar('celular', { length: 30 }),
     genero: generoEnum('genero'),
+    /** Foto de perfil (copia del avatar del ecosystem; data-URL o http). */
+    fotoUrl: text('foto_url'),
     /** Peso actual en kg (dato competitivo, editable por maestro o competidor). */
     pesoActual: decimal('peso_actual', { precision: 5, scale: 2 }),
     cinturon: varchar('cinturon', { length: 50 }),
@@ -70,6 +72,8 @@ export const inscripciones = camp.table(
     grupoCinturonInscripcion: grupoCinturonEnum('grupo_cinturon_inscripcion'),
     cinturonInscripcion: varchar('cinturon_inscripcion', { length: 50 }),
     estado: estadoInscripcionEnum('estado').notNull().default('PENDIENTE'),
+    /** Motivo del rechazo/desaprobación (visible para el competidor). */
+    motivoRechazo: text('motivo_rechazo'),
     /** Total = costo base + modalidades extra (calculado, §5.1). */
     montoTotal: decimal('monto_total', { precision: 10, scale: 2 }).default('0'),
     montoAbonado: decimal('monto_abonado', { precision: 10, scale: 2 }).default('0'),

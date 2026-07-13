@@ -31,6 +31,7 @@ describe('guard JWT del ecosystem', () => {
       app_scopes: scopes,
       role_academy: null,
       role_campeonatos: role,
+      role_membresias: null,
       is_super_admin: isSuperAdmin,
     };
     return new SignJWT({ ...payload })

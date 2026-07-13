@@ -3,21 +3,30 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
+import api, {
   obtenerToken,
   decodificarToken,
   cerrarSesion,
+  misOrganizacionesAPI,
+  miClubAPI,
   type TokenPayload,
 } from '@/lib/api';
+import { Avatar } from '@/components/Avatar';
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
+const MEMBRESIAS_URL =
+  process.env.NEXT_PUBLIC_MEMBRESIAS_URL || 'http://localhost:3006';
 const ACADEMY_URL =
-  process.env.NEXT_PUBLIC_ACADEMY_URL || 'http://localhost:3004';
+  process.env.NEXT_PUBLIC_ACADEMY_URL || 'http://localhost:3008';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [payload, setPayload] = useState<TokenPayload | null>(null);
+  // ¿Gestiona alguna organización (admin/maestro)? ¿Pertenece a algún club?
+  const [gestiona, setGestiona] = useState<boolean | null>(null);
+  const [nombreClub, setNombreClub] = useState<string | null>(null);
+  const [foto, setFoto] = useState<string | null>(null);
 
   useEffect(() => {
     const t = obtenerToken();
@@ -32,6 +41,22 @@ export default function DashboardPage() {
       return;
     }
     setPayload(p);
+
+    // Decide qué tarjeta mostrar: «Mi organización» (la gestiona) o
+    // «Mi club» (solo pertenece). Ambas consultas fallan sin romper la página.
+    Promise.allSettled([
+      misOrganizacionesAPI(),
+      miClubAPI(),
+      api.get(`/users/${p.sub}/profile`),
+    ]).then(([orgs, club, perfil]) => {
+      setGestiona(orgs.status === 'fulfilled' && orgs.value.length > 0);
+      if (club.status === 'fulfilled' && club.value.length > 0) {
+        setNombreClub(club.value[0].name);
+      }
+      if (perfil.status === 'fulfilled') {
+        setFoto((perfil.value.data as { avatarUrl: string | null }).avatarUrl);
+      }
+    });
   }, [router]);
 
   function salir() {
@@ -49,23 +74,27 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
-      <header className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--gold)' }}>
-            Hola, {payload.fullName}
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            {payload.email}
-            {payload.is_super_admin ? ' · Super administrador' : ''}
-          </p>
+      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <Avatar src={foto} nombre={payload.fullName} size={56} />
+          <div className="min-w-0">
+            <p className="eyebrow mb-1">Tu cuenta DINAMYT</p>
+            <h1 className="display text-3xl">Hola, {payload.fullName}</h1>
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+              {payload.email}
+              {payload.is_super_admin ? ' · Super administrador' : ''}
+            </p>
+          </div>
         </div>
-        <button
-          onClick={salir}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          Salir
-        </button>
+        <div className="flex items-center gap-2">
+          <Link href="/perfil" className="btn btn-outline">
+            Mi perfil
+          </Link>
+          {/* Salir se distingue: es la única acción destructiva */}
+          <button onClick={salir} className="btn btn-danger">
+            ⏻ Salir
+          </button>
+        </div>
       </header>
 
       <section
@@ -83,19 +112,35 @@ export default function DashboardPage() {
             <a
               href={`${CAMPEONATOS_URL}/admin/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
               className="rounded-lg px-4 py-3 font-semibold"
-              style={{ background: 'var(--gold)', color: '#14141e' }}
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               Entrar a Campeonatos
               {payload.role_campeonatos ? ` (${payload.role_campeonatos})` : ''}
             </a>
           )}
-          {(payload.is_super_admin || payload.app_scopes.includes('academy')) && (
+          {(payload.is_super_admin ||
+            payload.app_scopes.includes('membresias')) && (
+            // Mismo SSO por fragmento que Campeonatos: membresias-web guarda el
+            // token al aterrizar en /login#token=… sin segundo formulario.
             <a
-              href={ACADEMY_URL}
+              href={`${MEMBRESIAS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
               className="rounded-lg px-4 py-3 font-semibold"
-              style={{ background: 'var(--gold)', color: '#14141e' }}
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
+            >
+              Entrar a Membresías
+              {payload.role_membresias ? ` (${payload.role_membresias})` : ''}
+            </a>
+          )}
+          {(payload.is_super_admin || payload.app_scopes.includes('academy')) && (
+            // Mismo SSO por fragmento: academy-web guarda el token al aterrizar
+            // en /login#token=… sin segundo formulario.
+            <a
+              href={`${ACADEMY_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
+              className="rounded-lg px-4 py-3 font-semibold"
+              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               Entrar a Academy
+              {payload.role_academy ? ` (${payload.role_academy})` : ''}
             </a>
           )}
           {!payload.is_super_admin && payload.app_scopes.length === 0 && (
@@ -109,6 +154,47 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* «Mi organización» si la gestiona; si solo pertenece a un club,
+          «Mi club» con su información (la llena el maestro/admin del club). */}
+      {gestiona ? (
+        <section
+          className="mt-4 rounded-xl border p-5"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <h2 className="mb-1 text-lg font-semibold">Mi organización</h2>
+          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Gestiona tus clubes y tu gente, la ficha de tu club y las
+            invitaciones entre organización y clubes.
+          </p>
+          <Link
+            href="/mi-organizacion"
+            className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
+            style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+          >
+            Abrir mi organización
+          </Link>
+        </section>
+      ) : gestiona === false ? (
+        <section
+          className="mt-4 rounded-xl border p-5"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <h2 className="mb-1 text-lg font-semibold">Mi club</h2>
+          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            {nombreClub
+              ? `Perteneces a ${nombreClub}: mira sus horarios, sede y contactos.`
+              : 'Cuando tu maestro te agregue a su club, aquí verás su información. ¿Eres maestro? Funda tu club.'}
+          </p>
+          <Link
+            href="/mi-club"
+            className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
+            style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+          >
+            {nombreClub ? 'Ver la información de mi club' : 'Mi club'}
+          </Link>
+        </section>
+      ) : null}
+
       {payload.is_super_admin && (
         <section
           className="mt-4 rounded-xl border p-5"
@@ -121,7 +207,7 @@ export default function DashboardPage() {
           <Link
             href="/admin"
             className="inline-block rounded-lg px-4 py-2 text-sm font-semibold"
-            style={{ background: 'var(--gold)', color: '#14141e' }}
+            style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
           >
             Abrir panel de administración
           </Link>

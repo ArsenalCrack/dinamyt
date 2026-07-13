@@ -30,6 +30,46 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dinamyt/campeonatos-combat", "dev"],
       "port": 3005
+    },
+    {
+      "name": "membresias-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/membresias-api", "dev"],
+      "port": 3004
+    },
+    {
+      "name": "membresias-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/membresias-web", "dev"],
+      "port": 3006
+    },
+    {
+      "name": "membresias-agent",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/membresias-agent", "dev"],
+      "port": 7070
+    },
+    {
+      "name": "academy-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/academy-api", "dev"],
+      "port": 3007
+    },
+    {
+      "name": "academy-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/academy-web", "dev"],
+      "port": 3008
+    },
+    {
+      "name": "academy-figuras",
+      "runtimeExecutable": "apps/academy-figuras/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m", "uvicorn", "service.main:app",
+        "--port", "3009",
+        "--app-dir", "apps/academy-figuras"
+      ],
+      "port": 3009
     }
   ]
 }

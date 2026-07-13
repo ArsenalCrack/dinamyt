@@ -1,260 +1,247 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  inscribirAPI,
-  invitarAPI,
-  listInvitacionesAPI,
+  obtenerToken,
+  getCampeonatoAPI,
+  cambiarEstadoAPI,
+  siguienteEstadoUI,
   extraerError,
-  MODALIDADES,
-  GRUPOS_CINTURON,
-  GENEROS,
-  type Modalidad,
-  type Invitacion,
+  type CampeonatoDetalle,
+  type EstadoCampeonato,
 } from '@/lib/api';
+import { getSesion, esAdmin, puedeInscribir } from '@/lib/session';
 
-export default function InscribirPage() {
+/** Qué significa cada estado del ciclo de vida (guía para el admin). */
+const GUIA_ESTADO: Record<EstadoCampeonato, string> = {
+  BORRADOR: 'Configura el evento, inscribe e invita. El público aún no lo ve.',
+  LISTO: 'Publicado: el público ya lo ve. Últimas inscripciones y llaves.',
+  EN_CURSO: 'Evento en vivo: dirige desde Tatamis. La configuración quedó congelada.',
+  FINALIZADO: 'Terminado: los resultados quedan públicos y el historial es inmutable.',
+};
+
+function badgeEstado(e: EstadoCampeonato): string {
+  return e === 'EN_CURSO'
+    ? 'badge badge-live'
+    : e === 'LISTO'
+      ? 'badge badge-info'
+      : e === 'FINALIZADO'
+        ? 'badge badge-ok'
+        : 'badge';
+}
+
+/**
+ * HUB del campeonato: un solo lugar con el flujo completo en tarjetas
+ * numeradas (configurar → inscribir → categorías/llaves → evento en vivo),
+ * para que el admin avance en orden sin perderse entre rutas.
+ */
+export default function HubCampeonatoPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const campId = params.id;
 
-  const [documento, setDocumento] = useState('');
-  const [nombreCompleto, setNombreCompleto] = useState('');
-  const [fechaNacimiento, setFechaNacimiento] = useState('');
-  const [genero, setGenero] = useState<(typeof GENEROS)[number]>('MASCULINO');
-  const [grupoCinturon, setGrupoCinturon] =
-    useState<(typeof GRUPOS_CINTURON)[number]>('BLANCO');
-  const [pesoActual, setPesoActual] = useState('');
-  const [academiaClub, setAcademiaClub] = useState('');
-  const [mods, setMods] = useState<Modalidad[]>([]);
-
-  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
-  const [enviando, setEnviando] = useState(false);
-
-  function toggleMod(m: Modalidad) {
-    setMods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
-  }
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    if (mods.length === 0) {
-      setMsg({ tipo: 'error', texto: 'Selecciona al menos una modalidad.' });
-      return;
-    }
-    setEnviando(true);
-    try {
-      await inscribirAPI(campId, {
-        documento,
-        nombreCompleto,
-        fechaNacimiento,
-        genero,
-        grupoCinturon,
-        pesoActual: pesoActual || undefined,
-        academiaClub: academiaClub || undefined,
-        modalidades: mods,
-      });
-      setMsg({ tipo: 'ok', texto: 'Competidor inscrito correctamente.' });
-      setDocumento('');
-      setNombreCompleto('');
-      setFechaNacimiento('');
-      setPesoActual('');
-      setAcademiaClub('');
-      setMods([]);
-    } catch (err) {
-      setMsg({ tipo: 'error', texto: extraerError(err, 'No se pudo inscribir.') });
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  return (
-    <main className="mx-auto min-h-screen max-w-xl px-6 py-10">
-      <div className="flex items-center justify-between">
-        <Link href="/admin" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          ← Volver
-        </Link>
-        <Link
-          href={`/admin/${campId}/secciones`}
-          className="text-sm font-semibold"
-          style={{ color: 'var(--gold)' }}
-        >
-          Secciones y llaves →
-        </Link>
-      </div>
-      <h1 className="mb-6 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-        Inscribir competidor
-      </h1>
-
-      <form
-        onSubmit={onSubmit}
-        className="rounded-xl border p-5"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            Documento
-            <input value={documento} onChange={(e) => setDocumento(e.target.value.replace(/\D/g, ''))} required maxLength={30} inputMode="numeric" placeholder="Solo números" className="mt-1" />
-          </label>
-          <label className="block text-sm">
-            Nombre completo
-            <input value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} required maxLength={200} className="mt-1" />
-          </label>
-          <label className="block text-sm">
-            Fecha de nacimiento
-            <input type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} required className="mt-1" />
-          </label>
-          <label className="block text-sm">
-            Peso actual (kg)
-            <input type="number" step="0.1" min={10} max={400} value={pesoActual} onChange={(e) => setPesoActual(e.target.value)} className="mt-1" />
-          </label>
-          <label className="block text-sm">
-            Género
-            <select value={genero} onChange={(e) => setGenero(e.target.value as (typeof GENEROS)[number])} className="mt-1">
-              {GENEROS.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            Grupo de cinturón
-            <select
-              value={grupoCinturon}
-              onChange={(e) => setGrupoCinturon(e.target.value as (typeof GRUPOS_CINTURON)[number])}
-              className="mt-1"
-            >
-              {GRUPOS_CINTURON.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="mt-3 block text-sm">
-          Academia / club
-          <input value={academiaClub} onChange={(e) => setAcademiaClub(e.target.value)} maxLength={200} className="mt-1" />
-        </label>
-
-        <fieldset className="mt-3">
-          <legend className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Modalidades
-          </legend>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {MODALIDADES.map((m) => (
-              <label key={m} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={mods.includes(m)} onChange={() => toggleMod(m)} />
-                {m}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        {msg && (
-          <p
-            className="mt-3 text-sm"
-            style={{ color: msg.tipo === 'ok' ? 'var(--gold)' : '#ff5577' }}
-          >
-            {msg.texto}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={enviando}
-          className="mt-4 rounded-lg px-5 py-2 font-semibold"
-          style={{ background: 'var(--gold)', color: '#14141e' }}
-        >
-          {enviando ? 'Inscribiendo…' : 'Inscribir'}
-        </button>
-      </form>
-
-      <SeccionInvitaciones campId={campId} />
-    </main>
-  );
-}
-
-/** Invitar competidores por email (aceptan in-app eligiendo modalidades). */
-function SeccionInvitaciones({ campId }: { campId: string }) {
-  const [email, setEmail] = useState('');
-  const [lista, setLista] = useState<Invitacion[]>([]);
-  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [camp, setCamp] = useState<CampeonatoDetalle | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
   const cargar = useCallback(() => {
-    listInvitacionesAPI(campId)
-      .then(setLista)
-      .catch(() => setLista([]));
+    getCampeonatoAPI(campId)
+      .then(setCamp)
+      .catch((e) => setMsg(extraerError(e, 'No se pudo cargar el campeonato.')));
   }, [campId]);
 
   useEffect(() => {
+    if (!obtenerToken()) {
+      router.replace('/admin/login');
+      return;
+    }
+    const s = getSesion();
+    if (!puedeInscribir(s)) {
+      router.replace('/panel');
+      return;
+    }
+    // El maestro no gestiona: va directo a inscribir/invitar.
+    if (!esAdmin(s)) {
+      router.replace(`/admin/${campId}/inscribir`);
+      return;
+    }
     cargar();
-  }, [cargar]);
+  }, [router, campId, cargar]);
 
-  async function invitar(e: React.FormEvent) {
-    e.preventDefault();
+  async function avanzar() {
+    if (!camp) return;
+    const sig = siguienteEstadoUI(camp.estado);
+    if (!sig) return;
     setMsg(null);
     setOcupado(true);
     try {
-      const inv = await invitarAPI(campId, email.trim());
-      setMsg({
-        tipo: 'ok',
-        texto: inv.correoEnviado
-          ? 'Invitación enviada por correo; también la verá al iniciar sesión.'
-          : 'Invitación creada: la verá al iniciar sesión (correo no configurado).',
-      });
-      setEmail('');
+      await cambiarEstadoAPI(campId, sig);
       cargar();
-    } catch (err) {
-      setMsg({ tipo: 'error', texto: extraerError(err, 'No se pudo invitar.') });
+    } catch (e) {
+      setMsg(extraerError(e, 'No se pudo cambiar el estado.'));
     } finally {
       setOcupado(false);
     }
   }
 
+  if (!camp) {
+    return (
+      <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
+        <p style={{ color: 'var(--text-muted)' }}>{msg ?? 'Cargando…'}</p>
+      </main>
+    );
+  }
+
+  const congelado = camp.estado === 'EN_CURSO' || camp.estado === 'FINALIZADO';
+  const sig = siguienteEstadoUI(camp.estado);
+
+  const pasos = [
+    {
+      n: 1,
+      titulo: 'Configuración',
+      desc: 'Datos del evento, fechas, tatamis y modalidades habilitadas.',
+      href: `/admin/${campId}/editar`,
+      accion: 'Editar',
+      deshabilitado: congelado,
+      nota: congelado ? 'Congelada: el evento ya arrancó.' : null,
+    },
+    {
+      n: 2,
+      titulo: 'Inscripciones',
+      desc: 'Inscribe directo, invita por correo y aprueba o rechaza lo enviado.',
+      href: `/admin/${campId}/inscribir`,
+      accion: 'Inscribir / Invitar',
+      extra: { href: `/admin/${campId}/inscripciones`, etiqueta: 'Revisar' },
+      // Con el evento EN VIVO, el admin sigue pudiendo añadir/invitar (es la
+      // única vía de entrada); recién FINALIZADO se cierra del todo.
+      deshabilitado: camp.estado === 'FINALIZADO',
+      nota:
+        camp.estado === 'EN_CURSO'
+          ? 'En vivo: solo tú puedes añadir o invitar competidores.'
+          : camp.estado === 'FINALIZADO'
+            ? 'Cerradas: el evento terminó.'
+            : null,
+    },
+    {
+      n: 3,
+      titulo: 'Categorías y llaves',
+      desc: 'Define cinturones, edades y pesos; genera las secciones y sus llaves.',
+      href: `/admin/${campId}/secciones`,
+      accion: 'Abrir',
+      deshabilitado: false,
+      nota: congelado ? 'Solo lectura durante el evento.' : null,
+    },
+    {
+      n: 4,
+      titulo: 'Tatamis · evento en vivo',
+      desc: 'Colas por tatami, jueces asignados, robo de secciones y mesa central.',
+      href: `/admin/${campId}/tatamis`,
+      accion: 'Dirigir',
+      deshabilitado: false,
+      nota: null,
+    },
+  ];
+
   return (
-    <section className="card mt-6 p-5">
-      <h2 className="mb-1 text-lg font-semibold">Invitar competidores</h2>
-      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-        El invitado recibe un correo y ve la invitación al entrar con su cuenta;
-        al aceptar completa sus datos y elige modalidades.
-      </p>
-      <form onSubmit={invitar} className="flex flex-wrap gap-2">
-        <input
-          type="email"
-          placeholder="email@competidor.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="min-w-0 flex-1"
-        />
-        <button type="submit" disabled={ocupado || !email.trim()} className="btn btn-gold">
-          + Invitar
-        </button>
-      </form>
-      {msg && (
-        <p className={`mt-2 text-sm ${msg.tipo === 'ok' ? 'msg-ok' : 'msg-error'}`}>
-          {msg.texto}
-        </p>
-      )}
-      {lista.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-1.5">
-          {lista.map((i) => (
-            <li
-              key={i.id}
-              className="flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <span className="truncate">{i.email}</span>
-              <span
-                className={`badge ${
-                  i.estado === 'ACEPTADA' ? 'badge-ok' : i.estado === 'PENDIENTE' ? 'badge-info' : ''
-                }`}
+    <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
+      <Link href="/admin" className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        ← Campeonatos
+      </Link>
+
+      {/* Cabecera del campeonato */}
+      <header className="card mt-2 mb-6 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-bold" style={{ color: 'var(--gold)' }}>
+              {camp.nombre}
+            </h1>
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+              {GUIA_ESTADO[camp.estado]}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className={badgeEstado(camp.estado)}>
+              {camp.estado === 'EN_CURSO' ? '● EN CURSO' : camp.estado}
+            </span>
+            {sig && (
+              <button
+                onClick={avanzar}
+                disabled={ocupado}
+                className="btn btn-gold btn-sm"
+                title={`Avanzar el campeonato a ${sig}`}
               >
-                {i.estado}
+                Pasar a {sig} →
+              </button>
+            )}
+            <Link
+              href={`/admin/${campId}/reportes`}
+              className="btn btn-outline btn-sm"
+              title="Resumen, registros, podios y descarga a gusto"
+            >
+              📊 Reportes
+            </Link>
+          </div>
+        </div>
+        {msg && <p className="msg-error mt-2 text-sm">{msg}</p>}
+      </header>
+
+      {/* Flujo en tarjetas numeradas */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {pasos.map((p) => (
+          <article
+            key={p.n}
+            className="card flex flex-col p-5"
+            style={p.deshabilitado ? { opacity: 0.65 } : undefined}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-extrabold"
+                style={{ background: 'var(--bg-elevated)', color: 'var(--gold)', border: '1px solid var(--gold-dim)' }}
+              >
+                {p.n}
               </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+              <div className="min-w-0">
+                <h2 className="font-bold">{p.titulo}</h2>
+                <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {p.desc}
+                </p>
+              </div>
+            </div>
+            {p.nota && (
+              <p className="mt-2 text-xs" style={{ color: 'var(--gold)' }}>
+                🔒 {p.nota}
+              </p>
+            )}
+            <div className="mt-auto flex flex-wrap gap-2 pt-4">
+              {p.deshabilitado ? (
+                <span className="btn btn-outline btn-sm" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                  {p.accion}
+                </span>
+              ) : (
+                <Link href={p.href} className="btn btn-gold btn-sm">
+                  {p.accion} →
+                </Link>
+              )}
+              {p.extra && !p.deshabilitado && (
+                <Link href={p.extra.href} className="btn btn-outline btn-sm">
+                  {p.extra.etiqueta} →
+                </Link>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {/* Vista del público */}
+      <Link
+        href={`/pantalla/${campId}`}
+        className="card mt-4 block p-4 text-center text-sm font-semibold"
+        style={{ color: 'var(--gold)' }}
+      >
+        📺 Ver como lo ve el público (información, tatamis y resultados) →
+      </Link>
+    </main>
   );
 }
