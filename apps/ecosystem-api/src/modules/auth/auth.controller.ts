@@ -39,7 +39,10 @@ export class AuthController {
 
   @Throttle({ global: { limit: 10, ttl: 60_000 } })
   @Post('login')
-  login(@Body() body: { email: string; password: string }) {
+  login(@Body() body: { email?: string; password?: string }) {
+    if (!body || !body.email || !body.password) {
+      throw new BadRequestException('Faltan credenciales (email y password).');
+    }
     return this.authService.login(body.email, body.password);
   }
 

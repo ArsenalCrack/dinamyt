@@ -1,4 +1,4 @@
-CREATE SCHEMA "academy";
+CREATE SCHEMA IF NOT EXISTS "academy";
 --> statement-breakpoint
 CREATE TYPE "academy"."estado_intento" AS ENUM('EN_CURSO', 'ENVIADO', 'CALIFICADO');--> statement-breakpoint
 CREATE TYPE "academy"."estado_solicitud" AS ENUM('PENDIENTE', 'APROBADA', 'RECHAZADA');--> statement-breakpoint

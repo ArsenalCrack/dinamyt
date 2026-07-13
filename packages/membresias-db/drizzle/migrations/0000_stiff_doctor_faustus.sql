@@ -1,4 +1,4 @@
-CREATE SCHEMA "membresias";
+CREATE SCHEMA IF NOT EXISTS "membresias";
 --> statement-breakpoint
 CREATE TYPE "membresias"."canal_notif" AS ENUM('push', 'email', 'inapp');--> statement-breakpoint
 CREATE TYPE "membresias"."estado_membresia" AS ENUM('activo', 'inactivo', 'suspendido', 'retirado');--> statement-breakpoint

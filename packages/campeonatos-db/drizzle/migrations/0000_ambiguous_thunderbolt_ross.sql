@@ -1,4 +1,4 @@
-CREATE SCHEMA "campeonatos";
+CREATE SCHEMA IF NOT EXISTS "campeonatos";
 --> statement-breakpoint
 CREATE TYPE "campeonatos"."estado_campeonato" AS ENUM('BORRADOR', 'LISTO', 'EN_CURSO', 'FINALIZADO');--> statement-breakpoint
 CREATE TYPE "campeonatos"."estado_inscripcion" AS ENUM('PENDIENTE', 'APROBADA', 'RECHAZADA');--> statement-breakpoint

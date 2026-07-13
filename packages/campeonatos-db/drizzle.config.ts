@@ -13,4 +13,8 @@ export default defineConfig({
     url: process.env.CAMPEONATOS_DATABASE_URL!,
   },
   schemaFilter: ['campeonatos'],
+  migrations: {
+    schema: 'campeonatos',
+    table: '__drizzle_migrations',
+  },
 });
