@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { resolve } from 'path';
 import * as jose from 'jose';
 import { JwtPayload } from '@dinamyt/shared';
 
@@ -15,11 +15,11 @@ export class JwtTokenService {
 
   async onModuleInit() {
     const privatePem = readFileSync(
-      join(process.cwd(), process.env.JWT_PRIVATE_KEY_PATH!),
+      resolve(process.cwd(), process.env.JWT_PRIVATE_KEY_PATH!),
       'utf8',
     );
     const publicPem = readFileSync(
-      join(process.cwd(), process.env.JWT_PUBLIC_KEY_PATH!),
+      resolve(process.cwd(), process.env.JWT_PUBLIC_KEY_PATH!),
       'utf8',
     );
 
