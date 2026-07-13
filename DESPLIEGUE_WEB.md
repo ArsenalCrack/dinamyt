@@ -246,7 +246,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | Campo | Valor |
 | --- | --- |
 | **Name** | `dinamyt-ecosystem-api` |
-| **Build** | `npm install -g pnpm && pnpm install && pnpm --filter "@dinamyt/ecosystem-api..." build` |
+| **Build** | `pnpm install && pnpm --filter "@dinamyt/ecosystem-api..." build` |
 | **Start** | `pnpm --filter @dinamyt/ecosystem-api start:prod` |
 
 **Environment Variables:**
@@ -271,7 +271,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | Campo | Valor |
 | --- | --- |
 | **Name** | `dinamyt-campeonatos-api` |
-| **Build** | `npm install -g pnpm && pnpm install && pnpm --filter "@dinamyt/campeonatos-api..." build` |
+| **Build** | `pnpm install && pnpm --filter "@dinamyt/campeonatos-api..." build` |
 | **Start** | `pnpm --filter @dinamyt/campeonatos-api start` |
 
 **Environment Variables:**
@@ -287,7 +287,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | Campo | Valor |
 | --- | --- |
 | **Name** | `dinamyt-membresias-api` |
-| **Build** | `npm install -g pnpm && pnpm install && pnpm --filter "@dinamyt/membresias-api..." build` |
+| **Build** | `pnpm install && pnpm --filter "@dinamyt/membresias-api..." build` |
 | **Start** | `pnpm --filter @dinamyt/membresias-api start` |
 
 **Environment Variables:**
@@ -307,7 +307,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | Campo | Valor |
 | --- | --- |
 | **Name** | `dinamyt-academy-api` |
-| **Build** | `npm install -g pnpm && pnpm install && pnpm --filter "@dinamyt/academy-api..." build` |
+| **Build** | `pnpm install && pnpm --filter "@dinamyt/academy-api..." build` |
 | **Start** | `pnpm --filter @dinamyt/academy-api start` |
 
 **Environment Variables:**
