@@ -13,15 +13,22 @@ export class JwtTokenService {
   private privateKey: CryptoKey;
   private publicKey: CryptoKey;
 
+  private loadKey(envPath: string): string {
+    try {
+      return readFileSync(resolve(process.cwd(), envPath), 'utf8');
+    } catch (err) {
+      if (!envPath.startsWith('/')) {
+        try {
+          return readFileSync('/' + envPath, 'utf8');
+        } catch (err2) {}
+      }
+      throw new Error(`Fallo al leer llave JWT en path: ${envPath}. Revisa tus variables de entorno y Secret Files.`);
+    }
+  }
+
   async onModuleInit() {
-    const privatePem = readFileSync(
-      resolve(process.cwd(), process.env.JWT_PRIVATE_KEY_PATH!),
-      'utf8',
-    );
-    const publicPem = readFileSync(
-      resolve(process.cwd(), process.env.JWT_PUBLIC_KEY_PATH!),
-      'utf8',
-    );
+    const privatePem = this.loadKey(process.env.JWT_PRIVATE_KEY_PATH!);
+    const publicPem = this.loadKey(process.env.JWT_PUBLIC_KEY_PATH!);
 
     this.privateKey = await jose.importPKCS8(privatePem, 'RS256');
     this.publicKey = await jose.importSPKI(publicPem, 'RS256');
