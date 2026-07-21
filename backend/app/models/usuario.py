@@ -28,6 +28,11 @@ class Usuario(db.Model):
         nullable=False,
         default="juez",
     )
+    # Jerarquía: superadmin > admin > juez. El superadmin (el admin sembrado)
+    # ve y gestiona TODO; un admin normal solo su propio workspace (los jueces,
+    # campeonatos y competidores que él creó). Booleano aparte y no un tercer
+    # valor del Enum para no requerir migración del tipo en bases existentes.
+    es_superadmin = db.Column(db.Boolean, default=False, nullable=True)
     activo = db.Column(db.Boolean, default=True, nullable=False)
     creado_por_id = db.Column(
         db.Integer, db.ForeignKey("usuarios.id"), nullable=True, index=True
@@ -83,6 +88,11 @@ class Usuario(db.Model):
             self.password_hash.encode("utf-8"),
         )
 
+    @property
+    def es_super(self) -> bool:
+        """True si es superadmin (la columna puede ser NULL en bases viejas)."""
+        return self.rol == "admin" and bool(self.es_superadmin)
+
     def necesita_rehash(self) -> bool:
         """True si el hash guardado usa más rondas que las configuradas.
 
@@ -102,6 +112,7 @@ class Usuario(db.Model):
             "email": self.email,
             "nombre": self.nombre,
             "rol": self.rol,
+            "es_superadmin": self.es_super,
             "activo": self.activo,
             "creado_por_id": self.creado_por_id,
             "creado_por": (

@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { listLlavesTatamiAPI, type LlaveTatamiInfo } from "@/lib/api";
 import type { ConfirmData } from "@/components/AlertSystem";
+import { useI18n } from "@/lib/i18n";
 
 interface CombateLlaveActivo {
   llave_id: number;
   nombre: string;
-  ronda: number;
+  /** Índice de ronda, o "bronce" para el partido por el 3er puesto */
+  ronda: number | "bronce";
   partido: number;
   ronda_nombre: string;
   comp1: { id: number; nombre: string };
@@ -34,6 +36,7 @@ export default function LlavePanel({
   enviarEvento: (accion: string, datos?: Record<string, unknown>) => void;
   onShowConfirm: (data: ConfirmData) => void;
 }) {
+  const { t } = useI18n();
   const [llaves, setLlaves] = useState<LlaveTatamiInfo[]>([]);
   const [cargado, setCargado] = useState(false);
 
@@ -63,30 +66,29 @@ export default function LlavePanel({
         gap: 8, flexWrap: "wrap", marginBottom: 8,
       }}>
         <div className="card-title" style={{ marginBottom: 0 }}>
-          Combates de Eliminación
+          {t("lp.titulo")}
         </div>
         {hayArbol && (
           <button
             className="btn btn-sm"
             onClick={() => enviarEvento("mostrar_arbol", { mostrar: !mostrarArbol })}
             title={mostrarArbol
-              ? "La pantalla pública pasará a mostrar el marcador de puntos"
-              : "La pantalla pública pasará a mostrar el árbol de la llave"}
+              ? t("lp.titleMarcador")
+              : t("lp.titleArbol")}
             style={{
               background: mostrarArbol ? "var(--gold-bg)" : undefined,
               borderColor: mostrarArbol ? "var(--gold-border)" : undefined,
               color: mostrarArbol ? "var(--gold)" : undefined,
-              fontSize: "0.75rem",
+              fontSize: "0.82rem",
             }}
           >
-            {mostrarArbol ? "Mostrar puntuación" : "Mostrar árbol"}
+            {mostrarArbol ? t("lp.mostrarPuntuacion") : t("lp.mostrarArbol")}
           </button>
         )}
       </div>
       {hayArbol && (
-        <p style={{ color: "var(--text-dim)", fontSize: "0.72rem", margin: "0 0 8px" }}>
-          El público ve {mostrarArbol ? "el árbol de la llave" : "el marcador de puntos"}.
-          Al iniciar el cronómetro cambia solo a la puntuación.
+        <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", margin: "0 0 8px" }}>
+          {t("lp.publicoVe", { que: mostrarArbol ? t("lp.elArbol") : t("lp.elMarcador") })}
         </p>
       )}
 
@@ -99,31 +101,31 @@ export default function LlavePanel({
           border: "1px solid var(--gold-border)", borderRadius: "var(--radius-sm)",
         }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 800, color: "var(--gold)", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <div style={{ fontWeight: 800, color: "var(--gold)", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {combateLlave.nombre} · {combateLlave.ronda_nombre}
             </div>
-            <div style={{ fontSize: "0.85rem", marginTop: 2 }}>
+            <div style={{ fontSize: "0.9rem", marginTop: 2 }}>
               <span style={{ color: "var(--hong-light)", fontWeight: 700 }}>{combateLlave.comp1.nombre}</span>
-              <span style={{ color: "var(--text-dim)" }}> (Rojo) vs </span>
+              <span style={{ color: "var(--text-dim)" }}> {t("lp.rojo")} vs </span>
               <span style={{ color: "var(--chung-light)", fontWeight: 700 }}>{combateLlave.comp2.nombre}</span>
-              <span style={{ color: "var(--text-dim)" }}> (Azul)</span>
+              <span style={{ color: "var(--text-dim)" }}> {t("lp.azul")}</span>
             </div>
-            <div style={{ fontSize: "0.72rem", color: "var(--text-dim)", marginTop: 2 }}>
-              Al presionar &quot;Guardar + Nuevo&quot; el ganador avanza en la llave automáticamente.
+            <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", marginTop: 2 }}>
+              {t("lp.avanzaAuto")}
             </div>
           </div>
           <button
             className="btn btn-sm btn-danger"
             onClick={() => onShowConfirm({
-              titulo: "SOLTAR COMBATE",
-              mensaje: "¿Liberar este combate de eliminación? El marcador quedará suelto y el combate seguirá pendiente en la llave.",
+              titulo: t("lp.soltar.titulo"),
+              mensaje: t("lp.soltar.mensaje"),
               tipo: "advertencia",
-              confirmLabel: "SOLTAR",
-              cancelLabel: "Cancelar",
+              confirmLabel: t("lp.soltarLabel"),
+              cancelLabel: t("comun.cancelar"),
               onConfirm: () => enviarEvento("soltar_combate_llave"),
             })}
           >
-            Soltar
+            {t("lp.soltarBtn")}
           </button>
         </div>
       ) : (
@@ -136,9 +138,9 @@ export default function LlavePanel({
               padding: "8px 12px", background: "var(--bg-elevated)",
               border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
             }}>
-              <div style={{ fontWeight: 800, fontSize: "0.85rem" }}>{llave.nombre}</div>
-              <div style={{ fontSize: "0.8rem", color: "var(--gold)", fontWeight: 800, marginTop: 2 }}>
-                🏆 Campeón: {llave.campeon!.nombre}
+              <div style={{ fontWeight: 800, fontSize: "0.9rem" }}>{llave.nombre}</div>
+              <div style={{ fontSize: "0.875rem", color: "var(--gold)", fontWeight: 800, marginTop: 2 }}>
+                {t("lp.campeonLabel")} {llave.campeon!.nombre}
               </div>
             </div>
           ))}
@@ -159,14 +161,14 @@ export default function LlavePanel({
                   border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
                 }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: "0.85rem" }}>
+                    <div style={{ fontWeight: 800, fontSize: "0.9rem" }}>
                       {llave.nombre}
-                      <span style={{ color: "var(--text-dim)", fontWeight: 600, marginLeft: 8, fontSize: "0.75rem" }}>
-                        {llave.pendientes} combate(s) pendiente(s)
+                      <span style={{ color: "var(--text-dim)", fontWeight: 600, marginLeft: 8, fontSize: "0.82rem" }}>
+                        {t("lp.pendientesN", { n: llave.pendientes })}
                       </span>
                     </div>
-                    <div style={{ fontSize: "0.8rem", marginTop: 2 }}>
-                      <span style={{ color: "var(--text-dim)" }}>Sigue ({llave.siguiente!.ronda_nombre}): </span>
+                    <div style={{ fontSize: "0.875rem", marginTop: 2 }}>
+                      <span style={{ color: "var(--text-dim)" }}>{t("lp.sigue", { ronda: llave.siguiente!.ronda_nombre })} </span>
                       <span style={{ color: "var(--hong-light)", fontWeight: 700 }}>{llave.siguiente!.comp1.nombre}</span>
                       <span style={{ color: "var(--text-dim)" }}> vs </span>
                       <span style={{ color: "var(--chung-light)", fontWeight: 700 }}>{llave.siguiente!.comp2.nombre}</span>
@@ -175,20 +177,25 @@ export default function LlavePanel({
                   <button
                     className="btn btn-sm btn-primary"
                     onClick={() => onShowConfirm({
-                      titulo: "ACTIVAR COMBATE DE ELIMINACIÓN",
-                      mensaje: `${llave.nombre} · ${llave.siguiente?.ronda_nombre}: ${llave.siguiente?.comp1.nombre} (Rojo) vs ${llave.siguiente?.comp2.nombre} (Azul). Los nombres se cargarán en el marcador con el tiempo pausado.`,
+                      titulo: t("lp.activar.titulo"),
+                      mensaje: t("lp.activar.mensaje", {
+                        llave: llave.nombre,
+                        ronda: llave.siguiente?.ronda_nombre ?? "",
+                        c1: llave.siguiente?.comp1.nombre ?? "",
+                        c2: llave.siguiente?.comp2.nombre ?? "",
+                      }),
                       tipo: "info",
-                      confirmLabel: "ACTIVAR",
-                      cancelLabel: "Cancelar",
+                      confirmLabel: t("lp.activarLabel"),
+                      cancelLabel: t("comun.cancelar"),
                       onConfirm: () => enviarEvento("activar_combate_llave", { llave_id: llave.id }),
                     })}
                   >
-                    Activar
+                    {t("lp.activarBtn")}
                   </button>
                 </div>
                 {enCola > 0 && (
-                  <p style={{ color: "var(--text-dim)", fontSize: "0.74rem", margin: "2px 2px 0" }}>
-                    ⏳ {enCola} llave(s) más en cola en este tatami — aparecerán al terminar la actual.
+                  <p style={{ color: "var(--text-dim)", fontSize: "0.82rem", margin: "2px 2px 0" }}>
+                    {t("lp.enCola", { n: enCola })}
                   </p>
                 )}
               </>

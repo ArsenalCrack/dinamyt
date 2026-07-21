@@ -2,10 +2,10 @@
 
 import { Fragment, useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import api, { getCampeonatoAPI, listTatamisAPI } from "@/lib/api";
-import AvisoSinInternet from "@/components/AvisoSinInternet";
+import api, { getCampeonatoAPI, idiomaArchivo, listTatamisAPI, resolverApiUrl } from "@/lib/api";
 import PodioLlave from "@/components/PodioLlave";
 import type { PodioItem } from "@/lib/llaves";
+import { useI18n, type ClaveTexto } from "@/lib/i18n";
 
 interface RankingItem {
   id?: number;
@@ -68,8 +68,9 @@ interface TatamiOption {
   numero: number;
 }
 
-const RONDAS: Record<string, string> = {
-  r1: "Round 1", r2: "Round 2", oro: "Punto de Oro", figuras: "Figuras",
+// Clave i18n de cada ronda del reporte (el texto vive en lib/i18n)
+const RONDAS_CLAVE: Record<string, ClaveTexto> = {
+  r1: "rep.ronda.r1", r2: "rep.ronda.r2", oro: "rep.ronda.oro", figuras: "rep.ronda.figuras",
 };
 
 function slugArchivo(texto: string, fallback = "reporte") {
@@ -111,6 +112,7 @@ async function getExportError(res: Response) {
 
 export default function ReportesCampeonatoPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const params = useParams();
   const campId = String(params.id);
 
@@ -237,14 +239,14 @@ export default function ReportesCampeonatoPage() {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : "No se pudo generar el reporte.");
+      setExportError(err instanceof Error ? err.message : t("rep.errorGenerar"));
     } finally {
       setExporting(null);
     }
   }
 
   function buildParams(extra: Record<string, string> = {}) {
-    const qp: Record<string, string> = { campeonato_id: campId, ...extra };
+    const qp: Record<string, string> = { campeonato_id: campId, lang: idiomaArchivo(), ...extra };
     if (filters.tatami_id) qp.tatami_id = filters.tatami_id;
     if (filters.tipo) qp.tipo = filters.tipo;
     if (filters.categoria) qp.categoria = filters.categoria;
@@ -255,7 +257,7 @@ export default function ReportesCampeonatoPage() {
 
   // Reporte GENERAL de todo el campeonato (con filtros aplicados)
   function handleExportGeneral(type: "pdf" | "excel") {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const apiUrl = resolverApiUrl();
     const url = splitZip
       ? `${apiUrl}/api/reportes/combates/export/zip?${buildParams({ formato: type })}`
       : `${apiUrl}/api/reportes/combates/export/${type}?${buildParams()}`;
@@ -267,9 +269,9 @@ export default function ReportesCampeonatoPage() {
   // Reporte SOLO de los registros seleccionados con checkbox
   function handleExportSeleccion(type: "pdf" | "excel") {
     if (seleccion.size === 0) return;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const apiUrl = resolverApiUrl();
     const ids = Array.from(seleccion).sort((a, b) => a - b).join(",");
-    const qp = new URLSearchParams({ campeonato_id: campId, ids }).toString();
+    const qp = new URLSearchParams({ campeonato_id: campId, ids, lang: idiomaArchivo() }).toString();
     const url = `${apiUrl}/api/reportes/combates/export/${type}?${qp}`;
     const fallback = `dinamyt_${slugArchivo(campNombre, "campeonato")}_seleccion-${seleccion.size}_${fechaArchivo()}.${type === "pdf" ? "pdf" : "xlsx"}`;
     void descargar(url, fallback, `seleccion-${type}`);
@@ -288,7 +290,7 @@ export default function ReportesCampeonatoPage() {
     if (c.tipo === "figuras") return c.ranking?.[0]?.nombre || c.nombre_hong || "—";
     if (c.ganador === "hong") return c.nombre_hong;
     if (c.ganador === "chung") return c.nombre_chung;
-    return "Empate";
+    return t("rep.empate");
   }
 
   function ganadorColor(c: Combate) {
@@ -304,26 +306,25 @@ export default function ReportesCampeonatoPage() {
 
   return (
     <div className="reportes-page">
-      <AvisoSinInternet />
       {/* Header */}
       <div className="reportes-header">
         <div>
           <button className="btn btn-sm btn-ghost" onClick={() => router.push(`/admin/campeonato/${campId}`)}
             style={{ marginBottom: 8 }}>
-            ← Volver al campeonato
+            {t("ins.volver")}
           </button>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>
-            Reportes — {campNombre || "..."}
+            {t("rep.titulo")} {campNombre || "..."}
           </h1>
-          <p className="text-muted" style={{ fontSize: "0.88rem" }}>
-            {data ? `${data.total} registros guardados en este campeonato` : "Cargando..."}
+          <p className="text-muted" style={{ fontSize: "0.92rem" }}>
+            {data ? t("rep.subtitulo", { n: data.total }) : t("comun.cargando")}
           </p>
         </div>
 
         {/* Reporte general del campeonato */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-          <span style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)" }}>
-            Reporte general del campeonato
+          <span style={{ fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)" }}>
+            {t("rep.general")}
           </span>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
@@ -336,7 +337,7 @@ export default function ReportesCampeonatoPage() {
                 color: "#00D472",
               }}
             >
-              {exporting === "general-excel" ? "Generando..." : splitZip ? "Excel (ZIP)" : "Excel completo"}
+              {exporting === "general-excel" ? t("rep.generando") : splitZip ? t("rep.excelZip") : t("rep.excelCompleto")}
             </button>
             <button
               className="btn btn-sm"
@@ -348,12 +349,12 @@ export default function ReportesCampeonatoPage() {
                 color: "#FF6666",
               }}
             >
-              {exporting === "general-pdf" ? "Generando..." : splitZip ? "PDF (ZIP)" : "PDF completo"}
+              {exporting === "general-pdf" ? t("rep.generando") : splitZip ? t("rep.pdfZip") : t("rep.pdfCompleto")}
             </button>
           </div>
           <label style={{
             display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
-            fontSize: "0.78rem", color: splitZip ? "var(--gold)" : "var(--text-muted)",
+            fontSize: "0.85rem", color: splitZip ? "var(--gold)" : "var(--text-muted)",
             fontWeight: 700, userSelect: "none",
           }}>
             <input
@@ -362,7 +363,7 @@ export default function ReportesCampeonatoPage() {
               onChange={(e) => setSplitZip(e.target.checked)}
               style={{ accentColor: "var(--gold)", width: 16, height: 16 }}
             />
-            Dividir por tatami (ZIP)
+            {t("rep.dividir")}
           </label>
         </div>
       </div>
@@ -383,8 +384,8 @@ export default function ReportesCampeonatoPage() {
             <span style={{ fontFamily: "var(--font-display)", fontSize: "1.8rem", lineHeight: 1, color: "var(--gold)" }}>
               {data.total}
             </span>
-            <span style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginTop: 4 }}>
-              Registros
+            <span style={{ fontSize: "0.78rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginTop: 4 }}>
+              {t("rep.registros")}
             </span>
           </div>
           {(data.categorias || []).map((cat) => (
@@ -397,7 +398,10 @@ export default function ReportesCampeonatoPage() {
                 categoria: f.categoria.toLowerCase() === cat.nombre.toLowerCase() ? "" : cat.nombre,
                 page: 1,
               }))}
-              title={`Filtrar por ${cat.nombre} (puntuación ${cat.puntuacion === "individual" ? "individual" : "de combate"})`}
+              title={t("rep.filtrarCat", {
+                nombre: cat.nombre,
+                tipo: cat.puntuacion === "individual" ? t("rep.puntIndividualCorta") : t("rep.puntCombateCorta"),
+              })}
               style={{
                 padding: "10px 18px", display: "flex", flexDirection: "column",
                 alignItems: "center", flex: "0 1 auto", minWidth: 120,
@@ -415,7 +419,7 @@ export default function ReportesCampeonatoPage() {
                 {cat.cantidad}
               </span>
               <span style={{
-                fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase",
+                fontSize: "0.78rem", fontWeight: 800, textTransform: "uppercase",
                 letterSpacing: "0.06em", color: "var(--text-muted)", marginTop: 4,
                 maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>
@@ -431,8 +435,8 @@ export default function ReportesCampeonatoPage() {
               <span style={{ fontFamily: "var(--font-display)", fontSize: "1.8rem", lineHeight: 1, color: "var(--green)" }}>
                 {seleccion.size}
               </span>
-              <span style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginTop: 4 }}>
-                Seleccionados
+              <span style={{ fontSize: "0.78rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginTop: 4 }}>
+                {t("rep.seleccionados")}
               </span>
             </div>
           )}
@@ -443,48 +447,48 @@ export default function ReportesCampeonatoPage() {
       <div className="card" style={{ padding: "16px 20px" }}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 150px" }}>
-            <label className="login-label" style={{ fontSize: "0.72rem" }}>Tatami</label>
+            <label className="login-label" style={{ fontSize: "0.8rem" }}>{t("rep.tatami")}</label>
             <select
               className="input"
               value={filters.tatami_id}
               onChange={(e) => setFilters(f => ({ ...f, tatami_id: e.target.value, page: 1 }))}
               style={{ padding: "8px 12px", minHeight: 36 }}
             >
-              <option value="">Todos los tatamis</option>
-              {tatamis.map((t) => (
-                <option key={t.id} value={String(t.id)}>Tatami {t.numero}</option>
+              <option value="">{t("rep.todosTatamis")}</option>
+              {tatamis.map((tt) => (
+                <option key={tt.id} value={String(tt.id)}>{t("rep.tatami")} {tt.numero}</option>
               ))}
             </select>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 170px" }}>
-            <label className="login-label" style={{ fontSize: "0.72rem" }}>Puntuación</label>
+            <label className="login-label" style={{ fontSize: "0.8rem" }}>{t("rep.puntuacion")}</label>
             <select
               className="input"
               value={filters.tipo}
               onChange={(e) => setFilters(f => ({ ...f, tipo: e.target.value, page: 1 }))}
               style={{ padding: "8px 12px", minHeight: 36 }}
             >
-              <option value="">Todas</option>
-              <option value="combate">Puntuación Combate</option>
-              <option value="figuras">Puntuación Individual</option>
+              <option value="">{t("rep.todas")}</option>
+              <option value="combate">{t("rep.puntCombate")}</option>
+              <option value="figuras">{t("rep.puntIndividual")}</option>
             </select>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 170px" }}>
-            <label className="login-label" style={{ fontSize: "0.72rem" }}>Categoría</label>
+            <label className="login-label" style={{ fontSize: "0.8rem" }}>{t("rep.categoria")}</label>
             <select
               className="input"
               value={filters.categoria}
               onChange={(e) => setFilters(f => ({ ...f, categoria: e.target.value, page: 1 }))}
               style={{ padding: "8px 12px", minHeight: 36 }}
             >
-              <option value="">Todas las categorías</option>
+              <option value="">{t("rep.todasCategorias")}</option>
               {(data?.categorias || []).map((cat) => (
                 <option key={cat.nombre} value={cat.nombre}>{cat.nombre}</option>
               ))}
             </select>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 150px" }}>
-            <label className="login-label" style={{ fontSize: "0.72rem" }}>Desde</label>
+            <label className="login-label" style={{ fontSize: "0.8rem" }}>{t("rep.desde")}</label>
             <input
               className="input" type="date"
               value={filters.desde}
@@ -493,7 +497,7 @@ export default function ReportesCampeonatoPage() {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 150px" }}>
-            <label className="login-label" style={{ fontSize: "0.72rem" }}>Hasta</label>
+            <label className="login-label" style={{ fontSize: "0.8rem" }}>{t("rep.hasta")}</label>
             <input
               className="input" type="date"
               value={filters.hasta}
@@ -506,7 +510,7 @@ export default function ReportesCampeonatoPage() {
             onClick={() => setFilters({ tatami_id: "", tipo: "", categoria: "", desde: "", hasta: "", page: 1 })}
             style={{ alignSelf: "flex-end" }}
           >
-            Limpiar
+            {t("rep.limpiar")}
           </button>
         </div>
       </div>
@@ -519,22 +523,22 @@ export default function ReportesCampeonatoPage() {
           background: "rgba(0, 212, 114, 0.08)",
           border: "1px solid var(--green-border)", borderRadius: "var(--radius)",
         }}>
-          <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--green)" }}>
-            {seleccion.size} registro(s) seleccionado(s)
+          <span style={{ fontWeight: 700, fontSize: "0.92rem", color: "var(--green)" }}>
+            {t("rep.nSeleccionados", { n: seleccion.size })}
           </span>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="btn btn-sm" disabled={exporting !== null}
               onClick={() => handleExportSeleccion("excel")}
               style={{ background: "rgba(0,168,107,0.12)", borderColor: "rgba(0,168,107,0.35)", color: "#00D472" }}>
-              {exporting === "seleccion-excel" ? "Generando..." : "Descargar selección (Excel)"}
+              {exporting === "seleccion-excel" ? t("rep.generando") : t("rep.descSelExcel")}
             </button>
             <button className="btn btn-sm" disabled={exporting !== null}
               onClick={() => handleExportSeleccion("pdf")}
               style={{ background: "rgba(255,68,68,0.10)", borderColor: "rgba(255,68,68,0.30)", color: "#FF6666" }}>
-              {exporting === "seleccion-pdf" ? "Generando..." : "Descargar selección (PDF)"}
+              {exporting === "seleccion-pdf" ? t("rep.generando") : t("rep.descSelPdf")}
             </button>
             <button className="btn btn-sm btn-ghost" onClick={() => setSeleccion(new Set())}>
-              Limpiar selección
+              {t("rep.limpiarSel")}
             </button>
           </div>
         </div>
@@ -544,14 +548,14 @@ export default function ReportesCampeonatoPage() {
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }} className="animate-shimmer">
-            Cargando registros...
+            {t("rep.cargandoRegistros")}
           </div>
         ) : !data || data.combates.length === 0 ? (
           <div style={{ padding: 48, textAlign: "center", color: "var(--text-dim)" }}>
             <p style={{ fontSize: "2rem", marginBottom: 8 }}>📋</p>
-            <p>No hay registros con los filtros actuales.</p>
-            <p style={{ fontSize: "0.85rem", marginTop: 6 }}>
-              Los resultados se guardan cuando el Juez Central presiona &quot;Guardar + Nuevo&quot;
+            <p>{t("rep.sinRegistros")}</p>
+            <p style={{ fontSize: "0.9rem", marginTop: 6 }}>
+              {t("rep.sinRegistrosNota")}
             </p>
           </div>
         ) : (
@@ -564,19 +568,19 @@ export default function ReportesCampeonatoPage() {
                       type="checkbox"
                       checked={todosVisiblesMarcados}
                       onChange={toggleSeleccionTodos}
-                      title="Seleccionar todos los visibles"
+                      title={t("rep.selTodos")}
                       style={{ accentColor: "var(--gold)", width: 16, height: 16, cursor: "pointer" }}
                     />
                   </th>
                   <th>#</th>
-                  <th>Puntuación</th>
-                  <th>Tatami</th>
-                  <th>Categoría</th>
-                  <th>Marcador</th>
-                  <th>Ganador</th>
-                  <th>Jueces</th>
-                  <th>Rondas</th>
-                  <th>Fecha</th>
+                  <th>{t("rep.puntuacion")}</th>
+                  <th>{t("rep.tatami")}</th>
+                  <th>{t("rep.categoria")}</th>
+                  <th>{t("rep.marcador")}</th>
+                  <th>{t("rep.ganador")}</th>
+                  <th>{t("rep.jueces")}</th>
+                  <th>{t("rep.rondas")}</th>
+                  <th>{t("rep.fecha")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -593,10 +597,10 @@ export default function ReportesCampeonatoPage() {
                         style={{ accentColor: "var(--gold)", width: 16, height: 16, cursor: "pointer" }}
                       />
                     </td>
-                    <td className="text-muted font-mono" style={{ fontSize: "0.8rem" }}>{c.id}</td>
+                    <td className="text-muted font-mono" style={{ fontSize: "0.875rem" }}>{c.id}</td>
                     <td>
                       <span className={`badge ${c.tipo === "figuras" ? "badge-chung" : "badge-hong"}`}>
-                        {c.tipo === "figuras" ? "Individual" : "Combate"}
+                        {c.tipo === "figuras" ? t("rep.individual") : t("tat.combate")}
                       </span>
                     </td>
                     <td className="text-center">
@@ -607,14 +611,14 @@ export default function ReportesCampeonatoPage() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
                           <span>{c.llave.nombre}</span>
                           <span className="badge badge-gold">
-                            Eliminación · {c.llave.ronda_nombre}
+                            {t("rep.eliminacion", { ronda: c.llave.ronda_nombre })}
                           </span>
                         </div>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          <span>{c.nombre_categoria || (c.tipo === "figuras" ? "Figuras" : "Combate")}</span>
+                          <span>{c.nombre_categoria || (c.tipo === "figuras" ? t("tat.figuras") : t("tat.combate"))}</span>
                           {c.descripcion && (
-                            <span style={{ fontWeight: 500, fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                            <span style={{ fontWeight: 500, fontSize: "0.82rem", color: "var(--text-muted)" }}>
                               {c.descripcion}
                             </span>
                           )}
@@ -625,8 +629,8 @@ export default function ReportesCampeonatoPage() {
                       {c.tipo === "figuras" ? (
                         <span style={{ color: "var(--gold)" }}>
                           {c.marcador_hong.toFixed(2)}
-                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", marginLeft: 6 }}>
-                            {c.ranking?.length || 0} comp.
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginLeft: 6 }}>
+                            {t("rep.nComp", { n: c.ranking?.length || 0 })}
                           </span>
                         </span>
                       ) : (
@@ -648,11 +652,11 @@ export default function ReportesCampeonatoPage() {
                         </span>
                         {c.tipo !== "figuras" && c.ganador !== "empate" && (
                           <span style={{
-                            fontSize: "0.7rem", fontWeight: 800,
+                            fontSize: "0.78rem", fontWeight: 800,
                             textTransform: "uppercase", letterSpacing: "0.08em",
                             color: c.ganador === "hong" ? "var(--hong-light)" : "var(--chung-light)",
                           }}>
-                            {c.ganador === "hong" ? "Rojo" : "Azul"}
+                            {c.ganador === "hong" ? t("rep.rojo") : t("rep.azul")}
                           </span>
                         )}
                         {c.tipo === "figuras" && (c.ranking?.length || 0) > 0 && (
@@ -660,9 +664,9 @@ export default function ReportesCampeonatoPage() {
                             type="button"
                             className="btn btn-sm btn-ghost"
                             onClick={() => togglePodio(c.id)}
-                            style={{ padding: "2px 8px", minHeight: 26, fontSize: "0.72rem" }}
+                            style={{ padding: "2px 8px", minHeight: 26, fontSize: "0.8rem" }}
                           >
-                            {podioAbierto.has(c.id) ? "▲ Ocultar podio" : `▾ Ver podio (${c.ranking?.length})`}
+                            {podioAbierto.has(c.id) ? t("rep.ocultarPodio") : t("rep.verPodio", { n: c.ranking?.length || 0 })}
                           </button>
                         )}
                         {c.tipo !== "figuras" && (c.podio_llave?.length || 0) > 0 && (
@@ -670,9 +674,9 @@ export default function ReportesCampeonatoPage() {
                             type="button"
                             className="btn btn-sm btn-ghost"
                             onClick={() => togglePodio(c.id)}
-                            style={{ padding: "2px 8px", minHeight: 26, fontSize: "0.72rem" }}
+                            style={{ padding: "2px 8px", minHeight: 26, fontSize: "0.8rem" }}
                           >
-                            {podioAbierto.has(c.id) ? "▲ Ocultar podio" : "🏆 Ver podio de la llave"}
+                            {podioAbierto.has(c.id) ? t("rep.ocultarPodio") : t("rep.verPodioLlave")}
                           </button>
                         )}
                       </div>
@@ -681,7 +685,7 @@ export default function ReportesCampeonatoPage() {
                       {c.jueces && c.jueces.length > 0 ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           {c.jueces.map((j) => (
-                            <span key={`${c.id}-${j.rol_tatami}`} style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                            <span key={`${c.id}-${j.rol_tatami}`} style={{ fontSize: "0.84rem", color: "var(--text-muted)" }}>
                               <strong style={{ color: "var(--text)" }}>{j.asignacion}:</strong> {j.nombre} · {j.email}
                               {j.origen !== "asignacion" ? " · Directo" : ""}
                             </span>
@@ -691,11 +695,11 @@ export default function ReportesCampeonatoPage() {
                         <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td className="text-muted" style={{ fontSize: "0.8rem", minWidth: 150 }}>
+                    <td className="text-muted" style={{ fontSize: "0.875rem", minWidth: 150 }}>
                       {c.tipo === "figuras" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
                           <span className={`badge ${c.figuras_completas ? "badge-green" : "badge-gray"}`}>
-                            {c.figuras_completas ? "Completo" : "Incompleto"}
+                            {c.figuras_completas ? t("rep.completo") : t("rep.incompleto")}
                           </span>
                           {(c.figuras_desempates?.length || 0) > 0 && (
                             <span
@@ -707,17 +711,17 @@ export default function ReportesCampeonatoPage() {
                                 color: "var(--orange)",
                               }}
                             >
-                              Desempate reevaluado
+                              {t("rep.desempateReev")}
                             </span>
                           )}
                         </div>
                       ) : (
                         c.rondas_resumen && c.rondas_resumen !== "-"
                           ? c.rondas_resumen
-                          : (RONDAS[c.ronda_final] || c.ronda_final || "—")
+                          : (RONDAS_CLAVE[c.ronda_final] ? t(RONDAS_CLAVE[c.ronda_final]) : (c.ronda_final || "—"))
                       )}
                     </td>
-                    <td className="text-muted font-mono" style={{ fontSize: "0.78rem" }}>
+                    <td className="text-muted font-mono" style={{ fontSize: "0.85rem" }}>
                       {c.created_at
                         ? new Date(c.created_at).toLocaleString("es-CO", {
                             day: "2-digit", month: "2-digit",
@@ -731,7 +735,7 @@ export default function ReportesCampeonatoPage() {
                       <td colSpan={10} style={{ background: "rgba(255,255,255,0.02)", padding: "10px 16px" }}>
                         {c.tipo === "figuras"
                           ? <PodioFiguras ranking={c.ranking || []} />
-                          : <PodioLlave podio={c.podio_llave || []} titulo="Podio de la llave" />}
+                          : <PodioLlave podio={c.podio_llave || []} titulo={t("rep.podioLlave")} />}
                       </td>
                     </tr>
                   )}
@@ -783,11 +787,11 @@ export default function ReportesCampeonatoPage() {
           background: rgba(255, 68, 68, 0.10);
           color: #ff9a9a;
           border-radius: var(--radius);
-          font-size: 0.88rem;
+          font-size: 0.92rem;
           font-weight: 700;
         }
         .login-label {
-          font-size: 0.72rem;
+          font-size: 0.8rem;
           font-weight: 800;
           text-transform: uppercase;
           letter-spacing: 0.10em;
@@ -805,16 +809,17 @@ export default function ReportesCampeonatoPage() {
 
 // Podio completo de una categoría de figuras (no solo el ganador).
 function PodioFiguras({ ranking }: { ranking: RankingItem[] }) {
+  const { t } = useI18n();
   if (ranking.length === 0) return null;
   const medalla = (puesto?: number) =>
     puesto === 1 ? "🥇" : puesto === 2 ? "🥈" : puesto === 3 ? "🥉" : `${puesto ?? "-"}°`;
   return (
     <div>
       <div style={{
-        fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase",
+        fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase",
         letterSpacing: "0.1em", color: "var(--text-muted)", marginBottom: 8,
       }}>
-        Podio de la categoría
+        {t("podio.titulo")}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {ranking.map((r, i) => (
@@ -829,9 +834,9 @@ function PodioFiguras({ ranking }: { ranking: RankingItem[] }) {
             </span>
             <span style={{ flex: 1, fontWeight: 700, overflowWrap: "anywhere" }}>
               {r.nombre}
-              {r.club && <span style={{ color: "var(--text-muted)", fontWeight: 500, marginLeft: 8, fontSize: "0.8rem" }}>{r.club}</span>}
-              {r.especial && <span className="badge badge-chung" style={{ marginLeft: 8 }}>Especial</span>}
-              {r.empate && <span className="badge badge-gray" style={{ marginLeft: 8 }}>Empate</span>}
+              {r.club && <span style={{ color: "var(--text-muted)", fontWeight: 500, marginLeft: 8, fontSize: "0.875rem" }}>{r.club}</span>}
+              {r.especial && <span className="badge badge-chung" style={{ marginLeft: 8 }}>{t("rep.especial")}</span>}
+              {r.empate && <span className="badge badge-gray" style={{ marginLeft: 8 }}>{t("rep.empate")}</span>}
             </span>
             <span style={{ fontFamily: "var(--font-mono)", fontWeight: 800, color: "var(--gold)" }}>
               {Number(r.total ?? 0).toFixed(2)}

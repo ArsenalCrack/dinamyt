@@ -49,13 +49,27 @@ def create_app(config_name=None):
     migrate.init_app(app, db)
     jwt.init_app(app)
     # FRONTEND_URL acepta varios orígenes separados por coma
-    # (ej: "https://dinamyt.vercel.app,http://localhost:3000")
+    # (ej: "http://192.168.1.50:3000,http://localhost:3000")
     origins = [
         o.strip() for o in str(app.config["FRONTEND_URL"]).split(",") if o.strip()
     ]
+    # Despliegue local (LAN sin internet): aceptar cualquier equipo de la red
+    # privada en el puerto del frontend, sin tener que fijar la IP del PC a
+    # mano. Cubre los tres rangos privados (10.x, 172.16-31.x, 192.168.x) más
+    # localhost. El puerto es opcional para no romper si se sirve en otro.
+    import re
+    lan_regex = re.compile(
+        r"^http://("
+        r"localhost|127\.0\.0\.1|"
+        r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+        r"192\.168\.\d{1,3}\.\d{1,3}|"
+        r"172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+        r")(:\d{2,5})?$"
+    )
+    cors_origins = origins + [lan_regex]
     cors.init_app(
         app,
-        resources={r"/api/*": {"origins": origins}},
+        resources={r"/api/*": {"origins": cors_origins}},
         supports_credentials=True,
         # Sin esto el navegador no puede leer el nombre de archivo de las
         # descargas (Content-Disposition) y usa un nombre genérico.
@@ -63,10 +77,12 @@ def create_app(config_name=None):
     )
     socketio.init_app(
         app,
-        cors_allowed_origins=origins,
+        # Red local de confianza: sin restricción de origen para el socket (el
+        # JWT viaja en el payload `auth`, no depende de cookies ni del origen).
+        cors_allowed_origins="*",
         async_mode=app.config.get("SOCKETIO_ASYNC_MODE", "eventlet"),
-        # Heartbeat corto: en redes inestables (polideportivos) detecta el
-        # corte en ~20s para que los jueces pasen al modo sin conexión rápido.
+        # Heartbeat corto: detecta un corte de WiFi en ~20 s y dispara la
+        # reconexión automática del cliente (y el registro local del tatami).
         ping_interval=10,
         ping_timeout=10,
         logger=False,
@@ -74,7 +90,7 @@ def create_app(config_name=None):
     )
 
     # ── Importar modelos (para que Alembic los detecte) ──
-    from .models import usuario, campeonato, categoria, tatami, asignacion, combate, llave  # noqa: F401
+    from .models import usuario, campeonato, categoria, tatami, asignacion, combate, llave, competidor  # noqa: F401
 
     # ── Registrar Blueprints (API REST) ──
     from .api import register_blueprints

@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getCampeonatoAPI } from "@/lib/api";
 import LlavesSection from "@/components/LlavesSection";
-import AvisoSinInternet from "@/components/AvisoSinInternet";
+import { useI18n } from "@/lib/i18n";
 
 export default function LlavesCampeonatoPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const params = useParams();
   const campId = Number(params.id);
   const [campNombre, setCampNombre] = useState("");
@@ -31,20 +32,16 @@ export default function LlavesCampeonatoPage() {
 
   return (
     <div className="llaves-page">
-      <AvisoSinInternet />
       <div style={{ marginBottom: 20 }}>
         <button className="btn btn-sm btn-ghost" onClick={() => router.push(`/admin/campeonato/${campId}`)}
           style={{ marginBottom: 8 }}>
-          ← Volver al campeonato
+          {t("ins.volver")}
         </button>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 800, overflowWrap: "anywhere" }}>
-          Llaves y Grupos — {campNombre || "..."}
+          {t("llv.titulo")} {campNombre || "..."}
         </h1>
-        <p className="text-muted" style={{ fontSize: "0.88rem" }}>
-          Crea llaves de combate (eliminación) o grupos de figuras, asígnalos a
-          un tatami —o déjalos en el pool para asignar después— y actívalos desde
-          el panel del Juez Central. Cada llave muestra su estado: pendiente,
-          activa o terminada.
+        <p className="text-muted" style={{ fontSize: "0.92rem" }}>
+          {t("llv.desc")}
         </p>
       </div>
 

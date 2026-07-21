@@ -17,6 +17,10 @@ class Campeonato(db.Model):
     fecha_inicio = db.Column(db.Date, nullable=True)
     fecha_fin = db.Column(db.Date, nullable=True)
     activo = db.Column(db.Boolean, default=True, nullable=False)
+    # Config de categorías por modalidad para la generación automática de
+    # llaves: {"modalidades": [{nombre, tipo, activa, categorias: {...}}]}.
+    # NULL = el admin todavía no configuró (el flujo manual no la necesita).
+    config_categorias = db.Column(db.JSON, nullable=True)
     created_by = db.Column(
         db.Integer, db.ForeignKey("usuarios.id"), nullable=True
     )
@@ -27,6 +31,10 @@ class Campeonato(db.Model):
     # Relaciones
     tatamis = db.relationship(
         "Tatami", backref="campeonato", lazy="dynamic", cascade="all, delete-orphan"
+    )
+    inscripciones = db.relationship(
+        "Inscripcion", backref="campeonato", lazy="dynamic",
+        cascade="all, delete-orphan",
     )
 
     def to_dict(self, include_tatamis=False):
@@ -40,9 +48,11 @@ class Campeonato(db.Model):
             "created_by": self.created_by,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "num_tatamis": self.tatamis.count() if self.tatamis else 0,
+            "num_inscripciones": self.inscripciones.count() if self.inscripciones else 0,
         }
         if include_tatamis:
             data["tatamis"] = [t.to_dict() for t in self.tatamis.all()]
+            data["config_categorias"] = self.config_categorias
         return data
 
     def __repr__(self):

@@ -47,7 +47,8 @@ export interface CombateState {
   _combate_llave?: {
     llave_id: number;
     nombre: string;
-    ronda: number;
+    /** Índice de ronda, o "bronce" para el partido por el 3er puesto */
+    ronda: number | "bronce";
     partido: number;
     ronda_nombre: string;
     comp1: { id: number; nombre: string };
@@ -63,6 +64,20 @@ export interface CombateState {
   } | null;
   // Grupo de figuras de la cola actualmente activo en el tatami
   _grupo_figuras?: { llave_id: number; nombre: string } | null;
+  /** Jueces conectados en este momento: {rol: nombre|null} */
+  _roles_conectados?: Record<string, string | null>;
+  /** Número de combate del día en este tatami (coordinación con la mesa) */
+  _num_combate?: number | null;
+  /** Próximos combates de la llave activa (pantalla pública) */
+  _proximos_llave?: { ronda_nombre: string; comp1: string; comp2: string }[];
+  /** Registros locales de jueces esperando resolución de la mesa */
+  _propuestas_local?: Record<string, PropuestaLocal>;
+}
+
+export interface PropuestaLocal {
+  nombre?: string;
+  ts?: number;
+  entradas: { ts?: number; etiqueta: string; color: "hong" | "chung"; pts: number }[];
 }
 
 export interface HistorialEntry {
@@ -72,15 +87,25 @@ export interface HistorialEntry {
   nombre: string;
   tiempo?: number;
   ronda?: string;
+  /** Hora real ISO del evento (para mostrar y para la firma de anulación) */
+  momento?: string;
   esEspecial?: boolean;
   esKyongGo?: boolean;
   esGamJeum?: boolean;
+  esDecision?: boolean;
+  juez_nombre?: string | null;
+  juez_asignacion?: string | null;
 }
 
 export interface LogEntry {
   txt: string;
   color: string;
+  /** Hora real de la acción (epoch ms) */
   ts: number;
+  /** Tiempo del cronómetro del combate en ese momento (segundos restantes) */
+  crono?: number | null;
+  /** Si el cronómetro corría (true) o estaba en pausa (false) */
+  cronoActivo?: boolean;
 }
 
 function estadoInicial(): CombateState {
@@ -144,6 +169,23 @@ export function marcadorDisplay(state: CombateState, color: "hong" | "chung") {
   return val.toFixed(1);
 }
 
+/**
+ * Puntos propios del Juez Central (especiales y faltas). Van APARTE del
+ * promedio de esquinas: cambiar la cantidad de jueces promediados jamás
+ * altera este valor (una falta de −0.5 sigue siendo −0.5 con 2, 3 o 4 jueces).
+ */
+export function puntosJuezCentral(state: CombateState, color: "hong" | "chung") {
+  return color === "hong" ? state.arbHong : state.arbChung;
+}
+
+/** Formatea con signo explícito: "+2", "−0.5", "0" */
+export function fmtSigno(v: number) {
+  const abs = Number.isInteger(v) ? String(Math.abs(v)) : Math.abs(v).toFixed(1);
+  if (v > 0) return `+${abs}`;
+  if (v < 0) return `−${abs}`;
+  return "0";
+}
+
 export function formatTime(seg: number) {
   return `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")}`;
 }
@@ -168,42 +210,18 @@ export function useCombate(
   }>({});
   const socketRef = useRef<Socket | null>(null);
   const pendingMap = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // El heartbeat del socket puede tardar ~30s en detectar un corte de red;
-  // navigator.onLine lo reporta al instante y activa el modo sin conexión.
-  const [netOnline, setNetOnline] = useState(true);
-  useEffect(() => {
-    setNetOnline(typeof navigator === "undefined" ? true : navigator.onLine);
-    const marcarOnline = () => setNetOnline(true);
-    const marcarOffline = () => setNetOnline(false);
-    window.addEventListener("online", marcarOnline);
-    window.addEventListener("offline", marcarOffline);
-    return () => {
-      window.removeEventListener("online", marcarOnline);
-      window.removeEventListener("offline", marcarOffline);
-    };
-  }, []);
-
-  // "offline" = corte CONFIRMADO. Conectar siempre tarda un instante, así que
-  // un período de gracia evita el falso "sin conexión" al entrar a la página:
-  // 5s en la conexión inicial, 2.5s si una conexión establecida se cae.
-  // Si el sistema operativo reporta que no hay red, es inmediato.
   const [offline, setOffline] = useState(false);
+  // Otro dispositivo tomó este rol (el servidor reemplazó esta sesión)
+  const [sesionReemplazada, setSesionReemplazada] = useState(false);
+  // La mesa aplicó o descartó el registro local de un juez (contador para
+  // que el mismo rol pueda resolverse varias veces)
+  const [registroResuelto, setRegistroResuelto] = useState<
+    { rol: string; aplicado: boolean; n: number } | null
+  >(null);
+  const registroResueltoSeq = useRef(0);
   const huboConexionRef = useRef(false);
-  useEffect(() => {
-    if (connected) huboConexionRef.current = true;
-    if (connected && netOnline) {
-      setOffline(false);
-      return;
-    }
-    if (!netOnline) {
-      setOffline(true);
-      return;
-    }
-    const espera = huboConexionRef.current ? 2500 : 5000;
-    const timer = setTimeout(() => setOffline(true), espera);
-    return () => clearTimeout(timer);
-  }, [connected, netOnline]);
 
   // Conectar al tatami
   useEffect(() => {
@@ -212,21 +230,80 @@ export function useCombate(
     const sock = getSocket(tatamiId, rol, token);
     socketRef.current = sock;
 
-    sock.on("connect", () => {
+    const clearOfflineTimer = () => {
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current);
+        offlineTimerRef.current = null;
+      }
+    };
+    const marcarConectado = () => {
+      huboConexionRef.current = true;
+      clearOfflineTimer();
       setConnected(true);
+      setOffline(false);
       setSocketError("");
-    });
-    sock.on("disconnect", () => setConnected(false));
-    sock.on("connect_error", (err: Error) => {
+      // Tras cualquier reconexión, pedir el estado completo del tatami
+      // (el servidor también lo envía en connect; esto es doble seguro).
+      sock.emit("pedir");
+    };
+    const marcarDesconectado = () => {
       setConnected(false);
+      // OJO: no reiniciar el conteo si ya hay uno corriendo. Cada reintento
+      // fallido dispara connect_error (cada 1-3 s) y reiniciarlo aquí hacía
+      // que el corte NUNCA se confirmara: pantallas y jueces quedaban en
+      // "Cargando…" para siempre. El corte se confirma a los N segundos del
+      // PRIMER fallo; el timer se limpia al reconectar (marcarConectado).
+      if (offlineTimerRef.current) return;
+      const espera = huboConexionRef.current ? 3000 : 6000;
+      offlineTimerRef.current = setTimeout(() => {
+        setOffline(true);
+        offlineTimerRef.current = null;
+      }, espera);
+    };
+
+    sock.on("connect", marcarConectado);
+    sock.on("disconnect", marcarDesconectado);
+    sock.on("connect_error", (err: Error) => {
+      marcarDesconectado();
       setSocketError(err.message || "No se pudo conectar al tatami");
     });
+
+    // El mismo rol se conectó desde otra pantalla/dispositivo: NO pelear la
+    // conexión (evita el ping-pong de desconexiones entre los dos). El juez
+    // decide retomar aquí con reconectar().
+    sock.on("sesion_reemplazada", () => {
+      setSesionReemplazada(true);
+      sock.disconnect();
+    });
+
+    // La mesa resolvió el registro local de un juez (aplicado o descartado)
+    sock.on("registro_local_resuelto", (data: { rol: string; aplicado: boolean }) => {
+      registroResueltoSeq.current += 1;
+      setRegistroResuelto({
+        rol: data.rol,
+        aplicado: Boolean(data.aplicado),
+        n: registroResueltoSeq.current,
+      });
+    });
+
+    if (sock.connected) {
+      marcarConectado();
+    } else {
+      marcarDesconectado();
+    }
 
     sock.on("estado", (data: { datos: CombateState }) => {
       setHasServerState(true);
       if (pendingMap.current.size === 0) {
         setState(data.datos);
       }
+    });
+
+    // Tick ligero del cronómetro del servidor: solo viaja el segundero (el
+    // estado completo con log e historial pesa demasiado para ir cada
+    // segundo a todos los dispositivos). Se fusiona sobre el estado actual.
+    sock.on("crono", (data: { segundos: number; activo: boolean }) => {
+      setState((prev) => ({ ...prev, segundos: data.segundos, activo: data.activo }));
     });
 
     sock.on("estado_confirmado", (data: { datos: CombateState }) => {
@@ -259,6 +336,7 @@ export function useCombate(
 
     const pending = pendingMap.current;
     return () => {
+      clearOfflineTimer();
       pending.forEach((timer) => clearTimeout(timer));
       pending.clear();
       setPendingEvents(0);
@@ -366,11 +444,22 @@ export function useCombate(
     setAlerts((prev) => ({ ...prev, [key]: undefined }));
   }, []);
 
+  // ── Retomar la sesión aquí (tras un takeover desde otro dispositivo) ──
+  const reconectar = useCallback(() => {
+    setSesionReemplazada(false);
+    socketRef.current?.connect();
+  }, []);
+
   return {
     state,
-    connected: connected && netOnline,
+    connected,
     /** Corte de conexión confirmado (tras el período de gracia) */
     offline,
+    /** Otro dispositivo tomó este rol; reconectar() lo retoma aquí */
+    sesionReemplazada,
+    reconectar,
+    /** Última resolución de un registro local por la mesa */
+    registroResuelto,
     hasServerState,
     socketError,
     pendingEvents,

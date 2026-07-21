@@ -7,6 +7,7 @@ EventoCombate — Cada acción delta durante un combate (para replay y auditorí
 
 from datetime import datetime, timezone
 from ..extensions import db
+from ..timeutil import iso_utc
 
 
 class Combate(db.Model):
@@ -86,9 +87,10 @@ class Combate(db.Model):
             "duracion_segundos": self.duracion_segundos,
             "ronda_final": self.ronda_final,
             "ganador": self.ganador,
-            "inicio": self.inicio.isoformat() if self.inicio else None,
-            "fin": self.fin.isoformat() if self.fin else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            # Con zona UTC explícita: el navegador los muestra en hora local
+            "inicio": iso_utc(self.inicio),
+            "fin": iso_utc(self.fin),
+            "created_at": iso_utc(self.created_at),
         }
         if include_historial:
             data["historial_completo"] = self.historial_completo
@@ -122,7 +124,7 @@ class EventoCombate(db.Model):
             "accion": self.accion,
             "datos": self.datos,
             "secuencia": self.secuencia,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
 
     def __repr__(self):

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { listLlavesTatamiAPI, type LlaveTatamiInfo } from "@/lib/api";
 import type { ConfirmData } from "@/components/AlertSystem";
+import { useI18n } from "@/lib/i18n";
 
 interface GrupoFigurasActivo {
   llave_id: number;
@@ -23,6 +24,7 @@ export default function GrupoFigurasPanel({
   enviarEvento: (accion: string, datos?: Record<string, unknown>) => void;
   onShowConfirm: (data: ConfirmData) => void;
 }) {
+  const { t } = useI18n();
   const [grupos, setGrupos] = useState<LlaveTatamiInfo[]>([]);
   const [cargado, setCargado] = useState(false);
 
@@ -52,7 +54,7 @@ export default function GrupoFigurasPanel({
   return (
     <div className="card" style={{ marginBottom: 8, padding: "10px 14px", borderColor: "var(--chung-border)" }}>
       <div className="card-title" style={{ marginBottom: 8 }}>
-        Grupos de Figuras en cola
+        {t("gf.titulo")}
       </div>
 
       {grupoActivo ? (
@@ -63,25 +65,25 @@ export default function GrupoFigurasPanel({
           border: "1px solid var(--chung-border)", borderRadius: "var(--radius-sm)",
         }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 800, color: "var(--chung-light)", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              En curso: {grupoActivo.nombre}
+            <div style={{ fontWeight: 800, color: "var(--chung-light)", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              {t("gf.enCurso", { nombre: grupoActivo.nombre })}
             </div>
-            <div style={{ fontSize: "0.72rem", color: "var(--text-dim)", marginTop: 2 }}>
-              Al guardar la categoría (&quot;Nueva categoría&quot;) este grupo queda terminado.
+            <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", marginTop: 2 }}>
+              {t("gf.alGuardar")}
             </div>
           </div>
           <button
             className="btn btn-sm btn-danger"
             onClick={() => onShowConfirm({
-              titulo: "SOLTAR GRUPO DE FIGURAS",
-              mensaje: `¿Liberar "${grupoActivo.nombre}"? Volverá a la cola como pendiente y podrás activarlo de nuevo. Las puntuaciones sin guardar se descartan.`,
+              titulo: t("gf.soltar.titulo"),
+              mensaje: t("gf.soltar.mensaje", { nombre: grupoActivo.nombre }),
               tipo: "advertencia",
-              confirmLabel: "SOLTAR",
-              cancelLabel: "Cancelar",
+              confirmLabel: t("lp.soltarLabel"),
+              cancelLabel: t("comun.cancelar"),
               onConfirm: () => enviarEvento("soltar_grupo_figuras"),
             })}
           >
-            Soltar
+            {t("lp.soltarBtn")}
           </button>
         </div>
       ) : siguiente ? (
@@ -92,14 +94,14 @@ export default function GrupoFigurasPanel({
           border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
         }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: "0.85rem", overflowWrap: "anywhere" }}>
+            <div style={{ fontWeight: 800, fontSize: "0.9rem", overflowWrap: "anywhere" }}>
               {siguiente.nombre}
-              <span style={{ color: "var(--text-dim)", fontWeight: 600, marginLeft: 8, fontSize: "0.75rem" }}>
-                {siguiente.num_competidores} competidor(es)
+              <span style={{ color: "var(--text-dim)", fontWeight: 600, marginLeft: 8, fontSize: "0.82rem" }}>
+                {t("gf.competidoresN", { n: siguiente.num_competidores ?? 0 })}
               </span>
             </div>
             {siguiente.descripcion && (
-              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 2, overflowWrap: "anywhere" }}>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: 2, overflowWrap: "anywhere" }}>
                 {siguiente.descripcion}
               </div>
             )}
@@ -107,22 +109,22 @@ export default function GrupoFigurasPanel({
           <button
             className="btn btn-sm btn-primary"
             onClick={() => onShowConfirm({
-              titulo: "ACTIVAR GRUPO DE FIGURAS",
-              mensaje: `Se cargarán ${siguiente.num_competidores} competidor(es) de "${siguiente.nombre}" en la categoría de figuras. El nombre y la descripción se mostrarán al público.`,
+              titulo: t("gf.activar.titulo"),
+              mensaje: t("gf.activar.mensaje", { n: siguiente.num_competidores ?? 0, nombre: siguiente.nombre }),
               tipo: "info",
-              confirmLabel: "ACTIVAR",
-              cancelLabel: "Cancelar",
+              confirmLabel: t("lp.activarLabel"),
+              cancelLabel: t("comun.cancelar"),
               onConfirm: () => enviarEvento("activar_grupo_figuras", { llave_id: siguiente.id }),
             })}
           >
-            Activar
+            {t("lp.activarBtn")}
           </button>
         </div>
       ) : null}
 
       {!grupoActivo && enCola > 0 && (
-        <p style={{ color: "var(--text-dim)", fontSize: "0.74rem", margin: "6px 2px 0" }}>
-          ⏳ {enCola} grupo(s) más en cola en este tatami.
+        <p style={{ color: "var(--text-dim)", fontSize: "0.82rem", margin: "6px 2px 0" }}>
+          {t("gf.enCola", { n: enCola })}
         </p>
       )}
     </div>

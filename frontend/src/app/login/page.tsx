@@ -4,31 +4,32 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginAPI } from "@/lib/api";
 import Logo from "@/components/Logo";
+import { IDIOMAS, useI18n } from "@/lib/i18n";
+import { aplicarTema, getTema, type Tema } from "@/lib/theme";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t, idioma, setIdioma } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Iniciar sesión requiere internet: avisar de frente en vez de fallar feo
-  const [sinInternet, setSinInternet] = useState(false);
+  // Tema (sin sesión no hay menú global): arranca "dark" como el servidor y
+  // se sincroniza al montar para no desajustar la hidratación.
+  const [tema, setTema] = useState<Tema>("dark");
   useEffect(() => {
-    setSinInternet(typeof navigator !== "undefined" && !navigator.onLine);
-    const on = () => setSinInternet(false);
-    const off = () => setSinInternet(true);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
-    };
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) setTema(getTema()); });
+    return () => { cancelled = true; };
   }, []);
+  function cambiarTema() {
+    const nuevo: Tema = tema === "dark" ? "light" : "dark";
+    aplicarTema(nuevo);
+    setTema(nuevo);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (sinInternet) return;
     setError("");
     setLoading(true);
     try {
@@ -38,7 +39,7 @@ export default function LoginPage() {
       router.push(data.user.rol === "admin" ? "/admin" : "/juez");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
-      setError(axiosErr.response?.data?.error || "Error de conexion con el servidor");
+      setError(axiosErr.response?.data?.error || t("login.errorConexion"));
     } finally {
       setLoading(false);
     }
@@ -54,7 +55,7 @@ export default function LoginPage() {
         {/* Logo central */}
         <div className="login-logo">
           <Logo stacked fontSize="clamp(2rem, 6vw, 2.8rem)" />
-          <p className="login-tagline">Sistema Oficial de Competencias Hapkido</p>
+          <p className="login-tagline">{t("login.tagline")}</p>
           <p className="login-sub">Global Hapkido Association · GHA</p>
         </div>
 
@@ -64,20 +65,17 @@ export default function LoginPage() {
           {/* ── PANTALLA PUBLICA ── */}
           <div className="login-card login-card-public animate-fade">
             <div className="login-card-icon" aria-hidden="true">📺</div>
-            <h2 className="login-card-title">Pantalla Publica</h2>
+            <h2 className="login-card-title">{t("login.publica.titulo")}</h2>
             <p className="login-card-desc">
-              Ve el marcador en tiempo real de cualquier tatami.<br />
-              Elige el campeonato y el tatami — no requiere cuenta.
+              {t("login.publica.desc1")}<br />
+              {t("login.publica.desc2")}
             </p>
             <button
               type="button"
-              className="btn btn-lg"
+              className="btn btn-lg login-btn-public"
               onClick={() => router.push("/pantalla")}
               style={{
                 width: "100%",
-                background: "linear-gradient(135deg, #1c2e5e 0%, #0d1d42 100%)",
-                border: "2px solid var(--chung-border)",
-                color: "var(--chung-light)",
                 fontWeight: 800,
                 fontSize: "1rem",
                 textTransform: "uppercase",
@@ -85,29 +83,38 @@ export default function LoginPage() {
               }}
               id="public-access-btn"
             >
-              Elegir Tatami
+              {t("login.publica.boton")}
             </button>
-            <p className="login-card-note">Cualquier persona puede acceder</p>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => router.push("/resultados")}
+              style={{ width: "100%", borderColor: "var(--gold-border)", color: "var(--gold)", fontWeight: 700 }}
+              id="public-results-btn"
+            >
+              {t("res.verResultados")}
+            </button>
+            <p className="login-card-note">{t("login.publica.nota")}</p>
           </div>
 
           {/* ── SEPARADOR ── */}
           <div className="login-separator" aria-hidden="true">
             <div className="login-separator-line" />
-            <span className="login-separator-label">O</span>
+            <span className="login-separator-label">{t("login.o")}</span>
             <div className="login-separator-line" />
           </div>
 
           {/* ── LOGIN JUECES / ADMIN ── */}
           <div className="login-card login-card-auth animate-fade" style={{ animationDelay: "0.1s" }}>
             <div className="login-card-icon" aria-hidden="true">🏅</div>
-            <h2 className="login-card-title">Jueces y Admin</h2>
+            <h2 className="login-card-title">{t("login.jueces.titulo")}</h2>
             <p className="login-card-desc">
-              Accede con tu cuenta para ingresar puntajes o administrar el campeonato.
+              {t("login.jueces.desc")}
             </p>
 
             <form onSubmit={handleSubmit} className="login-form">
               <div className="login-field">
-                <label className="login-label" htmlFor="login-email">Correo Electronico</label>
+                <label className="login-label" htmlFor="login-email">{t("login.correo")}</label>
                 <input
                   type="email"
                   className="input"
@@ -121,7 +128,7 @@ export default function LoginPage() {
               </div>
 
               <div className="login-field">
-                <label className="login-label" htmlFor="login-password">Contrasena</label>
+                <label className="login-label" htmlFor="login-password">{t("login.contrasena")}</label>
                 <input
                   type="password"
                   className="input"
@@ -134,14 +141,7 @@ export default function LoginPage() {
                 />
               </div>
 
-              {sinInternet && (
-                <div className="login-error animate-fade" role="alert">
-                  📡 Sin conexión a internet. Para iniciar sesión necesitas
-                  internet; vuelve a intentarlo cuando regrese.
-                </div>
-              )}
-
-              {error && !sinInternet && (
+              {error && (
                 <div className="login-error animate-fade" role="alert">
                   {error}
                 </div>
@@ -150,19 +150,45 @@ export default function LoginPage() {
               <button
                 type="submit"
                 className="btn btn-primary btn-lg"
-                style={{ width: "100%", opacity: sinInternet ? 0.5 : 1 }}
-                disabled={loading || sinInternet}
+                style={{ width: "100%" }}
+                disabled={loading}
                 id="login-submit"
               >
-                {sinInternet ? "Sin conexión" : loading ? "Verificando..." : "Iniciar Sesion"}
+                {loading ? t("login.verificando") : t("login.entrar")}
               </button>
             </form>
           </div>
 
         </div>
+
       </div>
 
-      <p className="login-footer">DINAMYT v4.0 · Global Hapkido ASSOCIATION · Competencias en tiempo real</p>
+      {/* Aquí no hay menú global (se oculta en /login): selector propio de
+          idioma + toggle de tema */}
+      <div className="login-idiomas" role="group" aria-label={t("menu.idioma")}>
+        {IDIOMAS.map((l) => (
+          <button
+            key={l.codigo}
+            type="button"
+            className="login-idioma-btn"
+            data-activo={idioma === l.codigo}
+            aria-pressed={idioma === l.codigo}
+            onClick={() => setIdioma(l.codigo)}
+          >
+            {l.etiqueta}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="login-idioma-btn"
+          onClick={cambiarTema}
+          title={tema === "dark" ? t("menu.modoClaro") : t("menu.modoOscuro")}
+        >
+          {tema === "dark" ? "☀️" : "🌙"}
+        </button>
+      </div>
+
+      <p className="login-footer">{t("login.footer")}</p>
 
       <style>{`
         .login-page {
@@ -211,7 +237,7 @@ export default function LoginPage() {
         }
 
         .login-sub {
-          font-size: 0.78rem;
+          font-size: 0.85rem;
           color: var(--text-dim);
           text-transform: uppercase;
           letter-spacing: 0.12em;
@@ -240,6 +266,18 @@ export default function LoginPage() {
           border-color: var(--chung-border);
         }
 
+        /* CTA de pantalla pública: navy sólido en oscuro; en claro ese navy
+           chocaría con el texto azul del tema, así que usa el tinte chung */
+        .login-btn-public {
+          background: linear-gradient(135deg, #1c2e5e 0%, #0d1d42 100%);
+          border: 2px solid var(--chung-border);
+          color: var(--chung-light);
+        }
+
+        html[data-theme="light"] .login-btn-public {
+          background: var(--chung-bg-strong);
+        }
+
         .login-card-auth {
           border-color: var(--gold-border);
         }
@@ -258,13 +296,13 @@ export default function LoginPage() {
         }
 
         .login-card-desc {
-          font-size: 0.88rem;
+          font-size: 0.92rem;
           color: var(--text-muted);
           line-height: 1.5;
         }
 
         .login-card-note {
-          font-size: 0.75rem;
+          font-size: 0.82rem;
           color: var(--text-dim);
           text-align: center;
           margin-top: auto;
@@ -294,7 +332,7 @@ export default function LoginPage() {
         }
 
         .login-separator-label {
-          font-size: 0.8rem;
+          font-size: 0.875rem;
           font-weight: 800;
           color: var(--text-dim);
           letter-spacing: 0.1em;
@@ -314,7 +352,7 @@ export default function LoginPage() {
         }
 
         .login-label {
-          font-size: 0.75rem;
+          font-size: 0.82rem;
           font-weight: 800;
           text-transform: uppercase;
           letter-spacing: 0.10em;
@@ -327,8 +365,44 @@ export default function LoginPage() {
           border-radius: var(--radius-sm);
           padding: 10px 14px;
           color: var(--red-alert);
-          font-size: 0.88rem;
+          font-size: 0.92rem;
           text-align: center;
+        }
+
+        .login-idiomas {
+          position: relative;
+          z-index: 1;
+          margin-top: 24px;
+          display: flex;
+          gap: 8px;
+          justify-content: center;
+        }
+
+        .login-idioma-btn {
+          padding: 7px 18px;
+          background: transparent;
+          border: 1.5px solid var(--border-light);
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          font: inherit;
+          font-weight: 600;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: var(--transition);
+        }
+
+        .login-idioma-btn:hover,
+        .login-idioma-btn:focus-visible {
+          background: var(--bg-elevated);
+          color: var(--text);
+          outline: none;
+        }
+
+        .login-idioma-btn[data-activo="true"] {
+          background: var(--gold-bg);
+          border-color: var(--gold-border);
+          color: var(--gold);
+          font-weight: 800;
         }
 
         .login-footer {
@@ -336,7 +410,7 @@ export default function LoginPage() {
           z-index: 1;
           margin-top: 20px;
           color: var(--text-dim);
-          font-size: 0.72rem;
+          font-size: 0.8rem;
           letter-spacing: 0.1em;
           text-transform: uppercase;
           text-align: center;

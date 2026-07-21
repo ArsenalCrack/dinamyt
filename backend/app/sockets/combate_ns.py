@@ -71,6 +71,9 @@ def _serializar_ts(ts):
         "grupo_figuras": ts.get("grupo_figuras"),
         "mostrar_arbol": bool(ts.get("mostrar_arbol")),
         "llave_arbol": ts.get("llave_arbol"),
+        "proximos_llave": ts.get("proximos_llave"),
+        # Registros locales de jueces pendientes de que la mesa los resuelva
+        "propuestas_local": ts.get("propuestas_local", {}),
     }
 
 
@@ -120,6 +123,8 @@ def _cargar_estados():
                 "grupo_figuras": guardado.get("grupo_figuras"),
                 "mostrar_arbol": bool(guardado.get("mostrar_arbol")),
                 "llave_arbol": guardado.get("llave_arbol"),
+                "proximos_llave": guardado.get("proximos_llave"),
+                "propuestas_local": guardado.get("propuestas_local", {}),
             }
         if data:
             print(f"  [OK] Estado de {len(data)} tatami(s) restaurado tras reinicio")
@@ -151,6 +156,10 @@ ACCIONES_SIN_ACTIVACION = {
     "activar_grupo_figuras",
     "soltar_grupo_figuras",
     "mostrar_arbol",
+    # El registro local llega apenas el juez reconecta, esté o no activo el
+    # tatami; la mesa lo resuelve cuando pueda.
+    "proponer_registro_local",
+    "resolver_registro_local",
 }
 
 ACCIONES_DURANTE_GANADOR_PENDIENTE = {"cerrar_ganador", "cerrar_alerta12"}
@@ -217,6 +226,8 @@ ACCIONES_SOLO_ARBITRO = {
     "activar_grupo_figuras",
     "soltar_grupo_figuras",
     "mostrar_arbol",
+    "resolver_registro_local",
+    "anular_entrada",
 }
 
 CATEGORIA_NOMBRE_MAX = 40
@@ -247,6 +258,36 @@ def _info_tatami(tatami_id):
         return None, None, None
 
 
+def _num_combate_hoy(tatami_id):
+    """
+    Número de combate del día para este tatami: cuántos combates (no figuras)
+    se han guardado HOY (día local) + 1. Sirve para coordinar con la mesa y el
+    llamado por altavoz ("Combate #12").
+    """
+    try:
+        from datetime import timedelta
+        # Medianoche local de hoy → UTC naive (como se guarda created_at)
+        hoy_local = datetime.now().astimezone().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        hoy_utc = hoy_local.astimezone(timezone.utc).replace(tzinfo=None)
+        sesion_ids = [
+            s.id for s in SesionTatami.query.filter_by(tatami_id=int(tatami_id)).all()
+        ]
+        if not sesion_ids:
+            return 1
+        n = (
+            Combate.query
+            .filter(Combate.sesion_tatami_id.in_(sesion_ids))
+            .filter(Combate.created_at >= hoy_utc)
+            .filter(Combate.ronda_final != "figuras")
+            .count()
+        )
+        return n + 1
+    except Exception:
+        return None
+
+
 def _get_tatami_state(tatami_id):
     """Obtiene o crea el estado de un tatami."""
     _cargar_estados()
@@ -268,6 +309,7 @@ def _get_tatami_state(tatami_id):
             "tatami_numero": numero,
             "campeonato_nombre": camp_nombre,
             "campeonato_id": camp_id,
+            "propuestas_local": {},
         }
     ts = tatami_states[tid]
     # Estados restaurados de versiones previas pueden no tener el número
@@ -276,6 +318,9 @@ def _get_tatami_state(tatami_id):
         ts["tatami_numero"] = numero
         ts["campeonato_nombre"] = camp_nombre
         ts["campeonato_id"] = camp_id
+    # Número de combate del día (se calcula una vez y se actualiza al guardar)
+    if ts.get("num_combate") is None:
+        ts["num_combate"] = _num_combate_hoy(tatami_id)
     return ts
 
 
@@ -300,11 +345,44 @@ def _build_estado_broadcast(ts):
     estado_copy["_mostrar_arbol"] = bool(ts.get("mostrar_arbol"))
     estado_copy["_hay_arbol"] = bool(ts.get("llave_arbol"))
     estado_copy["_llave_arbol"] = ts.get("llave_arbol") if ts.get("mostrar_arbol") else None
+    # Número de combate del día (coordinación con la mesa / altavoz)
+    estado_copy["_num_combate"] = ts.get("num_combate")
+    # Próximos combates de la llave activa (pantalla pública)
+    estado_copy["_proximos_llave"] = ts.get("proximos_llave") or []
+    # Jueces conectados en este momento: {rol: nombre} (panel de la mesa)
+    estado_copy["_roles_conectados"] = {
+        rol: (info.get("nombre") or None)
+        for rol, info in (ts.get("roles_activos") or {}).items()
+    }
+    # Registros locales de jueces esperando resolución del JC
+    estado_copy["_propuestas_local"] = ts.get("propuestas_local") or {}
     return estado_copy
 
 
 def _rol_label(rol):
     return ROL_LABELS.get(rol, rol or "-")
+
+
+def _proximos_de_llave(estructura, excluir=None, limite=3):
+    """
+    Próximos combates jugables de una llave (para la pantalla pública):
+    [{ronda_nombre, comp1, comp2}], excluyendo el partido en curso.
+    """
+    from ..api.llaves import partidos_jugables, etiqueta_ronda
+
+    total = len((estructura or {}).get("rondas", []))
+    proximos = []
+    for r, i, p in partidos_jugables(estructura or {}):
+        if excluir is not None and (r, i) == tuple(excluir):
+            continue
+        proximos.append({
+            "ronda_nombre": etiqueta_ronda(r, total),
+            "comp1": (p.get("comp1") or {}).get("nombre", "-"),
+            "comp2": (p.get("comp2") or {}).get("nombre", "-"),
+        })
+        if len(proximos) >= limite:
+            break
+    return proximos
 
 
 def roles_ocupados_para_tatami(tatami_id):
@@ -403,20 +481,41 @@ class CombateNamespace(Namespace):
             except Exception:
                 pass
 
+        sid_anterior = None
         with _lock:
             ts = _get_tatami_state(tatami_id)
             if rol != "pantalla":
                 activo = ts.setdefault("roles_activos", {}).get(rol)
                 if activo and activo.get("sid") != request.sid:
-                    raise ConnectionRefusedError(
-                        f"{_rol_label(rol)} ya está conectado en este tatami"
-                    )
+                    # TAKEOVER: una recarga de página o un cambio de dispositivo
+                    # NO puede dejar al juez bloqueado fuera del tatami (el sid
+                    # viejo tarda en soltarse por ping-timeout). La conexión
+                    # nueva reemplaza a la anterior; a la vieja se le avisa y
+                    # se desconecta (si aún existe).
+                    sid_anterior = activo.get("sid")
                 ts["roles_activos"][rol] = {
                     "sid": request.sid,
                     "usuario_id": int(user_id) if user_id else None,
                     "nombre": user_nombre,
                     "email": user_email,
                 }
+
+        if sid_anterior:
+            try:
+                socketio.emit(
+                    "sesion_reemplazada",
+                    {
+                        "message": f"{_rol_label(rol)} se conectó desde otra "
+                                   "pantalla o dispositivo. Esta sesión quedó inactiva.",
+                    },
+                    namespace="/combate",
+                    to=sid_anterior,
+                )
+                socketio.server.disconnect(sid_anterior, namespace="/combate")
+            except Exception:
+                pass
+            print(f"  [CONN] [{_room_name(tatami_id)}] {rol} reconectado — "
+                  f"sesión anterior reemplazada (sid viejo={sid_anterior})")
 
         # Registrar acceso
         try:
@@ -434,7 +533,11 @@ class CombateNamespace(Namespace):
 
         join_room(_room_name(tatami_id))
 
-        # Enviar estado completo CON metadatos desde el primer momento
+        # Enviar estado completo CON metadatos desde el primer momento.
+        # La meta del juez se arma FUERA del lock (toca la BD); la mutación
+        # de jueces_meta y el snapshot del estado, dentro (otro hilo puede
+        # estar mutándolo).
+        meta_rol = None
         try:
             asignacion = (
                 AsignacionJuez.query.filter_by(
@@ -443,17 +546,25 @@ class CombateNamespace(Namespace):
                 if user_id else None
             )
             if asignacion and asignacion.rol_tatami == rol:
-                ts["jueces_meta"][rol] = _meta_desde_asignacion(asignacion)
-            elif rol != "pantalla":
-                ts["jueces_meta"][rol] = _meta_desde_conexion(
-                    rol, user_id=user_id, nombre=user_nombre, email=user_email, origen="directo"
-                )
+                meta_rol = _meta_desde_asignacion(asignacion)
         except Exception:
-            if rol != "pantalla":
-                ts["jueces_meta"][rol] = _meta_desde_conexion(
-                    rol, user_id=user_id, nombre=user_nombre, email=user_email, origen="directo"
-                )
-        emit("estado", {"datos": _build_estado_broadcast(ts)})
+            meta_rol = None
+        if meta_rol is None and rol != "pantalla":
+            meta_rol = _meta_desde_conexion(
+                rol, user_id=user_id, nombre=user_nombre, email=user_email, origen="directo"
+            )
+        with _lock:
+            if meta_rol is not None:
+                ts["jueces_meta"][rol] = meta_rol
+            datos = _build_estado_broadcast(ts)
+        emit("estado", {"datos": datos})
+        # Avisar al resto del tatami que este rol se conectó (el panel de
+        # conexiones del Juez Central se actualiza al instante).
+        if rol != "pantalla":
+            socketio.emit(
+                "estado", {"datos": datos}, namespace="/combate",
+                to=_room_name(tatami_id),
+            )
 
         print(f"  [CONN] [{_room_name(tatami_id)}] {rol} conectado (sid={request.sid})")
 
@@ -462,6 +573,7 @@ class CombateNamespace(Namespace):
         rol = request.args.get("rol", "pantalla")
         if not tatami_id or rol == "pantalla":
             return
+        datos = None
         with _lock:
             ts = tatami_states.get(str(tatami_id))
             if not ts:
@@ -469,14 +581,25 @@ class CombateNamespace(Namespace):
             activo = ts.get("roles_activos", {}).get(rol)
             if activo and activo.get("sid") == request.sid:
                 ts["roles_activos"].pop(rol, None)
+                datos = _build_estado_broadcast(ts)
+        # Avisar la desconexión al tatami (fuera del lock)
+        if datos is not None:
+            socketio.emit(
+                "estado", {"datos": datos}, namespace="/combate",
+                to=_room_name(tatami_id),
+            )
 
     def on_pedir(self, data=None):
         """Cliente solicita estado completo (reconexión)."""
         tatami_id = request.args.get("tatami_id")
         if not tatami_id:
             return
-        ts = _get_tatami_state(tatami_id)
-        emit("estado", {"datos": _build_estado_broadcast(ts)})
+        # Snapshot bajo lock: copiar el estado mientras otro hilo lo muta
+        # puede lanzar excepción y dejar al cliente sin respuesta.
+        with _lock:
+            ts = _get_tatami_state(tatami_id)
+            datos = _build_estado_broadcast(ts)
+        emit("estado", {"datos": datos})
 
     def on_evento(self, data):
         """
@@ -644,6 +767,7 @@ class CombateNamespace(Namespace):
                     )
                 ts["mostrar_arbol"] = False
                 ts.pop("llave_arbol", None)
+                ts.pop("proximos_llave", None)
                 if ev_id:
                     emit("ack", {"evId": ev_id})
                 self._broadcast_estado(room, ts)
@@ -782,6 +906,113 @@ class CombateNamespace(Namespace):
                 self._broadcast_estado(room, ts)
                 return
 
+            # ── Registro local de un juez (se envía solo al reconectar) ────
+            if accion == "proponer_registro_local":
+                if rol in ("j1", "j2", "j3", "j4"):
+                    entradas = []
+                    for e in (ev.get("entradas") or [])[:100]:
+                        color = e.get("color")
+                        try:
+                            pts = float(e.get("pts", 0))
+                        except (TypeError, ValueError):
+                            continue
+                        if color not in ("hong", "chung") or not (0 < pts <= 10):
+                            continue
+                        entradas.append({
+                            "ts": e.get("ts"),
+                            "etiqueta": str(e.get("etiqueta", ""))[:60],
+                            "color": color,
+                            "pts": int(pts) if pts == int(pts) else pts,
+                        })
+                    if entradas:
+                        meta = ts.get("jueces_meta", {}).get(rol) or {}
+                        ts.setdefault("propuestas_local", {})[rol] = {
+                            "nombre": meta.get("nombre") or _rol_label(rol),
+                            "entradas": entradas,
+                            "ts": int(datetime.now(timezone.utc).timestamp() * 1000),
+                        }
+                        _agregar_log(
+                            ts["estado"],
+                            f"[MESA] {_rol_label(rol)} envió su registro local "
+                            f"({len(entradas)} anotación(es)) — pendiente de la mesa",
+                            "arb",
+                        )
+                if ev_id:
+                    emit("ack", {"evId": ev_id})
+                self._broadcast_estado(room, ts)
+                return
+
+            # ── La mesa (JC) aplica o descarta un registro local ───────────
+            if accion == "resolver_registro_local":
+                rol_obj = ev.get("rol")
+                propuesta = ts.get("propuestas_local", {}).get(rol_obj)
+                if not propuesta:
+                    if ev_id:
+                        emit("ack", {"evId": ev_id})
+                    return
+                aplicar = bool(ev.get("aplicar"))
+                estado = ts["estado"]
+                if aplicar and (
+                    ts.get("categoria_activa", "combate") != "combate"
+                    or estado.get("ganadorManualColor")
+                    or estado.get("alerta12Data")
+                    or estado.get("oroPendienteAprobacion")
+                ):
+                    if ev_id:
+                        emit("ack", {"evId": ev_id})
+                    emit("accion_rechazada", {
+                        "message": "No se puede aplicar ahora: el combate está "
+                                   "cerrado, en alerta o no es la categoría "
+                                   "Combate. Resuélvelo y vuelve a intentar."
+                    })
+                    return
+                ts["propuestas_local"].pop(rol_obj, None)
+                if aplicar:
+                    aplicados = 0
+                    for e in propuesta.get("entradas", []):
+                        etiqueta = e.get("etiqueta") or "Registro local"
+                        # La etiqueta viene como "+2 GIRO ...": quitar el
+                        # prefijo para no duplicar los puntos en el log.
+                        nombre_pt = re.sub(r"^\+[\d.]+\s*", "", etiqueta) or etiqueta
+                        ev_punto = {
+                            "accion": "punto_juez",
+                            "juez": rol_obj,
+                            "color": e.get("color"),
+                            "pts": e.get("pts"),
+                            "nombre": f"{nombre_pt} (registro local)",
+                        }
+                        self._inyectar_meta_juez(ts, ev_punto, rol_obj)
+                        antes = len(estado["historial"])
+                        aplicar_evento(
+                            estado, ev_punto,
+                            ganador_cb, alerta_superioridad_cb, derrota_cb,
+                        )
+                        if len(estado["historial"]) > antes:
+                            aplicados += 1
+                    _agregar_log(
+                        estado,
+                        f"[MESA] Registro local de {_rol_label(rol_obj)} "
+                        f"APLICADO: {aplicados} punto(s) sumado(s)",
+                        "arb",
+                    )
+                else:
+                    _agregar_log(
+                        estado,
+                        f"[MESA] Registro local de {_rol_label(rol_obj)} "
+                        "descartado por la mesa",
+                        "arb",
+                    )
+                # El juez dueño del registro limpia su libreta al recibir esto
+                socketio.emit(
+                    "registro_local_resuelto",
+                    {"rol": rol_obj, "aplicado": aplicar},
+                    namespace="/combate", to=room,
+                )
+                if ev_id:
+                    emit("ack", {"evId": ev_id})
+                self._broadcast_estado(room, ts)
+                return
+
             # ── Aplicar evento al estado ───────────────────────────────────
             categoria = ts.get("categoria_activa", "combate")
             self._inyectar_meta_juez(ts, ev, rol)
@@ -823,8 +1054,10 @@ class CombateNamespace(Namespace):
         tatami_id = request.args.get("tatami_id")
         if not tatami_id:
             return
-        ts = _get_tatami_state(tatami_id)
-        if not ts.get("tatami_activo", False):
+        with _lock:
+            ts = _get_tatami_state(tatami_id)
+            activo = ts.get("tatami_activo", False)
+        if not activo:
             return
 
         room = _room_name(tatami_id)
@@ -954,6 +1187,10 @@ class CombateNamespace(Namespace):
             "comp1": partido["comp1"],
             "comp2": partido["comp2"],
         }
+        # Los que siguen después de este (para que se vayan preparando)
+        ts["proximos_llave"] = _proximos_de_llave(
+            llave.estructura, excluir=(ronda_idx, partido_idx)
+        )
         # El público ve el árbol hasta que el combate comience (crono_start)
         ts["llave_arbol"] = {
             "llave_id": llave.id,
@@ -1001,6 +1238,7 @@ class CombateNamespace(Namespace):
                     "estructura": copy.deepcopy(estructura),
                 }
                 ts["mostrar_arbol"] = True
+                ts["proximos_llave"] = _proximos_de_llave(estructura)
 
                 gano_bronce = llave_info.get("ronda") == "bronce"
                 campeon = estructura.get("campeon")
@@ -1078,6 +1316,9 @@ class CombateNamespace(Namespace):
                 "accion": "agregar_competidor",
                 "nombre": c.get("nombre"),
                 "club": c.get("club", ""),
+                # Categoría especial marcada en el competidor: el motor de
+                # figuras le da 1er puesto sin afectar el ranking normal.
+                "especial": bool(c.get("especial")),
             })
 
         ts["categoria_activa"] = "figuras"
@@ -1262,6 +1503,9 @@ class CombateNamespace(Namespace):
             db.session.add(combate)
             db.session.commit()
 
+            # Avanza el número de combate del día para este tatami
+            ts["num_combate"] = _num_combate_hoy(tatami_id)
+
             print(
                 f"  [OK] Combate guardado tatami {tatami_id}: "
                 f"{snapshot['nombre_hong']} vs {snapshot['nombre_chung']} "
@@ -1302,28 +1546,44 @@ class CombateNamespace(Namespace):
         if ts["crono_activo"]:
             return
         ts["crono_activo"] = True
+        room = _room_name(tatami_id)
 
         def tick():
             while ts["crono_activo"]:
                 socketio.sleep(1)
                 if not ts["crono_activo"]:
                     break
+                estado_full = None
+                crono_ligero = None
+                # El snapshot se construye DENTRO del lock: copiar el estado
+                # mientras otro hilo lo muta puede reventar este hilo (y el
+                # cronómetro moriría en silencio para todos los dispositivos).
                 with _lock:
                     estado = ts["estado"]
-                    if not estado.get("activo") or estado.get("segundos", 0) <= 0:
-                        if estado.get("segundos", 1) <= 0:
-                            estado["activo"] = False
-                            _agregar_log(estado, "[TIEMPO] KuMan — Fin del tiempo", "arb")
-                            ts["crono_activo"] = False
+                    if not estado.get("activo"):
+                        ts["crono_activo"] = False
                         break
-                    estado["segundos"] -= 1
-                # Broadcast fuera del lock
-                socketio.emit(
-                    "estado",
-                    {"datos": _build_estado_broadcast(ts)},
-                    namespace="/combate",
-                    to=_room_name(tatami_id),
-                )
+                    if estado.get("segundos", 0) > 0:
+                        estado["segundos"] -= 1
+                    if estado.get("segundos", 0) <= 0:
+                        # Fin del tiempo: los clientes DEBEN recibir el estado
+                        # completo (activo=False + log de KuMan). Antes el
+                        # break salía sin emitir y las pantallas quedaban con
+                        # el crono "corriendo" en 0:00 sin el aviso de KuMan.
+                        estado["segundos"] = 0
+                        estado["activo"] = False
+                        ts["crono_activo"] = False
+                        _agregar_log(estado, "[TIEMPO] KuMan — Fin del tiempo", "arb")
+                        estado_full = _build_estado_broadcast(ts)
+                    else:
+                        # Tick normal: solo viaja el segundero. El estado
+                        # completo (log + historial) pesa demasiado para
+                        # mandarlo cada segundo a decenas de dispositivos.
+                        crono_ligero = {"segundos": estado["segundos"], "activo": True}
+                if estado_full is not None:
+                    socketio.emit("estado", {"datos": estado_full}, namespace="/combate", to=room)
+                elif crono_ligero is not None:
+                    socketio.emit("crono", crono_ligero, namespace="/combate", to=room)
 
         ts["crono_thread"] = socketio.start_background_task(tick)
 

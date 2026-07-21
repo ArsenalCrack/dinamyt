@@ -95,8 +95,10 @@ def estado_inicial_figuras(config=None):
 
 def _agregar_log_f(estado, txt, color="info"):
     estado["log"].insert(0, {"txt": txt, "color": color, "ts": int(time.time() * 1000)})
-    if len(estado["log"]) > 50:
-        estado["log"] = estado["log"][:50]
+    # Registro completo de la categoría (se limpia al guardar / resetear);
+    # el tope alto es solo un seguro de memoria/payload.
+    if len(estado["log"]) > 300:
+        estado["log"] = estado["log"][:300]
 
 
 def _jueces_activos_figuras(estado):
@@ -260,12 +262,17 @@ def aplicar_evento_figuras(estado, ev):
 
     # ── Número de jueces (máximo 4 de esquina) ──────────────────────────────
     elif accion == "set_num_jueces":
-        estado["num_jueces"] = max(2, min(4, int(ev.get("num_jueces", 4))))
+        # Coerción defensiva: un payload no numérico no debe tumbar el handler
+        try:
+            n = int(ev.get("num_jueces", 4))
+        except (TypeError, ValueError):
+            n = estado.get("num_jueces", 4)
+        estado["num_jueces"] = max(2, min(4, n))
 
     # ── Competidores ─────────────────────────────────────────────────────────
     elif accion == "agregar_competidor":
-        nombre = ev.get("nombre", "Competidor").strip()
-        club = ev.get("club", "").strip()
+        nombre = str(ev.get("nombre", "Competidor")).strip()[:60]
+        club = str(ev.get("club", "")).strip()[:60]
         especial = bool(ev.get("especial"))
         if not nombre:
             return estado
@@ -281,6 +288,9 @@ def aplicar_evento_figuras(estado, ev):
         })
         estado["puntuaciones"][str(nuevo_id)] = {}
         estado["puntuaciones_confirmadas"][str(nuevo_id)] = {}
+        # Un competidor nuevo aún no tiene notas: si la categoría ya estaba
+        # finalizada, el podio deja de ser válido hasta calificarlo.
+        estado["finalizado"] = False
         etiqueta = " (Categoría Especial)" if especial else ""
         _agregar_log_f(estado, f"[+] {nombre}{etiqueta}", "info")
 
@@ -294,7 +304,20 @@ def aplicar_evento_figuras(estado, ev):
         if str(estado.get("competidor_activo_id")) == str(cid):
             estado["competidor_activo_id"] = None
             estado["puntuacion_abierta"] = False
+        # Si estaba en un desempate, sale de la lista: sin esta limpieza el
+        # turno quedaba bloqueado para siempre ("solo los empatados pueden
+        # presentarse") apuntando a un competidor que ya no existe.
+        estado["en_desempate"] = [
+            i for i in (estado.get("en_desempate") or []) if str(i) != str(cid)
+        ]
         _agregar_log_f(estado, "[-] Competidor eliminado", "info")
+        # Al quitarlo puede que los restantes ya estén todos calificados:
+        # se habilita el podio igual que al confirmar la última nota.
+        if not estado.get("finalizado") and puntuaciones_completas(estado):
+            estado["finalizado"] = True
+            estado["puntuacion_abierta"] = False
+            estado["en_desempate"] = []
+            _agregar_log_f(estado, "[PODIO] Puntuaciones completas — Podio habilitado", "arb")
 
     # ── Control de turno (Juez Central) ─────────────────────────────────────
     elif accion == "activar_competidor":

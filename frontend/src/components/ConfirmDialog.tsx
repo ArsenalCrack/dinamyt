@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 export interface ConfirmDialogOptions {
   titulo: string;
@@ -23,6 +24,7 @@ function ConfirmDialog({
   opciones: ConfirmDialogOptions;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const tipo = opciones.tipo || "advertencia";
   const { color, icono } = COLORES[tipo];
@@ -66,7 +68,7 @@ function ConfirmDialog({
             onClick={onClose}
             style={{ minWidth: 120 }}
           >
-            {opciones.cancelLabel || "Cancelar"}
+            {opciones.cancelLabel || t("comun.cancelar")}
           </button>
           <button
             type="button"
@@ -77,7 +79,7 @@ function ConfirmDialog({
             }}
             style={{ minWidth: 140, fontWeight: 800 }}
           >
-            {opciones.confirmLabel || "Confirmar"}
+            {opciones.confirmLabel || t("alert.confirmar")}
           </button>
         </div>
       </div>

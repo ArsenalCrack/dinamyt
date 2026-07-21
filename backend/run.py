@@ -27,8 +27,21 @@ with app.app_context():
         seed_categorias()
         seed_admin(app.config)
 
+# Respaldo automático de la BD local (cada RESPALDO_MINUTOS; 0 = off)
+from app.respaldos import iniciar_respaldos
+iniciar_respaldos(app)
+
 
 if __name__ == "__main__":
+    import logging
+
+    # Silenciar el log por-petición de Werkzeug: con decenas de dispositivos
+    # conectados son miles de líneas, y escribir sin parar a la consola de
+    # Windows puede llegar a BLOQUEAR el proceso entero (p. ej. si alguien
+    # hace clic dentro de la ventana negra y activa "Selección rápida").
+    # Solo se muestran advertencias y errores.
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
+
     port = int(os.getenv("PORT", 5000))
     print(f"""
 ==============================================

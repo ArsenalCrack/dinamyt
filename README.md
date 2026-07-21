@@ -20,14 +20,21 @@ tablero local que el Juez Central proyecta aunque se caiga la red.
 - **Dos modalidades**:
   - **Combate** — motor de puntuación con marcador en vivo.
   - **Figuras** — evaluación por jueces con podio automático.
-- **Gestión completa** de campeonatos, hasta **6 tatamis**, categorías canónicas,
+- **Gestión completa** de campeonatos, hasta **10 tatamis**, categorías canónicas,
   llaves (modelo unificado: `pendiente` / `activa` / `terminada`) y asignación de
   hasta 4 jueces.
+- **Competidores**: alta manual e **importación masiva por Excel**, con
+  generación de llaves a partir del listado.
+- **Ingreso por QR** (`/acceso`): el administrador genera un código y el juez
+  entra directo a su rol en el tatami, sin escribir usuario ni contraseña.
+- **Multi-idioma (i18n)**: la interfaz cambia de idioma en vivo.
 - **Pantalla pública** para TV: elige campeonato y tatami y muestra el marcador.
-- **Modo sin conexión**: registro local por juez + tablero local del JC (`/tablero`)
-  que proyecta a la TV sin servidor en LAN.
+- **Resultados públicos** (`/resultados`): consulta y búsqueda de resultados por
+  campeonato.
+- **Modo local de contingencia** (`/local`): cada juez de esquina registra 100 %
+  en su dispositivo, sin servidor ni conexión; las anotaciones sobreviven a
+  recargas y se reingresan al volver la red.
 - **Reportes** exportables a **Excel y PDF** (openpyxl + reportlab).
-- **PWA**: instalable en escritorio y con soporte offline en la pantalla pública.
 
 ---
 

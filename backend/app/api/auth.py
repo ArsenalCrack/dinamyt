@@ -15,6 +15,7 @@ from ..extensions import db
 from ..models.asignacion import AsignacionJuez
 from ..models.usuario import Usuario
 from ..security import intento_bloqueado, limpiar_intentos, segundos_restantes
+from .scoping import es_dueno_usuario, require_admin
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -94,9 +95,8 @@ def register():
     Body: { "email": "...", "password": "...", "nombre": "...", "rol": "juez" }
     """
     # Verificar que el usuario actual sea admin
-    current_user_id = get_jwt_identity()
-    current_user = Usuario.query.get(int(current_user_id))
-    if not current_user or current_user.rol != "admin":
+    current_user = require_admin()
+    if not current_user:
         return jsonify({"error": "Solo administradores pueden crear usuarios"}), 403
 
     data = request.get_json()
@@ -113,6 +113,13 @@ def register():
 
     if rol not in ("admin", "juez"):
         return jsonify({"error": "Rol debe ser 'admin' o 'juez'"}), 400
+
+    # Jerarquía: solo el superadmin crea administradores. Un admin normal
+    # solo agrega jueces a SU workspace (los demás admins no los ven).
+    if rol == "admin" and not current_user.es_super:
+        return jsonify({
+            "error": "Solo el superadministrador puede crear administradores"
+        }), 403
 
     if Usuario.query.filter_by(email=email).first():
         return jsonify({"error": f"El email '{email}' ya está registrado"}), 409
@@ -161,15 +168,20 @@ def me():
 def list_users():
     """
     GET /api/auth/users (solo Admin)
-    Lista todos los usuarios.
+    Superadmin: todos los usuarios. Admin normal: solo los que él creó
+    (sus jueces) y él mismo — los usuarios de otros admins no se ven.
     """
-    current_user_id = get_jwt_identity()
-    current_user = Usuario.query.get(int(current_user_id))
-    if not current_user or current_user.rol != "admin":
+    current_user = require_admin()
+    if not current_user:
         return jsonify({"error": "Solo administradores"}), 403
 
     include_inactive = request.args.get("include_inactive") == "1"
     query = Usuario.query
+    if not current_user.es_super:
+        query = query.filter(db.or_(
+            Usuario.creado_por_id == current_user.id,
+            Usuario.id == current_user.id,
+        ))
     if not include_inactive:
         query = query.filter_by(activo=True)
 
@@ -185,15 +197,22 @@ def update_user(user_id):
     Body opcional: { "nombre", "email", "password", "activo", "rol" }
     Permite al administrador corregir correo, restablecer contraseña,
     cambiar el rol (admin/juez) o activar/desactivar un usuario.
+    Un admin normal solo puede editar los usuarios que él creó.
     """
-    current_user_id = get_jwt_identity()
-    current_user = Usuario.query.get(int(current_user_id))
-    if not current_user or current_user.rol != "admin":
+    current_user = require_admin()
+    if not current_user:
         return jsonify({"error": "Solo administradores"}), 403
 
     user = Usuario.query.get(user_id)
-    if not user:
+    # 404 también cuando el usuario es de otro workspace (no revelar existencia)
+    if not user or not es_dueno_usuario(current_user, user):
         return jsonify({"error": "Usuario no encontrado"}), 404
+
+    # El superadmin solo se edita a sí mismo (nadie lo degrada ni desactiva)
+    if user.es_super and user.id != current_user.id:
+        return jsonify({
+            "error": "El superadministrador no puede ser modificado por otros usuarios"
+        }), 403
 
     data = request.get_json() or {}
 
@@ -220,6 +239,12 @@ def update_user(user_id):
             return jsonify({"error": "Rol inválido (debe ser 'admin' o 'juez')"}), 400
         if user.id == current_user.id and nuevo_rol != "admin":
             return jsonify({"error": "No puedes quitarte tu propio rol de administrador"}), 400
+        # Jerarquía: los cambios de rol (crear o degradar administradores)
+        # son exclusivos del superadmin.
+        if nuevo_rol != user.rol and not current_user.es_super:
+            return jsonify({
+                "error": "Solo el superadministrador puede cambiar roles"
+            }), 403
         if nuevo_rol != user.rol:
             if nuevo_rol == "admin":
                 # Un admin no actúa como juez de tatami: liberar sus asignaciones
@@ -250,18 +275,20 @@ def delete_user(user_id):
     """
     DELETE /api/auth/users/:id (solo Admin)
     Desactiva el usuario y elimina sus asignaciones activas.
+    Un admin normal solo puede quitar usuarios que él creó.
     """
-    current_user_id = get_jwt_identity()
-    current_user = Usuario.query.get(int(current_user_id))
-    if not current_user or current_user.rol != "admin":
+    current_user = require_admin()
+    if not current_user:
         return jsonify({"error": "Solo administradores"}), 403
 
-    if int(current_user_id) == user_id:
+    if current_user.id == user_id:
         return jsonify({"error": "No puedes quitar tu propio usuario"}), 400
 
     user = Usuario.query.get(user_id)
-    if not user:
+    if not user or not es_dueno_usuario(current_user, user):
         return jsonify({"error": "Usuario no encontrado"}), 404
+    if user.es_super:
+        return jsonify({"error": "El superadministrador no puede ser eliminado"}), 403
 
     AsignacionJuez.query.filter_by(usuario_id=user.id).delete()
     user.activo = False

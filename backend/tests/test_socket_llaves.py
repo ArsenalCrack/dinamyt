@@ -203,7 +203,8 @@ class TestCombateEliminacionSocket:
             from flask_jwt_extended import create_access_token
             from app.models.usuario import Usuario
 
-            admin = Usuario(email="admin@test.com", nombre="Admin", rol="admin", activo=True)
+            admin = Usuario(email="admin@test.com", nombre="Admin", rol="admin",
+                            activo=True, es_superadmin=True)
             admin.set_password("clave-test")
             db.session.add(admin)
             db.session.commit()
@@ -272,7 +273,9 @@ def _token_admin(app):
 
         admin = Usuario.query.filter_by(email="admin@test.com").first()
         if not admin:
-            admin = Usuario(email="admin@test.com", nombre="Admin", rol="admin", activo=True)
+            # Superadmin: opera sobre cualquier workspace (sin scoping por dueño).
+            admin = Usuario(email="admin@test.com", nombre="Admin", rol="admin",
+                            activo=True, es_superadmin=True)
             admin.set_password("clave-test")
             db.session.add(admin)
             db.session.commit()
@@ -325,6 +328,135 @@ def test_podio_llave_con_bye():
     podio = podio_llave(est)
     puestos = sorted(p["puesto"] for p in podio)
     assert puestos == [1, 2, 3], f"esperado 1/2/3, fue {puestos}"
+
+
+def test_registro_local_propuesto_y_aplicado(entorno):
+    """
+    Un juez de esquina reconecta y envía su registro local; la mesa (JC) lo
+    aplica y los puntos entran al marcador. Las entradas inválidas se filtran.
+    """
+    app, tatami_id, _llave_id = entorno
+    arbitro = socketio.test_client(
+        app, namespace="/combate", query_string=f"tatami_id={tatami_id}&rol=arbitro",
+    )
+    j1 = socketio.test_client(
+        app, namespace="/combate", query_string=f"tatami_id={tatami_id}&rol=j1",
+    )
+
+    _emitir(arbitro, "activar_tatami")
+    _emitir(arbitro, "nombres", nombreHong="Ana", nombreChung="Luis")
+
+    _emitir(j1, "proponer_registro_local", entradas=[
+        {"ts": 1, "etiqueta": "+2 GIRO / PAT. CABEZA", "color": "hong", "pts": 2},
+        {"ts": 2, "etiqueta": "+1 CUERPO", "color": "chung", "pts": 1},
+        {"ts": 3, "etiqueta": "basura", "color": "verde", "pts": 5},   # se filtra
+        {"ts": 4, "etiqueta": "basura", "color": "hong", "pts": "x"},  # se filtra
+    ])
+    estado = _ultimo_estado(arbitro)
+    assert "j1" in estado["_propuestas_local"]
+    assert len(estado["_propuestas_local"]["j1"]["entradas"]) == 2
+
+    # Solo el Juez Central puede resolver
+    _emitir(j1, "resolver_registro_local", rol="j1", aplicar=True)
+    estado = _ultimo_estado(arbitro) or estado
+    assert estado["jueces"]["j1"]["hong"] == 0, "un juez no puede auto-aplicarse"
+
+    # La mesa lo aplica: los puntos entran al marcador con su detalle
+    _emitir(arbitro, "resolver_registro_local", rol="j1", aplicar=True)
+    estado = _ultimo_estado(arbitro)
+    assert estado["_propuestas_local"] == {}
+    assert estado["jueces"]["j1"]["hong"] == 2
+    assert estado["jueces"]["j1"]["chung"] == 1
+    assert any("APLICADO" in l["txt"] for l in estado["log"])
+
+    # El juez recibe la resolución (su libreta local se limpia sola)
+    resueltos = [
+        r for r in j1.get_received("/combate")
+        if r["name"] == "registro_local_resuelto"
+    ]
+    assert resueltos and resueltos[-1]["args"][0]["aplicado"] is True
+
+
+def test_bronce_espera_a_la_otra_semifinal():
+    """
+    Con 4 competidores, al caer el PRIMER semifinalista el bronce NO se
+    adjudica: queda en espera del perdedor de la otra semifinal. (Antes se
+    marcaba 3° automático como si la semifinal pendiente fuera un bye.)
+    """
+    from app.api.llaves import generar_estructura, registrar_resultado
+
+    est = generar_estructura([
+        {"nombre": "A"}, {"nombre": "B"}, {"nombre": "C"}, {"nombre": "D"},
+    ])
+    registrar_resultado(est, 0, 0, 1)  # primera semifinal jugada
+    bronce = est.get("bronce")
+    assert bronce is not None
+    assert bronce["comp1"] is not None
+    assert bronce["comp2"] is None, "el rival sale de la otra semifinal"
+    assert bronce["ganador"] is None, "el 3° no puede adjudicarse aún"
+
+    registrar_resultado(est, 0, 1, 1)  # segunda semifinal jugada
+    bronce = est["bronce"]
+    assert bronce["comp1"] and bronce["comp2"]
+    assert bronce["ganador"] is None, "el bronce queda por disputarse"
+
+
+def test_no_se_marca_ganador_sin_rival_definido():
+    """En rondas > 1, marcar ganador con el rival aún sin definir se rechaza."""
+    from app.api.llaves import generar_estructura, registrar_resultado
+
+    est = generar_estructura([
+        {"nombre": "A"}, {"nombre": "B"}, {"nombre": "C"}, {"nombre": "D"},
+    ])
+    registrar_resultado(est, 0, 0, 1)  # solo una semifinal jugada
+    with pytest.raises(ValueError):
+        registrar_resultado(est, 1, 0, 1)  # la final espera al otro finalista
+    assert est["campeon"] is None
+
+
+def test_editar_conserva_el_sorteo_si_competidores_no_cambian(entorno):
+    """
+    PUT /api/llaves/:id reenviando los MISMOS competidores (así lo hace el
+    formulario al cambiar solo nombre o tatami) no debe volver a sortear.
+    """
+    app, tatami_id, _llave_id = entorno
+    token = _token_admin(app)
+    cliente = app.test_client()
+    auth = {"Authorization": f"Bearer {token}"}
+
+    with app.app_context():
+        from app.models.tatami import Tatami
+        camp_id = Tatami.query.get(tatami_id).campeonato_id
+
+    comps = [{"nombre": n, "club": ""} for n in ("A", "B", "C", "D")]
+    resp = cliente.post(
+        "/api/llaves",
+        json={"campeonato_id": camp_id, "nombre": "Editable", "competidores": comps},
+        headers=auth,
+    )
+    assert resp.status_code == 201
+    llave_id = resp.get_json()["llave"]["id"]
+    estructura_antes = resp.get_json()["llave"]["estructura"]
+
+    resp = cliente.put(
+        f"/api/llaves/{llave_id}",
+        json={"nombre": "Nombre Nuevo", "competidores": comps},
+        headers=auth,
+    )
+    assert resp.status_code == 200
+    datos = resp.get_json()["llave"]
+    assert datos["nombre"] == "Nombre Nuevo"
+    assert datos["estructura"] == estructura_antes, "el cuadro no debe re-sortearse"
+
+    # Con una lista DIFERENTE sí se regenera el cuadro
+    resp = cliente.put(
+        f"/api/llaves/{llave_id}",
+        json={"competidores": comps + [{"nombre": "E", "club": ""}]},
+        headers=auth,
+    )
+    assert resp.status_code == 200
+    regenerada = resp.get_json()["llave"]["estructura"]
+    assert len(regenerada["competidores"]) == 5
 
 
 class TestGrupoFiguras:
@@ -572,3 +704,176 @@ def test_activar_grupo_figuras_sin_activar(entorno):
     assert estado["_tatami_activo"] is False
     assert len(estado["competidores"]) == 3
     cliente.disconnect(namespace="/combate")
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Combinar llaves y mover competidores entre llaves (solo pendientes)
+# ══════════════════════════════════════════════════════════════════
+
+def _crear_llave_combate(app, tatami_id, nombre, comps, asignar=True):
+    """Crea una llave de combate PENDIENTE directamente en la BD."""
+    with app.app_context():
+        from app.models.tatami import Tatami
+        from app.models.llave import Llave
+        from app.api.llaves import generar_estructura
+
+        tatami = Tatami.query.get(tatami_id)
+        llave = Llave(
+            campeonato_id=tatami.campeonato_id,
+            tatami_id=tatami_id if asignar else None,
+            tipo="combate",
+            nombre=nombre,
+            estado="pendiente",
+            estructura=generar_estructura(comps),
+        )
+        db.session.add(llave)
+        db.session.commit()
+        return llave.id
+
+
+def test_combinar_llaves_une_y_resortea(entorno):
+    """Dos llaves pendientes se fusionan en una con todos los competidores."""
+    app, tatami_id, base_llave = entorno
+    token = _token_admin(app)
+    a = _crear_llave_combate(app, tatami_id, "A", [{"nombre": "Ana"}, {"nombre": "Bea"}, {"nombre": "Cami"}])
+    b = _crear_llave_combate(app, tatami_id, "B", [{"nombre": "Dario"}, {"nombre": "Elias"}, {"nombre": "Fabi"}])
+
+    cliente = app.test_client()
+    resp = cliente.post(
+        "/api/llaves/combinar",
+        json={"llave_ids": [a, b], "nombre": "UNIDA"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 201, resp.get_json()
+    nueva = resp.get_json()["llave"]
+    assert nueva["nombre"] == "UNIDA"
+    assert len(nueva["estructura"]["competidores"]) == 6
+
+    with app.app_context():
+        from app.models.llave import Llave
+        assert Llave.query.get(a) is None, "la llave origen A se elimina"
+        assert Llave.query.get(b) is None, "la llave origen B se elimina"
+
+
+def test_combinar_rechaza_tipos_distintos(entorno):
+    """No se puede combinar una llave de combate con un grupo de figuras."""
+    app, tatami_id, _ = entorno
+    token = _token_admin(app)
+    combate = _crear_llave_combate(app, tatami_id, "C", [{"nombre": "A"}, {"nombre": "B"}, {"nombre": "C"}])
+    figuras = _crear_llave_figuras(app, tatami_id)
+
+    cliente = app.test_client()
+    resp = cliente.post(
+        "/api/llaves/combinar",
+        json={"llave_ids": [combate, figuras]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    assert "combate" in resp.get_json()["error"].lower()
+
+
+def test_combinar_rechaza_llave_no_pendiente(entorno):
+    """Una llave activa no se puede combinar (protege resultados)."""
+    app, tatami_id, _ = entorno
+    token = _token_admin(app)
+    a = _crear_llave_combate(app, tatami_id, "A", [{"nombre": "A"}, {"nombre": "B"}, {"nombre": "C"}])
+    b = _crear_llave_combate(app, tatami_id, "B", [{"nombre": "D"}, {"nombre": "E"}, {"nombre": "F"}])
+    with app.app_context():
+        from app.models.llave import Llave
+        llave = Llave.query.get(a)
+        llave.estado = "activa"
+        db.session.commit()
+
+    cliente = app.test_client()
+    resp = cliente.post(
+        "/api/llaves/combinar",
+        json={"llave_ids": [a, b]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 409
+
+
+def test_mover_competidor_entre_llaves(entorno):
+    """Mover un competidor: sale de la origen y entra en la destino.
+    Origen con 4 comps → al quitar 1 quedan 3 (sigue siendo válida)."""
+    app, tatami_id, _ = entorno
+    token = _token_admin(app)
+    origen = _crear_llave_combate(app, tatami_id, "ORIG",
+                                  [{"nombre": "Ana"}, {"nombre": "Bea"}, {"nombre": "Cami"}, {"nombre": "Gaby"}])
+    destino = _crear_llave_combate(app, tatami_id, "DEST",
+                                   [{"nombre": "Dario"}, {"nombre": "Elias"}, {"nombre": "Fabi"}])
+
+    with app.app_context():
+        from app.models.llave import Llave
+        comp = Llave.query.get(origen).estructura["competidores"][0]
+        comp_id, comp_nombre = comp["id"], comp["nombre"]
+
+    cliente = app.test_client()
+    resp = cliente.post(
+        "/api/llaves/mover-competidor",
+        json={"origen_id": origen, "destino_id": destino, "competidor_id": comp_id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["origen_eliminada"] is False
+
+    with app.app_context():
+        from app.models.llave import Llave
+        nombres_origen = [c["nombre"] for c in Llave.query.get(origen).estructura["competidores"]]
+        nombres_destino = [c["nombre"] for c in Llave.query.get(destino).estructura["competidores"]]
+        assert comp_nombre not in nombres_origen
+        assert comp_nombre in nombres_destino
+        assert len(nombres_origen) == 3
+        assert len(nombres_destino) == 4
+
+
+def test_mover_rechaza_si_origen_queda_invalida(entorno):
+    """Mover de una llave de 3 (el mínimo) la dejaría en 2: se rechaza (409)."""
+    app, tatami_id, _ = entorno
+    token = _token_admin(app)
+    origen = _crear_llave_combate(app, tatami_id, "ORIG", [{"nombre": "Ana"}, {"nombre": "Bea"}, {"nombre": "Cami"}])
+    destino = _crear_llave_combate(app, tatami_id, "DEST", [{"nombre": "Dario"}, {"nombre": "Elias"}, {"nombre": "Fabi"}])
+
+    with app.app_context():
+        from app.models.llave import Llave
+        comp_id = Llave.query.get(origen).estructura["competidores"][0]["id"]
+
+    cliente = app.test_client()
+    resp = cliente.post(
+        "/api/llaves/mover-competidor",
+        json={"origen_id": origen, "destino_id": destino, "competidor_id": comp_id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 409
+    assert "combinar" in resp.get_json()["error"].lower()
+
+
+def test_scoping_admin_no_ve_llaves_de_otro(entorno):
+    """Un admin normal no ve las llaves de un campeonato que no creó (404)."""
+    app, tatami_id, llave_id = entorno
+    with app.app_context():
+        from flask_jwt_extended import create_access_token
+        from app.models.usuario import Usuario
+        from app.models.tatami import Tatami
+
+        camp_id = Tatami.query.get(tatami_id).campeonato_id
+        # Admin normal (NO superadmin, NO dueño del campeonato de prueba)
+        otro = Usuario(email="otro@test.com", nombre="Otro", rol="admin", activo=True)
+        otro.set_password("x")
+        db.session.add(otro)
+        db.session.commit()
+        token_otro = create_access_token(identity=str(otro.id))
+
+    cliente = app.test_client()
+    # No ve las llaves del campeonato ajeno
+    resp = cliente.get(
+        f"/api/llaves/campeonato/{camp_id}",
+        headers={"Authorization": f"Bearer {token_otro}"},
+    )
+    assert resp.status_code == 404
+    # Ni el detalle de una llave ajena
+    resp2 = cliente.get(
+        f"/api/llaves/{llave_id}",
+        headers={"Authorization": f"Bearer {token_otro}"},
+    )
+    assert resp2.status_code == 404

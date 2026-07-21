@@ -22,6 +22,7 @@ ACCIONES_MARCADOR = {
     "kyonggo",
     "gamjeum",
     "set_num_jueces",
+    "anular_entrada",
 }
 
 # Con la alerta de superioridad abierta el combate queda EN PAUSA: nada que
@@ -38,6 +39,7 @@ ACCIONES_BLOQUEADAS_DURANTE_ALERTA = {
     "ronda",
     "set_num_jueces",
     "nombres",
+    "anular_entrada",
 }
 
 # Con ganador ya declarado el combate está cerrado: solo se permite cerrarlo
@@ -56,7 +58,24 @@ ACCIONES_BLOQUEADAS_TRAS_GANADOR = {
     "descalificar",
     "set_num_jueces",
     "nombres",
+    "anular_entrada",
 }
+
+
+def _pts_validos(valor):
+    """
+    Valida los puntos que llegan del cliente. Un payload malformado (string,
+    negativo, gigante) no debe tumbar el handler ni corromper el marcador.
+    Retorna el valor como float, o None si no es un punto razonable.
+    """
+    try:
+        pts = float(valor)
+    except (TypeError, ValueError):
+        return None
+    if not (0 < pts <= 10):
+        return None
+    # Entero cuando lo es: evita "+2.0" en el log y en los reportes
+    return int(pts) if pts == int(pts) else pts
 
 
 def estado_inicial():
@@ -105,11 +124,24 @@ def estado_inicial():
     }
 
 
+# El log conserva TODO el combate (de inicio a fin / guardado); se limpia con
+# reset o nuevo combate. El tope alto es solo un seguro de memoria/payload.
+MAX_LOG_ENTRADAS = 300
+
+
 def _agregar_log(estado, txt, color):
-    """Agrega una entrada al log del estado."""
-    estado["log"].insert(0, {"txt": txt, "color": color, "ts": int(time.time() * 1000)})
-    if len(estado["log"]) > 15:
-        estado["log"] = estado["log"][:15]
+    """Agrega una entrada al log del estado (ts = hora real, epoch ms)."""
+    entrada = {"txt": txt, "color": color, "ts": int(time.time() * 1000)}
+    # En combate, cada acción registra también el tiempo del cronómetro en ese
+    # momento (y si corría o estaba en pausa): así los jueces ubican la acción
+    # en el reloj del combate, no solo en la hora del día. Figuras no tiene
+    # cronómetro ("segundos" no existe) y no lleva estos campos.
+    if "segundos" in estado:
+        entrada["crono"] = estado.get("segundos")
+        entrada["cronoActivo"] = bool(estado.get("activo"))
+    estado["log"].insert(0, entrada)
+    if len(estado["log"]) > MAX_LOG_ENTRADAS:
+        estado["log"] = estado["log"][:MAX_LOG_ENTRADAS]
 
 
 def _momento_evento():
@@ -261,9 +293,11 @@ def aplicar_evento(estado, ev, broadcast_ganador_cb=None, broadcast_alerta_cb=No
     if accion == "punto_juez":
         juez = ev.get("juez")
         color = ev.get("color")
-        pts = ev.get("pts", 0)
-        nombre = ev.get("nombre", "")
+        pts = _pts_validos(ev.get("pts", 0))
+        nombre = str(ev.get("nombre", ""))[:60]
 
+        if pts is None or color not in ("hong", "chung"):
+            return estado
         if estado["ronda"] == "oro" and estado.get("oroResuelto"):
             return estado
 
@@ -299,22 +333,85 @@ def aplicar_evento(estado, ev, broadcast_ganador_cb=None, broadcast_alerta_cb=No
             emoji = "🔴" if color == "hong" else "🔵"
             _agregar_log(estado, f"{emoji} {nombre} +{pts} · {_juez_log_label(ev, juez)}", color)
 
+    elif accion == "anular_entrada":
+        # La mesa (JC) anula UNA entrada específica del historial, no solo la
+        # última. La firma (juez/color/pts/momento) evita anular la entrada
+        # equivocada si el historial cambió entre que se mostró y se tocó.
+        firma = ev.get("firma") or {}
+        try:
+            idx = int(ev.get("idx"))
+        except (TypeError, ValueError):
+            return estado
+        if not (0 <= idx < len(estado["historial"])):
+            return estado
+        h = estado["historial"][idx]
+        if (
+            h.get("juez") != firma.get("juez")
+            or h.get("color") != firma.get("color")
+            or h.get("pts") != firma.get("pts")
+            or h.get("momento") != firma.get("momento")
+        ):
+            return estado
+        if h.get("esDecision"):
+            # Las decisiones (ganador/descalificación) no se anulan por aquí
+            return estado
+        color = h.get("color")
+        if color not in ("hong", "chung"):
+            return estado
+        if h.get("esKyongGo"):
+            if color == "hong":
+                estado["kyongHong"] = max(0, estado["kyongHong"] - 1)
+                estado["arbHong"] += 0.5
+            else:
+                estado["kyongChung"] = max(0, estado["kyongChung"] - 1)
+                estado["arbChung"] += 0.5
+        elif h.get("esGamJeum"):
+            if color == "hong":
+                estado["faltasHong"] = max(0, estado["faltasHong"] - 1)
+                estado["arbHong"] += 1
+            else:
+                estado["faltasChung"] = max(0, estado["faltasChung"] - 1)
+                estado["arbChung"] += 1
+        elif h.get("esEspecial"):
+            if color == "hong":
+                estado["arbHong"] -= h.get("pts", 0)
+            else:
+                estado["arbChung"] -= h.get("pts", 0)
+        elif h.get("juez") in estado["jueces"]:
+            estado["jueces"][h["juez"]][color] -= h.get("pts", 0)
+        else:
+            return estado
+        estado["historial"].pop(idx)
+        emoji = "🔴" if color == "hong" else "🔵"
+        _agregar_log(
+            estado,
+            f"{emoji} ⛔ ANULADO por el JC: {h.get('nombre', '')} "
+            f"({h.get('pts', 0):+g}) de {_juez_log_label(h, h.get('juez', '-'))}",
+            "arb",
+        )
+
     elif accion == "deshacer_juez":
         juez = ev.get("juez")
-        # Buscar la última entrada del juez en el historial
+        color = ev.get("color")
+        # Buscar la última entrada del juez en el historial. Si el evento trae
+        # color (los botones de deshacer son por columna Hong/Chung), SOLO se
+        # deshace un punto de ese color: sin este filtro, deshacer en la
+        # columna Hong podía borrar el último punto dado a Chung.
         for i in range(len(estado["historial"]) - 1, -1, -1):
             h = estado["historial"][i]
-            if h.get("juez") == juez:
+            if h.get("juez") == juez and (not color or h.get("color") == color):
                 estado["jueces"][h["juez"]][h["color"]] -= h["pts"]
                 estado["historial"].pop(i)
-                _agregar_log(estado, f"↩ Deshacer {juez}", "arb")
+                _agregar_log(estado, f"↩ Deshacer {juez}" + (f" ({color})" if color else ""), "arb")
                 break
 
     elif accion == "especial":
         color = ev.get("color")
-        pts = ev.get("pts", 0)
-        nombre = ev.get("nombre", "")
+        pts = _pts_validos(ev.get("pts", 0))
+        nombre = str(ev.get("nombre", ""))[:60]
 
+        if pts is None or color not in ("hong", "chung"):
+            return estado
         if estado["ronda"] == "oro" and estado.get("oroResuelto"):
             return estado
 
@@ -450,33 +547,50 @@ def aplicar_evento(estado, ev, broadcast_ganador_cb=None, broadcast_alerta_cb=No
                           ev, broadcast_ganador_cb, broadcast_derrota_cb)
 
     elif accion == "set_num_jueces":
-        estado["numJueces"] = max(2, min(4, ev.get("numJueces", 4)))
+        # Coerción defensiva: un payload no numérico no debe tumbar el handler
+        try:
+            n = int(ev.get("numJueces", 4))
+        except (TypeError, ValueError):
+            n = estado.get("numJueces", 4)
+        estado["numJueces"] = max(2, min(4, n))
         _agregar_log(estado, f"🔢 Réferis de esquina: {estado['numJueces']}", "arb")
 
     elif accion == "nombres":
-        estado["nombreHong"] = ev.get("nombreHong") or "Hong"
-        estado["nombreChung"] = ev.get("nombreChung") or "Chung"
+        estado["nombreHong"] = str(ev.get("nombreHong") or "Hong")[:60]
+        estado["nombreChung"] = str(ev.get("nombreChung") or "Chung")[:60]
 
     elif accion == "set_nombre_juez":
         juez = ev.get("juez")
-        if juez and "nombresJueces" in estado:
-            estado["nombresJueces"][juez] = ev.get("nombre", "")
+        if juez and "nombresJueces" in estado and juez in estado["nombresJueces"]:
+            estado["nombresJueces"][juez] = str(ev.get("nombre", ""))[:40]
 
     elif accion == "crono_start":
-        estado["activo"] = True
+        # Con el tiempo en 0 no hay nada que correr: el JC debe resetear el
+        # cronómetro (o cambiar la duración) antes de reanudar. Sin este
+        # guard, PLAY en 0:00 registraba "KuMan" duplicados en el log.
+        if estado.get("segundos", 0) > 0:
+            estado["activo"] = True
 
     elif accion == "crono_pause":
         estado["activo"] = False
 
     elif accion == "crono_reset":
         estado["activo"] = False
-        estado["segundos"] = ev.get("segundosMax", estado["segundosMax"])
-        if ev.get("segundosMax"):
-            estado["segundosMax"] = ev["segundosMax"]
+        try:
+            seg_max = int(ev.get("segundosMax") or 0)
+        except (TypeError, ValueError):
+            seg_max = 0
+        if seg_max > 0:
+            estado["segundosMax"] = max(10, min(3600, seg_max))
+        estado["segundos"] = estado["segundosMax"]
 
     elif accion == "crono_seg":
-        estado["segundos"] = ev.get("segundos", estado["segundos"])
-        estado["activo"] = ev.get("activo", estado["activo"])
+        try:
+            seg = int(ev.get("segundos", estado["segundos"]))
+        except (TypeError, ValueError):
+            seg = estado["segundos"]
+        estado["segundos"] = max(0, min(int(estado.get("segundosMax", 3600)), seg))
+        estado["activo"] = bool(ev.get("activo", estado["activo"]))
 
     elif accion == "ronda":
         estado["ronda"] = ev.get("ronda", "r1")
@@ -521,7 +635,7 @@ def aplicar_evento(estado, ev, broadcast_ganador_cb=None, broadcast_alerta_cb=No
         color = ev.get("color")
         if color in ("hong", "chung"):
             winner = estado["nombreHong"] if color == "hong" else estado["nombreChung"]
-            motivo = ev.get("motivo") or "Decisión del Juez Central"
+            motivo = str(ev.get("motivo") or "Decisión del Juez Central").strip()[:80]
             estado["alerta12Data"] = None
             estado["ganadorManualColor"] = color
             estado["ganadorManualMotivo"] = motivo
@@ -656,6 +770,8 @@ def guardar_combate_snapshot(estado):
         "jueces_detalle": {
             "jueces": copy.deepcopy(estado["jueces"]),
             "nombres": copy.deepcopy(estado.get("nombresJueces", {})),
+            # Log completo del combate con hora real de cada acción
+            "log": copy.deepcopy(estado.get("log", [])),
             "resultado": {
                 "ganador_manual": estado.get("ganadorManualColor") or None,
                 "motivo": estado.get("ganadorManualMotivo") or None,

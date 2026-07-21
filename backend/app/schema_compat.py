@@ -9,6 +9,9 @@ OPTIONAL_COLUMNS = {
     "usuarios": {
         "creado_por_id": "INTEGER",
         "eliminado_at": "DATETIME",
+        # Jerarquía: el superadmin ve todos los workspaces; un admin normal
+        # solo ve lo que él creó (sus jueces, campeonatos y competidores).
+        "es_superadmin": "BOOLEAN",
     },
     "asignaciones_juez": {
         "asignado_por_id": "INTEGER",
@@ -18,6 +21,16 @@ OPTIONAL_COLUMNS = {
         "tipo": "VARCHAR(20)",
         "descripcion": "TEXT",
         "estado": "VARCHAR(20)",
+        "seccion_clave": "VARCHAR(300)",
+    },
+    "campeonatos": {
+        "config_categorias": "JSON",
+    },
+    "competidores": {
+        "categoria_especial": "BOOLEAN",
+        # Fecha de última actualización de datos (peso/cinturón cambian entre
+        # campeonatos). NULL en filas viejas = nunca actualizado tras crearse.
+        "updated_at": "DATETIME",
     },
 }
 

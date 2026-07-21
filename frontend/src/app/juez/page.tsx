@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { misTatamisAPI, type UserData } from "@/lib/api";
 import Logo from "@/components/Logo";
+import { useI18n, type ClaveTexto } from "@/lib/i18n";
 
 interface MiTatami {
   id: number;
@@ -13,16 +14,18 @@ interface MiTatami {
   mi_rol: string;
 }
 
-const ROLES: Record<string, string> = {
-  arbitro: "Juez Central",
-  j1: "Juez Esquina 1",
-  j2: "Juez Esquina 2",
-  j3: "Juez Esquina 3",
-  j4: "Juez Esquina 4",
+// Claves de traducción por rol (los textos viven en lib/i18n)
+const ROLES: Record<string, ClaveTexto> = {
+  arbitro: "rol.arbitro",
+  j1: "rol.j1",
+  j2: "rol.j2",
+  j3: "rol.j3",
+  j4: "rol.j4",
 };
 
 export default function JuezPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [user, setUser] = useState<UserData | null>(null);
   const [tatamis, setTatamis] = useState<MiTatami[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -76,8 +79,8 @@ export default function JuezPage() {
       }}>
         <div>
           <Logo fontSize="1.8rem" />
-          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 2 }}>
-            Bienvenido, {user.nombre}
+          <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: 2 }}>
+            {t("juez.bienvenido")} {user.nombre}
           </p>
         </div>
       </div>
@@ -87,54 +90,54 @@ export default function JuezPage() {
         <div style={{
           marginBottom: 12, padding: "8px 12px", borderRadius: "var(--radius-sm)",
           border: "1px solid var(--red-alert)", background: "rgba(232,0,42,0.08)",
-          color: "var(--red-alert)", fontSize: "0.82rem", fontWeight: 700, textAlign: "center",
+          color: "var(--red-alert)", fontSize: "0.88rem", fontWeight: 700, textAlign: "center",
         }}>
-          📴 Sin conexión — mostrando tus tatamis guardados. Toca el tuyo para
-          volver a tu pantalla de registro local.
+          {t("juez.offline")}
         </div>
       )}
-      <div className="card-title">Mis Tatamis Asignados</div>
+      <div className="card-title">{t("juez.misTatamis")}</div>
       {tatamis.length > 0 ? (
         <>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: 12 }}>
-            Toca tu tatami para entrar con el rol que te asignó el administrador.
+          <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: 12 }}>
+            {t("juez.instruccion")}
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-            {tatamis.map((t) => (
+            {/* "tat" y no "t": no hacerle sombra a la función de traducción */}
+            {tatamis.map((tat) => (
               <div
-                key={t.id}
+                key={tat.id}
                 className="card"
                 style={{ cursor: "pointer" }}
-                onClick={() => router.push(`/tatami/${t.id}?rol=${t.mi_rol}`)}
+                onClick={() => router.push(`/tatami/${tat.id}?rol=${tat.mi_rol}`)}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ minWidth: 0 }}>
                     <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>
-                      Tatami {t.numero}
+                      {t("juez.tatami")} {tat.numero}
                     </span>
-                    {t.campeonato_nombre && (
-                      <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                        {t.campeonato_nombre}
+                    {tat.campeonato_nombre && (
+                      <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                        {tat.campeonato_nombre}
                       </div>
                     )}
                     <span style={{
                       display: "inline-block", marginTop: 6,
-                      padding: "4px 10px", borderRadius: "var(--radius-sm)", fontSize: "0.75rem",
+                      padding: "4px 10px", borderRadius: "var(--radius-sm)", fontSize: "0.82rem",
                       fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
-                      background: t.mi_rol === "arbitro" ? "var(--gold-bg)" : "var(--chung-bg)",
-                      color: t.mi_rol === "arbitro" ? "var(--gold)" : "var(--chung-light)",
-                      border: `1px solid ${t.mi_rol === "arbitro" ? "var(--gold-border)" : "var(--chung-border)"}`,
-                    }}>{ROLES[t.mi_rol] || t.mi_rol}</span>
+                      background: tat.mi_rol === "arbitro" ? "var(--gold-bg)" : "var(--chung-bg)",
+                      color: tat.mi_rol === "arbitro" ? "var(--gold)" : "var(--chung-light)",
+                      border: `1px solid ${tat.mi_rol === "arbitro" ? "var(--gold-border)" : "var(--chung-border)"}`,
+                    }}>{ROLES[tat.mi_rol] ? t(ROLES[tat.mi_rol]) : tat.mi_rol}</span>
                   </div>
                   <button
                     className="btn btn-primary"
                     style={{ flexShrink: 0 }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/tatami/${t.id}?rol=${t.mi_rol}`);
+                      router.push(`/tatami/${tat.id}?rol=${tat.mi_rol}`);
                     }}
                   >
-                    Entrar →
+                    {t("juez.entrar")}
                   </button>
                 </div>
               </div>
@@ -144,16 +147,14 @@ export default function JuezPage() {
       ) : (
         <div className="card" style={{ textAlign: "center", padding: 32, color: "var(--text-dim)", marginBottom: 24 }}>
           {cargando ? (
-            "Cargando tus asignaciones..."
+            t("juez.cargando")
           ) : (
             <>
               <p style={{ marginBottom: 8, fontWeight: 700, color: "var(--text-muted)" }}>
-                Aún no tienes un tatami asignado.
+                {t("juez.sinAsignacion")}
               </p>
-              <p style={{ fontSize: "0.85rem", margin: 0 }}>
-                Pide al administrador del campeonato que te asigne a un tatami
-                con tu rol de juez. Cuando lo haga, aparecerá aquí — recarga la
-                página o vuelve a entrar.
+              <p style={{ fontSize: "0.9rem", margin: 0 }}>
+                {t("juez.sinAsignacionDesc")}
               </p>
             </>
           )}
@@ -161,7 +162,7 @@ export default function JuezPage() {
       )}
 
       <div style={{ textAlign: "center", marginTop: 16 }}>
-        <p style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
+        <p style={{ color: "var(--text-dim)", fontSize: "0.875rem" }}>
           DINAMYT v4.0 &middot; Global Hapkido Association
         </p>
       </div>

@@ -5,6 +5,7 @@ from .categoria import Categoria
 from .tatami import Tatami, SesionTatami
 from .asignacion import AsignacionJuez, AccesoTatami
 from .combate import Combate, EventoCombate
+from .competidor import Competidor, Inscripcion
 
 __all__ = [
     "Usuario",
@@ -16,4 +17,6 @@ __all__ = [
     "AccesoTatami",
     "Combate",
     "EventoCombate",
+    "Competidor",
+    "Inscripcion",
 ]

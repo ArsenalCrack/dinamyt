@@ -12,8 +12,8 @@ import {
   type UserData,
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import AvisoSinInternet, { useSinInternet } from "@/components/AvisoSinInternet";
 import Logo from "@/components/Logo";
+import { useI18n } from "@/lib/i18n";
 
 interface Campeonato {
   id: number;
@@ -28,6 +28,7 @@ interface Campeonato {
 
 export default function AdminPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [user, setUser] = useState<UserData | null>(null);
   const [campeonatos, setCampeonatos] = useState<Campeonato[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
@@ -46,16 +47,6 @@ export default function AdminPage() {
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [editUserData, setEditUserData] = useState({ nombre: "", email: "", password: "", rol: "juez" });
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
-  const sinInternet = useSinInternet();
-
-  // Sin internet el admin queda en solo-consulta: ninguna mutación sale
-  function bloqueadoPorInternet(): boolean {
-    if (sinInternet) {
-      flash("Sin internet: los cambios no se pueden guardar ahora. Reintenta cuando vuelva la conexión.", "error");
-      return true;
-    }
-    return false;
-  }
 
   useEffect(() => {
     const saved = localStorage.getItem("dinamyt_user");
@@ -88,19 +79,18 @@ export default function AdminPage() {
   }
 
   async function handleToggleCampActivo(c: Campeonato) {
-    if (bloqueadoPorInternet()) return;
     try {
       await updateCampeonatoAPI(c.id, { activo: !c.activo });
       await loadData(showInactive);
       flash(c.activo
-        ? `"${c.nombre}" desactivado: el público ya no lo verá.`
-        : `"${c.nombre}" activado: visible para el público.`, "ok");
-    } catch { flash("Error al cambiar el estado del campeonato", "error"); }
+        ? t("admin.camp.desactivadoMsg", { nombre: c.nombre })
+        : t("admin.camp.activadoMsg", { nombre: c.nombre }), "ok");
+    } catch { flash(t("admin.camp.errorEstado"), "error"); }
   }
 
   async function handleSaveUserEdit(e: React.FormEvent) {
     e.preventDefault();
-    if (!editingUser || bloqueadoPorInternet()) return;
+    if (!editingUser) return;
     const payload: { nombre?: string; email?: string; password?: string; rol?: string } = {};
     if (editUserData.nombre.trim()) payload.nombre = editUserData.nombre.trim();
     if (editUserData.email.trim()) payload.email = editUserData.email.trim();
@@ -110,32 +100,31 @@ export default function AdminPage() {
       await updateUserAPI(editingUser.id, payload);
       setEditingUser(null);
       await loadData(showInactive);
-      flash("Usuario actualizado correctamente", "ok");
+      flash(t("admin.usuarios.actualizado"), "ok");
     } catch (err) {
       const m = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      flash(m || "Error al actualizar el usuario", "error");
+      flash(m || t("admin.usuarios.errorActualizar"), "error");
     }
   }
 
   function handleToggleUserActivo(target: UserData) {
-    if (bloqueadoPorInternet()) return;
     if (target.id === user?.id) {
-      flash("No puedes desactivar tu propio usuario", "error");
+      flash(t("admin.usuarios.noPropio"), "error");
       return;
     }
     const ejecutar = async () => {
       try {
         await updateUserAPI(target.id, { activo: !target.activo });
         await loadData(showInactive);
-        flash(target.activo ? "Usuario desactivado" : "Usuario reactivado", "ok");
-      } catch { flash("Error al cambiar el estado del usuario", "error"); }
+        flash(target.activo ? t("admin.usuarios.desactivado") : t("admin.usuarios.reactivado"), "ok");
+      } catch { flash(t("admin.usuarios.errorEstado"), "error"); }
     };
     if (target.activo) {
       pedirConfirmacion({
-        titulo: "Desactivar usuario",
-        mensaje: `¿Desactivar a ${target.nombre}? No podrá iniciar sesión y se quitarán sus asignaciones de tatami.`,
+        titulo: t("admin.usuarios.confDesactivar.titulo"),
+        mensaje: t("admin.usuarios.confDesactivar.mensaje", { nombre: target.nombre }),
         tipo: "peligro",
-        confirmLabel: "Desactivar",
+        confirmLabel: t("comun.desactivar"),
         onConfirm: ejecutar,
       });
     } else {
@@ -145,16 +134,16 @@ export default function AdminPage() {
 
   async function handleCreateCamp(e: React.FormEvent) {
     e.preventDefault();
-    if (creandoCamp || bloqueadoPorInternet()) return;
+    if (creandoCamp) return;
     setCreandoCamp(true);
     try {
       await createCampeonatoAPI(newCamp);
       setShowNewCamp(false);
       setNewCamp({ nombre: "", descripcion: "", num_tatamis: 6 });
       loadData(showInactive);
-      flash("Campeonato creado exitosamente", "ok");
+      flash(t("admin.camp.creado"), "ok");
     } catch {
-      flash("Error al crear el campeonato. Si el servidor estaba dormido puede tardar ~1 min en despertar: revisa la lista antes de reintentar.", "error");
+      flash(t("admin.camp.errorCrear"), "error");
       loadData(showInactive);
     } finally {
       setCreandoCamp(false);
@@ -163,20 +152,23 @@ export default function AdminPage() {
 
   async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
-    if (bloqueadoPorInternet()) return;
     try {
       await registerUserAPI(newUser);
       setShowNewUser(false);
       setNewUser({ email: "", password: "", nombre: "", rol: "juez" });
       loadData(showInactive);
-      flash("Usuario creado exitosamente", "ok");
+      flash(t("admin.usuarios.creado"), "ok");
     } catch (err) {
       const m = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      flash(m || "Error al crear el usuario", "error");
+      flash(m || t("admin.usuarios.errorCrear"), "error");
     }
   }
 
   if (!user) return null;
+
+  // Jerarquía: el dato fresco de superadmin viene de la lista de usuarios
+  // (el user guardado en localStorage puede ser de un login viejo sin el campo)
+  const esSuper = users.some((u) => u.id === user.id && u.es_superadmin);
 
   // Filtro combinado de campeonatos: búsqueda por nombre + estado activo/inactivo
   const coincideCamp = (c: Campeonato) =>
@@ -185,7 +177,6 @@ export default function AdminPage() {
 
   return (
     <div className="admin-page" style={{ maxWidth: 960, margin: "0 auto", padding: "20px" }}>
-      <AvisoSinInternet />
       {/* Header */}
       <div className="admin-header" style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -193,8 +184,8 @@ export default function AdminPage() {
       }}>
         <div>
           <Logo fontSize="1.8rem" />
-          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 2 }}>
-            Panel de Administracion &middot; {user.nombre}
+          <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: 2 }}>
+            {t("admin.panel")} &middot; {user.nombre}
           </p>
         </div>
       </div>
@@ -212,22 +203,26 @@ export default function AdminPage() {
       {dialogo}
 
       {/* Tabs */}
-      <div className="admin-tabs" style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        {(["campeonatos", "jueces"] as const).map((t) => (
+      <div className="admin-tabs" style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {/* "pestana" y no "t": no hacerle sombra a la función de traducción */}
+        {(["campeonatos", "jueces"] as const).map((pestana) => (
           <button
-            key={t}
+            key={pestana}
             className="btn"
-            onClick={() => setTab(t)}
+            onClick={() => setTab(pestana)}
             style={{
-              background: tab === t ? "var(--gold-bg)" : undefined,
-              borderColor: tab === t ? "var(--gold-border)" : undefined,
-              color: tab === t ? "var(--gold)" : undefined,
+              background: tab === pestana ? "var(--gold-bg)" : undefined,
+              borderColor: tab === pestana ? "var(--gold-border)" : undefined,
+              color: tab === pestana ? "var(--gold)" : undefined,
               textTransform: "capitalize",
             }}
           >
-            {t === "campeonatos" ? "Campeonatos" : "Jueces / Usuarios"}
+            {pestana === "campeonatos" ? t("admin.tab.campeonatos") : t("admin.tab.jueces")}
           </button>
         ))}
+        <button className="btn" onClick={() => router.push("/admin/competidores")}>
+          {t("admin.tab.competidores")}
+        </button>
       </div>
 
       {/* ══════════════ CAMPEONATOS TAB ══════════════ */}
@@ -235,17 +230,17 @@ export default function AdminPage() {
         <div className="animate-fade">
           <div className="admin-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
             <h2 style={{ fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "1.1rem", color: "var(--gold)" }}>
-              Campeonatos ({campeonatos.length})
+              {t("admin.tab.campeonatos")} ({campeonatos.length})
             </h2>
             <button className="btn btn-primary btn-sm" onClick={() => setShowNewCamp(!showNewCamp)}>
-              + Nuevo Campeonato
+              {t("admin.camp.nuevo")}
             </button>
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
             <input
               className="input"
-              placeholder="Buscar campeonato por nombre..."
+              placeholder={t("admin.camp.buscar")}
               value={campSearch}
               onChange={(e) => setCampSearch(e.target.value)}
               style={{ flex: "1 1 200px", maxWidth: 380 }}
@@ -254,38 +249,38 @@ export default function AdminPage() {
               className="input"
               value={campFiltro}
               onChange={(e) => setCampFiltro(e.target.value as "todos" | "activos" | "inactivos")}
-              aria-label="Filtrar campeonatos por estado"
+              aria-label={t("admin.camp.filtroAria")}
               style={{ width: "auto", minWidth: 150, padding: "8px 30px 8px 12px", minHeight: 38 }}
             >
-              <option value="todos">Todos</option>
-              <option value="activos">Activos</option>
-              <option value="inactivos">Inactivos</option>
+              <option value="todos">{t("admin.filtro.todos")}</option>
+              <option value="activos">{t("admin.filtro.activos")}</option>
+              <option value="inactivos">{t("admin.filtro.inactivos")}</option>
             </select>
           </div>
 
           {showNewCamp && (
             <div className="card animate-slide" style={{ marginBottom: 16 }}>
-              <div className="card-title">Crear Campeonato</div>
+              <div className="card-title">{t("admin.camp.crear.titulo")}</div>
               <form onSubmit={handleCreateCamp} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <input className="input" placeholder="Nombre del campeonato" value={newCamp.nombre}
+                <input className="input" placeholder={t("admin.camp.nombre")} value={newCamp.nombre}
                   onChange={(e) => setNewCamp({ ...newCamp, nombre: e.target.value })} required />
-                <input className="input" placeholder="Descripcion (opcional)" value={newCamp.descripcion}
+                <input className="input" placeholder={t("admin.camp.desc")} value={newCamp.descripcion}
                   onChange={(e) => setNewCamp({ ...newCamp, descripcion: e.target.value })} />
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <label style={{ color: "var(--text-muted)", fontSize: "0.85rem", whiteSpace: "nowrap" }}>Tatamis:</label>
+                  <label style={{ color: "var(--text-muted)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>{t("admin.camp.tatamisLabel")}</label>
                   <input className="input" type="number" min={1} max={10} value={newCamp.num_tatamis}
                     onChange={(e) => {
                       const n = parseInt(e.target.value) || 1;
                       setNewCamp({ ...newCamp, num_tatamis: Math.min(10, Math.max(1, n)) });
                     }}
                     style={{ width: 80 }} />
-                  <span style={{ color: "var(--text-dim)", fontSize: "0.78rem" }}>máximo 10</span>
+                  <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>{t("admin.camp.max10")}</span>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button type="submit" className="btn btn-primary" disabled={creandoCamp}>
-                    {creandoCamp ? "Creando…" : "Crear"}
+                    {creandoCamp ? t("admin.camp.creando") : t("comun.crear")}
                   </button>
-                  <button type="button" className="btn" onClick={() => setShowNewCamp(false)} disabled={creandoCamp}>Cancelar</button>
+                  <button type="button" className="btn" onClick={() => setShowNewCamp(false)} disabled={creandoCamp}>{t("comun.cancelar")}</button>
                 </div>
               </form>
             </div>
@@ -294,8 +289,8 @@ export default function AdminPage() {
           {campeonatos.filter(coincideCamp).length === 0 ? (
             <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--text-dim)" }}>
               {campeonatos.length === 0
-                ? "No hay campeonatos creados. Crea uno para empezar."
-                : "Ningún campeonato coincide con los filtros."}
+                ? t("admin.camp.vacio")
+                : t("admin.camp.sinCoincidencias")}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -309,13 +304,13 @@ export default function AdminPage() {
                       <h3 style={{ fontWeight: 700, fontSize: "1.05rem", marginBottom: 4 }}>
                         {c.nombre}
                         <span className={`badge ${c.activo ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 8, verticalAlign: "middle" }}>
-                          {c.activo ? "Activo" : "Inactivo"}
+                          {c.activo ? t("comun.activo") : t("comun.inactivo")}
                         </span>
                       </h3>
-                      <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                        {c.num_tatamis} tatamis
+                      <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                        {c.num_tatamis} {t("comun.tatamis")}
                         {c.descripcion && ` · ${c.descripcion}`}
-                        {!c.activo && " · oculto para el público"}
+                        {!c.activo && t("admin.camp.oculto")}
                       </p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -326,9 +321,9 @@ export default function AdminPage() {
                           handleToggleCampActivo(c);
                         }}
                       >
-                        {c.activo ? "Desactivar" : "Activar"}
+                        {c.activo ? t("comun.desactivar") : t("comun.activar")}
                       </button>
-                      <span style={{ color: "var(--gold)", fontSize: "0.85rem" }}>Ver detalles →</span>
+                      <span style={{ color: "var(--gold)", fontSize: "0.9rem" }}>{t("admin.camp.verDetalles")}</span>
                     </div>
                   </div>
                 </div>
@@ -343,31 +338,39 @@ export default function AdminPage() {
         <div className="animate-fade">
           <div className="admin-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
             <h2 style={{ fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "1.1rem", color: "var(--gold)" }}>
-              Usuarios ({users.length})
+              {t("admin.usuarios.titulo")} ({users.length})
             </h2>
             <button className="btn btn-primary btn-sm" onClick={() => setShowNewUser(!showNewUser)}>
-              + Crear Usuario
+              {t("admin.usuarios.nuevo")}
             </button>
           </div>
 
           {showNewUser && (
             <div className="card animate-slide" style={{ marginBottom: 16 }}>
-              <div className="card-title">Crear Usuario</div>
+              <div className="card-title">{t("admin.usuarios.crear.titulo")}</div>
               <form onSubmit={handleCreateUser} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <input className="input" placeholder="Nombre completo" value={newUser.nombre}
+                <input className="input" placeholder={t("admin.usuarios.nombre")} value={newUser.nombre}
                   onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })} required />
-                <input className="input" type="email" placeholder="Correo electronico" value={newUser.email}
+                <input className="input" type="email" placeholder={t("admin.usuarios.correo")} value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} required />
-                <input className="input" type="password" placeholder="Contrasena" value={newUser.password}
+                <input className="input" type="password" placeholder={t("admin.usuarios.contrasena")} value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} required />
-                <select className="input" value={newUser.rol}
-                  onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}>
-                  <option value="juez">Juez</option>
-                  <option value="admin">Administrador</option>
-                </select>
+                {/* Jerarquía: solo el superadmin crea administradores; un admin
+                    normal solo agrega jueces a su propio equipo */}
+                {esSuper ? (
+                  <select className="input" value={newUser.rol}
+                    onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}>
+                    <option value="juez">{t("rol.juez")}</option>
+                    <option value="admin">{t("rol.admin")}</option>
+                  </select>
+                ) : (
+                  <p style={{ color: "var(--text-dim)", fontSize: "0.84rem", margin: 0 }}>
+                    {t("admin.usuarios.soloJueces")}
+                  </p>
+                )}
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="submit" className="btn btn-primary">Crear</button>
-                  <button type="button" className="btn" onClick={() => setShowNewUser(false)}>Cancelar</button>
+                  <button type="submit" className="btn btn-primary">{t("comun.crear")}</button>
+                  <button type="button" className="btn" onClick={() => setShowNewUser(false)}>{t("comun.cancelar")}</button>
                 </div>
               </form>
             </div>
@@ -377,7 +380,7 @@ export default function AdminPage() {
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
             <input
               className="input"
-              placeholder="Buscar por nombre o correo..."
+              placeholder={t("admin.usuarios.buscar")}
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}
               style={{ flex: "1 1 200px", maxWidth: 380 }}
@@ -386,16 +389,16 @@ export default function AdminPage() {
               className="input"
               value={rolFiltro}
               onChange={(e) => setRolFiltro(e.target.value as "todos" | "admin" | "juez")}
-              aria-label="Filtrar por tipo de usuario"
+              aria-label={t("admin.usuarios.filtroAria")}
               style={{ width: "auto", minWidth: 150, padding: "8px 30px 8px 12px", minHeight: 38 }}
             >
-              <option value="todos">Todos los tipos</option>
-              <option value="admin">Administradores</option>
-              <option value="juez">Jueces</option>
+              <option value="todos">{t("admin.usuarios.filtro.todos")}</option>
+              <option value="admin">{t("admin.usuarios.filtro.admins")}</option>
+              <option value="juez">{t("admin.usuarios.filtro.jueces")}</option>
             </select>
             <label style={{
               display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
-              fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 700,
+              fontSize: "0.88rem", color: "var(--text-muted)", fontWeight: 700,
               userSelect: "none", whiteSpace: "nowrap",
             }}>
               <input
@@ -404,7 +407,7 @@ export default function AdminPage() {
                 onChange={(e) => setShowInactive(e.target.checked)}
                 style={{ accentColor: "var(--gold)", width: 16, height: 16 }}
               />
-              Mostrar inactivos
+              {t("admin.usuarios.mostrarInactivos")}
             </label>
           </div>
 
@@ -425,24 +428,24 @@ export default function AdminPage() {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ overflowWrap: "anywhere" }}>
                       <span style={{ fontWeight: 700 }}>{u.nombre}</span>
-                      <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: "0.85rem" }}>{u.email}</span>
+                      <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: "0.9rem" }}>{u.email}</span>
                       {!u.activo && (
-                        <span className="badge badge-gray" style={{ marginLeft: 8 }}>Inactivo</span>
+                        <span className="badge badge-gray" style={{ marginLeft: 8 }}>{t("comun.inactivo")}</span>
                       )}
                     </div>
-                    <div style={{ color: "var(--text-dim)", fontSize: "0.76rem", marginTop: 4 }}>
-                      Agregado {u.created_at ? new Date(u.created_at).toLocaleDateString("es-CO") : "—"}
-                      {u.creado_por ? ` por ${u.creado_por.nombre}` : ""}
+                    <div style={{ color: "var(--text-dim)", fontSize: "0.84rem", marginTop: 4 }}>
+                      {t("admin.usuarios.agregado")} {u.created_at ? new Date(u.created_at).toLocaleDateString("es-CO") : "—"}
+                      {u.creado_por ? ` ${t("comun.por")} ${u.creado_por.nombre}` : ""}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                     <span style={{
-                      padding: "4px 10px", borderRadius: "var(--radius-sm)", fontSize: "0.75rem",
+                      padding: "4px 10px", borderRadius: "var(--radius-sm)", fontSize: "0.82rem",
                       fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
                       background: u.rol === "admin" ? "var(--gold-bg)" : "var(--chung-bg)",
                       color: u.rol === "admin" ? "var(--gold)" : "var(--chung-light)",
                       border: `1px solid ${u.rol === "admin" ? "var(--gold-border)" : "var(--chung-border)"}`,
-                    }}>{u.rol}</span>
+                    }}>{u.es_superadmin ? t("rol.superadmin") : u.rol === "admin" ? t("rol.admin") : t("rol.juez")}</span>
                     <button
                       className="btn btn-sm"
                       onClick={() => {
@@ -453,17 +456,17 @@ export default function AdminPage() {
                           setEditUserData({ nombre: u.nombre, email: u.email, password: "", rol: u.rol });
                         }
                       }}
-                      style={{ padding: "4px 10px", fontSize: "0.75rem" }}
+                      style={{ padding: "4px 10px", fontSize: "0.82rem" }}
                     >
-                      {editingUser?.id === u.id ? "Cerrar" : "Editar"}
+                      {editingUser?.id === u.id ? t("comun.cerrar") : t("comun.editar")}
                     </button>
                     <button
                       className={`btn btn-sm ${u.activo ? "btn-danger" : "btn-primary"}`}
                       onClick={() => handleToggleUserActivo(u)}
                       disabled={u.id === user.id}
-                      style={{ padding: "4px 10px", fontSize: "0.75rem" }}
+                      style={{ padding: "4px 10px", fontSize: "0.82rem" }}
                     >
-                      {u.activo ? "Desactivar" : "Reactivar"}
+                      {u.activo ? t("comun.desactivar") : t("comun.reactivar")}
                     </button>
                   </div>
                 </div>
@@ -474,34 +477,36 @@ export default function AdminPage() {
                     display: "flex", flexDirection: "column", gap: 10,
                     marginTop: 6, borderColor: "var(--gold-border)",
                   }}>
-                    <div className="card-title">Editar a {u.nombre}</div>
-                    <input className="input" placeholder="Nombre completo" value={editUserData.nombre}
+                    <div className="card-title">{t("admin.usuarios.editarA", { nombre: u.nombre })}</div>
+                    <input className="input" placeholder={t("admin.usuarios.nombre")} value={editUserData.nombre}
                       onChange={(e) => setEditUserData({ ...editUserData, nombre: e.target.value })} />
-                    <input className="input" type="email" placeholder="Correo electrónico" value={editUserData.email}
+                    <input className="input" type="email" placeholder={t("admin.usuarios.correo")} value={editUserData.email}
                       onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })} />
                     <input className="input" type="password" autoComplete="new-password"
-                      placeholder="Nueva contraseña (dejar vacío para no cambiarla)"
+                      placeholder={t("admin.usuarios.nuevaContrasena")}
                       value={editUserData.password}
                       onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })} />
-                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <label style={{ color: "var(--text-muted)", fontSize: "0.85rem", whiteSpace: "nowrap" }}>Rol:</label>
-                      <select className="input" value={editUserData.rol}
-                        disabled={u.id === user.id}
-                        onChange={(e) => setEditUserData({ ...editUserData, rol: e.target.value })}>
-                        <option value="juez">Juez</option>
-                        <option value="admin">Administrador</option>
-                      </select>
-                    </div>
-                    <p style={{ color: "var(--text-dim)", fontSize: "0.76rem", margin: 0 }}>
-                      Si el juez olvidó su contraseña, escríbele una nueva aquí y
-                      comunícasela: este restablecimiento solo lo puede hacer un administrador.
+                    {/* Cambios de rol: exclusivos del superadmin */}
+                    {esSuper && (
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <label style={{ color: "var(--text-muted)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>{t("admin.usuarios.rolLabel")}</label>
+                        <select className="input" value={editUserData.rol}
+                          disabled={u.id === user.id}
+                          onChange={(e) => setEditUserData({ ...editUserData, rol: e.target.value })}>
+                          <option value="juez">{t("rol.juez")}</option>
+                          <option value="admin">{t("rol.admin")}</option>
+                        </select>
+                      </div>
+                    )}
+                    <p style={{ color: "var(--text-dim)", fontSize: "0.84rem", margin: 0 }}>
+                      {t("admin.usuarios.notaReset")}
                       {u.id === user.id
-                        ? " No puedes cambiar tu propio rol."
-                        : " Al volver administrador a un juez se liberan sus asignaciones de tatami."}
+                        ? t("admin.usuarios.notaPropio")
+                        : t("admin.usuarios.notaRolCambio")}
                     </p>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button type="submit" className="btn btn-primary btn-sm">Guardar cambios</button>
-                      <button type="button" className="btn btn-sm" onClick={() => setEditingUser(null)}>Cancelar</button>
+                      <button type="submit" className="btn btn-primary btn-sm">{t("comun.guardarCambios")}</button>
+                      <button type="button" className="btn btn-sm" onClick={() => setEditingUser(null)}>{t("comun.cancelar")}</button>
                     </div>
                   </form>
                 )}

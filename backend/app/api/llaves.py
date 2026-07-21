@@ -7,18 +7,35 @@ API: Llaves de eliminación directa (brackets)
 - Los ganadores avanzan ronda a ronda hasta la final.
 """
 
+import io
 import math
 import random
+import re
+from datetime import datetime
 
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify, send_file
+from flask_jwt_extended import jwt_required
 from ..extensions import db
-from ..models.usuario import Usuario
 from ..models.campeonato import Campeonato
 from ..models.tatami import Tatami
 from ..models.llave import Llave
+from ..filei18n import trad, idioma_request
+from .scoping import es_dueno_campeonato, usuario_actual
 
 llaves_bp = Blueprint("llaves", __name__)
+
+# Traductor por defecto (español) para llamadas internas sin idioma explícito.
+_T_ES = trad("es")
+# Clave de traducción del nombre de ronda por nº de rondas restantes.
+_RONDA_CLAVE = {1: "llave_final", 2: "llave_semifinal", 3: "llave_cuartos", 4: "llave_octavos"}
+
+
+def _llave_fuera_de_workspace(user, llave):
+    """True si un admin intenta tocar una llave de un campeonato ajeno."""
+    if user is None or user.rol != "admin":
+        return False
+    camp = Campeonato.query.get(llave.campeonato_id)
+    return not es_dueno_campeonato(user, camp)
 
 MAX_COMPETIDORES = 64
 # Figuras puntúa hasta 50 competidores (límite del motor de figuras)
@@ -32,16 +49,22 @@ RONDA_NOMBRES = {1: "Final", 2: "Semifinal", 3: "Cuartos", 4: "Octavos"}
 BRONCE = "bronce"
 
 
+def _comp_estructura(idx, c):
+    """Competidor dentro de la estructura de una llave. Conserva la marca de
+    categoría especial cuando viene (llaves generadas automáticamente)."""
+    comp = {"id": idx + 1, "nombre": c["nombre"], "club": c.get("club") or ""}
+    if c.get("especial"):
+        comp["especial"] = True
+    return comp
+
+
 def generar_estructura_figuras(competidores):
     """
     Estructura de un grupo de figuras: solo la lista de competidores, sin
     sorteo ni cuadro. Se mantienen `rondas` y `campeon` vacíos para que el
     front comparta el mismo tipo de dato que las llaves de combate.
     """
-    comps = [
-        {"id": i + 1, "nombre": c["nombre"], "club": c.get("club") or ""}
-        for i, c in enumerate(competidores)
-    ]
+    comps = [_comp_estructura(i, c) for i, c in enumerate(competidores)]
     return {"tipo": "figuras", "competidores": comps, "rondas": [], "campeon": None}
 
 
@@ -75,10 +98,14 @@ def _validar_competidores(tipo, competidores):
     return None
 
 
-def nombre_ronda(ronda_idx, total_rondas):
-    """Nombre legible de una ronda: Final, Semifinal, Cuartos, ..."""
+def nombre_ronda(ronda_idx, total_rondas, t=None):
+    """Nombre legible de una ronda: Final, Semifinal, Cuartos, ...
+    Sin `t` responde en español (lo usan el socket y los datos guardados)."""
+    t = t or _T_ES
     restantes = total_rondas - ronda_idx
-    return RONDA_NOMBRES.get(restantes, f"Ronda {ronda_idx + 1}")
+    if restantes in _RONDA_CLAVE:
+        return t(_RONDA_CLAVE[restantes])
+    return t("llave_ronda_n", n=ronda_idx + 1)
 
 
 def etiqueta_ronda(ronda_idx, total_rondas):
@@ -98,7 +125,9 @@ def _actualizar_bronce(estructura):
     """
     Rellena `estructura["bronce"]` con los perdedores de las semifinales:
     - 2 perdedores reales → partido por el bronce a disputar.
-    - 1 perdedor real (el otro lado fue bye) → ese competidor es 3° directo.
+    - 1 perdedor real y la otra semifinal fue un BYE → 3° directo sin disputa.
+    - 1 perdedor real y la otra semifinal AÚN NO se juega → bronce en espera
+      (sin ganador: el rival saldrá al terminar esa semifinal).
     - 0 → no hay bronce.
     Conserva el ganador del bronce si los competidores no cambiaron.
     """
@@ -107,11 +136,18 @@ def _actualizar_bronce(estructura):
         estructura.pop("bronce", None)
         return
     perdedores = []
+    semi_pendiente = False
     for p in estructura["rondas"][semi_idx]:
         if p.get("ganador") in (1, 2) and p.get("comp1") and p.get("comp2"):
             perdedores.append(p["comp2"] if p["ganador"] == 1 else p["comp1"])
-        else:
+        elif p.get("ganador") in (1, 2):
+            # Bye ya resuelto (un solo competidor): nunca producirá perdedor.
             perdedores.append(None)
+        else:
+            # Semifinal sin jugar (o esperando a sus clasificados): SÍ va a
+            # producir un perdedor más adelante — el bronce debe esperar.
+            perdedores.append(None)
+            semi_pendiente = True
     reales = [x for x in perdedores if x]
     actual = estructura.get("bronce") or {}
 
@@ -126,8 +162,13 @@ def _actualizar_bronce(estructura):
             "comp2": comp2,
             "ganador": actual.get("ganador") if mismos else None,
         }
+    elif len(reales) == 1 and semi_pendiente:
+        # El rival del bronce todavía no existe: partido en espera. (Antes se
+        # adjudicaba el 3° automáticamente apenas caía el primer semifinalista,
+        # como si la otra semifinal fuera un bye.)
+        estructura["bronce"] = {"comp1": reales[0], "comp2": None, "ganador": None}
     elif len(reales) == 1:
-        # Bye en una semifinal: el único semifinalista es 3° sin disputar.
+        # Bye en la otra semifinal: el único perdedor real es 3° sin disputar.
         estructura["bronce"] = {"comp1": reales[0], "comp2": None, "ganador": 1}
     else:
         estructura.pop("bronce", None)
@@ -195,6 +236,18 @@ def registrar_resultado(estructura, ronda_idx, partido_idx, ganador):
         raise ValueError("Ese lado del partido está vacío")
     if ganador == 2 and not partido.get("comp2"):
         raise ValueError("Ese lado del partido está vacío")
+    # En rondas posteriores a la primera, un lado vacío significa que el rival
+    # aún no se define (su partido previo no terminó). Marcar ganador ahí
+    # registraría un triunfo sin disputa y corrompería el avance del cuadro.
+    # (En la primera ronda un lado vacío es un bye legítimo.)
+    if (
+        ganador is not None
+        and ronda_idx > 0
+        and (not partido.get("comp1") or not partido.get("comp2"))
+    ):
+        raise ValueError(
+            "Ese partido aún no tiene rival definido: completa primero la ronda anterior"
+        )
 
     _limpiar_descendientes(estructura, ronda_idx, partido_idx)
     partido["ganador"] = ganador
@@ -212,8 +265,8 @@ def registrar_resultado(estructura, ronda_idx, partido_idx, ganador):
 def podio_llave(estructura):
     """
     Podio de una llave de eliminación a partir del cuadro:
-    1° campeón · 2° finalista perdedor · 3° perdedores de la ronda anterior a la
-    final (semifinales) — bronce compartido, estándar en artes marciales.
+    1° campeón · 2° finalista perdedor · 3° ganador del partido por el bronce
+    (un único tercer puesto, disputado entre los perdedores de semifinales).
     Retorna [] si todavía no hay campeón.
     """
     estructura = estructura or {}
@@ -274,11 +327,8 @@ def _info_siguiente(llave):
 
 
 def _require_admin():
-    uid = get_jwt_identity()
-    user = Usuario.query.get(int(uid))
-    if not user or user.rol != "admin":
-        return None
-    return user
+    from .scoping import require_admin
+    return require_admin()
 
 
 def generar_estructura(competidores):
@@ -289,10 +339,7 @@ def generar_estructura(competidores):
       ningún competidor enfrente a otro bye en la primera ronda.
     - Los byes avanzan automáticamente a la segunda ronda.
     """
-    comps = [
-        {"id": i + 1, "nombre": c["nombre"], "club": c.get("club") or ""}
-        for i, c in enumerate(competidores)
-    ]
+    comps = [_comp_estructura(i, c) for i, c in enumerate(competidores)]
     random.shuffle(comps)
 
     n = len(comps)
@@ -396,7 +443,8 @@ def crear():
 
     if tipo not in ("combate", "figuras"):
         return jsonify({"error": "Tipo de llave inválido"}), 400
-    if not campeonato_id or not Campeonato.query.get(campeonato_id):
+    camp = Campeonato.query.get(campeonato_id) if campeonato_id else None
+    if not camp or not es_dueno_campeonato(admin, camp):
         return jsonify({"error": "Campeonato no encontrado"}), 404
     if not nombre:
         return jsonify({"error": "El nombre de la categoría es requerido"}), 400
@@ -452,6 +500,8 @@ def editar(llave_id):
         return jsonify({"error": "Solo administradores"}), 403
 
     llave = Llave.query.get_or_404(llave_id)
+    if _llave_fuera_de_workspace(admin, llave):
+        return jsonify({"error": "Llave no encontrada"}), 404
     if llave.estado_norm != "pendiente":
         return jsonify({
             "error": "Solo se pueden editar llaves pendientes. Una llave activa "
@@ -485,10 +535,20 @@ def editar(llave_id):
         error = _validar_competidores(tipo, competidores)
         if error:
             return jsonify({"error": error}), 400
-        llave.estructura = (
-            generar_estructura_figuras(competidores) if tipo == "figuras"
-            else generar_estructura(competidores)
+        # Re-sortear SOLO si la lista realmente cambió: el formulario de
+        # edición siempre reenvía los competidores, y al cambiar solo el
+        # nombre o el tatami el cuadro (ya sorteado y quizá anunciado) no
+        # debe volver a barajarse.
+        actuales = sorted(
+            (c.get("nombre", ""), c.get("club") or "")
+            for c in (llave.estructura or {}).get("competidores", [])
         )
+        nuevos = sorted((c["nombre"], c.get("club") or "") for c in competidores)
+        if nuevos != actuales:
+            llave.estructura = (
+                generar_estructura_figuras(competidores) if tipo == "figuras"
+                else generar_estructura(competidores)
+            )
 
     db.session.commit()
     return jsonify({
@@ -511,6 +571,11 @@ def _con_numero_tatami(llaves):
 @jwt_required()
 def listar_por_campeonato(camp_id):
     """GET /api/llaves/campeonato/:id — Llaves de un campeonato."""
+    user = usuario_actual()
+    if user and user.rol == "admin":
+        camp = Campeonato.query.get(camp_id)
+        if not camp or not es_dueno_campeonato(user, camp):
+            return jsonify({"error": "Campeonato no encontrado"}), 404
     llaves = (
         Llave.query.filter_by(campeonato_id=camp_id)
         .order_by(Llave.created_at.desc())
@@ -545,6 +610,8 @@ def listar_por_tatami(tatami_id):
 def obtener(llave_id):
     """GET /api/llaves/:id — Detalle de una llave."""
     llave = Llave.query.get_or_404(llave_id)
+    if _llave_fuera_de_workspace(usuario_actual(), llave):
+        return jsonify({"error": "Llave no encontrada"}), 404
     return jsonify(_con_numero_tatami([llave])[0]), 200
 
 
@@ -561,6 +628,8 @@ def marcar_ganador(llave_id):
         return jsonify({"error": "Solo administradores"}), 403
 
     llave = Llave.query.get_or_404(llave_id)
+    if _llave_fuera_de_workspace(admin, llave):
+        return jsonify({"error": "Llave no encontrada"}), 404
     if llave.tipo_norm != "combate":
         return jsonify({"error": "Solo las llaves de combate tienen partidos."}), 400
     data = request.get_json() or {}
@@ -600,6 +669,206 @@ def marcar_ganador(llave_id):
     }), 200
 
 
+def _pdf_llave(llave, tatami_numero=None, t=None):
+    """
+    PDF del cuadro de una llave de combate (para publicar el sorteo en
+    cartelera) o de la lista de un grupo de figuras. Una página apaisada.
+    """
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas as pdfcanvas
+
+    t = t or _T_ES
+    est = llave.estructura or {}
+    W, H = landscape(A4)
+    buf = io.BytesIO()
+    c = pdfcanvas.Canvas(buf, pagesize=landscape(A4))
+
+    GOLD = colors.HexColor("#B8860B")
+    GOLD_BG = colors.HexColor("#FDF3D0")
+    DARK = colors.HexColor("#1A1A2E")
+    GRIS = colors.HexColor("#888888")
+    BORDE = colors.HexColor("#BBBBBB")
+
+    # ── Encabezado ──
+    c.setFillColor(DARK)
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(40, H - 45, llave.nombre[:70])
+    c.setFont("Helvetica", 9)
+    c.setFillColor(GRIS)
+    sub = "DINAMYT — " + (
+        t("llave_grupo_figuras") if llave.tipo_norm == "figuras" else t("llave_cuadro")
+    )
+    if tatami_numero:
+        sub += " · " + t("tatami_n", n=tatami_numero)
+    sub += " · " + t("llave_generado", fecha=datetime.now().strftime('%d/%m/%Y %H:%M'))
+    if llave.descripcion:
+        sub += f" · {llave.descripcion[:70]}"
+    c.drawString(40, H - 60, sub)
+    c.setStrokeColor(BORDE)
+    c.line(40, H - 68, W - 40, H - 68)
+
+    top = H - 92
+    bottom = 40
+    usable_h = top - bottom
+
+    # ── Grupo de figuras: lista de competidores en columnas ──
+    if llave.tipo_norm == "figuras":
+        comps = est.get("competidores") or []
+        por_col = 22
+        n_cols = max(1, -(-len(comps) // por_col))
+        col_w = (W - 80) / n_cols
+        c.setFont("Helvetica", 10)
+        for i, comp in enumerate(comps):
+            col, fila = divmod(i, por_col)
+            x = 40 + col * col_w
+            y = top - 10 - fila * 20
+            c.setFillColor(GRIS)
+            c.drawString(x, y, f"{i + 1}.")
+            c.setFillColor(DARK)
+            texto = comp.get("nombre", "-")
+            if comp.get("club"):
+                texto += f"  ({comp['club']})"
+            c.drawString(x + 22, y, texto[:52])
+        c.showPage()
+        c.save()
+        buf.seek(0)
+        return buf
+
+    # ── Cuadro de eliminación ──
+    rondas = est.get("rondas") or []
+    n_cols = len(rondas) + 1
+    col_w = (W - 80) / max(1, n_cols)
+    box_w = col_w - 16
+
+    def _texto_lado(comp, es_bye):
+        if comp:
+            texto = comp.get("nombre") or "-"
+            if comp.get("club"):
+                texto += f" ({comp['club']})"
+            return texto
+        return t("llave_bye") if es_bye else t("llave_por_definir")
+
+    def _caja_partido(x, y_c, h, comp1, comp2, ganador, font, bye_abajo=False):
+        mitades = [(1, comp1, y_c, y_c + h / 2, False),
+                   (2, comp2, y_c - h / 2, y_c, bye_abajo)]
+        for lado, comp, y0, y1, _b in mitades:
+            if ganador == lado and comp:
+                c.setFillColor(GOLD_BG)
+                c.rect(x, y0, box_w, y1 - y0, stroke=0, fill=1)
+        c.setStrokeColor(BORDE)
+        c.setLineWidth(0.7)
+        c.rect(x, y_c - h / 2, box_w, h, stroke=1, fill=0)
+        c.line(x, y_c, x + box_w, y_c)
+        for lado, comp, y0, y1, es_bye in mitades:
+            gana = ganador == lado and comp
+            c.setFont("Helvetica-Bold" if gana else "Helvetica", font)
+            c.setFillColor(DARK if comp else GRIS)
+            max_chars = max(6, int((box_w - 8) / (font * 0.52)))
+            c.drawString(
+                x + 4, (y0 + y1) / 2 - font * 0.35,
+                _texto_lado(comp, es_bye)[:max_chars],
+            )
+
+    for r, ronda in enumerate(rondas):
+        x = 40 + r * col_w
+        c.setFont("Helvetica-Bold", 9)
+        c.setFillColor(GOLD)
+        c.drawCentredString(x + box_w / 2, top + 8, nombre_ronda(r, len(rondas), t).upper())
+        m = max(1, len(ronda))
+        slot = usable_h / m
+        h_box = max(14, min(38, slot - 8))
+        font = 8 if h_box >= 26 else max(4.6, h_box / 3.2)
+        for i, p in enumerate(ronda):
+            y_c = top - slot * i - slot / 2
+            es_bye = r == 0 and p.get("comp1") and not p.get("comp2")
+            _caja_partido(
+                x, y_c, h_box, p.get("comp1"), p.get("comp2"),
+                p.get("ganador"), font, bye_abajo=bool(es_bye),
+            )
+
+    # Columna final: campeón + bronce + podio
+    x = 40 + len(rondas) * col_w
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(GOLD)
+    c.drawCentredString(x + box_w / 2, top + 8, t("llave_campeon"))
+    campeon = est.get("campeon")
+    y_camp = top - usable_h / 2 + 40
+    c.setStrokeColor(GOLD if campeon else BORDE)
+    if campeon:
+        c.setFillColor(GOLD_BG)
+        c.rect(x, y_camp - 14, box_w, 28, stroke=1, fill=1)
+    else:
+        c.rect(x, y_camp - 14, box_w, 28, stroke=1, fill=0)
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(DARK if campeon else GRIS)
+    c.drawCentredString(
+        x + box_w / 2, y_camp - 3.5,
+        (campeon.get("nombre") if campeon else t("llave_por_definir"))[:26],
+    )
+
+    bronce = est.get("bronce")
+    if bronce and (bronce.get("comp1") or bronce.get("comp2")):
+        y_b = y_camp - 74
+        c.setFont("Helvetica-Bold", 9)
+        c.setFillColor(GOLD)
+        c.drawCentredString(x + box_w / 2, y_b + 26, t("llave_3er"))
+        _caja_partido(
+            x, y_b, 30, bronce.get("comp1"), bronce.get("comp2"),
+            bronce.get("ganador"), 7.5,
+            bye_abajo=bool(not bronce.get("comp2") and bronce.get("ganador") == 1),
+        )
+
+    podio = podio_llave(est)
+    if podio:
+        y_p = y_camp - 140
+        c.setFont("Helvetica-Bold", 9)
+        c.setFillColor(GOLD)
+        c.drawString(x, y_p + 14, t("llave_podio"))
+        c.setFillColor(DARK)
+        for item in podio:
+            c.setFont("Helvetica-Bold", 8.5)
+            c.drawString(x, y_p, f"{item['puesto']}°")
+            c.setFont("Helvetica", 8.5)
+            c.drawString(x + 16, y_p, f"{item['nombre']}"[:30])
+            y_p -= 13
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf
+
+
+@llaves_bp.route("/<int:llave_id>/export/pdf", methods=["GET"])
+@jwt_required()
+def exportar_pdf_llave(llave_id):
+    """GET /api/llaves/:id/export/pdf — Cuadro de la llave para imprimir."""
+    admin = _require_admin()
+    if not admin:
+        return jsonify({"error": "Solo administradores"}), 403
+
+    llave = Llave.query.get_or_404(llave_id)
+    if _llave_fuera_de_workspace(admin, llave):
+        return jsonify({"error": "Llave no encontrada"}), 404
+    tatami = Tatami.query.get(llave.tatami_id) if llave.tatami_id else None
+    try:
+        output = _pdf_llave(llave, tatami.numero if tatami else None, trad(idioma_request()))
+    except ImportError:
+        return jsonify({
+            "error": "No se pudo generar PDF: falta reportlab. Instala "
+                     "dependencias con pip install -r requirements.txt."
+        }), 500
+
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", llave.nombre).strip("-").lower()[:40] or "llave"
+    nombre = f"dinamyt_llave_{slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    return send_file(
+        output,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=nombre,
+    )
+
+
 @llaves_bp.route("/<int:llave_id>", methods=["DELETE"])
 @jwt_required()
 def eliminar(llave_id):
@@ -609,9 +878,229 @@ def eliminar(llave_id):
         return jsonify({"error": "Solo administradores"}), 403
 
     llave = Llave.query.get_or_404(llave_id)
+    if _llave_fuera_de_workspace(admin, llave):
+        return jsonify({"error": "Llave no encontrada"}), 404
     # Capturar el nombre ANTES de borrar: tras el commit el objeto queda
     # expirado y acceder a sus atributos lanza ObjectDeletedError (500).
     nombre = llave.nombre
     db.session.delete(llave)
     db.session.commit()
     return jsonify({"message": f"Llave '{nombre}' eliminada"}), 200
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Combinar llaves y mover competidores entre llaves
+#  (solo llaves PENDIENTES: las activas/terminadas no se tocan para
+#   no corromper resultados ya disputados)
+# ══════════════════════════════════════════════════════════════════
+
+def _comps_planos(estructura):
+    """Competidores de una estructura como lista plana {nombre, club, especial}."""
+    out = []
+    for c in (estructura or {}).get("competidores", []):
+        d = {"nombre": c.get("nombre", ""), "club": c.get("club") or ""}
+        if c.get("especial"):
+            d["especial"] = True
+        out.append(d)
+    return out
+
+
+def _regenerar(tipo, competidores):
+    """Nueva estructura (con sorteo si es combate) para la lista dada."""
+    return (
+        generar_estructura_figuras(competidores) if tipo == "figuras"
+        else generar_estructura(competidores)
+    )
+
+
+@llaves_bp.route("/combinar", methods=["POST"])
+@jwt_required()
+def combinar():
+    """
+    POST /api/llaves/combinar
+    Body: { "llave_ids": [..], "nombre"?: str, "tatami_id"?: int|null }
+    Fusiona 2+ llaves PENDIENTES del mismo campeonato y tipo en UNA nueva:
+    concatena los competidores (sin duplicar nombre+club), re-sortea el cuadro
+    y elimina las llaves originales. Sin `nombre`, conserva el de la primera;
+    sin `tatami_id`, conserva el tatami de la primera.
+    """
+    admin = _require_admin()
+    if not admin:
+        return jsonify({"error": "Solo administradores"}), 403
+
+    data = request.get_json() or {}
+    try:
+        ids = [int(x) for x in (data.get("llave_ids") or [])]
+    except (TypeError, ValueError):
+        return jsonify({"error": "llave_ids inválidos"}), 400
+    ids = list(dict.fromkeys(ids))  # únicos conservando el orden
+    if len(ids) < 2:
+        return jsonify({"error": "Selecciona al menos 2 llaves para combinar."}), 400
+
+    llaves = Llave.query.filter(Llave.id.in_(ids)).all()
+    por_id = {l.id: l for l in llaves}
+    if len(por_id) != len(ids):
+        return jsonify({"error": "Alguna de las llaves no existe."}), 404
+    for l in llaves:
+        if _llave_fuera_de_workspace(admin, l):
+            return jsonify({"error": "Llave no encontrada"}), 404
+    if len({l.campeonato_id for l in llaves}) != 1:
+        return jsonify({"error": "Solo se pueden combinar llaves del mismo campeonato."}), 400
+    tipos = {l.tipo_norm for l in llaves}
+    if len(tipos) != 1:
+        return jsonify({"error": "No se puede combinar una llave de combate con un grupo de figuras."}), 400
+    if any(l.estado_norm != "pendiente" for l in llaves):
+        return jsonify({
+            "error": "Solo se pueden combinar llaves pendientes. Las activas o "
+                     "terminadas no se tocan para no perder resultados."
+        }), 409
+
+    tipo = tipos.pop()
+    primera = por_id[ids[0]]
+
+    # Unión de competidores en el orden de selección, sin duplicados
+    competidores, vistos = [], set()
+    for lid in ids:
+        for c in _comps_planos(por_id[lid].estructura):
+            clave = (c["nombre"].strip().lower(), c["club"].strip().lower())
+            if not c["nombre"].strip() or clave in vistos:
+                continue
+            vistos.add(clave)
+            competidores.append(c)
+
+    error = _validar_competidores(tipo, competidores)
+    if error:
+        return jsonify({"error": error}), 400
+
+    # Tatami de la nueva llave: el del body o el de la primera seleccionada
+    tatami = None
+    if "tatami_id" in data:
+        tid = data.get("tatami_id")
+        if tid not in (None, "", 0):
+            tatami = Tatami.query.get(int(tid))
+            if not tatami or tatami.campeonato_id != primera.campeonato_id:
+                return jsonify({"error": "El tatami no pertenece a este campeonato"}), 400
+    elif primera.tatami_id:
+        tatami = Tatami.query.get(primera.tatami_id)
+
+    nombre = (data.get("nombre") or "").strip() or primera.nombre
+    nueva = Llave(
+        campeonato_id=primera.campeonato_id,
+        tatami_id=tatami.id if tatami else None,
+        tipo=tipo,
+        nombre=nombre[:120],
+        descripcion=primera.descripcion,
+        estado="pendiente",
+        estructura=_regenerar(tipo, competidores),
+        created_by=admin.id,
+    )
+    db.session.add(nueva)
+    for l in llaves:
+        db.session.delete(l)
+    db.session.commit()
+
+    return jsonify({
+        "message": f"{len(ids)} llaves combinadas en '{nueva.nombre}' "
+                   f"({len(competidores)} competidores, sorteo nuevo)",
+        "llave": _con_numero_tatami([nueva])[0],
+    }), 201
+
+
+@llaves_bp.route("/mover-competidor", methods=["POST"])
+@jwt_required()
+def mover_competidor():
+    """
+    POST /api/llaves/mover-competidor
+    Body: { "origen_id": int, "destino_id": int, "competidor_id": int }
+    Mueve un competidor entre dos llaves PENDIENTES del mismo campeonato y
+    tipo; ambos cuadros se re-sortean. Si el origen queda vacío, se elimina.
+    Si quedaría por debajo del mínimo (sin quedar vacío), se rechaza y se
+    sugiere combinar las llaves.
+    """
+    admin = _require_admin()
+    if not admin:
+        return jsonify({"error": "Solo administradores"}), 403
+
+    data = request.get_json() or {}
+    try:
+        origen_id = int(data.get("origen_id"))
+        destino_id = int(data.get("destino_id"))
+        competidor_id = int(data.get("competidor_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "origen_id, destino_id y competidor_id son requeridos"}), 400
+    if origen_id == destino_id:
+        return jsonify({"error": "El origen y el destino son la misma llave."}), 400
+
+    origen = Llave.query.get(origen_id)
+    destino = Llave.query.get(destino_id)
+    if not origen or _llave_fuera_de_workspace(admin, origen):
+        return jsonify({"error": "Llave de origen no encontrada"}), 404
+    if not destino or _llave_fuera_de_workspace(admin, destino):
+        return jsonify({"error": "Llave de destino no encontrada"}), 404
+    if origen.campeonato_id != destino.campeonato_id:
+        return jsonify({"error": "Las llaves pertenecen a campeonatos distintos."}), 400
+    if origen.tipo_norm != destino.tipo_norm:
+        return jsonify({"error": "No se puede mover entre combate y figuras."}), 400
+    if origen.estado_norm != "pendiente" or destino.estado_norm != "pendiente":
+        return jsonify({
+            "error": "Solo se puede mover entre llaves pendientes. Las activas "
+                     "o terminadas no se tocan para no perder resultados."
+        }), 409
+
+    tipo = origen.tipo_norm
+    comp_mover = None
+    restantes = []
+    for c in (origen.estructura or {}).get("competidores", []):
+        if c.get("id") == competidor_id:
+            comp_mover = {"nombre": c.get("nombre", ""), "club": c.get("club") or ""}
+            if c.get("especial"):
+                comp_mover["especial"] = True
+        else:
+            d = {"nombre": c.get("nombre", ""), "club": c.get("club") or ""}
+            if c.get("especial"):
+                d["especial"] = True
+            restantes.append(d)
+    if not comp_mover:
+        return jsonify({"error": "Competidor no encontrado en la llave de origen"}), 404
+
+    destino_comps = _comps_planos(destino.estructura)
+    clave_nuevo = (comp_mover["nombre"].strip().lower(), comp_mover["club"].strip().lower())
+    if any(
+        (c["nombre"].strip().lower(), c["club"].strip().lower()) == clave_nuevo
+        for c in destino_comps
+    ):
+        return jsonify({
+            "error": f"\"{comp_mover['nombre']}\" ya está en la llave de destino."
+        }), 409
+    destino_comps.append(comp_mover)
+
+    error = _validar_competidores(tipo, destino_comps)
+    if error:
+        return jsonify({"error": error}), 400
+
+    origen_eliminada = False
+    if len(restantes) == 0:
+        # Movió al único competidor: la llave origen queda vacía y se elimina.
+        db.session.delete(origen)
+        origen_eliminada = True
+    else:
+        error = _validar_competidores(tipo, restantes)
+        if error:
+            return jsonify({
+                "error": f"La llave de origen quedaría inválida: {error} "
+                         "Usa «Combinar» para fusionar las llaves completas."
+            }), 409
+        origen.estructura = _regenerar(tipo, restantes)
+
+    destino.estructura = _regenerar(tipo, destino_comps)
+    db.session.commit()
+
+    respuesta = {
+        "message": f"\"{comp_mover['nombre']}\" movido a '{destino.nombre}' "
+                   "(cuadros re-sorteados)",
+        "destino": _con_numero_tatami([destino])[0],
+        "origen_eliminada": origen_eliminada,
+    }
+    if not origen_eliminada:
+        respuesta["origen"] = _con_numero_tatami([origen])[0]
+    return jsonify(respuesta), 200

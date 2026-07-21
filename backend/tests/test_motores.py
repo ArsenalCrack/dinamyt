@@ -248,6 +248,102 @@ class TestCombate:
         assert e["segundosMax"] == 90
         assert e["jueces"]["j1"]["hong"] == 0
 
+    def test_deshacer_juez_respeta_color(self):
+        # Un juez anota Hong y luego Chung; deshacer en la columna Hong debe
+        # quitar el punto de HONG, no el último del historial (Chung).
+        e = estado_inicial()
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j1", "color": "hong", "pts": 2, "nombre": "a"})
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j1", "color": "chung", "pts": 3, "nombre": "b"})
+        aplicar_evento(e, {"accion": "deshacer_juez", "juez": "j1", "color": "hong"})
+        assert e["jueces"]["j1"]["hong"] == 0
+        assert e["jueces"]["j1"]["chung"] == 3
+        assert len(e["historial"]) == 1
+        # Sin color se conserva el comportamiento anterior (última entrada)
+        aplicar_evento(e, {"accion": "deshacer_juez", "juez": "j1"})
+        assert e["jueces"]["j1"]["chung"] == 0
+        assert len(e["historial"]) == 0
+
+    def test_log_registra_hora_y_tiempo_de_crono(self):
+        e = estado_inicial()
+        e["segundos"] = 75
+        aplicar_evento(e, {"accion": "crono_start"})
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j1", "color": "hong", "pts": 2, "nombre": "Giro"})
+        entrada = e["log"][0]
+        assert entrada["ts"] > 0                # hora real (epoch ms)
+        assert entrada["crono"] == 75           # tiempo del cronómetro
+        assert entrada["cronoActivo"] is True   # corría en ese momento
+        aplicar_evento(e, {"accion": "crono_pause"})
+        aplicar_evento(e, {"accion": "kyonggo", "color": "hong"})
+        assert e["log"][0]["cronoActivo"] is False
+
+    def test_payloads_malformados_no_rompen_el_motor(self):
+        e = estado_inicial()
+        # Puntos no numéricos, negativos o absurdos se ignoran
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j1", "color": "hong", "pts": "tres", "nombre": "x"})
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j1", "color": "hong", "pts": -5, "nombre": "x"})
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j1", "color": "hong", "pts": 999, "nombre": "x"})
+        aplicar_evento(e, {"accion": "especial", "color": "hong", "pts": "NaN", "nombre": "x"})
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j1", "color": "verde", "pts": 2, "nombre": "x"})
+        assert e["jueces"]["j1"]["hong"] == 0
+        assert e["arbHong"] == 0
+        assert len(e["historial"]) == 0
+        # numJueces y crono con basura: se conserva un valor sano
+        aplicar_evento(e, {"accion": "set_num_jueces", "numJueces": "muchos"})
+        assert e["numJueces"] == 4
+        aplicar_evento(e, {"accion": "crono_reset", "segundosMax": "abc"})
+        assert e["segundos"] == e["segundosMax"] == 120
+
+    def test_anular_entrada_especifica(self):
+        # La mesa anula UNA entrada puntual (no la última) con firma de seguridad
+        e = estado_inicial()
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j1", "color": "hong", "pts": 2, "nombre": "Giro"})
+        aplicar_evento(e, {"accion": "kyonggo", "color": "hong"})
+        aplicar_evento(e, {"accion": "punto_juez", "juez": "j2", "color": "chung", "pts": 3, "nombre": "Cabeza"})
+        assert e["jueces"]["j1"]["hong"] == 2 and e["arbHong"] == -0.5
+
+        # Anular el punto de j1 (índice 0), no el último
+        h = e["historial"][0]
+        firma = {"juez": h["juez"], "color": h["color"], "pts": h["pts"], "momento": h["momento"]}
+        aplicar_evento(e, {"accion": "anular_entrada", "idx": 0, "firma": firma})
+        assert e["jueces"]["j1"]["hong"] == 0
+        assert e["jueces"]["j2"]["chung"] == 3, "las demás entradas no se tocan"
+        assert len(e["historial"]) == 2
+        assert "ANULADO" in e["log"][0]["txt"]
+
+        # Anular la falta (kyonggo): revierte contador y puntos del JC
+        h = e["historial"][0]
+        firma = {"juez": h["juez"], "color": h["color"], "pts": h["pts"], "momento": h["momento"]}
+        aplicar_evento(e, {"accion": "anular_entrada", "idx": 0, "firma": firma})
+        assert e["kyongHong"] == 0 and e["arbHong"] == 0
+
+        # Firma que no coincide (historial cambió): no se anula nada
+        h = e["historial"][0]
+        aplicar_evento(e, {"accion": "anular_entrada", "idx": 0, "firma": {
+            "juez": h["juez"], "color": h["color"], "pts": 99, "momento": h["momento"],
+        }})
+        assert len(e["historial"]) == 1
+
+    def test_anular_no_toca_decisiones(self):
+        e = estado_inicial()
+        e["nombreHong"], e["nombreChung"] = "Ana", "Luis"
+        aplicar_evento(e, {"accion": "declarar_ganador", "color": "hong", "motivo": "Decisión"})
+        h = e["historial"][0]
+        firma = {"juez": h["juez"], "color": h["color"], "pts": h["pts"], "momento": h["momento"]}
+        aplicar_evento(e, {"accion": "anular_entrada", "idx": 0, "firma": firma})
+        assert len(e["historial"]) == 1, "las decisiones de ganador no se anulan"
+
+    def test_crono_start_en_cero_no_reactiva(self):
+        # PLAY con el tiempo agotado no debe "revivir" el cronómetro
+        # (generaba logs de KuMan duplicados).
+        e = estado_inicial()
+        e["segundos"] = 0
+        aplicar_evento(e, {"accion": "crono_start"})
+        assert e["activo"] is False
+        aplicar_evento(e, {"accion": "crono_reset"})
+        assert e["segundos"] == 120
+        aplicar_evento(e, {"accion": "crono_start"})
+        assert e["activo"] is True
+
 
 # ══════════════════════════════════════════════════════════════════
 #  MOTOR DE FIGURAS
@@ -540,6 +636,49 @@ class TestRankingFiguras:
         assert e["finalizado"] is True
         assert e["puntuaciones"]["1"] != {}
         assert e["desempates"] == []
+
+    def test_eliminar_empatado_libera_el_desempate(self):
+        # Ana y Luis empatan; se lanza el desempate y Luis se retira.
+        # Sin la limpieza, en_desempate quedaba apuntando a un competidor
+        # inexistente y el turno se bloqueaba para siempre.
+        e = self._base([("Ana", False), ("Luis", False), ("Caro", False)])
+        for cid, valor in ((1, "8.00"), (2, "8.00"), (3, "7.00")):
+            _puntuar(e, cid, "j1", valor)
+            _puntuar(e, cid, "j2", valor)
+        aplicar_evento_figuras(e, {"accion": "reevaluar_empate"})
+        assert sorted(e["en_desempate"]) == [1, 2]
+
+        aplicar_evento_figuras(e, {"accion": "eliminar_competidor", "competidor_id": 2})
+        assert e["en_desempate"] in ([], [1]) and 2 not in e["en_desempate"]
+        # Ana quedó sin notas pero sin rival: al retirarse Luis los demás ya
+        # están completos solo cuando Ana vuelva a puntuar
+        _puntuar(e, 1, "j1", "9.00")
+        _puntuar(e, 1, "j2", "9.00")
+        assert e["finalizado"] is True
+        assert e["en_desempate"] == []
+
+    def test_eliminar_ultimo_sin_calificar_habilita_podio(self):
+        # Todos calificados menos uno que se retira: el podio debe habilitarse
+        # igual que si se hubiera confirmado la última nota.
+        e = self._base([("Ana", False), ("Luis", False)])
+        _puntuar(e, 1, "j1", "9.00")
+        _puntuar(e, 1, "j2", "9.00")
+        assert e["finalizado"] is False
+        aplicar_evento_figuras(e, {"accion": "eliminar_competidor", "competidor_id": 2})
+        assert e["finalizado"] is True
+
+    def test_agregar_competidor_reabre_categoria_finalizada(self):
+        e = self._base([("Ana", False)])
+        _puntuar(e, 1, "j1", "9.00")
+        _puntuar(e, 1, "j2", "9.00")
+        assert e["finalizado"] is True
+        aplicar_evento_figuras(e, {"accion": "agregar_competidor", "nombre": "Luis"})
+        assert e["finalizado"] is False, "el nuevo competidor aún no tiene notas"
+
+    def test_num_jueces_basura_no_rompe_figuras(self):
+        e = self._base([("Ana", False)])
+        aplicar_evento_figuras(e, {"accion": "set_num_jueces", "num_jueces": "todos"})
+        assert e["num_jueces"] == 2, "conserva el valor previo del fixture"
 
 
 # ══════════════════════════════════════════════════════════════════

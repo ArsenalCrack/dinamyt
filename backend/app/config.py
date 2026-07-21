@@ -39,11 +39,22 @@ class Config:
     ADMIN_NOMBRE = os.getenv("ADMIN_NOMBRE", "Administrador DINAMYT")
 
     # Flask-SocketIO
-    SOCKETIO_ASYNC_MODE = "eventlet"
+    SOCKETIO_ASYNC_MODE = "threading"
 
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    # Despliegue LOCAL (un solo PC sirviendo a la LAN, sin gunicorn):
+    # modo "threading" en vez de eventlet. Evita el monkey-patching de eventlet
+    # —problemático en Python 3.12+/Windows— y da paralelismo real de hilos para
+    # atender a decenas de dispositivos y escribir en la BD sin bloquear el loop.
+    SOCKETIO_ASYNC_MODE = "threading"
+    # SQLite local: si dos jueces guardan a la vez, esperar el lock hasta 30 s
+    # en lugar de fallar con "database is locked".
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "connect_args": {"timeout": 30},
+    }
 
 
 class ProductionConfig(Config):

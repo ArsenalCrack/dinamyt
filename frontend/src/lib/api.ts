@@ -2,14 +2,40 @@
 
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// Despliegue local (LAN): el navegador habla DIRECTO con el backend (puerto
+// 5000, mismo host que la página) en vez de pasar por el proxy de Next. Menos
+// saltos = menos puntos de falla; el CORS del backend ya acepta cualquier
+// origen de la red privada y abrir-firewall.bat abre el puerto 5000.
+const BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "5000";
+
+export function resolverApiUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:${BACKEND_PORT}`;
+  }
+  return "http://localhost:5000";
+}
+
+const API_URL = resolverApiUrl();
+
+// Idioma elegido (persistido por i18n en localStorage). Se envía como ?lang=
+// en las descargas para que el backend genere el archivo en ese idioma.
+export function idiomaArchivo(): "es" | "en" {
+  if (typeof window === "undefined") return "es";
+  try {
+    return localStorage.getItem("dinamyt_lang") === "en" ? "en" : "es";
+  } catch {
+    return "es";
+  }
+}
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: { "Content-Type": "application/json" },
-  // 60 s: cubre el despertar del plan gratis de Render (~50 s tras 15 min
-  // inactivo) pero evita pantallas de carga colgadas para siempre.
-  timeout: 60000,
+  // En LAN la respuesta es inmediata: si en 20 s no contestó, el servidor está
+  // caído y conviene enterarse rápido (activa el modo local) en vez de dejar
+  // pantallas de carga colgadas.
+  timeout: 20000,
 });
 
 // Interceptor: inyectar JWT en cada request
@@ -84,6 +110,58 @@ export async function updateUserAPI(
 export async function listCampeonatosAPI() {
   const res = await api.get("/campeonatos");
   return res.data;
+}
+
+// ── Resultados públicos (sin login) ──
+export interface ResultadoPodioItem {
+  puesto: number;
+  nombre: string;
+  club?: string;
+}
+
+export interface ResultadoRankingItem {
+  puesto?: number;
+  nombre: string;
+  club?: string;
+  total?: number;
+  especial?: boolean;
+  empate?: boolean;
+}
+
+export interface ResultadoPublico {
+  tipo: "combate" | "figuras" | "combate_suelto";
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  tatami_numero?: number | null;
+  participantes: string[];
+  num_competidores?: number;
+  fecha?: string;
+  // combate (llave)
+  podio?: ResultadoPodioItem[];
+  // figuras
+  ranking?: ResultadoRankingItem[];
+  // combate suelto
+  hong?: { nombre: string; marcador: number };
+  chung?: { nombre: string; marcador: number };
+  ganador?: { nombre: string | null; color: "hong" | "chung" | "empate" | null };
+}
+
+export interface ResultadosCampeonato {
+  campeonato: { id: number; nombre: string };
+  resultados: ResultadoPublico[];
+  categorias: string[];
+  tatamis: number[];
+}
+
+export async function listCampeonatosResultadosAPI() {
+  const res = await api.get("/resultados/campeonatos");
+  return res.data as { id: number; nombre: string; num_resultados: number }[];
+}
+
+export async function getResultadosCampeonatoAPI(campId: number) {
+  const res = await api.get(`/resultados/campeonato/${campId}`);
+  return res.data as ResultadosCampeonato;
 }
 
 export async function listCampeonatosPublicoAPI() {
@@ -186,6 +264,8 @@ export interface LlaveData {
   nombre: string;
   descripcion: string;
   estado: EstadoLlave;
+  /** Clave de la sección que la generó automáticamente (null = manual). */
+  seccion_clave?: string | null;
   estructura: LlaveEstructura;
   created_at: string;
 }
@@ -261,6 +341,326 @@ export async function deleteLlaveAPI(llaveId: number) {
   return res.data;
 }
 
+export async function combinarLlavesAPI(data: {
+  llave_ids: number[];
+  nombre?: string;
+  tatami_id?: number | null;
+}) {
+  // Fusiona llaves PENDIENTES del mismo tipo en una nueva (re-sorteo);
+  // las originales se eliminan.
+  const res = await api.post("/llaves/combinar", data);
+  return res.data as { message: string; llave: LlaveData };
+}
+
+export async function moverCompetidorLlaveAPI(data: {
+  origen_id: number;
+  destino_id: number;
+  competidor_id: number;
+}) {
+  // Mueve un competidor entre llaves PENDIENTES; ambas se re-sortean.
+  // Si el origen queda vacío, se elimina (origen_eliminada=true).
+  const res = await api.post("/llaves/mover-competidor", data);
+  return res.data as {
+    message: string;
+    destino: LlaveData;
+    origen?: LlaveData;
+    origen_eliminada: boolean;
+  };
+}
+
+export async function descargarLlavePdfAPI(llaveId: number) {
+  // Cuadro de la llave listo para imprimir (publicar el sorteo en cartelera)
+  const res = await api.get(`/llaves/${llaveId}/export/pdf`, {
+    responseType: "blob",
+    params: { lang: idiomaArchivo() },
+  });
+  return res.data as Blob;
+}
+
+export async function accesoQrAPI(tatamiId: number, usuarioId: number) {
+  // Token de acceso directo para el QR de un juez asignado (solo admin)
+  const res = await api.post(`/tatamis/${tatamiId}/acceso-qr/${usuarioId}`);
+  return res.data as {
+    token: string;
+    tatami_id: number;
+    rol_tatami: string;
+    nombre: string;
+    ip_local: string | null;
+  };
+}
+
+/**
+ * Origen (protocolo + host + puerto) con el que se arman las URLs de los QR.
+ * Un QR con "localhost" solo funciona en el mismo PC: el teléfono que lo
+ * escanee necesita una dirección alcanzable en la red. Prioridad:
+ * 1. NEXT_PUBLIC_QR_ORIGIN (frontend/.env.local) — fija la URL a mano,
+ *    p. ej. cuando haya dominio propio: NEXT_PUBLIC_QR_ORIGIN=https://midominio.com
+ * 2. El origen actual del navegador, si NO es localhost (el admin entró por
+ *    la IP de red o un dominio: esa misma dirección sirve para el teléfono).
+ * 3. La IP LAN que reporta el backend + el puerto actual (el admin navega en
+ *    localhost, pero el QR sale con la IP real de la máquina).
+ */
+export function origenParaQr(ipLocalBackend?: string | null): string {
+  const fijo = process.env.NEXT_PUBLIC_QR_ORIGIN;
+  if (fijo) return fijo.replace(/\/+$/, "");
+  const { hostname, origin, protocol, port } = window.location;
+  const esLocalhost =
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  if (!esLocalhost) return origin;
+  if (ipLocalBackend) return `${protocol}//${ipLocalBackend}${port ? `:${port}` : ""}`;
+  return origin;
+}
+
+// ── Competidores API ──
+export interface CompetidorData {
+  id: number;
+  nombre_completo: string;
+  documento: string | null;
+  fecha_nacimiento: string | null;
+  genero: "MASCULINO" | "FEMENINO" | null;
+  grupo_cinturon: string | null;
+  cinturon: string | null;
+  peso: number | null;
+  club: string | null;
+  categoria_especial: boolean;
+  activo: boolean;
+  created_at: string;
+  // Última actualización de datos (peso/cinturón). El backend devuelve
+  // created_at cuando nunca se ha editado.
+  updated_at?: string;
+  num_inscripciones?: number;
+}
+
+export type CompetidorInput = Partial<Omit<CompetidorData, "id" | "created_at">> & {
+  nombre_completo: string;
+};
+
+export const GRUPOS_CINTURON = [
+  "BLANCO", "PRINCIPIANTE", "INTERMEDIO", "AVANZADO", "NEGRO",
+] as const;
+export type GrupoCinturon = (typeof GRUPOS_CINTURON)[number];
+
+/**
+ * Cinturones REALES de Hapkido → grupo competitivo (espejo del backend).
+ * El admin elige el cinturón; el grupo se detecta automáticamente.
+ */
+export const CINTURONES: { nombre: string; grupo: GrupoCinturon }[] = [
+  { nombre: "Blanco", grupo: "BLANCO" },
+  { nombre: "Amarillo", grupo: "PRINCIPIANTE" },
+  { nombre: "Naranja", grupo: "PRINCIPIANTE" },
+  { nombre: "Naranja/Verde", grupo: "PRINCIPIANTE" },
+  { nombre: "Verde", grupo: "INTERMEDIO" },
+  { nombre: "Verde/Azul", grupo: "INTERMEDIO" },
+  { nombre: "Azul", grupo: "INTERMEDIO" },
+  { nombre: "Rojo", grupo: "AVANZADO" },
+  { nombre: "Marrón", grupo: "AVANZADO" },
+  { nombre: "Marrón/Negro", grupo: "AVANZADO" },
+  { nombre: "Negro", grupo: "NEGRO" },
+];
+
+export function grupoDeCinturon(nombre: string | null | undefined): GrupoCinturon | null {
+  return (
+    CINTURONES.find((c) => c.nombre.toLowerCase() === (nombre || "").toLowerCase())
+      ?.grupo ?? null
+  );
+}
+
+// Límites de los campos del competidor (espejo del backend)
+export const COMPETIDOR_LIMITES = {
+  nombreMax: 80,
+  documentoMax: 15,
+  clubMax: 80,
+  edadMin: 3,
+  edadMax: 100,
+  pesoMin: 10,
+  pesoMax: 200,
+} as const;
+
+export async function listCompetidoresAPI(q = "", includeInactivos = false) {
+  const res = await api.get("/competidores", {
+    params: {
+      ...(q ? { q } : {}),
+      ...(includeInactivos ? { include_inactivos: "1" } : {}),
+    },
+  });
+  return res.data as CompetidorData[];
+}
+
+export async function createCompetidorAPI(data: CompetidorInput) {
+  const res = await api.post("/competidores", data);
+  return res.data as { message: string; competidor: CompetidorData };
+}
+
+export async function updateCompetidorAPI(id: number, data: Partial<CompetidorInput> & { activo?: boolean }) {
+  const res = await api.put(`/competidores/${id}`, data);
+  return res.data as { message: string; competidor: CompetidorData };
+}
+
+export async function deleteCompetidorAPI(id: number) {
+  const res = await api.delete(`/competidores/${id}`);
+  return res.data;
+}
+
+export async function descargarPlantillaCompetidoresAPI() {
+  const res = await api.get("/competidores/plantilla", {
+    responseType: "blob",
+    params: { lang: idiomaArchivo() },
+  });
+  return res.data as Blob;
+}
+
+export interface ImportResultado {
+  message: string;
+  creados: number;
+  actualizados: number;
+  inscritos: number;
+  errores: { fila: number; error: string }[];
+}
+
+export async function importCompetidoresAPI(
+  file: File,
+  opts?: { campeonato_id?: number; modalidades?: string[] }
+) {
+  const form = new FormData();
+  form.append("file", file);
+  if (opts?.campeonato_id) form.append("campeonato_id", String(opts.campeonato_id));
+  if (opts?.modalidades?.length) form.append("modalidades", opts.modalidades.join(","));
+  const res = await api.post("/competidores/import", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data as ImportResultado;
+}
+
+// ── Inscripciones API (competidor ↔ campeonato) ──
+export interface InscripcionData {
+  id: number;
+  campeonato_id: number;
+  competidor_id: number;
+  modalidades: string[];
+  peso: number | null;
+  grupo_cinturon: string | null;
+  peso_efectivo: number | null;
+  grupo_cinturon_efectivo: string | null;
+  created_at: string;
+  competidor?: CompetidorData;
+}
+
+export async function listInscripcionesAPI(campeonatoId: number) {
+  const res = await api.get(`/inscripciones/campeonato/${campeonatoId}`);
+  return res.data as InscripcionData[];
+}
+
+export async function inscribirAPI(
+  campeonatoId: number,
+  data: {
+    competidor_id?: number;
+    competidor?: CompetidorInput;
+    modalidades?: string[];
+    peso?: number | null;
+  }
+) {
+  const res = await api.post(`/inscripciones/campeonato/${campeonatoId}`, data);
+  return res.data as { message: string; inscripcion: InscripcionData };
+}
+
+export async function updateInscripcionAPI(
+  id: number,
+  data: { modalidades?: string[]; peso?: number | null; grupo_cinturon?: string | null }
+) {
+  const res = await api.put(`/inscripciones/${id}`, data);
+  return res.data as { message: string; inscripcion: InscripcionData };
+}
+
+export async function deleteInscripcionAPI(id: number) {
+  const res = await api.delete(`/inscripciones/${id}`);
+  return res.data;
+}
+
+// ── Generación automática de llaves ──
+export interface CategoriaConfigItem {
+  activa: boolean;
+  tipo?: "individual" | "rango";
+  valor?: string;
+  desde?: string;
+  hasta?: string;
+  /** Solo cinturón: grupos que abarca la categoría. */
+  grupos?: string[];
+}
+
+export interface ModalidadConfigData {
+  nombre: string;
+  tipo_llave: TipoLlave;
+  activa: boolean;
+  categorias: {
+    genero: string; // "mixto" | "separado"
+    cinturon: CategoriaConfigItem[];
+    edad: CategoriaConfigItem[];
+    peso: CategoriaConfigItem[];
+  };
+}
+
+export interface ConfigCategorias {
+  modalidades: ModalidadConfigData[];
+}
+
+export interface SeccionCompetidorPreview {
+  inscripcion_id: number;
+  competidor_id: number;
+  nombre: string;
+  club: string;
+  edad: number | null;
+  peso: number | null;
+  grupo_cinturon: string | null;
+}
+
+export interface SeccionPreview {
+  clave: string;
+  modalidad: string;
+  tipo_llave: TipoLlave;
+  genero: string;
+  cinturon: string | null;
+  cinturon_grupos: string[] | null;
+  edad: string | null;
+  peso: string | null;
+  nombre: string;
+  competidores: SeccionCompetidorPreview[];
+  llave_existente?: { llave_id: number; estado: EstadoLlave; nombre: string } | null;
+}
+
+export async function getConfigCategoriasAPI(campeonatoId: number) {
+  const res = await api.get(`/campeonatos/${campeonatoId}/config-categorias`);
+  return res.data as { config: ConfigCategorias; guardada: boolean };
+}
+
+export async function saveConfigCategoriasAPI(campeonatoId: number, config: ConfigCategorias) {
+  const res = await api.put(`/campeonatos/${campeonatoId}/config-categorias`, { config });
+  return res.data as { message: string; config: ConfigCategorias };
+}
+
+export async function getSeccionesPreviewAPI(campeonatoId: number) {
+  const res = await api.get(`/campeonatos/${campeonatoId}/secciones-preview`);
+  return res.data as {
+    secciones: SeccionPreview[];
+    avisos: string[];
+    total_secciones: number;
+    secciones_con_competidores: number;
+    total_inscripciones: number;
+  };
+}
+
+export async function generarLlavesAPI(
+  campeonatoId: number,
+  opts?: { reemplazar?: boolean; asignar_tatamis?: boolean; solo_claves?: string[] }
+) {
+  const res = await api.post(`/campeonatos/${campeonatoId}/generar-llaves`, opts || {});
+  return res.data as {
+    message: string;
+    creadas: { clave: string; nombre: string; competidores: number }[];
+    omitidas: { clave: string; nombre: string; motivo: string }[];
+    avisos: string[];
+  };
+}
+
 // ── Categorías API ──
 export async function listCategoriasAPI() {
   const res = await api.get("/categorias");
@@ -289,6 +689,9 @@ export interface UserData {
   email: string;
   nombre: string;
   rol: "admin" | "juez";
+  // Jerarquía: el superadmin ve todos los workspaces; un admin normal solo
+  // los jueces, campeonatos y competidores que él creó.
+  es_superadmin?: boolean;
   activo: boolean;
   creado_por_id?: number | null;
   creado_por?: {

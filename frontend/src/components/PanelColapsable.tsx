@@ -34,11 +34,11 @@ export default function PanelColapsable({
           color, cursor: "pointer", font: "inherit", textAlign: "left",
         }}
       >
-        <span style={{ fontWeight: 800, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.06em", flex: 1 }}>
+        <span style={{ fontWeight: 800, fontSize: "0.875rem", textTransform: "uppercase", letterSpacing: "0.06em", flex: 1 }}>
           {icono ? `${icono} ` : ""}{titulo}
         </span>
         {badge && <span className="badge badge-gray">{badge}</span>}
-        <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>{open ? "▲" : "▼"}</span>
+        <span style={{ color: "var(--text-dim)", fontSize: "0.875rem" }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && <div style={{ padding: "0 12px 12px" }}>{children}</div>}
     </div>

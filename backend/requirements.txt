@@ -21,3 +21,6 @@ psycopg2-binary==2.9.10; python_version < "3.14"
 eventlet==0.33.3; python_version < "3.12"
 eventlet==0.39.1; python_version >= "3.12"
 gunicorn==23.0.0
+# simple-websocket: habilita WebSocket real en el modo "threading" (despliegue
+# local). Sin él, Socket.IO cae a long-polling (funciona igual, solo más pesado).
+simple-websocket>=1.0.0

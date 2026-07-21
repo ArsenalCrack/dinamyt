@@ -8,7 +8,7 @@ Soporta filtros por campeonato/tatami y exportacion dividida (ZIP):
 import io
 import re
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..extensions import db
@@ -17,28 +17,27 @@ from ..models.combate import Combate
 from ..models.tatami import Tatami, SesionTatami
 from ..models.campeonato import Campeonato
 from ..models.llave import Llave
+from ..timeutil import a_local, iso_utc
+from ..filei18n import trad, idioma_request
 from .llaves import podio_llave
 
 reportes_bp = Blueprint("reportes", __name__)
 
-RONDA_LABELS = {
-    "r1": "Round 1",
-    "r2": "Round 2",
-    "oro": "Punto de Oro",
-    "figuras": "Figuras",
-}
+# Traductor por defecto (español) para llamadas internas sin idioma explícito.
+_T_ES = trad("es")
+
+# Clave de traducción de cada ronda (el texto vive en filei18n).
+RONDA_CLAVE = {"r1": "ronda_r1", "r2": "ronda_r2", "oro": "ronda_oro", "figuras": "figuras"}
 
 
 def _require_admin():
-    uid = get_jwt_identity()
-    user = Usuario.query.get(int(uid))
-    if not user or user.rol != "admin":
-        return None
-    return user
+    from .scoping import require_admin
+    return require_admin()
 
 
-def _build_query(args):
-    """Query de (Combate, Tatami, Campeonato) con filtros opcionales."""
+def _build_query(args, user=None):
+    """Query de (Combate, Tatami, Campeonato) con filtros opcionales.
+    Con `user` admin no-superadmin, se limita a SUS campeonatos (workspace)."""
     q = db.session.query(Combate, Tatami, Campeonato).join(
         SesionTatami, Combate.sesion_tatami_id == SesionTatami.id
     ).join(
@@ -46,6 +45,9 @@ def _build_query(args):
     ).outerjoin(
         Campeonato, Tatami.campeonato_id == Campeonato.id
     )
+
+    if user is not None and user.rol == "admin" and not user.es_super:
+        q = q.filter(Campeonato.created_by == user.id)
 
     if args.get("campeonato_id"):
         q = q.filter(Tatami.campeonato_id == int(args["campeonato_id"]))
@@ -67,16 +69,28 @@ def _build_query(args):
         q = q.filter(Combate.ronda_final == "figuras")
     elif args.get("tipo") == "combate":
         q = q.filter(Combate.ronda_final != "figuras")
+    # Los filtros de fecha llegan como días LOCALES ("2026-07-16") y la BD
+    # guarda timestamps UTC: se convierte el límite local a UTC. Además,
+    # "hasta" una fecha sin hora significa ese día COMPLETO (antes cortaba en
+    # la medianoche y excluía casi todo el día seleccionado).
     if args.get("desde"):
         try:
             desde = datetime.fromisoformat(args["desde"])
-            q = q.filter(Combate.created_at >= desde)
+            if desde.tzinfo is None:
+                desde = desde.astimezone()  # medianoche local del servidor
+            desde_utc = desde.astimezone(timezone.utc).replace(tzinfo=None)
+            q = q.filter(Combate.created_at >= desde_utc)
         except Exception:
             pass
     if args.get("hasta"):
         try:
             hasta = datetime.fromisoformat(args["hasta"])
-            q = q.filter(Combate.created_at <= hasta)
+            if hasta.tzinfo is None:
+                hasta = hasta.astimezone()
+            if hasta.hour == 0 and hasta.minute == 0 and hasta.second == 0:
+                hasta = hasta + timedelta(days=1)  # incluir el día completo
+            hasta_utc = hasta.astimezone(timezone.utc).replace(tzinfo=None)
+            q = q.filter(Combate.created_at < hasta_utc)
         except Exception:
             pass
 
@@ -84,13 +98,13 @@ def _build_query(args):
     return q
 
 
-def _rows_filtradas(args):
+def _rows_filtradas(args, user=None):
     """
     Filas (combate, tatami, camp) con todos los filtros aplicados.
     El filtro de categoría se aplica en Python porque el nombre de la
     categoría vive dentro del JSON jueces_detalle.
     """
-    rows = _build_query(args).all()
+    rows = _build_query(args, user=user).all()
     categoria = (args.get("categoria") or "").strip().lower()
     if categoria:
         rows = [
@@ -123,13 +137,15 @@ def _slug(texto, fallback="reporte"):
     return limpio[:40] or fallback
 
 
-def _contexto_filtros(args):
+def _contexto_filtros(args, t=None):
     """Filtros activos con nombres legibles (para títulos y nombre de archivo)."""
+    t = t or _T_ES
     ctx = {
         "campeonato": None,
         "tatami": None,
         "categoria": None,
         "tipo": None,
+        "tipo_slug": None,
         "num_ids": 0,
     }
     if args.get("campeonato_id"):
@@ -139,7 +155,7 @@ def _contexto_filtros(args):
     if args.get("tatami_id"):
         tatami = Tatami.query.get(int(args["tatami_id"]))
         if tatami:
-            ctx["tatami"] = f"Tatami {tatami.numero}"
+            ctx["tatami"] = t("tatami_n", n=tatami.numero)
             if not ctx["campeonato"] and tatami.campeonato_id:
                 camp = Campeonato.query.get(tatami.campeonato_id)
                 if camp:
@@ -147,26 +163,29 @@ def _contexto_filtros(args):
     if args.get("categoria"):
         ctx["categoria"] = str(args["categoria"]).strip()
     if args.get("tipo") == "combate":
-        ctx["tipo"] = "Puntuación Combate"
+        ctx["tipo"] = t("punt_combate")
+        ctx["tipo_slug"] = "combate"
     elif args.get("tipo") == "figuras":
-        ctx["tipo"] = "Puntuación Individual"
+        ctx["tipo"] = t("punt_individual")
+        ctx["tipo_slug"] = "figuras"
     if args.get("ids"):
         ctx["num_ids"] = len([x for x in str(args["ids"]).split(",") if x.strip()])
     return ctx
 
 
-def _subtitulo_filtros(ctx):
+def _subtitulo_filtros(ctx, t=None):
+    t = t or _T_ES
     partes = []
     if ctx.get("campeonato"):
-        partes.append(f"Campeonato: {ctx['campeonato']}")
+        partes.append(t("sub_campeonato", v=ctx["campeonato"]))
     if ctx.get("tatami"):
         partes.append(ctx["tatami"])
     if ctx.get("categoria"):
-        partes.append(f"Categoría: {ctx['categoria']}")
+        partes.append(t("sub_categoria", v=ctx["categoria"]))
     elif ctx.get("tipo"):
         partes.append(ctx["tipo"])
     if ctx.get("num_ids"):
-        partes.append(f"Selección de {ctx['num_ids']} registro(s)")
+        partes.append(t("sub_seleccion", n=ctx["num_ids"]))
     return " — ".join(partes)
 
 
@@ -183,8 +202,8 @@ def _nombre_archivo(ctx, ext):
         partes.append(_slug(ctx["tatami"], "tatami"))
     if ctx.get("categoria"):
         partes.append(_slug(ctx["categoria"], "categoria"))
-    elif ctx.get("tipo"):
-        partes.append("combates" if "Combate" in ctx["tipo"] else "individual")
+    elif ctx.get("tipo_slug"):
+        partes.append("combates" if ctx["tipo_slug"] == "combate" else "individual")
     if ctx.get("num_ids"):
         partes.append(f"seleccion-{ctx['num_ids']}")
     if len(partes) == 1:
@@ -194,20 +213,36 @@ def _nombre_archivo(ctx, ext):
 
 
 def _format_momento_evento(entrada):
-    """Formatea el timestamp real de una entrada del historial."""
+    """
+    Formatea el timestamp real de una entrada del historial EN HORA LOCAL
+    del servidor (la del evento). Los momentos se guardan en UTC; mostrarlos
+    sin convertir dejaba los reportes 5 horas corridos respecto al reloj
+    que vieron los jueces.
+    """
     momento = entrada.get("momento") or entrada.get("ts")
     if not momento:
         return "-"
     if isinstance(momento, (int, float)):
         try:
-            return datetime.fromtimestamp(momento / 1000, tz=timezone.utc).strftime(
-                "%d/%m/%Y %H:%M:%S"
-            )
+            # fromtimestamp sin tz = hora local del servidor
+            return datetime.fromtimestamp(momento / 1000).strftime("%d/%m/%Y %H:%M:%S")
         except Exception:
             return str(momento)
     if isinstance(momento, str):
-        return momento.replace("T", " ")[:19]
+        try:
+            dt = datetime.fromisoformat(momento)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone().strftime("%d/%m/%Y %H:%M:%S")
+        except ValueError:
+            return momento.replace("T", " ")[:19]
     return str(momento)
+
+
+def _fecha_local_txt(dt, formato="%d/%m/%Y %H:%M"):
+    """Fecha guardada en UTC → texto en hora local del servidor."""
+    local = a_local(dt)
+    return local.strftime(formato) if local else "-"
 
 
 def _jueces_meta(combate):
@@ -323,18 +358,23 @@ def _podios_llaves_map(rows):
     return mapa
 
 
-def _puesto_figuras_txt(item):
+def _puesto_figuras_txt(item, t=None):
     """Puesto anotado: '1 (Especial)' / '3 (Empate)' para Excel y PDF."""
+    t = t or _T_ES
     puesto = str(item.get("puesto", "-"))
     if item.get("especial"):
-        puesto += " (Especial)"
+        puesto += t("especial_sfx")
     elif item.get("empate"):
-        puesto += " (Empate)"
+        puesto += t("empate_sfx")
     return puesto
 
 
-def _medalla_txt(puesto):
-    return {1: "1° (Oro)", 2: "2° (Plata)", 3: "3° (Bronce)"}.get(puesto, f"{puesto}°")
+def _medalla_txt(puesto, t=None):
+    t = t or _T_ES
+    claves = {1: "medalla_oro", 2: "medalla_plata", 3: "medalla_bronce"}
+    if puesto in claves:
+        return t(claves[puesto])
+    return t("medalla_n", n=puesto)
 
 
 def _figuras_completas(combate):
@@ -362,14 +402,15 @@ def _figuras_desempates(combate):
     return desempates if isinstance(desempates, list) else []
 
 
-def _figuras_estado(combate):
-    estado = "Completo" if _figuras_completas(combate) else "Incompleto"
+def _figuras_estado(combate, t=None):
+    t = t or _T_ES
+    estado = t("completo") if _figuras_completas(combate) else t("incompleto")
     desempates = _figuras_desempates(combate)
     if desempates:
         nombres = "; ".join(
             " y ".join(d.get("nombres", [])) for d in desempates
         )
-        estado += f" · Desempate reevaluado: {nombres}"
+        estado += " " + t("desempate_reev", nombres=nombres)
     return estado
 
 
@@ -408,23 +449,41 @@ def _fmt_pts(valor):
     return f"{round(valor, 2):g}"
 
 
-def _rondas_resumen(combate):
+def _rondas_resumen(combate, t=None):
     """Texto 'Round 1: 5-3 · Round 2: 2-2 · Punto de Oro: 1-0' segun historial."""
+    t = t or _T_ES
     if _tipo_registro(combate) == "figuras":
-        return f"Figuras — {_figuras_estado(combate)}"
+        return t("figuras_estado", estado=_figuras_estado(combate, t))
     rondas = _puntos_por_ronda(combate)
     partes = []
     orden = ["r1", "r2", "oro"]
     for rid in orden + [r for r in rondas if r not in orden]:
         if rid in rondas:
             r = rondas[rid]
-            etiqueta = RONDA_LABELS.get(rid, rid)
+            etiqueta = t(RONDA_CLAVE[rid]) if rid in RONDA_CLAVE else rid
             partes.append(f"{etiqueta}: {_fmt_pts(r['hong'])}-{_fmt_pts(r['chung'])}")
     return " · ".join(partes) if partes else "-"
 
 
-def _ronda_label(ronda):
-    return RONDA_LABELS.get(ronda, ronda or "-")
+def _ronda_label(ronda, t=None):
+    t = t or _T_ES
+    if ronda in RONDA_CLAVE:
+        return t(RONDA_CLAVE[ronda])
+    return ronda or "-"
+
+
+def _tipo_punto_txt(entrada, t=None):
+    """Etiqueta traducida del tipo de punto de una entrada del historial."""
+    t = t or _T_ES
+    if entrada.get("esEspecial"):
+        return t("pt_especial")
+    if entrada.get("esKyongGo"):
+        return t("pt_kyonggo")
+    if entrada.get("esGamJeum"):
+        return t("pt_gamjeum")
+    if entrada.get("esDecision"):
+        return t("pt_decision")
+    return t("pt_normal")
 
 
 def _figuras_puntajes_detalle(combate, comp_id):
@@ -455,7 +514,8 @@ def _figuras_puntajes_detalle(combate, comp_id):
     return "; ".join(partes) or "-"
 
 
-def _ganador_nombre(combate):
+def _ganador_nombre(combate, t=None):
+    t = t or _T_ES
     if _tipo_registro(combate) == "figuras":
         ranking = _ranking_figuras(combate)
         # 1° del podio normal (los especiales tienen su podio aparte)
@@ -466,7 +526,7 @@ def _ganador_nombre(combate):
         return combate.nombre_hong
     if combate.ganador == "chung":
         return combate.nombre_chung
-    return "Empate"
+    return t("empate")
 
 
 @reportes_bp.route("/combates", methods=["GET"])
@@ -477,12 +537,19 @@ def listar_combates():
     if not admin:
         return jsonify({"error": "Solo administradores"}), 403
 
-    page = max(1, int(request.args.get("page", 1)))
-    per_page = min(200, max(1, int(request.args.get("per_page", 50))))
+    # Coerción defensiva: paginación con basura no debe responder 500
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        per_page = min(200, max(1, int(request.args.get("per_page", 50))))
+    except (TypeError, ValueError):
+        per_page = 50
 
     # Todas las filas con filtros SQL: el resumen por categoría se calcula
     # ANTES del filtro de categoría para que el selector muestre todas.
-    rows_sql = _build_query(request.args).all()
+    rows_sql = _build_query(request.args, user=admin).all()
     categorias = _resumen_categorias(rows_sql)
 
     categoria = (request.args.get("categoria") or "").strip().lower()
@@ -497,6 +564,7 @@ def listar_combates():
     rows = rows_filtradas[(page - 1) * per_page: page * per_page]
 
     podios_llaves = _podios_llaves_map(rows)
+    t = trad(idioma_request())
 
     result = []
     for c, tatami, camp in rows:
@@ -516,7 +584,7 @@ def listar_combates():
             "marcador_chung": float(c.marcador_chung or 0),
             "ganador": c.ganador,
             "ronda_final": c.ronda_final,
-            "rondas_resumen": _rondas_resumen(c),
+            "rondas_resumen": _rondas_resumen(c, t),
             "figuras_completas": _figuras_completas(c) if tipo == "figuras" else None,
             "figuras_desempates": _figuras_desempates(c) if tipo == "figuras" else [],
             # Combate de eliminación: llave y ronda (Semifinal, Final, ...)
@@ -527,8 +595,9 @@ def listar_combates():
             "tatami_numero": tatami.numero if tatami else None,
             "campeonato_id": camp.id if camp else None,
             "campeonato_nombre": camp.nombre if camp else None,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
-            "fin": c.fin.isoformat() if c.fin else None,
+            # Con zona UTC explícita: el navegador los muestra en hora local
+            "created_at": iso_utc(c.created_at),
+            "fin": iso_utc(c.fin),
             "historial_completo": c.historial_completo or [],
             "jueces_detalle": c.jueces_detalle or {},
             "jueces": _jueces_list(c),
@@ -551,14 +620,15 @@ def listar_combates():
 #  GENERADORES (reutilizados por export simple y export ZIP dividido)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _generar_excel(rows, subtitulo=""):
+def _generar_excel(rows, subtitulo="", t=None):
     """Genera el workbook Excel para una lista de (combate, tatami, camp)."""
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
+    t = t or _T_ES
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Resultados DINAMYT"
+    ws.title = t("hoja_resultados")
 
     # Estilos
     header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
@@ -576,7 +646,7 @@ def _generar_excel(rows, subtitulo=""):
     # Titulo
     ws.merge_cells("A1:P1")
     titulo = ws["A1"]
-    titulo.value = f"DINAMYT — Reporte de Resultados — {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    titulo.value = f"{t('reporte_titulo')} — {datetime.now().strftime('%d/%m/%Y %H:%M')}"
     titulo.font = Font(name="Arial", bold=True, size=13, color="1A1A2E")
     titulo.alignment = center
     if subtitulo:
@@ -588,10 +658,10 @@ def _generar_excel(rows, subtitulo=""):
 
     # Headers
     headers = [
-        "ID", "Tipo", "Categoría", "Campeonato", "Tatami",
-        "Rojo / Competidor", "Azul / Categoría", "Pts 1 / Total", "Pts 2",
-        "Ganador", "Ronda Final", "Rondas (Hong-Chung)", "No. Jueces",
-        "Duracion (s)", "Fecha/Hora", "Jueces (rol, nombre y correo)",
+        t("h_id"), t("h_tipo"), t("h_categoria"), t("h_campeonato"), t("h_tatami"),
+        t("h_rojo_comp"), t("h_azul_cat"), t("h_pts1_total"), t("h_pts2"),
+        t("h_ganador"), t("h_ronda_final"), t("h_rondas_hc"), t("h_num_jueces"),
+        t("h_duracion"), t("h_fecha_hora"), t("h_jueces_full"),
     ]
     row = 3
     for col_idx, header in enumerate(headers, 1):
@@ -608,24 +678,24 @@ def _generar_excel(rows, subtitulo=""):
         tipo = _tipo_registro(combate)
 
         row += 1
-        ganador_nombre = _ganador_nombre(combate)
+        ganador_nombre = _ganador_nombre(combate, t)
 
         data = [
             combate.id,
-            "Figuras" if tipo == "figuras" else "Combate",
+            t("figuras") if tipo == "figuras" else t("combate"),
             _nombre_categoria_registro(combate),
             camp.nombre if camp else "-",
-            f"Tatami {tatami.numero}" if tatami else "-",
+            t("tatami_n", n=tatami.numero) if tatami else "-",
             combate.nombre_hong,
             combate.nombre_chung,
             float(combate.marcador_hong or 0),
             float(combate.marcador_chung or 0),
             ganador_nombre,
-            "Figuras" if tipo == "figuras" else _ronda_label(combate.ronda_final),
-            _rondas_resumen(combate),
+            t("figuras") if tipo == "figuras" else _ronda_label(combate.ronda_final, t),
+            _rondas_resumen(combate, t),
             combate.num_jueces or 4,
             combate.duracion_segundos or "-",
-            combate.created_at.strftime("%d/%m/%Y %H:%M") if combate.created_at else "-",
+            _fecha_local_txt(combate.created_at),
             _jueces_resumen(combate),
         ]
 
@@ -645,11 +715,12 @@ def _generar_excel(rows, subtitulo=""):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
 
     # ── Hoja 2: Detalle de puntos por juez ──────────────────────────────────
-    ws2 = wb.create_sheet("Detalle de Puntos")
+    ws2 = wb.create_sheet(t("hoja_detalle"))
     det_headers = [
-        "Combate ID", "Tatami", "Hong", "Chung", "Rol", "Nombre juez", "Correo",
-        "Asignacion", "Acceso", "Color", "Pts", "Accion", "Tiempo (s)",
-        "Momento", "Ronda", "Tipo"
+        t("h_combate_id"), t("h_tatami"), t("h_hong"), t("h_chung"), t("h_rol"),
+        t("h_nombre_juez"), t("h_correo"), t("h_asignacion"), t("h_acceso"),
+        t("h_color"), t("h_pts"), t("h_accion"), t("h_tiempo"),
+        t("h_momento"), t("h_ronda"), t("h_tipo"),
     ]
     for col_idx, h in enumerate(det_headers, 1):
         cell = ws2.cell(row=1, column=col_idx, value=h)
@@ -665,16 +736,11 @@ def _generar_excel(rows, subtitulo=""):
         historial = combate.historial_completo or []
         for entrada in historial:
             juez_meta = _juez_meta_para_evento(combate, entrada)
-            tipo = ""
-            if entrada.get("esEspecial"):   tipo = "Especial"
-            elif entrada.get("esKyongGo"): tipo = "KyongGo"
-            elif entrada.get("esGamJeum"): tipo = "GamJeum"
-            elif entrada.get("esDecision"): tipo = "Decisión JC"
-            else:                           tipo = "Punto Normal"
+            tipo = _tipo_punto_txt(entrada, t)
 
             det_data = [
                 combate.id,
-                f"Tatami {tatami.numero}" if tatami else "-",
+                t("tatami_n", n=tatami.numero) if tatami else "-",
                 combate.nombre_hong,
                 combate.nombre_chung,
                 juez_meta["rol"],
@@ -687,7 +753,7 @@ def _generar_excel(rows, subtitulo=""):
                 entrada.get("nombre", "-"),
                 entrada.get("tiempo", "-"),
                 _format_momento_evento(entrada),
-                _ronda_label(entrada.get("ronda")),
+                _ronda_label(entrada.get("ronda"), t),
                 tipo,
             ]
             for col_idx, val in enumerate(det_data, 1):
@@ -704,10 +770,11 @@ def _generar_excel(rows, subtitulo=""):
         ws2.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
 
     # ── Hoja 3: Ranking de Figuras ──────────────────────────────────────────
-    ws3 = wb.create_sheet("Ranking Figuras")
+    ws3 = wb.create_sheet(t("hoja_ranking"))
     fig_headers = [
-        "Registro ID", "Categoría", "Descripción", "Campeonato", "Tatami", "Estado", "Puesto",
-        "Competidor", "Club", "Total", "Puntajes por juez (criterio y correo)",
+        t("h_registro_id"), t("h_categoria"), t("h_descripcion"), t("h_campeonato"),
+        t("h_tatami"), t("h_estado"), t("h_puesto"),
+        t("h_competidor"), t("h_club"), t("h_total"), t("h_puntajes_juez"),
     ]
     for col_idx, h in enumerate(fig_headers, 1):
         cell = ws3.cell(row=1, column=col_idx, value=h)
@@ -720,7 +787,7 @@ def _generar_excel(rows, subtitulo=""):
     for combate, tatami, camp in rows:
         if _tipo_registro(combate) != "figuras":
             continue
-        estado = _figuras_estado(combate)
+        estado = _figuras_estado(combate, t)
         for item in _ranking_figuras(combate):
             comp_id = str(item.get("id", ""))
             fig_data = [
@@ -728,9 +795,9 @@ def _generar_excel(rows, subtitulo=""):
                 _nombre_categoria_registro(combate),
                 _descripcion_registro(combate) or "-",
                 camp.nombre if camp else "-",
-                f"Tatami {tatami.numero}" if tatami else "-",
+                t("tatami_n", n=tatami.numero) if tatami else "-",
                 estado,
-                _puesto_figuras_txt(item),
+                _puesto_figuras_txt(item, t),
                 item.get("nombre", "-"),
                 item.get("club") or "-",
                 float(item.get("total", 0)),
@@ -748,8 +815,8 @@ def _generar_excel(rows, subtitulo=""):
     # ── Hoja 4: Podios de Llaves (eliminación) ──────────────────────────────
     podios_map = _podios_llaves_map(rows)
     if podios_map:
-        ws4 = wb.create_sheet("Podios Llaves")
-        po_headers = ["Llave", "Puesto", "Competidor", "Club"]
+        ws4 = wb.create_sheet(t("hoja_podios"))
+        po_headers = [t("h_llave"), t("h_puesto"), t("h_competidor"), t("h_club")]
         for col_idx, h in enumerate(po_headers, 1):
             cell = ws4.cell(row=1, column=col_idx, value=h)
             cell.font = header_font
@@ -761,7 +828,7 @@ def _generar_excel(rows, subtitulo=""):
             for item in info["podio"]:
                 po_data = [
                     info["nombre"],
-                    _medalla_txt(item["puesto"]),
+                    _medalla_txt(item["puesto"], t),
                     item.get("nombre", "-"),
                     item.get("club") or "-",
                 ]
@@ -780,8 +847,9 @@ def _generar_excel(rows, subtitulo=""):
     return output
 
 
-def _generar_pdf(rows, subtitulo=""):
+def _generar_pdf(rows, subtitulo="", t=None):
     """Genera el documento PDF para una lista de (combate, tatami, camp)."""
+    t = t or _T_ES
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -816,11 +884,11 @@ def _generar_pdf(rows, subtitulo=""):
         spaceAfter=12,
     )
 
-    story.append(Paragraph("DINAMYT — Reporte de Resultados", title_style))
+    story.append(Paragraph(t("reporte_titulo"), title_style))
     encabezado = (
         f"Global Hapkido Association &nbsp;&nbsp;|&nbsp;&nbsp; "
-        f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')} &nbsp;&nbsp;|&nbsp;&nbsp; "
-        f"Total: {len(rows)} registros"
+        f"{t('reporte_generado', fecha=datetime.now().strftime('%d/%m/%Y %H:%M'))} &nbsp;&nbsp;|&nbsp;&nbsp; "
+        f"{t('reporte_total', n=len(rows))}"
     )
     if subtitulo:
         encabezado = f"<b>{subtitulo}</b> &nbsp;&nbsp;|&nbsp;&nbsp; " + encabezado
@@ -834,24 +902,25 @@ def _generar_pdf(rows, subtitulo=""):
         1.5*cm, 1.5*cm, 3.0*cm, 1.8*cm, 2.4*cm
     ]
 
-    table_data = [["#", "Tipo", "Campeonato", "Tatami", "Rojo/Comp.", "Azul/Cat.",
-                   "Pts 1", "Pts 2", "Ganador", "Ronda", "Fecha"]]
+    table_data = [[t("h_num"), t("h_tipo"), t("h_campeonato"), t("h_tatami"),
+                   t("h_rojo_comp_corto"), t("h_azul_cat_corto"),
+                   t("h_pts1_total"), t("h_pts2"), t("h_ganador"), t("h_ronda"), t("h_fecha")]]
 
     for combate, tatami, camp in rows:
         tipo = _tipo_registro(combate)
 
         table_data.append([
             str(combate.id),
-            "Fig." if tipo == "figuras" else "Comb.",
+            t("fig_corto") if tipo == "figuras" else t("comb_corto"),
             camp.nombre if camp else "-",
-            f"T{tatami.numero}" if tatami else "-",
+            t("tatami_corto", n=tatami.numero) if tatami else "-",
             combate.nombre_hong or "-",
             combate.nombre_chung or "-",
             str(float(combate.marcador_hong or 0)),
             str(float(combate.marcador_chung or 0)),
-            _ganador_nombre(combate),
-            "Fig." if tipo == "figuras" else _ronda_label(combate.ronda_final),
-            combate.created_at.strftime("%d/%m %H:%M") if combate.created_at else "-",
+            _ganador_nombre(combate, t),
+            t("fig_corto") if tipo == "figuras" else _ronda_label(combate.ronda_final, t),
+            _fecha_local_txt(combate.created_at, "%d/%m %H:%M"),
         ])
 
     # Colors
@@ -887,22 +956,22 @@ def _generar_pdf(rows, subtitulo=""):
             style_cmds.append(("BACKGROUND", (5, row_idx), (5, row_idx), CHUNG_BG))
             style_cmds.append(("BACKGROUND", (7, row_idx), (7, row_idx), CHUNG_BG))
 
-    t = Table(table_data, colWidths=col_widths_pdf, repeatRows=1)
-    t.setStyle(TableStyle(style_cmds))
-    story.append(t)
+    tabla = Table(table_data, colWidths=col_widths_pdf, repeatRows=1)
+    tabla.setStyle(TableStyle(style_cmds))
+    story.append(tabla)
 
     # ── Marcador por rondas (R1 / R2 / Punto de Oro) ──
     combates_normales = [r for r in rows if _tipo_registro(r[0]) != "figuras"]
     if combates_normales:
         story.append(Spacer(1, 0.7 * cm))
-        story.append(Paragraph("Marcador por rondas (Hong-Chung)", title_style))
-        rondas_table_data = [["Comb ID", "Rojo", "Azul", "Rondas jugadas"]]
+        story.append(Paragraph(t("sec_marcador_rondas"), title_style))
+        rondas_table_data = [[t("h_comb_id"), t("h_rojo"), t("h_azul"), t("h_rondas_jugadas")]]
         for combate, _t2, _c2 in combates_normales:
             rondas_table_data.append([
                 str(combate.id),
                 combate.nombre_hong or "-",
                 combate.nombre_chung or "-",
-                _rondas_resumen(combate),
+                _rondas_resumen(combate, t),
             ])
         rondas_table = Table(
             rondas_table_data, colWidths=[2*cm, 5*cm, 5*cm, 14*cm], repeatRows=1
@@ -922,12 +991,12 @@ def _generar_pdf(rows, subtitulo=""):
 
     # ── Resumen de jueces por combate ──
     story.append(Spacer(1, 0.7 * cm))
-    story.append(Paragraph("Jueces, correo y asignación", title_style))
-    jueces_table_data = [["Comb ID", "Tatami", "Jueces"]]
+    story.append(Paragraph(t("sec_jueces"), title_style))
+    jueces_table_data = [[t("h_comb_id"), t("h_tatami"), t("h_jueces")]]
     for combate, tatami, _c3 in rows:
         jueces_table_data.append([
             str(combate.id),
-            f"T{tatami.numero}" if tatami else "-",
+            t("tatami_corto", n=tatami.numero) if tatami else "-",
             _jueces_resumen(combate),
         ])
 
@@ -946,12 +1015,14 @@ def _generar_pdf(rows, subtitulo=""):
 
     # ── Detalle de puntos en PDF ──
     story.append(Spacer(1, 1 * cm))
-    story.append(Paragraph("Detalle de Puntos por Juez", title_style))
+    story.append(Paragraph(t("sec_detalle_puntos"), title_style))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#DDDDDD")))
     story.append(Spacer(1, 0.5 * cm))
 
     det_col_widths = [1.3*cm, 1.2*cm, 3*cm, 4.2*cm, 2.4*cm, 1.4*cm, 1.2*cm, 1*cm, 2.6*cm, 2.6*cm, 1.7*cm, 1.8*cm]
-    det_table_data = [["Comb ID", "Rol", "Nombre", "Correo", "Asign.", "Acceso", "Color", "Pts", "Accion", "Momento", "Ronda", "Tipo"]]
+    det_table_data = [[t("h_comb_id"), t("h_rol"), t("h_nombre"), t("h_correo"),
+                       t("h_asign_corto"), t("h_acceso"), t("h_color"), t("h_pts"),
+                       t("h_accion"), t("h_momento"), t("h_ronda"), t("h_tipo")]]
 
     det_style_cmds = [
         ("BACKGROUND", (0, 0), (-1, 0), DARK),
@@ -974,12 +1045,7 @@ def _generar_pdf(rows, subtitulo=""):
         historial = combate.historial_completo or []
         for entrada in historial:
             juez_meta = _juez_meta_para_evento(combate, entrada)
-            tipo = ""
-            if entrada.get("esEspecial"):   tipo = "Especial"
-            elif entrada.get("esKyongGo"): tipo = "KyongGo"
-            elif entrada.get("esGamJeum"): tipo = "GamJeum"
-            elif entrada.get("esDecision"): tipo = "Decisión JC"
-            else:                           tipo = "Punto Normal"
+            tipo = _tipo_punto_txt(entrada, t)
 
             det_table_data.append([
                 str(combate.id),
@@ -992,7 +1058,7 @@ def _generar_pdf(rows, subtitulo=""):
                 str(entrada.get("pts", 0)),
                 str(entrada.get("nombre", "-")),
                 _format_momento_evento(entrada),
-                _ronda_label(entrada.get("ronda")),
+                _ronda_label(entrada.get("ronda"), t),
                 tipo,
             ])
 
@@ -1016,13 +1082,14 @@ def _generar_pdf(rows, subtitulo=""):
     figuras = [r for r in rows if _tipo_registro(r[0]) == "figuras"]
     if figuras:
         story.append(Spacer(1, 1 * cm))
-        story.append(Paragraph("Ranking de Figuras", title_style))
+        story.append(Paragraph(t("sec_ranking_figuras"), title_style))
         story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#DDDDDD")))
         story.append(Spacer(1, 0.4 * cm))
 
-        fig_table_data = [["Reg ID", "Categoría", "Descripción", "Estado", "Puesto", "Competidor", "Club", "Total"]]
+        fig_table_data = [[t("h_reg_id"), t("h_categoria"), t("h_descripcion"),
+                           t("h_estado"), t("h_puesto"), t("h_competidor"), t("h_club"), t("h_total")]]
         for combate, _t5, _c5 in figuras:
-            estado = _figuras_estado(combate)
+            estado = _figuras_estado(combate, t)
             descripcion = _descripcion_registro(combate) or "-"
             for item in _ranking_figuras(combate):
                 fig_table_data.append([
@@ -1030,7 +1097,7 @@ def _generar_pdf(rows, subtitulo=""):
                     _nombre_categoria_registro(combate),
                     descripcion,
                     estado,
-                    _puesto_figuras_txt(item),
+                    _puesto_figuras_txt(item, t),
                     str(item.get("nombre", "-")),
                     str(item.get("club") or "-"),
                     str(float(item.get("total", 0))),
@@ -1057,8 +1124,8 @@ def _generar_pdf(rows, subtitulo=""):
 
         # Detalle de puntajes por juez (criterio + correo)
         story.append(Spacer(1, 0.5 * cm))
-        story.append(Paragraph("Puntajes de Figuras por juez (criterio y correo)", title_style))
-        figdet_data = [["Reg ID", "Competidor", "Puntajes"]]
+        story.append(Paragraph(t("sec_puntajes_figuras"), title_style))
+        figdet_data = [[t("h_reg_id"), t("h_competidor"), t("h_puntajes")]]
         for combate, _t6, _c6 in figuras:
             for item in _ranking_figuras(combate):
                 figdet_data.append([
@@ -1084,15 +1151,15 @@ def _generar_pdf(rows, subtitulo=""):
     podios_map = _podios_llaves_map(rows)
     if podios_map:
         story.append(Spacer(1, 1 * cm))
-        story.append(Paragraph("Podios de Llaves (eliminación)", title_style))
+        story.append(Paragraph(t("sec_podios_llaves"), title_style))
         story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#DDDDDD")))
         story.append(Spacer(1, 0.4 * cm))
-        po_data = [["Llave", "Puesto", "Competidor", "Club"]]
+        po_data = [[t("h_llave"), t("h_puesto"), t("h_competidor"), t("h_club")]]
         for _llid, info in sorted(podios_map.items(), key=lambda x: x[1]["nombre"]):
             for item in info["podio"]:
                 po_data.append([
                     info["nombre"],
-                    _medalla_txt(item["puesto"]),
+                    _medalla_txt(item["puesto"], t),
                     str(item.get("nombre", "-")),
                     str(item.get("club") or "-"),
                 ])
@@ -1129,9 +1196,10 @@ def exportar_excel():
         return jsonify({"error": "Solo administradores"}), 403
 
     try:
-        rows = _rows_filtradas(request.args)
-        ctx = _contexto_filtros(request.args)
-        output = _generar_excel(rows, _subtitulo_filtros(ctx))
+        t = trad(idioma_request())
+        rows = _rows_filtradas(request.args, user=admin)
+        ctx = _contexto_filtros(request.args, t)
+        output = _generar_excel(rows, _subtitulo_filtros(ctx, t), t)
     except ImportError:
         return jsonify({
             "error": "No se pudo generar Excel: falta openpyxl. Instala dependencias con pip install -r requirements.txt."
@@ -1154,9 +1222,10 @@ def exportar_pdf():
         return jsonify({"error": "Solo administradores"}), 403
 
     try:
-        rows = _rows_filtradas(request.args)
-        ctx = _contexto_filtros(request.args)
-        output = _generar_pdf(rows, _subtitulo_filtros(ctx))
+        t = trad(idioma_request())
+        rows = _rows_filtradas(request.args, user=admin)
+        ctx = _contexto_filtros(request.args, t)
+        output = _generar_pdf(rows, _subtitulo_filtros(ctx, t), t)
     except ImportError:
         return jsonify({
             "error": "No se pudo generar PDF: falta reportlab. Instala dependencias con pip install -r requirements.txt."
@@ -1188,10 +1257,11 @@ def exportar_zip():
     if formato not in ("excel", "pdf"):
         return jsonify({"error": "Formato inválido. Usa 'excel' o 'pdf'."}), 400
 
-    rows = _rows_filtradas(request.args)
+    rows = _rows_filtradas(request.args, user=admin)
     if not rows:
         return jsonify({"error": "No hay registros con los filtros actuales."}), 404
 
+    t = trad(idioma_request())
     fecha = datetime.now().strftime("%Y%m%d_%H%M")
     ext = "xlsx" if formato == "excel" else "pdf"
     generar = _generar_excel if formato == "excel" else _generar_pdf
@@ -1207,11 +1277,12 @@ def exportar_zip():
         for clave in sorted(por_tatami):
             grupo = por_tatami[clave]
             _cb, tatami, camp = grupo[0]
-            camp_nombre = camp.nombre if camp else "Sin campeonato"
-            tatami_label = f"Tatami {tatami.numero}" if tatami else "Sin tatami"
+            camp_nombre = camp.nombre if camp else "-"
+            tatami_label = t("tatami_n", n=tatami.numero) if tatami else "-"
             nombre = f"dinamyt_{_slug(camp_nombre, 'campeonato')}_tatami{tatami.numero if tatami else 0}_{fecha}.{ext}"
-            grupos.append((nombre, f"Campeonato: {camp_nombre} — {tatami_label}", grupo))
-        zip_nombre = f"dinamyt_{_slug(grupos[0][1].split('—')[0].replace('Campeonato:', ''), 'campeonato')}_por_tatami_{fecha}.zip"
+            subtitulo = f"{t('sub_campeonato', v=camp_nombre)} — {tatami_label}"
+            grupos.append((nombre, subtitulo, grupo))
+        zip_nombre = f"dinamyt_{_slug(grupos[0][2][0][2].nombre if grupos[0][2][0][2] else 'campeonato', 'campeonato')}_por_tatami_{fecha}.zip"
     else:
         por_camp = {}
         for row in rows:
@@ -1221,9 +1292,9 @@ def exportar_zip():
         for clave in sorted(por_camp):
             grupo = por_camp[clave]
             _cb, _tt, camp = grupo[0]
-            camp_nombre = camp.nombre if camp else "Sin campeonato"
+            camp_nombre = camp.nombre if camp else "-"
             nombre = f"dinamyt_{_slug(camp_nombre, 'campeonato')}_{fecha}.{ext}"
-            grupos.append((nombre, f"Campeonato: {camp_nombre}", grupo))
+            grupos.append((nombre, t("sub_campeonato", v=camp_nombre), grupo))
         zip_nombre = f"dinamyt_reportes_por_campeonato_{fecha}.zip"
 
     try:
@@ -1238,7 +1309,7 @@ def exportar_zip():
                     nombre = base.replace(f".{ext}", f"_{contador}.{ext}")
                     contador += 1
                 usados.add(nombre)
-                archivo = generar(grupo, subtitulo)
+                archivo = generar(grupo, subtitulo, t)
                 zf.writestr(nombre, archivo.getvalue())
         zip_buffer.seek(0)
     except ImportError:

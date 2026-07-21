@@ -16,6 +16,7 @@ asignarse después, a medida que un tatami se desocupa.
 
 from datetime import datetime, timezone
 from ..extensions import db
+from ..timeutil import iso_utc
 
 TIPOS = ("combate", "figuras")
 ESTADOS = ("pendiente", "activa", "terminada")
@@ -42,6 +43,10 @@ class Llave(db.Model):
     descripcion = db.Column(db.Text, nullable=True)
     # "pendiente" | "activa" | "terminada". NULL = pendiente (compatibilidad).
     estado = db.Column(db.String(20), nullable=True)
+    # Clave canónica de la sección que originó esta llave cuando fue generada
+    # automáticamente (NULL = llave creada a mano). Permite regenerar sin
+    # duplicar ni tocar las llaves manuales.
+    seccion_clave = db.Column(db.String(300), nullable=True, index=True)
     estructura = db.Column(db.JSON, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
     created_at = db.Column(
@@ -68,8 +73,9 @@ class Llave(db.Model):
             "nombre": self.nombre,
             "descripcion": self.descripcion or "",
             "estado": self.estado_norm,
+            "seccion_clave": self.seccion_clave,
             "estructura": self.estructura,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
 
     def __repr__(self):

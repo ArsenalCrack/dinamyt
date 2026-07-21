@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Logo from "@/components/Logo";
+import { useI18n } from "@/lib/i18n";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 export interface FlashData {
@@ -307,7 +308,10 @@ function FaltaFlashOverlay({ data }: { data?: FaltaFlashData }) {
           style={{
             fontFamily: "var(--font-display)",
             fontSize: "1.4rem",
-            color: "rgba(255,255,255,0.75)",
+            // var(--text) y no blanco fijo: este overlay es un tinte translúcido
+            // sobre la página, que en tema claro es clara
+            color: "var(--text)",
+            opacity: 0.8,
             letterSpacing: "0.1em",
             marginTop: 4,
           }}
@@ -331,6 +335,7 @@ function GanadorOverlay({
   isPantalla: boolean;
   canClose: boolean;
 }) {
+  const { t } = useI18n();
   const colorMap = {
     hong: "var(--hong-vivid)",
     chung: "var(--chung-vivid)",
@@ -419,7 +424,7 @@ function GanadorOverlay({
               cursor: "pointer",
             }}
           >
-            CERRAR
+            {t("alert.cerrar")}
           </button>
         ) : (
           <div
@@ -431,7 +436,7 @@ function GanadorOverlay({
               color: "rgba(255,255,255,0.45)",
             }}
           >
-            ESPERANDO CIERRE DEL JUEZ CENTRAL
+            {t("alert.esperandoCierre")}
           </div>
         )}
       </div>
@@ -451,6 +456,7 @@ function Alerta12Modal({
   onReanudar?: () => void;
   onGanador?: () => void;
 }) {
+  const { t } = useI18n();
   // Confirmación inline antes de terminar el combate por superioridad
   const [confirmandoGanador, setConfirmandoGanador] = useState(false);
   const liderNombre = (data.liderNombre || data.lider || "").toUpperCase();
@@ -493,16 +499,16 @@ function Alerta12Modal({
             marginTop: 6,
           }}
         >
-          {(data.motivo || "SUPERIORIDAD TÉCNICA").toUpperCase()}
+          {(data.motivo || t("alert.superioridad")).toUpperCase()}
         </div>
         <div
           style={{
-            fontSize: "clamp(0.8rem, 3vw, 0.9rem)",
+            fontSize: "clamp(0.875rem, 3vw, 0.9rem)",
             color: "var(--text-muted)",
             margin: "8px 0 16px",
           }}
         >
-          {data.lider} lidera por {data.diferencia || "12.0"} puntos — El Juez Central evalúa
+          {t("alert.lidera", { lider: data.lider, dif: data.diferencia || "12.0" })}
         </div>
         <div
           style={{
@@ -538,13 +544,13 @@ function Alerta12Modal({
             <>
               <div
                 style={{
-                  fontSize: "clamp(0.82rem, 3vw, 0.92rem)",
+                  fontSize: "clamp(0.88rem, 3vw, 0.92rem)",
                   color: "var(--text-muted)",
                   marginBottom: 14,
                 }}
               >
-                El combate terminará y <strong style={{ color: "var(--gold)" }}>{liderNombre}</strong> quedará
-                como ganador por superioridad técnica.
+                {t("alert.terminara1")} <strong style={{ color: "var(--gold)" }}>{liderNombre}</strong>{" "}
+                {t("alert.terminara2")}
               </div>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 <button
@@ -561,7 +567,7 @@ function Alerta12Modal({
                     cursor: "pointer",
                   }}
                 >
-                  Volver
+                  {t("alert.volver")}
                 </button>
                 <button
                   onClick={onGanador}
@@ -577,7 +583,7 @@ function Alerta12Modal({
                     cursor: "pointer",
                   }}
                 >
-                  ✓ CONFIRMAR GANADOR
+                  {t("alert.confirmarGanador")}
                 </button>
               </div>
             </>
@@ -597,7 +603,7 @@ function Alerta12Modal({
                   cursor: "pointer",
                 }}
               >
-                ▶ REANUDAR COMBATE
+                {t("alert.reanudar")}
               </button>
               <button
                 onClick={() => setConfirmandoGanador(true)}
@@ -613,7 +619,7 @@ function Alerta12Modal({
                   cursor: "pointer",
                 }}
               >
-                🏆 GANADOR: {liderNombre}
+                {t("alert.ganadorBtn", { nombre: liderNombre })}
               </button>
             </div>
           )
@@ -621,12 +627,13 @@ function Alerta12Modal({
           <div
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: "clamp(0.85rem, 3vw, 1rem)",
+              fontSize: "clamp(0.9rem, 3vw, 1rem)",
               letterSpacing: "0.12em",
-              color: "rgba(255,255,255,0.45)",
+              // Sobre var(--bg-card): blanco fijo sería invisible en tema claro
+              color: "var(--text-muted)",
             }}
           >
-            ESPERANDO AL JUEZ CENTRAL
+            {t("alert.esperandoJC")}
           </div>
         )}
       </div>
@@ -642,6 +649,7 @@ function DerrotaModal({
   data: DerrotaData;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div
       style={{
@@ -681,7 +689,7 @@ function DerrotaModal({
             marginTop: 8,
           }}
         >
-          DESCALIFICADO
+          {t("alert.descalificado")}
         </div>
         <div
           style={{
@@ -717,7 +725,7 @@ function DerrotaModal({
             cursor: "pointer",
           }}
         >
-          CERRAR
+          {t("alert.cerrar")}
         </button>
       </div>
     </div>
@@ -732,6 +740,7 @@ function ConfirmModal({
   data: ConfirmData;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const tipoBorder = {
     peligro: "var(--hong)",
     advertencia: "var(--gold)",
@@ -823,7 +832,7 @@ function ConfirmModal({
                 cursor: "pointer",
               }}
             >
-              {data.cancelLabel || "Cancelar"}
+              {data.cancelLabel || t("comun.cancelar")}
             </button>
           )}
           <button
@@ -844,14 +853,20 @@ function ConfirmModal({
               fontFamily: "var(--font-display)",
               fontSize: "1rem",
               letterSpacing: "0.06em",
+              // #fff solo sobre el rojo de "peligro"; el fondo neutro
+              // (bg-elevated) es claro en tema claro y necesita var(--text)
               color:
-                tipo === "advertencia" ? "var(--text-on-gold)" : "#fff",
+                tipo === "peligro"
+                  ? "#fff"
+                  : tipo === "advertencia"
+                  ? "var(--text-on-gold)"
+                  : "var(--text)",
               cursor: "pointer",
             }}
           >
             {data.solo_ok
-              ? "ENTENDIDO"
-              : data.confirmLabel || "Confirmar"}
+              ? t("alert.entendido")
+              : data.confirmLabel || t("alert.confirmar")}
           </button>
         </div>
       </div>

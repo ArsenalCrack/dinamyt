@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * Botón de cerrar sesión con confirmación.
@@ -12,8 +13,9 @@ import { useRouter } from "next/navigation";
  * - Accesible: role="dialog", cierre con Escape, foco inicial en "Cancelar".
  * - Estado de carga mientras se cierra la sesión.
  */
-export default function LogoutButton({ label = "Cerrar sesión" }: { label?: string }) {
+export default function LogoutButton({ label }: { label?: string }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [confirming, setConfirming] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -52,7 +54,7 @@ export default function LogoutButton({ label = "Cerrar sesión" }: { label?: str
           <polyline points="16 17 21 12 16 7" />
           <line x1="21" y1="12" x2="9" y2="12" />
         </svg>
-        <span>{label}</span>
+        <span>{label ?? t("logout.boton")}</span>
       </button>
 
       {confirming && (
@@ -74,11 +76,10 @@ export default function LogoutButton({ label = "Cerrar sesión" }: { label?: str
                 letterSpacing: "0.04em", marginBottom: 8,
               }}
             >
-              ¿Cerrar sesión?
+              {t("logout.titulo")}
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: 22 }}>
-              Volverás a la pantalla de inicio de sesión. Los datos de los
-              tatamis permanecen guardados en el servidor.
+              {t("logout.mensaje")}
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button
@@ -89,7 +90,7 @@ export default function LogoutButton({ label = "Cerrar sesión" }: { label?: str
                 disabled={loggingOut}
                 style={{ minWidth: 130 }}
               >
-                Cancelar
+                {t("logout.cancelar")}
               </button>
               <button
                 type="button"
@@ -98,7 +99,7 @@ export default function LogoutButton({ label = "Cerrar sesión" }: { label?: str
                 disabled={loggingOut}
                 style={{ minWidth: 150, fontWeight: 800 }}
               >
-                {loggingOut ? "Cerrando..." : "Cerrar sesión"}
+                {loggingOut ? t("logout.cerrando") : t("logout.confirmar")}
               </button>
             </div>
           </div>

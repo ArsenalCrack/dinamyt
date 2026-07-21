@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Barlow_Condensed, Bebas_Neue, Inter, Share_Tech_Mono } from "next/font/google";
-import RegistrarSW from "@/components/RegistrarSW";
 import AppMenu from "@/components/AppMenu";
+import { I18nProvider } from "@/lib/i18n";
 import "./globals.css";
 
 // Fuentes auto-hospedadas: next/font las descarga en el build y las sirve
@@ -47,11 +47,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={fontClasses}>
+    // suppressHydrationWarning: el script inline de abajo pone data-theme en
+    // <html> antes de hidratar; sin esto React avisa de atributo distinto
+    <html lang="es" className={fontClasses} suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="theme-color" content="#050507" />
+        {/* Aplicar el tema guardado ANTES del primer pintado: si esto corriera
+            en un useEffect, cada carga en tema claro mostraría un flash oscuro.
+            Oscuro es el defecto, así que solo hay que marcar el claro. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{if(localStorage.getItem("dinamyt_theme")==="light"){document.documentElement.dataset.theme="light";document.querySelector(\'meta[name="theme-color"]\')?.setAttribute("content","#eef0f6")}}catch(e){}',
+          }}
+        />
         {/* PWA: instalable en escritorio y móvil */}
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
@@ -62,9 +73,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="DINAMYT" />
       </head>
       <body>
-        <RegistrarSW />
-        <AppMenu />
-        {children}
+        <I18nProvider>
+          <AppMenu />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

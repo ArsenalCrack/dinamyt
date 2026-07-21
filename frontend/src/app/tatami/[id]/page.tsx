@@ -5,10 +5,26 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   useCombate,
   marcadorDisplay,
+  marcadorFinal,
   formatTime,
   promedioEsquinas,
+  puntosJuezCentral,
+  fmtSigno,
   type CombateState,
 } from "@/hooks/useCombate";
+import {
+  activarAudio,
+  sfxAviso10s,
+  sfxFalta,
+  sfxGanador,
+  sfxGong,
+  sfxNotaFiguras,
+  sfxOro,
+  sfxPodio,
+  sfxPuntoChung,
+  sfxPuntoHong,
+  sfxTurnoFiguras,
+} from "@/lib/sfx";
 import AlertSystem, {
   useAlertSystem,
   type FaltaFlashData,
@@ -22,8 +38,10 @@ import PanelColapsable from "@/components/PanelColapsable";
 import BracketTree from "@/components/BracketTree";
 import PodioLlave from "@/components/PodioLlave";
 import Logo from "@/components/Logo";
+import PublicControls from "@/components/PublicControls";
 import SelectMenu from "@/components/SelectMenu";
 import { CATEGORIAS_FIGURAS } from "@/lib/categorias";
+import { useI18n, type ClaveTexto } from "@/lib/i18n";
 
 // ─── Figuras Types ───────────────────────────────────────────────────────────
 interface Criterio { id: string; nombre: string; max_pts: number; }
@@ -57,15 +75,18 @@ interface FigurasState {
   _campeonato_nombre?: string | null;
   _campeonato_id?: number | null;
   _grupo_figuras?: { llave_id: number; nombre: string } | null;
+  _roles_conectados?: Record<string, string | null>;
+  _num_combate?: number | null;
 }
 
 type AnyState = (CombateState & { _categoria?: string }) | (FigurasState & { _categoria?: string });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const RONDAS: Record<string, string> = {
-  r1: "ILHaeJon — Round 1",
-  r2: "EeHaeJon — Round 2",
-  oro: "PUNTO DE ORO",
+// Nombres de ronda para PANTALLA (los textos viven en lib/i18n)
+const RONDAS_CLAVE: Record<string, ClaveTexto> = {
+  r1: "tat.ronda.r1",
+  r2: "tat.ronda.r2",
+  oro: "tat.ronda.oro",
 };
 
 function isFiguras(state: AnyState): state is FigurasState {
@@ -214,14 +235,15 @@ function figurasConDatos(state: FigurasState) {
 function CatSelector({
   current, onSelect, figurasLabel,
 }: { current: string; onSelect: (cat: string) => void; figurasLabel: string }) {
+  const { t } = useI18n();
   const labels: Record<string, string> = {
-    combate: "Combate",
-    figuras: figurasLabel || "Figuras",
+    combate: t("tat.combate"),
+    figuras: figurasLabel || t("tat.figuras"),
   };
 
   return (
     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-      <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>CAT:</span>
+      <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("tat.cat")}</span>
       {["combate", "figuras"].map((cat) => (
         <button
           key={cat}
@@ -232,7 +254,7 @@ function CatSelector({
             background: current === cat ? (cat === "combate" ? "var(--hong-bg)" : "var(--gold-bg)") : undefined,
             borderColor: current === cat ? (cat === "combate" ? "var(--hong-border)" : "var(--gold-border)") : undefined,
             color: current === cat ? (cat === "combate" ? "var(--hong-light)" : "var(--gold)") : undefined,
-            padding: "4px 10px", minHeight: 32, fontSize: "0.8rem",
+            padding: "4px 10px", minHeight: 32, fontSize: "0.875rem",
           }}
         >
           {labels[cat]}
@@ -260,6 +282,82 @@ function CronoDisplay({ segundos, activo, big = false }: {
   );
 }
 
+// ─── Desglose del marcador ───────────────────────────────────────────────────
+// Promedio de esquinas y puntos del Juez Central SIEMPRE por separado. El
+// valor del JC no depende de la cantidad de jueces promediados: una falta de
+// −0.5 se muestra igual con 2, 3 o 4 jueces de esquina.
+function DesgloseMarcador({ state, color, grande = false }: {
+  state: CombateState; color: "hong" | "chung"; grande?: boolean;
+}) {
+  const { t } = useI18n();
+  const esq = promedioEsquinas(state, color);
+  const jc = puntosJuezCentral(state, color);
+  const jcColor = jc < 0 ? "var(--red-alert)" : jc > 0 ? "var(--green)" : "var(--text-dim)";
+  return (
+    <div style={{
+      display: "flex", gap: grande ? 18 : 10, justifyContent: "center", flexWrap: "wrap",
+      fontFamily: "var(--font-mono)",
+      fontSize: grande ? "clamp(0.875rem,1.5vw,1.1rem)" : "0.68rem",
+      marginTop: grande ? 8 : 2, color: "var(--text-muted)",
+    }}>
+      <span>
+        {t("tat.esquinas")} <strong style={{ color: "var(--text)" }}>{esq.toFixed(1)}</strong>
+      </span>
+      <span>
+        {t("tat.jcentral")} <strong style={{ color: jcColor }}>{fmtSigno(jc)}</strong>
+      </span>
+    </div>
+  );
+}
+
+// ─── Panel de conexiones: qué jueces están conectados AHORA ─────────────────
+// El servidor difunde _roles_conectados en cada conexión/desconexión: la mesa
+// ve al instante si un juez se cayó antes de seguir puntuando.
+function ConexionJueces({ conectados, numJueces }: {
+  conectados: Record<string, string | null>;
+  numJueces: number;
+}) {
+  const { t } = useI18n();
+  const roles = ["arbitro", ...["j1", "j2", "j3", "j4"].slice(0, numJueces || 4)];
+  const etiqueta = (r: string) => (r === "arbitro" ? "JC" : r.toUpperCase());
+  const faltan = roles.filter((r) => !(r in conectados));
+  return (
+    <div style={{
+      display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap",
+      padding: "6px 14px", borderBottom: "1px solid var(--border)",
+      background: "var(--bg-card)", fontSize: "0.78rem",
+    }}>
+      <span style={{ color: "var(--text-dim)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {t("tat.conexiones")}
+      </span>
+      {roles.map((r) => {
+        const on = r in conectados;
+        return (
+          <span
+            key={r}
+            title={on ? (conectados[r] || t("tat.conectado")) : t("tat.sinConexion")}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "2px 8px", borderRadius: 999,
+              border: `1px solid ${on ? "rgba(0,212,114,0.4)" : "var(--border)"}`,
+              color: on ? "var(--green)" : "var(--text-dim)",
+              fontWeight: 700,
+            }}
+          >
+            <span className={`status-dot ${on ? "online" : "offline"}`} />
+            {etiqueta(r)}
+          </span>
+        );
+      })}
+      {faltan.length > 0 && (
+        <span style={{ color: "var(--orange)", fontWeight: 700 }}>
+          {t("tat.sinConexionLista", { roles: faltan.map(etiqueta).join(", ") })}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // FIGURAS — Juez Central (Arbitro)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -272,6 +370,7 @@ function FigurasArbitro({
   tatamiDbId: string;
   onShowConfirm: (data: import("@/components/AlertSystem").ConfirmData) => void;
 }) {
+  const { t } = useI18n();
   const [newComp, setNewComp] = useState({ nombre: "", club: "", especial: false });
   const [showAddComp, setShowAddComp] = useState(false);
   const [categoriaError, setCategoriaError] = useState("");
@@ -320,7 +419,7 @@ function FigurasArbitro({
   function validarNombreCategoria() {
     const nombre = commitNombreCategoria();
     if (!categoriaNombreValido(nombre)) {
-      setCategoriaError("Ingresa el nombre de la categoría usando solo letras y espacios.");
+      setCategoriaError(t("tat.fig.errorCategoria"));
       return false;
     }
     setCategoriaError("");
@@ -345,11 +444,11 @@ function FigurasArbitro({
     if (!validarNombreCategoria() || empatadosNormales.length === 0) return;
     const nombres = empatadosNormales.map((r) => r.nombre).join(", ");
     onShowConfirm({
-      titulo: "REEVALUAR EMPATE",
-      mensaje: `Presentación de desempate para: ${nombres}. Se limpiarán SOLO sus puntuaciones para que los jueces los evalúen de nuevo; el podio se ocultará hasta completar. La categoría especial no se afecta y quedará constancia en el reporte.`,
+      titulo: t("tat.fig.reevaluar.titulo"),
+      mensaje: t("tat.fig.reevaluar.mensaje", { nombres }),
       tipo: "advertencia",
-      confirmLabel: "REEVALUAR",
-      cancelLabel: "Cancelar",
+      confirmLabel: t("tat.fig.reevaluar.confirmar"),
+      cancelLabel: t("comun.cancelar"),
       onConfirm: () => enviarEvento("reevaluar_empate"),
     });
   }
@@ -381,9 +480,9 @@ function FigurasArbitro({
           agregar competidores o empezar. */}
       <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 8 }}>
         <SelectMenu
-          ariaLabel="Categoría de figuras"
+          ariaLabel={t("tat.fig.categoriaAria")}
           value={(CATEGORIAS_FIGURAS as readonly string[]).includes(categoriaDraft) ? categoriaDraft : ""}
-          placeholder="— Selecciona la categoría —"
+          placeholder={t("tat.fig.selectCategoria")}
           onChange={(v) => {
             setCategoriaDraft(v);
             setCategoriaPendiente(true);
@@ -399,14 +498,14 @@ function FigurasArbitro({
           }}
         />
         {!nombreCategoriaValido && (
-          <p style={{ color: "var(--orange)", fontSize: "0.78rem", textAlign: "center", margin: 0 }}>
-            ⚠️ Elige una categoría para agregar competidores y comenzar.
+          <p style={{ color: "var(--orange)", fontSize: "0.85rem", textAlign: "center", margin: 0 }}>
+            {t("tat.fig.eligeCategoria")}
           </p>
         )}
         <input
           className="input"
           value={descDraft}
-          placeholder="Descripción pública (opc.) — ej: Intermedios 15-17 años"
+          placeholder={t("tat.fig.descPlaceholder")}
           maxLength={120}
           onChange={(e) => {
             setDescDraft(e.target.value);
@@ -414,33 +513,33 @@ function FigurasArbitro({
           }}
           onFocus={() => setDescFocused(true)}
           onBlur={() => setDescFocused(false)}
-          style={{ width: "100%", textAlign: "center", fontSize: "0.85rem" }}
+          style={{ width: "100%", textAlign: "center", fontSize: "0.9rem" }}
         />
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
           gap: 8, flexWrap: "wrap",
         }}>
-          <span className="card-title" style={{ marginBottom: 0, fontSize: "0.8rem" }}>
-            Juez Central · Tatami {tatamiId}
+          <span className="card-title" style={{ marginBottom: 0, fontSize: "0.875rem" }}>
+            {t("tat.fig.jcTatami", { n: tatamiId })}
           </span>
           {state.puntuacion_abierta && state.competidor_activo_id && (
             <button className="btn btn-sm btn-danger" onClick={() => {
               if (validarNombreCategoria()) enviarEvento("cerrar_puntuacion");
             }}>
-              Cerrar Puntuación
+              {t("tat.fig.cerrarPuntuacion")}
             </button>
           )}
         </div>
       </div>
       {categoriaError && (
-        <div style={{ color: "var(--orange)", fontWeight: 700, fontSize: "0.82rem", margin: "-8px 0 12px" }}>
+        <div style={{ color: "var(--orange)", fontWeight: 700, fontSize: "0.88rem", margin: "-8px 0 12px" }}>
           {categoriaError}
         </div>
       )}
 
       {/* Número de jueces (máximo 4 de esquina) */}
       <div className="card" style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", flexWrap: "wrap" }}>
-        <span style={{ color: "var(--text-muted)", fontSize: "0.82rem", fontWeight: 700 }}>Jueces:</span>
+        <span style={{ color: "var(--text-muted)", fontSize: "0.88rem", fontWeight: 700 }}>{t("tat.jc.jueces")}</span>
         {[2, 3, 4].map((n) => (
           <button key={n} className="btn btn-sm"
             onClick={() => {
@@ -458,11 +557,11 @@ function FigurasArbitro({
         <span style={{
           marginLeft: "auto",
           color: puntuacionesCompletas ? "var(--green)" : "var(--text-dim)",
-          fontSize: "0.78rem", fontWeight: 700,
+          fontSize: "0.85rem", fontWeight: 700,
         }}>
           {puntuacionesCompletas
-            ? "Puntuaciones completas — podio visible"
-            : "El podio aparece al completar todas las puntuaciones"}
+            ? t("tat.fig.completas")
+            : t("tat.fig.podioAparece")}
         </span>
       </div>
 
@@ -470,30 +569,30 @@ function FigurasArbitro({
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <div className="card-title" style={{ marginBottom: 0 }}>
-            Competidores ({state.competidores.length}/{MAX_COMPETIDORES})
+            {t("tat.fig.competidores")} ({state.competidores.length}/{MAX_COMPETIDORES})
           </div>
           <button className="btn btn-sm btn-primary"
             onClick={() => {
               if (validarNombreCategoria()) setShowAddComp(!showAddComp);
             }}
             disabled={!puedeAgregar}>
-            + Agregar
+            {t("tat.fig.agregarBtn")}
           </button>
         </div>
 
         {!puedeAgregar && (
-          <p style={{ color: "var(--orange)", fontSize: "0.82rem", marginBottom: 8 }}>
-            Máximo {MAX_COMPETIDORES} competidores alcanzado.
+          <p style={{ color: "var(--orange)", fontSize: "0.88rem", marginBottom: 8 }}>
+            {t("tat.fig.maxAlcanzado", { n: MAX_COMPETIDORES })}
           </p>
         )}
 
         {showAddComp && (
           <div className="animate-fade" style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <input className="input" placeholder="Nombre del competidor" value={newComp.nombre}
+              <input className="input" placeholder={t("tat.fig.nombreComp")} value={newComp.nombre}
                 onChange={(e) => setNewComp((v) => ({ ...v, nombre: e.target.value }))}
                 style={{ flex: "2 1 180px" }} />
-              <input className="input" placeholder="Club / Equipo (opc.)" value={newComp.club}
+              <input className="input" placeholder={t("tat.fig.club")} value={newComp.club}
                 onChange={(e) => setNewComp((v) => ({ ...v, club: e.target.value }))}
                 style={{ flex: "1 1 140px" }} />
               <button className="btn btn-primary"
@@ -508,12 +607,12 @@ function FigurasArbitro({
                     setShowAddComp(false);
                   }
                 }}>
-                Agregar
+                {t("tat.fig.agregar")}
               </button>
             </div>
             <label style={{
               display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
-              fontSize: "0.82rem", fontWeight: 700, userSelect: "none",
+              fontSize: "0.88rem", fontWeight: 700, userSelect: "none",
               color: newComp.especial ? "var(--gold)" : "var(--text-muted)",
             }}>
               <input
@@ -522,7 +621,7 @@ function FigurasArbitro({
                 onChange={(e) => setNewComp((v) => ({ ...v, especial: e.target.checked }))}
                 style={{ accentColor: "var(--gold)", width: 16, height: 16 }}
               />
-              Categoría especial — recibe su propio primer puesto sin afectar el podio del resto
+              {t("tat.fig.especialLabel")}
             </label>
           </div>
         )}
@@ -546,14 +645,14 @@ function FigurasArbitro({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, color: isActive ? "var(--gold)" : "inherit", overflowWrap: "anywhere" }}>
                     {comp.nombre}
-                    {comp.especial && <span className="badge badge-gold" style={{ marginLeft: 8, verticalAlign: "middle" }}>Especial</span>}
-                    {comp.empate && <span className="badge badge-gray" style={{ marginLeft: 8, verticalAlign: "middle", color: "var(--orange)", borderColor: "rgba(255,140,0,0.4)" }}>Desempate</span>}
+                    {comp.especial && <span className="badge badge-gold" style={{ marginLeft: 8, verticalAlign: "middle" }}>{t("tat.fig.especial")}</span>}
+                    {comp.empate && <span className="badge badge-gray" style={{ marginLeft: 8, verticalAlign: "middle", color: "var(--orange)", borderColor: "rgba(255,140,0,0.4)" }}>{t("tat.fig.desempate")}</span>}
                     {enDesempate.includes(comp.id) && !comp.empate && (
-                      <span className="badge badge-gray" style={{ marginLeft: 8, verticalAlign: "middle", color: "var(--orange)", borderColor: "rgba(255,140,0,0.4)" }}>Reevaluando</span>
+                      <span className="badge badge-gray" style={{ marginLeft: 8, verticalAlign: "middle", color: "var(--orange)", borderColor: "rgba(255,140,0,0.4)" }}>{t("tat.fig.reevaluando")}</span>
                     )}
-                    {isActive && <span style={{ marginLeft: 8, fontSize: "0.7rem", background: "var(--gold)", color: "#000", padding: "2px 6px", borderRadius: 4 }}>EN TURNO</span>}
+                    {isActive && <span style={{ marginLeft: 8, fontSize: "0.78rem", background: "var(--gold)", color: "#000", padding: "2px 6px", borderRadius: 4 }}>{t("tat.fig.enTurno")}</span>}
                   </div>
-                  {comp.club && <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{comp.club}</div>}
+                  {comp.club && <div style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>{comp.club}</div>}
                 </div>
                 <div style={{ fontFamily: "var(--font-display)", fontSize: "1.8rem", color: esPrimero || isActive ? "var(--gold)" : "var(--text)" }}>
                   {comp.total.toFixed(2)}
@@ -565,18 +664,18 @@ function FigurasArbitro({
                     <button className="btn btn-sm"
                       disabled={bloqueado}
                       title={comp.completo
-                        ? "Ya fue calificado por completo (sus notas son inmutables)"
+                        ? t("tat.fig.titleCalificado")
                         : fueraDelDesempate
-                          ? "Desempate en curso: solo los empatados pueden presentarse"
+                          ? t("tat.fig.titleDesempate")
                           : activoIncompleto
-                            ? "El competidor en turno aún tiene puntuaciones pendientes"
+                            ? t("tat.fig.titlePendiente")
                             : undefined}
                       onClick={() => {
                         if (!validarNombreCategoria()) return;
                         if (activoIncompleto) {
                           onShowConfirm({
-                            titulo: "TURNO EN CURSO",
-                            mensaje: "No puedes activar otro competidor: al competidor en turno le falta la puntuación de algún juez. Espera a que todos confirmen.",
+                            titulo: t("tat.fig.turnoCurso.titulo"),
+                            mensaje: t("tat.fig.turnoCurso.mensaje"),
                             tipo: "advertencia",
                             solo_ok: true,
                             onConfirm: () => {},
@@ -586,37 +685,41 @@ function FigurasArbitro({
                         enviarEvento("activar_competidor", { competidor_id: comp.id });
                       }}
                       style={{
-                        padding: "4px 8px", fontSize: "0.7rem",
+                        padding: "4px 8px", fontSize: "0.78rem",
                         background: "var(--bg-card)", borderColor: "var(--gold)",
                         opacity: bloqueado ? 0.45 : 1,
                       }}>
-                      ACTIVAR
+                      {t("tat.fig.activar")}
                     </button>
                   );
                 })()}
                 <button className="btn btn-sm btn-danger"
-                  title="Eliminar competidor"
+                  title={t("tat.fig.eliminarTitle")}
                   onClick={() => {
                     if (!validarNombreCategoria()) return;
                     const tieneNotas = Object.keys(state.puntuaciones[String(comp.id)] || {}).length > 0;
                     onShowConfirm({
-                      titulo: "ELIMINAR COMPETIDOR",
-                      mensaje: `¿Estás seguro de eliminar a "${comp.nombre}"${comp.club ? ` (${comp.club})` : ""}?${tieneNotas ? " Se perderán las puntuaciones que ya le registraron los jueces." : ""} Esta acción no se puede deshacer.`,
+                      titulo: t("tat.fig.eliminar.titulo"),
+                      mensaje: t("tat.fig.eliminar.mensaje", {
+                        nombre: comp.nombre,
+                        club: comp.club ? ` (${comp.club})` : "",
+                        notas: tieneNotas ? t("tat.fig.eliminar.notas") : "",
+                      }),
                       tipo: "peligro",
-                      confirmLabel: "ELIMINAR",
-                      cancelLabel: "Cancelar",
+                      confirmLabel: t("tat.fig.eliminar.confirmar"),
+                      cancelLabel: t("comun.cancelar"),
                       onConfirm: () => enviarEvento("eliminar_competidor", { competidor_id: comp.id }),
                     });
                   }}
-                  style={{ padding: "3px 8px", minHeight: 30, fontSize: "0.72rem" }}>
+                  style={{ padding: "3px 8px", minHeight: 30, fontSize: "0.8rem" }}>
                   ✕
                 </button>
               </div>
             );
           })}
           {state.competidores.length === 0 && (
-            <p style={{ textAlign: "center", color: "var(--text-dim)", padding: "20px 0", fontSize: "0.88rem" }}>
-              Agrega competidores para comenzar
+            <p style={{ textAlign: "center", color: "var(--text-dim)", padding: "20px 0", fontSize: "0.92rem" }}>
+              {t("tat.fig.agregaComp")}
             </p>
           )}
         </div>
@@ -624,13 +727,13 @@ function FigurasArbitro({
 
       {/* Criterios */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <div className="card-title">Criterios de Puntuación</div>
+        <div className="card-title">{t("tat.fig.criterios")}</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {state.criterios.map((c) => (
             <div key={c.id} style={{
               padding: "6px 14px", background: "var(--bg-elevated)",
               border: "1px solid var(--border-light)", borderRadius: "var(--radius-sm)",
-              fontSize: "0.82rem", fontWeight: 700,
+              fontSize: "0.88rem", fontWeight: 700,
             }}>
               {c.nombre} <span style={{ color: "var(--gold)", marginLeft: 4 }}>/{c.max_pts}</span>
             </div>
@@ -648,10 +751,10 @@ function FigurasArbitro({
           borderRadius: "var(--radius)",
         }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ color: "var(--orange)", fontWeight: 800, fontSize: "0.82rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Empate en el puesto {empatadosNormales[0].puesto} — deben desempatar
+            <div style={{ color: "var(--orange)", fontWeight: 800, fontSize: "0.88rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              {t("tat.fig.empatePuesto", { n: empatadosNormales[0].puesto })}
             </div>
-            <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 2, overflowWrap: "anywhere" }}>
+            <div style={{ fontSize: "0.88rem", color: "var(--text-muted)", marginTop: 2, overflowWrap: "anywhere" }}>
               {empatadosNormales.map((r) => r.nombre).join(" · ")}
             </div>
           </div>
@@ -665,7 +768,7 @@ function FigurasArbitro({
               fontWeight: 800,
             }}
           >
-            Reevaluar
+            {t("tat.fig.reevaluarBtn")}
           </button>
         </div>
       )}
@@ -677,47 +780,47 @@ function FigurasArbitro({
           onClick={() => {
             if (!validarNombreCategoria()) return;
             if (!state.competidores.length) {
-              setCategoriaError("Agrega competidores antes de guardar.");
+              setCategoriaError(t("tat.fig.agregaAntes"));
               return;
             }
             onShowConfirm({
-              titulo: "GUARDAR Y NUEVA CATEGORÍA",
-              mensaje: `¿Guardar "${state.nombre_categoria || "Figuras"}" e iniciar una nueva categoría? El ranking y las puntuaciones quedarán registrados en el reporte.`,
+              titulo: t("tat.fig.guardarNueva.titulo"),
+              mensaje: t("tat.fig.guardarNueva.mensaje", { nombre: state.nombre_categoria || "Figuras" }),
               tipo: "advertencia",
-              confirmLabel: "GUARDAR + NUEVO",
-              cancelLabel: "Cancelar",
+              confirmLabel: t("tat.guardarNuevoLabel"),
+              cancelLabel: t("comun.cancelar"),
               onConfirm: () => enviarEvento("nuevo_combate"),
             });
           }}>
-          Guardar + Nuevo
+          {t("tat.guardarNuevoBtn")}
         </button>
         <button className="btn btn-danger"
           style={{ whiteSpace: "normal", lineHeight: 1.25, padding: "12px 18px", minHeight: 48 }}
           onClick={() => {
             if (!validarNombreCategoria()) return;
             onShowConfirm({
-              titulo: "RESETEAR FIGURAS",
-              mensaje: "¿Reiniciar la categoría de figuras? Se perderán los competidores y todas las puntuaciones. Usa 'Guardar + Nuevo' si quieres conservarlas.",
+              titulo: t("tat.fig.reiniciar.titulo"),
+              mensaje: t("tat.fig.reiniciar.mensaje"),
               tipo: "peligro",
-              confirmLabel: "RESETEAR",
-              cancelLabel: "Cancelar",
+              confirmLabel: t("tat.reiniciarLabel"),
+              cancelLabel: t("comun.cancelar"),
               onConfirm: () => enviarEvento("reset_figuras"),
             });
           }}>
-          Resetear
+          {t("tat.reiniciarBtn")}
         </button>
       </div>
       {!puntuacionesCompletas && state.competidores.length > 0 && (
-        <p style={{ color: "var(--text-dim)", fontSize: "0.76rem", marginTop: 8, textAlign: "center" }}>
-          El podio aparecerá automáticamente en la pantalla pública cuando todos los competidores hayan sido calificados en todos sus criterios.
+        <p style={{ color: "var(--text-dim)", fontSize: "0.84rem", marginTop: 8, textAlign: "center" }}>
+          {t("tat.fig.podioAuto")}
         </p>
       )}
 
       {/* Log */}
       {state.log.length > 0 && (
         <div className="card" style={{ marginTop: 12, padding: "10px 14px" }}>
-          <div className="card-title" style={{ marginBottom: 6 }}>Log</div>
-          <div style={{ maxHeight: 120, overflowY: "auto", fontSize: "0.78rem" }}>
+          <div className="card-title" style={{ marginBottom: 6 }}>{t("tat.fig.log")}</div>
+          <div style={{ maxHeight: 120, overflowY: "auto", fontSize: "0.85rem" }}>
             {state.log.slice(0, 8).map((l, i) => (
               <div key={i} style={{ padding: "3px 0", borderBottom: "1px solid var(--border)", color: "var(--text-muted)" }}>
                 {l.txt}
@@ -742,6 +845,7 @@ function FigurasScoreCard({
   miCriterio: Criterio;
   comp: Competidor;
 }) {
+  const { t } = useI18n();
   const compId = String(comp.id);
   const valCommitted = state.puntuaciones[compId]?.[juezId];
   const isConfirmed = state.puntuaciones_confirmadas?.[compId]?.[juezId];
@@ -757,7 +861,7 @@ function FigurasScoreCard({
     }
     const formatted = normalizeScoreInput(val);
     if (!formatted) {
-      setError("La puntuación debe estar entre 0.00 y 9.99.");
+      setError(t("tat.fig.notaRango"));
       return;
     }
     setNota(formatted);
@@ -767,12 +871,12 @@ function FigurasScoreCard({
   function handleGuardar() {
     if (isConfirmed) return;
     if (!categoriaNombreValido(state.nombre_categoria)) {
-      setError("El Juez Central debe ingresar un nombre de categoría válido.");
+      setError(t("tat.fig.jcNombreValido"));
       return;
     }
     const formatted = normalizeScoreInput(nota);
     if (!formatted || !isValidScore(formatted)) {
-      setError("Ingresa la puntuación con números, por ejemplo 875 para 8.75.");
+      setError(t("tat.fig.notaFormato"));
       return;
     }
     setNota(formatted);
@@ -799,15 +903,15 @@ function FigurasScoreCard({
         <div style={{ fontWeight: 800, fontSize: "1.4rem", marginBottom: 4, color: "var(--gold)" }}>
           {comp.nombre}
         </div>
-        <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 20 }}>
+        <div style={{ fontSize: "0.88rem", color: "var(--text-muted)", marginBottom: 20 }}>
           {comp.club}
         </div>
 
-        <label style={{ fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
-          CALIFICA:
+        <label style={{ fontSize: "0.875rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+          {t("tat.fig.califica")}
         </label>
         <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--gold)", marginBottom: 16 }}>
-          {miCriterio.nombre} (Max {miCriterio.max_pts})
+          {miCriterio.nombre} ({t("tat.fig.maxPts")} {miCriterio.max_pts})
         </div>
 
         <input
@@ -835,28 +939,28 @@ function FigurasScoreCard({
         />
 
         {!isConfirmed && (
-          <div style={{ marginTop: 8, color: "var(--text-dim)", fontSize: "0.78rem" }}>
-            Escribe solo los números: <strong style={{ color: "var(--text-muted)" }}>875</strong> se
-            convierte en <strong style={{ color: "var(--gold)" }}>8.75</strong>
+          <div style={{ marginTop: 8, color: "var(--text-dim)", fontSize: "0.85rem" }}>
+            {t("tat.fig.soloNumeros1")} <strong style={{ color: "var(--text-muted)" }}>875</strong>{" "}
+            {t("tat.fig.soloNumeros2")} <strong style={{ color: "var(--gold)" }}>8.75</strong>
           </div>
         )}
 
         {error && (
-          <div style={{ marginTop: 10, color: "var(--orange)", fontWeight: 700, fontSize: "0.86rem" }}>
+          <div style={{ marginTop: 10, color: "var(--orange)", fontWeight: 700, fontSize: "0.92rem" }}>
             {error}
           </div>
         )}
 
         {isConfirmed ? (
           <div style={{ marginTop: 20, color: "var(--green)", fontWeight: 700, fontSize: "1.1rem" }}>
-            ✓ PUNTUACIÓN GUARDADA: {formatScoreValue(valCommitted ?? 0)}
+            {t("tat.fig.guardada")} {formatScoreValue(valCommitted ?? 0)}
           </div>
         ) : (
           <button className="btn btn-primary"
             onClick={handleGuardar}
             disabled={!canSave}
             style={{ marginTop: 20, width: "100%", padding: 16, fontSize: "1.1rem", fontWeight: 800 }}>
-            ✓ GUARDAR PUNTUACIÓN
+            {t("tat.fig.guardarPuntuacion")}
           </button>
         )}
       </div>
@@ -872,6 +976,7 @@ function FigurasJuez({
   juezId: string;
   connected: boolean;
 }) {
+  const { t } = useI18n();
   const params = useParams();
   const offline = useRegistroOffline(`dinamyt_offline_figuras_${params.id}_${juezId}`);
   const [nombreOff, setNombreOff] = useState("");
@@ -890,11 +995,10 @@ function FigurasJuez({
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--text-dim)" }}>
         <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>
-          {juezId.toUpperCase()} no participa en esta categoría
+          {t("tat.fig.noParticipa", { rol: juezId.toUpperCase() })}
         </p>
-        <p style={{ fontSize: "0.85rem" }}>
-          El Juez Central configuró las figuras con {numJueces} jueces de esquina.
-          Tu nota no contaría en el total.
+        <p style={{ fontSize: "0.9rem" }}>
+          {t("tat.fig.noParticipaDesc", { n: numJueces })}
         </p>
       </div>
     );
@@ -911,20 +1015,20 @@ function FigurasJuez({
           entradas={offline.entradas}
           onDeshacer={offline.deshacer}
           onLimpiar={offline.limpiar}
-          descripcion="Sin conexión: anota aquí el competidor y tu nota; se guardan en este dispositivo aunque recargues. Cuando vuelva la conexión, ingrésalas por el flujo normal cuando el Juez Central active a cada competidor, o díctalas a la mesa."
+          descripcion={t("tat.fig.offDesc")}
         />
         <div className="card" style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
-          <div className="card-title">Anotar nota local{miCriterio ? ` — ${miCriterio.nombre}` : ""}</div>
+          <div className="card-title">{t("tat.fig.anotarLocal")}{miCriterio ? ` — ${miCriterio.nombre}` : ""}</div>
           <input
             className="input"
-            placeholder="Nombre del competidor"
+            placeholder={t("tat.fig.nombreComp")}
             value={nombreOff}
             onChange={(e) => setNombreOff(e.target.value)}
           />
           <input
             className="input"
             inputMode="numeric"
-            placeholder="Nota (ej: 8.50)"
+            placeholder={t("tat.fig.notaEj")}
             value={notaOff}
             onChange={(e) => {
               // Igual que el input online: solo números, máximo 3 dígitos y
@@ -943,7 +1047,7 @@ function FigurasJuez({
               setNotaOff("");
             }}
           >
-            Guardar nota
+            {t("tat.fig.guardarNota")}
           </button>
         </div>
         <PanelRegistroOffline
@@ -966,7 +1070,7 @@ function FigurasJuez({
         entradas={offline.entradas}
         onDeshacer={offline.deshacer}
         onLimpiar={offline.limpiar}
-        descripcion="Recuperaste la conexión. Reingresa estas notas cuando el Juez Central active a cada competidor (o díctalas a la mesa) y luego borra el registro."
+        descripcion={t("tat.fig.reconectadoDesc")}
       />
     </div>
   ) : null;
@@ -974,8 +1078,8 @@ function FigurasJuez({
   if (!categoriaNombreValido(state.nombre_categoria)) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--text-dim)" }}>
-        <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>Esperando nombre de categoría...</p>
-        <p style={{ fontSize: "0.85rem" }}>El Juez Central debe ingresar un nombre válido usando solo letras y espacios.</p>
+        <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>{t("tat.fig.esperandoNombre")}</p>
+        <p style={{ fontSize: "0.9rem" }}>{t("tat.fig.esperandoNombreDesc")}</p>
       </div>
     );
   }
@@ -983,8 +1087,8 @@ function FigurasJuez({
   if (state.competidores.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--text-dim)" }}>
-        <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>Esperando competidores...</p>
-        <p style={{ fontSize: "0.85rem" }}>El Juez Central agregará los competidores.</p>
+        <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>{t("tat.fig.esperandoComp")}</p>
+        <p style={{ fontSize: "0.9rem" }}>{t("tat.fig.esperandoCompDesc")}</p>
       </div>
     );
   }
@@ -994,8 +1098,8 @@ function FigurasJuez({
       <>
         {recordatorioOffline}
         <div style={{ padding: 40, textAlign: "center", color: "var(--text-dim)" }}>
-          <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>Esperando autorización...</p>
-          <p style={{ fontSize: "0.85rem" }}>El Juez Central debe activar el turno del competidor.</p>
+          <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>{t("tat.fig.esperandoAuth")}</p>
+          <p style={{ fontSize: "0.9rem" }}>{t("tat.fig.esperandoAuthDesc")}</p>
         </div>
       </>
     );
@@ -1004,8 +1108,8 @@ function FigurasJuez({
   if (!miCriterio) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--red-alert)" }}>
-        <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>No tienes un criterio asignado.</p>
-        <p style={{ fontSize: "0.85rem" }}>Este rol no está configurado en los criterios actuales.</p>
+        <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>{t("tat.fig.sinCriterio")}</p>
+        <p style={{ fontSize: "0.9rem" }}>{t("tat.fig.sinCriterioDesc")}</p>
       </div>
     );
   }
@@ -1036,6 +1140,7 @@ function FigurasJuez({
 // FIGURAS — Pantalla Pública
 // ══════════════════════════════════════════════════════════════════════════════
 function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: string }) {
+  const { t } = useI18n();
   const ranking = rankingFiguras(state);
   const nombreCategoria = state._nombre_categoria || state.nombre_categoria || "Figuras";
   const puntuacionesCompletas = figurasPuntuacionesCompletas(state);
@@ -1043,6 +1148,38 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
   // calificados en todos sus criterios (el backend finaliza solo al completar).
   const shouldShowPodio = state.finalizado || puntuacionesCompletas;
   const activeComp = state.competidores.find((c) => c.id === state.competidor_activo_id);
+
+  // ── Sonidos (ver lib/sfx.ts): nuevo turno, nota registrada y podio final.
+  // El toggle 🔊 desbloquea el audio (política de autoplay). Se comparan
+  // VALORES prev/actual: un resync tras reconectar no repite sonidos. ──
+  const [soundOn, setSoundOn] = useState(false);
+  function toggleSound() {
+    if (!soundOn) activarAudio();
+    setSoundOn(!soundOn);
+  }
+  const notasConfirmadas = Object.values(state.puntuaciones_confirmadas || {})
+    .reduce((n, porJuez) => n + Object.values(porJuez || {}).filter(Boolean).length, 0);
+  const sfxFigPrevRef = useRef({
+    activo: state.competidor_activo_id,
+    notas: notasConfirmadas,
+    podio: shouldShowPodio,
+  });
+  useEffect(() => {
+    const prev = sfxFigPrevRef.current;
+    const ahora = {
+      activo: state.competidor_activo_id,
+      notas: notasConfirmadas,
+      podio: shouldShowPodio,
+    };
+    sfxFigPrevRef.current = ahora;
+    if (!soundOn) return;
+    if (ahora.podio && !prev.podio) {
+      sfxPodio();
+      return;
+    }
+    if (ahora.activo != null && ahora.activo !== prev.activo) sfxTurnoFiguras();
+    if (ahora.notas > prev.notas) sfxNotaFiguras();
+  }, [state, soundOn, notasConfirmadas, shouldShowPodio]);
   const juecesActivos = juecesActivosFiguras(state);
   const activeCompId = activeComp ? String(activeComp.id) : "";
   const activeTotal = ranking.find((r) => r.id === activeComp?.id)?.total ?? 0;
@@ -1058,11 +1195,28 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
         textAlign: "center", padding: "14px 20px",
         borderBottom: "1px solid var(--border)",
         background: "var(--bg-card)",
+        position: "relative",
       }}>
+        {/* Toggle de sonido (turnos, notas y podio) */}
+        <button
+          type="button"
+          onClick={toggleSound}
+          title={soundOn ? t("tat.pant.sonidoOnTitle") : t("tat.pant.sonidoOffTitle")}
+          style={{
+            position: "absolute", top: 10, right: 12,
+            background: "none", border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)", padding: "3px 10px",
+            color: soundOn ? "var(--gold)" : "var(--text-dim)",
+            cursor: "pointer", fontSize: "0.82rem", fontFamily: "var(--font-body)",
+            fontWeight: 700, zIndex: 2,
+          }}
+        >
+          {soundOn ? t("tat.pant.sonidoOn") : t("tat.pant.sonidoOff")}
+        </button>
         {!vistaEnVivo && <Logo fontSize="clamp(1.5rem, 4vw, 2rem)" />}
         {state._campeonato_nombre && (
           <div style={{
-            fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 700,
+            fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 700,
             textTransform: "uppercase", letterSpacing: "0.12em", marginTop: 2,
           }}>{state._campeonato_nombre}</div>
         )}
@@ -1071,16 +1225,16 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
           color: "var(--gold)", letterSpacing: "0.15em", lineHeight: 1,
           marginTop: 8,
         }}>
-          TATAMI {tatamiId}
+          {t("tat.tatamiMayus")} {tatamiId}
         </div>
         <div style={{
-          fontFamily: "var(--font-body)", fontSize: "0.85rem",
+          fontFamily: "var(--font-body)", fontSize: "0.9rem",
           color: "var(--gold)", fontWeight: 700, textTransform: "uppercase",
           letterSpacing: "0.15em", marginTop: 2,
         }}>{nombreCategoria}</div>
         {state.descripcion && (
           <div style={{
-            fontSize: "clamp(0.8rem, 1.6vw, 1.05rem)", color: "var(--text-muted)",
+            fontSize: "clamp(0.875rem, 1.6vw, 1.05rem)", color: "var(--text-muted)",
             fontWeight: 600, marginTop: 4,
           }}>{state.descripcion}</div>
         )}
@@ -1089,7 +1243,7 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
         {ranking.length === 0 ? (
           <div style={{ textAlign: "center", marginTop: "25%", color: "var(--text-dim)" }}>
-            <p style={{ fontSize: "1.6rem" }}>Esperando participantes...</p>
+            <p style={{ fontSize: "1.6rem" }}>{t("tat.pant.esperandoParticipantes")}</p>
           </div>
         ) : !shouldShowPodio ? (
           activeComp ? (
@@ -1107,13 +1261,13 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
                   style={{ marginBottom: 8 }}
                 />
                 <div style={{ fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.16em", color: "var(--text-dim)", fontWeight: 800 }}>
-                  En turno
+                  {t("tat.pant.enTurno")}
                 </div>
                 <div style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.2rem,5.5vw,4.5rem)", color: "var(--text)", lineHeight: 1.05 }}>
                   {activeComp.nombre}
                 </div>
                 {activeComp.club && (
-                  <div style={{ marginTop: 4, color: "var(--text-muted)", fontSize: "clamp(0.85rem,1.5vw,1.1rem)" }}>
+                  <div style={{ marginTop: 4, color: "var(--text-muted)", fontSize: "clamp(0.9rem,1.5vw,1.1rem)" }}>
                     {activeComp.club}
                   </div>
                 )}
@@ -1141,7 +1295,7 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
                       display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
                     }}>
                       <div style={{
-                        fontSize: "clamp(0.7rem,1.2vw,0.95rem)", fontWeight: 800,
+                        fontSize: "clamp(0.78rem,1.2vw,0.95rem)", fontWeight: 800,
                         textTransform: "uppercase", letterSpacing: "0.1em",
                         color: "var(--text-muted)",
                       }}>
@@ -1154,7 +1308,7 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
                       }}>
                         {tieneNota ? Number(valor).toFixed(2) : "—"}
                       </div>
-                      <div style={{ fontSize: "0.68rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
                         {juezId.toUpperCase()}
                       </div>
                     </div>
@@ -1170,8 +1324,8 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
                 border: "1.5px solid var(--gold-border)",
                 borderRadius: "var(--radius-lg)",
               }}>
-                <span style={{ fontSize: "clamp(0.8rem,1.4vw,1.1rem)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-muted)" }}>
-                  Total
+                <span style={{ fontSize: "clamp(0.875rem,1.4vw,1.1rem)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-muted)" }}>
+                  {t("tat.pant.total")}
                 </span>
                 <span style={{ fontFamily: "var(--font-display)", fontSize: "clamp(3rem,7vw,6rem)", color: "var(--gold)", lineHeight: 1 }}>
                   {activeTotal.toFixed(2)}
@@ -1182,12 +1336,12 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
             /* ── Sin competidor activo: esperando ── */
             <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "var(--text-muted)" }}>
               <div style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2rem,5vw,4rem)", color: "var(--gold)", letterSpacing: "0.08em" }}>
-                Puntuaciones en curso
+                {t("tat.pant.puntuacionesCurso")}
               </div>
               <div style={{ marginTop: 12, fontSize: "clamp(0.9rem,1.6vw,1.2rem)", color: "var(--text-dim)" }}>
                 {puntuacionesCompletas
-                  ? "Todas las puntuaciones registradas — esperando podio"
-                  : "Esperando al siguiente competidor"}
+                  ? t("tat.pant.todasRegistradas")
+                  : t("tat.pant.esperandoSiguiente")}
               </div>
             </div>
           )
@@ -1222,7 +1376,7 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
                     </div>
                     {comp.club && (
                       <div style={{
-                        fontSize: "clamp(0.85rem,1.6vw,1.1rem)",
+                        fontSize: "clamp(0.9rem,1.6vw,1.1rem)",
                         color: "var(--text-muted)", marginTop: 4,
                         overflowWrap: "anywhere",
                       }}>
@@ -1232,23 +1386,23 @@ function FigurasPantalla({ state, tatamiId }: { state: FigurasState; tatamiId: s
                     {(comp.especial || comp.empate || (hayEspeciales && comp.puesto === 1)) && (
                       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
                         {comp.especial && (
-                          <span className="badge badge-gold" style={{ fontSize: "clamp(0.6rem,1.2vw,0.85rem)" }}>
-                            Categoría Especial
+                          <span className="badge badge-gold" style={{ fontSize: "clamp(0.72rem,1.2vw,0.85rem)" }}>
+                            {t("tat.pant.catEspecial")}
                           </span>
                         )}
                         {hayEspeciales && comp.puesto === 1 && (
-                          <span className="badge badge-gold" style={{ fontSize: "clamp(0.6rem,1.2vw,0.85rem)" }}>
-                            Comparten puesto
+                          <span className="badge badge-gold" style={{ fontSize: "clamp(0.72rem,1.2vw,0.85rem)" }}>
+                            {t("tat.pant.compartenPuesto")}
                           </span>
                         )}
                         {comp.empate && (
                           <span className="badge" style={{
-                            fontSize: "clamp(0.6rem,1.2vw,0.85rem)",
+                            fontSize: "clamp(0.72rem,1.2vw,0.85rem)",
                             background: "rgba(255,140,0,0.12)",
                             border: "1px solid rgba(255,140,0,0.4)",
                             color: "var(--orange)",
                           }}>
-                            Desempate pendiente
+                            {t("tat.pant.desempatePendiente")}
                           </span>
                         )}
                       </div>
@@ -1280,6 +1434,7 @@ function CombatePantalla({
 }: {
   state: CombateState; tatamiId: string; connected: boolean;
 }) {
+  const { t } = useI18n();
   const totalHong = marcadorDisplay(state, "hong");
   const totalChung = marcadorDisplay(state, "chung");
 
@@ -1288,45 +1443,61 @@ function CombatePantalla({
     : state.segundos <= 10 ? "urgente"
     : "activo";
 
-  // ── Sonido: gong al terminar el tiempo (requiere activarlo con un toque
-  // por la política de autoplay de los navegadores) ──
+  // ── Sonidos de la pantalla pública (sintetizados, ver lib/sfx.ts). El
+  // toggle 🔊 crea/reanuda el AudioContext (política de autoplay de los
+  // navegadores: se necesita un toque del usuario antes de sonar) ──
   const [soundOn, setSoundOn] = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const prevSegundosRef = useRef(state.segundos);
 
   function toggleSound() {
-    if (!soundOn) {
-      type AudioWindow = Window & { webkitAudioContext?: typeof AudioContext };
-      const Ctx = window.AudioContext || (window as AudioWindow).webkitAudioContext;
-      if (!Ctx) return;
-      if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
-      void audioCtxRef.current.resume();
-    }
+    if (!soundOn) activarAudio();
     setSoundOn(!soundOn);
   }
 
+  // Un solo efecto compara el estado previo con el nuevo y dispara el sonido
+  // que corresponda. Se comparan VALORES (no eventos): así un resync completo
+  // tras reconectar no repite sonidos, y solo los AUMENTOS suenan (un
+  // deshacer/anular o un combate nuevo bajan valores en silencio).
+  const sfxPrevRef = useRef({
+    hong: marcadorFinal(state, "hong"),
+    chung: marcadorFinal(state, "chung"),
+    faltas: (state.kyongHong || 0) + (state.kyongChung || 0)
+      + (state.faltasHong || 0) + (state.faltasChung || 0),
+    oro: Boolean(state.oroPendienteAprobacion),
+    ganador: Boolean(state.ganadorPendienteCierre || state.ganadorManualColor),
+    segundos: state.segundos,
+  });
+
   useEffect(() => {
-    const prev = prevSegundosRef.current;
-    prevSegundosRef.current = state.segundos;
-    if (!soundOn || !audioCtxRef.current) return;
-    // Gong cuando el cronómetro llega a 0 viniendo de un valor mayor
-    if (prev > 0 && state.segundos === 0) {
-      const ctx = audioCtxRef.current;
-      const ahora = ctx.currentTime;
-      [196, 98].forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, ahora);
-        gain.gain.exponentialRampToValueAtTime(i === 0 ? 0.5 : 0.3, ahora + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ahora + 2.2);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(ahora);
-        osc.stop(ahora + 2.3);
-      });
+    const prev = sfxPrevRef.current;
+    const ahora = {
+      hong: marcadorFinal(state, "hong"),
+      chung: marcadorFinal(state, "chung"),
+      faltas: (state.kyongHong || 0) + (state.kyongChung || 0)
+        + (state.faltasHong || 0) + (state.faltasChung || 0),
+      oro: Boolean(state.oroPendienteAprobacion),
+      ganador: Boolean(state.ganadorPendienteCierre || state.ganadorManualColor),
+      segundos: state.segundos,
+    };
+    sfxPrevRef.current = ahora;
+    if (!soundOn) return;
+
+    // Cronómetro: gong al llegar a 0; doble tick al entrar a los últimos 10 s
+    if (prev.segundos > 0 && ahora.segundos === 0) sfxGong();
+    else if (state.activo && prev.segundos > 10 && ahora.segundos <= 10 && ahora.segundos > 0) {
+      sfxAviso10s();
     }
-  }, [state.segundos, soundOn]);
+
+    // Ganador declarado: fanfarria (y silenciar el beep del punto que lo causó)
+    if (ahora.ganador && !prev.ganador) {
+      sfxGanador();
+    } else {
+      if (ahora.hong > prev.hong) sfxPuntoHong();
+      if (ahora.chung > prev.chung) sfxPuntoChung();
+    }
+
+    if (ahora.faltas > prev.faltas) sfxFalta();
+    if (ahora.oro && !prev.oro) sfxOro();
+  }, [state, soundOn]);
 
   // ── Árbol de la llave en pantalla pública (antes/entre combates) ──
   if (state._mostrar_arbol && state._llave_arbol) {
@@ -1339,9 +1510,9 @@ function CombatePantalla({
           <Logo fontSize="clamp(1.4rem, 3.5vw, 1.8rem)" />
           {state._campeonato_nombre && (
             <div style={{
-              fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700,
+              fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 700,
               textTransform: "uppercase", letterSpacing: "0.12em", marginTop: 2,
-            }}>{state._campeonato_nombre} · Tatami {tatamiId}</div>
+            }}>{state._campeonato_nombre} · {t("camp.tatami")} {tatamiId}</div>
           )}
           <div style={{
             fontFamily: "var(--font-display)", fontSize: "clamp(1.6rem,3.5vw,3rem)",
@@ -1351,10 +1522,10 @@ function CombatePantalla({
           </div>
           {state._combate_llave && (
             <div style={{
-              fontSize: "clamp(0.75rem,1.4vw,1rem)", color: "var(--text)",
+              fontSize: "clamp(0.82rem,1.4vw,1rem)", color: "var(--text)",
               fontWeight: 700, marginTop: 4,
             }}>
-              Próximo ({state._combate_llave.ronda_nombre}):{" "}
+              {t("tat.pant.proximo")} ({state._combate_llave.ronda_nombre}):{" "}
               <span style={{ color: "var(--hong-light)" }}>{state._combate_llave.comp1.nombre}</span>
               {" vs "}
               <span style={{ color: "var(--chung-light)" }}>{state._combate_llave.comp2.nombre}</span>
@@ -1364,7 +1535,7 @@ function CombatePantalla({
         <div style={{ flex: 1, overflowY: "auto", padding: "clamp(10px,2vh,24px) clamp(12px,2vw,28px)" }}>
           {state._llave_arbol.estructura.campeon && (
             <div style={{ marginBottom: "clamp(14px,3vh,28px)" }}>
-              <PodioLlave estructura={state._llave_arbol.estructura} grande titulo="🏆 Podio final" />
+              <PodioLlave estructura={state._llave_arbol.estructura} grande titulo={t("tat.pant.podioFinal")} />
             </div>
           )}
           <BracketTree
@@ -1378,13 +1549,13 @@ function CombatePantalla({
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
           padding: "8px 24px", borderTop: "1px solid var(--border)",
-          fontSize: "0.78rem", color: "var(--text-dim)",
+          fontSize: "0.85rem", color: "var(--text-dim)",
         }}>
           <Logo fontSize="1.1rem" />
-          <span>Tatami {tatamiId}</span>
+          <span>{t("camp.tatami")} {tatamiId}</span>
           <span>
             <span className={`status-dot ${connected ? "online" : "offline"}`} />
-            {connected ? "En vivo" : "Desconectado"}
+            {connected ? t("tat.envivo") : t("tat.desconectado")}
           </span>
         </div>
       </div>
@@ -1412,10 +1583,7 @@ function CombatePantalla({
           >
             {totalHong}
           </div>
-          <div style={{ display: "flex", gap: 16, color: "var(--text-muted)", fontSize: "clamp(0.8rem,1.5vw,1.1rem)", fontFamily: "var(--font-mono)", marginTop: 8 }}>
-            <span>ESQ {promedioEsquinas(state, "hong").toFixed(1)}</span>
-            <span>ARB {state.arbHong}</span>
-          </div>
+          <DesgloseMarcador state={state} color="hong" grande />
           <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
             {state.kyongHong > 0 && <span style={{ color: "var(--orange)", fontSize: "0.9rem" }}>K:{state.kyongHong}</span>}
             {state.faltasHong > 0 && <span style={{ color: "var(--red-alert)", fontSize: "0.9rem" }}>G:{state.faltasHong}</span>}
@@ -1432,7 +1600,7 @@ function CombatePantalla({
           />
           {state._campeonato_nombre && (
             <div style={{
-              fontSize: "clamp(0.65rem,1.2vw,0.9rem)", color: "var(--text-muted)",
+              fontSize: "clamp(0.75rem,1.2vw,0.9rem)", color: "var(--text-muted)",
               fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em",
               marginBottom: 4,
             }}>
@@ -1441,16 +1609,25 @@ function CombatePantalla({
           )}
           <div style={{
             fontSize: "clamp(2rem,4vw,3.5rem)", fontFamily: "var(--font-display)",
-            color: "var(--gold)", letterSpacing: "0.15em", marginBottom: 12,
+            color: "var(--gold)", letterSpacing: "0.15em", marginBottom: 4,
             lineHeight: 1
           }}>
-            TATAMI {tatamiId}
+            {t("tat.tatamiMayus")} {tatamiId}
           </div>
+          {typeof state._num_combate === "number" && state._num_combate > 0 && (
+            <div style={{
+              fontSize: "clamp(0.78rem,1.4vw,1rem)", fontWeight: 800,
+              color: "var(--text-muted)", textTransform: "uppercase",
+              letterSpacing: "0.18em", marginBottom: 10,
+            }}>
+              {t("tat.combateNumPant", { n: state._num_combate })}
+            </div>
+          )}
           <div className={`crono-display ${cronoClass}`} style={{ fontSize: "clamp(2.5rem,7vw,6rem)" }}>
             {formatTime(state.segundos)}
           </div>
           <div style={{
-            fontFamily: "var(--font-display)", fontSize: "clamp(0.7rem,1.5vw,1.1rem)",
+            fontFamily: "var(--font-display)", fontSize: "clamp(0.78rem,1.5vw,1.1rem)",
             letterSpacing: "0.2em",
             color: state.ronda === "oro" ? "var(--gold)" : "var(--text-muted)",
             animation: state.ronda === "oro" ? "glow-oro 1.2s infinite alternate" : undefined,
@@ -1459,11 +1636,11 @@ function CombatePantalla({
             borderRadius: 20,
             marginTop: 6,
           }}>
-            {RONDAS[state.ronda] || state.ronda}
+            {RONDAS_CLAVE[state.ronda] ? t(RONDAS_CLAVE[state.ronda]) : state.ronda}
           </div>
           {state._combate_llave && (
             <div style={{
-              fontSize: "clamp(0.65rem,1.2vw,0.95rem)", fontWeight: 800,
+              fontSize: "clamp(0.75rem,1.2vw,0.95rem)", fontWeight: 800,
               color: "var(--gold)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginTop: 8,
             }}>
@@ -1485,10 +1662,7 @@ function CombatePantalla({
           <div className="proy-score chung" key={`c-${totalChung}`} style={{ animation: "boom 0.3s ease-out" }}>
             {totalChung}
           </div>
-          <div style={{ display: "flex", gap: 16, color: "var(--text-muted)", fontSize: "clamp(0.8rem,1.5vw,1.1rem)", fontFamily: "var(--font-mono)", marginTop: 8 }}>
-            <span>ESQ {promedioEsquinas(state, "chung").toFixed(1)}</span>
-            <span>ARB {state.arbChung}</span>
-          </div>
+          <DesgloseMarcador state={state} color="chung" grande />
           <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
             {state.kyongChung > 0 && <span style={{ color: "var(--orange)", fontSize: "0.9rem" }}>K:{state.kyongChung}</span>}
             {state.faltasChung > 0 && <span style={{ color: "var(--red-alert)", fontSize: "0.9rem" }}>G:{state.faltasChung}</span>}
@@ -1496,32 +1670,54 @@ function CombatePantalla({
         </div>
       </div>
 
+      {/* Próximos combates de la llave (para que se vayan preparando) */}
+      {(state._proximos_llave?.length ?? 0) > 0 && (
+        <div style={{
+          display: "flex", gap: "clamp(10px,2vw,24px)", alignItems: "center",
+          justifyContent: "center", flexWrap: "wrap", padding: "7px 16px",
+          borderTop: "1px solid var(--border)",
+          fontSize: "clamp(0.8rem,1.4vw,1rem)",
+        }}>
+          <span style={{ color: "var(--gold)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em" }}>
+            {t("tat.pant.proximos")}
+          </span>
+          {state._proximos_llave!.map((p, i) => (
+            <span key={`${p.comp1}-${p.comp2}-${i}`} style={{ color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              <span style={{ color: "var(--hong-light)", fontWeight: 700 }}>{p.comp1}</span>
+              {" vs "}
+              <span style={{ color: "var(--chung-light)", fontWeight: 700 }}>{p.comp2}</span>
+              <span style={{ color: "var(--text-dim)" }}> ({p.ronda_nombre})</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Footer */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         padding: "8px 24px", borderTop: "1px solid var(--border)",
-        fontSize: "0.78rem", color: "var(--text-dim)",
+        fontSize: "0.85rem", color: "var(--text-dim)",
       }}>
         <Logo fontSize="1.1rem" />
-        <span>Tatami {tatamiId}</span>
+        <span>{t("camp.tatami")} {tatamiId}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button
             type="button"
             onClick={toggleSound}
-            title={soundOn ? "Silenciar gong de fin de tiempo" : "Activar gong de fin de tiempo"}
+            title={soundOn ? t("tat.pant.sonidoOnTitle") : t("tat.pant.sonidoOffTitle")}
             style={{
               background: "none", border: "1px solid var(--border)",
               borderRadius: "var(--radius-sm)", padding: "3px 10px",
               color: soundOn ? "var(--gold)" : "var(--text-dim)",
-              cursor: "pointer", fontSize: "0.75rem", fontFamily: "var(--font-body)",
+              cursor: "pointer", fontSize: "0.82rem", fontFamily: "var(--font-body)",
               fontWeight: 700,
             }}
           >
-            {soundOn ? "🔊 Sonido ON" : "🔇 Sonido OFF"}
+            {soundOn ? t("tat.pant.sonidoOn") : t("tat.pant.sonidoOff")}
           </button>
           <span>
             <span className={`status-dot ${connected ? "online" : "offline"}`} />
-            {connected ? "En vivo" : "Desconectado"}
+            {connected ? t("tat.envivo") : t("tat.desconectado")}
           </span>
         </span>
       </div>
@@ -1533,16 +1729,46 @@ function CombatePantalla({
 // COMBATE — Juez Esquina (botones VERTICALES, solo sus puntos)
 // ══════════════════════════════════════════════════════════════════════════════
 function CombateJuez({
-  state, rol, enviarEvento, pendingEvents, connected, onFlash,
+  state, rol, enviarEvento, pendingEvents, connected, onFlash, registroResuelto,
 }: {
   state: CombateState; rol: string;
   enviarEvento: (accion: string, datos?: Record<string, unknown>) => void;
   pendingEvents: number; connected: boolean;
   onFlash: (ico: string, txt: string) => void;
+  registroResuelto?: { rol: string; aplicado: boolean; n: number } | null;
 }) {
+  const { t } = useI18n();
   const miPuntaje = state.jueces?.[rol] || { hong: 0, chung: 0 };
   const params = useParams();
   const offline = useRegistroOffline(`dinamyt_offline_${params.id}_${rol}`);
+
+  // Al RECONECTAR, el registro local se envía SOLO a la mesa como propuesta:
+  // el Juez Central lo aplica o lo descarta (adiós al reingreso manual).
+  const propuestoRef = useRef(false);
+  useEffect(() => {
+    if (!connected) { propuestoRef.current = false; return; }
+    if (propuestoRef.current) return;
+    const puntos = offline.entradas.filter((e) => e.color && (e.pts || 0) > 0);
+    if (puntos.length === 0) return;
+    propuestoRef.current = true;
+    enviarEvento("proponer_registro_local", { entradas: puntos });
+    onFlash("📤", t("tat.flash.registroEnviado"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, offline.entradas.length]);
+
+  // La mesa resolvió mi registro: limpiar la libreta local y avisar
+  const ultimoResueltoRef = useRef(0);
+  useEffect(() => {
+    if (!registroResuelto || registroResuelto.rol !== rol) return;
+    if (registroResuelto.n === ultimoResueltoRef.current) return;
+    ultimoResueltoRef.current = registroResuelto.n;
+    offline.limpiar();
+    onFlash(
+      registroResuelto.aplicado ? "✅" : "🗑",
+      registroResuelto.aplicado ? t("tat.flash.mesaAplico") : t("tat.flash.mesaDescarto"),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registroResuelto]);
   const nombresListos = competidoresConNombre(state);
   // Bloqueado con ganador declarado, punto de oro en espera o alerta de
   // superioridad abierta (el combate queda en pausa hasta que el JC la cierre).
@@ -1555,10 +1781,13 @@ function CombateJuez({
   const rolNum = rol.startsWith("j") ? Number(rol.slice(1)) : 0;
   const rolInactivo = rolNum > (state.numJueces || 4);
 
-  const PUNTOS = [
-    { pts: 1, label: "CUERPO" },
-    { pts: 2, label: "GIRO / PAT. CABEZA" },
-    { pts: 3, label: "GIRO CABEZA" },
+  // "label" es el nombre CANÓNICO (en español) que viaja al servidor y queda
+  // en el historial/reportes: NO cambia con el idioma del juez. "clave" es
+  // solo para mostrar el botón en el idioma del dispositivo.
+  const PUNTOS: { pts: number; label: string; clave: ClaveTexto }[] = [
+    { pts: 1, label: "CUERPO", clave: "tat.pts.cuerpo" },
+    { pts: 2, label: "GIRO / PAT. CABEZA", clave: "tat.pts.giroPatCabeza" },
+    { pts: 3, label: "GIRO CABEZA", clave: "tat.pts.giroCabeza" },
   ];
 
   function anotar(color: "hong" | "chung", pts: number, label: string) {
@@ -1569,11 +1798,11 @@ function CombateJuez({
       return;
     }
     if (!nombresListos) {
-      onFlash("⚠️", "NOMBRES REQUERIDOS");
+      onFlash("⚠️", t("tat.flash.nombresRequeridos"));
       return;
     }
     if (combateCerrado) {
-      onFlash("🏆", "COMBATE FINALIZADO");
+      onFlash("🏆", t("tat.flash.combateFinalizado"));
       return;
     }
     onFlash(color === "hong" ? "🔴" : "🔵", `+${pts} JEUMSU`);
@@ -1584,11 +1813,10 @@ function CombateJuez({
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--text-dim)" }}>
         <p style={{ fontSize: "1.4rem", marginBottom: 8 }}>
-          {rol.toUpperCase()} no participa en este combate
+          {t("tat.juez.noParticipa", { rol: rol.toUpperCase() })}
         </p>
-        <p style={{ fontSize: "0.85rem" }}>
-          El Juez Central configuró el combate con {state.numJueces} jueces de esquina.
-          Tus puntos no contarían en el marcador.
+        <p style={{ fontSize: "0.9rem" }}>
+          {t("tat.juez.noParticipaDesc", { n: state.numJueces })}
         </p>
       </div>
     );
@@ -1620,8 +1848,8 @@ function CombateJuez({
         onDeshacer={offline.deshacer}
         onLimpiar={offline.limpiar}
         descripcion={connected
-          ? "Recuperaste la conexión. Muestra el registro del final de esta pantalla a la mesa de control y, cuando esté conciliado, bórralo allí."
-          : "Tus puntos se están guardando en este teléfono (sobreviven aunque recargues). El detalle completo está al final de esta pantalla."}
+          ? t("tat.juez.reconectadoDesc")
+          : t("tat.juez.offDesc")}
       />
 
       {/* Aviso de combate cerrado o punto de oro en espera */}
@@ -1629,33 +1857,33 @@ function CombateJuez({
         <div style={{
           marginBottom: 10, padding: "8px 12px", borderRadius: "var(--radius)",
           border: "1px solid var(--gold)", background: "rgba(212,175,55,0.08)",
-          color: "var(--gold)", fontWeight: 700, textAlign: "center", fontSize: "0.85rem",
+          color: "var(--gold)", fontWeight: 700, textAlign: "center", fontSize: "0.9rem",
         }}>
           {state.oroPendienteAprobacion
-            ? "🏆 Punto de oro en espera de aprobación del Juez Central"
-            : "🏆 Combate finalizado — esperando al Juez Central"}
+            ? t("tat.oroEsperaJuez")
+            : t("tat.cerradoEsperaJuez")}
         </div>
       )}
 
       {/* Mis puntos — solo los propios */}
       <div className="grid-2" style={{ marginBottom: 10 }}>
         <div className="card card-hong" style={{ textAlign: "center", padding: "10px 8px" }}>
-          <div style={{ fontSize: "0.65rem", color: "var(--hong-light)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--hong-light)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>
             {state.nombreHong}
           </div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: "2.5rem", color: "var(--hong-vivid)" }}>
             {miPuntaje.hong}
           </div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-dim)" }}>Mis puntos</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{t("tat.juez.misPuntos")}</div>
         </div>
         <div className="card card-chung" style={{ textAlign: "center", padding: "10px 8px" }}>
-          <div style={{ fontSize: "0.65rem", color: "var(--chung-light)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--chung-light)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>
             {state.nombreChung}
           </div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: "2.5rem", color: "var(--chung-vivid)" }}>
             {miPuntaje.chung}
           </div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-dim)" }}>Mis puntos</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{t("tat.juez.misPuntos")}</div>
         </div>
       </div>
 
@@ -1675,21 +1903,21 @@ function CombateJuez({
               disabled={(connected && state.oroResuelto) || juezBloqueado}
             >
               <span className="pts">+{p.pts}</span>
-              <span className="label">{p.label}</span>
+              <span className="label">{t(p.clave)}</span>
             </button>
           ))}
           <button
             className="btn btn-danger"
-            style={{ marginTop: 4, padding: "10px 6px", fontSize: "0.82rem", opacity: (connected && state.oroResuelto) || juezBloqueado ? 0.5 : 1 }}
+            style={{ marginTop: 4, padding: "10px 6px", fontSize: "0.88rem", opacity: (connected && state.oroResuelto) || juezBloqueado ? 0.5 : 1 }}
             disabled={(connected && state.oroResuelto) || juezBloqueado}
             onClick={() => {
               if (!connected) { offline.deshacer(); return; }
               const hay = state.historial?.some((h) => h.juez === rol && h.color === "hong");
               if (hay) enviarEvento("deshacer_juez", { juez: rol, color: "hong" });
-              else onFlash("⚠️", "NADA QUE DESHACER");
+              else onFlash("⚠️", t("tat.flash.nadaDeshacer"));
             }}
           >
-            ↩ Deshacer
+            {t("tat.deshacer")}
           </button>
         </div>
 
@@ -1707,21 +1935,21 @@ function CombateJuez({
               disabled={(connected && state.oroResuelto) || juezBloqueado}
             >
               <span className="pts">+{p.pts}</span>
-              <span className="label">{p.label}</span>
+              <span className="label">{t(p.clave)}</span>
             </button>
           ))}
           <button
             className="btn btn-danger"
-            style={{ marginTop: 4, padding: "10px 6px", fontSize: "0.82rem", opacity: (connected && state.oroResuelto) || juezBloqueado ? 0.5 : 1 }}
+            style={{ marginTop: 4, padding: "10px 6px", fontSize: "0.88rem", opacity: (connected && state.oroResuelto) || juezBloqueado ? 0.5 : 1 }}
             disabled={(connected && state.oroResuelto) || juezBloqueado}
             onClick={() => {
               if (!connected) { offline.deshacer(); return; }
               const hay = state.historial?.some((h) => h.juez === rol && h.color === "chung");
               if (hay) enviarEvento("deshacer_juez", { juez: rol, color: "chung" });
-              else onFlash("⚠️", "NADA QUE DESHACER");
+              else onFlash("⚠️", t("tat.flash.nadaDeshacer"));
             }}
           >
-            ↩ Deshacer
+            {t("tat.deshacer")}
           </button>
         </div>
       </div>
@@ -1729,7 +1957,7 @@ function CombateJuez({
       {pendingEvents > 0 && (
         <div style={{ textAlign: "center", marginTop: 8 }}>
           <span className="status-dot pending" />
-          <span style={{ color: "var(--orange)", fontSize: "0.78rem" }}>{pendingEvents} pendiente(s)</span>
+          <span style={{ color: "var(--orange)", fontSize: "0.85rem" }}>{t("tat.pendientes", { n: pendingEvents })}</span>
         </div>
       )}
 
@@ -1808,6 +2036,7 @@ function PanelRegistroOffline({
    */
   modo?: "completo" | "resumen" | "detalle";
 }) {
+  const { t } = useI18n();
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
   // Visible mientras no haya conexión, o mientras quede un registro pendiente
   // de conciliar con la mesa después de reconectar.
@@ -1834,21 +2063,21 @@ function PanelRegistroOffline({
             fontWeight: 800, fontSize: "0.9rem", letterSpacing: "0.06em", textTransform: "uppercase",
             color: conectado ? "var(--gold)" : "var(--red-alert)", marginBottom: 6,
           }}>
-            {conectado ? "📋 Registro local pendiente" : "📴 Sin conexión — registro local activo"}
+            {conectado ? t("tat.off.pendiente") : t("tat.off.sinConexion")}
           </div>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginBottom: hayPuntos ? 10 : 0 }}>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: hayPuntos ? 10 : 0 }}>
             {descripcion}
           </p>
           {hayPuntos && (
             <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "0.65rem", color: "var(--hong-light)", fontWeight: 800 }}>HONG</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--hong-light)", fontWeight: 800 }}>HONG</div>
                 <div style={{ fontFamily: "var(--font-display)", fontSize: "2rem", color: "var(--hong-vivid)" }}>
                   {totalHong}
                 </div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "0.65rem", color: "var(--chung-light)", fontWeight: 800 }}>CHUNG</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--chung-light)", fontWeight: 800 }}>CHUNG</div>
                 <div style={{ fontFamily: "var(--font-display)", fontSize: "2rem", color: "var(--chung-vivid)" }}>
                   {totalChung}
                 </div>
@@ -1858,10 +2087,10 @@ function PanelRegistroOffline({
         </>
       ) : (
         <div style={{
-          fontWeight: 800, fontSize: "0.82rem", letterSpacing: "0.06em", textTransform: "uppercase",
+          fontWeight: 800, fontSize: "0.88rem", letterSpacing: "0.06em", textTransform: "uppercase",
           color: conectado ? "var(--gold)" : "var(--red-alert)", marginBottom: 8,
         }}>
-          📋 Registro local ({entradas.length})
+          {t("tat.off.registro", { n: entradas.length })}
         </div>
       )}
 
@@ -1869,7 +2098,7 @@ function PanelRegistroOffline({
         <>
           <div style={{ maxHeight: 160, overflowY: "auto", margin: "10px 0", display: "flex", flexDirection: "column", gap: 2 }}>
             {[...entradas].reverse().map((e) => (
-              <div key={e.ts} style={{ fontSize: "0.78rem", color: "var(--text-muted)", display: "flex", gap: 8 }}>
+              <div key={e.ts} style={{ fontSize: "0.85rem", color: "var(--text-muted)", display: "flex", gap: 8 }}>
                 <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}>{hora(e.ts)}</span>
                 {e.color && (
                   <span style={{ color: e.color === "hong" ? "var(--hong-light)" : "var(--chung-light)", fontWeight: 700 }}>
@@ -1881,17 +2110,17 @@ function PanelRegistroOffline({
             ))}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="btn btn-sm" onClick={onDeshacer}>↩ Deshacer último</button>
+            <button className="btn btn-sm" onClick={onDeshacer}>{t("tat.off.deshacerUltimo")}</button>
             {confirmandoBorrado ? (
               <>
                 <button className="btn btn-sm btn-danger" onClick={() => { onLimpiar(); setConfirmandoBorrado(false); }}>
-                  ✓ Sí, borrar todo
+                  {t("tat.off.siBorrar")}
                 </button>
-                <button className="btn btn-sm" onClick={() => setConfirmandoBorrado(false)}>Cancelar</button>
+                <button className="btn btn-sm" onClick={() => setConfirmandoBorrado(false)}>{t("comun.cancelar")}</button>
               </>
             ) : (
               <button className="btn btn-sm btn-danger" onClick={() => setConfirmandoBorrado(true)}>
-                Borrar registro
+                {t("tat.off.borrar")}
               </button>
             )}
           </div>
@@ -1911,6 +2140,7 @@ function NombresCombate({ nombreHong, nombreChung, enviarEvento, disabled }: {
   enviarEvento: (accion: string, datos?: Record<string, unknown>) => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   const aDraft = (v: string, def: string) => (v === def ? "" : v);
   const [hong, setHong] = useState(() => aDraft(nombreHong, "Hong"));
   const [chung, setChung] = useState(() => aDraft(nombreChung, "Chung"));
@@ -1955,7 +2185,7 @@ function NombresCombate({ nombreHong, nombreChung, enviarEvento, disabled }: {
 
   return (
     <div className="grid-2" style={{ marginBottom: 10 }}>
-      <input className="input" placeholder="Nombre Hong (Requerido)" value={hong}
+      <input className="input" placeholder={t("tat.jc.nombreHong")} value={hong}
         disabled={disabled}
         onFocus={() => { editandoRef.current = true; }}
         onBlur={onBlur}
@@ -1965,7 +2195,7 @@ function NombresCombate({ nombreHong, nombreChung, enviarEvento, disabled }: {
           textAlign: "center", fontWeight: 700, color: "var(--hong-light)",
           opacity: disabled ? 0.6 : 1,
         }} />
-      <input className="input" placeholder="Nombre Chung (Requerido)" value={chung}
+      <input className="input" placeholder={t("tat.jc.nombreChung")} value={chung}
         disabled={disabled}
         onFocus={() => { editandoRef.current = true; }}
         onBlur={onBlur}
@@ -1995,15 +2225,16 @@ function CombateArbitro({
   onShowConfirm: (data: import("@/components/AlertSystem").ConfirmData) => void;
   broadcast: (data: Record<string, unknown>) => void;
 }) {
+  const { t } = useI18n();
   const totalHong = marcadorDisplay(state, "hong");
   const totalChung = marcadorDisplay(state, "chung");
-  const esqHong = promedioEsquinas(state, "hong").toFixed(1);
-  const esqChung = promedioEsquinas(state, "chung").toFixed(1);
+  // El VALOR del motivo es canónico (en español): viaja al servidor y queda
+  // en reportes. Solo la etiqueta visible del <option> se traduce.
   const [motivoDq, setMotivoDq] = useState("No presentación");
   const offline = useRegistroOffline(`dinamyt_offline_${tatamiDbId}_arbitro`);
   const nombresListos = competidoresConNombre(state);
   // Con ganador declarado el combate está cerrado: se bloquea todo lo que
-  // altere marcador o cronómetro. Solo quedan NUEVO COMBATE (guardar) y RESET.
+  // altere marcador o cronómetro. Solo quedan NUEVO COMBATE (guardar) y REINICIO TOTAL.
   // La alerta de superioridad abierta también pausa el combate.
   const combateCerrado = Boolean(state.ganadorManualColor);
   const cierreBloqueado = !nombresListos || Boolean(state.ganadorPendienteCierre);
@@ -2016,22 +2247,29 @@ function CombateArbitro({
   const puntosArbBloqueados = connected && (state.oroResuelto || accionesBloqueadas);
   const faltasBloqueadas = connected && accionesBloqueadas;
 
-  const PUNTOS_ARB = [
-    { pts: 2, nombre: "Knock Down" },
-    { pts: 2, nombre: "Derribo/Barrida" },
-    { pts: 2, nombre: "Proyeccion" },
+  // "nombre" es el CANÓNICO (español) que viaja al servidor y queda en el
+  // historial/reportes; "clave" solo traduce la etiqueta del botón.
+  const PUNTOS_ARB: { pts: number; nombre: string; clave: ClaveTexto }[] = [
+    { pts: 2, nombre: "Knock Down", clave: "tat.pts.knockDown" },
+    { pts: 2, nombre: "Derribo/Barrida", clave: "tat.pts.derribo" },
+    { pts: 2, nombre: "Proyeccion", clave: "tat.pts.proyeccion" },
   ];
-  const RONDAS_BTN = [
-    { id: "r1", label: "Round 1" }, { id: "r2", label: "Round 2" }, { id: "oro", label: "Pto. Oro" },
+  const RONDAS_BTN: { id: string; clave: ClaveTexto }[] = [
+    { id: "r1", clave: "tat.rondaBtn.r1" }, { id: "r2", clave: "tat.rondaBtn.r2" }, { id: "oro", clave: "tat.rondaBtn.oro" },
   ];
   const DURACIONES = [30, 60, 90, 120];
 
   // Validar nombres antes de iniciar crono
   function handleCronoStart() {
+    if (state.segundos <= 0) {
+      // El servidor ignora INICIAR con el tiempo agotado: avisar al JC
+      onFlash("⏱", t("tat.flash.tiempoAgotado"));
+      return;
+    }
     if (!nombresListos) {
       onShowConfirm({
-        titulo: "NOMBRES REQUERIDOS",
-        mensaje: "Debes ingresar el nombre de ambos competidores antes de iniciar el cronómetro. El nombre aparecerá en la pantalla pública y en los reportes.",
+        titulo: t("tat.jc.nombresReq.titulo"),
+        mensaje: t("tat.jc.nombresReq.crono"),
         tipo: "advertencia",
         solo_ok: true,
         onConfirm: () => {},
@@ -2048,11 +2286,11 @@ function CombateArbitro({
       return;
     }
     if (!nombresListos) {
-      onFlash("⚠️", "NOMBRES REQUERIDOS");
+      onFlash("⚠️", t("tat.flash.nombresRequeridos"));
       return;
     }
     if (state.oroResuelto) {
-      onFlash("⚠️", "PUNTO DE ORO BLOQUEADO");
+      onFlash("⚠️", t("tat.flash.oroBloqueado"));
       return;
     }
     const data: FaltaFlashData = {
@@ -2072,7 +2310,7 @@ function CombateArbitro({
       return;
     }
     if (!nombresListos) {
-      onFlash("⚠️", "NOMBRES REQUERIDOS");
+      onFlash("⚠️", t("tat.flash.nombresRequeridos"));
       return;
     }
     const num = (color === "hong" ? state.kyongHong : state.kyongChung) + 1;
@@ -2093,7 +2331,7 @@ function CombateArbitro({
       return;
     }
     if (!nombresListos) {
-      onFlash("⚠️", "NOMBRES REQUERIDOS");
+      onFlash("⚠️", t("tat.flash.nombresRequeridos"));
       return;
     }
     const num = (color === "hong" ? state.faltasHong : state.faltasChung) + 1;
@@ -2111,8 +2349,8 @@ function CombateArbitro({
   function handleDeclararGanador(color: "hong" | "chung", motivo: string) {
     if (!nombresListos) {
       onShowConfirm({
-        titulo: "NOMBRES REQUERIDOS",
-        mensaje: "Debes ingresar el nombre de ambos competidores antes de declarar un ganador.",
+        titulo: t("tat.jc.nombresReq.titulo"),
+        mensaje: t("tat.jc.nombresReq.ganador"),
         tipo: "advertencia",
         solo_ok: true,
         onConfirm: () => {},
@@ -2122,11 +2360,13 @@ function CombateArbitro({
 
     const nombre = color === "hong" ? state.nombreHong : state.nombreChung;
     onShowConfirm({
-      titulo: motivo.toUpperCase(),
-      mensaje: `¿Declarar ganador a ${nombre}? Esta decisión pausará el combate y bloqueará todas las pantallas hasta que el Juez Central cierre la alerta.`,
+      // El motivo viaja canónico (español) al servidor; para el TÍTULO del
+      // diálogo se muestra traducido si es uno de los conocidos.
+      titulo: (motivo === "Superioridad técnica" ? t("alert.superioridad") : motivo).toUpperCase(),
+      mensaje: t("tat.jc.declarar.mensaje", { nombre }),
       tipo: "advertencia",
-      confirmLabel: "DECLARAR GANADOR",
-      cancelLabel: "Cancelar",
+      confirmLabel: t("tat.jc.declarar.confirmar"),
+      cancelLabel: t("comun.cancelar"),
       onConfirm: () => enviarEvento("declarar_ganador", { color, motivo }),
     });
   }
@@ -2134,8 +2374,8 @@ function CombateArbitro({
   function handleDescalificar(color: "hong" | "chung") {
     if (!nombresListos) {
       onShowConfirm({
-        titulo: "NOMBRES REQUERIDOS",
-        mensaje: "Debes ingresar el nombre de ambos competidores antes de descalificar.",
+        titulo: t("tat.jc.nombresReq.titulo"),
+        mensaje: t("tat.jc.nombresReq.dq"),
         tipo: "advertencia",
         solo_ok: true,
         onConfirm: () => {},
@@ -2145,24 +2385,29 @@ function CombateArbitro({
     const nombre = color === "hong" ? state.nombreHong : state.nombreChung;
     const rival = color === "hong" ? state.nombreChung : state.nombreHong;
     onShowConfirm({
-      titulo: "DESCALIFICACIÓN",
-      mensaje: `¿Descalificar a ${nombre} (${color === "hong" ? "🔴 HONG" : "🔵 CHUNG"}) por "${motivoDq}"? ${rival} quedará como ganador y el combate se cerrará.`,
+      titulo: t("tat.jc.dq.titulo"),
+      mensaje: t("tat.jc.dq.mensaje", {
+        nombre,
+        color: color === "hong" ? "🔴 HONG" : "🔵 CHUNG",
+        motivo: motivoDq,
+        rival,
+      }),
       tipo: "peligro",
-      confirmLabel: "DESCALIFICAR",
-      cancelLabel: "Cancelar",
+      confirmLabel: t("tat.jc.dq.confirmar"),
+      cancelLabel: t("comun.cancelar"),
       onConfirm: () => enviarEvento("descalificar", { color, razon: motivoDq }),
     });
   }
 
   function handleNuevoCombate() {
     onShowConfirm({
-      titulo: "GUARDAR Y NUEVO COMBATE",
-      mensaje: "¿Guardar este combate e iniciar uno nuevo? Los puntos quedarán registrados en el reporte.",
+      titulo: t("tat.jc.guardarNuevo.titulo"),
+      mensaje: t("tat.jc.guardarNuevo.mensaje"),
       tipo: "advertencia",
-      confirmLabel: "GUARDAR + NUEVO",
-      cancelLabel: "Cancelar",
+      confirmLabel: t("tat.guardarNuevoLabel"),
+      cancelLabel: t("comun.cancelar"),
       onConfirm: () => {
-        onFlash("📁", "COMBATE GUARDADO");
+        onFlash("📁", t("tat.flash.combateGuardado"));
         enviarEvento("nuevo_combate");
       },
     });
@@ -2170,10 +2415,10 @@ function CombateArbitro({
 
   function handleReset() {
     onShowConfirm({
-      titulo: "RESETEAR MARCADOR",
-      mensaje: "¿Reiniciar el marcador? Los puntos se perderán. Usa 'Guardar + Nuevo' si quieres conservarlos.",
+      titulo: t("tat.jc.reiniciarMarcador.titulo"),
+      mensaje: t("tat.jc.reiniciarMarcador.mensaje"),
       tipo: "peligro",
-      confirmLabel: "RESETEAR",
+      confirmLabel: t("tat.reiniciarLabel"),
       onConfirm: () => enviarEvento("reset"),
     });
   }
@@ -2189,7 +2434,7 @@ function CombateArbitro({
         }}>
           <div style={{ fontSize: "3rem", marginBottom: 12 }}>🏆</div>
           <div style={{ color: "var(--gold)", fontWeight: 800, fontSize: "1.5rem", letterSpacing: "0.05em", textAlign: "center", padding: "0 20px" }}>
-            PUNTO DE ORO POR APROBAR
+            {t("tat.jc.oroPorAprobar")}
           </div>
           {state.oroPuntoDetalle && (
             <div style={{
@@ -2201,17 +2446,16 @@ function CombateArbitro({
             </div>
           )}
           <div style={{ color: "var(--text)", marginTop: 10, textAlign: "center", maxWidth: 420, fontSize: "0.9rem" }}>
-            Punto para <strong>{state.oroGanadorNombre || "el competidor"}</strong>.
-            Aún <strong>no está sumado</strong> al marcador: si lo apruebas se suma,
-            se declara el ganador y el combate finaliza; si lo rechazas se descarta
-            y el combate continúa.
+            {t("tat.jc.oroPara")} <strong>{state.oroGanadorNombre || t("tat.jc.elCompetidor")}</strong>
+            {t("tat.jc.oroDesc1")} <strong>{t("tat.jc.oroNoSumado")}</strong>
+            {t("tat.jc.oroDesc2")}
           </div>
           <div style={{ display: "flex", gap: 16, marginTop: 24 }}>
             <button className="btn btn-primary" onClick={() => enviarEvento("aprobar_oro")} style={{ padding: "12px 24px", fontSize: "1.1rem" }}>
-              ✓ APROBAR Y FINALIZAR
+              {t("tat.jc.aprobarFinalizar")}
             </button>
             <button className="btn btn-danger" onClick={() => enviarEvento("rechazar_oro")} style={{ padding: "12px 24px", fontSize: "1.1rem" }}>
-              ✕ RECHAZAR Y CONTINUAR
+              {t("tat.jc.rechazarContinuar")}
             </button>
           </div>
         </div>
@@ -2238,9 +2482,72 @@ function CombateArbitro({
         onDeshacer={offline.deshacer}
         onLimpiar={offline.limpiar}
         descripcion={connected
-          ? "Recuperaste la conexión. Concilia el registro del final de esta pantalla con la mesa (aplica puntos/faltas con los botones normales o declara el ganador) y luego bórralo allí."
-          : "Sin conexión: tus puntos especiales y faltas se guardan en este dispositivo. Cronometra manualmente; el detalle completo está al final de esta pantalla."}
+          ? t("tat.jc.reconectadoDesc")
+          : t("tat.jc.offDesc")}
       />
+
+      {/* Registros locales de jueces de esquina esperando resolución */}
+      {state._propuestas_local && Object.keys(state._propuestas_local).length > 0 && (
+        <div className="card" style={{ marginBottom: 10, borderColor: "var(--orange)", padding: "10px 14px" }}>
+          <div className="card-title" style={{ color: "var(--orange)" }}>
+            {t("tat.jc.propuestas.titulo")}
+          </div>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginBottom: 8 }}>
+            {t("tat.jc.propuestas.desc")}
+          </p>
+          {Object.entries(state._propuestas_local).map(([rolJuez, prop]) => (
+            <div key={rolJuez} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid var(--border)" }}>
+              <div style={{ fontWeight: 800, fontSize: "0.9rem", marginBottom: 4 }}>
+                {rolJuez.toUpperCase()}{prop.nombre ? ` · ${prop.nombre}` : ""} — {prop.entradas.length} {t("tat.jc.propuestas.anotaciones")}
+              </div>
+              <div style={{ maxHeight: 96, overflowY: "auto", fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 6 }}>
+                {prop.entradas.map((e, i) => (
+                  <div key={`${e.ts}-${i}`}>
+                    <span style={{ color: e.color === "hong" ? "var(--hong-light)" : "var(--chung-light)", fontWeight: 700 }}>
+                      {e.color === "hong" ? "HONG" : "CHUNG"}
+                    </span>
+                    {" "}{e.etiqueta}
+                    {e.ts ? (
+                      <span style={{ color: "var(--text-dim)" }}>
+                        {" · "}
+                        {new Date(e.ts).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => onShowConfirm({
+                    titulo: t("tat.jc.aplicarReg.titulo"),
+                    mensaje: t("tat.jc.aplicarReg.mensaje", { n: prop.entradas.length, rol: rolJuez.toUpperCase() }),
+                    tipo: "advertencia",
+                    confirmLabel: t("tat.jc.aplicarReg.confirmar"),
+                    cancelLabel: t("comun.cancelar"),
+                    onConfirm: () => enviarEvento("resolver_registro_local", { rol: rolJuez, aplicar: true }),
+                  })}
+                >
+                  {t("tat.jc.aplicarBtn")}
+                </button>
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={() => onShowConfirm({
+                    titulo: t("tat.jc.descartarReg.titulo"),
+                    mensaje: t("tat.jc.descartarReg.mensaje", { rol: rolJuez.toUpperCase() }),
+                    tipo: "peligro",
+                    confirmLabel: t("tat.jc.descartarReg.confirmar"),
+                    cancelLabel: t("comun.cancelar"),
+                    onConfirm: () => enviarEvento("resolver_registro_local", { rol: rolJuez, aplicar: false }),
+                  })}
+                >
+                  {t("tat.jc.descartarBtn")}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Combate cerrado: solo guardar o descartar */}
       {combateCerrado && !state.ganadorPendienteCierre && (
@@ -2249,9 +2556,9 @@ function CombateArbitro({
           border: "1px solid var(--gold)", background: "rgba(212,175,55,0.08)",
           color: "var(--gold)", fontWeight: 700, textAlign: "center", fontSize: "0.92rem",
         }}>
-          🏆 Combate finalizado — Ganó {state.ganadorManualColor === "hong" ? state.nombreHong : state.nombreChung}
-          {state.ganadorManualMotivo ? ` (${state.ganadorManualMotivo})` : ""}.
-          Guarda con NUEVO COMBATE o descarta con RESET.
+          {t("tat.jc.cerradoBanner1")} {state.ganadorManualColor === "hong" ? state.nombreHong : state.nombreChung}
+          {state.ganadorManualMotivo ? ` (${state.ganadorManualMotivo})` : ""}.{" "}
+          {t("tat.jc.cerradoBanner2")}
         </div>
       )}
 
@@ -2263,18 +2570,18 @@ function CombateArbitro({
         disabled={combateCerrado || Boolean(state.ganadorPendienteCierre)}
       />
       {(state.nombreHong === "Hong" || state.nombreChung === "Chung") && (
-        <p style={{ color: "var(--orange)", fontSize: "0.78rem", textAlign: "center", marginBottom: 8 }}>
-          ⚠️ Ingresa los nombres antes de iniciar el cronómetro
+        <p style={{ color: "var(--orange)", fontSize: "0.85rem", textAlign: "center", marginBottom: 8 }}>
+          {t("tat.jc.ingresaNombres")}
         </p>
       )}
 
       {/* Scores + Timer */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 8, marginBottom: 10 }}>
         <div className="card card-hong" style={{ textAlign: "center", padding: "10px 8px" }}>
-          <div style={{ fontSize: "0.65rem", color: "var(--hong-light)", fontWeight: 800 }}>{state.nombreHong}</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--hong-light)", fontWeight: 800 }}>{state.nombreHong}</div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: "3rem", color: "var(--hong-vivid)" }}>{totalHong}</div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-dim)" }}>ESQ:{esqHong} ARB:{state.arbHong}</div>
-          <div style={{ fontSize: "0.65rem", marginTop: 2 }}>
+          <DesgloseMarcador state={state} color="hong" />
+          <div style={{ fontSize: "0.75rem", marginTop: 2 }}>
             {state.kyongHong > 0 && <span style={{ color: "var(--orange)", marginRight: 4 }}>K:{state.kyongHong}</span>}
             {state.faltasHong > 0 && <span style={{ color: "var(--red-alert)" }}>G:{state.faltasHong}</span>}
           </div>
@@ -2294,20 +2601,20 @@ function CombateArbitro({
                 borderColor: state.activo ? "rgba(255,68,68,0.4)" : "rgba(0,212,114,0.4)",
                 color: state.activo ? "var(--red-alert)" : "var(--green)",
               }}>
-              {state.activo ? "PAUSA" : "PLAY"}
+              {state.activo ? t("tat.jc.pausa") : t("tat.jc.iniciar")}
             </button>
             <button className="btn btn-sm"
               onClick={() => enviarEvento("crono_reset", { segundosMax: state.segundosMax })}
               disabled={accionesBloqueadas}
-              style={{ padding: "5px 8px", opacity: accionesBloqueadas ? 0.45 : 1 }}>RST</button>
+              style={{ padding: "5px 8px", opacity: accionesBloqueadas ? 0.45 : 1 }}>{t("tat.jc.reiniciarCrono")}</button>
           </div>
         </div>
 
         <div className="card card-chung" style={{ textAlign: "center", padding: "10px 8px" }}>
-          <div style={{ fontSize: "0.65rem", color: "var(--chung-light)", fontWeight: 800 }}>{state.nombreChung}</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--chung-light)", fontWeight: 800 }}>{state.nombreChung}</div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: "3rem", color: "var(--chung-vivid)" }}>{totalChung}</div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-dim)" }}>ESQ:{esqChung} ARB:{state.arbChung}</div>
-          <div style={{ fontSize: "0.65rem", marginTop: 2 }}>
+          <DesgloseMarcador state={state} color="chung" />
+          <div style={{ fontSize: "0.75rem", marginTop: 2 }}>
             {state.kyongChung > 0 && <span style={{ color: "var(--orange)", marginRight: 4 }}>K:{state.kyongChung}</span>}
             {state.faltasChung > 0 && <span style={{ color: "var(--red-alert)" }}>G:{state.faltasChung}</span>}
           </div>
@@ -2317,10 +2624,10 @@ function CombateArbitro({
       {/* Configuración (ronda, duración, jueces): se fija al inicio, por eso
           va colapsada con un resumen en el badge para no estorbar en vivo */}
       <PanelColapsable
-        titulo="Configuración del combate"
+        titulo={t("tat.jc.config")}
         icono="⚙"
         acento="oro"
-        badge={`${RONDAS_BTN.find((r) => r.id === state.ronda)?.label || "Round 1"} · ${state.segundosMax}s · ${state.numJueces}J`}
+        badge={`${t(RONDAS_BTN.find((r) => r.id === state.ronda)?.clave ?? "tat.rondaBtn.r1")} · ${state.segundosMax}s · ${state.numJueces}J`}
       >
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
         {RONDAS_BTN.map((r) => (
@@ -2333,7 +2640,7 @@ function CombateArbitro({
               borderColor: state.ronda === r.id ? "var(--gold-border)" : undefined,
               color: state.ronda === r.id ? "var(--gold)" : undefined,
               animation: state.ronda === "oro" && r.id === "oro" ? "glow-oro 1.2s infinite alternate" : undefined,
-            }}>{r.label}</button>
+            }}>{t(r.clave)}</button>
         ))}
         <span style={{ color: "var(--border-light)", alignSelf: "center", fontSize: "1.2rem" }}>|</span>
         {DURACIONES.map((d) => (
@@ -2347,7 +2654,7 @@ function CombateArbitro({
             }}>{d}s</button>
         ))}
         <span style={{ color: "var(--border-light)", alignSelf: "center", fontSize: "1.2rem" }}>|</span>
-        <span style={{ color: "var(--text-muted)", fontSize: "0.78rem", alignSelf: "center", fontWeight: 700 }}>Jueces:</span>
+        <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", alignSelf: "center", fontWeight: 700 }}>{t("tat.jc.jueces")}</span>
         {[2, 3, 4].map((n) => (
           <button key={n} className="btn btn-sm"
             onClick={() => enviarEvento("set_num_jueces", { numJueces: n })}
@@ -2363,7 +2670,7 @@ function CombateArbitro({
       </PanelColapsable>
 
       {/* Puntos árbitro */}
-      <div className="card-title">Puntos del Juez Central</div>
+      <div className="card-title">{t("tat.jc.puntosJC")}</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
         {PUNTOS_ARB.map((p) => (
           <div key={p.nombre} style={{ display: "contents" }}>
@@ -2374,7 +2681,7 @@ function CombateArbitro({
               style={{ opacity: puntosArbBloqueados ? 0.5 : 1 }}
             >
               <span className="pts">+{p.pts}</span>
-              <span className="label">{p.nombre}</span>
+              <span className="label">{t(p.clave)}</span>
             </button>
             <button
               className="combat-btn chung"
@@ -2383,14 +2690,14 @@ function CombateArbitro({
               style={{ opacity: puntosArbBloqueados ? 0.5 : 1 }}
             >
               <span className="pts">+{p.pts}</span>
-              <span className="label">{p.nombre}</span>
+              <span className="label">{t(p.clave)}</span>
             </button>
           </div>
         ))}
       </div>
 
       {/* Faltas */}
-      <div className="card-title">Faltas</div>
+      <div className="card-title">{t("tat.jc.faltas")}</div>
       <div className="grid-2" style={{ marginBottom: 8 }}>
         <button className="combat-btn hong" onClick={() => handleKyonggo("hong")} disabled={faltasBloqueadas} style={{ opacity: faltasBloqueadas ? 0.5 : 1 }}>
           <span className="pts">−0.5</span><span className="label">KyongGo HONG</span>
@@ -2408,8 +2715,8 @@ function CombateArbitro({
 
       {/* Finalizar: decisión y descalificación — solo se usan al cerrar el
           combate, así que van colapsadas para no saturar la vista en vivo */}
-      <PanelColapsable titulo="Finalizar combate · decisión / descalificación" icono="🏁" acento="rojo">
-      <div className="card-title" style={{ marginTop: 4 }}>Decisión del Juez Central</div>
+      <PanelColapsable titulo={t("tat.jc.finalizar")} icono="🏁" acento="rojo">
+      <div className="card-title" style={{ marginTop: 4 }}>{t("tat.jc.decision")}</div>
       <div className="grid-2" style={{ marginBottom: 8 }}>
         <button
           className="combat-btn hong"
@@ -2417,7 +2724,7 @@ function CombateArbitro({
           disabled={accionesBloqueadas}
           style={{ opacity: accionesBloqueadas ? 0.5 : 1 }}
         >
-          <span className="pts">S.T.</span><span className="label">Superioridad Hong</span>
+          <span className="pts">S.T.</span><span className="label">{t("tat.jc.superioridadHong")}</span>
         </button>
         <button
           className="combat-btn chung"
@@ -2425,7 +2732,7 @@ function CombateArbitro({
           disabled={accionesBloqueadas}
           style={{ opacity: accionesBloqueadas ? 0.5 : 1 }}
         >
-          <span className="pts">S.T.</span><span className="label">Superioridad Chung</span>
+          <span className="pts">S.T.</span><span className="label">{t("tat.jc.superioridadChung")}</span>
         </button>
         <button
           className="combat-btn hong"
@@ -2433,7 +2740,7 @@ function CombateArbitro({
           disabled={accionesBloqueadas}
           style={{ opacity: accionesBloqueadas ? 0.5 : 1 }}
         >
-          <span className="pts">SUNG</span><span className="label">Ganador Hong</span>
+          <span className="pts">SUNG</span><span className="label">{t("tat.jc.ganadorHong")}</span>
         </button>
         <button
           className="combat-btn chung"
@@ -2441,7 +2748,7 @@ function CombateArbitro({
           disabled={accionesBloqueadas}
           style={{ opacity: accionesBloqueadas ? 0.5 : 1 }}
         >
-          <span className="pts">SUNG</span><span className="label">Ganador Chung</span>
+          <span className="pts">SUNG</span><span className="label">{t("tat.jc.ganadorChung")}</span>
         </button>
       </div>
 
@@ -2454,9 +2761,9 @@ function CombateArbitro({
         disabled={accionesBloqueadas}
         style={{ marginBottom: 8, textAlign: "center", fontWeight: 700, opacity: accionesBloqueadas ? 0.5 : 1 }}
       >
-        <option value="No presentación">Motivo: No presentación (walkover)</option>
-        <option value="Conducta antideportiva">Motivo: Conducta antideportiva</option>
-        <option value="Decisión del Juez Central">Motivo: Decisión del Juez Central</option>
+        <option value="No presentación">{t("tat.motivo.noPresentacion")}</option>
+        <option value="Conducta antideportiva">{t("tat.motivo.conducta")}</option>
+        <option value="Decisión del Juez Central">{t("tat.motivo.decision")}</option>
       </select>
       <div className="grid-2" style={{ marginBottom: 8 }}>
         <button
@@ -2465,7 +2772,7 @@ function CombateArbitro({
           disabled={accionesBloqueadas}
           style={{ opacity: accionesBloqueadas ? 0.5 : 1 }}
         >
-          <span className="pts">🚫</span><span className="label">Descalificar HONG</span>
+          <span className="pts">🚫</span><span className="label">{t("tat.jc.dqHong")}</span>
         </button>
         <button
           className="combat-btn falta"
@@ -2473,7 +2780,7 @@ function CombateArbitro({
           disabled={accionesBloqueadas}
           style={{ opacity: accionesBloqueadas ? 0.5 : 1 }}
         >
-          <span className="pts">🚫</span><span className="label">Descalificar CHUNG</span>
+          <span className="pts">🚫</span><span className="label">{t("tat.jc.dqChung")}</span>
         </button>
       </div>
       </PanelColapsable>
@@ -2484,35 +2791,130 @@ function CombateArbitro({
           disabled={accionesBloqueadas}
           style={{ opacity: accionesBloqueadas ? 0.5 : 1 }}
           onClick={() => enviarEvento("deshacer_arbitro", { color: "hong" })}>
-          ↩ Deshacer Hong
+          {t("tat.jc.deshacerHong")}
         </button>
         <button className="btn btn-sm btn-danger"
           disabled={accionesBloqueadas}
           style={{ opacity: accionesBloqueadas ? 0.5 : 1 }}
           onClick={() => enviarEvento("deshacer_arbitro", { color: "chung" })}>
-          ↩ Deshacer Chung
+          {t("tat.jc.deshacerChung")}
         </button>
       </div>
 
       <div className="grid-2" style={{ marginBottom: 10 }}>
         <button className="btn btn-primary" onClick={handleNuevoCombate} disabled={cierreBloqueado} style={{ opacity: cierreBloqueado ? 0.5 : 1 }}>
-          Guardar + Nuevo
+          {t("tat.guardarNuevoBtn")}
         </button>
         <button className="btn btn-danger" onClick={handleReset} disabled={cierreBloqueado} style={{ opacity: cierreBloqueado ? 0.5 : 1 }}>
-          Reset Total
+          {t("tat.jc.reinicioTotal")}
         </button>
       </div>
 
-      {/* Log */}
+      {/* Historial de puntos: anular una entrada ESPECÍFICA (no solo la última) */}
+      {state.historial && state.historial.filter((h) => !h.esDecision).length > 0 && (
+        <PanelColapsable
+          titulo={t("tat.jc.historial.titulo")}
+          icono="⛔"
+          acento="rojo"
+          badge={String(state.historial.filter((h) => !h.esDecision).length)}
+        >
+          <div style={{ maxHeight: 240, overflowY: "auto", marginTop: 6, display: "flex", flexDirection: "column", gap: 2 }}>
+            {[...state.historial].reverse().filter((h) => !h.esDecision).map((h) => {
+              const idx = state.historial.indexOf(h);
+              const hora = h.momento
+                ? new Date(h.momento).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+                : "—";
+              return (
+                <div
+                  key={`${h.momento || "h"}-${idx}`}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, fontSize: "0.84rem",
+                    padding: "3px 0", borderBottom: "1px solid var(--border)",
+                  }}
+                >
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-dim)", flexShrink: 0, fontSize: "0.78rem" }}>
+                    {hora}
+                  </span>
+                  <span style={{ color: h.color === "hong" ? "var(--hong-light)" : "var(--chung-light)", fontWeight: 700, flexShrink: 0 }}>
+                    {h.color === "hong" ? "HONG" : "CHUNG"}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {h.pts > 0 ? `+${h.pts}` : h.pts} {h.nombre} · {h.juez_asignacion || h.juez.toUpperCase()}
+                  </span>
+                  <button
+                    className="btn btn-sm btn-danger"
+                    style={{ padding: "2px 8px", minHeight: 26, fontSize: "0.78rem", flexShrink: 0, opacity: accionesBloqueadas ? 0.5 : 1 }}
+                    disabled={accionesBloqueadas}
+                    onClick={() => onShowConfirm({
+                      titulo: t("tat.jc.anular.titulo"),
+                      mensaje: t("tat.jc.anular.mensaje", {
+                        punto: h.nombre,
+                        pts: h.pts > 0 ? `+${h.pts}` : h.pts,
+                        juez: (h.juez_asignacion || h.juez).toString().toUpperCase(),
+                        nombre: h.color === "hong" ? state.nombreHong : state.nombreChung,
+                      }),
+                      tipo: "peligro",
+                      confirmLabel: t("tat.jc.anular.confirmar"),
+                      cancelLabel: t("comun.cancelar"),
+                      onConfirm: () => enviarEvento("anular_entrada", {
+                        idx,
+                        firma: { juez: h.juez, color: h.color, pts: h.pts, momento: h.momento },
+                      }),
+                    })}
+                  >
+                    {t("tat.jc.anularBtn")}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ color: "var(--text-dim)", fontSize: "0.78rem", marginTop: 6 }}>
+            {t("tat.jc.historial.nota")}
+          </p>
+        </PanelColapsable>
+      )}
+
+      {/* Log completo del combate (de inicio a fin): hora real de cada
+          acción + tiempo del cronómetro en ese momento (⏱ corriendo,
+          ⏸ en pausa) para que los jueces ubiquen la acción en el reloj. */}
       {state.log && state.log.length > 0 && (
-        <PanelColapsable titulo="Log reciente" icono="📜" badge={String(state.log.length)}>
-          <div style={{ maxHeight: 160, overflowY: "auto", fontSize: "0.76rem", marginTop: 6 }}>
+        <PanelColapsable titulo={t("tat.jc.log.titulo")} icono="📜" badge={String(state.log.length)}>
+          <div style={{ maxHeight: 280, overflowY: "auto", fontSize: "0.84rem", marginTop: 6 }}>
             {state.log.map((l, i) => (
-              <div key={i} style={{ padding: "3px 0", borderBottom: "1px solid var(--border)", color: "var(--text-muted)" }}>
-                {l.txt}
+              <div
+                key={`${l.ts}-${i}`}
+                style={{
+                  padding: "3px 0", borderBottom: "1px solid var(--border)",
+                  display: "flex", gap: 8, alignItems: "baseline",
+                  color: l.color === "hong" ? "var(--hong-light)"
+                    : l.color === "chung" ? "var(--chung-light)"
+                    : "var(--text-muted)",
+                }}
+              >
+                <span style={{
+                  fontFamily: "var(--font-mono)", color: "var(--text-dim)",
+                  flexShrink: 0, fontSize: "0.78rem",
+                }}>
+                  {new Date(l.ts).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
+                </span>
+                {typeof l.crono === "number" && (
+                  <span
+                    title={l.cronoActivo ? t("tat.jc.cronoCorriendo") : t("tat.jc.cronoPausa")}
+                    style={{
+                      fontFamily: "var(--font-mono)", flexShrink: 0, fontSize: "0.78rem",
+                      color: l.cronoActivo ? "var(--green)" : "var(--text-dim)",
+                    }}
+                  >
+                    {l.cronoActivo ? "⏱" : "⏸"} {formatTime(l.crono)}
+                  </span>
+                )}
+                <span>{l.txt}</span>
               </div>
             ))}
           </div>
+          <p style={{ color: "var(--text-dim)", fontSize: "0.78rem", marginTop: 6 }}>
+            {t("tat.jc.log.nota")}
+          </p>
         </PanelColapsable>
       )}
 
@@ -2535,6 +2937,7 @@ function CombateArbitro({
 // MAIN PAGE
 // ══════════════════════════════════════════════════════════════════════════════
 function TatamiContent() {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -2543,18 +2946,10 @@ function TatamiContent() {
   const rol = searchParams.get("rol") || "pantalla";
 
   const token = typeof window !== "undefined" ? localStorage.getItem("dinamyt_token") : null;
-  const { state, connected, offline, hasServerState, socketError, pendingEvents, enviarEvento, broadcast, alerts: socketAlerts, clearAlert } = useCombate(tatamiId, rol, token);
+  const { state, connected, offline, sesionReemplazada, reconectar, registroResuelto, hasServerState, socketError, pendingEvents, enviarEvento, broadcast, alerts: socketAlerts, clearAlert } = useCombate(tatamiId, rol, token);
   // En modo offline el juez elige localmente qué necesita puntuar
   // (no se sabe cuánto dura la caída ni qué categoría corre el tatami).
   const [catOffline, setCatOffline] = useState<"combate" | "figuras" | null>(null);
-
-  // Mientras hay conexión, precargar el Tablero local (HTML + JS) para que
-  // cargue offline si se va el internet. El SW cachea estos recursos.
-  useEffect(() => {
-    if (!connected) return;
-    router.prefetch("/tablero");
-    router.prefetch("/tablero/pantalla");
-  }, [connected, router]);
 
   const alertSystem = useAlertSystem();
 
@@ -2601,7 +2996,7 @@ function TatamiContent() {
   useEffect(() => {
     if (socketAlerts.rechazo) {
       alertSystem.showConfirm({
-        titulo: "ACCIÓN RECHAZADA",
+        titulo: t("tat.accionRechazada"),
         mensaje: socketAlerts.rechazo.message,
         tipo: "advertencia",
         solo_ok: true,
@@ -2623,7 +3018,7 @@ function TatamiContent() {
     : (categoriaGuardada === "figuras" ? "figuras" : "combate");
   const catActiva = offline && catOffline ? catOffline : catServidor;
   const esFiguras = catActiva === "figuras";
-  const nombreCategoria = anyState._nombre_categoria || (isFiguras(anyState) ? anyState.nombre_categoria : "") || "Figuras";
+  const nombreCategoria = anyState._nombre_categoria || (isFiguras(anyState) ? anyState.nombre_categoria : "") || t("tat.figuras");
   // Número visible del tatami dentro de su campeonato (no el ID interno)
   const tatamiLabel = String(anyState._tatami_numero ?? tatamiId);
 
@@ -2681,10 +3076,10 @@ function TatamiContent() {
 
   function handleVolver() {
     alertSystem.showConfirm({
-      titulo: "VOLVER",
-      mensaje: "¿Volver al panel? Los puntos están guardados en el servidor y se pueden recuperar.",
+      titulo: t("tat.volver.titulo"),
+      mensaje: t("tat.volver.mensaje"),
       tipo: "info",
-      confirmLabel: "Volver",
+      confirmLabel: t("alert.volver"),
       onConfirm: () => router.push(getRolBack()),
     });
   }
@@ -2693,8 +3088,8 @@ function TatamiContent() {
     if (cat === categoria) return;
     if (esFiguras && figurasConDatos(anyState as FigurasState)) {
       alertSystem.showConfirm({
-        titulo: "FIGURAS EN CURSO",
-        mensaje: "Guarda o resetea la categoría de figuras antes de cambiar a combate.",
+        titulo: t("tat.figCurso.titulo"),
+        mensaje: t("tat.figCurso.mensaje"),
         tipo: "peligro",
         solo_ok: true,
         onConfirm: () => {},
@@ -2704,8 +3099,8 @@ function TatamiContent() {
     const combateState = state as CombateState;
     if (combateActivo(combateState)) {
       alertSystem.showConfirm({
-        titulo: "COMBATE EN CURSO",
-        mensaje: "Hay un combate activo con puntos o tiempo transcurrido. Debes guardar o resetear antes de cambiar la categoría.",
+        titulo: t("tat.combCurso.titulo"),
+        mensaje: t("tat.combCurso.mensaje"),
         tipo: "peligro",
         solo_ok: true,
         onConfirm: () => {},
@@ -2722,6 +3117,33 @@ function TatamiContent() {
     alertSystem.clearGanador();
   }
 
+  // Este rol se abrió en otro dispositivo/pestaña: el servidor reemplazó esta
+  // sesión (así una recarga en otro equipo nunca queda bloqueada afuera).
+  // No pelear la conexión: el juez decide si retoma aquí.
+  if (sesionReemplazada && !isPantalla) {
+    return (
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div className="card" style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
+          <Logo stacked fontSize="1.9rem" style={{ marginBottom: 12 }} />
+          <div style={{ color: "var(--orange)", fontWeight: 800, fontSize: "1.05rem", marginBottom: 8 }}>
+            {t("tat.sesion.titulo")}
+          </div>
+          <p style={{ color: "var(--text-muted)", marginBottom: 16, fontSize: "0.9rem" }}>
+            {t("tat.sesion.mensaje", { rol: rol === "arbitro" ? t("rol.arbitro") : rol.toUpperCase() })}
+          </p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <button className="btn btn-primary" onClick={reconectar}>
+              {t("tat.sesion.retomar")}
+            </button>
+            <button className="btn" onClick={() => router.push(getRolBack())}>
+              {t("alert.volver")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Solo es un rechazo real si el SERVIDOR negó el rol (mensaje en español
   // desde nuestro backend). Los fallos de red ("websocket error", "timeout",
   // "xhr poll error"...) NO expulsan al juez: se atienden con el modo offline.
@@ -2734,13 +3156,13 @@ function TatamiContent() {
         <div className="card" style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
           <Logo stacked fontSize="1.9rem" style={{ marginBottom: 12 }} />
           <div style={{ color: "var(--gold)", fontWeight: 800, fontSize: "1rem", marginBottom: 8 }}>
-            Rol no disponible
+            {t("tat.rolNoDisponible")}
           </div>
           <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>
             {socketError}
           </p>
           <button className="btn btn-primary" onClick={() => router.push(getRolBack())}>
-            Volver
+            {t("alert.volver")}
           </button>
         </div>
       </div>
@@ -2750,14 +3172,27 @@ function TatamiContent() {
   // Sin estado del servidor: mientras no se confirme el corte es una espera
   // breve (splash). Con el corte confirmado, los jueces NO se quedan
   // esperando: entran directo al modo de registro local (la pantalla pública
-  // sí necesita el servidor).
+  // sí necesita el servidor). La pantalla pública nunca se queda muda en
+  // "Cargando": muestra el corte y sigue reintentando sola.
   if (!hasServerState && (!offline || isPantalla)) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100dvh" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18, alignItems: "center", justifyContent: "center", height: "100dvh", padding: 20 }}>
         <Logo stacked className="animate-fade" fontSize="2.4rem" />
-        {offline && (
-          <p style={{ position: "absolute", bottom: "18vh", color: "var(--text-dim)", fontSize: "0.85rem" }}>
-            Sin conexión con el servidor…
+        {offline ? (
+          <div style={{ textAlign: "center", maxWidth: 440 }}>
+            <p style={{ color: "var(--red-alert)", fontWeight: 800, fontSize: "1rem", letterSpacing: "0.06em", marginBottom: 6 }}>
+              {t("tat.offline.titulo")}
+            </p>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: 14 }}>
+              {t("tat.offline.mensaje")}
+            </p>
+            <button className="btn btn-primary btn-sm" onClick={() => window.location.reload()}>
+              {t("tat.offline.reintentar")}
+            </button>
+          </div>
+        ) : (
+          <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
+            {t("tat.conectando")}
           </p>
         )}
       </div>
@@ -2771,11 +3206,12 @@ function TatamiContent() {
         <div style={{ height: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <Logo stacked fontSize="clamp(2rem, 6vw, 3rem)" style={{ marginBottom: 16 }} />
           <div style={{ fontSize: "2.5rem", color: "var(--text-dim)", fontFamily: "var(--font-display)", letterSpacing: "0.15em", marginBottom: 8 }}>
-            TATAMI {tatamiLabel}
+            {t("tat.tatamiMayus")} {tatamiLabel}
           </div>
           <div style={{ color: "var(--orange)", fontSize: "1.2rem", fontWeight: 700, letterSpacing: "0.1em" }}>
-            ESTE TATAMI SE ENCUENTRA DESACTIVADO
+            {t("tat.desactivadoPantalla")}
           </div>
+          <PublicControls />
         </div>
       );
     }
@@ -2799,6 +3235,8 @@ function TatamiContent() {
               connected={connected}
             />
         }
+        {/* Sin sesión no hay menú global: controles propios de tema e idioma */}
+        <PublicControls />
       </div>
     );
   }
@@ -2834,19 +3272,28 @@ function TatamiContent() {
         {/* Left: Volver */}
         <button className="btn btn-ghost btn-sm" onClick={handleVolver}
           style={{ gap: 4 }}>
-          ← Volver
+          {t("comun.volver")}
         </button>
 
         {/* Center: estado + categoría selector */}
         <div className="tatami-topbar-center" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span className={`status-dot ${connected ? "online" : "offline"}`} />
-          <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>T{tatamiLabel}</span>
+          <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>T{tatamiLabel}</span>
+          {!esFiguras && typeof anyState._num_combate === "number" && anyState._num_combate > 0 && (
+            <span style={{
+              fontSize: "0.8rem", fontWeight: 800, color: "var(--gold)",
+              border: "1px solid var(--gold-border)", background: "var(--gold-bg)",
+              borderRadius: "var(--radius-sm)", padding: "2px 8px", whiteSpace: "nowrap",
+            }}>
+              {t("tat.combateNumTop", { n: anyState._num_combate })}
+            </span>
+          )}
           {/* El selector online de categoría se oculta sin conexión:
               en offline manda el selector local de la barra roja */}
           {isArbitro && !offline && <CatSelector current={categoria} onSelect={handleChangeCategoria} figurasLabel={nombreCategoria} />}
           {!isArbitro && (
-            <span style={{ fontSize: "0.72rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-              {categoria} · {rol.toUpperCase()}
+            <span style={{ fontSize: "0.8rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              {categoria === "figuras" ? t("tat.figuras") : t("tat.combate")} · {rol.toUpperCase()}
             </span>
           )}
         </div>
@@ -2859,23 +3306,23 @@ function TatamiContent() {
               onClick={() => {
                 if (anyState._tatami_activo) {
                   alertSystem.showConfirm({
-                    titulo: "DESACTIVAR TATAMI",
-                    mensaje: "¿Estás seguro? La pantalla pública mostrará 'Desactivado' y los jueces no podrán puntuar.",
+                    titulo: t("tat.desactivarTatami.titulo"),
+                    mensaje: t("tat.desactivarTatami.mensaje"),
                     tipo: "peligro",
-                    confirmLabel: "Desactivar",
+                    confirmLabel: t("comun.desactivar"),
                     onConfirm: () => enviarEvento("desactivar_tatami"),
                   });
                 } else {
                   enviarEvento("activar_tatami");
                 }
               }}
-              style={{ fontWeight: 800, padding: "6px 12px", fontSize: "0.7rem", minHeight: 32 }}
+              style={{ fontWeight: 800, padding: "6px 12px", fontSize: "0.78rem", minHeight: 32 }}
             >
-              {anyState._tatami_activo ? "ACTIVO" : "DESACTIVADO"}
+              {anyState._tatami_activo ? t("tat.activo") : t("tat.desactivado")}
             </button>
           )}
-          <span className="tatami-topbar-rol-label" style={{ fontSize: "0.72rem", color: "var(--text-dim)" }}>
-            {isArbitro ? "Juez Central" : rol.toUpperCase()}
+          <span className="tatami-topbar-rol-label" style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
+            {isArbitro ? t("rol.arbitro") : rol.toUpperCase()}
           </span>
         </div>
       </div>
@@ -2938,7 +3385,7 @@ function TatamiContent() {
             height: auto !important;
             padding: 8px 10px !important;
             flex: 1 1 auto;
-            font-size: 0.72rem !important;
+            font-size: 0.8rem !important;
           }
         }
         @media (max-width: 380px) {
@@ -2948,6 +3395,16 @@ function TatamiContent() {
           }
         }
       `}</style>
+
+      {/* Panel de conexiones: solo el Juez Central, con datos frescos */}
+      {isArbitro && connected && (
+        <ConexionJueces
+          conectados={anyState._roles_conectados || {}}
+          numJueces={esFiguras
+            ? ((anyState as FigurasState).num_jueces || 4)
+            : ((state as CombateState).numJueces || 4)}
+        />
+      )}
 
       {/* Content */}
       <div style={{ position: "relative", flex: 1 }}>
@@ -2959,8 +3416,8 @@ function TatamiContent() {
             backdropFilter: "blur(4px)"
           }}>
             <div style={{ fontSize: "2rem", marginBottom: 12 }}>⏸️</div>
-            <div style={{ color: "var(--orange)", fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.05em" }}>TATAMI DESACTIVADO</div>
-            <div style={{ color: "var(--text-muted)", marginTop: 8 }}>Esperando activación del Juez Central</div>
+            <div style={{ color: "var(--orange)", fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.05em" }}>{t("tat.desactivadoOverlay")}</div>
+            <div style={{ color: "var(--text-muted)", marginTop: 8 }}>{t("tat.esperandoActivacion")}</div>
           </div>
         )}
 
@@ -2971,36 +3428,26 @@ function TatamiContent() {
             padding: "10px 14px", marginBottom: 4,
             background: "rgba(232,0,42,0.08)", borderBottom: "1px solid var(--red-alert)",
           }}>
-            <span style={{ color: "var(--red-alert)", fontWeight: 800, fontSize: "0.78rem", letterSpacing: "0.06em", textAlign: "center" }}>
-              📴 SIN CONEXIÓN · ¿Qué necesitas registrar?
+            <span style={{ color: "var(--red-alert)", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.06em", textAlign: "center" }}>
+              {t("tat.offSelector")}
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 className={`btn btn-sm ${!esFiguras ? "btn-primary" : ""}`}
                 onClick={() => setCatOffline("combate")}
               >
-                Combate
+                {t("tat.combate")}
               </button>
               <button
                 className={`btn btn-sm ${esFiguras ? "btn-primary" : ""}`}
                 onClick={() => setCatOffline("figuras")}
               >
-                Figuras
+                {t("tat.figuras")}
               </button>
             </div>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.72rem", textAlign: "center", margin: 0, maxWidth: 420 }}>
-              Aquí apuntas tus puntos en una libreta local.
-              {isArbitro && " Para cronómetro local y pantalla al público, usa el Tablero local."}
+            <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", textAlign: "center", margin: 0, maxWidth: 420 }}>
+              {t("tat.offSelectorNota")}
             </p>
-            {isArbitro && (
-              <button
-                className="btn btn-sm"
-                onClick={() => window.open("/tablero", "dinamyt_tablero")}
-                style={{ borderColor: "var(--gold-border)", color: "var(--gold)" }}
-              >
-                🖥️ Abrir Tablero local (cronómetro + pantalla pública)
-              </button>
-            )}
           </div>
         )}
 
@@ -3015,7 +3462,7 @@ function TatamiContent() {
                 tatamiDbId={tatamiId}
                 onShowConfirm={alertSystem.showConfirm}
               />
-            : <FigurasJuez state={anyState as FigurasState} enviarEvento={enviarEvento} juezId={rol} connected={!offline} />
+            : <FigurasJuez state={anyState as FigurasState} enviarEvento={enviarEvento} juezId={rol} connected={connected} />
         ) : (
           isArbitro
             ? <CombateArbitro
@@ -3023,7 +3470,7 @@ function TatamiContent() {
                 enviarEvento={enviarEvento}
                 tatamiId={tatamiLabel}
                 tatamiDbId={tatamiId}
-                connected={!offline}
+                connected={connected}
                 onFlash={alertSystem.showFlash}
                 onFaltaFlash={alertSystem.showFaltaFlash}
                 onShowConfirm={alertSystem.showConfirm}
@@ -3034,8 +3481,9 @@ function TatamiContent() {
                 rol={rol}
                 enviarEvento={enviarEvento}
                 pendingEvents={pendingEvents}
-                connected={!offline}
+                connected={connected}
                 onFlash={alertSystem.showFlash}
+                registroResuelto={registroResuelto}
               />
         )}
       </div>

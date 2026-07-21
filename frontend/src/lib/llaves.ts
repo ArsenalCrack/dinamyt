@@ -1,6 +1,6 @@
 // Podio de una llave de eliminación, derivado del cuadro:
-//   1° campeón · 2° finalista perdedor · 3° perdedores de la ronda anterior a la
-//   final (semifinales) — bronce compartido, estándar en artes marciales.
+//   1° campeón · 2° finalista perdedor · 3° ganador del partido por el bronce
+//   (un único tercer puesto, disputado entre los perdedores de semifinales).
 // Espejo de `podio_llave` del backend (app/api/llaves.py).
 
 import type { LlaveEstructura } from "@/lib/api";

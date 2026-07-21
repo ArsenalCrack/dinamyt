@@ -2,19 +2,22 @@
 
 import { podioLlave, medallaPuesto, type PodioItem } from "@/lib/llaves";
 import type { LlaveEstructura } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 /**
- * Podio de una llave de eliminación (1°, 2°, 3° — bronce compartido).
+ * Podio de una llave de eliminación (1°, 2° y un único 3° del bronce).
  * Acepta el cuadro completo o un podio ya calculado (reportes).
  */
 export default function PodioLlave({
-  estructura, podio, grande = false, titulo = "Podio de la categoría",
+  estructura, podio, grande = false, titulo,
 }: {
   estructura?: LlaveEstructura | null;
   podio?: PodioItem[];
   grande?: boolean;
   titulo?: string;
 }) {
+  const { t } = useI18n();
+  const tituloFinal = titulo ?? t("podio.titulo");
   const items = podio ?? podioLlave(estructura);
   if (items.length === 0) return null;
 
@@ -24,12 +27,12 @@ export default function PodioLlave({
 
   return (
     <div>
-      {titulo && (
+      {tituloFinal && (
         <div style={{
           fontSize: grande ? "clamp(0.9rem,1.8vw,1.2rem)" : "0.72rem",
           fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em",
           color: "var(--text-muted)", marginBottom: 8, textAlign: grande ? "center" : "left",
-        }}>{titulo}</div>
+        }}>{tituloFinal}</div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: grande ? "clamp(6px,1.4vh,12px)" : 4,
         maxWidth: grande ? 900 : undefined, margin: grande ? "0 auto" : undefined }}>
