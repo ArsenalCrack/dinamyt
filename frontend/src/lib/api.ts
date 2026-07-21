@@ -76,6 +76,8 @@ export async function registerUserAPI(data: {
   password: string;
   nombre: string;
   rol: string;
+  club?: string;
+  puede_juzgar?: boolean;
 }) {
   const res = await api.post("/auth/register", data);
   return res.data;
@@ -100,10 +102,19 @@ export async function deleteUserAPI(id: number) {
 
 export async function updateUserAPI(
   id: number,
-  data: { nombre?: string; email?: string; password?: string; activo?: boolean; rol?: string }
+  data: {
+    nombre?: string; email?: string; password?: string; activo?: boolean;
+    rol?: string; club?: string; puede_juzgar?: boolean;
+  }
 ) {
   const res = await api.put(`/auth/users/${id}`, data);
   return res.data;
+}
+
+// Clubes de los maestros del workspace (para el desplegable de club al inscribir)
+export async function listClubesAPI() {
+  const res = await api.get("/auth/clubes");
+  return res.data as string[];
 }
 
 // ── Campeonatos API ──
@@ -206,14 +217,23 @@ export async function eliminarResultadoPublicadoAPI(exportUuid: string) {
   return res.data as { message: string };
 }
 
+export interface CampeonatoPublico {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  lugar: string | null;
+  ciudad: string | null;
+  pais: string | null;
+  estado: EstadoCampeonato;
+  tatamis: { id: number; numero: number }[];
+}
+
 export async function listCampeonatosPublicoAPI() {
-  // Sin login: campeonatos activos con sus tatamis para la pantalla pública
+  // Sin login: campeonatos activos con sus tatamis y detalles para lo público
   const res = await api.get("/campeonatos/publico");
-  return res.data as {
-    id: number;
-    nombre: string;
-    tatamis: { id: number; numero: number }[];
-  }[];
+  return res.data as CampeonatoPublico[];
 }
 
 export async function getCampeonatoAPI(id: number) {
@@ -221,11 +241,22 @@ export async function getCampeonatoAPI(id: number) {
   return res.data;
 }
 
+// Estados del ciclo de vida de un campeonato (espejo del backend).
+export const ESTADOS_CAMPEONATO = ["preparacion", "en_curso", "finalizado"] as const;
+export type EstadoCampeonato = (typeof ESTADOS_CAMPEONATO)[number];
+
+// Tope de caracteres de sede/ciudad/país (espejo del backend).
+export const CAMPO_LUGAR_MAX = 120;
+
 export async function createCampeonatoAPI(data: {
   nombre: string;
   descripcion?: string;
   fecha_inicio?: string;
   fecha_fin?: string;
+  lugar?: string;
+  ciudad?: string;
+  pais?: string;
+  estado?: EstadoCampeonato;
   num_tatamis?: number;
 }) {
   const res = await api.post("/campeonatos", data);
@@ -574,6 +605,15 @@ export async function importCompetidoresAPI(
 }
 
 // ── Inscripciones API (competidor ↔ campeonato) ──
+export type EstadoInscripcion = "aceptada" | "pendiente" | "rechazada";
+
+export interface InscripcionSolicitante {
+  id: number;
+  nombre: string;
+  rol: string;
+  club: string | null;
+}
+
 export interface InscripcionData {
   id: number;
   campeonato_id: number;
@@ -583,13 +623,32 @@ export interface InscripcionData {
   grupo_cinturon: string | null;
   peso_efectivo: number | null;
   grupo_cinturon_efectivo: string | null;
+  estado: EstadoInscripcion;
+  created_by: number | null;
+  motivo_rechazo: string | null;
+  solicitante: InscripcionSolicitante | null;
   created_at: string;
   competidor?: CompetidorData;
 }
 
-export async function listInscripcionesAPI(campeonatoId: number) {
-  const res = await api.get(`/inscripciones/campeonato/${campeonatoId}`);
+export async function listInscripcionesAPI(
+  campeonatoId: number,
+  estado?: EstadoInscripcion
+) {
+  const res = await api.get(`/inscripciones/campeonato/${campeonatoId}`, {
+    params: estado ? { estado } : {},
+  });
   return res.data as InscripcionData[];
+}
+
+// Admin: acepta o rechaza una solicitud de inscripción enviada por un maestro
+export async function setEstadoInscripcionAPI(
+  id: number,
+  estado: "aceptada" | "rechazada",
+  motivo?: string
+) {
+  const res = await api.patch(`/inscripciones/${id}/estado`, { estado, motivo });
+  return res.data as { message: string; inscripcion: InscripcionData };
 }
 
 export async function inscribirAPI(
@@ -616,6 +675,75 @@ export async function updateInscripcionAPI(
 export async function deleteInscripcionAPI(id: number) {
   const res = await api.delete(`/inscripciones/${id}`);
   return res.data;
+}
+
+// ── Flujo del maestro (inscribe a sus alumnos) ──
+export interface MaestroCampeonato {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  estado: EstadoCampeonato;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  lugar: string | null;
+  ciudad: string | null;
+  pais: string | null;
+  puede_inscribir: boolean;
+}
+
+export async function maestroCampeonatosAPI() {
+  const res = await api.get("/inscripciones/maestro/campeonatos");
+  return res.data as MaestroCampeonato[];
+}
+
+export async function maestroInscribirAPI(
+  campeonatoId: number,
+  data: { competidor: CompetidorInput; modalidades?: string[]; peso?: number | null }
+) {
+  const res = await api.post(`/inscripciones/maestro/campeonato/${campeonatoId}`, data);
+  return res.data as { message: string; inscripcion: InscripcionData };
+}
+
+export async function maestroMisInscripcionesAPI(campeonatoId?: number) {
+  const res = await api.get("/inscripciones/maestro/mias", {
+    params: campeonatoId ? { campeonato_id: campeonatoId } : {},
+  });
+  return res.data as InscripcionData[];
+}
+
+// ── Ficha pública del campeonato (sin login) ──
+export interface CampeonatoPublicoCompetidor {
+  nombre: string;
+  club: string;
+  modalidades: string[];
+}
+
+export interface CampeonatoPublicoJuez {
+  nombre: string;
+  rol_tatami: string;
+  tatami_numero: number | null;
+}
+
+export interface CampeonatoPublicoDetalle {
+  campeonato: {
+    id: number;
+    nombre: string;
+    descripcion: string | null;
+    estado: EstadoCampeonato;
+    fecha_inicio: string | null;
+    fecha_fin: string | null;
+    lugar: string | null;
+    ciudad: string | null;
+    pais: string | null;
+  };
+  competidores: CampeonatoPublicoCompetidor[];
+  jueces: CampeonatoPublicoJuez[];
+  clubes: string[];
+}
+
+export async function getCampeonatoPublicoAPI(campId: number) {
+  const res = await api.get(`/inscripciones/publico/campeonato/${campId}`);
+  return res.data as CampeonatoPublicoDetalle;
 }
 
 // ── Generación automática de llaves ──
@@ -730,10 +858,13 @@ export interface UserData {
   id: number;
   email: string;
   nombre: string;
-  rol: "admin" | "juez";
+  rol: "admin" | "juez" | "maestro";
   // Jerarquía: el superadmin ve todos los workspaces; un admin normal solo
   // los jueces, campeonatos y competidores que él creó.
   es_superadmin?: boolean;
+  // Rol maestro: club (lo fija el admin) y permiso para juzgar tatamis.
+  club?: string | null;
+  puede_juzgar?: boolean;
   activo: boolean;
   creado_por_id?: number | null;
   creado_por?: {

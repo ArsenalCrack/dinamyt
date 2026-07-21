@@ -1,12 +1,19 @@
 """
 Modelo: Usuario
-Roles: admin (gestiona campeonatos, tatamis, jueces) | juez (puntúa combates)
+Roles: admin (gestiona campeonatos, tatamis, jueces) | maestro (inscribe a sus
+alumnos y, si el admin se lo permite, puntúa como juez) | juez (puntúa combates)
 """
 
 import os
 from datetime import datetime, timezone
 from ..extensions import db
 import bcrypt
+
+# Roles válidos del sistema. `rol` es un String (no Enum de BD) para poder
+# ampliar la lista sin migrar el tipo en bases existentes; la validez se
+# comprueba en la API. La jerarquía admin>maestro>juez se apoya además en
+# `es_superadmin` (booleano aparte) y en `creado_por_id` (workspace).
+ROLES_VALIDOS = ("admin", "maestro", "juez")
 
 # Costo (rondas) de bcrypt al hashear contraseñas. 12 (el default de la
 # librería) tarda ~0.5 s en un PC y 1.5–3 s en la CPU compartida del plan
@@ -23,16 +30,21 @@ class Usuario(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     nombre = db.Column(db.String(150), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    rol = db.Column(
-        db.Enum("admin", "juez", name="rol_usuario"),
-        nullable=False,
-        default="juez",
-    )
+    # String (no Enum de BD): en SQLite el Enum se guarda como VARCHAR sin
+    # CHECK y ampliar la lista de roles no requiere migración de tipo. La
+    # validez del valor la impone la API (ver ROLES_VALIDOS).
+    rol = db.Column(db.String(20), nullable=False, default="juez")
     # Jerarquía: superadmin > admin > juez. El superadmin (el admin sembrado)
     # ve y gestiona TODO; un admin normal solo su propio workspace (los jueces,
     # campeonatos y competidores que él creó). Booleano aparte y no un tercer
     # valor del Enum para no requerir migración del tipo en bases existentes.
     es_superadmin = db.Column(db.Boolean, default=False, nullable=True)
+    # Club del maestro: lo fija el admin al crear al usuario maestro. Los
+    # alumnos que ese maestro inscribe toman automáticamente este club.
+    club = db.Column(db.String(80), nullable=True)
+    # Permiso extra para que un maestro también pueda ser asignado a un tatami
+    # como juez (sin necesidad de una segunda cuenta). Solo aplica a maestros.
+    puede_juzgar = db.Column(db.Boolean, default=False, nullable=True)
     activo = db.Column(db.Boolean, default=True, nullable=False)
     creado_por_id = db.Column(
         db.Integer, db.ForeignKey("usuarios.id"), nullable=True, index=True
@@ -93,6 +105,16 @@ class Usuario(db.Model):
         """True si es superadmin (la columna puede ser NULL en bases viejas)."""
         return self.rol == "admin" and bool(self.es_superadmin)
 
+    @property
+    def es_maestro(self) -> bool:
+        return self.rol == "maestro"
+
+    @property
+    def puede_ser_juez(self) -> bool:
+        """True si el usuario puede asignarse a un tatami: un juez, o un
+        maestro con el permiso `puede_juzgar` activado por el admin."""
+        return self.rol == "juez" or (self.rol == "maestro" and bool(self.puede_juzgar))
+
     def necesita_rehash(self) -> bool:
         """True si el hash guardado usa más rondas que las configuradas.
 
@@ -113,6 +135,8 @@ class Usuario(db.Model):
             "nombre": self.nombre,
             "rol": self.rol,
             "es_superadmin": self.es_super,
+            "club": self.club,
+            "puede_juzgar": bool(self.puede_juzgar),
             "activo": self.activo,
             "creado_por_id": self.creado_por_id,
             "creado_por": (

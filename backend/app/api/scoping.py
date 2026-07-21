@@ -40,22 +40,47 @@ def require_admin():
     return user
 
 
+def require_maestro():
+    """Maestro activo, o None."""
+    user = usuario_actual()
+    if not user or user.rol != "maestro" or not user.activo:
+        return None
+    return user
+
+
+def workspace_owner_id(user):
+    """Id del admin dueño del workspace del usuario.
+
+    Un maestro pertenece al workspace del admin que lo creó: los campeonatos a
+    los que inscribe y los alumnos que registra viven bajo ESE admin. Para el
+    resto de usuarios el dueño del workspace es él mismo.
+    """
+    if user is None:
+        return -1
+    if user.rol == "maestro":
+        return user.creado_por_id or user.id
+    return user.id
+
+
 def es_dueno_campeonato(user, camp):
-    """Superadmin siempre; un admin solo los campeonatos creados por él."""
+    """Superadmin siempre; un admin (o maestro) solo los campeonatos de su
+    workspace. El maestro tiene acceso de LECTURA a los campeonatos de su
+    admin; los cambios de estado y la moderación siguen siendo del admin."""
     if user is None or camp is None:
         return False
     if user.es_super:
         return True
-    return camp.created_by == user.id
+    return camp.created_by == workspace_owner_id(user)
 
 
 def es_dueno_competidor(user, comp):
-    """Superadmin siempre; un admin solo los competidores que él registró."""
+    """Superadmin siempre; un admin (o maestro de su workspace) solo los
+    competidores registrados bajo ese workspace."""
     if user is None or comp is None:
         return False
     if user.es_super:
         return True
-    return comp.created_by == user.id
+    return comp.created_by == workspace_owner_id(user)
 
 
 def es_dueno_usuario(user, target):
@@ -73,7 +98,7 @@ def filtrar_campeonatos(user, query):
 
     if user is not None and user.es_super:
         return query
-    return query.filter(Campeonato.created_by == (user.id if user else -1))
+    return query.filter(Campeonato.created_by == workspace_owner_id(user))
 
 
 def filtrar_competidores(user, query):
@@ -82,4 +107,4 @@ def filtrar_competidores(user, query):
 
     if user is not None and user.es_super:
         return query
-    return query.filter(Competidor.created_by == (user.id if user else -1))
+    return query.filter(Competidor.created_by == workspace_owner_id(user))

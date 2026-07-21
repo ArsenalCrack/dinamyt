@@ -30,9 +30,12 @@ from ..models.competidor import (
 from .scoping import (
     es_dueno_campeonato,
     es_dueno_competidor,
+    filtrar_campeonatos,
     filtrar_competidores,
     require_admin as _require_admin,
+    require_maestro,
     usuario_actual,
+    workspace_owner_id,
 )
 
 competidores_bp = Blueprint("competidores", __name__)
@@ -629,6 +632,8 @@ def importar_excel():
                     modalidades=modalidades or None,
                     peso=comp.peso,
                     grupo_cinturon=comp.grupo_cinturon,
+                    estado="aceptada",
+                    created_by=admin.id,
                 ))
                 inscritos += 1
 
@@ -653,14 +658,23 @@ def importar_excel():
 @inscripciones_bp.route("/campeonato/<int:camp_id>", methods=["GET"])
 @jwt_required()
 def listar_inscripciones(camp_id):
-    """GET /api/inscripciones/campeonato/:id — Inscritos del campeonato."""
+    """
+    GET /api/inscripciones/campeonato/:id?estado= — Inscritos del campeonato.
+    `estado` opcional (aceptada|pendiente|rechazada) filtra la lista; sin él se
+    devuelven todas (para que el admin vea las solicitudes por revisar).
+    """
+    from ..models.competidor import ESTADOS_INSCRIPCION
+
     camp = Campeonato.query.get_or_404(camp_id)
     user = usuario_actual()
     if user and user.rol == "admin" and not es_dueno_campeonato(user, camp):
         return jsonify({"error": "Campeonato no encontrado"}), 404
+    query = Inscripcion.query.filter_by(campeonato_id=camp_id)
+    estado = request.args.get("estado")
+    if estado in ESTADOS_INSCRIPCION:
+        query = query.filter_by(estado=estado)
     inscripciones = (
-        Inscripcion.query.filter_by(campeonato_id=camp_id)
-        .join(Competidor)
+        query.join(Competidor)
         .order_by(Competidor.nombre_completo.asc())
         .all()
     )
@@ -721,6 +735,10 @@ def inscribir(camp_id):
         modalidades=_parse_modalidades(data.get("modalidades")) or None,
         peso=peso if peso is not None else comp.peso,
         grupo_cinturon=comp.grupo_cinturon,
+        # Las inscripciones del admin pasan directo, sin importar el estado
+        # del campeonato.
+        estado="aceptada",
+        created_by=admin.id,
     )
     db.session.add(inscripcion)
     db.session.commit()
@@ -776,3 +794,214 @@ def eliminar_inscripcion(ins_id):
     db.session.delete(inscripcion)
     db.session.commit()
     return jsonify({"message": f"Inscripción de '{nombre}' eliminada"}), 200
+
+
+@inscripciones_bp.route("/<int:ins_id>/estado", methods=["PATCH"])
+@jwt_required()
+def moderar_inscripcion(ins_id):
+    """
+    PATCH /api/inscripciones/:id/estado
+    Body: { "estado": "aceptada" | "rechazada", "motivo"?: str }
+    El admin dueño del campeonato acepta o rechaza una solicitud de un maestro.
+    """
+    admin = _require_admin()
+    if not admin:
+        return jsonify({"error": "Solo administradores"}), 403
+
+    inscripcion = Inscripcion.query.get_or_404(ins_id)
+    if not es_dueno_campeonato(admin, inscripcion.campeonato):
+        return jsonify({"error": "Inscripción no encontrada"}), 404
+
+    data = request.get_json() or {}
+    nuevo = data.get("estado")
+    if nuevo not in ("aceptada", "rechazada"):
+        return jsonify({"error": "Estado inválido: usa 'aceptada' o 'rechazada'."}), 400
+
+    inscripcion.estado = nuevo
+    if nuevo == "rechazada":
+        motivo = str(data.get("motivo") or "").strip()
+        if len(motivo) > 300:
+            return jsonify({"error": "El motivo no puede superar 300 caracteres."}), 400
+        inscripcion.motivo_rechazo = motivo or None
+    else:
+        inscripcion.motivo_rechazo = None
+
+    db.session.commit()
+    nombre = inscripcion.competidor.nombre_completo if inscripcion.competidor else "?"
+    verbo = "aceptada" if nuevo == "aceptada" else "rechazada"
+    return jsonify({
+        "message": f"Inscripción de '{nombre}' {verbo}",
+        "inscripcion": inscripcion.to_dict(),
+    }), 200
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Flujo del MAESTRO (inscribe a sus alumnos → solicitud "pendiente")
+# ══════════════════════════════════════════════════════════════════
+
+@inscripciones_bp.route("/maestro/campeonatos", methods=["GET"])
+@jwt_required()
+def maestro_campeonatos():
+    """
+    GET /api/inscripciones/maestro/campeonatos
+    Campeonatos activos del workspace del maestro con su estado. Solo puede
+    inscribir en los que estén en 'preparacion' (puede_inscribir=True).
+    """
+    maestro = require_maestro()
+    if not maestro:
+        return jsonify({"error": "Solo maestros"}), 403
+
+    query = filtrar_campeonatos(maestro, Campeonato.query.filter_by(activo=True))
+    camps = query.order_by(Campeonato.created_at.desc()).all()
+    return jsonify([{
+        "id": c.id,
+        "nombre": c.nombre,
+        "descripcion": c.descripcion,
+        "estado": c.estado or "preparacion",
+        "fecha_inicio": c.fecha_inicio.isoformat() if c.fecha_inicio else None,
+        "fecha_fin": c.fecha_fin.isoformat() if c.fecha_fin else None,
+        "lugar": c.lugar,
+        "ciudad": c.ciudad,
+        "pais": c.pais,
+        "puede_inscribir": (c.estado or "preparacion") == "preparacion",
+    } for c in camps]), 200
+
+
+@inscripciones_bp.route("/maestro/campeonato/<int:camp_id>", methods=["POST"])
+@jwt_required()
+def maestro_inscribir(camp_id):
+    """
+    POST /api/inscripciones/maestro/campeonato/:id
+    Body: { "competidor": { ... }, "modalidades"?: [...], "peso"?: number }
+    El maestro envía una solicitud (queda 'pendiente'). El club del alumno se
+    fuerza al club del maestro; el alumno queda bajo el workspace de su admin.
+    Solo si el campeonato está en 'preparacion' y es del workspace del maestro.
+    """
+    maestro = require_maestro()
+    if not maestro:
+        return jsonify({"error": "Solo maestros"}), 403
+
+    campeonato = Campeonato.query.get_or_404(camp_id)
+    if not es_dueno_campeonato(maestro, campeonato):
+        return jsonify({"error": "Campeonato no encontrado"}), 404
+    if (campeonato.estado or "preparacion") != "preparacion":
+        return jsonify({
+            "error": "Este campeonato ya no está en preparación: no acepta nuevas inscripciones."
+        }), 409
+
+    data = request.get_json() or {}
+    datos = dict(data.get("competidor") or {})
+    # El club SIEMPRE es el del maestro (no se toma del cliente).
+    datos["club"] = maestro.club or ""
+    comp = Competidor(
+        nombre_completo="", activo=True, created_by=workspace_owner_id(maestro)
+    )
+    error = _aplicar_datos(comp, datos, actor=maestro)
+    if error:
+        return jsonify({"error": error}), 400
+    db.session.add(comp)
+    db.session.flush()
+
+    peso = None
+    if data.get("peso") not in (None, ""):
+        peso, error = _validar_peso(data.get("peso"))
+        if error:
+            return jsonify({"error": error}), 400
+    inscripcion = Inscripcion(
+        campeonato_id=campeonato.id,
+        competidor_id=comp.id,
+        modalidades=_parse_modalidades(data.get("modalidades")) or None,
+        peso=peso if peso is not None else comp.peso,
+        grupo_cinturon=comp.grupo_cinturon,
+        estado="pendiente",
+        created_by=maestro.id,
+    )
+    db.session.add(inscripcion)
+    db.session.commit()
+    return jsonify({
+        "message": f"Solicitud enviada: {comp.nombre_completo}. El administrador la revisará.",
+        "inscripcion": inscripcion.to_dict(),
+    }), 201
+
+
+@inscripciones_bp.route("/maestro/mias", methods=["GET"])
+@jwt_required()
+def maestro_mis_inscripciones():
+    """
+    GET /api/inscripciones/maestro/mias?campeonato_id=
+    Solicitudes enviadas por el maestro actual, con su estado y motivo.
+    """
+    maestro = require_maestro()
+    if not maestro:
+        return jsonify({"error": "Solo maestros"}), 403
+
+    query = Inscripcion.query.filter_by(created_by=maestro.id)
+    camp_id = request.args.get("campeonato_id")
+    if camp_id:
+        try:
+            query = query.filter_by(campeonato_id=int(camp_id))
+        except (TypeError, ValueError):
+            return jsonify({"error": "campeonato_id inválido"}), 400
+    inscripciones = query.order_by(Inscripcion.created_at.desc()).all()
+    return jsonify([i.to_dict() for i in inscripciones]), 200
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Ficha PÚBLICA del campeonato (sin login)
+# ══════════════════════════════════════════════════════════════════
+
+@inscripciones_bp.route("/publico/campeonato/<int:camp_id>", methods=["GET"])
+def publico_campeonato(camp_id):
+    """
+    GET /api/inscripciones/publico/campeonato/:id — Sin login.
+    Ficha pública: datos del campeonato + inscritos ACEPTADOS (nombre, club,
+    modalidades) + jueces asignados. Solo campeonatos activos.
+    """
+    from ..models.asignacion import AsignacionJuez
+    from ..models.tatami import Tatami
+
+    camp = Campeonato.query.filter_by(id=camp_id, activo=True).first()
+    if not camp:
+        return jsonify({"error": "Campeonato no encontrado"}), 404
+
+    inscripciones = (
+        Inscripcion.query.filter_by(campeonato_id=camp.id, estado="aceptada")
+        .join(Competidor)
+        .order_by(Competidor.nombre_completo.asc())
+        .all()
+    )
+    competidores = [{
+        "nombre": i.competidor.nombre_completo,
+        "club": i.competidor.club or "",
+        "modalidades": i.modalidades or [],
+    } for i in inscripciones if i.competidor]
+
+    tatamis = Tatami.query.filter_by(campeonato_id=camp.id).all()
+    tnum = {t.id: t.numero for t in tatamis}
+    jueces = []
+    if tnum:
+        asigs = AsignacionJuez.query.filter(
+            AsignacionJuez.tatami_id.in_(list(tnum.keys()))
+        ).all()
+        jueces = [{
+            "nombre": a.nombre_display,
+            "rol_tatami": a.rol_tatami,
+            "tatami_numero": tnum.get(a.tatami_id),
+        } for a in asigs]
+
+    return jsonify({
+        "campeonato": {
+            "id": camp.id,
+            "nombre": camp.nombre,
+            "descripcion": camp.descripcion,
+            "estado": camp.estado or "preparacion",
+            "fecha_inicio": camp.fecha_inicio.isoformat() if camp.fecha_inicio else None,
+            "fecha_fin": camp.fecha_fin.isoformat() if camp.fecha_fin else None,
+            "lugar": camp.lugar,
+            "ciudad": camp.ciudad,
+            "pais": camp.pais,
+        },
+        "competidores": competidores,
+        "jueces": jueces,
+        "clubes": sorted({c["club"] for c in competidores if c["club"]}, key=str.lower),
+    }), 200

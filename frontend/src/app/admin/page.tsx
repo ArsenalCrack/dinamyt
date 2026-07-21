@@ -9,11 +9,12 @@ import {
   listUsersAPI,
   registerUserAPI,
   updateUserAPI,
+  type EstadoCampeonato,
   type UserData,
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import Logo from "@/components/Logo";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type ClaveTexto } from "@/lib/i18n";
 
 interface Campeonato {
   id: number;
@@ -21,8 +22,13 @@ interface Campeonato {
   descripcion: string;
   fecha_inicio: string;
   fecha_fin: string;
+  lugar?: string | null;
+  ciudad?: string | null;
+  pais?: string | null;
+  estado?: EstadoCampeonato;
   activo: boolean;
   num_tatamis: number;
+  num_pendientes?: number;
   created_at: string;
 }
 
@@ -35,17 +41,25 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"campeonatos" | "jueces">("campeonatos");
   const [showNewCamp, setShowNewCamp] = useState(false);
   const [showNewUser, setShowNewUser] = useState(false);
-  const [newCamp, setNewCamp] = useState({ nombre: "", descripcion: "", num_tatamis: 6 });
-  const [newUser, setNewUser] = useState({ email: "", password: "", nombre: "", rol: "juez" });
+  const [newCamp, setNewCamp] = useState({
+    nombre: "", descripcion: "", num_tatamis: 6,
+    fecha_inicio: "", fecha_fin: "", lugar: "", ciudad: "", pais: "",
+    estado: "preparacion" as EstadoCampeonato,
+  });
+  const [newUser, setNewUser] = useState({
+    email: "", password: "", nombre: "", rol: "juez", club: "", puede_juzgar: false,
+  });
   const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const [userSearch, setUserSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
-  const [rolFiltro, setRolFiltro] = useState<"todos" | "admin" | "juez">("todos");
+  const [rolFiltro, setRolFiltro] = useState<"todos" | "admin" | "maestro" | "juez">("todos");
   const [campSearch, setCampSearch] = useState("");
   const [campFiltro, setCampFiltro] = useState<"todos" | "activos" | "inactivos">("todos");
   const [creandoCamp, setCreandoCamp] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
-  const [editUserData, setEditUserData] = useState({ nombre: "", email: "", password: "", rol: "juez" });
+  const [editUserData, setEditUserData] = useState({
+    nombre: "", email: "", password: "", rol: "juez", club: "", puede_juzgar: false,
+  });
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
 
   useEffect(() => {
@@ -91,11 +105,24 @@ export default function AdminPage() {
   async function handleSaveUserEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editingUser) return;
-    const payload: { nombre?: string; email?: string; password?: string; rol?: string } = {};
+    const payload: {
+      nombre?: string; email?: string; password?: string; rol?: string;
+      club?: string; puede_juzgar?: boolean;
+    } = {};
     if (editUserData.nombre.trim()) payload.nombre = editUserData.nombre.trim();
     if (editUserData.email.trim()) payload.email = editUserData.email.trim();
     if (editUserData.password) payload.password = editUserData.password;
     if (editUserData.rol && editUserData.rol !== editingUser.rol) payload.rol = editUserData.rol;
+    // Club y permiso de juez cuando el usuario es (o pasa a ser) maestro.
+    const rolEfectivo = editUserData.rol || editingUser.rol;
+    if (rolEfectivo === "maestro") {
+      if (!editUserData.club.trim()) {
+        flash(t("admin.usuarios.clubReq"), "error");
+        return;
+      }
+      payload.club = editUserData.club.trim();
+      payload.puede_juzgar = editUserData.puede_juzgar;
+    }
     try {
       await updateUserAPI(editingUser.id, payload);
       setEditingUser(null);
@@ -139,7 +166,11 @@ export default function AdminPage() {
     try {
       await createCampeonatoAPI(newCamp);
       setShowNewCamp(false);
-      setNewCamp({ nombre: "", descripcion: "", num_tatamis: 6 });
+      setNewCamp({
+        nombre: "", descripcion: "", num_tatamis: 6,
+        fecha_inicio: "", fecha_fin: "", lugar: "", ciudad: "", pais: "",
+        estado: "preparacion",
+      });
       loadData(showInactive);
       flash(t("admin.camp.creado"), "ok");
     } catch {
@@ -152,10 +183,22 @@ export default function AdminPage() {
 
   async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
+    if (newUser.rol === "maestro" && !newUser.club.trim()) {
+      flash(t("admin.usuarios.clubReq"), "error");
+      return;
+    }
     try {
-      await registerUserAPI(newUser);
+      await registerUserAPI({
+        email: newUser.email,
+        password: newUser.password,
+        nombre: newUser.nombre,
+        rol: newUser.rol,
+        ...(newUser.rol === "maestro"
+          ? { club: newUser.club.trim(), puede_juzgar: newUser.puede_juzgar }
+          : {}),
+      });
       setShowNewUser(false);
-      setNewUser({ email: "", password: "", nombre: "", rol: "juez" });
+      setNewUser({ email: "", password: "", nombre: "", rol: "juez", club: "", puede_juzgar: false });
       loadData(showInactive);
       flash(t("admin.usuarios.creado"), "ok");
     } catch (err) {
@@ -269,6 +312,38 @@ export default function AdminPage() {
                   onChange={(e) => setNewCamp({ ...newCamp, nombre: e.target.value })} required />
                 <input className="input" placeholder={t("admin.camp.desc")} value={newCamp.descripcion}
                   onChange={(e) => setNewCamp({ ...newCamp, descripcion: e.target.value })} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
+                    {t("camp.campos.fechaInicio")}
+                    <input className="input" type="date" value={newCamp.fecha_inicio}
+                      onChange={(e) => setNewCamp({ ...newCamp, fecha_inicio: e.target.value })} />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
+                    {t("camp.campos.fechaFin")}
+                    <input className="input" type="date" value={newCamp.fecha_fin}
+                      onChange={(e) => setNewCamp({ ...newCamp, fecha_fin: e.target.value })} />
+                  </label>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                  <input className="input" placeholder={t("camp.campos.lugar")} value={newCamp.lugar}
+                    maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, lugar: e.target.value.slice(0, 120) })} />
+                  <input className="input" placeholder={t("camp.campos.ciudad")} value={newCamp.ciudad}
+                    maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, ciudad: e.target.value.slice(0, 120) })} />
+                  <input className="input" placeholder={t("camp.campos.pais")} value={newCamp.pais}
+                    maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, pais: e.target.value.slice(0, 120) })} />
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <label style={{ color: "var(--text-muted)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>{t("camp.campos.estado")}</label>
+                  <select className="input" value={newCamp.estado} style={{ minWidth: 160 }}
+                    onChange={(e) => setNewCamp({ ...newCamp, estado: e.target.value as EstadoCampeonato })}>
+                    <option value="preparacion">{t("camp.estado.preparacion")}</option>
+                    <option value="en_curso">{t("camp.estado.en_curso")}</option>
+                    <option value="finalizado">{t("camp.estado.finalizado")}</option>
+                  </select>
+                </div>
+                <p style={{ color: "var(--text-dim)", fontSize: "0.82rem", margin: 0 }}>
+                  {t("camp.estado.preparacionAyuda")}
+                </p>
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                   <label style={{ color: "var(--text-muted)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>{t("admin.camp.tatamisLabel")}</label>
                   <input className="input" type="number" min={1} max={10} value={newCamp.num_tatamis}
@@ -309,6 +384,18 @@ export default function AdminPage() {
                         <span className={`badge ${c.activo ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 8, verticalAlign: "middle" }}>
                           {c.activo ? t("comun.activo") : t("comun.inactivo")}
                         </span>
+                        <span className="badge badge-gray" style={{ marginLeft: 6, verticalAlign: "middle" }}>
+                          {t(`camp.estado.${c.estado || "preparacion"}` as ClaveTexto)}
+                        </span>
+                        {(c.num_pendientes || 0) > 0 && (
+                          <span className="badge" style={{
+                            marginLeft: 6, verticalAlign: "middle",
+                            background: "var(--gold-bg)", color: "var(--gold)",
+                            border: "1px solid var(--gold-border)",
+                          }}>
+                            {t("camp.solicitudes.pendientes", { n: c.num_pendientes! })}
+                          </span>
+                        )}
                       </h3>
                       <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
                         {c.num_tatamis} {t("comun.tatamis")}
@@ -358,18 +445,33 @@ export default function AdminPage() {
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} required />
                 <input className="input" type="password" placeholder={t("admin.usuarios.contrasena")} value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} required />
-                {/* Jerarquía: solo el superadmin crea administradores; un admin
-                    normal solo agrega jueces a su propio equipo */}
-                {esSuper ? (
-                  <select className="input" value={newUser.rol}
-                    onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}>
-                    <option value="juez">{t("rol.juez")}</option>
-                    <option value="admin">{t("rol.admin")}</option>
-                  </select>
-                ) : (
-                  <p style={{ color: "var(--text-dim)", fontSize: "0.84rem", margin: 0 }}>
-                    {t("admin.usuarios.soloJueces")}
-                  </p>
+                {/* Jerarquía: cualquier admin agrega jueces y maestros a su
+                    equipo; solo el superadmin puede crear administradores. */}
+                <select className="input" value={newUser.rol}
+                  onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}>
+                  <option value="juez">{t("rol.juez")}</option>
+                  <option value="maestro">{t("rol.maestro")}</option>
+                  {esSuper && <option value="admin">{t("rol.admin")}</option>}
+                </select>
+                {newUser.rol === "maestro" && (
+                  <>
+                    <input className="input" placeholder={t("admin.usuarios.clubPh")}
+                      value={newUser.club}
+                      onChange={(e) => setNewUser({ ...newUser, club: e.target.value.slice(0, 80) })}
+                      maxLength={80} required />
+                    <label style={{
+                      display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                      fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 700, userSelect: "none",
+                    }}>
+                      <input type="checkbox" checked={newUser.puede_juzgar}
+                        onChange={(e) => setNewUser({ ...newUser, puede_juzgar: e.target.checked })}
+                        style={{ accentColor: "var(--gold)", width: 16, height: 16 }} />
+                      {t("admin.usuarios.puedeJuzgar")}
+                    </label>
+                    <p style={{ color: "var(--text-dim)", fontSize: "0.84rem", margin: 0 }}>
+                      {t("admin.usuarios.rolMaestroNota")}
+                    </p>
+                  </>
                 )}
                 <div style={{ display: "flex", gap: 8 }}>
                   <button type="submit" className="btn btn-primary">{t("comun.crear")}</button>
@@ -391,12 +493,13 @@ export default function AdminPage() {
             <select
               className="input"
               value={rolFiltro}
-              onChange={(e) => setRolFiltro(e.target.value as "todos" | "admin" | "juez")}
+              onChange={(e) => setRolFiltro(e.target.value as "todos" | "admin" | "maestro" | "juez")}
               aria-label={t("admin.usuarios.filtroAria")}
               style={{ width: "auto", minWidth: 150, padding: "8px 30px 8px 12px", minHeight: 38 }}
             >
               <option value="todos">{t("admin.usuarios.filtro.todos")}</option>
               <option value="admin">{t("admin.usuarios.filtro.admins")}</option>
+              <option value="maestro">{t("admin.usuarios.filtro.maestros")}</option>
               <option value="juez">{t("admin.usuarios.filtro.jueces")}</option>
             </select>
             <label style={{
@@ -439,16 +542,18 @@ export default function AdminPage() {
                     <div style={{ color: "var(--text-dim)", fontSize: "0.84rem", marginTop: 4 }}>
                       {t("admin.usuarios.agregado")} {u.created_at ? new Date(u.created_at).toLocaleDateString("es-CO") : "—"}
                       {u.creado_por ? ` ${t("comun.por")} ${u.creado_por.nombre}` : ""}
+                      {u.rol === "maestro" && u.club ? ` · ${t("admin.usuarios.club")}: ${u.club}` : ""}
+                      {u.rol === "maestro" && u.puede_juzgar ? ` · ${t("rol.juez")}` : ""}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                     <span style={{
                       padding: "4px 10px", borderRadius: "var(--radius-sm)", fontSize: "0.82rem",
                       fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
-                      background: u.rol === "admin" ? "var(--gold-bg)" : "var(--chung-bg)",
-                      color: u.rol === "admin" ? "var(--gold)" : "var(--chung-light)",
-                      border: `1px solid ${u.rol === "admin" ? "var(--gold-border)" : "var(--chung-border)"}`,
-                    }}>{u.es_superadmin ? t("rol.superadmin") : u.rol === "admin" ? t("rol.admin") : t("rol.juez")}</span>
+                      background: u.rol === "admin" ? "var(--gold-bg)" : u.rol === "maestro" ? "var(--green-bg)" : "var(--chung-bg)",
+                      color: u.rol === "admin" ? "var(--gold)" : u.rol === "maestro" ? "var(--green)" : "var(--chung-light)",
+                      border: `1px solid ${u.rol === "admin" ? "var(--gold-border)" : u.rol === "maestro" ? "rgba(0,196,106,.35)" : "var(--chung-border)"}`,
+                    }}>{u.es_superadmin ? t("rol.superadmin") : u.rol === "admin" ? t("rol.admin") : u.rol === "maestro" ? t("rol.maestro") : t("rol.juez")}</span>
                     <button
                       className="btn btn-sm"
                       onClick={() => {
@@ -456,7 +561,10 @@ export default function AdminPage() {
                           setEditingUser(null);
                         } else {
                           setEditingUser(u);
-                          setEditUserData({ nombre: u.nombre, email: u.email, password: "", rol: u.rol });
+                          setEditUserData({
+                            nombre: u.nombre, email: u.email, password: "", rol: u.rol,
+                            club: u.club || "", puede_juzgar: !!u.puede_juzgar,
+                          });
                         }
                       }}
                       style={{ padding: "4px 10px", fontSize: "0.82rem" }}
@@ -489,17 +597,36 @@ export default function AdminPage() {
                       placeholder={t("admin.usuarios.nuevaContrasena")}
                       value={editUserData.password}
                       onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })} />
-                    {/* Cambios de rol: exclusivos del superadmin */}
-                    {esSuper && (
+                    {/* Rol: alternar juez/maestro lo hace cualquier admin; el
+                        rol de administrador es exclusivo del superadmin. */}
+                    {(esSuper || u.rol !== "admin") && (
                       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                         <label style={{ color: "var(--text-muted)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>{t("admin.usuarios.rolLabel")}</label>
                         <select className="input" value={editUserData.rol}
                           disabled={u.id === user.id}
                           onChange={(e) => setEditUserData({ ...editUserData, rol: e.target.value })}>
                           <option value="juez">{t("rol.juez")}</option>
-                          <option value="admin">{t("rol.admin")}</option>
+                          <option value="maestro">{t("rol.maestro")}</option>
+                          {esSuper && <option value="admin">{t("rol.admin")}</option>}
                         </select>
                       </div>
+                    )}
+                    {(editUserData.rol || u.rol) === "maestro" && (
+                      <>
+                        <input className="input" placeholder={t("admin.usuarios.clubPh")}
+                          value={editUserData.club}
+                          onChange={(e) => setEditUserData({ ...editUserData, club: e.target.value.slice(0, 80) })}
+                          maxLength={80} />
+                        <label style={{
+                          display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                          fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 700, userSelect: "none",
+                        }}>
+                          <input type="checkbox" checked={editUserData.puede_juzgar}
+                            onChange={(e) => setEditUserData({ ...editUserData, puede_juzgar: e.target.checked })}
+                            style={{ accentColor: "var(--gold)", width: 16, height: 16 }} />
+                          {t("admin.usuarios.puedeJuzgar")}
+                        </label>
+                      </>
                     )}
                     <p style={{ color: "var(--text-dim)", fontSize: "0.84rem", margin: 0 }}>
                       {t("admin.usuarios.notaReset")}

@@ -6,7 +6,7 @@ CRUD para campeonatos — solo Admin.
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from ..extensions import db
-from ..models.campeonato import Campeonato
+from ..models.campeonato import ESTADOS_CAMPEONATO, Campeonato
 from ..models.tatami import Tatami
 from .scoping import (
     es_dueno_campeonato,
@@ -16,6 +16,19 @@ from .scoping import (
 )
 
 campeonatos_bp = Blueprint("campeonatos", __name__)
+
+# Tope de caracteres de sede/ciudad/país (validado también en el frontend).
+CAMPO_LUGAR_MAX = 120
+
+
+def _validar_campo_texto(valor, etiqueta):
+    """(texto, error): recorta un campo opcional y valida su longitud."""
+    texto = str(valor or "").strip()
+    if not texto:
+        return None, None
+    if len(texto) > CAMPO_LUGAR_MAX:
+        return None, f"{etiqueta} no puede superar {CAMPO_LUGAR_MAX} caracteres."
+    return texto, None
 
 
 @campeonatos_bp.route("", methods=["GET"])
@@ -53,6 +66,14 @@ def listar_publico():
         result.append({
             "id": c.id,
             "nombre": c.nombre,
+            # Ficha pública: detalles del campeonato (sin PII de competidores).
+            "descripcion": c.descripcion,
+            "fecha_inicio": c.fecha_inicio.isoformat() if c.fecha_inicio else None,
+            "fecha_fin": c.fecha_fin.isoformat() if c.fecha_fin else None,
+            "lugar": c.lugar,
+            "ciudad": c.ciudad,
+            "pais": c.pais,
+            "estado": c.estado or "preparacion",
             "tatamis": [{"id": t.id, "numero": t.numero} for t in tatamis],
         })
     return jsonify(result), 200
@@ -89,11 +110,28 @@ def crear():
 
     from datetime import date
 
+    lugar, error = _validar_campo_texto(data.get("lugar"), "La sede")
+    if error:
+        return jsonify({"error": error}), 400
+    ciudad, error = _validar_campo_texto(data.get("ciudad"), "La ciudad")
+    if error:
+        return jsonify({"error": error}), 400
+    pais, error = _validar_campo_texto(data.get("pais"), "El país")
+    if error:
+        return jsonify({"error": error}), 400
+    estado = data.get("estado", "preparacion")
+    if estado not in ESTADOS_CAMPEONATO:
+        return jsonify({"error": "Estado de campeonato inválido"}), 400
+
     camp = Campeonato(
         nombre=data["nombre"],
         descripcion=data.get("descripcion"),
         fecha_inicio=date.fromisoformat(data["fecha_inicio"]) if data.get("fecha_inicio") else None,
         fecha_fin=date.fromisoformat(data["fecha_fin"]) if data.get("fecha_fin") else None,
+        lugar=lugar,
+        ciudad=ciudad,
+        pais=pais,
+        estado=estado,
         activo=True,
         created_by=admin.id,
     )
@@ -147,6 +185,16 @@ def actualizar(camp_id):
     if data.get("fecha_fin"):
         from datetime import date
         camp.fecha_fin = date.fromisoformat(data["fecha_fin"])
+    for campo, etiqueta in (("lugar", "La sede"), ("ciudad", "La ciudad"), ("pais", "El país")):
+        if campo in data:
+            valor, error = _validar_campo_texto(data.get(campo), etiqueta)
+            if error:
+                return jsonify({"error": error}), 400
+            setattr(camp, campo, valor)
+    if "estado" in data:
+        if data["estado"] not in ESTADOS_CAMPEONATO:
+            return jsonify({"error": "Estado de campeonato inválido"}), 400
+        camp.estado = data["estado"]
 
     db.session.commit()
     return jsonify(camp.to_dict()), 200
@@ -252,7 +300,9 @@ def _secciones_con_inscritos(camp):
 
     fecha_ref = camp.fecha_inicio or None
     avisos = []
-    inscripciones = camp.inscripciones.all()
+    # Solo las inscripciones ACEPTADAS entran a secciones/llaves (las
+    # pendientes son solicitudes de maestros por revisar).
+    inscripciones = camp.inscripciones.filter_by(estado="aceptada").all()
     for ins in inscripciones:
         comp = ins.competidor
         if not comp:
@@ -337,7 +387,7 @@ def preview_secciones(camp_id):
         "avisos": avisos,
         "total_secciones": len(secciones),
         "secciones_con_competidores": con_gente,
-        "total_inscripciones": camp.inscripciones.count(),
+        "total_inscripciones": camp.inscripciones.filter_by(estado="aceptada").count(),
     }), 200
 
 

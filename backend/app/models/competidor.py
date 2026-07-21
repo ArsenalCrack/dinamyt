@@ -18,6 +18,12 @@ from ..timeutil import iso_utc
 GENEROS = ("MASCULINO", "FEMENINO")
 GRUPOS_CINTURON = ("BLANCO", "PRINCIPIANTE", "INTERMEDIO", "AVANZADO", "NEGRO")
 
+# Estado de una inscripción:
+# - aceptada: participa (la crea el admin directo, o el admin aprueba la de un maestro).
+# - pendiente: solicitud de un maestro por revisar (no cuenta ni entra a llaves).
+# - rechazada: solicitud denegada por el admin (guarda motivo_rechazo).
+ESTADOS_INSCRIPCION = ("aceptada", "pendiente", "rechazada")
+
 # Cinturones REALES de Hapkido → grupo competitivo (misma escala del DINAMYT
 # turbo). El admin elige el cinturón; el grupo se deriva SOLO, nunca se
 # escribe a mano.
@@ -175,9 +181,17 @@ class Inscripcion(db.Model):
     # Snapshots al inscribir: si son NULL se usa el dato actual del competidor.
     peso = db.Column(db.Float, nullable=True)
     grupo_cinturon = db.Column(db.String(20), nullable=True)
+    # Moderación: las del admin nacen "aceptada"; las de un maestro "pendiente"
+    # hasta que el admin las acepte/rechace (ver ESTADOS_INSCRIPCION).
+    estado = db.Column(db.String(20), default="aceptada", nullable=False)
+    # Quién envió la inscripción (admin o maestro). Para el audit "solicitado por".
+    created_by = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    motivo_rechazo = db.Column(db.Text, nullable=True)
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
+
+    autor = db.relationship("Usuario", foreign_keys=[created_by])
 
     @property
     def peso_efectivo(self):
@@ -203,6 +217,19 @@ class Inscripcion(db.Model):
             "grupo_cinturon": self.grupo_cinturon,
             "peso_efectivo": self.peso_efectivo,
             "grupo_cinturon_efectivo": self.grupo_cinturon_efectivo,
+            "estado": self.estado or "aceptada",
+            "created_by": self.created_by,
+            "motivo_rechazo": self.motivo_rechazo,
+            # Datos del solicitante (para que el admin vea "solicitado por X").
+            "solicitante": (
+                {
+                    "id": self.autor.id,
+                    "nombre": self.autor.nombre,
+                    "rol": self.autor.rol,
+                    "club": self.autor.club,
+                }
+                if self.autor else None
+            ),
             "created_at": iso_utc(self.created_at),
         }
         if include_competidor and self.competidor:

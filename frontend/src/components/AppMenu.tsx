@@ -8,7 +8,7 @@ import { IDIOMAS, useI18n } from "@/lib/i18n";
 
 interface SesionUser {
   nombre?: string;
-  rol?: "admin" | "juez";
+  rol?: "admin" | "juez" | "maestro";
 }
 
 /**
@@ -91,8 +91,11 @@ export default function AppMenu() {
 
   if (!visible || !user) return null;
 
-  const inicio = user.rol === "admin" ? "/admin" : "/juez";
-  const rolLabel = user.rol === "admin" ? t("rol.admin") : t("rol.juez");
+  const inicio = user.rol === "admin" ? "/admin" : user.rol === "maestro" ? "/maestro" : "/juez";
+  const rolLabel =
+    user.rol === "admin" ? t("rol.admin")
+    : user.rol === "maestro" ? t("rol.maestro")
+    : t("rol.juez");
 
   function ir(ruta: string) {
     setOpen(false);
@@ -126,6 +129,9 @@ export default function AppMenu() {
           </button>
           <button type="button" role="menuitem" className="appmenu-item" onClick={() => ir("/pantalla")}>
             {t("menu.pantallaPublica")}
+          </button>
+          <button type="button" role="menuitem" className="appmenu-item" onClick={() => ir("/campeonatos")}>
+            {t("menu.campeonatos")}
           </button>
           <button type="button" role="menuitem" className="appmenu-item" onClick={cambiarTema}>
             {tema === "dark" ? t("menu.modoClaro") : t("menu.modoOscuro")}

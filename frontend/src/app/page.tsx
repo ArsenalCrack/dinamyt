@@ -14,7 +14,11 @@ export default function Home() {
       const user = localStorage.getItem("dinamyt_user");
       if (user) {
         const parsed = JSON.parse(user);
-        router.replace(parsed.rol === "admin" ? "/admin" : "/juez");
+        router.replace(
+          parsed.rol === "admin" ? "/admin"
+          : parsed.rol === "maestro" ? "/maestro"
+          : "/juez"
+        );
         return;
       }
     }

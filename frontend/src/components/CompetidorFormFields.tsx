@@ -16,6 +16,7 @@ import {
   type CompetidorInput,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import ClubCombobox from "@/components/ClubCombobox";
 
 export interface CompetidorFormState {
   nombre_completo: string;
@@ -90,9 +91,15 @@ function limitesFechaNacimiento(): { min: string; max: string } {
 export default function CompetidorFormFields({
   value,
   onChange,
+  clubes,
+  clubLocked = null,
 }: {
   value: CompetidorFormState;
   onChange: (next: CompetidorFormState) => void;
+  /** Clubes de los maestros del workspace → el club se elige por combobox. */
+  clubes?: string[];
+  /** Flujo maestro: el club va fijo a este valor (solo lectura). */
+  clubLocked?: string | null;
 }) {
   const { t } = useI18n();
   const set = (campo: keyof CompetidorFormState, v: string | boolean) =>
@@ -195,15 +202,32 @@ export default function CompetidorFormFields({
       </label>
       <label className="comp-field">
         <span className="comp-label">
-          {t("form.club")} <span className="comp-hint">{t("form.max", { n: COMPETIDOR_LIMITES.clubMax })}</span>
+          {t("form.club")}{" "}
+          {clubLocked !== null ? (
+            <span className="comp-hint">{t("form.clubFijo")}</span>
+          ) : (
+            <span className="comp-hint">{t("form.max", { n: COMPETIDOR_LIMITES.clubMax })}</span>
+          )}
         </span>
-        <input
-          className="input"
-          value={value.club}
-          onChange={(e) => set("club", e.target.value.slice(0, COMPETIDOR_LIMITES.clubMax))}
-          placeholder={t("form.clubPh")}
-          maxLength={COMPETIDOR_LIMITES.clubMax}
-        />
+        {clubLocked !== null ? (
+          // Flujo maestro: el club va fijo (lo asigna el admin al maestro).
+          <input className="input" value={clubLocked} disabled readOnly />
+        ) : clubes ? (
+          <ClubCombobox
+            value={value.club}
+            onChange={(v) => set("club", v.slice(0, COMPETIDOR_LIMITES.clubMax))}
+            clubes={clubes}
+            maxLen={COMPETIDOR_LIMITES.clubMax}
+          />
+        ) : (
+          <input
+            className="input"
+            value={value.club}
+            onChange={(e) => set("club", e.target.value.slice(0, COMPETIDOR_LIMITES.clubMax))}
+            placeholder={t("form.clubPh")}
+            maxLength={COMPETIDOR_LIMITES.clubMax}
+          />
+        )}
       </label>
 
       <label

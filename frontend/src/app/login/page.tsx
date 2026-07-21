@@ -36,7 +36,11 @@ export default function LoginPage() {
       const data = await loginAPI(email, password);
       localStorage.setItem("dinamyt_token", data.token);
       localStorage.setItem("dinamyt_user", JSON.stringify(data.user));
-      router.push(data.user.rol === "admin" ? "/admin" : "/juez");
+      router.push(
+        data.user.rol === "admin" ? "/admin"
+        : data.user.rol === "maestro" ? "/maestro"
+        : "/juez"
+      );
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setError(axiosErr.response?.data?.error || t("login.errorConexion"));
@@ -93,6 +97,15 @@ export default function LoginPage() {
               id="public-results-btn"
             >
               {t("res.verResultados")}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => router.push("/campeonatos")}
+              style={{ width: "100%", borderColor: "var(--gold-border)", color: "var(--gold)", fontWeight: 700 }}
+              id="public-champs-btn"
+            >
+              {t("pub.camp.boton")}
             </button>
             <p className="login-card-note">{t("login.publica.nota")}</p>
           </div>

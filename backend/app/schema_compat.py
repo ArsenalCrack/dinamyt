@@ -12,6 +12,9 @@ OPTIONAL_COLUMNS = {
         # Jerarquía: el superadmin ve todos los workspaces; un admin normal
         # solo ve lo que él creó (sus jueces, campeonatos y competidores).
         "es_superadmin": "BOOLEAN",
+        # Rol maestro: club (lo fija el admin) y permiso para juzgar.
+        "club": "VARCHAR(80)",
+        "puede_juzgar": "BOOLEAN",
     },
     "asignaciones_juez": {
         "asignado_por_id": "INTEGER",
@@ -26,6 +29,11 @@ OPTIONAL_COLUMNS = {
     "campeonatos": {
         "config_categorias": "JSON",
         "export_uuid": "VARCHAR(64)",
+        # Detalles públicos + ciclo de vida (preparacion/en_curso/finalizado).
+        "lugar": "VARCHAR(120)",
+        "ciudad": "VARCHAR(120)",
+        "pais": "VARCHAR(120)",
+        "estado": "VARCHAR(20)",
     },
     "competidores": {
         "categoria_especial": "BOOLEAN",
@@ -33,6 +41,21 @@ OPTIONAL_COLUMNS = {
         # campeonatos). NULL en filas viejas = nunca actualizado tras crearse.
         "updated_at": "DATETIME",
     },
+    "inscripciones": {
+        # Moderación de inscripciones enviadas por maestros.
+        "estado": "VARCHAR(20)",
+        "created_by": "INTEGER",
+        "motivo_rechazo": "TEXT",
+    },
+}
+
+# Valores por defecto para filas creadas ANTES de que existiera la columna
+# (se aplican una sola vez, solo donde el valor quedó NULL tras el ALTER).
+BACKFILL = {
+    # Las inscripciones previas eran todas del admin → participan.
+    "inscripciones": {"estado": "aceptada"},
+    # Los campeonatos previos arrancan en preparación.
+    "campeonatos": {"estado": "preparacion"},
 }
 
 
@@ -50,5 +73,22 @@ def ensure_optional_columns():
                 continue
             db.session.execute(
                 text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+            )
+    db.session.commit()
+
+    # Backfill de valores por defecto donde el ALTER dejó NULL (idempotente).
+    for table_name, valores in BACKFILL.items():
+        if table_name not in table_names:
+            continue
+        columnas = {col["name"] for col in inspect(db.engine).get_columns(table_name)}
+        for column_name, valor in valores.items():
+            if column_name not in columnas:
+                continue
+            db.session.execute(
+                text(
+                    f"UPDATE {table_name} SET {column_name} = :valor "
+                    f"WHERE {column_name} IS NULL"
+                ),
+                {"valor": valor},
             )
     db.session.commit()

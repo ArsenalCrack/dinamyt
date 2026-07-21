@@ -13,9 +13,9 @@ from flask_jwt_extended import (
 )
 from ..extensions import db
 from ..models.asignacion import AsignacionJuez
-from ..models.usuario import Usuario
+from ..models.usuario import ROLES_VALIDOS, Usuario
 from ..security import intento_bloqueado, limpiar_intentos, segundos_restantes
-from .scoping import es_dueno_usuario, require_admin
+from .scoping import es_dueno_usuario, require_admin, workspace_owner_id
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -23,6 +23,19 @@ auth_bp = Blueprint("auth", __name__)
 LOGIN_MAX_POR_EMAIL = 5
 LOGIN_MAX_POR_IP = 20
 LOGIN_VENTANA_SEG = 300
+
+# Tope de caracteres del club (espejo del competidor).
+CLUB_MAX = 80
+
+
+def _validar_club(valor):
+    """(club, error): club recortado o None; error si excede el tope."""
+    club = str(valor or "").strip()
+    if not club:
+        return None, None
+    if len(club) > CLUB_MAX:
+        return None, f"El club no puede superar {CLUB_MAX} caracteres."
+    return club, None
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -111,15 +124,21 @@ def register():
     if not email or not password or not nombre:
         return jsonify({"error": "Email, contraseña y nombre son requeridos"}), 400
 
-    if rol not in ("admin", "juez"):
-        return jsonify({"error": "Rol debe ser 'admin' o 'juez'"}), 400
+    if rol not in ROLES_VALIDOS:
+        return jsonify({"error": "Rol debe ser 'admin', 'maestro' o 'juez'"}), 400
 
     # Jerarquía: solo el superadmin crea administradores. Un admin normal
-    # solo agrega jueces a SU workspace (los demás admins no los ven).
+    # agrega jueces y maestros a SU workspace (los demás admins no los ven).
     if rol == "admin" and not current_user.es_super:
         return jsonify({
             "error": "Solo el superadministrador puede crear administradores"
         }), 403
+
+    # Club y permiso de juez: solo tienen sentido para un maestro.
+    club, error = _validar_club(data.get("club"))
+    if error:
+        return jsonify({"error": error}), 400
+    puede_juzgar = bool(data.get("puede_juzgar")) if rol == "maestro" else False
 
     if Usuario.query.filter_by(email=email).first():
         return jsonify({"error": f"El email '{email}' ya está registrado"}), 409
@@ -130,6 +149,8 @@ def register():
         rol=rol,
         activo=True,
         creado_por_id=current_user.id,
+        club=club if rol == "maestro" else None,
+        puede_juzgar=puede_juzgar,
     )
     new_user.set_password(password)
     db.session.add(new_user)
@@ -153,9 +174,9 @@ def me():
     if not user:
         return jsonify({"error": "Usuario no encontrado"}), 404
 
-    # Incluir tatamis asignados si es juez
+    # Incluir tatamis asignados si es juez (o un maestro que también juzga)
     data = user.to_dict()
-    if user.rol == "juez":
+    if user.puede_ser_juez:
         from ..models.asignacion import AsignacionJuez
         asignaciones = AsignacionJuez.query.filter_by(usuario_id=user.id).all()
         data["tatamis_asignados"] = [a.to_dict() for a in asignaciones]
@@ -187,6 +208,28 @@ def list_users():
 
     users = query.order_by(Usuario.nombre).all()
     return jsonify([u.to_dict(include_asignaciones=True) for u in users]), 200
+
+
+@auth_bp.route("/clubes", methods=["GET"])
+@jwt_required()
+def listar_clubes():
+    """
+    GET /api/auth/clubes (solo Admin)
+    Clubes distintos de los maestros del workspace. Alimenta el desplegable de
+    club al inscribir competidores ("Independiente"/"Otro…" los agrega el cliente).
+    """
+    current_user = require_admin()
+    if not current_user:
+        return jsonify({"error": "Solo administradores"}), 403
+
+    query = Usuario.query.filter(Usuario.rol == "maestro")
+    if not current_user.es_super:
+        query = query.filter(Usuario.creado_por_id == current_user.id)
+    clubes = sorted(
+        {(u.club or "").strip() for u in query.all() if (u.club or "").strip()},
+        key=str.lower,
+    )
+    return jsonify(clubes), 200
 
 
 @auth_bp.route("/users/<int:user_id>", methods=["PUT"])
@@ -235,21 +278,41 @@ def update_user(user_id):
 
     if data.get("rol"):
         nuevo_rol = data["rol"]
-        if nuevo_rol not in ("admin", "juez"):
-            return jsonify({"error": "Rol inválido (debe ser 'admin' o 'juez')"}), 400
+        if nuevo_rol not in ROLES_VALIDOS:
+            return jsonify({"error": "Rol inválido (debe ser 'admin', 'maestro' o 'juez')"}), 400
         if user.id == current_user.id and nuevo_rol != "admin":
             return jsonify({"error": "No puedes quitarte tu propio rol de administrador"}), 400
-        # Jerarquía: los cambios de rol (crear o degradar administradores)
-        # son exclusivos del superadmin.
-        if nuevo_rol != user.rol and not current_user.es_super:
+        # Jerarquía: solo el superadmin promueve o degrada ADMINISTRADORES.
+        # Alternar entre juez y maestro sí lo puede hacer un admin normal en su
+        # propio workspace.
+        toca_admin = "admin" in (nuevo_rol, user.rol)
+        if nuevo_rol != user.rol and toca_admin and not current_user.es_super:
             return jsonify({
-                "error": "Solo el superadministrador puede cambiar roles"
+                "error": "Solo el superadministrador puede cambiar el rol de administrador"
             }), 403
         if nuevo_rol != user.rol:
             if nuevo_rol == "admin":
                 # Un admin no actúa como juez de tatami: liberar sus asignaciones
                 AsignacionJuez.query.filter_by(usuario_id=user.id).delete()
+            if nuevo_rol != "maestro":
+                # Al dejar de ser maestro, el club y el permiso de juez dejan de aplicar.
+                user.club = None
+                user.puede_juzgar = False
             user.rol = nuevo_rol
+
+    # Club del maestro (lo fija/edita el admin).
+    if "club" in data:
+        club, error = _validar_club(data.get("club"))
+        if error:
+            return jsonify({"error": error}), 400
+        user.club = club
+
+    # Permiso de juez del maestro. Si se le revoca, se liberan sus asignaciones.
+    if "puede_juzgar" in data:
+        nuevo = bool(data["puede_juzgar"]) and user.rol == "maestro"
+        if user.puede_juzgar and not nuevo:
+            AsignacionJuez.query.filter_by(usuario_id=user.id).delete()
+        user.puede_juzgar = nuevo
 
     if "activo" in data:
         if user.id == current_user.id and not data["activo"]:

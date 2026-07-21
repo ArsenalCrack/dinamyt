@@ -12,6 +12,10 @@ import {
   deleteCampeonatoAPI,
   accesoQrAPI,
   origenParaQr,
+  listInscripcionesAPI,
+  setEstadoInscripcionAPI,
+  type EstadoCampeonato,
+  type InscripcionData,
   type UserData,
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -41,7 +45,14 @@ interface Campeonato {
   id: number;
   nombre: string;
   descripcion: string;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  lugar: string | null;
+  ciudad: string | null;
+  pais: string | null;
+  estado: EstadoCampeonato;
   activo: boolean;
+  num_pendientes?: number;
   tatamis: Tatami[];
 }
 
@@ -69,7 +80,12 @@ export default function CampeonatoDetailPage() {
   const [judgeSearch, setJudgeSearch] = useState("");
   const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const [editing, setEditing] = useState(false);
-  const [editData, setEditData] = useState({ nombre: "", descripcion: "" });
+  const [editData, setEditData] = useState({
+    nombre: "", descripcion: "", fecha_inicio: "", fecha_fin: "",
+    lugar: "", ciudad: "", pais: "",
+  });
+  const [solicitudes, setSolicitudes] = useState<InscripcionData[]>([]);
+  const [motivos, setMotivos] = useState<Record<number, string>>({});
   // QR de acceso directo de un juez: {nombre, rol, url, dataUrl}
   const [qrInfo, setQrInfo] = useState<{
     nombre: string; rol: string; url: string; dataUrl: string;
@@ -94,9 +110,15 @@ export default function CampeonatoDetailPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [c, u] = await Promise.all([getCampeonatoAPI(campId), listUsersAPI()]);
+      const [c, u, pend] = await Promise.all([
+        getCampeonatoAPI(campId),
+        listUsersAPI(),
+        listInscripcionesAPI(campId, "pendiente").catch(() => [] as InscripcionData[]),
+      ]);
       setCamp(c);
-      setUsers(u.filter((x: UserData) => x.rol === "juez"));
+      // Asignables a un tatami: jueces y maestros con permiso de juez.
+      setUsers(u.filter((x: UserData) => x.rol === "juez" || (x.rol === "maestro" && x.puede_juzgar)));
+      setSolicitudes(pend);
     } catch { router.replace("/admin"); }
   }, [campId, router]);
 
@@ -175,11 +197,38 @@ export default function CampeonatoDetailPage() {
       await updateCampeonatoAPI(camp.id, {
         nombre: editData.nombre.trim(),
         descripcion: editData.descripcion.trim(),
+        fecha_inicio: editData.fecha_inicio || undefined,
+        fecha_fin: editData.fecha_fin || undefined,
+        lugar: editData.lugar.trim(),
+        ciudad: editData.ciudad.trim(),
+        pais: editData.pais.trim(),
       });
       setEditing(false);
       await loadData();
       flash(t("camp.actualizado"), "ok");
     } catch { flash(t("camp.errorActualizar"), "error"); }
+  }
+
+  async function handleChangeEstado(estado: EstadoCampeonato) {
+    if (!camp || camp.estado === estado) return;
+    try {
+      await updateCampeonatoAPI(camp.id, { estado });
+      await loadData();
+      flash(t("camp.actualizado"), "ok");
+    } catch { flash(t("camp.errorActualizar"), "error"); }
+  }
+
+  async function handleModerar(ins: InscripcionData, estado: "aceptada" | "rechazada") {
+    try {
+      await setEstadoInscripcionAPI(
+        ins.id, estado, estado === "rechazada" ? motivos[ins.id] : undefined
+      );
+      await loadData();
+      flash(
+        estado === "aceptada" ? t("camp.solicitudes.aceptada") : t("camp.solicitudes.rechazada"),
+        "ok"
+      );
+    } catch { flash(t("camp.solicitudes.error"), "error"); }
   }
 
   function handleDeleteCampeonato() {
@@ -200,7 +249,7 @@ export default function CampeonatoDetailPage() {
 
   const searchTerm = judgeSearch.trim().toLowerCase();
   const availableJudges = users.filter((u) => {
-    if (!u.activo || u.rol !== "juez") return false;
+    if (!u.activo || !(u.rol === "juez" || (u.rol === "maestro" && u.puede_juzgar))) return false;
     if ((u.asignaciones?.length || 0) > 0) return false;
     if (!searchTerm) return true;
     return `${u.nombre} ${u.email}`.toLowerCase().includes(searchTerm);
@@ -289,7 +338,11 @@ export default function CampeonatoDetailPage() {
           <button
             className="btn btn-sm"
             onClick={() => {
-              setEditData({ nombre: camp.nombre, descripcion: camp.descripcion || "" });
+              setEditData({
+                nombre: camp.nombre, descripcion: camp.descripcion || "",
+                fecha_inicio: camp.fecha_inicio || "", fecha_fin: camp.fecha_fin || "",
+                lugar: camp.lugar || "", ciudad: camp.ciudad || "", pais: camp.pais || "",
+              });
               setEditing(!editing);
             }}
           >
@@ -315,11 +368,96 @@ export default function CampeonatoDetailPage() {
             onChange={(e) => setEditData({ ...editData, nombre: e.target.value })} required />
           <input className="input" placeholder={t("admin.camp.desc")} value={editData.descripcion}
             onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
+              {t("camp.campos.fechaInicio")}
+              <input className="input" type="date" value={editData.fecha_inicio}
+                onChange={(e) => setEditData({ ...editData, fecha_inicio: e.target.value })} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
+              {t("camp.campos.fechaFin")}
+              <input className="input" type="date" value={editData.fecha_fin}
+                onChange={(e) => setEditData({ ...editData, fecha_fin: e.target.value })} />
+            </label>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+            <input className="input" placeholder={t("camp.campos.lugar")} value={editData.lugar}
+              maxLength={120} onChange={(e) => setEditData({ ...editData, lugar: e.target.value.slice(0, 120) })} />
+            <input className="input" placeholder={t("camp.campos.ciudad")} value={editData.ciudad}
+              maxLength={120} onChange={(e) => setEditData({ ...editData, ciudad: e.target.value.slice(0, 120) })} />
+            <input className="input" placeholder={t("camp.campos.pais")} value={editData.pais}
+              maxLength={120} onChange={(e) => setEditData({ ...editData, pais: e.target.value.slice(0, 120) })} />
+          </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button type="submit" className="btn btn-primary">{t("comun.guardar")}</button>
             <button type="button" className="btn" onClick={() => setEditing(false)}>{t("comun.cancelar")}</button>
           </div>
         </form>
+      )}
+
+      {/* Estado del ciclo de vida del campeonato */}
+      <div className="card" style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
+        <span style={{ fontWeight: 700, color: "var(--text-muted)", fontSize: "0.9rem" }}>
+          {t("camp.campos.estado")}:
+        </span>
+        {(["preparacion", "en_curso", "finalizado"] as EstadoCampeonato[]).map((e) => (
+          <button key={e} type="button"
+            className={`btn btn-sm ${camp.estado === e ? "btn-primary" : ""}`}
+            onClick={() => handleChangeEstado(e)}
+            style={camp.estado === e ? undefined : { opacity: 0.75 }}
+          >
+            {t(`camp.estado.${e}` as ClaveTexto)}
+          </button>
+        ))}
+        <span style={{ color: "var(--text-dim)", fontSize: "0.82rem", flexBasis: "100%" }}>
+          {t("camp.estado.preparacionAyuda")}
+        </span>
+      </div>
+
+      {/* Solicitudes de inscripción de maestros (pendientes) */}
+      {solicitudes.length > 0 && (
+        <div className="card animate-fade" style={{ marginBottom: 16, borderColor: "var(--gold-border)" }}>
+          <div className="card-title" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {t("camp.solicitudes.titulo")}
+            <span className="badge" style={{ background: "var(--gold-bg)", color: "var(--gold)", border: "1px solid var(--gold-border)" }}>
+              {t("camp.solicitudes.pendientes", { n: solicitudes.length })}
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+            {solicitudes.map((s) => (
+              <div key={s.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <span style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
+                      {s.competidor?.nombre_completo || "—"}
+                    </span>
+                    {s.competidor?.club && (
+                      <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: "0.85rem" }}>
+                        {s.competidor.club}
+                      </span>
+                    )}
+                    <div style={{ color: "var(--text-dim)", fontSize: "0.82rem", marginTop: 2 }}>
+                      {(s.modalidades || []).join(", ")}
+                      {s.solicitante ? ` · ${t("camp.solicitudes.solicitadoPor", { nombre: s.solicitante.nombre })}` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input className="input" placeholder={t("camp.solicitudes.motivoPh")}
+                    value={motivos[s.id] || ""} maxLength={300}
+                    onChange={(e) => setMotivos({ ...motivos, [s.id]: e.target.value.slice(0, 300) })}
+                    style={{ flex: "1 1 180px", minWidth: 0 }} />
+                  <button className="btn btn-primary btn-sm" onClick={() => handleModerar(s, "aceptada")}>
+                    {t("camp.solicitudes.aceptar")}
+                  </button>
+                  <button className="btn btn-danger btn-sm" onClick={() => handleModerar(s, "rechazada")}>
+                    {t("camp.solicitudes.rechazar")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {msg && (
@@ -515,6 +653,9 @@ export default function CampeonatoDetailPage() {
                       >
                         <span style={{ fontWeight: 700 }}>{u.nombre}</span>
                         <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: "0.875rem" }}>{u.email}</span>
+                        {u.rol === "maestro" && (
+                          <span className="badge badge-green" style={{ marginLeft: 8 }}>{t("rol.maestro")}</span>
+                        )}
                       </button>
                     ))}
                     {availableJudges.length === 0 && !selectedJudge && (

@@ -96,8 +96,11 @@ def asignar_juez(tatami_id):
     # Un admin solo asigna SUS jueces (los que él creó); superadmin cualquiera.
     if not user or not es_dueno_usuario(admin, user):
         return jsonify({"error": "Usuario no encontrado"}), 404
-    if user.rol != "juez" or not user.activo:
-        return jsonify({"error": "Solo se pueden asignar jueces activos"}), 400
+    # Se puede asignar un juez, o un maestro con permiso de juez (puede_juzgar).
+    if not user.activo or not user.puede_ser_juez:
+        return jsonify({
+            "error": "Solo se pueden asignar jueces activos (o maestros con permiso de juez)"
+        }), 400
 
     ROLES_VALIDOS = ROLES_TATAMI
     rol = data["rol_tatami"]

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   createCompetidorAPI,
   deleteCompetidorAPI,
+  listClubesAPI,
   listCompetidoresAPI,
   updateCompetidorAPI,
   type CompetidorData,
@@ -24,6 +25,7 @@ export default function CompetidoresPage() {
   const router = useRouter();
   const { t } = useI18n();
   const [competidores, setCompetidores] = useState<CompetidorData[]>([]);
+  const [clubes, setClubes] = useState<string[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -53,7 +55,11 @@ export default function CompetidoresPage() {
       return;
     }
     let cancelled = false;
-    queueMicrotask(() => { if (!cancelled) void cargar(); });
+    queueMicrotask(() => {
+      if (cancelled) return;
+      void cargar();
+      listClubesAPI().then((c) => { if (!cancelled) setClubes(c); }).catch(() => {});
+    });
     return () => { cancelled = true; };
   }, [cargar, router]);
 
@@ -178,7 +184,7 @@ export default function CompetidoresPage() {
           <div className="card-title" style={{ marginBottom: 0 }}>
             {editandoId ? t("comp.editarTitulo") : t("comp.nuevoTitulo")}
           </div>
-          <CompetidorFormFields value={form} onChange={setForm} />
+          <CompetidorFormFields value={form} onChange={setForm} clubes={clubes} />
           <p style={{ color: "var(--text-dim)", fontSize: "0.84rem", margin: 0 }}>
             {t("comp.notaDatos")}
           </p>

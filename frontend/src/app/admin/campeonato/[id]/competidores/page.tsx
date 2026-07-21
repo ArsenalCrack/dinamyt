@@ -8,6 +8,7 @@ import {
   getCampeonatoAPI,
   getConfigCategoriasAPI,
   inscribirAPI,
+  listClubesAPI,
   listCompetidoresAPI,
   listInscripcionesAPI,
   updateCompetidorAPI,
@@ -54,6 +55,7 @@ export default function InscripcionesPage() {
   const [campNombre, setCampNombre] = useState("");
   const [inscripciones, setInscripciones] = useState<InscripcionData[]>([]);
   const [competidores, setCompetidores] = useState<CompetidorData[]>([]);
+  const [clubes, setClubes] = useState<string[]>([]);
   const [modalidadesDisponibles, setModalidadesDisponibles] = useState<string[]>(MODALIDADES_FALLBACK);
 
   const [panel, setPanel] = useState<Panel>("ninguno");
@@ -77,12 +79,16 @@ export default function InscripcionesPage() {
 
   const cargar = useCallback(async () => {
     try {
-      const [ins, comps] = await Promise.all([
-        listInscripcionesAPI(campId),
+      // Solo el "roster" aceptado; las solicitudes pendientes de maestros se
+      // aceptan/rechazan desde el panel del campeonato.
+      const [ins, comps, cl] = await Promise.all([
+        listInscripcionesAPI(campId, "aceptada"),
         listCompetidoresAPI(),
+        listClubesAPI().catch(() => [] as string[]),
       ]);
       setInscripciones(ins);
       setCompetidores(comps);
+      setClubes(cl);
     } catch { /* */ }
   }, [campId]);
 
@@ -515,7 +521,7 @@ export default function InscripcionesPage() {
           <div className="card-title" style={{ marginBottom: 0 }}>
             Nuevo competidor (se registra en el sistema y queda inscrito)
           </div>
-          <CompetidorFormFields value={formNuevo} onChange={setFormNuevo} />
+          <CompetidorFormFields value={formNuevo} onChange={setFormNuevo} clubes={clubes} />
           {selectorModalidades(modalidadesSel, setModalidadesSel)}
           <div style={{ display: "flex", gap: 8 }}>
             <button type="submit" className="btn btn-primary"
