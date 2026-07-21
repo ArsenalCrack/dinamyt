@@ -138,6 +138,8 @@ def register():
     club, error = _validar_club(data.get("club"))
     if error:
         return jsonify({"error": error}), 400
+    if rol == "maestro" and not club:
+        return jsonify({"error": "El club es obligatorio para un maestro"}), 400
     puede_juzgar = bool(data.get("puede_juzgar")) if rol == "maestro" else False
 
     if Usuario.query.filter_by(email=email).first():
@@ -305,6 +307,8 @@ def update_user(user_id):
         club, error = _validar_club(data.get("club"))
         if error:
             return jsonify({"error": error}), 400
+        if user.rol == "maestro" and not club:
+            return jsonify({"error": "El club es obligatorio para un maestro"}), 400
         user.club = club
 
     # Permiso de juez del maestro. Si se le revoca, se liberan sus asignaciones.
@@ -324,6 +328,9 @@ def update_user(user_id):
             # Al desactivar, liberar sus asignaciones de tatami
             AsignacionJuez.query.filter_by(usuario_id=user.id).delete()
             user.eliminado_at = datetime.now(timezone.utc)
+
+    if user.rol == "maestro" and not (user.club or "").strip():
+        return jsonify({"error": "El club es obligatorio para un maestro"}), 400
 
     db.session.commit()
     return jsonify({

@@ -59,10 +59,46 @@ BACKFILL = {
 }
 
 
+def _ensure_usuarios_rol_width(inspector, table_names):
+    """Amplía usuarios.rol si una instalación vieja quedó con VARCHAR(5)."""
+    if "usuarios" not in table_names:
+        return
+
+    columnas = {col["name"]: col for col in inspector.get_columns("usuarios")}
+    rol = columnas.get("rol")
+    if not rol:
+        return
+
+    tipo = rol["type"]
+    largo = getattr(tipo, "length", None)
+    valores_enum = getattr(tipo, "enums", None)
+    necesita_ensanchar = largo is not None and largo < 20
+    necesita_salir_de_enum = valores_enum is not None and "maestro" not in valores_enum
+    if not necesita_ensanchar and not necesita_salir_de_enum:
+        return
+
+    dialecto = db.engine.dialect.name
+    if dialecto == "postgresql":
+        db.session.execute(
+            text("ALTER TABLE usuarios ALTER COLUMN rol TYPE VARCHAR(20) USING rol::text")
+        )
+    elif dialecto in {"mysql", "mariadb"}:
+        db.session.execute(text("ALTER TABLE usuarios MODIFY COLUMN rol VARCHAR(20) NOT NULL"))
+    elif dialecto == "sqlite":
+        # SQLite no aplica el largo de VARCHAR; dejarlo como está evita reconstruir
+        # la tabla y preserva llaves/indices de instalaciones locales antiguas.
+        return
+    else:
+        return
+
+    db.session.commit()
+
+
 def ensure_optional_columns():
     """Agrega columnas nuevas cuando la base existente fue creada con una version previa."""
     inspector = inspect(db.engine)
     table_names = set(inspector.get_table_names())
+    _ensure_usuarios_rol_width(inspector, table_names)
 
     for table_name, columns in OPTIONAL_COLUMNS.items():
         if table_name not in table_names:

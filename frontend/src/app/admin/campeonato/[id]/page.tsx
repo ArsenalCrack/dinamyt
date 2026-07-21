@@ -19,6 +19,7 @@ import {
   type UserData,
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
 import QRCode from "qrcode";
 
@@ -381,12 +382,13 @@ export default function CampeonatoDetailPage() {
             </label>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-            <input className="input" placeholder={t("camp.campos.lugar")} value={editData.lugar}
-              maxLength={120} onChange={(e) => setEditData({ ...editData, lugar: e.target.value.slice(0, 120) })} />
-            <input className="input" placeholder={t("camp.campos.ciudad")} value={editData.ciudad}
-              maxLength={120} onChange={(e) => setEditData({ ...editData, ciudad: e.target.value.slice(0, 120) })} />
-            <input className="input" placeholder={t("camp.campos.pais")} value={editData.pais}
-              maxLength={120} onChange={(e) => setEditData({ ...editData, pais: e.target.value.slice(0, 120) })} />
+            <label className="pcs-field" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)" }}>{t("camp.campos.lugar")}</span>
+              <input className="input" placeholder={t("camp.campos.lugar")} value={editData.lugar}
+                maxLength={120} onChange={(e) => setEditData({ ...editData, lugar: e.target.value.slice(0, 120) })} />
+            </label>
+            <PaisCiudadSelect pais={editData.pais} ciudad={editData.ciudad}
+              onChange={(pais, ciudad) => setEditData({ ...editData, pais, ciudad })} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button type="submit" className="btn btn-primary">{t("comun.guardar")}</button>

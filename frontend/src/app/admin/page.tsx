@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import Logo from "@/components/Logo";
+import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
 
 interface Campeonato {
@@ -325,12 +326,13 @@ export default function AdminPage() {
                   </label>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-                  <input className="input" placeholder={t("camp.campos.lugar")} value={newCamp.lugar}
-                    maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, lugar: e.target.value.slice(0, 120) })} />
-                  <input className="input" placeholder={t("camp.campos.ciudad")} value={newCamp.ciudad}
-                    maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, ciudad: e.target.value.slice(0, 120) })} />
-                  <input className="input" placeholder={t("camp.campos.pais")} value={newCamp.pais}
-                    maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, pais: e.target.value.slice(0, 120) })} />
+                  <label className="pcs-field" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)" }}>{t("camp.campos.lugar")}</span>
+                    <input className="input" placeholder={t("camp.campos.lugar")} value={newCamp.lugar}
+                      maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, lugar: e.target.value.slice(0, 120) })} />
+                  </label>
+                  <PaisCiudadSelect pais={newCamp.pais} ciudad={newCamp.ciudad}
+                    onChange={(pais, ciudad) => setNewCamp({ ...newCamp, pais, ciudad })} />
                 </div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   <label style={{ color: "var(--text-muted)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>{t("camp.campos.estado")}</label>
