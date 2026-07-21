@@ -6,6 +6,7 @@ import {
   maestroCampeonatosAPI,
   maestroInscribirAPI,
   maestroMisInscripcionesAPI,
+  maestroReenviarAPI,
   misTatamisAPI,
   type InscripcionData,
   type MaestroCampeonato,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/api";
 import CompetidorFormFields, {
   COMPETIDOR_FORM_VACIO,
+  competidorToForm,
   formToPayload,
   type CompetidorFormState,
 } from "@/components/CompetidorFormFields";
@@ -47,7 +49,15 @@ export default function MaestroPage() {
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
 
+  // Re-envío de inscripción rechazada
+  const [reenvioId, setReenvioId] = useState<number | null>(null);
+  const [reenvioForm, setReenvioForm] = useState<CompetidorFormState>(COMPETIDOR_FORM_VACIO);
+  const [reenvioModalidades, setReenvioModalidades] = useState<string[]>(["COMBATE"]);
+  const [reenviando, setReenviando] = useState(false);
+
   const club = user?.club || "";
+  const delegacion = user?.delegacion || "";
+  const paisDelegacion = user?.pais_delegacion || "";
 
   const cargar = useCallback(async (puedeJuzgar: boolean) => {
     try {
@@ -117,6 +127,43 @@ export default function MaestroPage() {
     }
   }
 
+  function abrirReenvio(i: InscripcionData) {
+    setReenvioId(i.id);
+    if (i.competidor) {
+      setReenvioForm(competidorToForm(i.competidor));
+    } else {
+      setReenvioForm(COMPETIDOR_FORM_VACIO);
+    }
+    setReenvioModalidades(i.modalidades?.length ? [...i.modalidades] : ["COMBATE"]);
+  }
+
+  async function enviarReenvio(e: React.FormEvent) {
+    e.preventDefault();
+    if (reenviando || !reenvioId) return;
+    if (!reenvioForm.nombre_completo.trim()) return;
+    setReenviando(true);
+    try {
+      await maestroReenviarAPI(reenvioId, {
+        competidor: formToPayload(reenvioForm),
+        modalidades: reenvioModalidades,
+      });
+      setReenvioId(null);
+      await cargar(!!user?.puede_juzgar);
+      flash(t("maestro.reenvioOk"), "ok");
+    } catch (err) {
+      const m = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+      flash(m || t("maestro.errorEnviar"), "error");
+    } finally {
+      setReenviando(false);
+    }
+  }
+
+  function toggleReenvioModalidad(m: string) {
+    setReenvioModalidades((prev) =>
+      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
+    );
+  }
+
   const estadoInscBadge = (estado: InscripcionData["estado"]) => {
     const color =
       estado === "aceptada" ? "var(--green)"
@@ -149,12 +196,23 @@ export default function MaestroPage() {
           </p>
         </div>
         {club && (
-          <div style={{
-            padding: "6px 14px", borderRadius: "var(--radius-sm)",
-            border: "1px solid var(--gold-border)", background: "var(--gold-bg)",
-            color: "var(--gold)", fontWeight: 700,
-          }}>
-            {t("maestro.tuClub")}: {club}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+            <div style={{
+              padding: "6px 14px", borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--gold-border)", background: "var(--gold-bg)",
+              color: "var(--gold)", fontWeight: 700,
+            }}>
+              {t("maestro.tuClub")}: {club}
+            </div>
+            {delegacion && (
+              <div style={{
+                padding: "4px 12px", borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)", background: "var(--bg-elevated)",
+                color: "var(--text-muted)", fontWeight: 600, fontSize: "0.85rem",
+              }}>
+                {t("maestro.tuDelegacion")}: {delegacion}{paisDelegacion ? ` · ${paisDelegacion}` : ""}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -273,26 +331,83 @@ export default function MaestroPage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {suyas.map((i) => (
                         <div key={i.id} style={{
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                          gap: 8, flexWrap: "wrap", padding: "6px 10px",
+                          padding: "6px 10px",
                           border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
                         }}>
-                          <span style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
-                            {i.competidor?.nombre_completo || "—"}
-                            {(i.modalidades?.length || 0) > 0 && (
-                              <span style={{ color: "var(--text-dim)", fontWeight: 500, marginLeft: 8, fontSize: "0.82rem" }}>
-                                {i.modalidades.join(", ")}
-                              </span>
-                            )}
-                          </span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {i.estado === "rechazada" && i.motivo_rechazo && (
-                              <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
-                                {t("insc.motivo")}: {i.motivo_rechazo}
-                              </span>
-                            )}
-                            {estadoInscBadge(i.estado)}
-                          </span>
+                          <div style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            gap: 8, flexWrap: "wrap",
+                          }}>
+                            <span style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
+                              {i.competidor?.nombre_completo || "—"}
+                              {(i.modalidades?.length || 0) > 0 && (
+                                <span style={{ color: "var(--text-dim)", fontWeight: 500, marginLeft: 8, fontSize: "0.82rem" }}>
+                                  {i.modalidades.join(", ")}
+                                </span>
+                              )}
+                            </span>
+                            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {i.estado === "rechazada" && i.motivo_rechazo && (
+                                <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
+                                  {t("insc.motivo")}: {i.motivo_rechazo}
+                                </span>
+                              )}
+                              {estadoInscBadge(i.estado)}
+                            </span>
+                          </div>
+                          {/* Botón re-enviar para rechazadas */}
+                          {i.estado === "rechazada" && c.puede_inscribir && (
+                            <div style={{ marginTop: 8 }}>
+                              {reenvioId === i.id ? (
+                                <form onSubmit={enviarReenvio} className="card animate-slide"
+                                  style={{ display: "flex", flexDirection: "column", gap: 12, borderColor: "var(--red-alert)", marginTop: 4 }}>
+                                  <CompetidorFormFields value={reenvioForm} onChange={setReenvioForm} clubLocked={club} />
+                                  <div>
+                                    <div style={{ fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 6 }}>
+                                      {t("res.modCombate")} / {t("res.modFiguras")}
+                                    </div>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                      {MODALIDADES.map((m) => (
+                                        <label key={m} style={{
+                                          display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+                                          padding: "6px 10px", borderRadius: "var(--radius-sm)",
+                                          border: `1px solid ${reenvioModalidades.includes(m) ? "var(--gold-border)" : "var(--border)"}`,
+                                          background: reenvioModalidades.includes(m) ? "var(--gold-bg)" : "transparent",
+                                          fontSize: "0.82rem", fontWeight: 700,
+                                        }}>
+                                          <input type="checkbox" checked={reenvioModalidades.includes(m)}
+                                            onChange={() => toggleReenvioModalidad(m)}
+                                            style={{ accentColor: "var(--gold)" }} />
+                                          {m}
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div style={{ display: "flex", gap: 8 }}>
+                                    <button type="submit" className="btn btn-primary" disabled={reenviando}>
+                                      {reenviando ? t("maestro.reenviando") : t("maestro.enviarSolicitud")}
+                                    </button>
+                                    <button type="button" className="btn" onClick={() => setReenvioId(null)}>
+                                      {t("comun.cancelar")}
+                                    </button>
+                                  </div>
+                                </form>
+                              ) : (
+                                <button className="btn btn-sm" style={{
+                                  color: "var(--red-alert)", borderColor: "var(--red-alert)",
+                                  fontSize: "0.82rem",
+                                }} onClick={() => abrirReenvio(i)}>
+                                  {t("maestro.reenviar")}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {/* Mensaje para pendientes */}
+                          {i.estado === "pendiente" && (
+                            <div style={{ marginTop: 6, fontSize: "0.8rem", color: "var(--text-dim)", fontStyle: "italic" }}>
+                              {t("maestro.noEditar")}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

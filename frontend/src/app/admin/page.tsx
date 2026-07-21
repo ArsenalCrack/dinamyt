@@ -13,6 +13,7 @@ import {
   type UserData,
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import DelegacionSelect from "@/components/DelegacionSelect";
 import Logo from "@/components/Logo";
 import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
@@ -49,6 +50,7 @@ export default function AdminPage() {
   });
   const [newUser, setNewUser] = useState({
     email: "", password: "", nombre: "", rol: "juez", club: "", puede_juzgar: false,
+    delegacion: "", pais_delegacion: "",
   });
   const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const [userSearch, setUserSearch] = useState("");
@@ -60,6 +62,7 @@ export default function AdminPage() {
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [editUserData, setEditUserData] = useState({
     nombre: "", email: "", password: "", rol: "juez", club: "", puede_juzgar: false,
+    delegacion: "", pais_delegacion: "",
   });
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
 
@@ -108,13 +111,13 @@ export default function AdminPage() {
     if (!editingUser) return;
     const payload: {
       nombre?: string; email?: string; password?: string; rol?: string;
-      club?: string; puede_juzgar?: boolean;
+      club?: string; puede_juzgar?: boolean; delegacion?: string;
     } = {};
     if (editUserData.nombre.trim()) payload.nombre = editUserData.nombre.trim();
     if (editUserData.email.trim()) payload.email = editUserData.email.trim();
     if (editUserData.password) payload.password = editUserData.password;
     if (editUserData.rol && editUserData.rol !== editingUser.rol) payload.rol = editUserData.rol;
-    // Club y permiso de juez cuando el usuario es (o pasa a ser) maestro.
+    // Club, delegación y permiso de juez cuando el usuario es (o pasa a ser) maestro.
     const rolEfectivo = editUserData.rol || editingUser.rol;
     if (rolEfectivo === "maestro") {
       if (!editUserData.club.trim()) {
@@ -123,6 +126,7 @@ export default function AdminPage() {
       }
       payload.club = editUserData.club.trim();
       payload.puede_juzgar = editUserData.puede_juzgar;
+      payload.delegacion = editUserData.delegacion.trim() || undefined;
     }
     try {
       await updateUserAPI(editingUser.id, payload);
@@ -195,11 +199,15 @@ export default function AdminPage() {
         nombre: newUser.nombre,
         rol: newUser.rol,
         ...(newUser.rol === "maestro"
-          ? { club: newUser.club.trim(), puede_juzgar: newUser.puede_juzgar }
+          ? {
+              club: newUser.club.trim(),
+              puede_juzgar: newUser.puede_juzgar,
+              delegacion: newUser.delegacion.trim() || undefined,
+            }
           : {}),
       });
       setShowNewUser(false);
-      setNewUser({ email: "", password: "", nombre: "", rol: "juez", club: "", puede_juzgar: false });
+      setNewUser({ email: "", password: "", nombre: "", rol: "juez", club: "", puede_juzgar: false, delegacion: "", pais_delegacion: "" });
       loadData(showInactive);
       flash(t("admin.usuarios.creado"), "ok");
     } catch (err) {
@@ -461,6 +469,11 @@ export default function AdminPage() {
                       value={newUser.club}
                       onChange={(e) => setNewUser({ ...newUser, club: e.target.value.slice(0, 80) })}
                       maxLength={80} required />
+                    <DelegacionSelect
+                      delegacion={newUser.delegacion}
+                      pais={newUser.pais_delegacion}
+                      onChange={(d, p) => setNewUser({ ...newUser, delegacion: d, pais_delegacion: p })}
+                    />
                     <label style={{
                       display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
                       fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 700, userSelect: "none",
@@ -545,6 +558,7 @@ export default function AdminPage() {
                       {t("admin.usuarios.agregado")} {u.created_at ? new Date(u.created_at).toLocaleDateString("es-CO") : "—"}
                       {u.creado_por ? ` ${t("comun.por")} ${u.creado_por.nombre}` : ""}
                       {u.rol === "maestro" && u.club ? ` · ${t("admin.usuarios.club")}: ${u.club}` : ""}
+                      {u.rol === "maestro" && u.delegacion ? ` · ${t("maestro.tuDelegacion")}: ${u.delegacion}` : ""}
                       {u.rol === "maestro" && u.puede_juzgar ? ` · ${t("rol.juez")}` : ""}
                     </div>
                   </div>
@@ -566,6 +580,7 @@ export default function AdminPage() {
                           setEditUserData({
                             nombre: u.nombre, email: u.email, password: "", rol: u.rol,
                             club: u.club || "", puede_juzgar: !!u.puede_juzgar,
+                            delegacion: u.delegacion || "", pais_delegacion: u.pais_delegacion || "",
                           });
                         }
                       }}
@@ -619,6 +634,11 @@ export default function AdminPage() {
                           value={editUserData.club}
                           onChange={(e) => setEditUserData({ ...editUserData, club: e.target.value.slice(0, 80) })}
                           maxLength={80} />
+                        <DelegacionSelect
+                          delegacion={editUserData.delegacion}
+                          pais={editUserData.pais_delegacion}
+                          onChange={(d, p) => setEditUserData({ ...editUserData, delegacion: d, pais_delegacion: p })}
+                        />
                         <label style={{
                           display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
                           fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 700, userSelect: "none",

@@ -569,6 +569,7 @@ const es = {
   // ── Formulario de competidor ──
   "form.nombre": "Nombre completo *",
   "form.max": "(máx. {n})",
+  "form.nombreMin": "(mín. {n})",
   "form.nombrePh": "Ej: Ana María Pérez",
   "form.documento": "Documento",
   "form.soloNumeros": "(solo números)",
@@ -973,6 +974,7 @@ const es = {
   "admin.usuarios.clubReq": "El club es obligatorio para un maestro.",
   "admin.usuarios.puedeJuzgar": "También puede juzgar (asignable a un tatami)",
   "admin.usuarios.rolMaestroNota": "El maestro inscribe a sus alumnos con el club que le asignes; el admin acepta o rechaza.",
+  "admin.usuarios.delegacionPh": "Delegación del maestro (ciudad)",
 
   // ── Campos y estado del campeonato ──
   "camp.campos.fechaInicio": "Fecha de inicio",
@@ -1015,6 +1017,10 @@ const es = {
   "form.clubOtroPh": "Escribe el nombre del club",
   "form.clubFijo": "Club asignado por tu maestro",
   "form.clubSinResultados": "Sin coincidencias — elige «Otro…» para escribirlo",
+  "form.delegacion": "Delegación (ciudad)",
+  "form.delegacionPh": "Ciudad de origen",
+  "form.delegacionOtra": "Otra delegación…",
+  "form.paisAuto": "País: {pais} (detectado automáticamente)",
 
   // ── Panel del maestro ──
   "maestro.panel": "Panel del maestro",
@@ -1033,6 +1039,12 @@ const es = {
   "maestro.sinSolicitudes": "Aún no has enviado solicitudes a este campeonato.",
   "maestro.misTatamis": "Mis tatamis (juez)",
   "maestro.cargando": "Cargando…",
+  "maestro.tuDelegacion": "Delegación",
+  "maestro.sinDelegacion": "Tu administrador aún no te asignó una delegación.",
+  "maestro.reenviar": "Corregir y re-enviar",
+  "maestro.reenviando": "Re-enviando…",
+  "maestro.reenvioOk": "Solicitud re-enviada. El administrador la revisará.",
+  "maestro.noEditar": "Esta solicitud ya fue enviada y no puede modificarse.",
 
   // ── Apartado público de campeonatos ──
   "menu.campeonatos": "🥋 Campeonatos",
@@ -1587,6 +1599,7 @@ const en: Record<ClaveTexto, string> = {
 
   "form.nombre": "Full name *",
   "form.max": "(max. {n})",
+  "form.nombreMin": "(min. {n})",
   "form.nombrePh": "E.g.: Ana María Pérez",
   "form.documento": "ID number",
   "form.soloNumeros": "(digits only)",
@@ -1981,6 +1994,7 @@ const en: Record<ClaveTexto, string> = {
   "admin.usuarios.clubReq": "A club is required for a master.",
   "admin.usuarios.puedeJuzgar": "Can also judge (assignable to a tatami)",
   "admin.usuarios.rolMaestroNota": "The master registers their students with the club you assign; the admin accepts or rejects.",
+  "admin.usuarios.delegacionPh": "Master's delegation (city)",
 
   // ── Championship fields & status ──
   "camp.campos.fechaInicio": "Start date",
@@ -2023,6 +2037,10 @@ const en: Record<ClaveTexto, string> = {
   "form.clubOtroPh": "Type the club name",
   "form.clubFijo": "Club assigned by your master",
   "form.clubSinResultados": "No matches — choose “Other…” to type it",
+  "form.delegacion": "Delegation (city)",
+  "form.delegacionPh": "City of origin",
+  "form.delegacionOtra": "Other delegation…",
+  "form.paisAuto": "Country: {pais} (detected automatically)",
 
   // ── Master panel ──
   "maestro.panel": "Master panel",
@@ -2041,6 +2059,12 @@ const en: Record<ClaveTexto, string> = {
   "maestro.sinSolicitudes": "You haven't sent any requests to this championship yet.",
   "maestro.misTatamis": "My tatamis (judge)",
   "maestro.cargando": "Loading…",
+  "maestro.tuDelegacion": "Delegation",
+  "maestro.sinDelegacion": "Your administrator hasn't assigned you a delegation yet.",
+  "maestro.reenviar": "Correct and re-send",
+  "maestro.reenviando": "Re-sending…",
+  "maestro.reenvioOk": "Request re-sent. The administrator will review it.",
+  "maestro.noEditar": "This request has already been sent and cannot be modified.",
 
   // ── Public championships section ──
   "menu.campeonatos": "🥋 Championships",

@@ -44,11 +44,13 @@ inscripciones_bp = Blueprint("inscripciones", __name__)
 MAX_IMPORT_FILAS = 1000
 
 # Límites de los campos del competidor (validados también en el frontend)
+NOMBRE_MIN = 8
 NOMBRE_MAX = 80
 DOCUMENTO_MAX = 15
 CLUB_MAX = 80
 EDAD_MIN, EDAD_MAX = 3, 100
 PESO_MIN, PESO_MAX = 10.0, 200.0
+PESO_CHARS_MAX = 6  # máx. caracteres en el string de peso (ej: "200.50")
 
 
 def _sin_acentos(texto):
@@ -108,7 +110,10 @@ def _validar_fecha_nacimiento(valor):
 def _validar_peso(valor):
     """Retorna (peso, error): entre 10 y 200 kg, coma o punto decimal."""
     try:
-        peso = float(str(valor).replace(",", "."))
+        texto_peso = str(valor).replace(",", ".")
+        if len(texto_peso) > PESO_CHARS_MAX:
+            return None, f"El peso no puede tener más de {PESO_CHARS_MAX} caracteres."
+        peso = float(texto_peso)
     except (TypeError, ValueError):
         return None, "Peso inválido: escribe un número en kilogramos."
     if not (PESO_MIN <= peso <= PESO_MAX):
@@ -145,6 +150,8 @@ def _aplicar_datos(comp, data, parciales=False, actor=None):
         nombre = str(data.get("nombre_completo") or "").strip()
         if not nombre and not parciales:
             return "El nombre del competidor es requerido"
+        if nombre and len(nombre) < NOMBRE_MIN:
+            return f"El nombre debe tener al menos {NOMBRE_MIN} caracteres (nombre completo)."
         if len(nombre) > NOMBRE_MAX:
             return f"El nombre no puede superar {NOMBRE_MAX} caracteres."
         if nombre:
@@ -944,6 +951,71 @@ def maestro_mis_inscripciones():
             return jsonify({"error": "campeonato_id inválido"}), 400
     inscripciones = query.order_by(Inscripcion.created_at.desc()).all()
     return jsonify([i.to_dict() for i in inscripciones]), 200
+
+
+@inscripciones_bp.route("/maestro/<int:ins_id>", methods=["PUT"])
+@jwt_required()
+def maestro_reenviar(ins_id):
+    """
+    PUT /api/inscripciones/maestro/:id
+    Body: { "competidor": { ... }, "modalidades"?: [...] }
+    Re-envía una inscripción RECHAZADA: actualiza los datos del competidor,
+    restablece el estado a 'pendiente' y borra el motivo de rechazo.
+    Solo funciona si:
+      (a) la inscripción pertenece al maestro,
+      (b) el estado actual es 'rechazada',
+      (c) el campeonato sigue en 'preparacion'.
+    """
+    maestro = require_maestro()
+    if not maestro:
+        return jsonify({"error": "Solo maestros"}), 403
+
+    inscripcion = Inscripcion.query.get_or_404(ins_id)
+    if inscripcion.created_by != maestro.id:
+        return jsonify({"error": "Inscripción no encontrada"}), 404
+
+    if inscripcion.estado != "rechazada":
+        return jsonify({
+            "error": "Solo puedes corregir inscripciones rechazadas."
+        }), 409
+
+    campeonato = Campeonato.query.get(inscripcion.campeonato_id)
+    if not campeonato or (campeonato.estado or "preparacion") != "preparacion":
+        return jsonify({
+            "error": "Este campeonato ya no está en preparación: no acepta correcciones."
+        }), 409
+
+    data = request.get_json() or {}
+    datos = dict(data.get("competidor") or {})
+
+    # El club SIEMPRE es el del maestro (no se toma del cliente).
+    datos["club"] = maestro.club or ""
+
+    comp = inscripcion.competidor
+    if not comp:
+        return jsonify({"error": "Competidor no encontrado"}), 404
+
+    error = _aplicar_datos(comp, datos, actor=maestro)
+    if error:
+        return jsonify({"error": error}), 400
+
+    # Actualizar modalidades si se enviaron
+    if "modalidades" in data:
+        inscripcion.modalidades = _parse_modalidades(data.get("modalidades")) or None
+
+    # Actualizar snapshot de peso y cinturón
+    inscripcion.peso = comp.peso
+    inscripcion.grupo_cinturon = comp.grupo_cinturon
+
+    # Restablecer estado
+    inscripcion.estado = "pendiente"
+    inscripcion.motivo_rechazo = None
+
+    db.session.commit()
+    return jsonify({
+        "message": f"Solicitud re-enviada: {comp.nombre_completo}. El administrador la revisará.",
+        "inscripcion": inscripcion.to_dict(),
+    }), 200
 
 
 # ══════════════════════════════════════════════════════════════════

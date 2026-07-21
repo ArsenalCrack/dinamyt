@@ -15,6 +15,9 @@ OPTIONAL_COLUMNS = {
         # Rol maestro: club (lo fija el admin) y permiso para juzgar.
         "club": "VARCHAR(80)",
         "puede_juzgar": "BOOLEAN",
+        # Delegación del maestro: ciudad de origen y país derivado.
+        "delegacion": "VARCHAR(120)",
+        "pais_delegacion": "VARCHAR(80)",
     },
     "asignaciones_juez": {
         "asignado_por_id": "INTEGER",

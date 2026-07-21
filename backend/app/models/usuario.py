@@ -42,6 +42,10 @@ class Usuario(db.Model):
     # Club del maestro: lo fija el admin al crear al usuario maestro. Los
     # alumnos que ese maestro inscribe toman automáticamente este club.
     club = db.Column(db.String(80), nullable=True)
+    # Delegación del maestro: ciudad de origen del club. El país se deriva
+    # automáticamente del catálogo geográfico al asignar la delegación.
+    delegacion = db.Column(db.String(120), nullable=True)
+    pais_delegacion = db.Column(db.String(80), nullable=True)
     # Permiso extra para que un maestro también pueda ser asignado a un tatami
     # como juez (sin necesidad de una segunda cuenta). Solo aplica a maestros.
     puede_juzgar = db.Column(db.Boolean, default=False, nullable=True)
@@ -136,6 +140,8 @@ class Usuario(db.Model):
             "rol": self.rol,
             "es_superadmin": self.es_super,
             "club": self.club,
+            "delegacion": self.delegacion,
+            "pais_delegacion": self.pais_delegacion,
             "puede_juzgar": bool(self.puede_juzgar),
             "activo": self.activo,
             "creado_por_id": self.creado_por_id,

@@ -112,7 +112,7 @@ export default function CompetidorFormFields({
     <div className="comp-form-grid">
       <label className="comp-field" style={{ gridColumn: "1 / -1" }}>
         <span className="comp-label">
-          {t("form.nombre")} <span className="comp-hint">{t("form.max", { n: COMPETIDOR_LIMITES.nombreMax })}</span>
+          {t("form.nombre")} <span className="comp-hint">{t("form.nombreMin", { n: COMPETIDOR_LIMITES.nombreMin })} · {t("form.max", { n: COMPETIDOR_LIMITES.nombreMax })}</span>
         </span>
         <input
           className="input"
@@ -120,6 +120,7 @@ export default function CompetidorFormFields({
           onChange={(e) => set("nombre_completo", e.target.value.slice(0, COMPETIDOR_LIMITES.nombreMax))}
           placeholder={t("form.nombrePh")}
           maxLength={COMPETIDOR_LIMITES.nombreMax}
+          minLength={COMPETIDOR_LIMITES.nombreMin}
           required
         />
       </label>
@@ -191,13 +192,16 @@ export default function CompetidorFormFields({
         </span>
         <input
           className="input"
-          type="number"
+          inputMode="decimal"
           min={COMPETIDOR_LIMITES.pesoMin}
           max={COMPETIDOR_LIMITES.pesoMax}
-          step="0.1"
           value={value.peso}
-          onChange={(e) => set("peso", e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value.slice(0, COMPETIDOR_LIMITES.pesoCharsMax);
+            set("peso", v);
+          }}
           placeholder={t("form.pesoPh")}
+          maxLength={COMPETIDOR_LIMITES.pesoCharsMax}
         />
       </label>
       <label className="comp-field">

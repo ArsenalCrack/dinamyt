@@ -12,6 +12,7 @@ from flask_jwt_extended import (
     get_jwt_identity,
 )
 from ..extensions import db
+from ..geo import pais_de_ciudad
 from ..models.asignacion import AsignacionJuez
 from ..models.usuario import ROLES_VALIDOS, Usuario
 from ..security import intento_bloqueado, limpiar_intentos, segundos_restantes
@@ -26,6 +27,7 @@ LOGIN_VENTANA_SEG = 300
 
 # Tope de caracteres del club (espejo del competidor).
 CLUB_MAX = 80
+DELEGACION_MAX = 120
 
 
 def _validar_club(valor):
@@ -36,6 +38,19 @@ def _validar_club(valor):
     if len(club) > CLUB_MAX:
         return None, f"El club no puede superar {CLUB_MAX} caracteres."
     return club, None
+
+
+def _validar_delegacion(valor):
+    """(delegacion, pais, error): delegación recortada + país derivado."""
+    delegacion = str(valor or "").strip()
+    if not delegacion:
+        return None, None, None
+    if len(delegacion) > DELEGACION_MAX:
+        return None, None, f"La delegación no puede superar {DELEGACION_MAX} caracteres."
+    pais = pais_de_ciudad(delegacion)
+    # Si la ciudad no está en el catálogo, el país se queda en None
+    # (el admin puede escribir una delegación libre).
+    return delegacion, pais, None
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -142,6 +157,11 @@ def register():
         return jsonify({"error": "El club es obligatorio para un maestro"}), 400
     puede_juzgar = bool(data.get("puede_juzgar")) if rol == "maestro" else False
 
+    # Delegación: ciudad de origen del club del maestro.
+    delegacion, pais_del, error = _validar_delegacion(data.get("delegacion"))
+    if error:
+        return jsonify({"error": error}), 400
+
     if Usuario.query.filter_by(email=email).first():
         return jsonify({"error": f"El email '{email}' ya está registrado"}), 409
 
@@ -152,6 +172,8 @@ def register():
         activo=True,
         creado_por_id=current_user.id,
         club=club if rol == "maestro" else None,
+        delegacion=delegacion if rol == "maestro" else None,
+        pais_delegacion=pais_del if rol == "maestro" else None,
         puede_juzgar=puede_juzgar,
     )
     new_user.set_password(password)
@@ -297,8 +319,11 @@ def update_user(user_id):
                 # Un admin no actúa como juez de tatami: liberar sus asignaciones
                 AsignacionJuez.query.filter_by(usuario_id=user.id).delete()
             if nuevo_rol != "maestro":
-                # Al dejar de ser maestro, el club y el permiso de juez dejan de aplicar.
+                # Al dejar de ser maestro, el club, delegación y el permiso
+                # de juez dejan de aplicar.
                 user.club = None
+                user.delegacion = None
+                user.pais_delegacion = None
                 user.puede_juzgar = False
             user.rol = nuevo_rol
 
@@ -310,6 +335,14 @@ def update_user(user_id):
         if user.rol == "maestro" and not club:
             return jsonify({"error": "El club es obligatorio para un maestro"}), 400
         user.club = club
+
+    # Delegación del maestro (ciudad de origen del club).
+    if "delegacion" in data:
+        delegacion, pais_del, error = _validar_delegacion(data.get("delegacion"))
+        if error:
+            return jsonify({"error": error}), 400
+        user.delegacion = delegacion
+        user.pais_delegacion = pais_del
 
     # Permiso de juez del maestro. Si se le revoca, se liberan sus asignaciones.
     if "puede_juzgar" in data:

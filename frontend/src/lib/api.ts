@@ -78,6 +78,7 @@ export async function registerUserAPI(data: {
   rol: string;
   club?: string;
   puede_juzgar?: boolean;
+  delegacion?: string;
 }) {
   const res = await api.post("/auth/register", data);
   return res.data;
@@ -104,7 +105,7 @@ export async function updateUserAPI(
   id: number,
   data: {
     nombre?: string; email?: string; password?: string; activo?: boolean;
-    rol?: string; club?: string; puede_juzgar?: boolean;
+    rol?: string; club?: string; puede_juzgar?: boolean; delegacion?: string;
   }
 ) {
   const res = await api.put(`/auth/users/${id}`, data);
@@ -540,6 +541,7 @@ export function grupoDeCinturon(nombre: string | null | undefined): GrupoCinturo
 
 // Límites de los campos del competidor (espejo del backend)
 export const COMPETIDOR_LIMITES = {
+  nombreMin: 8,
   nombreMax: 80,
   documentoMax: 15,
   clubMax: 80,
@@ -547,6 +549,7 @@ export const COMPETIDOR_LIMITES = {
   edadMax: 100,
   pesoMin: 10,
   pesoMax: 200,
+  pesoCharsMax: 6,
 } as const;
 
 export async function listCompetidoresAPI(q = "", includeInactivos = false) {
@@ -711,6 +714,14 @@ export async function maestroMisInscripcionesAPI(campeonatoId?: number) {
   return res.data as InscripcionData[];
 }
 
+export async function maestroReenviarAPI(
+  insId: number,
+  data: { competidor: CompetidorInput; modalidades?: string[] }
+) {
+  const res = await api.put(`/inscripciones/maestro/${insId}`, data);
+  return res.data as { message: string; inscripcion: InscripcionData };
+}
+
 // ── Ficha pública del campeonato (sin login) ──
 export interface CampeonatoPublicoCompetidor {
   nombre: string;
@@ -864,6 +875,9 @@ export interface UserData {
   es_superadmin?: boolean;
   // Rol maestro: club (lo fija el admin) y permiso para juzgar tatamis.
   club?: string | null;
+  // Delegación: ciudad de origen del club del maestro.
+  delegacion?: string | null;
+  pais_delegacion?: string | null;
   puede_juzgar?: boolean;
   activo: boolean;
   creado_por_id?: number | null;
