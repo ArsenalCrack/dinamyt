@@ -21,6 +21,10 @@ class Campeonato(db.Model):
     # llaves: {"modalidades": [{nombre, tipo, activa, categorias: {...}}]}.
     # NULL = el admin todavía no configuró (el flujo manual no la necesita).
     config_categorias = db.Column(db.JSON, nullable=True)
+    # UUID estable para exportar/publicar los resultados en otra instancia.
+    # Se genera la primera vez que se exporta (ver api/resultados.py). Permite
+    # que reimportar el mismo campeonato REEMPLACE el snapshot, no lo duplique.
+    export_uuid = db.Column(db.String(64), nullable=True, index=True)
     created_by = db.Column(
         db.Integer, db.ForeignKey("usuarios.id"), nullable=True
     )

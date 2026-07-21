@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import api, { getCampeonatoAPI, idiomaArchivo, listTatamisAPI, resolverApiUrl } from "@/lib/api";
+import api, { getCampeonatoAPI, idiomaArchivo, listTatamisAPI, resolverApiUrl, exportarResultadosAPI } from "@/lib/api";
 import PodioLlave from "@/components/PodioLlave";
 import type { PodioItem } from "@/lib/llaves";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
@@ -277,6 +277,28 @@ export default function ReportesCampeonatoPage() {
     void descargar(url, fallback, `seleccion-${type}`);
   }
 
+  // Exporta los resultados del campeonato a un .json para IMPORTARLO en la
+  // instancia online (software de la red) y publicarlos ahí. Ver /resultados.
+  async function handleExportarResultados() {
+    setExporting("resultados-json");
+    setExportError("");
+    try {
+      const blob = await exportarResultadosAPI(Number(campId));
+      if (blob.size === 0) throw new Error("El archivo de resultados salió vacío.");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `resultados-${slugArchivo(campNombre, "campeonato")}_${fechaArchivo()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "No se pudo exportar los resultados.");
+    } finally {
+      setExporting(null);
+    }
+  }
+
   function togglePodio(id: number) {
     setPodioAbierto((prev) => {
       const next = new Set(prev);
@@ -365,6 +387,24 @@ export default function ReportesCampeonatoPage() {
             />
             {t("rep.dividir")}
           </label>
+
+          {/* Publicar en la web: exporta un .json para importarlo en el sitio online */}
+          <span style={{ fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)", marginTop: 6 }}>
+            Publicar en línea
+          </span>
+          <button
+            className="btn btn-sm"
+            onClick={handleExportarResultados}
+            disabled={exporting !== null || loading}
+            title="Descarga un archivo .json con los resultados para importarlo en el sitio web (software de la red) y publicarlos."
+            style={{
+              background: "var(--gold-bg)",
+              borderColor: "var(--gold-border)",
+              color: "var(--gold)",
+            }}
+          >
+            {exporting === "resultados-json" ? t("rep.generando") : "⤓ Exportar resultados (.json)"}
+          </button>
         </div>
       </div>
 

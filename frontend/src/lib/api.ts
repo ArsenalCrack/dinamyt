@@ -148,20 +148,62 @@ export interface ResultadoPublico {
 }
 
 export interface ResultadosCampeonato {
-  campeonato: { id: number; nombre: string };
+  // id numérico (campeonato en vivo) o "pub:<uuid>" (snapshot importado)
+  campeonato: { id: number | string; nombre: string };
   resultados: ResultadoPublico[];
   categorias: string[];
   tatamis: number[];
+  publicado?: boolean;
+  importado_at?: string;
+}
+
+export interface CampeonatoResultadoItem {
+  id: number | string; // "pub:<uuid>" si es un snapshot importado
+  nombre: string;
+  num_resultados: number;
+  publicado?: boolean;
+  importado_at?: string;
 }
 
 export async function listCampeonatosResultadosAPI() {
   const res = await api.get("/resultados/campeonatos");
-  return res.data as { id: number; nombre: string; num_resultados: number }[];
+  return res.data as CampeonatoResultadoItem[];
 }
 
-export async function getResultadosCampeonatoAPI(campId: number) {
+export async function getResultadosCampeonatoAPI(campId: number | string) {
   const res = await api.get(`/resultados/campeonato/${campId}`);
   return res.data as ResultadosCampeonato;
+}
+
+// ── Publicar resultados: exportar (en LOCAL) e importar (en ONLINE) ──
+
+export async function exportarResultadosAPI(campId: number) {
+  // Descarga el .json de resultados de un campeonato (solo admin dueño).
+  const res = await api.get(`/resultados/campeonato/${campId}/exportar`, {
+    responseType: "blob",
+  });
+  return res.data as Blob;
+}
+
+export interface ImportResultadosResumen {
+  message: string;
+  nombre: string;
+  num_resultados: number;
+  nuevo: boolean;
+}
+
+export async function importarResultadosAPI(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await api.post("/resultados/importar", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data as ImportResultadosResumen;
+}
+
+export async function eliminarResultadoPublicadoAPI(exportUuid: string) {
+  const res = await api.delete(`/resultados/publicado/${exportUuid}`);
+  return res.data as { message: string };
 }
 
 export async function listCampeonatosPublicoAPI() {

@@ -13,7 +13,7 @@ import PublicControls from "@/components/PublicControls";
 import { useI18n } from "@/lib/i18n";
 
 interface CampeonatoOpcion {
-  id: number;
+  id: number | string; // "pub:<uuid>" si es un snapshot importado
   nombre: string;
   num_resultados: number;
 }
@@ -41,7 +41,7 @@ export default function ResultadosPage() {
   const router = useRouter();
   const { t } = useI18n();
   const [campeonatos, setCampeonatos] = useState<CampeonatoOpcion[]>([]);
-  const [campId, setCampId] = useState<number | null>(null);
+  const [campId, setCampId] = useState<number | string | null>(null);
   const [data, setData] = useState<ResultadosCampeonato | null>(null);
   const [loading, setLoading] = useState(true);
   const [cargandoResultados, setCargandoResultados] = useState(false);
@@ -150,7 +150,11 @@ export default function ResultadosPage() {
               <select
                 className="input"
                 value={campId ?? ""}
-                onChange={(e) => setCampId(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  // Los snapshots importados usan id "pub:<uuid>" (no numérico).
+                  setCampId(!v ? null : v.startsWith("pub:") ? v : Number(v));
+                }}
               >
                 <option value="">{t("res.selecciona")}</option>
                 {campeonatos.map((c) => (

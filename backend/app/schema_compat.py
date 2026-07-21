@@ -25,6 +25,7 @@ OPTIONAL_COLUMNS = {
     },
     "campeonatos": {
         "config_categorias": "JSON",
+        "export_uuid": "VARCHAR(64)",
     },
     "competidores": {
         "categoria_especial": "BOOLEAN",

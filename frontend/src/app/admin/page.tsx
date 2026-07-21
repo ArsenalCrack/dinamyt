@@ -223,6 +223,9 @@ export default function AdminPage() {
         <button className="btn" onClick={() => router.push("/admin/competidores")}>
           {t("admin.tab.competidores")}
         </button>
+        <button className="btn" onClick={() => router.push("/admin/importar-resultados")}>
+          Importar resultados
+        </button>
       </div>
 
       {/* ══════════════ CAMPEONATOS TAB ══════════════ */}

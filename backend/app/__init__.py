@@ -90,7 +90,10 @@ def create_app(config_name=None):
     )
 
     # ── Importar modelos (para que Alembic los detecte) ──
-    from .models import usuario, campeonato, categoria, tatami, asignacion, combate, llave, competidor  # noqa: F401
+    from .models import (  # noqa: F401
+        usuario, campeonato, categoria, tatami, asignacion, combate, llave,
+        competidor, resultado_publicado,
+    )
 
     # ── Registrar Blueprints (API REST) ──
     from .api import register_blueprints
