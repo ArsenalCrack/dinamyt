@@ -441,6 +441,9 @@ export default function CampeonatoDetailPage() {
                     <div style={{ color: "var(--text-dim)", fontSize: "0.82rem", marginTop: 2 }}>
                       {(s.modalidades || []).join(", ")}
                       {s.solicitante ? ` · ${t("camp.solicitudes.solicitadoPor", { nombre: s.solicitante.nombre })}` : ""}
+                      {s.solicitante?.delegacion
+                        ? ` · ${t("maestro.tuDelegacion")}: ${s.solicitante.delegacion}${s.solicitante.pais_delegacion ? ` (${s.solicitante.pais_delegacion})` : ""}`
+                        : ""}
                     </div>
                   </div>
                 </div>

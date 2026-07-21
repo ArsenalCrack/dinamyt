@@ -112,12 +112,31 @@ for _pais, _ciudades in GEO.items():
     for _ciudad in _ciudades:
         _CIUDAD_A_PAIS[_normalizar(_ciudad)] = _pais
 
+# Índice de países normalizados → nombre canónico. Sirve para validar el país
+# que el admin elige del catálogo (debe ser uno de la lista, no texto libre).
+_PAIS_NORMALIZADO: dict[str, str] = {_normalizar(_p): _p for _p in GEO}
+
+# Países del catálogo (orden alfabético), espejo de PAISES en lib/geo.ts.
+PAISES: list[str] = sorted(GEO.keys())
+
 
 def pais_de_ciudad(ciudad: str | None) -> str | None:
     """Devuelve el país del catálogo para una ciudad, o None si no se encuentra."""
     if not ciudad:
         return None
     return _CIUDAD_A_PAIS.get(_normalizar(ciudad))
+
+
+def pais_valido(pais: str | None) -> str | None:
+    """Nombre canónico del país si está en el catálogo, o None.
+
+    Tolera mayúsculas/acentos ("mexico" → "México"). Con esto el país que el
+    admin selecciona se valida contra el catálogo: si no es uno de la lista, es
+    texto libre no permitido y se descarta.
+    """
+    if not pais:
+        return None
+    return _PAIS_NORMALIZADO.get(_normalizar(pais))
 
 
 def todas_las_delegaciones() -> list[str]:

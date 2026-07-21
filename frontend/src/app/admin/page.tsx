@@ -112,6 +112,7 @@ export default function AdminPage() {
     const payload: {
       nombre?: string; email?: string; password?: string; rol?: string;
       club?: string; puede_juzgar?: boolean; delegacion?: string;
+      pais_delegacion?: string;
     } = {};
     if (editUserData.nombre.trim()) payload.nombre = editUserData.nombre.trim();
     if (editUserData.email.trim()) payload.email = editUserData.email.trim();
@@ -126,7 +127,10 @@ export default function AdminPage() {
       }
       payload.club = editUserData.club.trim();
       payload.puede_juzgar = editUserData.puede_juzgar;
-      payload.delegacion = editUserData.delegacion.trim() || undefined;
+      // País y ciudad siempre viajan juntos (aunque vayan vacíos) para que al
+      // editar se sincronice bien la delegación e incluso pueda limpiarse.
+      payload.delegacion = editUserData.delegacion.trim();
+      payload.pais_delegacion = editUserData.pais_delegacion.trim();
     }
     try {
       await updateUserAPI(editingUser.id, payload);
@@ -203,6 +207,7 @@ export default function AdminPage() {
               club: newUser.club.trim(),
               puede_juzgar: newUser.puede_juzgar,
               delegacion: newUser.delegacion.trim() || undefined,
+              pais_delegacion: newUser.pais_delegacion.trim() || undefined,
             }
           : {}),
       });
@@ -558,7 +563,7 @@ export default function AdminPage() {
                       {t("admin.usuarios.agregado")} {u.created_at ? new Date(u.created_at).toLocaleDateString("es-CO") : "—"}
                       {u.creado_por ? ` ${t("comun.por")} ${u.creado_por.nombre}` : ""}
                       {u.rol === "maestro" && u.club ? ` · ${t("admin.usuarios.club")}: ${u.club}` : ""}
-                      {u.rol === "maestro" && u.delegacion ? ` · ${t("maestro.tuDelegacion")}: ${u.delegacion}` : ""}
+                      {u.rol === "maestro" && u.delegacion ? ` · ${t("maestro.tuDelegacion")}: ${u.delegacion}${u.pais_delegacion ? ` (${u.pais_delegacion})` : ""}` : ""}
                       {u.rol === "maestro" && u.puede_juzgar ? ` · ${t("rol.juez")}` : ""}
                     </div>
                   </div>

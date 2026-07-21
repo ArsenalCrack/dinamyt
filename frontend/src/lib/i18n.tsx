@@ -1021,6 +1021,11 @@ const es = {
   "form.delegacionPh": "Ciudad de origen",
   "form.delegacionOtra": "Otra delegación…",
   "form.paisAuto": "País: {pais} (detectado automáticamente)",
+  // ── Selector de delegación (país + ciudad) ──
+  "form.paisSelecc": "Escribe o elige un país",
+  "form.paisSinResultados": "Ningún país coincide",
+  "form.delegacionCiudadSelecc": "Escribe o elige una ciudad",
+  "form.delegacionPaisPrimero": "Elige primero un país",
 
   // ── Panel del maestro ──
   "maestro.panel": "Panel del maestro",
@@ -2041,6 +2046,11 @@ const en: Record<ClaveTexto, string> = {
   "form.delegacionPh": "City of origin",
   "form.delegacionOtra": "Other delegation…",
   "form.paisAuto": "Country: {pais} (detected automatically)",
+  // ── Delegation selector (country + city) ──
+  "form.paisSelecc": "Type or pick a country",
+  "form.paisSinResultados": "No matching countries",
+  "form.delegacionCiudadSelecc": "Type or pick a city",
+  "form.delegacionPaisPrimero": "Pick a country first",
 
   // ── Master panel ──
   "maestro.panel": "Master panel",

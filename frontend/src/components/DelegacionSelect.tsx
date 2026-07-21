@@ -1,24 +1,191 @@
 "use client";
 
-// Desplegable de delegación (ciudad de origen) para el maestro.
-// Las ciudades se agrupan por país usando <optgroup>. Al elegir una ciudad,
-// el país se detecta automáticamente del catálogo geográfico. Si la ciudad
-// no está en el catálogo, "Otra delegación…" habilita un campo de texto libre.
+// Delegación del maestro = país + ciudad, con DOS comboboxes escribibles:
+//
+//  • País: se escribe para FILTRAR, pero el valor final DEBE ser un país del
+//    catálogo (no vale texto libre: lo que se escriba y no coincida se descarta
+//    al cerrar). Reutiliza el patrón abrir/cerrar de ClubCombobox.
+//  • Ciudad: sugiere las ciudades del país elegido (se escribe para filtrar),
+//    pero acepta texto libre porque no todas las ciudades están en el catálogo.
+//    Se habilita solo tras elegir un país.
 
-import { useState, useEffect } from "react";
-import { GEO, PAISES } from "@/lib/geo";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { PAISES, ciudadesDe } from "@/lib/geo";
 import { useI18n } from "@/lib/i18n";
 
-const OTRA = "__otra__";
+/** Minúsculas y sin acentos, para filtrar sin sensibilidad. */
+function normaliza(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase();
+}
 
-/** Busca el país de una ciudad en el catálogo GEO. */
-function paisDeCiudad(ciudad: string): string | null {
-  if (!ciudad) return null;
-  const lower = ciudad.toLowerCase();
-  for (const [pais, ciudades] of Object.entries(GEO)) {
-    if (ciudades.some((c) => c.toLowerCase() === lower)) return pais;
+/** Hook: cierra el desplegable al hacer clic fuera o pulsar Escape. */
+function useCerrarFuera(
+  ref: React.RefObject<HTMLDivElement | null>,
+  abierto: boolean,
+  cerrar: () => void,
+) {
+  useEffect(() => {
+    if (!abierto) return;
+    function fuera(e: MouseEvent | TouchEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) cerrar();
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === "Escape") cerrar();
+    }
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("touchstart", fuera);
+    document.addEventListener("keydown", tecla);
+    return () => {
+      document.removeEventListener("mousedown", fuera);
+      document.removeEventListener("touchstart", fuera);
+      document.removeEventListener("keydown", tecla);
+    };
+  }, [abierto, ref, cerrar]);
+}
+
+const listaEstilo: React.CSSProperties = {
+  position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+  zIndex: 40, margin: 0, padding: 4, listStyle: "none",
+  maxHeight: 220, overflowY: "auto",
+  background: "var(--bg-card)", border: "1px solid var(--gold-border)",
+  borderRadius: "var(--radius-sm)", boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+};
+
+function opcionEstilo(activa: boolean): React.CSSProperties {
+  return {
+    padding: "8px 10px", cursor: "pointer", borderRadius: 6,
+    fontWeight: activa ? 800 : 500,
+    color: activa ? "var(--gold)" : "var(--text)",
+  };
+}
+
+/** Combobox ESTRICTO de país: filtra al escribir, pero solo un país del
+ *  catálogo puede quedar como valor. */
+function PaisCombobox({
+  value, onChange,
+}: {
+  value: string;
+  onChange: (pais: string) => void;
+}) {
+  const { t } = useI18n();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [abierto, setAbierto] = useState(false);
+  const [filtro, setFiltro] = useState("");
+
+  const cerrar = () => { setAbierto(false); setFiltro(""); };
+  useCerrarFuera(rootRef, abierto, cerrar);
+
+  const filtradas = useMemo(() => {
+    const q = normaliza(filtro);
+    return q ? PAISES.filter((p) => normaliza(p).includes(q)) : PAISES;
+  }, [filtro]);
+
+  function elegir(pais: string) {
+    onChange(pais);
+    cerrar();
   }
-  return null;
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      <input
+        className="input"
+        value={abierto ? filtro : value}
+        placeholder={t("form.paisSelecc")}
+        onFocus={() => { setAbierto(true); setFiltro(""); }}
+        onClick={() => setAbierto(true)}
+        onChange={(e) => { setAbierto(true); setFiltro(e.target.value); }}
+        autoComplete="off"
+      />
+      {abierto && (
+        <ul role="listbox" style={listaEstilo}>
+          {filtradas.map((p) => (
+            <li
+              key={p}
+              role="option"
+              aria-selected={p === value}
+              onClick={() => elegir(p)}
+              style={opcionEstilo(p === value)}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              {p}
+            </li>
+          ))}
+          {filtradas.length === 0 && (
+            <li style={{ padding: "8px 10px", color: "var(--text-dim)", fontSize: "0.85rem" }}>
+              {t("form.paisSinResultados")}
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Combobox de ciudad: sugiere las ciudades del país (filtra al escribir) y
+ *  además acepta texto libre. Deshabilitado hasta elegir país. */
+function CiudadCombobox({
+  value, ciudades, disabled, maxLen, onChange,
+}: {
+  value: string;
+  ciudades: string[];
+  disabled: boolean;
+  maxLen: number;
+  onChange: (ciudad: string) => void;
+}) {
+  const { t } = useI18n();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [abierto, setAbierto] = useState(false);
+
+  useCerrarFuera(rootRef, abierto, () => setAbierto(false));
+
+  const filtradas = useMemo(() => {
+    const q = normaliza(value);
+    return q ? ciudades.filter((c) => normaliza(c).includes(q)) : ciudades;
+  }, [ciudades, value]);
+
+  if (disabled) {
+    return (
+      <input className="input" value="" disabled readOnly
+        placeholder={t("form.delegacionPaisPrimero")} />
+    );
+  }
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      <input
+        className="input"
+        value={value}
+        placeholder={t("form.delegacionCiudadSelecc")}
+        maxLength={maxLen}
+        onFocus={() => setAbierto(true)}
+        onClick={() => setAbierto(true)}
+        onChange={(e) => { setAbierto(true); onChange(e.target.value.slice(0, maxLen)); }}
+        autoComplete="off"
+      />
+      {abierto && filtradas.length > 0 && (
+        <ul role="listbox" style={listaEstilo}>
+          {filtradas.map((c) => (
+            <li
+              key={c}
+              role="option"
+              aria-selected={normaliza(c) === normaliza(value)}
+              onClick={() => { onChange(c); setAbierto(false); }}
+              style={opcionEstilo(normaliza(c) === normaliza(value))}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              {c}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export default function DelegacionSelect({
@@ -33,99 +200,47 @@ export default function DelegacionSelect({
   maxLen?: number;
 }) {
   const { t } = useI18n();
-  const [libre, setLibre] = useState(false);
-
-  useEffect(() => {
-    if (delegacion && !paisDeCiudad(delegacion)) setLibre(true);
-    else if (!delegacion) setLibre(false);
-  }, [delegacion]);
+  const ciudades = pais ? ciudadesDe(pais) : [];
 
   return (
-    <>
+    <div className="deleg-grid">
+      <label className="deleg-field">
+        <span className="deleg-label">{t("camp.campos.pais")}</span>
+        <PaisCombobox
+          value={pais}
+          onChange={(nuevoPais) => {
+            // Al cambiar de país, conservar la ciudad solo si pertenece al
+            // nuevo país; si no, limpiarla para no dejar un par incoherente.
+            const pertenece = ciudadesDe(nuevoPais).some(
+              (c) => normaliza(c) === normaliza(delegacion),
+            );
+            onChange(pertenece ? delegacion : "", nuevoPais);
+          }}
+        />
+      </label>
       <label className="deleg-field">
         <span className="deleg-label">{t("form.delegacion")}</span>
-        {libre ? (
-          <div style={{ display: "flex", gap: 6 }}>
-            <input
-              className="input"
-              value={delegacion}
-              maxLength={maxLen}
-              placeholder={t("form.delegacionPh")}
-              onChange={(e) => {
-                const val = e.target.value.slice(0, maxLen);
-                const detected = paisDeCiudad(val);
-                onChange(val, detected || pais);
-              }}
-              style={{ flex: 1, minWidth: 0 }}
-              autoFocus
-            />
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => { setLibre(false); onChange("", ""); }}
-              title={t("geo.selecciona")}
-            >↩</button>
-          </div>
-        ) : (
-          <select
-            className="input"
-            value={delegacion}
-            onChange={(e) => {
-              if (e.target.value === OTRA) {
-                setLibre(true);
-                onChange("", pais);
-              } else {
-                const detected = paisDeCiudad(e.target.value);
-                onChange(e.target.value, detected || "");
-              }
-            }}
-          >
-            <option value="">{t("geo.selecciona")}</option>
-            {PAISES.map((p) => (
-              <optgroup key={p} label={p}>
-                {GEO[p].map((c) => (
-                  <option key={`${p}-${c}`} value={c}>{c}</option>
-                ))}
-              </optgroup>
-            ))}
-            <option value={OTRA}>{t("form.delegacionOtra")}</option>
-          </select>
-        )}
+        <CiudadCombobox
+          value={delegacion}
+          ciudades={ciudades}
+          disabled={!pais}
+          maxLen={maxLen}
+          onChange={(ciudad) => onChange(ciudad, pais)}
+        />
       </label>
 
-      {pais && (
-        <div className="deleg-pais-auto">
-          {t("form.paisAuto", { pais })}
-        </div>
-      )}
-
-      {libre && !paisDeCiudad(delegacion) && delegacion && (
-        <label className="deleg-field">
-          <span className="deleg-label">{t("camp.campos.pais")}</span>
-          <select
-            className="input"
-            value={pais}
-            onChange={(e) => onChange(delegacion, e.target.value)}
-          >
-            <option value="">{t("geo.selecciona")}</option>
-            {PAISES.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </label>
-      )}
-
       <style>{`
+        .deleg-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 10px;
+        }
         .deleg-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
         .deleg-label {
           font-size: 0.8rem; font-weight: 800; text-transform: uppercase;
           letter-spacing: 0.08em; color: var(--text-muted);
         }
-        .deleg-pais-auto {
-          font-size: 0.82rem; color: var(--gold); font-weight: 700;
-          padding: 2px 0;
-        }
       `}</style>
-    </>
+    </div>
   );
 }

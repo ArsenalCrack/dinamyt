@@ -79,6 +79,7 @@ export async function registerUserAPI(data: {
   club?: string;
   puede_juzgar?: boolean;
   delegacion?: string;
+  pais_delegacion?: string;
 }) {
   const res = await api.post("/auth/register", data);
   return res.data;
@@ -106,6 +107,7 @@ export async function updateUserAPI(
   data: {
     nombre?: string; email?: string; password?: string; activo?: boolean;
     rol?: string; club?: string; puede_juzgar?: boolean; delegacion?: string;
+    pais_delegacion?: string;
   }
 ) {
   const res = await api.put(`/auth/users/${id}`, data);
@@ -615,6 +617,8 @@ export interface InscripcionSolicitante {
   nombre: string;
   rol: string;
   club: string | null;
+  delegacion?: string | null;
+  pais_delegacion?: string | null;
 }
 
 export interface InscripcionData {

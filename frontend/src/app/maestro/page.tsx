@@ -182,6 +182,25 @@ export default function MaestroPage() {
 
   if (!user) return null;
 
+  // Origen del alumno al inscribir: su club y delegación (país + ciudad) van
+  // fijos a los del maestro. Se muestra dentro del formulario para que quede
+  // claro con qué delegación se registrará.
+  const infoOrigen = club ? (
+    <div style={{
+      display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
+      fontSize: "0.82rem", color: "var(--text-muted)",
+      padding: "8px 12px", borderRadius: "var(--radius-sm)",
+      background: "var(--bg-elevated)", border: "1px solid var(--border)",
+    }}>
+      <span>{t("maestro.tuClub")}: <strong style={{ color: "var(--text)" }}>{club}</strong></span>
+      {delegacion && (
+        <span>· {t("maestro.tuDelegacion")}: <strong style={{ color: "var(--text)" }}>
+          {delegacion}{paisDelegacion ? ` (${paisDelegacion})` : ""}
+        </strong></span>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "20px" }}>
       {/* Header */}
@@ -285,6 +304,7 @@ export default function MaestroPage() {
                 {campSel === c.id && c.puede_inscribir && (
                   <form onSubmit={(e) => enviar(e, c.id)} className="card animate-slide"
                     style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12, borderColor: "var(--gold-border)" }}>
+                    {infoOrigen}
                     <CompetidorFormFields value={form} onChange={setForm} clubLocked={club} />
                     <div>
                       <div style={{ fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 6 }}>
@@ -361,6 +381,7 @@ export default function MaestroPage() {
                               {reenvioId === i.id ? (
                                 <form onSubmit={enviarReenvio} className="card animate-slide"
                                   style={{ display: "flex", flexDirection: "column", gap: 12, borderColor: "var(--red-alert)", marginTop: 4 }}>
+                                  {infoOrigen}
                                   <CompetidorFormFields value={reenvioForm} onChange={setReenvioForm} clubLocked={club} />
                                   <div>
                                     <div style={{ fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 6 }}>

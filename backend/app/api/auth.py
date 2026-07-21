@@ -12,7 +12,7 @@ from flask_jwt_extended import (
     get_jwt_identity,
 )
 from ..extensions import db
-from ..geo import pais_de_ciudad
+from ..geo import pais_de_ciudad, pais_valido
 from ..models.asignacion import AsignacionJuez
 from ..models.usuario import ROLES_VALIDOS, Usuario
 from ..security import intento_bloqueado, limpiar_intentos, segundos_restantes
@@ -40,17 +40,18 @@ def _validar_club(valor):
     return club, None
 
 
-def _validar_delegacion(valor):
-    """(delegacion, pais, error): delegación recortada + país derivado."""
+def _validar_delegacion(valor, pais_valor=None):
+    """(delegacion, pais, error): delegación (ciudad) recortada + país.
+
+    El país lo elige el admin de un catálogo y debe ser uno válido. Si llega un
+    país reconocido se usa tal cual; si no llega (o no se reconoce) se deriva de
+    la ciudad para no perder el dato en datos viejos o clientes antiguos.
+    """
     delegacion = str(valor or "").strip()
-    if not delegacion:
-        return None, None, None
     if len(delegacion) > DELEGACION_MAX:
         return None, None, f"La delegación no puede superar {DELEGACION_MAX} caracteres."
-    pais = pais_de_ciudad(delegacion)
-    # Si la ciudad no está en el catálogo, el país se queda en None
-    # (el admin puede escribir una delegación libre).
-    return delegacion, pais, None
+    pais = pais_valido(pais_valor) or pais_de_ciudad(delegacion)
+    return (delegacion or None), pais, None
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -157,8 +158,10 @@ def register():
         return jsonify({"error": "El club es obligatorio para un maestro"}), 400
     puede_juzgar = bool(data.get("puede_juzgar")) if rol == "maestro" else False
 
-    # Delegación: ciudad de origen del club del maestro.
-    delegacion, pais_del, error = _validar_delegacion(data.get("delegacion"))
+    # Delegación: país (del catálogo) + ciudad de origen del club del maestro.
+    delegacion, pais_del, error = _validar_delegacion(
+        data.get("delegacion"), data.get("pais_delegacion")
+    )
     if error:
         return jsonify({"error": error}), 400
 
@@ -336,9 +339,11 @@ def update_user(user_id):
             return jsonify({"error": "El club es obligatorio para un maestro"}), 400
         user.club = club
 
-    # Delegación del maestro (ciudad de origen del club).
-    if "delegacion" in data:
-        delegacion, pais_del, error = _validar_delegacion(data.get("delegacion"))
+    # Delegación del maestro (país del catálogo + ciudad de origen del club).
+    if "delegacion" in data or "pais_delegacion" in data:
+        delegacion, pais_del, error = _validar_delegacion(
+            data.get("delegacion"), data.get("pais_delegacion")
+        )
         if error:
             return jsonify({"error": error}), 400
         user.delegacion = delegacion

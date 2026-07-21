@@ -220,13 +220,16 @@ class Inscripcion(db.Model):
             "estado": self.estado or "aceptada",
             "created_by": self.created_by,
             "motivo_rechazo": self.motivo_rechazo,
-            # Datos del solicitante (para que el admin vea "solicitado por X").
+            # Datos del solicitante (para que el admin vea "solicitado por X" con
+            # su club y delegación —país y ciudad— al revisar la inscripción).
             "solicitante": (
                 {
                     "id": self.autor.id,
                     "nombre": self.autor.nombre,
                     "rol": self.autor.rol,
                     "club": self.autor.club,
+                    "delegacion": self.autor.delegacion,
+                    "pais_delegacion": self.autor.pais_delegacion,
                 }
                 if self.autor else None
             ),
