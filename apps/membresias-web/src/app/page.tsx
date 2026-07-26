@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, obtenerToken } from '@/lib/api';
-import { activarPush } from '@/lib/push';
-import { getSesion, esStaff } from '@/lib/session';
+import { api, mensajeError } from '@/lib/api';
+import { rutaInicio, useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
+import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { Avisos } from '@/components/Avisos';
 import { Avatar } from '@/components/Avatar';
 
@@ -15,33 +16,40 @@ interface RosterItem {
   email: string;
   phone: string | null;
   avatarUrl: string | null;
+  qr: string;
   status: string | null;
   venceEl: string | null;
   clasesRestantes: number | null;
   diasFaltantes: number | null;
   estado: string;
 }
-interface Plan { id: string; name: string; type: string; price: string }
-interface Revenue { recaudado: number; esperadoMensual: number; numPagos: number; month: string }
-interface Overdue { userId: string; venceEl: string; diasVencido: number }
-interface Attendance { hoy: number; total: number }
-
-function estadoBadge(e: string) {
-  if (e === 'vencido') return 'badge badge-danger';
-  if (e === 'por_vencer') return 'badge badge-gold';
-  if (e === 'al_dia') return 'badge badge-ok';
-  return 'badge';
+interface Plan {
+  id: string;
+  name: string;
+  type: string;
+  price: string;
 }
-function estadoLabel(e: string) {
-  return (
-    ({ al_dia: 'Al día', por_vencer: 'Por vencer', vencido: 'Vencido', sin_plan: 'Sin plan' } as Record<string, string>)[e] ?? e
-  );
+interface Revenue {
+  recaudado: number;
+  esperadoMensual: number;
+  numPagos: number;
+  month: string;
 }
-const fmtCOP = (n: number) =>
-  n.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+interface Overdue {
+  userId: string;
+  venceEl: string;
+  diasVencido: number;
+}
+interface Attendance {
+  hoy: number;
+  total: number;
+}
 
 export default function Panel() {
   const router = useRouter();
+  const { t, idioma } = useI18n();
+  const { user, cargando: cargandoSesion, esStaff } = useAuth();
+
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [revenue, setRevenue] = useState<Revenue | null>(null);
@@ -55,11 +63,11 @@ export default function Panel() {
   const cargar = useCallback(async () => {
     try {
       const [r, p, rev, ov, at] = await Promise.all([
-        api.get('/memberships'),
-        api.get('/plans'),
-        api.get('/reports/revenue'),
-        api.get('/reports/overdue'),
-        api.get('/reports/attendance'),
+        api.get<RosterItem[]>('/memberships'),
+        api.get<Plan[]>('/plans'),
+        api.get<Revenue>('/reports/revenue'),
+        api.get<Overdue[]>('/reports/overdue'),
+        api.get<Attendance>('/reports/attendance'),
       ]);
       setRoster(r.data);
       setPlans(p.data);
@@ -67,99 +75,145 @@ export default function Panel() {
       setOverdue(ov.data);
       setAttendance(at.data);
     } catch (e) {
-      const err = e as { response?: { status?: number; data?: { error?: string } } };
-      if (err.response?.status === 401) {
-        router.push('/login');
-        return;
-      }
-      setError(err.response?.data?.error ?? 'Error al cargar los datos.');
+      setError(mensajeError(e, t('comun.ninguno')));
     } finally {
       setCargando(false);
     }
-  }, [router]);
+  }, [t]);
 
   useEffect(() => {
-    if (!obtenerToken()) {
-      router.push('/login');
+    if (cargandoSesion) return;
+    if (!user) {
+      router.replace('/login');
       return;
     }
-    // El panel del club es SOLO para el staff; el alumno tiene su propia vista.
-    if (!esStaff(getSesion())) {
-      router.replace('/mi');
+    // El panel del club es del staff; el alumno tiene su propia vista.
+    if (!esStaff) {
+      router.replace(rutaInicio(user));
       return;
     }
     void cargar();
-  }, [router, cargar]);
+  }, [cargandoSesion, user, esStaff, router, cargar]);
 
   async function registrarPago(userId: string) {
     const planId = planPorFila[userId] ?? plans[0]?.id;
     const plan = plans.find((p) => p.id === planId);
     if (!plan) return;
+    setError('');
     try {
       await api.post(`/memberships/${userId}/payments`, {
         planId: plan.id,
         amount: plan.price,
         method: 'efectivo',
       });
+      setAviso(t('pago.registrado'));
       await cargar();
     } catch (e) {
-      const err = e as { response?: { data?: { error?: string } } };
-      setError(err.response?.data?.error ?? 'No se pudo registrar el pago.');
+      setError(mensajeError(e, t('pago.titulo')));
     }
   }
 
   async function enviarAvisos() {
     setAviso('');
     try {
-      const r = await api.post('/notifications/run', {});
-      setAviso(`Avisos: ${r.data.creados} · emails: ${r.data.emailsEnviados} · push: ${r.data.pushEnviados ?? 0}`);
-    } catch {
-      setAviso('No se pudieron enviar los avisos.');
+      const r = await api.post<{ creados: number; pushEnviados: number }>(
+        '/notifications/run',
+        {},
+      );
+      setAviso(`${t('panel.avisos')}: ${r.data.creados} · push: ${r.data.pushEnviados}`);
+    } catch (e) {
+      setError(mensajeError(e, t('panel.avisos')));
     }
   }
 
-  async function activarNotis() {
-    const r = await activarPush();
-    setAviso(r.ok ? 'Notificaciones activadas en este equipo.' : `No se activaron: ${r.motivo}`);
+  if (cargandoSesion || cargando) {
+    return (
+      <main style={{ padding: '2rem' }} className="muted">
+        {t('comun.cargando')}
+      </main>
+    );
   }
-
-  if (cargando) return <main style={{ padding: '2rem' }} className="muted">Cargando…</main>;
 
   return (
     <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}>
-      {/* La navegación (Kiosco, Planes, Calendario, Salir…) vive en la barra
-          global con menú de hamburguesa; aquí solo las acciones del panel. */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <div>
-          <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Ecosistema DINAMYT</p>
-          <h1 className="display" style={{ fontSize: '1.5rem' }}>
-            Membresías <span style={{ color: 'var(--gold)' }}>del club</span>
-          </h1>
-        </div>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.25rem',
+          gap: '0.5rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1 className="display" style={{ fontSize: '1.5rem' }}>
+          {t('panel.titulo')}
+        </h1>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <Avisos deTodoElClub />
-          <button className="btn btn-outline btn-sm" onClick={enviarAvisos}>Enviar avisos</button>
-          <button className="btn btn-outline btn-sm" onClick={activarNotis}>Activar push</button>
+          <button className="btn btn-outline btn-sm" onClick={enviarAvisos}>
+            {t('panel.avisos')}
+          </button>
         </div>
       </header>
 
-      {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
-      {aviso && <p className="msg-ok" style={{ marginBottom: '1rem' }}>{aviso}</p>}
+      {error && (
+        <p className="msg-error" style={{ marginBottom: '1rem' }}>
+          {error}
+        </p>
+      )}
+      {aviso && (
+        <p className="msg-ok" style={{ marginBottom: '1rem' }}>
+          {aviso}
+        </p>
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))',
+          gap: '0.75rem',
+          marginBottom: '1.25rem',
+        }}
+      >
         <div className="card" style={{ padding: '0.9rem' }}>
-          <div className="muted" style={{ fontSize: '0.75rem' }}>Recaudado ({revenue?.month})</div>
-          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--gold)' }}>{fmtCOP(revenue?.recaudado ?? 0)}</div>
-          <div className="muted" style={{ fontSize: '0.72rem' }}>Esperado {fmtCOP(revenue?.esperadoMensual ?? 0)}</div>
+          <div className="muted" style={{ fontSize: '0.75rem' }}>
+            {revenue?.month}
+          </div>
+          <div
+            className="mono"
+            style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--gold)' }}
+          >
+            {fmtMoneda(revenue?.recaudado ?? 0)}
+          </div>
+          <div className="muted" style={{ fontSize: '0.72rem' }}>
+            / {fmtMoneda(revenue?.esperadoMensual ?? 0)}
+          </div>
         </div>
         <div className="card" style={{ padding: '0.9rem' }}>
-          <div className="muted" style={{ fontSize: '0.75rem' }}>Morosos</div>
-          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--danger)' }}>{overdue.length}</div>
+          <div className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('panel.vencidos')}
+          </div>
+          <div
+            className="mono"
+            style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--danger)' }}
+          >
+            {overdue.length}
+          </div>
         </div>
         <Link href="/asistencia" className="card" style={{ padding: '0.9rem' }}>
-          <div className="muted" style={{ fontSize: '0.75rem' }}>Asistieron hoy</div>
-          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--ok)' }}>{attendance?.hoy ?? 0}</div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--gold)' }}>Pasar lista →</div>
+          <div className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('asistencia.presentes')}
+          </div>
+          <div
+            className="mono"
+            style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--ok)' }}
+          >
+            {attendance?.hoy ?? 0}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--gold)' }}>
+            {t('asistencia.titulo')} →
+          </div>
         </Link>
       </div>
 
@@ -167,17 +221,19 @@ export default function Panel() {
         <table>
           <thead>
             <tr>
-              <th>Alumno</th>
-              <th>Estado</th>
-              <th>Vence / Clases</th>
-              <th>Registrar pago</th>
+              <th>{t('panel.alumnos')}</th>
+              <th>{t('comun.estado')}</th>
+              <th>
+                {t('panel.vence')} / {t('panel.clases')}
+              </th>
+              <th>{t('panel.registrarPago')}</th>
             </tr>
           </thead>
           <tbody>
             {roster.length === 0 && (
               <tr>
                 <td colSpan={4} className="muted" style={{ padding: '1rem' }}>
-                  No hay alumnos en el club todavía. Se agregan desde el portal del ecosystem.
+                  {t('panel.sinAlumnos')}
                 </td>
               </tr>
             )}
@@ -187,29 +243,45 @@ export default function Panel() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <Avatar src={a.avatarUrl} nombre={a.fullName} size={36} />
                     <div style={{ minWidth: 0 }}>
-                      <Link href={`/alumnos/${a.userId}`} style={{ fontWeight: 600, color: 'var(--gold)' }}>{a.fullName}</Link>
-                      <div className="muted" style={{ fontSize: '0.72rem' }}>{a.email}</div>
+                      <Link
+                        href={`/alumnos/${a.userId}`}
+                        style={{ fontWeight: 600, color: 'var(--gold)' }}
+                      >
+                        {a.fullName}
+                      </Link>
+                      <div className="muted" style={{ fontSize: '0.72rem' }}>
+                        {a.email}
+                      </div>
                     </div>
                   </div>
                 </td>
-                <td><span className={estadoBadge(a.estado)}>{estadoLabel(a.estado)}</span></td>
+                <td>
+                  <span className={claseEstado(a.estado)}>{t(claveEstado(a.estado))}</span>
+                </td>
                 <td className="muted">
                   {a.venceEl
-                    ? `Vence ${a.venceEl}${a.diasFaltantes != null ? ` (${a.diasFaltantes} d)` : ''}`
+                    ? `${fmtFecha(a.venceEl, idioma)}${
+                        a.diasFaltantes != null ? ` (${a.diasFaltantes} d)` : ''
+                      }`
                     : a.clasesRestantes != null
-                      ? `${a.clasesRestantes} clases`
+                      ? `${a.clasesRestantes} · ${t('panel.clases')}`
                       : '—'}
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                     <select
+                      aria-label={t('pago.plan')}
                       value={planPorFila[a.userId] ?? ''}
-                      onChange={(e) => setPlanPorFila((s) => ({ ...s, [a.userId]: e.target.value }))}
+                      onChange={(e) =>
+                        setPlanPorFila((s) => ({ ...s, [a.userId]: e.target.value }))
+                      }
                       style={{ maxWidth: 160 }}
                     >
-                      <option value="">Plan…</option>
+                      <option value="">{t('pago.plan')}…</option>
                       {plans.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} · {fmtCOP(parseFloat(p.price))}</option>
+                        <option key={p.id} value={p.id}>
+                          {p.name} · {fmtMoneda(p.price)}
+                        </option>
                       ))}
                     </select>
                     <button
@@ -217,7 +289,7 @@ export default function Panel() {
                       disabled={!(planPorFila[a.userId] ?? plans[0]?.id)}
                       onClick={() => registrarPago(a.userId)}
                     >
-                      Pagar
+                      {t('pago.registrar')}
                     </button>
                   </div>
                 </td>

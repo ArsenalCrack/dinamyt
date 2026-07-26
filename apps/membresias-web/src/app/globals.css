@@ -228,3 +228,88 @@ td.mono, .tabular { font-variant-numeric: tabular-nums; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   MODO CLARO
+   Se activa con data-theme="light" en <html> (ver lib/theme.ts y el script
+   anti-flash de layout.tsx). Solo redefine las variables de color: todo lo
+   demás — tipografía, espaciado, componentes — se mantiene igual.
+
+   El oro de marca se oscurece a --gold: #a37400 sobre fondo claro. El
+   #f0b800 del modo oscuro contra blanco da 1.9:1 de contraste, ilegible.
+   ════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f4f8;
+  --bg-card: #ffffff;
+  --bg-elevated: #ececf3;
+  --bg-input: #ffffff;
+  --border: #dcdce6;
+  --border-strong: #b9b9c9;
+  --text: #16161f;
+  --text-muted: #5d5d72;
+  --gold: #a37400;
+  --gold-dim: #8a6200;
+  --gold-soft: rgba(163, 116, 0, 0.1);
+  --accion: #17784f;
+  --accion-texto: #ffffff;
+  --danger: #c4213f;
+  --ok: #167a4d;
+  --info: #1b5fbf;
+}
+
+html[data-theme="light"] ::selection {
+  background: var(--gold);
+  color: #ffffff;
+}
+
+/* En claro las tarjetas se separan del fondo con sombra, no con borde
+   luminoso: el truco del modo oscuro aquí se ve sucio. */
+html[data-theme="light"] .card {
+  box-shadow: 0 1px 3px rgba(22, 22, 31, 0.06), 0 1px 2px rgba(22, 22, 31, 0.04);
+}
+
+html[data-theme="light"] .btn-danger {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+}
+
+html[data-theme="light"] .badge-ok {
+  background: rgba(22, 122, 77, 0.1);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+html[data-theme="light"] .badge-danger {
+  background: rgba(196, 33, 63, 0.1);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ── Impresión: el carnet QR sale limpio en papel ────────────────────────
+   Se imprime en claro pase lo que pase (tinta negra sobre blanco) y solo la
+   tarjeta marcada .solo-imprimir llega al papel. */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-imprimir,
+  header,
+  nav {
+    display: none !important;
+  }
+  .solo-imprimir {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    border: 2px solid #000000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+  .solo-imprimir .muted {
+    color: #444444 !important;
+  }
+}

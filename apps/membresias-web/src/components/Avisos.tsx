@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { fmtFecha } from '@/lib/formato';
 
 interface Aviso {
   id: string;
@@ -13,30 +15,23 @@ interface Aviso {
   status: string;
 }
 
-const TEXTO: Record<Aviso['type'], string> = {
-  pre_venc: 'Mensualidad próxima a vencer',
-  venc: 'La mensualidad vence hoy',
-  mora: 'Mensualidad vencida',
-  maestro: 'Resumen del club',
-};
-
-const fecha = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
-
 /**
- * Campana de avisos con contador. El staff ve los del club (?all=1);
- * el alumno/acudiente solo los suyos. Los avisos los genera el job diario
- * de la API (pre-vencimiento, vencimiento y mora).
+ * Campana de avisos con contador. El staff ve los del club (?all=1); el alumno
+ * y el acudiente solo los suyos. Los genera el job diario de la API
+ * (pre-vencimiento, vencimiento y mora).
  */
 export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
+  const { t, idioma } = useI18n();
   const [avisos, setAvisos] = useState<Aviso[]>([]);
   const [abierto, setAbierto] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     api
-      .get('/notifications', { params: deTodoElClub ? { all: '1' } : undefined })
-      .then((r) => setAvisos(r.data as Aviso[]))
+      .get<Aviso[]>('/notifications', {
+        params: deTodoElClub ? { all: '1' } : undefined,
+      })
+      .then((r) => setAvisos(r.data))
       .catch(() => setAvisos([]));
   }, [deTodoElClub]);
 
@@ -61,15 +56,15 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
         className="btn btn-outline btn-sm"
         onClick={() => setAbierto(!abierto)}
         aria-expanded={abierto}
-        title="Avisos de mensualidades"
+        title={t('aviso.titulo')}
       >
-        🔔 Avisos
+        🔔 {t('aviso.titulo')}
         {nuevos > 0 && (
           <span
             className="mono"
             style={{
               background: 'var(--gold)',
-              color: '#14141e',
+              color: 'var(--bg)',
               borderRadius: 999,
               fontSize: '0.68rem',
               fontWeight: 700,
@@ -98,11 +93,11 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
           }}
         >
           <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>
-            {deTodoElClub ? 'Avisos del club' : 'Mis avisos'}
+            {deTodoElClub ? t('aviso.delClub') : t('aviso.misAvisos')}
           </p>
           {avisos.length === 0 ? (
             <p className="muted" style={{ fontSize: '0.85rem' }}>
-              Sin avisos por ahora. Aquí verás los recordatorios de mensualidad.
+              {t('aviso.sinAvisos')}
             </p>
           ) : (
             <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -118,23 +113,21 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                     fontSize: '0.85rem',
                   }}
                 >
-                  <span>
-                    <span
-                      style={{
-                        color:
-                          a.type === 'mora'
-                            ? 'var(--danger)'
-                            : a.type === 'venc'
-                              ? 'var(--gold)'
-                              : 'var(--text)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {TEXTO[a.type] ?? a.type}
-                    </span>
+                  <span
+                    style={{
+                      color:
+                        a.type === 'mora'
+                          ? 'var(--danger)'
+                          : a.type === 'venc'
+                            ? 'var(--gold)'
+                            : 'var(--text)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {t(`aviso.${a.type}` as ClaveTexto)}
                   </span>
                   <span className="mono muted" style={{ fontSize: '0.72rem', flexShrink: 0 }}>
-                    {fecha(a.scheduledFor)}
+                    {fmtFecha(a.scheduledFor?.slice(0, 10), idioma)}
                   </span>
                 </li>
               ))}

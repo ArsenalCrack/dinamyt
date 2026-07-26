@@ -16,8 +16,11 @@ npm-debug.log*
 pnpm-debug.log*
 
 # Entorno y secretos — NUNCA versionar
+# El patrón `.env*.local` (sin punto antes del *) también atrapa `.env.local`,
+# que es el que usa Next en desarrollo.
 .env
-.env.*.local
+.env*.local
+!.env.example
 *.pem
 
 # OS / editores

@@ -1,24 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api, ecosystemApi, obtenerToken } from '@/lib/api';
-import { getSesion, esStaff } from '@/lib/session';
-import { agentEnroll } from '@/lib/agent';
+import { api, mensajeError, type Rol } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { Avatar } from '@/components/Avatar';
+import { CarnetQR } from '@/components/CarnetQR';
 
-interface Discipline { discipline: string; currentGrade: string | null }
-interface Profile {
-  fullName?: string;
-  email?: string;
-  phone?: string | null;
-  birthDate?: string | null;
-  avatarUrl?: string | null;
-  emergencyContactName?: string | null;
-  emergencyContactPhone?: string | null;
-  medicalNotes?: string | null;
-  disciplines?: Discipline[];
+interface Persona {
+  id: string;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  avatarUrl: string | null;
+  role: Rol;
+  isActive: boolean;
 }
 interface Membership {
   userId: string;
@@ -27,130 +26,228 @@ interface Membership {
   venceEl: string | null;
   clasesRestantes: number | null;
   diasFaltantes: number | null;
+  checkinPin: string | null;
 }
-interface Payment { id: string; amount: string; method: string; status: string; paidAt: string }
-interface Attendance { id: string; checkinDate: string; method: string }
-
-const fmtCOP = (n: number) =>
-  n.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-
-function estadoBadge(e?: string) {
-  if (e === 'vencido') return 'badge badge-danger';
-  if (e === 'por_vencer') return 'badge badge-gold';
-  if (e === 'al_dia') return 'badge badge-ok';
-  return 'badge';
+interface Payment {
+  id: string;
+  amount: string;
+  method: string;
+  status: string;
+  paidAt: string;
+}
+interface Attendance {
+  id: string;
+  checkinDate: string;
+  method: string;
 }
 
 export default function Ficha() {
   const router = useRouter();
   const params = useParams();
   const id = String(params.id ?? '');
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { t, idioma } = useI18n();
+  const { user, club, cargando: cargandoSesion, esStaff } = useAuth();
+  const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
+
+  const [persona, setPersona] = useState<Persona | null>(null);
   const [membership, setMembership] = useState<Membership | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
-  const [msg, setMsg] = useState('');
+  const [aviso, setAviso] = useState('');
   const [error, setError] = useState('');
+  const [nuevaPass, setNuevaPass] = useState('');
 
   const cargar = useCallback(async () => {
     try {
-      const [pr, mem, pays, ats] = await Promise.all([
-        ecosystemApi.get(`/users/${id}/profile`).catch(() => ({ data: null })),
-        api.get('/memberships'),
-        api.get(`/payments?userId=${id}`),
-        api.get(`/attendances?userId=${id}`),
+      const [pe, mem, pays, ats] = await Promise.all([
+        api.get<Persona>(`/users/${id}`),
+        api.get<Membership[]>('/memberships'),
+        api.get<Payment[]>(`/payments?userId=${id}`),
+        api.get<Attendance[]>(`/attendances?userId=${id}`),
       ]);
-      setProfile(pr.data);
-      setMembership((mem.data as Membership[]).find((m) => m.userId === id) ?? null);
+      setPersona(pe.data);
+      setMembership(mem.data.find((m) => m.userId === id) ?? null);
       setPayments(pays.data);
       setAttendances(ats.data);
     } catch (e) {
-      const err = e as { response?: { status?: number } };
-      if (err.response?.status === 401) {
-        router.push('/login');
-        return;
-      }
-      setError('No se pudo cargar la ficha.');
+      setError(mensajeError(e, t('comun.ninguno')));
     }
-  }, [id, router]);
+  }, [id, t]);
 
   useEffect(() => {
-    if (!obtenerToken()) {
-      router.push('/login');
+    if (cargandoSesion) return;
+    if (!user) {
+      router.replace('/login');
       return;
     }
-    if (!esStaff(getSesion())) {
+    if (!esStaff) {
       router.replace('/mi');
       return;
     }
     if (id) void cargar();
-  }, [id, router, cargar]);
+  }, [cargandoSesion, user, esStaff, id, router, cargar]);
 
-  async function registrarHuella() {
-    setMsg('');
-    const cap = await agentEnroll();
-    if (!cap) {
-      setMsg('No se detectó el lector. Enrola desde el kiosco con el agente y el lector conectados.');
-      return;
-    }
+  async function cambiarPassword(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setAviso('');
     try {
-      await api.post(`/memberships/${id}/biometrics`, {
-        template: cap.template,
-        format: cap.format,
-        consent: true,
-      });
-      setMsg('Huella enrolada correctamente.');
-    } catch {
-      setMsg('No se pudo guardar la huella.');
+      await api.post(`/users/${id}/password`, { password: nuevaPass });
+      setNuevaPass('');
+      setAviso(t('alumnos.contrasenaCambiada'));
+    } catch (err) {
+      setError(mensajeError(err, t('alumnos.nuevaContrasena')));
     }
   }
 
-  const nombre = profile?.fullName ?? membership?.fullName ?? 'Alumno';
+  const nombre = persona?.fullName ?? membership?.fullName ?? '—';
 
   return (
-    <main style={{ maxWidth: 820, margin: '0 auto', padding: '1.5rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '0.75rem', flexWrap: 'wrap' }}>
+    <main style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem' }}>
+      <header
+        className="no-imprimir"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.25rem',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-          <Avatar src={profile?.avatarUrl} nombre={nombre} size={52} />
-          <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>{nombre}</h1>
+          <Avatar src={persona?.avatarUrl} nombre={nombre} size={52} />
+          <div>
+            <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>{nombre}</h1>
+            <p className="muted" style={{ fontSize: '0.78rem' }}>
+              {persona?.email}
+            </p>
+          </div>
         </div>
-        <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
+        <Link href="/alumnos" className="btn btn-outline btn-sm">
+          {t('comun.volver')}
+        </Link>
       </header>
 
-      {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
-      {msg && <p className="msg-ok" style={{ marginBottom: '1rem' }}>{msg}</p>}
+      {error && (
+        <p className="msg-error no-imprimir" style={{ marginBottom: '1rem' }}>
+          {error}
+        </p>
+      )}
+      {aviso && (
+        <p className="msg-ok no-imprimir" style={{ marginBottom: '1rem' }}>
+          {aviso}
+        </p>
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
+          gap: '1rem',
+          marginBottom: '1.25rem',
+        }}
+      >
+        {/* ── Carnet QR: el motivo por el que esta pantalla se imprime ─────── */}
         <div className="card" style={{ padding: '1rem' }}>
-          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>Perfil (ecosystem)</h2>
-          <p><span className="muted">Correo:</span> {profile?.email ?? '—'}</p>
-          <p><span className="muted">Teléfono:</span> {profile?.phone ?? '—'}</p>
-          <p><span className="muted">Nacimiento:</span> {profile?.birthDate?.slice(0, 10) ?? '—'}</p>
-          <p><span className="muted">Grado:</span> {profile?.disciplines?.map((d) => `${d.discipline}: ${d.currentGrade ?? '—'}`).join(', ') || '—'}</p>
-          <p><span className="muted">Emergencia:</span> {profile?.emergencyContactName ?? '—'} {profile?.emergencyContactPhone ?? ''}</p>
-          <p><span className="muted">Notas médicas:</span> {profile?.medicalNotes ?? '—'}</p>
-          <button className="btn btn-outline btn-sm" style={{ marginTop: '0.6rem' }} onClick={registrarHuella}>Registrar huella</button>
+          <h2
+            className="no-imprimir"
+            style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}
+          >
+            {t('qr.titulo')}
+          </h2>
+          <p className="muted no-imprimir" style={{ fontSize: '0.75rem', marginBottom: '0.9rem' }}>
+            {t('qr.descripcion')}
+          </p>
+          <CarnetQR
+            valor={id}
+            nombre={nombre}
+            club={club?.name}
+            pin={membership?.checkinPin}
+          />
         </div>
 
-        <div className="card" style={{ padding: '1rem' }}>
-          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>Membresía en el club</h2>
-          <p><span className="muted">Estado:</span> <span className={estadoBadge(membership?.estado)}>{membership?.estado ?? 'sin datos'}</span></p>
-          <p><span className="muted">Vence:</span> {membership?.venceEl ?? '—'} {membership?.diasFaltantes != null ? `(${membership.diasFaltantes} d)` : ''}</p>
-          <p><span className="muted">Clases restantes:</span> {membership?.clasesRestantes ?? '—'}</p>
+        <div className="no-imprimir" style={{ display: 'grid', gap: '1rem', alignContent: 'start' }}>
+          <div className="card" style={{ padding: '1rem' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+              {t('ficha.membresia')}
+            </h2>
+            <p>
+              <span className="muted">{t('comun.estado')}: </span>
+              <span className={claseEstado(membership?.estado ?? '')}>
+                {t(claveEstado(membership?.estado ?? ''))}
+              </span>
+            </p>
+            <p>
+              <span className="muted">{t('mi.vence')}: </span>
+              {fmtFecha(membership?.venceEl, idioma)}
+              {membership?.diasFaltantes != null ? ` (${membership.diasFaltantes} d)` : ''}
+            </p>
+            <p>
+              <span className="muted">{t('mi.clasesRestantes')}: </span>
+              {membership?.clasesRestantes ?? '—'}
+            </p>
+            <p>
+              <span className="muted">{t('comun.telefono')}: </span>
+              {persona?.phone || '—'}
+            </p>
+          </div>
+
+          {esMaestro && (
+            <form onSubmit={cambiarPassword} className="card" style={{ padding: '1rem' }}>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+                {t('alumnos.nuevaContrasena')}
+              </h2>
+              <input
+                type="text"
+                minLength={8}
+                required
+                value={nuevaPass}
+                onChange={(e) => setNuevaPass(e.target.value)}
+                placeholder={t('mi.contrasenaNueva')}
+              />
+              <p className="muted" style={{ fontSize: '0.7rem', margin: '0.35rem 0 0.6rem' }}>
+                {t('alumnos.contrasenaAyuda')}
+              </p>
+              <button type="submit" className="btn btn-outline btn-sm">
+                {t('comun.guardar')}
+              </button>
+            </form>
+          )}
         </div>
       </div>
 
-      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>Pagos</h2>
+      <div
+        className="card tabla-scroll no-imprimir"
+        style={{ padding: '0.5rem 1rem', marginBottom: '1.25rem' }}
+      >
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
+          {t('ficha.pagos')}
+        </h2>
         <table>
-          <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th><th>Estado</th></tr></thead>
+          <thead>
+            <tr>
+              <th>{t('comun.fecha')}</th>
+              <th>{t('pago.monto')}</th>
+              <th>{t('pago.metodo')}</th>
+              <th>{t('comun.estado')}</th>
+            </tr>
+          </thead>
           <tbody>
-            {payments.length === 0 && <tr><td colSpan={4} className="muted" style={{ padding: '0.75rem' }}>Sin pagos.</td></tr>}
+            {payments.length === 0 && (
+              <tr>
+                <td colSpan={4} className="muted" style={{ padding: '0.75rem' }}>
+                  {t('comun.ninguno')}
+                </td>
+              </tr>
+            )}
             {payments.map((p) => (
               <tr key={p.id}>
-                <td>{p.paidAt?.slice(0, 10)}</td>
-                <td>{fmtCOP(parseFloat(p.amount))}</td>
-                <td className="muted">{p.method}</td>
+                <td>{fmtFecha(p.paidAt?.slice(0, 10), idioma)}</td>
+                <td className="mono">{fmtMoneda(p.amount)}</td>
+                <td className="muted">
+                  {t(`pago.metodo.${p.method}` as ClaveTexto)}
+                </td>
                 <td>{p.status}</td>
               </tr>
             ))}
@@ -158,12 +255,23 @@ export default function Ficha() {
         </table>
       </div>
 
-      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>Asistencias recientes</h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', paddingBottom: '0.75rem' }}>
-          {attendances.length === 0 && <span className="muted" style={{ fontSize: '0.85rem' }}>Sin asistencias.</span>}
+      <div className="card no-imprimir" style={{ padding: '0.5rem 1rem' }}>
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
+          {t('ficha.asistencias')}
+        </h2>
+        <div
+          style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', paddingBottom: '0.75rem' }}
+        >
+          {attendances.length === 0 && (
+            <span className="muted" style={{ fontSize: '0.85rem' }}>
+              {t('comun.ninguno')}
+            </span>
+          )}
           {attendances.slice(0, 30).map((a) => (
-            <span key={a.id} className="badge">{a.checkinDate} · {a.method}</span>
+            <span key={a.id} className="badge">
+              {fmtFecha(a.checkinDate, idioma)} ·{' '}
+              {t(`asistencia.metodo.${a.method}` as ClaveTexto)}
+            </span>
           ))}
         </div>
       </div>

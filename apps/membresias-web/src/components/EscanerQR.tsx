@@ -1,12 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 
 /**
- * Escáner de carnet QR con la CÁMARA del dispositivo (celular/tablet del
- * kiosco). Usa la API nativa BarcodeDetector cuando está disponible (Chrome/
- * Edge/Android); si no, avisa que se use el lector USB o el PIN. No agrega
- * dependencias externas.
+ * Escáner de carnet QR con la cámara del celular del maestro.
+ *
+ * Usa BarcodeDetector, la API nativa del navegador (Chrome/Edge/Android), en
+ * vez de una librería de decodificación: son ~50 KB menos de JS y el decodeo
+ * corre en código nativo, que en un celular de gama baja es la diferencia
+ * entre leer al instante y hacer esperar al alumno en la puerta.
+ *
+ * Donde no existe, el componente lo dice y el maestro usa PIN o marcado manual.
  */
 export function EscanerQR({
   onDetectado,
@@ -15,6 +20,7 @@ export function EscanerQR({
   onDetectado: (valor: string) => void;
   onCerrar: () => void;
 }) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [error, setError] = useState('');
   const [soportado, setSoportado] = useState(true);
@@ -42,7 +48,7 @@ export function EscanerQR({
         await videoRef.current.play();
         escanear();
       } catch {
-        setError('No se pudo abrir la cámara. Revisa los permisos del navegador.');
+        setError(t('kiosco.permisoCamara'));
       }
     }
 
@@ -65,9 +71,9 @@ export function EscanerQR({
     return () => {
       activo = false;
       cancelAnimationFrame(raf);
-      stream?.getTracks().forEach((t) => t.stop());
+      stream?.getTracks().forEach((tr) => tr.stop());
     };
-  }, [onDetectado]);
+  }, [onDetectado, t]);
 
   return (
     <div
@@ -75,7 +81,7 @@ export function EscanerQR({
         position: 'fixed',
         inset: 0,
         zIndex: 50,
-        background: 'rgba(0,0,0,0.9)',
+        background: 'rgba(0,0,0,0.92)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -102,19 +108,22 @@ export function EscanerQR({
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
-          <p className="muted" style={{ marginTop: '1rem', textAlign: 'center' }}>
-            Apunta al carnet QR del alumno (lo tiene en su panel «Mi membresía»).
+          <p style={{ marginTop: '1rem', textAlign: 'center', color: '#f3f1e8' }}>
+            {t('kiosco.apunta')}
           </p>
         </>
       ) : (
-        <p style={{ color: 'var(--text)', textAlign: 'center', maxWidth: 320 }}>
-          Este navegador no puede escanear con la cámara. Usa el lector USB
-          (teclea el carnet) o el PIN del alumno.
+        <p style={{ color: '#f3f1e8', textAlign: 'center', maxWidth: 320 }}>
+          {t('kiosco.sinCamara')}
         </p>
       )}
-      {error && <p className="msg-error" style={{ marginTop: '0.75rem' }}>{error}</p>}
+      {error && (
+        <p className="msg-error" style={{ marginTop: '0.75rem' }}>
+          {error}
+        </p>
+      )}
       <button onClick={onCerrar} className="btn btn-outline" style={{ marginTop: '1.25rem' }}>
-        Cerrar
+        {t('comun.cerrar')}
       </button>
     </div>
   );

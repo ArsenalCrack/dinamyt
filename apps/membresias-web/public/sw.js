@@ -1,4 +1,61 @@
-// Service worker de DINAMYT Membresías: recibe Web Push y muestra la notificación.
+// Service worker de DINAMYT Membresías.
+//
+// Hace dos cosas: recibir los avisos Web Push y servir el App Shell cuando no
+// hay red, para que el kiosco siga abriendo en un salón con mala señal. NO
+// cachea datos: mostrar el estado de un alumno desde caché sería peor que un
+// error claro — el maestro cobraría mal.
+
+var CACHE = 'membresias-shell-v1';
+var SHELL = ['/', '/kiosco', '/mi', '/manifest.json', '/logo.png'];
+
+self.addEventListener('install', function (event) {
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then(function (c) {
+        // addAll falla entero si un solo recurso no responde; uno por uno
+        // permite instalar aunque una ruta esté caída.
+        return Promise.all(
+          SHELL.map(function (u) {
+            return c.add(u).catch(function () {});
+          }),
+        );
+      })
+      .then(function () {
+        return self.skipWaiting();
+      }),
+  );
+});
+
+self.addEventListener('activate', function (event) {
+  event.waitUntil(
+    caches
+      .keys()
+      .then(function (claves) {
+        return Promise.all(
+          claves.map(function (k) {
+            return k === CACHE ? null : caches.delete(k);
+          }),
+        );
+      })
+      .then(function () {
+        return self.clients.claim();
+      }),
+  );
+});
+
+// Solo navegaciones: las llamadas a la API nunca salen de caché.
+self.addEventListener('fetch', function (event) {
+  if (event.request.method !== 'GET' || event.request.mode !== 'navigate') return;
+  event.respondWith(
+    fetch(event.request).catch(function () {
+      return caches.match(event.request).then(function (r) {
+        return r || caches.match('/');
+      });
+    }),
+  );
+});
+
 self.addEventListener('push', function (event) {
   var data = {};
   try {
@@ -9,12 +66,25 @@ self.addEventListener('push', function (event) {
   event.waitUntil(
     self.registration.showNotification(data.title || 'DINAMYT Membresías', {
       body: data.body || '',
-      badge: '/manifest.json',
+      icon: '/logo.png',
+      badge: '/logo.png',
+      data: { url: data.url || '/mi' },
     }),
   );
 });
 
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
-  event.waitUntil(self.clients.openWindow('/'));
+  var destino = (event.notification.data && event.notification.data.url) || '/mi';
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then(function (lista) {
+        // Si la app ya está abierta se reutiliza esa pestaña, no se abre otra.
+        for (var i = 0; i < lista.length; i++) {
+          if ('focus' in lista[i]) return lista[i].focus();
+        }
+        return self.clients.openWindow(destino);
+      }),
+  );
 });

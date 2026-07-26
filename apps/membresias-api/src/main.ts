@@ -1,4 +1,4 @@
-import { db } from '@dinamyt/membresias-db';
+import { db, migrarBd } from '@dinamyt/membresias-db';
 import { buildApp } from './app';
 import { config, ssoHabilitado } from './config';
 import { seedSuperadmin } from './scripts/seed';
@@ -15,6 +15,15 @@ async function main() {
   }
 
   const app = buildApp();
+
+  // Migrar antes de escuchar: si el esquema no está al día, es mejor no
+  // aceptar tráfico que responder errores raros a mitad de una clase.
+  try {
+    await migrarBd();
+  } catch (err) {
+    console.error('No se pudieron aplicar las migraciones:', err);
+    process.exit(1);
+  }
 
   try {
     const seed = await seedSuperadmin(db);

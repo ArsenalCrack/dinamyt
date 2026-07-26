@@ -1,12 +1,41 @@
 {
   "name": "DINAMYT Membresías",
   "short_name": "Membresías",
-  "description": "Control de mensualidades y asistencia del club.",
+  "description": "Control de mensualidades y asistencia de tu club de artes marciales.",
+  "lang": "es",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#14141e",
-  "theme_color": "#f0b800",
+  "orientation": "portrait-primary",
+  "background_color": "#0e0e15",
+  "theme_color": "#0e0e15",
+  "categories": ["sports", "productivity"],
   "icons": [
-    { "src": "/logo.png", "sizes": "any", "type": "image/png", "purpose": "any" }
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Kiosco de check-in",
+      "short_name": "Kiosco",
+      "description": "Escanear carnets QR al entrar a clase",
+      "url": "/kiosco"
+    },
+    {
+      "name": "Mi membresía",
+      "short_name": "Mi carnet",
+      "description": "Mi estado y mi carnet QR",
+      "url": "/mi"
+    }
   ]
 }

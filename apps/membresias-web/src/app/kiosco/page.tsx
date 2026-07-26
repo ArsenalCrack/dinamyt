@@ -3,14 +3,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, obtenerToken } from '@/lib/api';
-import { getSesion, esStaff } from '@/lib/session';
+import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { EscanerQR } from '@/components/EscanerQR';
+import { ControlesApariencia } from '@/components/ControlesApariencia';
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-interface RosterItem { userId: string; fullName: string; estado: string }
+interface RosterItem {
+  userId: string;
+  fullName: string;
+  estado: string;
+}
 interface Resultado {
   ok: boolean;
   bloqueado?: boolean;
@@ -24,10 +29,20 @@ interface Resultado {
 }
 
 const QKEY = 'membresias_checkin_queue';
-interface Encolado { identifier: { type: string; value: string }; ts: number }
+interface Encolado {
+  identifier: { type: string; value: string };
+  ts: number;
+}
 
+/**
+ * Kiosco de check-in: pantalla completa, sin barra de navegación, pensada para
+ * el celular del maestro en la puerta del salón.
+ */
 export default function Kiosco() {
   const router = useRouter();
+  const { t } = useI18n();
+  const { user, cargando: cargandoSesion, esStaff } = useAuth();
+
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [pin, setPin] = useState('');
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -41,7 +56,8 @@ export default function Kiosco() {
     setPendientes(q.length);
   }
 
-  // Reintenta los check-ins guardados sin conexión; descarta los rechazados por el servidor.
+  // Reintenta los check-ins guardados sin conexión. Los que el servidor
+  // rechaza se descartan: reintentarlos daría el mismo error para siempre.
   const flush = useCallback(async () => {
     const q: Encolado[] = JSON.parse(localStorage.getItem(QKEY) || '[]');
     if (!q.length) return;
@@ -60,26 +76,27 @@ export default function Kiosco() {
 
   const cargar = useCallback(async () => {
     try {
-      const r = await api.get('/memberships');
+      const r = await api.get<RosterItem[]>('/memberships');
       setRoster(r.data);
     } catch {
-      /* el kiosco puede operar sin roster (solo PIN/huella) */
+      /* el kiosco puede operar sin roster (solo QR/PIN) */
     }
   }, []);
 
   useEffect(() => {
-    if (!obtenerToken()) {
-      router.push('/login');
+    if (cargandoSesion) return;
+    if (!user) {
+      router.replace('/login');
       return;
     }
-    if (!esStaff(getSesion())) {
+    if (!esStaff) {
       router.replace('/mi');
       return;
     }
     void cargar();
     setPendientes((JSON.parse(localStorage.getItem(QKEY) || '[]') as Encolado[]).length);
     void flush();
-  }, [router, cargar, flush]);
+  }, [cargandoSesion, user, esStaff, router, cargar, flush]);
 
   async function checkin(identifier: { type: string; value: string }) {
     setResultado(null);
@@ -91,9 +108,9 @@ export default function Kiosco() {
       const err = e as { response?: { data?: Resultado } };
       if (!err.response) {
         encolar(identifier);
-        setResultado({ ok: false, error: 'Sin conexión: se guardó y se sincronizará luego.' });
+        setResultado({ ok: false, error: t('kiosco.ayuda') });
       } else {
-        setResultado({ ...(err.response.data ?? { error: 'No se pudo registrar.' }), ok: false });
+        setResultado({ ...(err.response.data ?? {}), ok: false });
       }
     }
   }
@@ -116,44 +133,56 @@ export default function Kiosco() {
         <EscanerQR
           onDetectado={(valor) => {
             setEscaneando(false);
-            const tipo = UUID_RE.test(valor) ? 'qr' : 'pin';
-            void checkin({ type: tipo, value: valor });
+            // Un carnet QR lleva el id del alumno (un UUID); cualquier otra
+            // cosa se intenta como PIN.
+            void checkin({ type: UUID_RE.test(valor) ? 'qr' : 'pin', value: valor });
           }}
           onCerrar={() => setEscaneando(false)}
         />
       )}
 
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <div>
-          <h1 className="display" style={{ fontSize: '1.5rem' }}>
-            Kiosco · <span style={{ color: 'var(--gold)' }}>Asistencia</span>
-          </h1>
-          <p className="muted" style={{ fontSize: '0.78rem' }}>
-            Marca la ASISTENCIA a clase. Los pagos de mensualidad se registran
-            en el{' '}
-            <Link href="/" style={{ color: 'var(--gold)' }}>
-              panel del club
-            </Link>
-            .
-          </p>
-        </div>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1rem',
+          gap: '0.5rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1 className="display" style={{ fontSize: '1.5rem' }}>
+          {t('kiosco.titulo')}
+        </h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {pendientes > 0 && <span className="badge badge-gold">{pendientes} sin sincronizar</span>}
-          <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
+          {pendientes > 0 && <span className="badge badge-gold">{pendientes}</span>}
+          <Link href="/" className="btn btn-outline btn-sm">
+            {t('menu.panel')}
+          </Link>
         </div>
       </header>
 
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-        <label className="muted" style={{ fontSize: '0.8rem' }}>
-          Escanea el carnet QR, o ingresa el PIN del alumno
+        <button
+          type="button"
+          className="btn btn-cta"
+          onClick={() => setEscaneando(true)}
+          style={{ width: '100%', fontSize: '1.05rem', padding: '0.9rem' }}
+        >
+          {t('kiosco.escanear')}
+        </button>
+
+        <label
+          className="muted"
+          style={{ fontSize: '0.8rem', display: 'block', marginTop: '1.1rem' }}
+        >
+          {t('kiosco.pin')}
         </label>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             const valor = pin.trim();
             if (!valor) return;
-            // Un escáner USB "teclea" el contenido del carnet QR (el ID de la
-            // persona, un UUID) y termina con Enter — entra como método `qr`.
             void checkin({ type: UUID_RE.test(valor) ? 'qr' : 'pin', value: valor });
             setPin('');
           }}
@@ -162,64 +191,79 @@ export default function Kiosco() {
           <input
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-            placeholder="PIN o carnet"
+            inputMode="numeric"
             className="mono"
-            autoFocus
             style={{ fontSize: '1.4rem', textAlign: 'center', letterSpacing: '0.15em' }}
           />
-          <button className="btn btn-gold" type="submit">Marcar</button>
-        </form>
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => setEscaneando(true)}
-          >
-            📷 Escanear carnet con la cámara
+          <button className="btn btn-gold" type="submit">
+            {t('asistencia.marcar')}
           </button>
-        </div>
-        <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.5rem' }}>
-          Con lector de huella el marcado es automático. Sin lector: cámara, PIN,
-          carnet QR (el alumno lo tiene en su panel) o toca tu nombre abajo.
+        </form>
+
+        <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.6rem' }}>
+          {t('kiosco.ayuda')}
         </p>
       </div>
 
       {resultado && (
-        <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem', borderColor: color }}>
+        <div
+          className="card"
+          style={{ padding: '1.25rem', marginBottom: '1.25rem', borderColor: color }}
+        >
           {resultado.ok || resultado.bloqueado ? (
             <>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{nombreDe(resultado.userId)}</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>
+                {nombreDe(resultado.userId)}
+              </div>
               <div className="display" style={{ fontSize: '1.8rem', color }}>
-                {resultado.bloqueado ? 'Acceso bloqueado' : resultado.accionSugerida === 'avisar' ? '¡Atención!' : '¡Adelante!'}
+                {resultado.bloqueado ? t('kiosco.bloqueado') : t('kiosco.registrado')}
               </div>
               <div className="muted" style={{ marginTop: '0.3rem' }}>
                 {resultado.estado === 'vencido'
-                  ? resultado.message ?? 'Mensualidad vencida.'
+                  ? (resultado.message ?? '')
                   : resultado.diasFaltantes != null
-                    ? `Te faltan ${resultado.diasFaltantes} días.`
+                    ? `${t('mi.diasFaltantes')}: ${resultado.diasFaltantes}`
                     : resultado.clasesRestantes != null
-                      ? `Te quedan ${resultado.clasesRestantes} clases.`
+                      ? `${t('mi.clasesRestantes')}: ${resultado.clasesRestantes}`
                       : ''}
               </div>
             </>
           ) : (
-            <div className="msg-error" style={{ fontWeight: 600 }}>{resultado.error ?? 'No se pudo registrar.'}</div>
+            <div className="msg-error" style={{ fontWeight: 600 }}>
+              {resultado.error ?? t('comun.ninguno')}
+            </div>
           )}
         </div>
       )}
 
       {roster.length > 0 && (
         <div className="card" style={{ padding: '0.5rem 1rem' }}>
-          <div className="muted" style={{ fontSize: '0.75rem', padding: '0.5rem 0' }}>O toca tu nombre (marcado manual)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '0.5rem', paddingBottom: '0.75rem' }}>
+          <div className="muted" style={{ fontSize: '0.75rem', padding: '0.5rem 0' }}>
+            {t('kiosco.manual')}
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))',
+              gap: '0.5rem',
+              paddingBottom: '0.75rem',
+            }}
+          >
             {roster.map((a) => (
-              <button key={a.userId} className="btn btn-outline" onClick={() => checkin({ type: 'manual', value: a.userId })}>
+              <button
+                key={a.userId}
+                className="btn btn-outline"
+                onClick={() => checkin({ type: 'manual', value: a.userId })}
+              >
                 {a.fullName}
               </button>
             ))}
           </div>
         </div>
       )}
+
+      {/* El kiosco no lleva NavBar: el tema y el idioma van aquí. */}
+      <ControlesApariencia />
     </main>
   );
 }

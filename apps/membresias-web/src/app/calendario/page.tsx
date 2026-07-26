@@ -3,123 +3,239 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, obtenerToken } from '@/lib/api';
-import { getSesion, esStaff } from '@/lib/session';
+import { api, mensajeError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
+import { fmtFecha } from '@/lib/formato';
 
-const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-interface Exc { id: string; date: string; isClosed: boolean; note: string | null }
+interface Exc {
+  id: string;
+  date: string;
+  isClosed: boolean;
+  note: string | null;
+}
+
+/** Nombres de los días en el idioma activo, sin diccionario propio. */
+function nombresDias(idioma: string): string[] {
+  const fmt = new Intl.DateTimeFormat(idioma === 'en' ? 'en-GB' : 'es-CO', {
+    weekday: 'long',
+  });
+  // 2024-01-07 fue domingo: la semana arranca ahí para que el índice 0..6
+  // coincida con el `weekday` que guarda la API.
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(2024, 0, 7 + i);
+    const nombre = fmt.format(d);
+    return nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  });
+}
 
 export default function Calendario() {
   const router = useRouter();
+  const { t, idioma } = useI18n();
+  const { user, cargando: cargandoSesion, esStaff } = useAuth();
+
   const [dias, setDias] = useState<number[]>([]);
   const [exc, setExc] = useState<Exc[]>([]);
   const [nueva, setNueva] = useState({ date: '', isClosed: true, note: '' });
   const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
 
   const cargar = useCallback(async () => {
     try {
-      const r = await api.get('/schedule');
-      setDias((r.data.dias as { weekday: number }[]).map((d) => d.weekday));
-      setExc(r.data.excepciones);
+      const { data } = await api.get<{
+        dias: { weekday: number }[];
+        excepciones: Exc[];
+      }>('/schedule');
+      setDias(data.dias.map((d) => d.weekday));
+      setExc(data.excepciones);
     } catch (e) {
-      const err = e as { response?: { status?: number } };
-      if (err.response?.status === 401) router.push('/login');
+      setError(mensajeError(e, t('comun.ninguno')));
     }
-  }, [router]);
+  }, [t]);
 
   useEffect(() => {
-    if (!obtenerToken()) {
-      router.push('/login');
+    if (cargandoSesion) return;
+    if (!user) {
+      router.replace('/login');
       return;
     }
-    if (!esStaff(getSesion())) {
+    if (!esStaff) {
       router.replace('/mi');
       return;
     }
     void cargar();
-  }, [router, cargar]);
+  }, [cargandoSesion, user, esStaff, router, cargar]);
 
-  function toggleDia(w: number) {
+  function alternarDia(w: number) {
     setDias((d) => (d.includes(w) ? d.filter((x) => x !== w) : [...d, w]));
   }
 
   async function guardarDias() {
     setMsg('');
-    await api.put('/schedule', { dias: dias.map((w) => ({ weekday: w })) });
-    setMsg('Días de operación guardados.');
-    await cargar();
+    setError('');
+    try {
+      await api.put('/schedule', { dias: dias.map((w) => ({ weekday: w })) });
+      setMsg(t('alumnos.actualizado'));
+      await cargar();
+    } catch (e) {
+      setError(mensajeError(e, t('comun.guardar')));
+    }
   }
 
   async function agregarExc(e: FormEvent) {
     e.preventDefault();
     if (!nueva.date) return;
-    await api.post('/schedule/exceptions', nueva);
-    setNueva({ date: '', isClosed: true, note: '' });
-    await cargar();
+    setError('');
+    try {
+      await api.post('/schedule/exceptions', nueva);
+      setNueva({ date: '', isClosed: true, note: '' });
+      await cargar();
+    } catch (err) {
+      setError(mensajeError(err, t('calendario.agregarExcepcion')));
+    }
   }
 
   async function borrarExc(id: string) {
-    await api.delete(`/schedule/exceptions/${id}`);
-    await cargar();
+    setError('');
+    try {
+      await api.delete(`/schedule/exceptions/${id}`);
+      await cargar();
+    } catch (e) {
+      setError(mensajeError(e, t('comun.eliminar')));
+    }
   }
+
+  const DIAS = nombresDias(idioma);
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: '1.5rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-        <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Días de <span style={{ color: 'var(--gold)' }}>operación</span></h1>
-        <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.25rem',
+          gap: '0.5rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1 className="display" style={{ fontSize: '1.5rem' }}>
+          {t('calendario.titulo')}
+        </h1>
+        <Link href="/" className="btn btn-outline btn-sm">
+          {t('menu.panel')}
+        </Link>
       </header>
 
-      <div className="card" style={{ padding: '1rem', marginBottom: '1.25rem' }}>
-        <p className="muted" style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-          Marca los días en que el club tiene clase. Los días desmarcados no cuentan como clase.
+      {error && (
+        <p className="msg-error" style={{ marginBottom: '1rem' }}>
+          {error}
         </p>
+      )}
+
+      <div className="card" style={{ padding: '1rem', marginBottom: '1.25rem' }}>
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+          {t('calendario.diasSemana')}
+        </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.9rem' }}>
           {DIAS.map((nombre, w) => (
             <button
               key={w}
               type="button"
               className={dias.includes(w) ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
-              onClick={() => toggleDia(w)}
+              aria-pressed={dias.includes(w)}
+              onClick={() => alternarDia(w)}
             >
               {nombre}
             </button>
           ))}
         </div>
-        <button className="btn btn-gold" onClick={guardarDias}>Guardar días</button>
-        {msg && <span className="msg-ok" style={{ marginLeft: '0.75rem', fontSize: '0.85rem' }}>{msg}</span>}
+        <button className="btn btn-gold" onClick={guardarDias}>
+          {t('comun.guardar')}
+        </button>
+        {msg && (
+          <span className="msg-ok" style={{ marginLeft: '0.75rem', fontSize: '0.85rem' }}>
+            {msg}
+          </span>
+        )}
       </div>
 
       <div className="card" style={{ padding: '1rem' }}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>Excepciones (festivos / aperturas extra)</h2>
-        <form onSubmit={agregarExc} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'end', marginBottom: '0.9rem' }}>
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+          {t('calendario.excepciones')}
+        </h2>
+        <form
+          onSubmit={agregarExc}
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            alignItems: 'end',
+            marginBottom: '0.9rem',
+          }}
+        >
           <div>
-            <label className="muted" style={{ fontSize: '0.72rem' }}>Fecha</label>
-            <input type="date" value={nueva.date} onChange={(e) => setNueva((n) => ({ ...n, date: e.target.value }))} />
+            <label className="muted" style={{ fontSize: '0.72rem' }}>
+              {t('comun.fecha')}
+            </label>
+            <input
+              type="date"
+              value={nueva.date}
+              onChange={(e) => setNueva((n) => ({ ...n, date: e.target.value }))}
+            />
           </div>
           <div>
-            <label className="muted" style={{ fontSize: '0.72rem' }}>Tipo</label>
-            <select value={nueva.isClosed ? 'closed' : 'open'} onChange={(e) => setNueva((n) => ({ ...n, isClosed: e.target.value === 'closed' }))}>
-              <option value="closed">Cerrado</option>
-              <option value="open">Apertura extra</option>
+            <label className="muted" style={{ fontSize: '0.72rem' }}>
+              {t('planes.tipo')}
+            </label>
+            <select
+              value={nueva.isClosed ? 'closed' : 'open'}
+              onChange={(e) => setNueva((n) => ({ ...n, isClosed: e.target.value === 'closed' }))}
+            >
+              <option value="closed">{t('calendario.cerrado')}</option>
+              <option value="open">{t('calendario.abierto')}</option>
             </select>
           </div>
           <div style={{ flex: 1, minWidth: 120 }}>
-            <label className="muted" style={{ fontSize: '0.72rem' }}>Nota</label>
-            <input value={nueva.note} onChange={(e) => setNueva((n) => ({ ...n, note: e.target.value }))} />
+            <label className="muted" style={{ fontSize: '0.72rem' }}>
+              {t('calendario.nota')}
+            </label>
+            <input
+              value={nueva.note}
+              onChange={(e) => setNueva((n) => ({ ...n, note: e.target.value }))}
+            />
           </div>
-          <button className="btn btn-outline" type="submit">Agregar</button>
+          <button className="btn btn-outline" type="submit">
+            {t('calendario.agregarExcepcion')}
+          </button>
         </form>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          {exc.length === 0 && <span className="muted" style={{ fontSize: '0.85rem' }}>Sin excepciones.</span>}
+          {exc.length === 0 && (
+            <span className="muted" style={{ fontSize: '0.85rem' }}>
+              {t('calendario.sinExcepciones')}
+            </span>
+          )}
           {exc.map((x) => (
-            <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+            <div
+              key={x.id}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
               <span>
-                <strong>{x.date}</strong>{' '}
-                <span className={x.isClosed ? 'badge badge-danger' : 'badge badge-ok'}>{x.isClosed ? 'Cerrado' : 'Abierto'}</span>
+                <strong className="mono">{fmtFecha(x.date, idioma)}</strong>{' '}
+                <span className={x.isClosed ? 'badge badge-danger' : 'badge badge-ok'}>
+                  {x.isClosed ? t('calendario.cerrado') : t('calendario.abierto')}
+                </span>
                 {x.note ? <span className="muted"> · {x.note}</span> : null}
               </span>
-              <button className="btn btn-outline btn-sm" onClick={() => borrarExc(x.id)}>Quitar</button>
+              <button className="btn btn-outline btn-sm" onClick={() => borrarExc(x.id)}>
+                {t('comun.eliminar')}
+              </button>
             </div>
           ))}
         </div>

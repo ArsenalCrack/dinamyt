@@ -1,16 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import QRCode from 'qrcode';
-import { api, ecosystemApi, obtenerToken } from '@/lib/api';
-import { getSesion, etiquetaRol, type Sesion } from '@/lib/session';
+import { api, mensajeError } from '@/lib/api';
+import { claveRol, useAuth } from '@/lib/auth';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { activarPush } from '@/lib/push';
 import { Avisos } from '@/components/Avisos';
 import { Avatar } from '@/components/Avatar';
-
-const PORTAL_URL =
-  process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
+import { CarnetQR } from '@/components/CarnetQR';
 
 interface Pago {
   id: string;
@@ -32,122 +31,95 @@ interface MiEstado {
   venceEl: string | null;
   diasFaltantes: number | null;
   clasesRestantes: number | null;
-  matriculado?: boolean;
   checkinPin?: string | null;
   plan: { id: string; name: string; type: string; price: string } | null;
   pagos: Pago[];
   asistencias: Asistencia[];
 }
 
-const fmtCOP = (v: string) =>
-  parseFloat(v).toLocaleString('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  });
-const fecha = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
-
-function estadoBadge(e: string) {
-  if (e === 'vencido') return 'badge badge-danger';
-  if (e === 'por_vencer') return 'badge badge-gold';
-  if (e === 'al_dia') return 'badge badge-ok';
-  return 'badge';
-}
-const ESTADO_LABEL: Record<string, string> = {
-  al_dia: 'Al día',
-  por_vencer: 'Por vencer',
-  vencido: 'Vencido',
-  sin_plan: 'Sin plan activo',
-};
-const METODO_LABEL: Record<string, string> = {
-  fingerprint: 'huella',
-  qr: 'QR',
-  pin: 'PIN',
-  manual: 'manual',
-  efectivo: 'Efectivo',
-  transferencia: 'Transferencia',
-  nequi: 'Nequi',
-  daviplata: 'Daviplata',
-};
-
 /**
- * Panel personal del alumno/acudiente: SU membresía, SUS pagos y asistencias.
- * (El staff del club usa el panel de gestión en `/`; aquí no hay datos de
- * otros miembros.)
+ * Panel personal: MI membresía, MIS pagos y asistencias, MI carnet QR. Aquí no
+ * aparece jamás un dato de otro miembro del club.
  */
 export default function MiPanel() {
   const router = useRouter();
-  const [sesion, setSesion] = useState<Sesion | null>(null);
+  const { t, idioma } = useI18n();
+  const { user, club, cargando: cargandoSesion, refrescar } = useAuth();
+
   const [mi, setMi] = useState<MiEstado | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
-  const qrRef = useRef<HTMLCanvasElement | null>(null);
+  const [pass, setPass] = useState({ actual: '', nueva: '' });
+  const [perfil, setPerfil] = useState({ fullName: '', phone: '' });
 
   const cargar = useCallback(async () => {
     try {
-      const r = await api.get('/mi');
-      setMi(r.data as MiEstado);
+      const { data } = await api.get<MiEstado>('/mi');
+      setMi(data);
     } catch (e) {
-      const err = e as { response?: { status?: number; data?: { error?: string } } };
-      if (err.response?.status === 401) {
-        router.push('/login');
-        return;
-      }
-      setError(err.response?.data?.error ?? 'No se pudo cargar tu estado.');
+      setError(mensajeError(e, t('mi.sinPlan')));
     }
-  }, [router]);
-
-  const [foto, setFoto] = useState<string | null>(null);
+  }, [t]);
 
   useEffect(() => {
-    if (!obtenerToken()) {
-      router.push('/login');
+    if (cargandoSesion) return;
+    if (!user) {
+      router.replace('/login');
       return;
     }
-    const s = getSesion();
-    setSesion(s);
+    setPerfil({ fullName: user.fullName, phone: user.phone ?? '' });
     void cargar();
-    // Foto de perfil desde el ecosystem (best-effort).
-    if (s?.sub) {
-      ecosystemApi
-        .get(`/users/${s.sub}/profile`)
-        .then((r) => setFoto((r.data as { avatarUrl: string | null }).avatarUrl))
-        .catch(() => setFoto(null));
-    }
-  }, [router, cargar]);
-
-  // Carnet QR: contiene el ID de la persona en el ecosistema. Un escáner USB
-  // en el kiosco lo "teclea" en el campo de check-in y entra como método `qr`.
-  useEffect(() => {
-    if (!sesion?.sub || !qrRef.current) return;
-    void QRCode.toCanvas(qrRef.current, sesion.sub, {
-      width: 148,
-      margin: 1,
-      color: { dark: '#0e0e15', light: '#f3f1e8' },
-    });
-  }, [sesion?.sub, mi]);
+  }, [cargandoSesion, user, router, cargar]);
 
   async function activarNotis() {
+    setAviso('');
+    setError('');
     const r = await activarPush();
-    setAviso(
-      r.ok
-        ? 'Notificaciones activadas: te avisaremos antes del vencimiento.'
-        : `No se activaron: ${r.motivo}`,
-    );
+    if (r.ok) setAviso(t('mi.pushActivo'));
+    else setError(r.motivo ?? t('mi.activarPush'));
   }
 
-  if (!mi) {
+  async function guardarPerfil(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setAviso('');
+    try {
+      await api.patch('/auth/me', {
+        fullName: perfil.fullName,
+        phone: perfil.phone || null,
+      });
+      await refrescar();
+      setAviso(t('alumnos.actualizado'));
+    } catch (err) {
+      setError(mensajeError(err, t('mi.miPerfil')));
+    }
+  }
+
+  async function cambiarPassword(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setAviso('');
+    try {
+      await api.post('/auth/change-password', pass);
+      setPass({ actual: '', nueva: '' });
+      setAviso(t('mi.contrasenaOk'));
+    } catch (err) {
+      setError(mensajeError(err, t('mi.cambiarContrasena')));
+    }
+  }
+
+  if (cargandoSesion || !mi) {
     return (
       <main style={{ padding: '2rem' }} className="muted">
-        {error || 'Cargando tu estado…'}
+        {error || t('comun.cargando')}
       </main>
     );
   }
 
   return (
-    <main style={{ maxWidth: 760, margin: '0 auto', padding: '1.5rem' }}>
+    <main style={{ maxWidth: 780, margin: '0 auto', padding: '1.5rem' }}>
       <header
+        className="no-imprimir"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -158,25 +130,34 @@ export default function MiPanel() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <Avatar src={foto} nombre={sesion?.fullName ?? '?'} size={52} />
+          <Avatar src={user?.avatarUrl} nombre={user?.fullName ?? '?'} size={52} />
           <div>
             <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>
-              {etiquetaRol(sesion)} · Membresías
+              {t(claveRol(user))}
+              {club ? ` · ${club.name}` : ''}
             </p>
             <h1 className="display" style={{ fontSize: '1.5rem' }}>
-              Hola, {sesion?.fullName?.split(' ')[0] ?? 'deportista'}
+              {user?.fullName?.split(' ')[0] ?? ''}
             </h1>
           </div>
         </div>
         <Avisos />
       </header>
 
-      {aviso && <p className="msg-ok" style={{ marginBottom: '1rem' }}>{aviso}</p>}
-      {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {aviso && (
+        <p className="msg-ok no-imprimir" style={{ marginBottom: '1rem' }}>
+          {aviso}
+        </p>
+      )}
+      {error && (
+        <p className="msg-error no-imprimir" style={{ marginBottom: '1rem' }}>
+          {error}
+        </p>
+      )}
 
       {/* ── Mi membresía ── */}
       <div
-        className="card"
+        className="card no-imprimir"
         style={{
           padding: '1.25rem',
           marginBottom: '1rem',
@@ -199,13 +180,13 @@ export default function MiPanel() {
         >
           <div>
             <p className="muted" style={{ fontSize: '0.78rem' }}>
-              {mi.plan ? mi.plan.name : 'Aún no tienes un plan asignado'}
+              {mi.plan ? mi.plan.name : t('mi.sinPlan')}
             </p>
             <p className="display" style={{ fontSize: '1.6rem' }}>
-              {ESTADO_LABEL[mi.estado] ?? mi.estado}
+              {t(claveEstado(mi.estado))}
             </p>
           </div>
-          <span className={estadoBadge(mi.estado)}>{ESTADO_LABEL[mi.estado]}</span>
+          <span className={claseEstado(mi.estado)}>{t(claveEstado(mi.estado))}</span>
         </div>
 
         <div
@@ -218,12 +199,15 @@ export default function MiPanel() {
         >
           {mi.venceEl && (
             <div>
-              <div className="muted" style={{ fontSize: '0.72rem' }}>Vence el</div>
+              <div className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('mi.vence')}
+              </div>
               <div className="mono" style={{ fontSize: '1.1rem', fontWeight: 600 }}>
-                {mi.venceEl}
+                {fmtFecha(mi.venceEl, idioma)}
                 {mi.diasFaltantes != null && mi.diasFaltantes >= 0 && (
                   <span className="muted" style={{ fontSize: '0.8rem' }}>
-                    {' '}({mi.diasFaltantes} días)
+                    {' '}
+                    ({mi.diasFaltantes} d)
                   </span>
                 )}
               </div>
@@ -231,93 +215,148 @@ export default function MiPanel() {
           )}
           {mi.clasesRestantes != null && (
             <div>
-              <div className="muted" style={{ fontSize: '0.72rem' }}>Clases restantes</div>
+              <div className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('mi.clasesRestantes')}
+              </div>
               <div className="mono" style={{ fontSize: '1.1rem', fontWeight: 600 }}>
                 {mi.clasesRestantes}
               </div>
             </div>
           )}
-          {mi.checkinPin && (
-            <div>
-              <div className="muted" style={{ fontSize: '0.72rem' }}>Mi PIN del kiosco</div>
-              <div className="mono" style={{ fontSize: '1.1rem', fontWeight: 600, letterSpacing: '0.2em' }}>
-                {mi.checkinPin}
-              </div>
-            </div>
-          )}
         </div>
 
-        {mi.estado === 'vencido' && (
-          <p style={{ marginTop: '0.9rem', fontSize: '0.85rem', color: 'var(--danger)' }}>
-            Tu mensualidad está vencida: acércate al maestro para registrar el pago
-            (efectivo, transferencia, Nequi o Daviplata).
-          </p>
-        )}
-
-        {/* Carnet QR: se escanea en el kiosco del club para marcar asistencia */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '1rem',
-            alignItems: 'center',
-            marginTop: '1rem',
-            flexWrap: 'wrap',
-          }}
+        <button
+          className="btn btn-outline btn-sm"
+          onClick={activarNotis}
+          style={{ marginTop: '1rem' }}
         >
-          <canvas
-            ref={qrRef}
-            style={{ borderRadius: 8, border: '1px solid var(--border)' }}
-            aria-label="Carnet QR para el check-in del kiosco"
-          />
-          <div style={{ minWidth: 180, flex: 1 }}>
-            <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Mi carnet QR</p>
-            <p className="muted" style={{ fontSize: '0.8rem' }}>
-              Muéstralo en el kiosco del club: el escáner registra tu asistencia
-              al instante (también puedes usar tu PIN).
-            </p>
-          </div>
-        </div>
+          🔔 {t('mi.activarPush')}
+        </button>
+      </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-outline btn-sm" onClick={activarNotis}>
-            🔔 Avisarme antes del vencimiento
+      {/* ── Mi carnet QR: se imprime y se lleva a clase ── */}
+      <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+        <h2
+          className="no-imprimir"
+          style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}
+        >
+          {t('mi.miCarnet')}
+        </h2>
+        <p className="muted no-imprimir" style={{ fontSize: '0.78rem', marginBottom: '0.9rem' }}>
+          {t('qr.descripcionMia')}
+        </p>
+        {user && (
+          <CarnetQR
+            valor={user.id}
+            nombre={user.fullName}
+            club={club?.name}
+            pin={mi.checkinPin}
+          />
+        )}
+      </div>
+
+      {/* ── Mi perfil y mi contraseña ── */}
+      <div
+        className="no-imprimir"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
+          gap: '1rem',
+          marginBottom: '1rem',
+        }}
+      >
+        <form onSubmit={guardarPerfil} className="card" style={{ padding: '1rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
+            {t('mi.miPerfil')}
+          </h2>
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('comun.nombre')}
+          </label>
+          <input
+            value={perfil.fullName}
+            onChange={(e) => setPerfil({ ...perfil, fullName: e.target.value })}
+            required
+            style={{ margin: '0.25rem 0 0.7rem' }}
+          />
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('comun.telefono')}
+          </label>
+          <input
+            value={perfil.phone}
+            onChange={(e) => setPerfil({ ...perfil, phone: e.target.value })}
+            style={{ margin: '0.25rem 0 0.9rem' }}
+          />
+          <button type="submit" className="btn btn-outline btn-sm">
+            {t('comun.guardar')}
           </button>
-          <a
-            href={`${PORTAL_URL}/perfil`}
-            className="btn btn-outline btn-sm"
-            title="Tu perfil vive en el ecosistema DINAMYT"
-          >
-            Editar mi perfil
-          </a>
-        </div>
+        </form>
+
+        <form onSubmit={cambiarPassword} className="card" style={{ padding: '1rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
+            {t('mi.cambiarContrasena')}
+          </h2>
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('mi.contrasenaActual')}
+          </label>
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={pass.actual}
+            onChange={(e) => setPass({ ...pass, actual: e.target.value })}
+            required
+            style={{ margin: '0.25rem 0 0.7rem' }}
+          />
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('mi.contrasenaNueva')}
+          </label>
+          <input
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+            value={pass.nueva}
+            onChange={(e) => setPass({ ...pass, nueva: e.target.value })}
+            required
+            style={{ margin: '0.25rem 0 0.9rem' }}
+          />
+          <button type="submit" className="btn btn-outline btn-sm">
+            {t('comun.guardar')}
+          </button>
+        </form>
       </div>
 
       {/* ── Mis pagos ── */}
-      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem', marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>Mis pagos</h2>
+      <div
+        className="card tabla-scroll no-imprimir"
+        style={{ padding: '0.5rem 1rem', marginBottom: '1rem' }}
+      >
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
+          {t('mi.pagos')}
+        </h2>
         <table>
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Plan</th>
-              <th>Método</th>
-              <th>Monto</th>
+              <th>{t('comun.fecha')}</th>
+              <th>{t('pago.plan')}</th>
+              <th>{t('pago.metodo')}</th>
+              <th>{t('pago.monto')}</th>
             </tr>
           </thead>
           <tbody>
             {mi.pagos.length === 0 && (
               <tr>
                 <td colSpan={4} className="muted" style={{ padding: '0.9rem' }}>
-                  Todavía no hay pagos registrados.
+                  {t('comun.ninguno')}
                 </td>
               </tr>
             )}
             {mi.pagos.map((p) => (
               <tr key={p.id}>
-                <td className="mono">{fecha(p.paidAt)}</td>
+                <td className="mono">{fmtFecha(p.paidAt?.slice(0, 10), idioma)}</td>
                 <td>{p.planName}</td>
-                <td>{METODO_LABEL[p.method] ?? p.method}</td>
-                <td className="mono">{fmtCOP(p.amount)}</td>
+                <td className="muted">
+                  {t(`pago.metodo.${p.method}` as ClaveTexto)}
+                </td>
+                <td className="mono">{fmtMoneda(p.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -325,29 +364,31 @@ export default function MiPanel() {
       </div>
 
       {/* ── Mis asistencias ── */}
-      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
+      <div className="card tabla-scroll no-imprimir" style={{ padding: '0.5rem 1rem' }}>
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
-          Mis últimas asistencias
+          {t('mi.asistencias')}
         </h2>
         <table>
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Método</th>
+              <th>{t('comun.fecha')}</th>
+              <th>{t('pago.metodo')}</th>
             </tr>
           </thead>
           <tbody>
             {mi.asistencias.length === 0 && (
               <tr>
                 <td colSpan={2} className="muted" style={{ padding: '0.9rem' }}>
-                  Aún no registras asistencias. Marca tu llegada en el kiosco del club.
+                  {t('comun.ninguno')}
                 </td>
               </tr>
             )}
             {mi.asistencias.map((a) => (
               <tr key={a.id}>
-                <td className="mono">{a.checkinDate}</td>
-                <td>{METODO_LABEL[a.method] ?? a.method}</td>
+                <td className="mono">{fmtFecha(a.checkinDate, idioma)}</td>
+                <td className="muted">
+                  {t(`asistencia.metodo.${a.method}` as ClaveTexto)}
+                </td>
               </tr>
             ))}
           </tbody>

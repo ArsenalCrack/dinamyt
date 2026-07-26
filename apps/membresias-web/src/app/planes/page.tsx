@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, obtenerToken } from '@/lib/api';
-import { getSesion, esStaff } from '@/lib/session';
+import { api, mensajeError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { fmtMoneda } from '@/lib/formato';
 
 interface Plan {
   id: string;
@@ -15,37 +17,39 @@ interface Plan {
   nClasses: number | null;
   isActive: boolean;
 }
-const TIPOS = ['mensual', 'semanal', 'clase', 'paquete', 'matricula'];
-const fmtCOP = (n: number) =>
-  n.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+const TIPOS = ['mensual', 'semanal', 'clase', 'paquete', 'matricula'] as const;
 
 export default function Planes() {
   const router = useRouter();
+  const { t } = useI18n();
+  const { user, cargando: cargandoSesion, esStaff } = useAuth();
+
   const [plans, setPlans] = useState<Plan[]>([]);
   const [form, setForm] = useState({ name: '', type: 'mensual', price: '', nClasses: '' });
   const [error, setError] = useState('');
 
   const cargar = useCallback(async () => {
     try {
-      const r = await api.get('/plans');
-      setPlans(r.data);
+      const { data } = await api.get<Plan[]>('/plans');
+      setPlans(data);
     } catch (e) {
-      const err = e as { response?: { status?: number } };
-      if (err.response?.status === 401) router.push('/login');
+      setError(mensajeError(e, t('comun.ninguno')));
     }
-  }, [router]);
+  }, [t]);
 
   useEffect(() => {
-    if (!obtenerToken()) {
-      router.push('/login');
+    if (cargandoSesion) return;
+    if (!user) {
+      router.replace('/login');
       return;
     }
-    if (!esStaff(getSesion())) {
+    if (!esStaff) {
       router.replace('/mi');
       return;
     }
     void cargar();
-  }, [router, cargar]);
+  }, [cargandoSesion, user, esStaff, router, cargar]);
 
   async function crear(e: FormEvent) {
     e.preventDefault();
@@ -59,65 +63,146 @@ export default function Planes() {
       });
       setForm({ name: '', type: 'mensual', price: '', nClasses: '' });
       await cargar();
-    } catch (e) {
-      const err = e as { response?: { data?: { error?: string } } };
-      setError(err.response?.data?.error ?? 'No se pudo crear el plan.');
+    } catch (err) {
+      setError(mensajeError(err, t('planes.nuevo')));
     }
   }
 
   async function desactivar(id: string) {
-    await api.delete(`/plans/${id}`);
-    await cargar();
+    setError('');
+    try {
+      await api.delete(`/plans/${id}`);
+      await cargar();
+    } catch (err) {
+      setError(mensajeError(err, t('comun.eliminar')));
+    }
   }
 
   const esPorClases = form.type === 'clase' || form.type === 'paquete';
+  const activos = plans.filter((p) => p.isActive);
 
   return (
     <main style={{ maxWidth: 800, margin: '0 auto', padding: '1.5rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-        <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Planes y <span style={{ color: 'var(--gold)' }}>tarifas</span></h1>
-        <Link href="/" className="btn btn-outline btn-sm">Panel</Link>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.25rem',
+          gap: '0.5rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1 className="display" style={{ fontSize: '1.5rem' }}>
+          {t('planes.titulo')}
+        </h1>
+        <Link href="/" className="btn btn-outline btn-sm">
+          {t('menu.panel')}
+        </Link>
       </header>
 
-      <form onSubmit={crear} className="card" style={{ padding: '1rem', marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '0.6rem', alignItems: 'end' }}>
+      <form
+        onSubmit={crear}
+        className="card"
+        style={{
+          padding: '1rem',
+          marginBottom: '1.25rem',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))',
+          gap: '0.6rem',
+          alignItems: 'end',
+        }}
+      >
         <div>
-          <label className="muted" style={{ fontSize: '0.75rem' }}>Nombre</label>
-          <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('planes.nombre')}
+          </label>
+          <input
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            required
+          />
         </div>
         <div>
-          <label className="muted" style={{ fontSize: '0.75rem' }}>Tipo</label>
-          <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
-            {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('planes.tipo')}
+          </label>
+          <select
+            value={form.type}
+            onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+          >
+            {TIPOS.map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {t(`planes.tipo.${tipo}` as ClaveTexto)}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <label className="muted" style={{ fontSize: '0.75rem' }}>Precio (COP)</label>
-          <input inputMode="numeric" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} required />
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('planes.precio')}
+          </label>
+          <input
+            inputMode="numeric"
+            value={form.price}
+            onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+            required
+          />
         </div>
         {esPorClases && (
           <div>
-            <label className="muted" style={{ fontSize: '0.75rem' }}>N° clases</label>
-            <input inputMode="numeric" value={form.nClasses} onChange={(e) => setForm((f) => ({ ...f, nClasses: e.target.value }))} />
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('planes.clases')}
+            </label>
+            <input
+              inputMode="numeric"
+              value={form.nClasses}
+              onChange={(e) => setForm((f) => ({ ...f, nClasses: e.target.value }))}
+            />
           </div>
         )}
-        <button className="btn btn-gold" type="submit">Crear plan</button>
+        <button className="btn btn-gold" type="submit">
+          {t('comun.crear')}
+        </button>
       </form>
 
-      {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && (
+        <p className="msg-error" style={{ marginBottom: '1rem' }}>
+          {error}
+        </p>
+      )}
 
       <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <table>
-          <thead><tr><th>Plan</th><th>Tipo</th><th>Precio</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>{t('planes.nombre')}</th>
+              <th>{t('planes.tipo')}</th>
+              <th>{t('planes.precio')}</th>
+              <th>{t('comun.acciones')}</th>
+            </tr>
+          </thead>
           <tbody>
-            {plans.filter((p) => p.isActive).length === 0 && (
-              <tr><td colSpan={4} className="muted" style={{ padding: '1rem' }}>Aún no hay planes.</td></tr>
+            {activos.length === 0 && (
+              <tr>
+                <td colSpan={4} className="muted" style={{ padding: '1rem' }}>
+                  {t('planes.sinPlanes')}
+                </td>
+              </tr>
             )}
-            {plans.filter((p) => p.isActive).map((p) => (
+            {activos.map((p) => (
               <tr key={p.id}>
                 <td style={{ fontWeight: 600 }}>{p.name}</td>
-                <td className="muted">{p.type}{p.nClasses ? ` · ${p.nClasses} clases` : ''}</td>
-                <td>{fmtCOP(parseFloat(p.price))}</td>
-                <td><button className="btn btn-outline btn-sm" onClick={() => desactivar(p.id)}>Desactivar</button></td>
+                <td className="muted">
+                  {t(`planes.tipo.${p.type}` as ClaveTexto)}
+                  {p.nClasses ? ` · ${p.nClasses}` : ''}
+                </td>
+                <td className="mono">{fmtMoneda(p.price)}</td>
+                <td>
+                  <button className="btn btn-outline btn-sm" onClick={() => desactivar(p.id)}>
+                    {t('comun.eliminar')}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

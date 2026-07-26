@@ -1,0 +1,66 @@
+# Despliegue de la API de DINAMYT Membresías en Render.
+#
+# En el panel de Render: New → Blueprint → apuntar a este repositorio.
+#
+# Sobre pnpm: NO se usa `corepack enable` ni `npm i -g pnpm`. El sistema de
+# archivos de Render es de solo lectura en esas rutas y ambos fallan con EROFS.
+# `npx --yes pnpm@<versión>` lo descarga en la carpeta del build y funciona.
+#
+# Las migraciones NO van aquí: la API las aplica sola al arrancar
+# (ver apps/membresias-api/src/main.ts), así el esquema nunca queda desfasado.
+
+services:
+  - type: web
+    name: dinamyt-membresias-api
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: >-
+      npx --yes pnpm@11.5.0 install --frozen-lockfile &&
+      npx --yes pnpm@11.5.0 --filter @dinamyt/membresias-db build &&
+      npx --yes pnpm@11.5.0 --filter @dinamyt/membresias-api build
+    startCommand: node apps/membresias-api/dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PORT
+        value: "3004"
+
+      # Base de datos (Supabase u otro Postgres). Se pega en el panel.
+      - key: MEMBRESIAS_DATABASE_URL
+        sync: false
+
+      # Identidad. Render genera el secreto solo: nadie tiene que verlo.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: "86400"
+      - key: BCRYPT_ROUNDS
+        value: "10"
+
+      # Cuenta inicial del superadmin. Se siembra UNA vez, en el primer
+      # arranque; cambiarla aquí después no reescribe la contraseña real.
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: SUPERADMIN_NOMBRE
+        value: Super administrador
+
+      # Dominio de la web en Vercel. Sin esto el navegador bloquea las
+      # peticiones por CORS y la app se ve vacía sin dar ningún error claro.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: MEMBRESIAS_WEB_URL
+        sync: false
+
+      # Avisos push (opcional). Generar con:
+      #   pnpm --filter @dinamyt/membresias-api gen:vapid
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false

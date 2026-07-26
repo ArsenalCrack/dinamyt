@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, obtenerToken } from '@/lib/api';
-import { agentStatus } from '@/lib/agent';
-import { getSesion, esStaff } from '@/lib/session';
+import { api, mensajeError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
+import { fmtFecha } from '@/lib/formato';
 import { Avatar } from '@/components/Avatar';
 
 interface RosterItem {
@@ -24,66 +25,64 @@ interface Asistencia {
   method: string;
 }
 
-const METODO: Record<string, string> = {
-  fingerprint: '🖐 huella',
-  qr: 'QR',
-  pin: 'PIN',
-  manual: '✍ manual',
+const hoyISO = () => {
+  // Fecha LOCAL, no toISOString(): en husos negativos como el de Colombia, la
+  // fecha UTC ya es la de mañana después de las 7 de la noche, y la lista de
+  // la clase saldría vacía justo en el horario de entrenamiento.
+  const d = new Date();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
 };
 
-const hoyISO = () => new Date().toISOString().slice(0, 10);
-
 /**
- * ASISTENCIA DE LA CLASE — el maestro pasa lista: marca manualmente a cada
- * alumno presente, o deja que ellos marquen con huella / carnet QR / PIN en el
- * kiosco (esta lista se actualiza con lo que entre por cualquier método).
+ * Pasar lista. El maestro marca a cada alumno presente, o deja que entren con
+ * su carnet QR o su PIN en el kiosco: la lista recoge todo, venga por donde
+ * venga, y se refresca sola cada 10 segundos.
  */
 export default function AsistenciaPage() {
   const router = useRouter();
+  const { t, idioma } = useI18n();
+  const { user, cargando: cargandoSesion, esStaff } = useAuth();
+
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [asistencias, setAsistencias] = useState<Asistencia[]>([]);
-  const [lector, setLector] = useState<{ readerConnected: boolean; vendor: string } | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error' | 'aviso'; texto: string } | null>(null);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error' | 'aviso'; texto: string } | null>(
+    null,
+  );
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
 
   const cargar = useCallback(async () => {
     try {
       const [r, a] = await Promise.all([
-        api.get('/memberships'),
-        api.get('/attendances', { params: { date: hoyISO() } }),
+        api.get<RosterItem[]>('/memberships'),
+        api.get<Asistencia[]>('/attendances', { params: { date: hoyISO() } }),
       ]);
-      setRoster(r.data as RosterItem[]);
-      setAsistencias(a.data as Asistencia[]);
+      setRoster(r.data);
+      setAsistencias(a.data);
     } catch (e) {
-      const err = e as { response?: { status?: number; data?: { error?: string } } };
-      if (err.response?.status === 401) {
-        router.push('/login');
-        return;
-      }
-      setMsg({ tipo: 'error', texto: err.response?.data?.error ?? 'No se pudo cargar la lista.' });
+      setMsg({ tipo: 'error', texto: mensajeError(e, t('comun.ninguno')) });
     } finally {
       setCargando(false);
     }
-  }, [router]);
+  }, [t]);
 
   useEffect(() => {
-    if (!obtenerToken()) {
-      router.push('/login');
+    if (cargandoSesion) return;
+    if (!user) {
+      router.replace('/login');
       return;
     }
-    if (!esStaff(getSesion())) {
+    if (!esStaff) {
       router.replace('/mi');
       return;
     }
     void cargar();
-    // Estado del lector de huella (best-effort: sin agente se opera manual).
-    agentStatus().then(setLector);
-    // La lista se refresca sola: los check-ins del kiosco aparecen aquí.
-    const t = setInterval(() => void cargar(), 10000);
-    return () => clearInterval(t);
-  }, [router, cargar]);
+    const id = setInterval(() => void cargar(), 10000);
+    return () => clearInterval(id);
+  }, [cargandoSesion, user, esStaff, router, cargar]);
 
   const presentes = new Map(asistencias.map((a) => [a.userId, a]));
 
@@ -91,28 +90,17 @@ export default function AsistenciaPage() {
     setMsg(null);
     setOcupado(alumno.userId);
     try {
-      const r = await api.post('/checkin', {
+      const r = await api.post<{ accionSugerida?: string }>('/checkin', {
         identifier: { type: 'manual', value: alumno.userId },
       });
-      const d = r.data as { accionSugerida?: string; clasesRestantes?: number | null };
-      if (d.accionSugerida === 'avisar') {
-        setMsg({
-          tipo: 'aviso',
-          texto: `${alumno.fullName} quedó presente, pero su plan está por vencer o sin clases: recuérdale renovar.`,
-        });
-      } else {
-        setMsg({ tipo: 'ok', texto: `${alumno.fullName} presente. ✓` });
-      }
+      setMsg(
+        r.data.accionSugerida === 'avisar'
+          ? { tipo: 'aviso', texto: `${alumno.fullName} · ${t('estado.por_vencer')}` }
+          : { tipo: 'ok', texto: `${alumno.fullName} · ${t('asistencia.marcado')} ✓` },
+      );
       await cargar();
     } catch (e) {
-      const err = e as { response?: { status?: number; data?: { error?: string; message?: string } } };
-      setMsg({
-        tipo: 'error',
-        texto:
-          err.response?.data?.message ??
-          err.response?.data?.error ??
-          'No se pudo marcar la asistencia.',
-      });
+      setMsg({ tipo: 'error', texto: mensajeError(e, t('asistencia.marcar')) });
     } finally {
       setOcupado(null);
     }
@@ -122,52 +110,35 @@ export default function AsistenciaPage() {
   const visibles = roster.filter(
     (a) => !q || a.fullName.toLowerCase().includes(q) || a.email.toLowerCase().includes(q),
   );
-  const totalHoy = asistencias.length;
 
-  if (cargando) {
-    return <main style={{ padding: '2rem' }} className="muted">Cargando la clase…</main>;
+  if (cargandoSesion || cargando) {
+    return (
+      <main style={{ padding: '2rem' }} className="muted">
+        {t('comun.cargando')}
+      </main>
+    );
   }
 
   return (
     <main style={{ maxWidth: 760, margin: '0 auto', padding: '1.5rem' }}>
       <header style={{ marginBottom: '1.25rem' }}>
         <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>
-          {new Date().toLocaleDateString('es-CO', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          })}
+          {fmtFecha(hoyISO(), idioma)}
         </p>
         <h1 className="display" style={{ fontSize: '1.5rem' }}>
-          Asistencia <span style={{ color: 'var(--gold)' }}>de la clase</span>
+          {t('asistencia.titulo')}
         </h1>
         <p className="muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
-          Marca manualmente a cada alumno, o deja que ellos entren con huella,
-          carnet QR o PIN en el{' '}
+          {t('asistencia.instruccion')}{' '}
           <Link href="/kiosco" style={{ color: 'var(--gold)' }}>
-            kiosco
+            {t('menu.kiosco')} →
           </Link>
-          ; todo aparece en esta lista.
         </p>
       </header>
 
-      {/* Estado del día: presentes + lector de huella */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.75rem',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          marginBottom: '1rem',
-        }}
-      >
+      <div style={{ marginBottom: '1rem' }}>
         <span className="badge badge-ok" style={{ fontSize: '0.8rem' }}>
-          ✓ {totalHoy} presente{totalHoy === 1 ? '' : 's'} hoy
-        </span>
-        <span className={`badge ${lector?.readerConnected ? 'badge-gold' : ''}`}>
-          {lector?.readerConnected
-            ? `🖐 Lector de huella conectado (${lector.vendor})`
-            : '🖐 Lector de huella no detectado — marca manual o usa PIN/QR'}
+          ✓ {asistencias.length} · {t('asistencia.presentes')}
         </span>
       </div>
 
@@ -186,14 +157,13 @@ export default function AsistenciaPage() {
       <input
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar alumno…"
+        placeholder={t('comun.buscar')}
+        aria-label={t('comun.buscar')}
         style={{ marginBottom: '0.9rem', width: '100%' }}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {visibles.length === 0 && (
-          <p className="muted">No hay alumnos que coincidan.</p>
-        )}
+        {visibles.length === 0 && <p className="muted">{t('comun.ninguno')}</p>}
         {visibles.map((a) => {
           const asistencia = presentes.get(a.userId);
           return (
@@ -218,22 +188,21 @@ export default function AsistenciaPage() {
                 </Link>
                 <div className="muted" style={{ fontSize: '0.72rem' }}>
                   {a.estado === 'vencido'
-                    ? '⚠ Mensualidad vencida'
+                    ? `⚠ ${t('estado.vencido')}`
                     : a.venceEl
-                      ? `Vence ${a.venceEl}`
+                      ? `${t('panel.vence')} ${fmtFecha(a.venceEl, idioma)}`
                       : a.clasesRestantes != null
-                        ? `${a.clasesRestantes} clases restantes`
-                        : 'Sin plan'}
+                        ? `${a.clasesRestantes} · ${t('panel.clases')}`
+                        : t('estado.sin_plan')}
                 </div>
               </div>
               {asistencia ? (
-                <span className="badge badge-ok" title={`Método: ${asistencia.method}`}>
+                <span className="badge badge-ok">
                   ✓{' '}
-                  {new Date(asistencia.checkedInAt).toLocaleTimeString('es-CO', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}{' '}
-                  · {METODO[asistencia.method] ?? asistencia.method}
+                  {new Date(asistencia.checkedInAt).toLocaleTimeString(
+                    idioma === 'en' ? 'en-GB' : 'es-CO',
+                    { hour: '2-digit', minute: '2-digit' },
+                  )}
                 </span>
               ) : (
                 <button
@@ -241,7 +210,7 @@ export default function AsistenciaPage() {
                   disabled={ocupado === a.userId}
                   onClick={() => marcar(a)}
                 >
-                  {ocupado === a.userId ? 'Marcando…' : 'Marcar presente'}
+                  {ocupado === a.userId ? t('comun.guardando') : t('asistencia.marcar')}
                 </button>
               )}
             </div>
