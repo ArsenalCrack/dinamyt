@@ -1,29 +1,17 @@
 {
-  "name": "@dinamyt/membresias-web",
-  "version": "0.0.0",
+  "name": "dinamyt-membresias",
+  "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@11.5.0",
+  "description": "DINAMYT Membresías — control de mensualidades, pagos y asistencia de un club de artes marciales. Producto independiente: identidad, base de datos y despliegue propios.",
   "scripts": {
-    "dev": "next dev -p 3006",
-    "build": "next build",
-    "start": "next start -p 3006",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "axios": "^1.17.0",
-    "next": "16.2.7",
-    "qrcode": "^1.5.4",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/qrcode": "^1.5.6",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.7",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "turbo": "^2.5.0",
+    "typescript": "^5.7.3"
   }
 }

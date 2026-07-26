@@ -19,7 +19,7 @@ interface RosterItem {
 }
 interface Asistencia {
   id: string;
-  ecosystemUserId: string;
+  userId: string;
   checkedInAt: string;
   method: string;
 }
@@ -85,7 +85,7 @@ export default function AsistenciaPage() {
     return () => clearInterval(t);
   }, [router, cargar]);
 
-  const presentes = new Map(asistencias.map((a) => [a.ecosystemUserId, a]));
+  const presentes = new Map(asistencias.map((a) => [a.userId, a]));
 
   async function marcar(alumno: RosterItem) {
     setMsg(null);

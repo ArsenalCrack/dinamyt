@@ -23,7 +23,7 @@ interface RosterItem {
 }
 interface Plan { id: string; name: string; type: string; price: string }
 interface Revenue { recaudado: number; esperadoMensual: number; numPagos: number; month: string }
-interface Overdue { ecosystemUserId: string; venceEl: string; diasVencido: number }
+interface Overdue { userId: string; venceEl: string; diasVencido: number }
 interface Attendance { hoy: number; total: number }
 
 function estadoBadge(e: string) {

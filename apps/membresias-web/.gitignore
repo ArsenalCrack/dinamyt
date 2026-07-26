@@ -18,6 +18,7 @@ pnpm-debug.log*
 # Entorno y secretos — NUNCA versionar
 .env
 .env.*.local
+**/keys/
 *.pem
 
 # OS / editores

@@ -14,7 +14,7 @@ interface RosterItem { userId: string; fullName: string; estado: string }
 interface Resultado {
   ok: boolean;
   bloqueado?: boolean;
-  ecosystemUserId?: string;
+  userId?: string;
   estado?: string;
   diasFaltantes?: number | null;
   clasesRestantes?: number | null;
@@ -188,7 +188,7 @@ export default function Kiosco() {
         <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem', borderColor: color }}>
           {resultado.ok || resultado.bloqueado ? (
             <>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{nombreDe(resultado.ecosystemUserId)}</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{nombreDe(resultado.userId)}</div>
               <div className="display" style={{ fontSize: '1.8rem', color }}>
                 {resultado.bloqueado ? 'Acceso bloqueado' : resultado.accionSugerida === 'avisar' ? '¡Atención!' : '¡Adelante!'}
               </div>
