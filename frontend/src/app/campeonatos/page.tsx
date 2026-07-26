@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  getCampeonatoPublicoAPI,
   listCampeonatosPublicoAPI,
   type CampeonatoPublico,
-  type CampeonatoPublicoDetalle,
 } from "@/lib/api";
 import Logo from "@/components/Logo";
 import PublicControls from "@/components/PublicControls";
@@ -30,15 +28,6 @@ export default function CampeonatosPublicoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const [expandido, setExpandido] = useState<number | null>(null);
-  const [detalle, setDetalle] = useState<CampeonatoPublicoDetalle | null>(null);
-  const [cargandoDetalle, setCargandoDetalle] = useState(false);
-
-  // Filtros de la lista de inscritos
-  const [busqueda, setBusqueda] = useState("");
-  const [clubFiltro, setClubFiltro] = useState("");
-  const [modalidadFiltro, setModalidadFiltro] = useState("");
-
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(async () => {
@@ -53,37 +42,6 @@ export default function CampeonatosPublicoPage() {
     });
     return () => { cancelled = true; };
   }, []);
-
-  async function toggleDetalle(id: number) {
-    if (expandido === id) { setExpandido(null); setDetalle(null); return; }
-    setExpandido(id);
-    setDetalle(null);
-    setBusqueda(""); setClubFiltro(""); setModalidadFiltro("");
-    setCargandoDetalle(true);
-    try {
-      const d = await getCampeonatoPublicoAPI(id);
-      setDetalle(d);
-    } catch { setDetalle(null); }
-    finally { setCargandoDetalle(false); }
-  }
-
-  const modalidadesDetalle = useMemo(() => {
-    if (!detalle) return [];
-    const set = new Set<string>();
-    detalle.competidores.forEach((c) => c.modalidades.forEach((m) => set.add(m)));
-    return [...set].sort();
-  }, [detalle]);
-
-  const inscritosVisibles = useMemo(() => {
-    if (!detalle) return [];
-    const term = busqueda.trim().toLowerCase();
-    return detalle.competidores.filter((c) => {
-      if (clubFiltro && c.club !== clubFiltro) return false;
-      if (modalidadFiltro && !c.modalidades.includes(modalidadFiltro)) return false;
-      if (term && !`${c.nombre} ${c.club}`.toLowerCase().includes(term)) return false;
-      return true;
-    });
-  }, [detalle, busqueda, clubFiltro, modalidadFiltro]);
 
   return (
     <div className="campub-page">
@@ -106,11 +64,18 @@ export default function CampeonatosPublicoPage() {
         <p className="campub-msg">{t("pub.camp.sinCampeonatos")}</p>
       ) : (
         <div className="campub-grid">
+          {/* La tarjeta es solo el resumen: el detalle completo (inscritos,
+              jueces, clubes y tatamis) vive en su propia ficha. */}
           {camps.map((c) => {
             const fecha = fechaRango(c.fecha_inicio, c.fecha_fin);
             const lugar = [c.lugar, c.ciudad, c.pais].filter(Boolean).join(", ");
             return (
-              <div key={c.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                key={c.id}
+                type="button"
+                className="card campub-card"
+                onClick={() => router.push(`/campeonatos/${c.id}`)}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 800, fontSize: "1.1rem", overflowWrap: "anywhere" }}>{c.nombre}</span>
                   <span className="badge badge-gray">{t(`camp.estado.${c.estado}` as ClaveTexto)}</span>
@@ -122,95 +87,8 @@ export default function CampeonatosPublicoPage() {
                   {fecha && <div>📅 {t("pub.camp.fecha")}: {fecha}</div>}
                   {lugar && <div>📍 {lugar}</div>}
                 </div>
-
-                <div style={{
-                  padding: "8px 12px", borderRadius: "var(--radius-sm)",
-                  background: "var(--gold-bg)", border: "1px solid var(--gold-border)",
-                  color: "var(--gold)", fontWeight: 700, fontSize: "0.9rem",
-                }}>
-                  {t("pub.camp.contactaMaestro")}
-                </div>
-
-                <button className="btn btn-sm" onClick={() => toggleDetalle(c.id)}>
-                  {expandido === c.id ? t("pub.camp.ocultarDetalle") : t("pub.camp.verDetalle")}
-                </button>
-
-                {expandido === c.id && (
-                  <div className="animate-fade" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {cargandoDetalle || !detalle ? (
-                      <p className="animate-shimmer" style={{ color: "var(--text-dim)", textAlign: "center", padding: 12 }}>
-                        {t("pub.camp.cargando")}
-                      </p>
-                    ) : (
-                      <>
-                        {/* Filtros */}
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <input className="input" placeholder={t("pub.camp.buscar")}
-                            value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
-                            style={{ flex: "1 1 160px", minWidth: 0 }} />
-                          <select className="input" value={clubFiltro}
-                            onChange={(e) => setClubFiltro(e.target.value)}
-                            style={{ width: "auto", minWidth: 130 }}>
-                            <option value="">{t("pub.camp.todosClubes")}</option>
-                            {detalle.clubes.map((cl) => <option key={cl} value={cl}>{cl}</option>)}
-                          </select>
-                          <select className="input" value={modalidadFiltro}
-                            onChange={(e) => setModalidadFiltro(e.target.value)}
-                            style={{ width: "auto", minWidth: 130 }}>
-                            <option value="">{t("pub.camp.todasModalidades")}</option>
-                            {modalidadesDetalle.map((m) => <option key={m} value={m}>{m}</option>)}
-                          </select>
-                        </div>
-
-                        {/* Inscritos */}
-                        <div style={{ fontWeight: 800, fontSize: "0.82rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
-                          {t("pub.camp.inscritos")} ({inscritosVisibles.length})
-                        </div>
-                        {inscritosVisibles.length === 0 ? (
-                          <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", margin: 0 }}>
-                            {t("pub.camp.sinInscritos")}
-                          </p>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            {inscritosVisibles.map((a, i) => (
-                              <div key={`${a.nombre}-${i}`} style={{
-                                display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap",
-                                padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-                              }}>
-                                <span style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
-                                  {a.nombre}
-                                  {a.club && <span style={{ color: "var(--text-muted)", fontWeight: 500, marginLeft: 8, fontSize: "0.85rem" }}>{a.club}</span>}
-                                </span>
-                                {a.modalidades.length > 0 && (
-                                  <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>{a.modalidades.join(", ")}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Jueces */}
-                        <div style={{ fontWeight: 800, fontSize: "0.82rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginTop: 4 }}>
-                          {t("pub.camp.jueces")} ({detalle.jueces.length})
-                        </div>
-                        {detalle.jueces.length === 0 ? (
-                          <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", margin: 0 }}>
-                            {t("pub.camp.sinJueces")}
-                          </p>
-                        ) : (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {detalle.jueces.map((j, i) => (
-                              <span key={i} className="badge badge-chung">
-                                {j.nombre}{j.tatami_numero != null ? ` · T${j.tatami_numero}` : ""}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+                <span className="campub-abrir">{t("pub.camp.abrir")} →</span>
+              </button>
             );
           })}
         </div>
@@ -238,6 +116,19 @@ export default function CampeonatosPublicoPage() {
           display: grid; gap: 12px;
           grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
           align-items: start;
+        }
+        .campub-card {
+          display: flex; flex-direction: column; gap: 10px;
+          width: 100%; text-align: left; font: inherit; color: inherit;
+          cursor: pointer; transition: var(--transition);
+        }
+        .campub-card:hover, .campub-card:focus-visible {
+          border-color: var(--gold-border); background: var(--bg-elevated);
+          outline: none;
+        }
+        .campub-abrir {
+          margin-top: auto; color: var(--gold); font-weight: 800;
+          font-size: 0.9rem;
         }
       `}</style>
     </div>

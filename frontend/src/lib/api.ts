@@ -276,6 +276,135 @@ export async function deleteCampeonatoAPI(id: number) {
   return res.data;
 }
 
+// Tatamis por campeonato: mínimo y tope (espejo del backend).
+export const MIN_TATAMIS = 1;
+export const MAX_TATAMIS = 10;
+
+export interface AjusteTatamis {
+  message: string;
+  num_tatamis: number;
+  creados: number[];
+  eliminados: number[];
+  jueces_liberados: number;
+}
+
+/**
+ * Cambia cuántos tatamis tiene el campeonato. Solo funciona en PREPARACIÓN, y
+ * el backend responde 409 si al bajar habría que borrar un tatami con llaves
+ * asignadas o combates guardados.
+ */
+export async function ajustarTatamisAPI(campeonatoId: number, numTatamis: number) {
+  const res = await api.put(`/campeonatos/${campeonatoId}/tatamis`, {
+    num_tatamis: numTatamis,
+  });
+  return res.data as AjusteTatamis;
+}
+
+// ── Sincronización entre instancias (local ↔ online) ──
+//
+// Un paquete .json auto-contenido viaja de una instancia a la otra. El
+// importador empareja por identidad estable (uid) y resuelve él mismo el orden
+// de las dependencias, así que no hay forma de importar "en el orden malo".
+// Ver backend/app/api/sincronizacion.py.
+
+export type ModoImportacion = "fusionar" | "reemplazar";
+
+export interface ContadoresSeccion {
+  nuevos: number;
+  actualizados: number;
+  omitidos: number;
+}
+
+export interface InformeImportacion {
+  vista_previa: boolean;
+  formato: string;
+  modo: ModoImportacion;
+  message: string;
+  exportado_at?: string | null;
+  origen?: { admin?: string } | null;
+  resumen: Partial<Record<
+    "usuarios" | "competidores" | "tatamis" | "asignaciones" | "inscripciones" | "llaves",
+    ContadoresSeccion
+  >>;
+  avisos: string[];
+  campeonato?: { id: number; nombre: string; uid: string; nuevo: boolean };
+}
+
+export interface OpcionesExportCampeonato {
+  usuarios?: boolean;
+  competidores?: boolean;
+  llaves?: boolean;
+}
+
+function descargar(blob: Blob, nombre: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Armar el paquete de un campeonato grande lleva más que una consulta normal:
+// se sale del timeout corto que usa el resto de la app.
+const OPCIONES_DESCARGA = { responseType: "blob" as const, timeout: 60000 };
+
+/** Descarga el paquete completo del campeonato (para llevarlo a la otra instancia). */
+export async function exportarCampeonatoAPI(
+  campId: number,
+  opciones: OpcionesExportCampeonato = {}
+) {
+  const params: Record<string, string> = {};
+  for (const clave of ["usuarios", "competidores", "llaves"] as const) {
+    if (opciones[clave] === false) params[clave] = "0";
+  }
+  const res = await api.get(`/sincronizacion/campeonato/${campId}/exportar`, {
+    params, ...OPCIONES_DESCARGA,
+  });
+  descargar(res.data as Blob, nombreDeDescarga(res, `campeonato-${campId}.json`));
+}
+
+export async function exportarUsuariosAPI() {
+  const res = await api.get("/sincronizacion/usuarios/exportar", OPCIONES_DESCARGA);
+  descargar(res.data as Blob, nombreDeDescarga(res, "usuarios-dinamyt.json"));
+}
+
+export async function exportarCompetidoresAPI() {
+  const res = await api.get("/sincronizacion/competidores/exportar", OPCIONES_DESCARGA);
+  descargar(res.data as Blob, nombreDeDescarga(res, "competidores-dinamyt.json"));
+}
+
+/** Nombre que puso el servidor en Content-Disposition, o uno de reserva. */
+function nombreDeDescarga(
+  res: { headers: Record<string, unknown> },
+  defecto: string
+): string {
+  const cabecera = String(res.headers["content-disposition"] || "");
+  return /filename="([^"]+)"/.exec(cabecera)?.[1] || defecto;
+}
+
+/**
+ * Sube un paquete. Con `vista_previa` el backend ejecuta la importación entera
+ * y la revierte: el informe devuelto es exactamente lo que pasaría al confirmar.
+ */
+export async function importarPaqueteAPI(
+  file: File,
+  opciones: { vistaPrevia?: boolean; modo?: ModoImportacion; forzar?: boolean } = {}
+) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("vista_previa", opciones.vistaPrevia ? "1" : "0");
+  form.append("modo", opciones.modo || "fusionar");
+  form.append("forzar", opciones.forzar ? "1" : "0");
+  const res = await api.post("/sincronizacion/importar", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+    // Un campeonato grande son miles de filas en una sola transacción: se sale
+    // del timeout corto que usa el resto de la app (pensado para la LAN).
+    timeout: 120000,
+  });
+  return res.data as InformeImportacion;
+}
+
 // ── Tatamis API ──
 export async function listTatamisAPI(campeonatoId: number) {
   const res = await api.get(`/tatamis/campeonato/${campeonatoId}`);
@@ -754,6 +883,7 @@ export interface CampeonatoPublicoDetalle {
   competidores: CampeonatoPublicoCompetidor[];
   jueces: CampeonatoPublicoJuez[];
   clubes: string[];
+  tatamis: { id: number; numero: number; activo: boolean }[];
 }
 
 export async function getCampeonatoPublicoAPI(campId: number) {

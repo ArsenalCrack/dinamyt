@@ -14,6 +14,7 @@ import unicodedata
 from datetime import datetime, timezone
 from ..extensions import db
 from ..timeutil import iso_utc
+from ..uid import nuevo_uid
 
 GENEROS = ("MASCULINO", "FEMENINO")
 GRUPOS_CINTURON = ("BLANCO", "PRINCIPIANTE", "INTERMEDIO", "AVANZADO", "NEGRO")
@@ -97,6 +98,8 @@ class Competidor(db.Model):
     __tablename__ = "competidores"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Identidad estable entre instancias (local ↔ online). Ver app/uid.py.
+    uid = db.Column(db.String(32), nullable=True, index=True, default=nuevo_uid)
     nombre_completo = db.Column(db.String(200), nullable=False)
     # Documento de identidad: identificador natural para no duplicar atletas
     # (único cuando existe; puede faltar en registros rápidos).
@@ -170,6 +173,8 @@ class Inscripcion(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    # Identidad estable entre instancias (local ↔ online). Ver app/uid.py.
+    uid = db.Column(db.String(32), nullable=True, index=True, default=nuevo_uid)
     campeonato_id = db.Column(
         db.Integer, db.ForeignKey("campeonatos.id"), nullable=False, index=True
     )

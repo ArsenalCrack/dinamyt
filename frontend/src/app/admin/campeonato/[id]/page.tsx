@@ -6,16 +6,18 @@ import {
   getCampeonatoAPI,
   listUsersAPI,
   getTatamiAPI,
+  ajustarTatamisAPI,
   asignarJuezAPI,
   desasignarJuezAPI,
   updateCampeonatoAPI,
   deleteCampeonatoAPI,
   accesoQrAPI,
+  exportarCampeonatoAPI,
   origenParaQr,
-  listInscripcionesAPI,
-  setEstadoInscripcionAPI,
+  MAX_TATAMIS,
+  MIN_TATAMIS,
   type EstadoCampeonato,
-  type InscripcionData,
+  type OpcionesExportCampeonato,
   type UserData,
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -85,8 +87,16 @@ export default function CampeonatoDetailPage() {
     nombre: "", descripcion: "", fecha_inicio: "", fecha_fin: "",
     lugar: "", ciudad: "", pais: "",
   });
-  const [solicitudes, setSolicitudes] = useState<InscripcionData[]>([]);
-  const [motivos, setMotivos] = useState<Record<number, string>>({});
+  // Nº de tatamis (editable solo en preparación): se escribe como texto para
+  // permitir borrar el campo mientras se teclea, y se valida al aplicar.
+  const [numTatamis, setNumTatamis] = useState("");
+  const [ajustandoTatamis, setAjustandoTatamis] = useState(false);
+  // Exportar el campeonato para llevarlo a la otra instalación
+  const [panelExportar, setPanelExportar] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [incluir, setIncluir] = useState<Required<OpcionesExportCampeonato>>({
+    usuarios: true, competidores: true, llaves: true,
+  });
   // QR de acceso directo de un juez: {nombre, rol, url, dataUrl}
   const [qrInfo, setQrInfo] = useState<{
     nombre: string; rol: string; url: string; dataUrl: string;
@@ -111,15 +121,14 @@ export default function CampeonatoDetailPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [c, u, pend] = await Promise.all([
+      const [c, u] = await Promise.all([
         getCampeonatoAPI(campId),
         listUsersAPI(),
-        listInscripcionesAPI(campId, "pendiente").catch(() => [] as InscripcionData[]),
       ]);
       setCamp(c);
+      setNumTatamis(String(c.tatamis?.length || 0));
       // Asignables a un tatami: jueces y maestros con permiso de juez.
       setUsers(u.filter((x: UserData) => x.rol === "juez" || (x.rol === "maestro" && x.puede_juzgar)));
-      setSolicitudes(pend);
     } catch { router.replace("/admin"); }
   }, [campId, router]);
 
@@ -219,17 +228,60 @@ export default function CampeonatoDetailPage() {
     } catch { flash(t("camp.errorActualizar"), "error"); }
   }
 
-  async function handleModerar(ins: InscripcionData, estado: "aceptada" | "rechazada") {
+  async function handleExportar() {
+    if (!camp) return;
+    setExportando(true);
     try {
-      await setEstadoInscripcionAPI(
-        ins.id, estado, estado === "rechazada" ? motivos[ins.id] : undefined
-      );
-      await loadData();
-      flash(
-        estado === "aceptada" ? t("camp.solicitudes.aceptada") : t("camp.solicitudes.rechazada"),
-        "ok"
-      );
-    } catch { flash(t("camp.solicitudes.error"), "error"); }
+      await exportarCampeonatoAPI(camp.id, incluir);
+      setPanelExportar(false);
+      flash(t("sync.exportado"), "ok");
+    } catch { flash(t("sync.errorExportar"), "error"); }
+    finally { setExportando(false); }
+  }
+
+  /** Aplica el nº de tatamis escrito. Al bajar pide confirmación primero. */
+  async function handleAjustarTatamis() {
+    if (!camp) return;
+    const objetivo = Number(numTatamis);
+    const actual = camp.tatamis?.length || 0;
+    if (!Number.isInteger(objetivo) || objetivo < MIN_TATAMIS || objetivo > MAX_TATAMIS) {
+      setNumTatamis(String(actual));
+      return;
+    }
+    if (objetivo === actual) return;
+
+    const aplicar = async () => {
+      setAjustandoTatamis(true);
+      try {
+        const res = await ajustarTatamisAPI(camp.id, objetivo);
+        // El tatami abierto en el detalle puede haber desaparecido.
+        if (selectedTatami && res.eliminados.includes(selectedTatami.numero)) {
+          setSelectedTatami(null);
+        }
+        await loadData();
+        flash(res.message, "ok");
+      } catch (err) {
+        const m = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+        flash(m || t("camp.tatamis.error"), "error");
+        setNumTatamis(String(actual));
+      } finally {
+        setAjustandoTatamis(false);
+      }
+    };
+
+    if (objetivo < actual) {
+      pedirConfirmacion({
+        titulo: t("camp.tatamis.confirmar.titulo"),
+        mensaje: t("camp.tatamis.confirmar.mensaje", {
+          desde: objetivo + 1, hasta: actual,
+        }),
+        tipo: "advertencia",
+        confirmLabel: t("camp.tatamis.aplicar"),
+        onConfirm: aplicar,
+      });
+      return;
+    }
+    await aplicar();
   }
 
   function handleDeleteCampeonato() {
@@ -305,14 +357,20 @@ export default function CampeonatoDetailPage() {
           </button>
           <button
             className="btn btn-sm"
-            onClick={() => router.push(`/admin/campeonato/${camp.id}/competidores`)}
+            onClick={() => router.push(`/admin/campeonato/${camp.id}/inscripciones`)}
             style={{
               background: "rgba(0, 150, 255, 0.10)",
               borderColor: "rgba(0, 150, 255, 0.30)",
               color: "var(--chung-light, #4da3ff)",
             }}
           >
-            {t("admin.tab.competidores")}
+            {t("camp.inscripciones.boton")}
+            {!!camp.num_pendientes && (
+              <span className="badge" style={{
+                marginLeft: 6, background: "var(--gold-bg)", color: "var(--gold)",
+                border: "1px solid var(--gold-border)",
+              }}>{camp.num_pendientes}</span>
+            )}
           </button>
           <button
             className="btn btn-sm"
@@ -335,6 +393,12 @@ export default function CampeonatoDetailPage() {
             }}
           >
             {t("camp.generarLlaves")}
+          </button>
+          <button
+            className={`btn btn-sm ${panelExportar ? "btn-primary" : ""}`}
+            onClick={() => setPanelExportar(!panelExportar)}
+          >
+            {t("sync.exportarCampeonato")}
           </button>
           <button
             className="btn btn-sm"
@@ -397,6 +461,52 @@ export default function CampeonatoDetailPage() {
         </form>
       )}
 
+      {/* Exportar el campeonato para la otra instalación (local ↔ internet) */}
+      {panelExportar && (
+        <div className="card animate-slide" style={{
+          marginBottom: 16, display: "flex", flexDirection: "column", gap: 10,
+        }}>
+          <div className="card-title" style={{ marginBottom: 0 }}>
+            {t("sync.exportarCampeonato")}
+          </div>
+          <p className="text-muted" style={{ margin: 0, fontSize: "0.88rem" }}>
+            {t("sync.exportarCampeonato.desc")}
+          </p>
+          <fieldset style={{ border: "none", padding: 0, margin: 0 }}>
+            <legend style={{
+              fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase",
+              letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 6,
+            }}>
+              {t("sync.incluir")}
+            </legend>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {([
+                ["usuarios", "sync.incluir.usuarios"],
+                ["competidores", "sync.incluir.competidores"],
+                ["llaves", "sync.incluir.llaves"],
+              ] as const).map(([clave, labelKey]) => (
+                <label key={clave} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.88rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={incluir[clave]}
+                    onChange={(e) => setIncluir({ ...incluir, [clave]: e.target.checked })}
+                  />
+                  {t(labelKey)}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn btn-primary btn-sm" disabled={exportando} onClick={handleExportar}>
+              {exportando ? t("sync.exportando") : t("sync.exportar")}
+            </button>
+            <button className="btn btn-sm" onClick={() => setPanelExportar(false)}>
+              {t("comun.cancelar")}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Estado del ciclo de vida del campeonato */}
       <div className="card" style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
         <span style={{ fontWeight: 700, color: "var(--text-muted)", fontSize: "0.9rem" }}>
@@ -416,52 +526,22 @@ export default function CampeonatoDetailPage() {
         </span>
       </div>
 
-      {/* Solicitudes de inscripción de maestros (pendientes) */}
-      {solicitudes.length > 0 && (
-        <div className="card animate-fade" style={{ marginBottom: 16, borderColor: "var(--gold-border)" }}>
-          <div className="card-title" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            {t("camp.solicitudes.titulo")}
-            <span className="badge" style={{ background: "var(--gold-bg)", color: "var(--gold)", border: "1px solid var(--gold-border)" }}>
-              {t("camp.solicitudes.pendientes", { n: solicitudes.length })}
-            </span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-            {solicitudes.map((s) => (
-              <div key={s.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <span style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
-                      {s.competidor?.nombre_completo || "—"}
-                    </span>
-                    {s.competidor?.club && (
-                      <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: "0.85rem" }}>
-                        {s.competidor.club}
-                      </span>
-                    )}
-                    <div style={{ color: "var(--text-dim)", fontSize: "0.82rem", marginTop: 2 }}>
-                      {(s.modalidades || []).join(", ")}
-                      {s.solicitante ? ` · ${t("camp.solicitudes.solicitadoPor", { nombre: s.solicitante.nombre })}` : ""}
-                      {s.solicitante?.delegacion
-                        ? ` · ${t("maestro.tuDelegacion")}: ${s.solicitante.delegacion}${s.solicitante.pais_delegacion ? ` (${s.solicitante.pais_delegacion})` : ""}`
-                        : ""}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input className="input" placeholder={t("camp.solicitudes.motivoPh")}
-                    value={motivos[s.id] || ""} maxLength={300}
-                    onChange={(e) => setMotivos({ ...motivos, [s.id]: e.target.value.slice(0, 300) })}
-                    style={{ flex: "1 1 180px", minWidth: 0 }} />
-                  <button className="btn btn-primary btn-sm" onClick={() => handleModerar(s, "aceptada")}>
-                    {t("camp.solicitudes.aceptar")}
-                  </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleModerar(s, "rechazada")}>
-                    {t("camp.solicitudes.rechazar")}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Solicitudes por revisar: se moderan en el panel de inscripciones */}
+      {!!camp.num_pendientes && (
+        <div className="card animate-fade" style={{
+          marginBottom: 16, borderColor: "var(--gold-border)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 10, flexWrap: "wrap",
+        }}>
+          <span style={{ fontWeight: 700, color: "var(--gold)" }}>
+            {t("camp.inscripciones.aviso", { n: camp.num_pendientes })}
+          </span>
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={() => router.push(`/admin/campeonato/${camp.id}/inscripciones?estado=pendiente`)}
+          >
+            {t("camp.inscripciones.revisar")}
+          </button>
         </div>
       )}
 
@@ -536,6 +616,48 @@ export default function CampeonatoDetailPage() {
         {/* Tatamis list */}
         <div>
           <div className="card-title">{t("camp.tatamis.titulo")}</div>
+
+          {/* Cantidad de tatamis: editable solo mientras se prepara el evento */}
+          <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+            {camp.estado === "preparacion" ? (
+              <>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <label htmlFor="num-tatamis" style={{
+                    fontSize: "0.85rem", fontWeight: 700, color: "var(--text-muted)",
+                  }}>
+                    {t("camp.tatamis.cantidad")}
+                  </label>
+                  <input
+                    id="num-tatamis"
+                    className="input"
+                    type="number"
+                    min={MIN_TATAMIS}
+                    max={MAX_TATAMIS}
+                    value={numTatamis}
+                    disabled={ajustandoTatamis}
+                    onChange={(e) => setNumTatamis(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void handleAjustarTatamis(); }}
+                    style={{ width: 90 }}
+                  />
+                  <button
+                    className="btn btn-sm btn-primary"
+                    disabled={ajustandoTatamis || Number(numTatamis) === (camp.tatamis?.length || 0)}
+                    onClick={() => void handleAjustarTatamis()}
+                  >
+                    {t("camp.tatamis.aplicar")}
+                  </button>
+                </div>
+                <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--text-dim)" }}>
+                  {t("camp.tatamis.ayuda")}
+                </p>
+              </>
+            ) : (
+              <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--text-dim)" }}>
+                {t("camp.tatamis.bloqueado")}
+              </p>
+            )}
+          </div>
+
           <div className="tatami-list">
             {/* "tat" y no "t": no hacerle sombra a la función de traducción */}
             {camp.tatamis?.map((tat) => (

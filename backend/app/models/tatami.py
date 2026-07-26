@@ -10,6 +10,7 @@ import random
 import string
 from datetime import datetime, timezone
 from ..extensions import db
+from ..uid import nuevo_uid
 
 
 def _generar_pin():
@@ -21,6 +22,8 @@ class Tatami(db.Model):
     __tablename__ = "tatamis"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Identidad estable entre instancias (local ↔ online). Ver app/uid.py.
+    uid = db.Column(db.String(32), nullable=True, index=True, default=nuevo_uid)
     campeonato_id = db.Column(
         db.Integer, db.ForeignKey("campeonatos.id"), nullable=False, index=True
     )

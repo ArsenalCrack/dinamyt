@@ -14,6 +14,7 @@ def register_blueprints(app):
     from .llaves import llaves_bp
     from .competidores import competidores_bp, inscripciones_bp
     from .resultados import resultados_bp
+    from .sincronizacion import sincronizacion_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(campeonatos_bp, url_prefix="/api/campeonatos")
@@ -25,3 +26,4 @@ def register_blueprints(app):
     app.register_blueprint(competidores_bp, url_prefix="/api/competidores")
     app.register_blueprint(inscripciones_bp, url_prefix="/api/inscripciones")
     app.register_blueprint(resultados_bp, url_prefix="/api/resultados")
+    app.register_blueprint(sincronizacion_bp, url_prefix="/api/sincronizacion")

@@ -1,5 +1,20 @@
 "use client";
 
+// ═════════════════════════════════════════════════════════════════════════════
+// INSCRIPCIONES DE UN CAMPEONATO
+//
+// Panel único de inscritos, separado del de tatamis (que vive en la ficha del
+// campeonato). Las inscripciones se agrupan en tres pestañas por estado:
+//
+//   Pendientes — solicitudes de maestros por revisar. NO cuentan como inscritos
+//                ni entran a las llaves hasta que el admin las acepte.
+//   Aceptadas  — el roster real del campeonato. Aquí se dan de alta atletas.
+//   Rechazadas — denegadas, con su motivo; se pueden reconsiderar.
+//
+// Se cargan las tres de una sola vez (el endpoint sin `estado` las devuelve
+// todas) y se agrupan en cliente, así los contadores siempre concuerdan.
+// ═════════════════════════════════════════════════════════════════════════════
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -11,9 +26,11 @@ import {
   listClubesAPI,
   listCompetidoresAPI,
   listInscripcionesAPI,
+  setEstadoInscripcionAPI,
   updateCompetidorAPI,
   updateInscripcionAPI,
   type CompetidorData,
+  type EstadoInscripcion,
   type InscripcionData,
 } from "@/lib/api";
 import CompetidorFormFields, {
@@ -24,7 +41,7 @@ import CompetidorFormFields, {
 } from "@/components/CompetidorFormFields";
 import ImportarExcelPanel from "@/components/ImportarExcelPanel";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type ClaveTexto } from "@/lib/i18n";
 
 // Nombres CANÓNICOS de modalidad (viajan al servidor y a los reportes):
 // se muestran tal cual, sin traducir, para no fragmentar el registro.
@@ -33,6 +50,12 @@ const MODALIDADES_FALLBACK = [
 ];
 
 type Panel = "ninguno" | "existente" | "nuevo" | "excel";
+
+const PESTANAS: { estado: EstadoInscripcion; labelKey: ClaveTexto }[] = [
+  { estado: "pendiente", labelKey: "ins.tab.pendientes" },
+  { estado: "aceptada", labelKey: "ins.tab.aceptadas" },
+  { estado: "rechazada", labelKey: "ins.tab.rechazadas" },
+];
 
 // Ventana de "perdón" (días): si los datos del atleta se actualizaron hace
 // menos de esto, se inscribe directo sin pedir confirmación. Cubre varios
@@ -58,6 +81,7 @@ export default function InscripcionesPage() {
   const [clubes, setClubes] = useState<string[]>([]);
   const [modalidadesDisponibles, setModalidadesDisponibles] = useState<string[]>(MODALIDADES_FALLBACK);
 
+  const [pestana, setPestana] = useState<EstadoInscripcion>("aceptada");
   const [panel, setPanel] = useState<Panel>("ninguno");
   const [busquedaExistente, setBusquedaExistente] = useState("");
   const [seleccionado, setSeleccionado] = useState<CompetidorData | null>(null);
@@ -72,6 +96,8 @@ export default function InscripcionesPage() {
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [editModalidades, setEditModalidades] = useState<string[]>([]);
   const [editPeso, setEditPeso] = useState("");
+  // Motivo de rechazo por solicitud (pestaña de pendientes)
+  const [motivos, setMotivos] = useState<Record<number, string>>({});
 
   const [busquedaLista, setBusquedaLista] = useState("");
   const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
@@ -79,10 +105,9 @@ export default function InscripcionesPage() {
 
   const cargar = useCallback(async () => {
     try {
-      // Solo el "roster" aceptado; las solicitudes pendientes de maestros se
-      // aceptan/rechazan desde el panel del campeonato.
+      // Sin filtro de estado: llegan las tres listas de una vez.
       const [ins, comps, cl] = await Promise.all([
-        listInscripcionesAPI(campId, "aceptada"),
+        listInscripcionesAPI(campId),
         listCompetidoresAPI(),
         listClubesAPI().catch(() => [] as string[]),
       ]);
@@ -101,6 +126,14 @@ export default function InscripcionesPage() {
     let cancelled = false;
     queueMicrotask(async () => {
       if (cancelled) return;
+      // Pestaña inicial por query (?estado=pendiente): la ficha del campeonato
+      // enlaza así su aviso de solicitudes por revisar. Se lee de window y no
+      // con useSearchParams porque este componente no está bajo un <Suspense>,
+      // y sin él la compilación de producción falla.
+      const pedida = new URLSearchParams(window.location.search).get("estado");
+      if (pedida === "pendiente" || pedida === "rechazada" || pedida === "aceptada") {
+        setPestana(pedida);
+      }
       try {
         const c = await getCampeonatoAPI(campId);
         if (!cancelled) setCampNombre(c.nombre);
@@ -134,6 +167,13 @@ export default function InscripcionesPage() {
     setModalidadesSel(["COMBATE"]);
     setPesoInscripcion("");
     setFormNuevo(COMPETIDOR_FORM_VACIO);
+  }
+
+  function cambiarPestana(estado: EstadoInscripcion) {
+    setPestana(estado);
+    setPanel("ninguno");
+    setEditandoId(null);
+    setBusquedaLista("");
   }
 
   /** Selecciona un candidato y precarga sus datos para la confirmación. */
@@ -210,6 +250,25 @@ export default function InscripcionesPage() {
     }
   }
 
+  /** Acepta o rechaza una solicitud (y también reconsidera una rechazada). */
+  async function handleModerar(ins: InscripcionData, estado: "aceptada" | "rechazada") {
+    try {
+      await setEstadoInscripcionAPI(
+        ins.id, estado, estado === "rechazada" ? motivos[ins.id] : undefined
+      );
+      setMotivos((prev) => {
+        const resto = { ...prev };
+        delete resto[ins.id];
+        return resto;
+      });
+      await cargar();
+      flash(
+        estado === "aceptada" ? t("camp.solicitudes.aceptada") : t("camp.solicitudes.rechazada"),
+        "ok"
+      );
+    } catch { flash(t("camp.solicitudes.error"), "error"); }
+  }
+
   function abrirEdicion(ins: InscripcionData) {
     setEditandoId(ins.id);
     setEditModalidades(ins.modalidades || []);
@@ -248,10 +307,20 @@ export default function InscripcionesPage() {
     });
   }
 
+  // Un competidor con inscripción en CUALQUIER estado deja de ser candidato: el
+  // backend solo admite una inscripción por competidor y campeonato.
   const idsInscritos = useMemo(
     () => new Set(inscripciones.map((i) => i.competidor_id)),
     [inscripciones]
   );
+
+  const porEstado = useMemo(() => {
+    const grupos: Record<EstadoInscripcion, InscripcionData[]> = {
+      pendiente: [], aceptada: [], rechazada: [],
+    };
+    for (const i of inscripciones) grupos[i.estado]?.push(i);
+    return grupos;
+  }, [inscripciones]);
 
   const candidatos = useMemo(() => {
     const termino = busquedaExistente.trim().toLowerCase();
@@ -264,15 +333,16 @@ export default function InscripcionesPage() {
       .slice(0, 30);
   }, [competidores, idsInscritos, busquedaExistente]);
 
-  const inscripcionesVisibles = useMemo(() => {
+  const listaActiva = porEstado[pestana];
+  const visibles = useMemo(() => {
     const termino = busquedaLista.trim().toLowerCase();
-    if (!termino) return inscripciones;
-    return inscripciones.filter((i) =>
+    if (!termino) return listaActiva;
+    return listaActiva.filter((i) =>
       `${i.competidor?.nombre_completo || ""} ${i.competidor?.club || ""} ${(i.modalidades || []).join(" ")}`
         .toLowerCase()
         .includes(termino)
     );
-  }, [inscripciones, busquedaLista]);
+  }, [listaActiva, busquedaLista]);
 
   const selectorModalidades = (lista: string[], setLista: (l: string[]) => void) => (
     <div>
@@ -307,6 +377,62 @@ export default function InscripcionesPage() {
     </div>
   );
 
+  /** Ficha del atleta: idéntica en las tres pestañas. */
+  const fichaAtleta = (ins: InscripcionData) => {
+    const c = ins.competidor;
+    const edad = edadDesde(c?.fecha_nacimiento || null);
+    return (
+      <div style={{ minWidth: 0, flex: "1 1 240px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontWeight: 800, overflowWrap: "anywhere" }}>
+            {c?.nombre_completo || t("ins.eliminadoComp")}
+          </span>
+          {ins.grupo_cinturon_efectivo && (
+            <span className="badge badge-chung">{ins.grupo_cinturon_efectivo}</span>
+          )}
+          {c?.categoria_especial && (
+            <span className="badge badge-gold" title={t("comp.especialTitle")}>
+              {t("comp.especialBadge")}
+            </span>
+          )}
+          {(ins.modalidades || []).map((m) => (
+            <span key={m} className="badge badge-gray">{m}</span>
+          ))}
+        </div>
+        <div style={{
+          color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4,
+          display: "flex", gap: 12, flexWrap: "wrap",
+        }}>
+          {edad != null && <span>{edad} {t("comp.anios")}</span>}
+          {c?.genero && <span>{c.genero === "MASCULINO" ? t("comp.masc") : t("comp.fem")}</span>}
+          {ins.peso_efectivo != null && <span>{ins.peso_efectivo} kg</span>}
+          {c?.club && <span>{c.club}</span>}
+          {(ins.modalidades || []).length === 0 && (
+            <span style={{ color: "var(--orange)" }}>{t("ins.sinModalidades")}</span>
+          )}
+        </div>
+        {/* Quién la envió: el admin decide sabiendo de qué club y delegación viene */}
+        {ins.solicitante && (
+          <div style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginTop: 4 }}>
+            {t("camp.solicitudes.solicitadoPor", { nombre: ins.solicitante.nombre })}
+            {ins.solicitante.delegacion
+              ? ` · ${ins.solicitante.delegacion}${ins.solicitante.pais_delegacion ? ` (${ins.solicitante.pais_delegacion})` : ""}`
+              : ""}
+            {ins.created_at
+              ? ` · ${t("ins.solicitadaEl", { fecha: new Date(ins.created_at).toLocaleDateString() })}`
+              : ""}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const vacioPorPestana: Record<EstadoInscripcion, string> = {
+    pendiente: t("ins.pendientes.vacio"),
+    aceptada: t("ins.vacio"),
+    rechazada: t("ins.rechazadas.vacio"),
+  };
+
   return (
     <div className="inscripciones-page">
       <div style={{ marginBottom: 18 }}>
@@ -317,10 +443,10 @@ export default function InscripcionesPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
           <div>
             <h1 style={{ fontSize: "1.5rem", fontWeight: 800, overflowWrap: "anywhere" }}>
-              {t("comp.titulo")} — {campNombre || "..."}
+              {t("camp.inscripciones.boton")} — {campNombre || "..."}
             </h1>
             <p className="text-muted" style={{ fontSize: "0.92rem" }}>
-              {t("ins.desc", { n: inscripciones.length })}
+              {t("ins.desc", { n: porEstado.aceptada.length })}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -346,272 +472,336 @@ export default function InscripcionesPage() {
       )}
       {dialogo}
 
-      {/* Acciones de alta */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-        <button
-          className={`btn btn-sm ${panel === "existente" ? "btn-primary" : ""}`}
-          onClick={() => abrirPanel("existente")}
-        >
-          + Inscribir registrado
-        </button>
-        <button
-          className={`btn btn-sm ${panel === "nuevo" ? "btn-primary" : ""}`}
-          onClick={() => abrirPanel("nuevo")}
-        >
-          + Nuevo competidor
-        </button>
-        <button
-          className={`btn btn-sm ${panel === "excel" ? "btn-primary" : ""}`}
-          onClick={() => abrirPanel("excel")}
-        >
-          📥 Importar Excel
-        </button>
+      {/* Pestañas por estado */}
+      <div role="tablist" aria-label={t("ins.tab.aria")}
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        {PESTANAS.map(({ estado, labelKey }) => {
+          const activa = pestana === estado;
+          const n = porEstado[estado].length;
+          // Las pendientes se resaltan aunque no sea la pestaña activa: son las
+          // únicas que exigen una decisión del admin.
+          const destacar = estado === "pendiente" && n > 0;
+          return (
+            <button
+              key={estado}
+              role="tab"
+              aria-selected={activa}
+              className="btn btn-sm"
+              onClick={() => cambiarPestana(estado)}
+              style={{
+                background: activa ? "var(--gold-bg)" : undefined,
+                borderColor: activa || destacar ? "var(--gold-border)" : undefined,
+                color: activa || destacar ? "var(--gold)" : undefined,
+                fontWeight: activa ? 800 : undefined,
+              }}
+            >
+              {t(labelKey)} ({n})
+            </button>
+          );
+        })}
       </div>
 
-      {/* Panel: inscribir existente */}
-      {panel === "existente" && (
-        <form onSubmit={handleInscribirExistente} className="card animate-slide"
-          style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
-          <div className="card-title" style={{ marginBottom: 0 }}>Inscribir un competidor registrado</div>
-          <input
-            className="input"
-            placeholder="Buscar por nombre, documento o club"
-            value={busquedaExistente}
-            onChange={(e) => { setBusquedaExistente(e.target.value); setSeleccionado(null); }}
-          />
-          {seleccionado ? (
-            <div style={{
-              padding: "10px 12px", border: "1px solid var(--green-border, rgba(0,196,106,.25))",
-              borderRadius: "var(--radius-sm)", display: "flex", justifyContent: "space-between",
-              alignItems: "center", gap: 8, flexWrap: "wrap",
-            }}>
-              <div>
-                <div style={{ fontWeight: 800, color: "var(--green)" }}>{seleccionado.nombre_completo}</div>
-                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                  {[
-                    seleccionado.club,
-                    seleccionado.grupo_cinturon,
-                    edadDesde(seleccionado.fecha_nacimiento) != null
-                      ? `${edadDesde(seleccionado.fecha_nacimiento)} años` : null,
-                    seleccionado.peso != null ? `${seleccionado.peso} kg` : null,
-                  ].filter(Boolean).join(" · ") || "Sin datos de categorización"}
-                </div>
-              </div>
-              <button type="button" className="btn btn-sm" onClick={() => setSeleccionado(null)}>Cambiar</button>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 220, overflowY: "auto" }}>
-              {candidatos.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="btn"
-                  onClick={() => seleccionarCandidato(c)}
-                  style={{ justifyContent: "flex-start", textAlign: "left", padding: "8px 10px" }}
-                >
-                  <span style={{ fontWeight: 700 }}>{c.nombre_completo}</span>
-                  <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: "0.85rem" }}>
-                    {[c.club, c.grupo_cinturon].filter(Boolean).join(" · ")}
-                  </span>
-                </button>
-              ))}
-              {candidatos.length === 0 && (
-                <p style={{ color: "var(--text-dim)", fontSize: "0.88rem", margin: "4px 0" }}>
-                  No hay competidores disponibles con esa búsqueda (¿ya están todos inscritos?).
-                  Créalo con «Nuevo competidor».
-                </p>
-              )}
-            </div>
-          )}
-          {selectorModalidades(modalidadesSel, setModalidadesSel)}
+      {pestana === "pendiente" && (
+        <p className="text-muted" style={{ fontSize: "0.88rem", marginBottom: 12 }}>
+          {t("ins.pendientes.desc")}
+        </p>
+      )}
+      {pestana === "rechazada" && (
+        <p className="text-muted" style={{ fontSize: "0.88rem", marginBottom: 12 }}>
+          {t("ins.rechazadas.desc")}
+        </p>
+      )}
 
-          {/* ── Datos viejos: pedir confirmación de peso y cinturón ── */}
-          {seleccionado && datosViejos ? (
-            <div className="animate-fade" style={{
-              border: "1px solid var(--gold-border)", background: "var(--gold-bg)",
-              borderRadius: "var(--radius-sm)", padding: "12px 14px",
-              display: "flex", flexDirection: "column", gap: 10,
-            }}>
-              <div style={{ fontWeight: 800, color: "var(--gold)", fontSize: "0.92rem" }}>
-                {t("ins.datosViejos.titulo", { n: diasDatos ?? 0 })}
-              </div>
-              <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                {t("ins.datosViejos.desc", {
-                  nombre: seleccionado.nombre_completo,
-                  fecha: new Date(seleccionado.updated_at || seleccionado.created_at)
-                    .toLocaleDateString(),
-                })}
-              </p>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 700 }}>
-                  {t("form.peso")}
-                  <input
-                    className="input" type="number" min={10} max={200} step="0.1"
-                    value={confPeso}
-                    onChange={(e) => setConfPeso(e.target.value)}
-                    style={{ width: 130 }}
-                  />
-                </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 700 }}>
-                  {t("form.cinturon")}
-                  <select
-                    className="input"
-                    value={confCinturon}
-                    onChange={(e) => setConfCinturon(e.target.value)}
-                    style={{ minWidth: 160 }}
-                  >
-                    <option value="">{t("form.sinDefinir")}</option>
-                    {CINTURONES.map((c) => (
-                      <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" className="btn btn-primary"
-                  disabled={modalidadesSel.length === 0 || guardando}
-                  onClick={() => inscribirSeleccionado(true)}>
-                  {guardando ? t("ins.inscribiendo") : t("ins.actualizarInscribir")}
-                </button>
-                <button type="button" className="btn"
-                  disabled={modalidadesSel.length === 0 || guardando}
-                  onClick={() => inscribirSeleccionado(false)}>
-                  {t("ins.continuarMismos")}
-                </button>
-                <button type="button" className="btn" onClick={() => abrirPanel("ninguno")}>{t("comun.cancelar")}</button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {seleccionado && diasDatos != null && (
-                <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--green)" }}>
-                  {t("ins.datosAlDia", { n: diasDatos })}
-                </p>
+      {/* Alta de inscritos: solo en la pestaña del roster aceptado */}
+      {pestana === "aceptada" && (
+        <>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            <button
+              className={`btn btn-sm ${panel === "existente" ? "btn-primary" : ""}`}
+              onClick={() => abrirPanel("existente")}
+            >
+              {t("ins.inscribirRegistrado")}
+            </button>
+            <button
+              className={`btn btn-sm ${panel === "nuevo" ? "btn-primary" : ""}`}
+              onClick={() => abrirPanel("nuevo")}
+            >
+              {t("comp.nuevo")}
+            </button>
+            <button
+              className={`btn btn-sm ${panel === "excel" ? "btn-primary" : ""}`}
+              onClick={() => abrirPanel("excel")}
+            >
+              {t("comp.importarExcel")}
+            </button>
+          </div>
+
+          {/* Panel: inscribir existente */}
+          {panel === "existente" && (
+            <form onSubmit={handleInscribirExistente} className="card animate-slide"
+              style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
+              <div className="card-title" style={{ marginBottom: 0 }}>{t("ins.panelRegistrado")}</div>
+              <input
+                className="input"
+                placeholder={t("comp.buscar")}
+                value={busquedaExistente}
+                onChange={(e) => { setBusquedaExistente(e.target.value); setSeleccionado(null); }}
+              />
+              {seleccionado ? (
+                <div style={{
+                  padding: "10px 12px", border: "1px solid var(--green-border, rgba(0,196,106,.25))",
+                  borderRadius: "var(--radius-sm)", display: "flex", justifyContent: "space-between",
+                  alignItems: "center", gap: 8, flexWrap: "wrap",
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 800, color: "var(--green)" }}>{seleccionado.nombre_completo}</div>
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                      {[
+                        seleccionado.club,
+                        seleccionado.grupo_cinturon,
+                        edadDesde(seleccionado.fecha_nacimiento) != null
+                          ? `${edadDesde(seleccionado.fecha_nacimiento)} ${t("comp.anios")}` : null,
+                        seleccionado.peso != null ? `${seleccionado.peso} kg` : null,
+                      ].filter(Boolean).join(" · ") || t("ins.sinDatos")}
+                    </div>
+                  </div>
+                  <button type="button" className="btn btn-sm" onClick={() => setSeleccionado(null)}>
+                    {t("ins.cambiar")}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 220, overflowY: "auto" }}>
+                  {candidatos.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="btn"
+                      onClick={() => seleccionarCandidato(c)}
+                      style={{ justifyContent: "flex-start", textAlign: "left", padding: "8px 10px" }}
+                    >
+                      <span style={{ fontWeight: 700 }}>{c.nombre_completo}</span>
+                      <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: "0.85rem" }}>
+                        {[c.club, c.grupo_cinturon].filter(Boolean).join(" · ")}
+                      </span>
+                    </button>
+                  ))}
+                  {candidatos.length === 0 && (
+                    <p style={{ color: "var(--text-dim)", fontSize: "0.88rem", margin: "4px 0" }}>
+                      {t("ins.sinCandidatos")}
+                    </p>
+                  )}
+                </div>
               )}
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.88rem", color: "var(--text-muted)", flexWrap: "wrap" }}>
-                {t("ins.pesoInscribir")}
-                <input
-                  className="input"
-                  type="number"
-                  min={10}
-                  max={200}
-                  step="0.1"
-                  value={pesoInscripcion}
-                  onChange={(e) => setPesoInscripcion(e.target.value)}
-                  placeholder={seleccionado?.peso != null ? t("ins.pesoActual", { peso: seleccionado.peso }) : "Ej: 62.5"}
-                  style={{ width: 140 }}
-                />
-              </label>
+              {selectorModalidades(modalidadesSel, setModalidadesSel)}
+
+              {/* ── Datos viejos: pedir confirmación de peso y cinturón ── */}
+              {seleccionado && datosViejos ? (
+                <div className="animate-fade" style={{
+                  border: "1px solid var(--gold-border)", background: "var(--gold-bg)",
+                  borderRadius: "var(--radius-sm)", padding: "12px 14px",
+                  display: "flex", flexDirection: "column", gap: 10,
+                }}>
+                  <div style={{ fontWeight: 800, color: "var(--gold)", fontSize: "0.92rem" }}>
+                    {t("ins.datosViejos.titulo", { n: diasDatos ?? 0 })}
+                  </div>
+                  <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                    {t("ins.datosViejos.desc", {
+                      nombre: seleccionado.nombre_completo,
+                      fecha: new Date(seleccionado.updated_at || seleccionado.created_at)
+                        .toLocaleDateString(),
+                    })}
+                  </p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 700 }}>
+                      {t("form.peso")}
+                      <input
+                        className="input" type="number" min={10} max={200} step="0.1"
+                        value={confPeso}
+                        onChange={(e) => setConfPeso(e.target.value)}
+                        style={{ width: 130 }}
+                      />
+                    </label>
+                    <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 700 }}>
+                      {t("form.cinturon")}
+                      <select
+                        className="input"
+                        value={confCinturon}
+                        onChange={(e) => setConfCinturon(e.target.value)}
+                        style={{ minWidth: 160 }}
+                      >
+                        <option value="">{t("form.sinDefinir")}</option>
+                        {CINTURONES.map((c) => (
+                          <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button type="button" className="btn btn-primary"
+                      disabled={modalidadesSel.length === 0 || guardando}
+                      onClick={() => inscribirSeleccionado(true)}>
+                      {guardando ? t("ins.inscribiendo") : t("ins.actualizarInscribir")}
+                    </button>
+                    <button type="button" className="btn"
+                      disabled={modalidadesSel.length === 0 || guardando}
+                      onClick={() => inscribirSeleccionado(false)}>
+                      {t("ins.continuarMismos")}
+                    </button>
+                    <button type="button" className="btn" onClick={() => abrirPanel("ninguno")}>{t("comun.cancelar")}</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {seleccionado && diasDatos != null && (
+                    <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--green)" }}>
+                      {t("ins.datosAlDia", { n: diasDatos })}
+                    </p>
+                  )}
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.88rem", color: "var(--text-muted)", flexWrap: "wrap" }}>
+                    {t("ins.pesoInscribir")}
+                    <input
+                      className="input"
+                      type="number"
+                      min={10}
+                      max={200}
+                      step="0.1"
+                      value={pesoInscripcion}
+                      onChange={(e) => setPesoInscripcion(e.target.value)}
+                      placeholder={seleccionado?.peso != null ? t("ins.pesoActual", { peso: seleccionado.peso }) : "62.5"}
+                      style={{ width: 140 }}
+                    />
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="submit" className="btn btn-primary"
+                      disabled={!seleccionado || modalidadesSel.length === 0 || guardando}>
+                      {guardando ? t("ins.inscribiendo") : t("ins.inscribir")}
+                    </button>
+                    <button type="button" className="btn" onClick={() => abrirPanel("ninguno")}>{t("comun.cancelar")}</button>
+                  </div>
+                </>
+              )}
+            </form>
+          )}
+
+          {/* Panel: nuevo competidor + inscripción */}
+          {panel === "nuevo" && (
+            <form onSubmit={handleInscribirNuevo} className="card animate-slide"
+              style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
+              <div className="card-title" style={{ marginBottom: 0 }}>{t("ins.panelNuevo")}</div>
+              <CompetidorFormFields value={formNuevo} onChange={setFormNuevo} clubes={clubes} />
+              {selectorModalidades(modalidadesSel, setModalidadesSel)}
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="submit" className="btn btn-primary"
-                  disabled={!seleccionado || modalidadesSel.length === 0 || guardando}>
-                  {guardando ? t("ins.inscribiendo") : t("ins.inscribir")}
+                  disabled={!formNuevo.nombre_completo.trim() || modalidadesSel.length === 0 || guardando}>
+                  {guardando ? t("comp.guardando") : t("ins.registrarInscribir")}
                 </button>
                 <button type="button" className="btn" onClick={() => abrirPanel("ninguno")}>{t("comun.cancelar")}</button>
               </div>
-            </>
+            </form>
           )}
-        </form>
+
+          {/* Panel: importar Excel */}
+          {panel === "excel" && (
+            <div style={{ marginBottom: 14 }}>
+              <ImportarExcelPanel
+                campeonatoId={campId}
+                modalidadesDefault={modalidadesSel.length ? modalidadesSel : ["COMBATE"]}
+                onImportado={cargar}
+                onMensaje={flash}
+              />
+            </div>
+          )}
+        </>
       )}
 
-      {/* Panel: nuevo competidor + inscripción */}
-      {panel === "nuevo" && (
-        <form onSubmit={handleInscribirNuevo} className="card animate-slide"
-          style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
-          <div className="card-title" style={{ marginBottom: 0 }}>
-            Nuevo competidor (se registra en el sistema y queda inscrito)
-          </div>
-          <CompetidorFormFields value={formNuevo} onChange={setFormNuevo} clubes={clubes} />
-          {selectorModalidades(modalidadesSel, setModalidadesSel)}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit" className="btn btn-primary"
-              disabled={!formNuevo.nombre_completo.trim() || modalidadesSel.length === 0 || guardando}>
-              {guardando ? "Guardando..." : "Registrar e inscribir"}
-            </button>
-            <button type="button" className="btn" onClick={() => abrirPanel("ninguno")}>Cancelar</button>
-          </div>
-        </form>
-      )}
-
-      {/* Panel: importar Excel */}
-      {panel === "excel" && (
-        <div style={{ marginBottom: 14 }}>
-          <ImportarExcelPanel
-            campeonatoId={campId}
-            modalidadesDefault={modalidadesSel.length ? modalidadesSel : ["COMBATE"]}
-            onImportado={cargar}
-            onMensaje={flash}
-          />
-        </div>
-      )}
-
-      {/* Lista de inscritos */}
+      {/* Buscador de la pestaña activa */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
         <input
           className="input"
-          placeholder="Filtrar inscritos"
+          placeholder={pestana === "aceptada" ? t("ins.filtrar") : t("ins.filtrarEstado")}
           value={busquedaLista}
           onChange={(e) => setBusquedaLista(e.target.value)}
           style={{ flex: "1 1 220px", maxWidth: 340 }}
         />
         <span style={{ fontSize: "0.875rem", color: "var(--text-dim)" }}>
-          {inscripcionesVisibles.length} de {inscripciones.length}
+          {t("comp.deTotal", { n: visibles.length, total: listaActiva.length })}
         </span>
       </div>
 
-      {inscripciones.length === 0 ? (
+      {listaActiva.length === 0 ? (
         <div className="card" style={{ textAlign: "center", padding: 28, color: "var(--text-dim)" }}>
-          Aún no hay inscritos. Usa «Inscribir registrado», «Nuevo competidor» o
-          importa la lista desde Excel.
+          {vacioPorPestana[pestana]}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {inscripcionesVisibles.map((ins) => {
-            const c = ins.competidor;
-            const edad = edadDesde(c?.fecha_nacimiento || null);
+          {visibles.map((ins) => {
             const editando = editandoId === ins.id;
             return (
-              <div key={ins.id} className="card" style={{ padding: "12px 14px" }}>
+              <div key={ins.id} className="card" style={{
+                padding: "12px 14px",
+                borderColor: pestana === "pendiente" ? "var(--gold-border)" : undefined,
+              }}>
                 <div className="ins-row">
-                  <div style={{ minWidth: 0, flex: "1 1 240px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 800, overflowWrap: "anywhere" }}>
-                        {c?.nombre_completo || "(competidor eliminado)"}
-                      </span>
-                      {ins.grupo_cinturon_efectivo && (
-                        <span className="badge badge-chung">{ins.grupo_cinturon_efectivo}</span>
-                      )}
-                      {c?.categoria_especial && (
-                        <span className="badge badge-gold" title="Categoría especial: en figuras recibe el 1er puesto sin afectar el ranking normal">
-                          ⭐ Especial
-                        </span>
-                      )}
-                      {(ins.modalidades || []).map((m) => (
-                        <span key={m} className="badge badge-gray">{m}</span>
-                      ))}
+                  {fichaAtleta(ins)}
+
+                  {/* Acciones según la pestaña */}
+                  {pestana === "aceptada" && (
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                      <button className="btn btn-sm" onClick={() => (editando ? setEditandoId(null) : abrirEdicion(ins))}>
+                        {editando ? t("comun.cerrar") : t("comun.editar")}
+                      </button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleQuitar(ins)}>
+                        {t("comun.quitar")}
+                      </button>
                     </div>
-                    <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      {edad != null && <span>{edad} años</span>}
-                      {c?.genero && <span>{c.genero === "MASCULINO" ? "Masc." : "Fem."}</span>}
-                      {ins.peso_efectivo != null && <span>{ins.peso_efectivo} kg</span>}
-                      {c?.club && <span>{c.club}</span>}
-                      {(ins.modalidades || []).length === 0 && (
-                        <span style={{ color: "var(--orange)" }}>⚠ Sin modalidades</span>
-                      )}
+                  )}
+                  {pestana === "rechazada" && (
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                      <button className="btn btn-primary btn-sm" onClick={() => handleModerar(ins, "aceptada")}>
+                        {t("ins.reconsiderar")}
+                      </button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleQuitar(ins)}>
+                        {t("comun.quitar")}
+                      </button>
                     </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
-                    <button className="btn btn-sm" onClick={() => (editando ? setEditandoId(null) : abrirEdicion(ins))}>
-                      {editando ? "Cerrar" : "Editar"}
-                    </button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleQuitar(ins)}>Quitar</button>
-                  </div>
+                  )}
                 </div>
+
+                {/* Pendiente: motivo + aceptar / rechazar */}
+                {pestana === "pendiente" && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                    <input
+                      className="input"
+                      placeholder={t("camp.solicitudes.motivoPh")}
+                      value={motivos[ins.id] || ""}
+                      maxLength={300}
+                      onChange={(e) => setMotivos({ ...motivos, [ins.id]: e.target.value.slice(0, 300) })}
+                      style={{ flex: "1 1 180px", minWidth: 0 }}
+                    />
+                    <button className="btn btn-primary btn-sm" onClick={() => handleModerar(ins, "aceptada")}>
+                      {t("camp.solicitudes.aceptar")}
+                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleModerar(ins, "rechazada")}>
+                      {t("camp.solicitudes.rechazar")}
+                    </button>
+                  </div>
+                )}
+
+                {/* Rechazada: por qué se denegó */}
+                {pestana === "rechazada" && (
+                  <p style={{ margin: "8px 0 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                    {ins.motivo_rechazo
+                      ? t("ins.rechazadas.motivo", { motivo: ins.motivo_rechazo })
+                      : t("ins.rechazadas.sinMotivo")}
+                  </p>
+                )}
+
+                {/* Aceptada: edición de modalidades y peso */}
                 {editando && (
                   <div className="animate-fade" style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
                     {selectorModalidades(editModalidades, setEditModalidades)}
                     <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.88rem", color: "var(--text-muted)", flexWrap: "wrap" }}>
-                      Peso de inscripción (kg):
+                      {t("ins.pesoInscripcion")}
                       <input
                         className="input"
                         type="number"
@@ -620,21 +810,28 @@ export default function InscripcionesPage() {
                         step="0.1"
                         value={editPeso}
                         onChange={(e) => setEditPeso(e.target.value)}
-                        placeholder={c?.peso != null ? `Actual del atleta: ${c.peso}` : "Sin dato"}
+                        placeholder={ins.competidor?.peso != null
+                          ? t("ins.pesoActualAtleta", { peso: ins.competidor.peso })
+                          : t("ins.sinDato")}
                         style={{ width: 150 }}
                       />
                     </label>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button className="btn btn-primary btn-sm" onClick={() => handleGuardarEdicion(ins)}>
-                        Guardar
+                        {t("comun.guardar")}
                       </button>
-                      <button className="btn btn-sm" onClick={() => setEditandoId(null)}>Cancelar</button>
+                      <button className="btn btn-sm" onClick={() => setEditandoId(null)}>{t("comun.cancelar")}</button>
                     </div>
                   </div>
                 )}
               </div>
             );
           })}
+          {visibles.length === 0 && (
+            <div className="card" style={{ textAlign: "center", padding: 20, color: "var(--text-dim)" }}>
+              {t("comp.sinCoincidencias")}
+            </div>
+          )}
         </div>
       )}
 

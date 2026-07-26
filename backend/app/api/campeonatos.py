@@ -20,6 +20,10 @@ campeonatos_bp = Blueprint("campeonatos", __name__)
 # Tope de caracteres de sede/ciudad/país (validado también en el frontend).
 CAMPO_LUGAR_MAX = 120
 
+# Tatamis por campeonato: mínimo 1, tope 10 (al crear y al ajustar después).
+MIN_TATAMIS = 1
+MAX_TATAMIS = 10
+
 
 def _validar_campo_texto(valor, etiqueta):
     """(texto, error): recorta un campo opcional y valida su longitud."""
@@ -138,12 +142,13 @@ def crear():
     db.session.add(camp)
     db.session.flush()  # Para obtener el ID
 
-    # Crear tatamis (máximo 10 por campeonato; mínimo 1)
+    # Crear tatamis (entre MIN_TATAMIS y MAX_TATAMIS). Después se pueden
+    # ajustar mientras el campeonato siga en preparación (ver ajustar_tatamis).
     try:
         num_tatamis = int(data.get("num_tatamis", 6))
     except (TypeError, ValueError):
         num_tatamis = 6
-    num_tatamis = max(1, min(10, num_tatamis))
+    num_tatamis = max(MIN_TATAMIS, min(MAX_TATAMIS, num_tatamis))
     for i in range(1, num_tatamis + 1):
         tatami = Tatami(
             campeonato_id=camp.id,
@@ -198,6 +203,118 @@ def actualizar(camp_id):
 
     db.session.commit()
     return jsonify(camp.to_dict()), 200
+
+
+@campeonatos_bp.route("/<int:camp_id>/tatamis", methods=["PUT"])
+@jwt_required()
+def ajustar_tatamis(camp_id):
+    """
+    PUT /api/campeonatos/:id/tatamis
+    Body: { "num_tatamis": 8 }
+
+    Cambia cuántos tatamis tiene el campeonato, solo mientras está en
+    PREPARACIÓN (una vez en curso, mover tatamis desordenaría el evento).
+    Al subir crea los que faltan; al bajar borra los de número más alto, de
+    modo que el campeonato queda numerado 1..N sin huecos.
+
+    Bajar SE NIEGA (409) si algún tatami a eliminar tiene llaves asignadas o
+    combates guardados: se perderían resultados. Las asignaciones de jueces sí
+    se liberan solas (cascada) y se informa cuántas fueron.
+    """
+    from ..models.combate import Combate
+    from ..models.llave import Llave
+    from ..models.tatami import SesionTatami
+
+    admin = _require_admin()
+    if not admin:
+        return jsonify({"error": "Solo administradores"}), 403
+
+    camp = Campeonato.query.get_or_404(camp_id)
+    if not es_dueno_campeonato(admin, camp):
+        return jsonify({"error": "Campeonato no encontrado"}), 404
+
+    if (camp.estado or "preparacion") != "preparacion":
+        return jsonify({
+            "error": "Los tatamis solo se pueden cambiar mientras el campeonato "
+                     "está en preparación."
+        }), 409
+
+    data = request.get_json() or {}
+    try:
+        objetivo = int(data.get("num_tatamis"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Indica cuántos tatamis debe tener el campeonato."}), 400
+    if not MIN_TATAMIS <= objetivo <= MAX_TATAMIS:
+        return jsonify({
+            "error": f"El campeonato debe tener entre {MIN_TATAMIS} y "
+                     f"{MAX_TATAMIS} tatamis."
+        }), 400
+
+    tatamis = (
+        Tatami.query.filter_by(campeonato_id=camp.id).order_by(Tatami.numero).all()
+    )
+    numeros_actuales = {t.numero for t in tatamis}
+    sobran = [t for t in tatamis if t.numero > objetivo]
+
+    # Antes de borrar nada: comprobar que ningún tatami que sobra guarda trabajo.
+    bloqueos = []
+    for tat in sobran:
+        motivos = []
+        llaves = Llave.query.filter_by(tatami_id=tat.id).count()
+        if llaves:
+            motivos.append(f"tiene {llaves} llave(s) asignada(s)")
+        combates = (
+            Combate.query
+            .join(SesionTatami, Combate.sesion_tatami_id == SesionTatami.id)
+            .filter(SesionTatami.tatami_id == tat.id)
+            .count()
+        )
+        if combates:
+            motivos.append(f"tiene {combates} combate(s) guardado(s)")
+        if motivos:
+            bloqueos.append(f"Tatami {tat.numero} {' y '.join(motivos)}")
+    if bloqueos:
+        return jsonify({
+            "error": "No se puede reducir a "
+                     f"{objetivo} tatamis: " + "; ".join(bloqueos)
+                     + ". Mueve esas llaves a otro tatami o bórralas primero."
+        }), 409
+
+    # Los números se leen ANTES del commit: tras borrar, el objeto expira.
+    eliminados = [tat.numero for tat in sobran]
+    jueces_liberados = 0
+    for tat in sobran:
+        jueces_liberados += tat.asignaciones.count()
+        db.session.delete(tat)
+
+    creados = []
+    for numero in range(1, objetivo + 1):
+        if numero in numeros_actuales:
+            continue
+        db.session.add(Tatami(campeonato_id=camp.id, numero=numero, activo=True))
+        creados.append(numero)
+
+    db.session.commit()
+
+    if creados and not eliminados:
+        message = f"Se agregaron {len(creados)} tatami(s): ahora hay {objetivo}."
+    elif eliminados and not creados:
+        message = f"Se quitaron {len(eliminados)} tatami(s): ahora hay {objetivo}."
+    elif creados or eliminados:
+        message = f"Tatamis actualizados: ahora hay {objetivo}."
+    else:
+        message = f"El campeonato ya tenía {objetivo} tatami(s)."
+    if jueces_liberados:
+        message += f" {jueces_liberados} juez(ces) quedaron sin asignación."
+
+    return jsonify({
+        "message": message,
+        "num_tatamis": objetivo,
+        "creados": creados,
+        "eliminados": eliminados,
+        "jueces_liberados": jueces_liberados,
+        "campeonato": camp.to_dict(include_tatamis=True),
+    }), 200
 
 
 @campeonatos_bp.route("/<int:camp_id>", methods=["DELETE"])

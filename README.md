@@ -35,6 +35,11 @@ tablero local que el Juez Central proyecta aunque se caiga la red.
   en su dispositivo, sin servidor ni conexión; las anotaciones sobreviven a
   recargas y se reingresan al volver la red.
 - **Reportes** exportables a **Excel y PDF** (openpyxl + reportlab).
+- **Traspaso entre la instalación de internet y la local**: un paquete `.json`
+  auto-contenido lleva el campeonato completo (usuarios, competidores,
+  inscripciones, tatamis, asignaciones y llaves) de una instalación a la otra,
+  con vista previa antes de escribir nada. Ver
+  [PLAN-SINCRONIZACION-LOCAL-ONLINE.md](PLAN-SINCRONIZACION-LOCAL-ONLINE.md).
 
 ---
 
@@ -45,12 +50,13 @@ DINAMYT-COMBAT/
 ├── backend/          API REST + Socket.IO (Flask)
 │   └── app/
 │       ├── api/        Endpoints REST (auth, campeonatos, categorias,
-│       │               tatamis, llaves, combates, reportes)
+│       │               tatamis, llaves, combates, reportes, sincronizacion)
 │       ├── sockets/    Namespace de tiempo real (/combate)
 │       ├── engine/     Motores de puntuación (combate y figuras)
 │       ├── models/     Modelos SQLAlchemy (usuario, campeonato, categoria,
 │       │               tatami, asignacion, combate, llave)
 │       ├── seeds/      Datos iniciales (categorías, admin)
+│       ├── uid.py      Identidad estable entre instalaciones (local ↔ online)
 │       └── config.py   Configuración por entorno
 └── frontend/         Aplicación web (Next.js)
     └── src/app/        Rutas: /login, /admin, /juez, /tatami,

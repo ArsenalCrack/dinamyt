@@ -6,6 +6,7 @@ import {
   listCampeonatosAPI,
   createCampeonatoAPI,
   updateCampeonatoAPI,
+  exportarUsuariosAPI,
   listUsersAPI,
   registerUserAPI,
   updateUserAPI,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import DelegacionSelect from "@/components/DelegacionSelect";
+import ImportarPaquetePanel from "@/components/ImportarPaquetePanel";
 import Logo from "@/components/Logo";
 import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
@@ -43,6 +45,10 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"campeonatos" | "jueces">("campeonatos");
   const [showNewCamp, setShowNewCamp] = useState(false);
   const [showNewUser, setShowNewUser] = useState(false);
+  // Paneles de traspaso entre instalaciones (local ↔ internet)
+  const [showImportCamp, setShowImportCamp] = useState(false);
+  const [showImportUsers, setShowImportUsers] = useState(false);
+  const [exportandoUsuarios, setExportandoUsuarios] = useState(false);
   const [newCamp, setNewCamp] = useState({
     nombre: "", descripcion: "", num_tatamis: 6,
     fecha_inicio: "", fecha_fin: "", lugar: "", ciudad: "", pais: "",
@@ -292,10 +298,32 @@ export default function AdminPage() {
             <h2 style={{ fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "1.1rem", color: "var(--gold)" }}>
               {t("admin.tab.campeonatos")} ({campeonatos.length})
             </h2>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowNewCamp(!showNewCamp)}>
-              {t("admin.camp.nuevo")}
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                className={`btn btn-sm ${showImportCamp ? "btn-primary" : ""}`}
+                onClick={() => setShowImportCamp(!showImportCamp)}
+              >
+                {t("sync.importarCampeonato")}
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowNewCamp(!showNewCamp)}>
+                {t("admin.camp.nuevo")}
+              </button>
+            </div>
           </div>
+
+          {/* Traer un campeonato completo desde la otra instalación */}
+          {showImportCamp && (
+            <div style={{ marginBottom: 16 }}>
+              <ImportarPaquetePanel
+                conModo
+                onImportado={(informe) => {
+                  setShowImportCamp(false);
+                  loadData(showInactive);
+                  flash(informe.message, "ok");
+                }}
+              />
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
             <input
@@ -445,10 +473,45 @@ export default function AdminPage() {
             <h2 style={{ fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "1.1rem", color: "var(--gold)" }}>
               {t("admin.usuarios.titulo")} ({users.length})
             </h2>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowNewUser(!showNewUser)}>
-              {t("admin.usuarios.nuevo")}
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                className="btn btn-sm"
+                disabled={exportandoUsuarios}
+                onClick={async () => {
+                  setExportandoUsuarios(true);
+                  try {
+                    await exportarUsuariosAPI();
+                    flash(t("sync.exportado"), "ok");
+                  } catch { flash(t("sync.errorExportar"), "error"); }
+                  finally { setExportandoUsuarios(false); }
+                }}
+              >
+                {exportandoUsuarios ? t("sync.exportando") : t("sync.exportarUsuarios")}
+              </button>
+              <button
+                className={`btn btn-sm ${showImportUsers ? "btn-primary" : ""}`}
+                onClick={() => setShowImportUsers(!showImportUsers)}
+              >
+                {t("sync.importarUsuarios")}
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowNewUser(!showNewUser)}>
+                {t("admin.usuarios.nuevo")}
+              </button>
+            </div>
           </div>
+
+          {/* Traer maestros y jueces desde la otra instalación */}
+          {showImportUsers && (
+            <div style={{ marginBottom: 16 }}>
+              <ImportarPaquetePanel
+                onImportado={(informe) => {
+                  setShowImportUsers(false);
+                  loadData(showInactive);
+                  flash(informe.message, "ok");
+                }}
+              />
+            </div>
+          )}
 
           {showNewUser && (
             <div className="card animate-slide" style={{ marginBottom: 16 }}>

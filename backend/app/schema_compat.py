@@ -7,6 +7,8 @@ from .extensions import db
 
 OPTIONAL_COLUMNS = {
     "usuarios": {
+        # Identidad estable entre instancias (local ↔ online). Ver app/uid.py.
+        "uid": "VARCHAR(32)",
         "creado_por_id": "INTEGER",
         "eliminado_at": "DATETIME",
         # Jerarquía: el superadmin ve todos los workspaces; un admin normal
@@ -20,9 +22,14 @@ OPTIONAL_COLUMNS = {
         "pais_delegacion": "VARCHAR(80)",
     },
     "asignaciones_juez": {
+        "uid": "VARCHAR(32)",
         "asignado_por_id": "INTEGER",
     },
+    "tatamis": {
+        "uid": "VARCHAR(32)",
+    },
     "llaves": {
+        "uid": "VARCHAR(32)",
         "tatami_id": "INTEGER",
         "tipo": "VARCHAR(20)",
         "descripcion": "TEXT",
@@ -39,12 +46,14 @@ OPTIONAL_COLUMNS = {
         "estado": "VARCHAR(20)",
     },
     "competidores": {
+        "uid": "VARCHAR(32)",
         "categoria_especial": "BOOLEAN",
         # Fecha de última actualización de datos (peso/cinturón cambian entre
         # campeonatos). NULL en filas viejas = nunca actualizado tras crearse.
         "updated_at": "DATETIME",
     },
     "inscripciones": {
+        "uid": "VARCHAR(32)",
         # Moderación de inscripciones enviadas por maestros.
         "estado": "VARCHAR(20)",
         "created_by": "INTEGER",
@@ -130,4 +139,43 @@ def ensure_optional_columns():
                 ),
                 {"valor": valor},
             )
+    db.session.commit()
+
+    _ensure_indices_uid(table_names)
+
+    # Los uid llevan un valor DISTINTO por fila, así que no salen de un UPDATE
+    # plano como el resto: los genera el backfill de app/uid.py.
+    from .uid import backfill_uids
+    rellenados = backfill_uids()
+    if rellenados:
+        print(f"  [OK] Identidad de sincronización asignada a {rellenados} registro(s)")
+
+
+def _ensure_indices_uid(table_names):
+    """Índice por uid en las bases que recibieron la columna con ALTER TABLE.
+
+    `db.create_all()` sí crea el índice en una base nueva, pero un ALTER TABLE
+    solo agrega la columna. Sin el índice, emparejar por uid al importar haría
+    un recorrido completo de la tabla.
+    """
+    indices = {
+        "usuarios": "uid",
+        "competidores": "uid",
+        "tatamis": "uid",
+        "asignaciones_juez": "uid",
+        "inscripciones": "uid",
+        "llaves": "uid",
+        "campeonatos": "export_uuid",
+    }
+    for table_name, column_name in indices.items():
+        if table_name not in table_names:
+            continue
+        # SQLite y PostgreSQL admiten los dos IF NOT EXISTS; el nombre es el
+        # mismo que genera SQLAlchemy con index=True, así que no se duplica.
+        db.session.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS ix_{table_name}_{column_name} "
+                f"ON {table_name} ({column_name})"
+            )
+        )
     db.session.commit()

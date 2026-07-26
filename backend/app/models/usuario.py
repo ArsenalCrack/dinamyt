@@ -7,6 +7,7 @@ alumnos y, si el admin se lo permite, puntúa como juez) | juez (puntúa combate
 import os
 from datetime import datetime, timezone
 from ..extensions import db
+from ..uid import nuevo_uid
 import bcrypt
 
 # Roles válidos del sistema. `rol` es un String (no Enum de BD) para poder
@@ -27,6 +28,8 @@ class Usuario(db.Model):
     __tablename__ = "usuarios"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Identidad estable entre instancias (local ↔ online). Ver app/uid.py.
+    uid = db.Column(db.String(32), nullable=True, index=True, default=nuevo_uid)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     nombre = db.Column(db.String(150), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)

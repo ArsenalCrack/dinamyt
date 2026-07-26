@@ -7,12 +7,15 @@ AccesoTatami — Auditoría: quién entró, cuándo, con qué IP, a qué tatami.
 
 from datetime import datetime, timezone
 from ..extensions import db
+from ..uid import nuevo_uid
 
 
 class AsignacionJuez(db.Model):
     __tablename__ = "asignaciones_juez"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Identidad estable entre instancias (local ↔ online). Ver app/uid.py.
+    uid = db.Column(db.String(32), nullable=True, index=True, default=nuevo_uid)
     usuario_id = db.Column(
         db.Integer, db.ForeignKey("usuarios.id"), nullable=False, index=True
     )

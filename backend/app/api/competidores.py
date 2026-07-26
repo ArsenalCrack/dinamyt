@@ -1027,7 +1027,7 @@ def publico_campeonato(camp_id):
     """
     GET /api/inscripciones/publico/campeonato/:id — Sin login.
     Ficha pública: datos del campeonato + inscritos ACEPTADOS (nombre, club,
-    modalidades) + jueces asignados. Solo campeonatos activos.
+    modalidades) + jueces asignados + tatamis. Solo campeonatos activos.
     """
     from ..models.asignacion import AsignacionJuez
     from ..models.tatami import Tatami
@@ -1048,7 +1048,11 @@ def publico_campeonato(camp_id):
         "modalidades": i.modalidades or [],
     } for i in inscripciones if i.competidor]
 
-    tatamis = Tatami.query.filter_by(campeonato_id=camp.id).all()
+    tatamis = (
+        Tatami.query.filter_by(campeonato_id=camp.id)
+        .order_by(Tatami.numero.asc())
+        .all()
+    )
     tnum = {t.id: t.numero for t in tatamis}
     jueces = []
     if tnum:
@@ -1076,4 +1080,10 @@ def publico_campeonato(camp_id):
         "competidores": competidores,
         "jueces": jueces,
         "clubes": sorted({c["club"] for c in competidores if c["club"]}, key=str.lower),
+        # La ficha pública muestra los tatamis del evento (y enlaza a su
+        # pantalla cuando el campeonato ya está en curso).
+        "tatamis": [
+            {"id": t.id, "numero": t.numero, "activo": bool(t.activo)}
+            for t in tatamis
+        ],
     }), 200

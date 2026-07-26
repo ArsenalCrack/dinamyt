@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   createCompetidorAPI,
   deleteCompetidorAPI,
+  exportarCompetidoresAPI,
   listClubesAPI,
   listCompetidoresAPI,
   updateCompetidorAPI,
@@ -18,6 +19,7 @@ import CompetidorFormFields, {
   type CompetidorFormState,
 } from "@/components/CompetidorFormFields";
 import ImportarExcelPanel from "@/components/ImportarExcelPanel";
+import ImportarPaquetePanel from "@/components/ImportarPaquetePanel";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useI18n } from "@/lib/i18n";
 
@@ -32,6 +34,9 @@ export default function CompetidoresPage() {
 
   const [formAbierto, setFormAbierto] = useState(false);
   const [importAbierto, setImportAbierto] = useState(false);
+  // Traspaso entre instalaciones (paquete .json), aparte del Excel
+  const [paqueteAbierto, setPaqueteAbierto] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [form, setForm] = useState<CompetidorFormState>(COMPETIDOR_FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
@@ -154,6 +159,28 @@ export default function CompetidoresPage() {
             <button className="btn btn-sm" onClick={() => { setImportAbierto(!importAbierto); setFormAbierto(false); }}>
               {t("comp.importarExcel")}
             </button>
+            {/* Traspaso entre instalaciones: JSON con todos los campos, a
+                diferencia del Excel, que es para capturar listas a mano. */}
+            <button
+              className="btn btn-sm"
+              disabled={exportando}
+              onClick={async () => {
+                setExportando(true);
+                try {
+                  await exportarCompetidoresAPI();
+                  flash(t("sync.exportado"));
+                } catch { flash(t("sync.errorExportar"), "error"); }
+                finally { setExportando(false); }
+              }}
+            >
+              {exportando ? t("sync.exportando") : t("sync.exportarCompetidores")}
+            </button>
+            <button
+              className={`btn btn-sm ${paqueteAbierto ? "btn-primary" : ""}`}
+              onClick={() => { setPaqueteAbierto(!paqueteAbierto); setFormAbierto(false); }}
+            >
+              {t("sync.importarCompetidores")}
+            </button>
             <button className="btn btn-primary btn-sm" onClick={abrirCrear}>
               {t("comp.nuevo")}
             </button>
@@ -175,6 +202,18 @@ export default function CompetidoresPage() {
       {importAbierto && (
         <div style={{ marginBottom: 14 }}>
           <ImportarExcelPanel onImportado={cargar} onMensaje={flash} />
+        </div>
+      )}
+
+      {paqueteAbierto && (
+        <div style={{ marginBottom: 14 }}>
+          <ImportarPaquetePanel
+            onImportado={(informe) => {
+              setPaqueteAbierto(false);
+              void cargar();
+              flash(informe.message);
+            }}
+          />
         </div>
       )}
 

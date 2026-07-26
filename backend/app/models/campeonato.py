@@ -6,6 +6,7 @@ Soporta múltiples campeonatos simultáneos.
 
 from datetime import datetime, timezone
 from ..extensions import db
+from ..uid import nuevo_uid
 
 # Ciclo de vida del campeonato (independiente de `activo`, que controla la
 # visibilidad pública):
@@ -35,10 +36,15 @@ class Campeonato(db.Model):
     # llaves: {"modalidades": [{nombre, tipo, activa, categorias: {...}}]}.
     # NULL = el admin todavía no configuró (el flujo manual no la necesita).
     config_categorias = db.Column(db.JSON, nullable=True)
-    # UUID estable para exportar/publicar los resultados en otra instancia.
-    # Se genera la primera vez que se exporta (ver api/resultados.py). Permite
-    # que reimportar el mismo campeonato REEMPLACE el snapshot, no lo duplique.
-    export_uuid = db.Column(db.String(64), nullable=True, index=True)
+    # UUID estable del campeonato: es su identidad al viajar entre instancias
+    # (ver app/uid.py). Permite que reimportar el mismo campeonato lo ACTUALICE
+    # en vez de duplicarlo, tanto al publicar solo los resultados
+    # (api/resultados.py) como al traspasar el campeonato completo
+    # (api/sincronizacion.py). Los campeonatos anteriores a esta columna lo
+    # reciben en el backfill de arranque.
+    export_uuid = db.Column(
+        db.String(64), nullable=True, index=True, default=nuevo_uid
+    )
     created_by = db.Column(
         db.Integer, db.ForeignKey("usuarios.id"), nullable=True
     )
