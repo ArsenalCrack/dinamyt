@@ -24,13 +24,16 @@ const mono = IBM_Plex_Mono({
   variable: '--font-mono',
 });
 
+// Lo que el alumno lee en la pestaña y bajo el ícono de la app instalada. El
+// nombre interno del proyecto sigue siendo «membresías»; lo que ve el usuario,
+// no: su club.
 export const metadata: Metadata = {
-  title: 'DINAMYT Membresías',
-  description: 'Control de mensualidades y asistencia de tu club de artes marciales.',
+  title: 'Mi Club · DINAMYT',
+  description: 'Tu carnet, tus asistencias y tu estado en el club.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    title: 'Membresías',
+    title: 'Mi Club',
     statusBarStyle: 'black-translucent',
   },
 };

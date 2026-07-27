@@ -1,7 +1,7 @@
 {
-  "name": "DINAMYT Membresías",
-  "short_name": "Membresías",
-  "description": "Control de mensualidades y asistencia de tu club de artes marciales.",
+  "name": "Mi Club · DINAMYT",
+  "short_name": "Mi Club",
+  "description": "Tu carnet, tus asistencias y tu estado en el club.",
   "lang": "es",
   "start_url": "/",
   "scope": "/",
@@ -32,7 +32,7 @@
       "url": "/kiosco"
     },
     {
-      "name": "Mi membresía",
+      "name": "Mi estado",
       "short_name": "Mi carnet",
       "description": "Mi estado y mi carnet QR",
       "url": "/mi"

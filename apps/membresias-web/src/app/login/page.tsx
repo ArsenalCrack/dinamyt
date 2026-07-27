@@ -162,17 +162,6 @@ export default function Login() {
             </a>
           </>
         )}
-
-        {/* Aquí no hay registro abierto ni «olvidé mi contraseña»: las cuentas
-            las crea el maestro y él mismo restablece las contraseñas. */}
-        <p
-          className="muted"
-          style={{ marginTop: '1.25rem', fontSize: '0.78rem', lineHeight: 1.5 }}
-        >
-          {t('login.sinCuenta')}
-          <br />
-          {t('login.olvide')}
-        </p>
       </form>
 
       {/* Sin sesión no hay NavBar: el tema y el idioma viven aquí. */}

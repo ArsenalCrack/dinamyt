@@ -170,6 +170,31 @@ puerta de entrada: sin ella nadie puede crear el primer club.
 
 4. **Deploy**. Copia la URL resultante.
 
+### Cambiarle la URL (que no diga «membresías»)
+
+La URL es lo primero que lee un alumno cuando el maestro le pasa el enlace, y
+`dinamyt-membresias.vercel.app` suena a que le van a cobrar. El nombre interno
+del repositorio da igual: solo hay que cambiar el del **proyecto en Vercel**,
+porque de ahí sale el subdominio.
+
+1. Vercel → tu proyecto → **Settings → General → Project Name**. Ponle algo
+   como `dinamyt-mi-club`. Al guardar, el dominio pasa a ser
+   `dinamyt-mi-club.vercel.app`.
+
+   > El dominio viejo **deja de responder**. Si ya le pasaste el enlace a
+   > alguien, avísale.
+
+2. **Actualiza Render.** Este es el paso que se olvida y deja la app inservible:
+   `CORS_ORIGINS` y `MEMBRESIAS_WEB_URL` siguen apuntando al dominio anterior.
+   Ve a Render → **Environment**, cámbialas por la URL nueva (sin barra final) y
+   guarda; el servicio se reinicia solo.
+
+3. Entra a la URL nueva y haz login. Si el login responde pero la pantalla queda
+   vacía, es que el paso 2 quedó a medias.
+
+Si más adelante quieres un dominio propio (`club.tudominio.com`), va en
+**Settings → Domains**; el mismo paso 2 aplica igual.
+
 ---
 
 ## 4. Cerrar el círculo

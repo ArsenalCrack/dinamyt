@@ -35,11 +35,7 @@ export function NavBar() {
     { href: '/kiosco', clave: 'menu.kiosco', visible: esStaff },
     { href: '/planes', clave: 'menu.planes', visible: esStaff },
     { href: '/calendario', clave: 'menu.calendario', visible: esStaff },
-    {
-      href: '/mi',
-      clave: esStaff ? 'menu.miEstado' : 'menu.miMembresia',
-      visible: !esSuper,
-    },
+    { href: '/mi', clave: 'menu.miEstado', visible: !esSuper },
   ];
   const visibles = links.filter((l) => l.visible);
 
@@ -118,7 +114,7 @@ export function NavBar() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="DINAMYT" width={30} height={30} />
           <span className="display" style={{ fontSize: '1rem', whiteSpace: 'nowrap' }}>
-            {t('login.titulo')}
+            {t('app.nombre')}
           </span>
         </Link>
 

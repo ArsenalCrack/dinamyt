@@ -25,6 +25,11 @@ const STORAGE_KEY = 'membresias_lang';
 
 // ─── Diccionario base (español) ──────────────────────────────────────────────
 const es = {
+  // Nombre visible de la app. El alumno no entra a «gestionar su membresía»:
+  // entra a su club. El vocabulario de cobro (mensualidad, plan, pago) se queda
+  // dentro del panel del maestro, que es de quien sí es el asunto.
+  'app.nombre': 'Mi Club',
+
   // Navegación
   'menu.panel': 'Panel del club',
   'menu.alumnos': 'Alumnos',
@@ -33,7 +38,6 @@ const es = {
   'menu.planes': 'Planes',
   'menu.calendario': 'Calendario',
   'menu.miEstado': 'Mi estado',
-  'menu.miMembresia': 'Mi membresía',
   'menu.admin': 'Clubes y maestros',
   'menu.abrir': 'Abrir menú',
   'menu.cerrar': 'Cerrar menú',
@@ -51,20 +55,17 @@ const es = {
   'rol.student': 'Alumno',
   'rol.miembro': 'Miembro',
 
-  // Login
-  'login.eyebrow': 'Control de mensualidades',
-  'login.titulo': 'Membresías',
-  'login.tituloAcento': 'del club',
+  // Login. Es la única pantalla que ven por igual el maestro y el alumno, así
+  // que no habla de cuotas: habla del club.
+  'login.eyebrow': 'DINAMYT',
+  'login.titulo': 'Mi',
+  'login.tituloAcento': 'Club',
   'login.subtitulo': 'Ingresa con la cuenta que te dio tu maestro.',
   'login.correo': 'Correo',
   'login.contrasena': 'Contraseña',
   'login.entrar': 'Ingresar',
   'login.entrando': 'Ingresando…',
   'login.error': 'No se pudo iniciar sesión.',
-  'login.sinCuenta':
-    '¿No tienes cuenta? Pídesela a tu maestro: aquí no hay registro abierto.',
-  'login.olvide':
-    '¿Olvidaste la contraseña? Tu maestro puede ponerte una nueva.',
   'login.sso': 'Entrar con el portal DINAMYT',
   'login.o': 'o',
 
@@ -196,8 +197,8 @@ const es = {
   'calendario.nota': 'Motivo',
   'calendario.sinExcepciones': 'Sin excepciones registradas.',
 
-  // Mi membresía
-  'mi.titulo': 'Mi membresía',
+  // Mi estado
+  'mi.titulo': 'Mi estado',
   'mi.estado': 'Estado',
   'mi.vence': 'Vence el',
   'mi.diasFaltantes': 'Días restantes',
@@ -262,6 +263,8 @@ const es = {
 export type ClaveTexto = keyof typeof es;
 
 const en: Record<ClaveTexto, string> = {
+  'app.nombre': 'My Club',
+
   'menu.panel': 'Club dashboard',
   'menu.alumnos': 'Students',
   'menu.asistencia': 'Attendance',
@@ -269,7 +272,6 @@ const en: Record<ClaveTexto, string> = {
   'menu.planes': 'Plans',
   'menu.calendario': 'Calendar',
   'menu.miEstado': 'My status',
-  'menu.miMembresia': 'My membership',
   'menu.admin': 'Clubs and masters',
   'menu.abrir': 'Open menu',
   'menu.cerrar': 'Close menu',
@@ -286,17 +288,15 @@ const en: Record<ClaveTexto, string> = {
   'rol.student': 'Student',
   'rol.miembro': 'Member',
 
-  'login.eyebrow': 'Membership tracking',
-  'login.titulo': 'Memberships',
-  'login.tituloAcento': 'for your club',
+  'login.eyebrow': 'DINAMYT',
+  'login.titulo': 'My',
+  'login.tituloAcento': 'Club',
   'login.subtitulo': 'Sign in with the account your master gave you.',
   'login.correo': 'Email',
   'login.contrasena': 'Password',
   'login.entrar': 'Sign in',
   'login.entrando': 'Signing in…',
   'login.error': 'Could not sign in.',
-  'login.sinCuenta': "No account? Ask your master — there's no open sign-up here.",
-  'login.olvide': 'Forgot your password? Your master can set a new one.',
   'login.sso': 'Sign in with the DINAMYT portal',
   'login.o': 'or',
 
@@ -416,7 +416,7 @@ const en: Record<ClaveTexto, string> = {
   'calendario.nota': 'Reason',
   'calendario.sinExcepciones': 'No exceptions recorded.',
 
-  'mi.titulo': 'My membership',
+  'mi.titulo': 'My status',
   'mi.estado': 'Status',
   'mi.vence': 'Due on',
   'mi.diasFaltantes': 'Days left',

@@ -6,9 +6,9 @@ import { useEffect } from 'react';
  * Registra el service worker al cargar la app.
  *
  * Es lo que la hace instalable: sin un SW activo, el navegador no ofrece
- * «Añadir a la pantalla de inicio» y el maestro no puede tener Membresías como
- * un ícono más en su celular. También deja lista la recepción de avisos push,
- * aunque el permiso se pida después desde «Mi membresía».
+ * «Añadir a la pantalla de inicio» y el maestro no puede tener la app como un
+ * ícono más en su celular. También deja lista la recepción de avisos push,
+ * aunque el permiso se pida después desde «Mi estado».
  */
 export function RegistrarServiceWorker() {
   useEffect(() => {

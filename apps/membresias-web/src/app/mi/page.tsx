@@ -38,7 +38,7 @@ interface MiEstado {
 }
 
 /**
- * Panel personal: MI membresía, MIS pagos y asistencias, MI carnet QR. Aquí no
+ * Panel personal: MI estado, MIS pagos y asistencias, MI carnet QR. Aquí no
  * aparece jamás un dato de otro miembro del club.
  */
 export default function MiPanel() {
