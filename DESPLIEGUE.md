@@ -392,6 +392,35 @@ El eslabón que primero va a molestar es Render. El segundo es la pausa por
 inactividad de Supabase, que en un club con clases toda la semana no debería
 llegar a dispararse.
 
+### Mantener despierta la API con UptimeRobot
+
+Mientras sigas en el plan gratis de Render, un *ping* periódico evita el minuto
+de espera del primer acceso del día. En UptimeRobot: **New monitor → HTTP(s)**,
+cada **5 minutos**, y como URL la del servicio de **Render** con `/health`:
+
+```
+https://TU-SERVICIO.onrender.com/health
+```
+
+Debe responder `{"status":"ok","service":"membresias-api"}`.
+
+Tres detalles que importan:
+
+- **La URL de Render, no la de Vercel.** Vercel no se duerme, así que pincharla
+  no despierta a nadie. Sirve también `https://tu-web.vercel.app/api/health`,
+  que llega a Render por el rewrite y de paso comprueba la cadena entera; pero
+  entonces una caída de Vercel se ve como si la API estuviera mal.
+- **Copia la URL real del panel de Render**, no la deduzcas del nombre del
+  `render.yaml`: si el nombre estaba tomado, Render le pega un sufijo.
+- **`/health` no toca la base de datos** — está fuera del contexto RLS a
+  propósito. Despierta el proceso sin gastar conexiones de Supabase, y por eso
+  mismo **no** evita que Supabase se pause: eso lo evita el uso real del club.
+
+Ojo con las horas: el plan gratis de Render da 750 horas de instancia al mes y
+un servicio despierto todo el mes consume ~730. Cabe si es el único servicio
+gratis de la cuenta; si hay más, se reparten el cupo y alguno se quedará sin
+horas antes de fin de mes.
+
 ---
 
 ## Si algo falla
