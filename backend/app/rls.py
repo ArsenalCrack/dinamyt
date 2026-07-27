@@ -156,11 +156,8 @@ def _politica(tabla, columna):
     ]
 
 
-def ensure_rls():
-    """Crea (o actualiza) las políticas. No-op fuera de PostgreSQL."""
-    if not _es_postgres():
-        return False
-
+def _sentencias():
+    """Todo el DDL de las políticas, en orden."""
     sentencias = [_FUNCIONES, _FUNCION_ACCESO]
     for tabla in TABLAS_POR_CREADOR:
         sentencias += _politica(tabla, "created_by")
@@ -179,10 +176,38 @@ def ensure_rls():
         ),
     ]
 
-    with db.engine.begin() as conn:
-        for sentencia in sentencias:
-            conn.execute(text(sentencia))
-    return True
+    return sentencias
+
+
+def ensure_rls():
+    """
+    Crea (o actualiza) las políticas. Devuelve (aplicadas, fallos).
+
+    NO propaga errores, y es deliberado: RLS es una red de seguridad, no un
+    requisito para arrancar. Si el rol de conexión no es dueño de las tablas
+    —caso típico en Neon o Supabase cuando la base la creó otro usuario— los
+    `ALTER TABLE` fallan con "must be owner of table", y dejar que esa
+    excepción suba tumbaba el despliegue entero: sin backend no hay ni sesión
+    ni nada. La app funciona igual sin RLS; el filtro por workspace lo sigue
+    haciendo `api/scoping.py`, que es donde siempre estuvo.
+
+    Fuera de PostgreSQL (SQLite local) devuelve None: ahí RLS no existe.
+
+    Cada sentencia va en su propia transacción para que un fallo no deshaga las
+    que sí pasaron: es preferible RLS a medias que nada.
+    """
+    if not _es_postgres():
+        return None
+
+    aplicadas, fallos = 0, []
+    for sentencia in _sentencias():
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(text(sentencia))
+            aplicadas += 1
+        except Exception as exc:  # noqa: BLE001 — se reporta, no se propaga
+            fallos.append((sentencia.strip().split("\n")[0], str(exc).split("\n")[0]))
+    return aplicadas, fallos
 
 
 def estado_rls():

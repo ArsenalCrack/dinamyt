@@ -192,9 +192,22 @@ def register_cli_commands(app):
         """Crea/actualiza las políticas de RLS y reporta si protegen de verdad."""
         from .rls import ensure_rls, estado_rls
 
-        if not ensure_rls():
+        resultado = ensure_rls()
+        if resultado is None:
             print("[--] SQLite: RLS no aplica. El filtro por workspace lo hace la app.")
             return
+
+        aplicadas, fallos = resultado
+        if fallos:
+            print(f"[ERR] {aplicadas} sentencias aplicadas, {len(fallos)} fallidas:")
+            for sentencia, error in fallos:
+                print(f"      · {sentencia} -> {error}")
+            print(
+                "      Si es 'must be owner of table', conéctate con el rol dueño de "
+                "las tablas para aplicarlas (una sola vez)."
+            )
+            return
+
         ok, motivo = estado_rls()
         print("[OK] Políticas de RLS aplicadas." if ok else f"[ERR] RLS no protege: {motivo}")
 
@@ -207,7 +220,8 @@ def register_cli_commands(app):
         print("[OK] Tablas creadas.")
 
         from .rls import ensure_rls
-        if ensure_rls():
+        resultado = ensure_rls()
+        if resultado and not resultado[1]:
             print("[OK] Políticas de RLS aplicadas.")
 
         from .seeds.seed_categorias import seed_categorias

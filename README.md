@@ -216,6 +216,39 @@ El plan gratis de Render apaga el servicio tras 15 min sin tráfico. Crea un
 monitor HTTP en <https://uptimerobot.com> apuntando a
 `https://<tu-backend>.onrender.com/api/campeonatos/publico` cada 5 minutos.
 
+### 6. Row Level Security (opcional)
+
+El aislamiento entre workspaces lo hace la aplicación (`api/scoping.py` filtra
+por `created_by`). Encima de eso, con PostgreSQL el backend intenta activar
+políticas de RLS al arrancar: si algún día una consulta nueva se olvida del
+filtro, la base devuelve cero filas en vez de las de otro admin.
+
+**Es una capa extra y puede fallar sin consecuencias.** Si en el log de Render
+ves algo así:
+
+```
+[SEGURIDAD] RLS incompleto: 0 sentencias aplicadas, 26 fallidas.
+           · ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY -> must be owner of table usuarios
+```
+
+significa que el rol con el que se conecta el backend no es dueño de las
+tablas — pasa cuando la base la creó otro usuario. El backend **arranca igual**
+y el aislamiento por workspace sigue funcionando; solo falta la red de abajo.
+
+Para activarla, conéctate a la base con el rol dueño de las tablas (en Neon, el
+`owner` del proyecto) y ejecuta una vez:
+
+```bash
+flask rls
+```
+
+O transfiere la propiedad al rol de la aplicación:
+`ALTER TABLE usuarios OWNER TO <rol>;` (y lo mismo para `campeonatos`,
+`competidores`, `inscripciones`, `llaves` y `resultados_publicados`).
+
+Ojo: RLS tampoco protege si el rol es `SUPERUSER` o tiene `BYPASSRLS`, porque
+se salta todas las políticas. El backend lo comprueba y lo dice al arrancar.
+
 ### Actualizar lo ya desplegado
 
 ```powershell
