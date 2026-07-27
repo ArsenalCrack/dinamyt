@@ -106,13 +106,18 @@ puerta de entrada: sin ella nadie puede crear el primer club.
    `JWT_SECRET` no te la pide: Render la genera sola y nadie tiene que verla.
 
 4. **Apply**. El primer build tarda unos minutos. Cuando termine, copia la URL
-   del servicio y comprueba que responde:
+   **que aparece arriba en el panel del servicio** y comprueba que responde:
 
    ```bash
-   curl https://dinamyt-membresias-api.onrender.com/health
+   curl https://TU-SERVICIO.onrender.com/health
    ```
 
    Debe devolver `{"status":"ok","service":"membresias-api"}`.
+
+   > **No la deduzcas del nombre del `render.yaml`.** Si `dinamyt-membresias-api`
+   > ya estaba tomado, Render le pega un sufijo aleatorio y el servicio pasa a
+   > llamarse algo como `dinamyt-membresias-api-m0xb`. Copiar la URL «lógica» en
+   > vez de la real deja la web apuntando a un host que no existe.
 
 5. En **Logs** deberías ver `Superadmin sembrado: tu@correo.com`. Si no aparece
    ni esa línea ni un error, la cuenta ya existía de un despliegue anterior: es
@@ -159,6 +164,32 @@ puerta de entrada: sin ella nadie puede crear el primer club.
    >
    > Fíjate en que `MEMBRESIAS_API_ORIGIN` **no** lleva el prefijo
    > `NEXT_PUBLIC_`: es a propósito, solo la usa el servidor.
+   >
+   > **Y se lee al CONSTRUIR, no al arrancar.** Next mete el destino del rewrite
+   > dentro del build, así que añadirla o corregirla en el panel **no hace nada
+   > hasta que vuelvas a desplegar**: Deployments → el último → ⋯ → *Redeploy*.
+   > Comprueba también que esté marcada para el entorno **Production**, no solo
+   > para Preview.
+
+   **Cómo saber si quedó mal.** La web carga, pero cualquier llamada a la API
+   responde 404 con este cuerpo:
+
+   ```
+   The page could not be found
+   DNS_HOSTNAME_RESOLVED_PRIVATE
+   ```
+
+   Eso es Vercel diciendo «el rewrite apunta a una IP privada»: la variable
+   estaba vacía en el build y el destino se quedó en `127.0.0.1`. Desde el
+   navegador, en la web desplegada:
+
+   ```js
+   fetch('/api/health').then(r => r.text()).then(console.log)
+   ```
+
+   Si sale ese texto, es esto. Si sale `{"status":"ok"}`, el proxy está bien.
+   Desde el commit que añadió el guardarraíl esto ya no puede pasar callado: el
+   build de Vercel falla con el motivo escrito.
 
    Opcionales:
 
@@ -224,7 +255,7 @@ Vale la pena entenderlo porque explica varias decisiones de la configuración:
 navegador  ──►  tu-web.vercel.app/api/...   (mismo origen: la cookie viaja)
                         │
                         ▼  rewrite de Next, servidor a servidor
-                dinamyt-membresias-api.onrender.com
+                TU-SERVICIO.onrender.com   (MEMBRESIAS_API_ORIGIN)
 ```
 
 El navegador **nunca** habla con Render. Si lo hiciera, la cookie de sesión
