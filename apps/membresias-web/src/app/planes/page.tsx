@@ -7,6 +7,7 @@ import { api, mensajeError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { fmtMoneda } from '@/lib/formato';
+import { LIM, soloDigitos, soloDinero } from '@/lib/campos';
 
 interface Plan {
   id: string;
@@ -120,6 +121,7 @@ export default function Planes() {
           <input
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            maxLength={LIM.planNombre}
             required
           />
         </div>
@@ -142,10 +144,15 @@ export default function Planes() {
           <label className="muted" style={{ fontSize: '0.75rem' }}>
             {t('planes.precio')}
           </label>
+          {/* `inputMode` solo elige el teclado del móvil: en un escritorio se
+              podían teclear letras y el precio llegaba roto a la API. El filtro
+              del onChange es lo que de verdad impide escribir algo que no sea
+              un número. */}
           <input
-            inputMode="numeric"
+            inputMode="decimal"
             value={form.price}
-            onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, price: soloDinero(e.target.value) }))}
+            maxLength={LIM.precioEnteros + 3}
             required
           />
         </div>
@@ -157,7 +164,10 @@ export default function Planes() {
             <input
               inputMode="numeric"
               value={form.nClasses}
-              onChange={(e) => setForm((f) => ({ ...f, nClasses: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, nClasses: soloDigitos(e.target.value, LIM.clases) }))
+              }
+              maxLength={LIM.clases}
             />
           </div>
         )}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { guardarToken, mensajeError, obtenerConfig, obtenerMe } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
+import { LIM } from '@/lib/campos';
 import { ControlesApariencia } from '@/components/ControlesApariencia';
 
 const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
@@ -103,6 +104,7 @@ export default function Login() {
           autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          maxLength={LIM.correo}
           required
           style={{ margin: '0.3rem 0 0.9rem' }}
         />
@@ -110,6 +112,10 @@ export default function Login() {
         <label className="muted" style={{ fontSize: '0.8rem' }} htmlFor="password">
           {t('login.contrasena')}
         </label>
+        {/* Sin `maxLength` a propósito: es el único campo de contraseña que no
+            fija una nueva, sino que comprueba la que ya existe. Recortar aquí
+            dejaría fuera a quien tenga una más larga de lo que hoy se permite
+            crear. El tope vive donde se FIJAN (perfil, alta y restablecer). */}
         <input
           id="password"
           type="password"

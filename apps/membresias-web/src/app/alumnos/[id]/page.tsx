@@ -7,6 +7,7 @@ import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
+import { LIM } from '@/lib/campos';
 import { Avatar } from '@/components/Avatar';
 import { CarnetQR } from '@/components/CarnetQR';
 
@@ -201,6 +202,7 @@ export default function Ficha() {
               <input
                 type="text"
                 minLength={8}
+                maxLength={LIM.password}
                 required
                 value={nuevaPass}
                 onChange={(e) => setNuevaPass(e.target.value)}

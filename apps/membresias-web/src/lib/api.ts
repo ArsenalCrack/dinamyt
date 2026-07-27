@@ -209,3 +209,25 @@ export async function obtenerConfig(): Promise<{ sso: boolean }> {
   const { data } = await api.get<{ sso: boolean }>('/auth/config');
   return data;
 }
+
+export interface Pais {
+  /** Código ISO-3166 alfa-2. Con él se traduce el nombre al idioma activo. */
+  iso2: string;
+  nombre: string;
+}
+
+/**
+ * Catálogo geográfico de los formularios. La lista completa vive en la API
+ * porque el dataset pesa megabytes y no tiene por qué viajar al navegador de
+ * todo el mundo por un formulario que solo abre el superadmin.
+ */
+export async function listarPaises(): Promise<Pais[]> {
+  const { data } = await api.get<Pais[]>('/geo/paises');
+  return data;
+}
+
+/** Ciudades de un país, por su iso2. */
+export async function listarCiudades(iso2: string): Promise<string[]> {
+  const { data } = await api.get<string[]>('/geo/ciudades', { params: { pais: iso2 } });
+  return data;
+}

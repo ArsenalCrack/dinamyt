@@ -7,6 +7,7 @@ import { api, mensajeError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { fmtFecha } from '@/lib/formato';
+import { LIM } from '@/lib/campos';
 
 interface Exc {
   id: string;
@@ -178,8 +179,12 @@ export default function Calendario() {
             <label className="muted" style={{ fontSize: '0.72rem' }}>
               {t('comun.fecha')}
             </label>
+            {/* Un `type="date"` sin acotar admite años de cinco cifras, que la
+                columna `date` no acepta y acaban en un error del servidor. */}
             <input
               type="date"
+              min="2000-01-01"
+              max="2100-12-31"
               value={nueva.date}
               onChange={(e) => setNueva((n) => ({ ...n, date: e.target.value }))}
             />
@@ -203,6 +208,7 @@ export default function Calendario() {
             <input
               value={nueva.note}
               onChange={(e) => setNueva((n) => ({ ...n, note: e.target.value }))}
+              maxLength={LIM.notaCalendario}
             />
           </div>
           <button className="btn btn-outline" type="submit">

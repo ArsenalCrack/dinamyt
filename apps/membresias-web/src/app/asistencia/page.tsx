@@ -7,6 +7,7 @@ import { api, mensajeError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { fmtFecha } from '@/lib/formato';
+import { LIM } from '@/lib/campos';
 import { Avatar } from '@/components/Avatar';
 
 interface RosterItem {
@@ -157,6 +158,7 @@ export default function AsistenciaPage() {
       <input
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
+        maxLength={LIM.busqueda}
         placeholder={t('comun.buscar')}
         aria-label={t('comun.buscar')}
         style={{ marginBottom: '0.9rem', width: '100%' }}

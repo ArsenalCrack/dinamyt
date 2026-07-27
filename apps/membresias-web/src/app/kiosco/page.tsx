@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
+import { LIM, soloDigitos } from '@/lib/campos';
 import { EscanerQR } from '@/components/EscanerQR';
 import { ControlesApariencia } from '@/components/ControlesApariencia';
 
@@ -183,15 +184,20 @@ export default function Kiosco() {
             e.preventDefault();
             const valor = pin.trim();
             if (!valor) return;
-            void checkin({ type: UUID_RE.test(valor) ? 'qr' : 'pin', value: valor });
+            void checkin({ type: 'pin', value: valor });
             setPin('');
           }}
           style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}
         >
+          {/* Solo dígitos y los que caben en la columna: este cuadro es el
+              respaldo del escáner y lo que se teclea aquí es el PIN. Un QR se
+              lee con la cámara, no se transcribe a mano. */}
           <input
             value={pin}
-            onChange={(e) => setPin(e.target.value)}
+            onChange={(e) => setPin(soloDigitos(e.target.value, LIM.checkinPin))}
             inputMode="numeric"
+            autoComplete="off"
+            maxLength={LIM.checkinPin}
             className="mono"
             style={{ fontSize: '1.4rem', textAlign: 'center', letterSpacing: '0.15em' }}
           />

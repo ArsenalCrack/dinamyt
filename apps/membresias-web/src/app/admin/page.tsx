@@ -1,10 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, mensajeError, type Rol } from '@/lib/api';
+import {
+  api,
+  listarCiudades,
+  listarPaises,
+  mensajeError,
+  type Pais,
+  type Rol,
+} from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
+import { LIM, soloTelefono } from '@/lib/campos';
 
 interface Club {
   id: string;
@@ -33,7 +41,7 @@ interface Persona {
  */
 export default function Admin() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, idioma } = useI18n();
   const { user, cargando: cargandoSesion, esSuper } = useAuth();
 
   const [clubes, setClubes] = useState<Club[]>([]);
@@ -50,6 +58,36 @@ export default function Admin() {
     password: '',
     phone: '',
   });
+
+  // ── Catálogo geográfico ────────────────────────────────────────────────────
+  // Los países se piden una vez y las ciudades solo del país elegido: son miles
+  // por país y traerlas todas de golpe no cabe en una pantalla ni en la red.
+  // Si la API no responde, ambos campos siguen funcionando como texto libre —
+  // que no se pueda crear un club porque falló un catálogo sería absurdo.
+  const [paises, setPaises] = useState<Pais[]>([]);
+  const [ciudades, setCiudades] = useState<string[]>([]);
+  /**
+   * El desplegable trabaja con el iso2 y no con el nombre: así, cambiar de
+   * idioma a media captura no le borra el país elegido al superadmin — solo
+   * cambia la etiqueta. Lo que se guarda en el club sigue siendo el nombre.
+   */
+  const [paisIso, setPaisIso] = useState('');
+
+  const nombresPais = useMemo(() => {
+    try {
+      return new Intl.DisplayNames([idioma], { type: 'region' });
+    } catch {
+      return null;
+    }
+  }, [idioma]);
+
+  const paisesTraducidos = useMemo(
+    () =>
+      paises
+        .map((p) => ({ ...p, nombre: nombresPais?.of(p.iso2) ?? p.nombre }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, idioma)),
+    [paises, nombresPais, idioma],
+  );
 
   const cargar = useCallback(async () => {
     try {
@@ -73,7 +111,27 @@ export default function Admin() {
       return;
     }
     void cargar();
+    listarPaises()
+      .then(setPaises)
+      .catch(() => setPaises([]));
   }, [cargandoSesion, user, esSuper, router, cargar]);
+
+  useEffect(() => {
+    if (!paisIso) {
+      setCiudades([]);
+      return;
+    }
+    listarCiudades(paisIso)
+      .then(setCiudades)
+      .catch(() => setCiudades([]));
+  }, [paisIso]);
+
+  // Al cambiar de idioma, el nombre guardado se reescribe en el nuevo.
+  useEffect(() => {
+    if (!paisIso) return;
+    const nombre = paisesTraducidos.find((p) => p.iso2 === paisIso)?.nombre;
+    if (nombre) setNuevoClub((c) => (c.country === nombre ? c : { ...c, country: nombre }));
+  }, [paisIso, paisesTraducidos]);
 
   async function crearClub(e: FormEvent) {
     e.preventDefault();
@@ -82,6 +140,7 @@ export default function Admin() {
     try {
       await api.post('/orgs', nuevoClub);
       setNuevoClub({ name: '', city: '', country: '' });
+      setPaisIso('');
       setAviso(t('admin.clubCreado'));
       await cargar();
     } catch (err) {
@@ -202,17 +261,8 @@ export default function Admin() {
             <input
               value={nuevoClub.name}
               onChange={(e) => setNuevoClub({ ...nuevoClub, name: e.target.value })}
+              maxLength={LIM.orgNombre}
               required
-              style={{ marginTop: '0.25rem' }}
-            />
-          </label>
-          <label style={{ display: 'block' }}>
-            <span className="muted" style={{ fontSize: '0.78rem' }}>
-              {t('admin.ciudad')}
-            </span>
-            <input
-              value={nuevoClub.city}
-              onChange={(e) => setNuevoClub({ ...nuevoClub, city: e.target.value })}
               style={{ marginTop: '0.25rem' }}
             />
           </label>
@@ -220,11 +270,60 @@ export default function Admin() {
             <span className="muted" style={{ fontSize: '0.78rem' }}>
               {t('admin.pais')}
             </span>
+            {paisesTraducidos.length > 0 ? (
+              <select
+                value={paisIso}
+                // Cambiar de país deja obsoleta la ciudad elegida: se borra
+                // para no acabar con "Bogotá, México".
+                onChange={(e) => {
+                  const iso = e.target.value;
+                  setPaisIso(iso);
+                  const nombre = paisesTraducidos.find((p) => p.iso2 === iso)?.nombre ?? '';
+                  setNuevoClub((c) => ({ ...c, country: nombre, city: '' }));
+                }}
+                style={{ marginTop: '0.25rem' }}
+              >
+                <option value="">{t('admin.selecciona')}</option>
+                {paisesTraducidos.map((p) => (
+                  <option key={p.iso2} value={p.iso2}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={nuevoClub.country}
+                onChange={(e) => setNuevoClub({ ...nuevoClub, country: e.target.value })}
+                maxLength={LIM.pais}
+                style={{ marginTop: '0.25rem' }}
+              />
+            )}
+          </label>
+          <label style={{ display: 'block' }}>
+            <span className="muted" style={{ fontSize: '0.78rem' }}>
+              {t('admin.ciudad')}
+            </span>
+            {/* Datalist y no `select`: hay miles de ciudades por país y con un
+                desplegable a secas encontrar la suya sería un scroll eterno.
+                Así se escribe y se filtra, y aun así se puede teclear una que
+                no esté en el catálogo. */}
             <input
-              value={nuevoClub.country}
-              onChange={(e) => setNuevoClub({ ...nuevoClub, country: e.target.value })}
+              value={nuevoClub.city}
+              onChange={(e) => setNuevoClub({ ...nuevoClub, city: e.target.value })}
+              maxLength={LIM.ciudad}
+              list="ciudades-del-pais"
+              placeholder={
+                ciudades.length > 0
+                  ? `${t('admin.buscaCiudad')} (${ciudades.length})`
+                  : undefined
+              }
               style={{ marginTop: '0.25rem' }}
             />
+            <datalist id="ciudades-del-pais">
+              {ciudades.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </label>
         </div>
         <button type="submit" className="btn btn-cta" style={{ marginTop: '1rem' }}>
@@ -351,6 +450,7 @@ export default function Admin() {
                       onChange={(e) =>
                         setNuevoMaestro({ ...nuevoMaestro, fullName: e.target.value })
                       }
+                      maxLength={LIM.nombrePersona}
                       required
                     />
                     <input
@@ -360,18 +460,26 @@ export default function Admin() {
                       onChange={(e) =>
                         setNuevoMaestro({ ...nuevoMaestro, email: e.target.value })
                       }
+                      maxLength={LIM.correo}
                       required
                     />
                     <input
+                      type="tel"
+                      inputMode="tel"
                       placeholder={t('comun.telefono')}
                       value={nuevoMaestro.phone}
                       onChange={(e) =>
-                        setNuevoMaestro({ ...nuevoMaestro, phone: e.target.value })
+                        setNuevoMaestro({
+                          ...nuevoMaestro,
+                          phone: soloTelefono(e.target.value),
+                        })
                       }
+                      maxLength={LIM.telefono}
                     />
                     <input
                       type="text"
                       minLength={8}
+                      maxLength={LIM.password}
                       placeholder={t('alumnos.contrasenaInicial')}
                       value={nuevoMaestro.password}
                       onChange={(e) =>

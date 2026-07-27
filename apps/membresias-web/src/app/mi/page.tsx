@@ -7,6 +7,7 @@ import { claveRol, useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { activarPush } from '@/lib/push';
+import { LIM, soloTelefono } from '@/lib/campos';
 import { Avisos } from '@/components/Avisos';
 import { Avatar } from '@/components/Avatar';
 import { CarnetQR } from '@/components/CarnetQR';
@@ -275,6 +276,7 @@ export default function MiPanel() {
           <input
             value={perfil.fullName}
             onChange={(e) => setPerfil({ ...perfil, fullName: e.target.value })}
+            maxLength={LIM.nombrePersona}
             required
             style={{ margin: '0.25rem 0 0.7rem' }}
           />
@@ -282,8 +284,11 @@ export default function MiPanel() {
             {t('comun.telefono')}
           </label>
           <input
+            type="tel"
+            inputMode="tel"
             value={perfil.phone}
-            onChange={(e) => setPerfil({ ...perfil, phone: e.target.value })}
+            onChange={(e) => setPerfil({ ...perfil, phone: soloTelefono(e.target.value) })}
+            maxLength={LIM.telefono}
             style={{ margin: '0.25rem 0 0.9rem' }}
           />
           <button type="submit" className="btn btn-outline btn-sm">
@@ -303,6 +308,7 @@ export default function MiPanel() {
             autoComplete="current-password"
             value={pass.actual}
             onChange={(e) => setPass({ ...pass, actual: e.target.value })}
+            maxLength={LIM.password}
             required
             style={{ margin: '0.25rem 0 0.7rem' }}
           />
@@ -313,6 +319,7 @@ export default function MiPanel() {
             type="password"
             autoComplete="new-password"
             minLength={8}
+            maxLength={LIM.password}
             value={pass.nueva}
             onChange={(e) => setPass({ ...pass, nueva: e.target.value })}
             required

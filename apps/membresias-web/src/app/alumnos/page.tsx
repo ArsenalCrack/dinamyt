@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
+import { LIM, soloTelefono } from '@/lib/campos';
 import { Avatar } from '@/components/Avatar';
 
 interface Persona {
@@ -170,6 +171,7 @@ export default function Alumnos() {
               <input
                 value={form.fullName}
                 onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                maxLength={LIM.nombrePersona}
                 required
                 style={{ marginTop: '0.25rem' }}
               />
@@ -182,6 +184,7 @@ export default function Alumnos() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+                maxLength={LIM.correo}
                 required
                 style={{ marginTop: '0.25rem' }}
               />
@@ -191,8 +194,11 @@ export default function Alumnos() {
                 {t('comun.telefono')}
               </span>
               <input
+                type="tel"
+                inputMode="tel"
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) => setForm({ ...form, phone: soloTelefono(e.target.value) })}
+                maxLength={LIM.telefono}
                 style={{ marginTop: '0.25rem' }}
               />
             </label>
@@ -222,6 +228,7 @@ export default function Alumnos() {
               <input
                 type="text"
                 minLength={8}
+                maxLength={LIM.password}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required
