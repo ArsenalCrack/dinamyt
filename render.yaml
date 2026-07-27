@@ -28,7 +28,9 @@ services:
       - key: PORT
         value: "3004"
 
-      # Base de datos (Supabase u otro Postgres). Se pega en el panel.
+      # Base de datos. En Supabase: la cadena del "Transaction pooler"
+      # (puerto 6543), NO la conexión directa — esa solo responde por IPv6 y
+      # Render no hace salidas por IPv6.
       - key: MEMBRESIAS_DATABASE_URL
         sync: false
 

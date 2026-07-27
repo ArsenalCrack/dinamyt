@@ -104,7 +104,7 @@ el cálculo de vencimientos y las reglas del check-in.
 
 ## Despliegue
 
-**Paso a paso completo en [DESPLIEGUE.md](DESPLIEGUE.md)** — Neon (base de
+**Paso a paso completo en [DESPLIEGUE.md](DESPLIEGUE.md)** — Supabase (base de
 datos) + Render (API) + Vercel (web), con la lista de variables y las trampas
 que cuestan una tarde.
 
