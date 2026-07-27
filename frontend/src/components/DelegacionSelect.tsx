@@ -8,8 +8,13 @@
 //  • Ciudad: sugiere las ciudades del país elegido (se escribe para filtrar),
 //    pero acepta texto libre porque no todas las ciudades están en el catálogo.
 //    Se habilita solo tras elegir un país.
+//
+// Ojo con el marcado: el desplegable NO puede colgar dentro de un <label> que
+// envuelva al input, porque al hacer clic en una opción el navegador reenvía
+// ese clic al input (comportamiento propio de <label>), este se vuelve a
+// enfocar y el país recién elegido se veía en blanco.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { PAISES, ciudadesDe } from "@/lib/geo";
 import { useI18n } from "@/lib/i18n";
 
@@ -66,21 +71,24 @@ function opcionEstilo(activa: boolean): React.CSSProperties {
 /** Combobox ESTRICTO de país: filtra al escribir, pero solo un país del
  *  catálogo puede quedar como valor. */
 function PaisCombobox({
-  value, onChange,
+  id, value, onChange,
 }: {
+  id: string;
   value: string;
   onChange: (pais: string) => void;
 }) {
   const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [abierto, setAbierto] = useState(false);
-  const [filtro, setFiltro] = useState("");
+  // null = no se está filtrando → el input muestra el país elegido. Así el
+  // campo nunca se ve vacío teniendo país, ni al abrir ni al reenfocar.
+  const [filtro, setFiltro] = useState<string | null>(null);
 
-  const cerrar = () => { setAbierto(false); setFiltro(""); };
+  const cerrar = () => { setAbierto(false); setFiltro(null); };
   useCerrarFuera(rootRef, abierto, cerrar);
 
   const filtradas = useMemo(() => {
-    const q = normaliza(filtro);
+    const q = normaliza(filtro ?? "");
     return q ? PAISES.filter((p) => normaliza(p).includes(q)) : PAISES;
   }, [filtro]);
 
@@ -92,11 +100,14 @@ function PaisCombobox({
   return (
     <div ref={rootRef} style={{ position: "relative" }}>
       <input
+        id={id}
         className="input"
-        value={abierto ? filtro : value}
+        value={filtro ?? value}
         placeholder={t("form.paisSelecc")}
-        onFocus={() => { setAbierto(true); setFiltro(""); }}
-        onClick={() => setAbierto(true)}
+        // Al enfocar se selecciona el texto: la primera tecla reemplaza el
+        // país mostrado en vez de escribir pegado a él.
+        onFocus={(e) => { setAbierto(true); e.currentTarget.select(); }}
+        onClick={(e) => { setAbierto(true); if (filtro === null) e.currentTarget.select(); }}
         onChange={(e) => { setAbierto(true); setFiltro(e.target.value); }}
         autoComplete="off"
       />
@@ -107,7 +118,9 @@ function PaisCombobox({
               key={p}
               role="option"
               aria-selected={p === value}
-              onClick={() => elegir(p)}
+              // preventDefault: si algún día esto queda dentro de un <label>,
+              // evita que el clic se reenvíe al input y lo reabra.
+              onClick={(e) => { e.preventDefault(); elegir(p); }}
               style={opcionEstilo(p === value)}
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -129,8 +142,9 @@ function PaisCombobox({
 /** Combobox de ciudad: sugiere las ciudades del país (filtra al escribir) y
  *  además acepta texto libre. Deshabilitado hasta elegir país. */
 function CiudadCombobox({
-  value, ciudades, disabled, maxLen, onChange,
+  id, value, ciudades, disabled, maxLen, onChange,
 }: {
+  id: string;
   value: string;
   ciudades: string[];
   disabled: boolean;
@@ -150,7 +164,7 @@ function CiudadCombobox({
 
   if (disabled) {
     return (
-      <input className="input" value="" disabled readOnly
+      <input id={id} className="input" value="" disabled readOnly
         placeholder={t("form.delegacionPaisPrimero")} />
     );
   }
@@ -158,6 +172,7 @@ function CiudadCombobox({
   return (
     <div ref={rootRef} style={{ position: "relative" }}>
       <input
+        id={id}
         className="input"
         value={value}
         placeholder={t("form.delegacionCiudadSelecc")}
@@ -174,7 +189,7 @@ function CiudadCombobox({
               key={c}
               role="option"
               aria-selected={normaliza(c) === normaliza(value)}
-              onClick={() => { onChange(c); setAbierto(false); }}
+              onClick={(e) => { e.preventDefault(); onChange(c); setAbierto(false); }}
               style={opcionEstilo(normaliza(c) === normaliza(value))}
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -201,12 +216,16 @@ export default function DelegacionSelect({
 }) {
   const { t } = useI18n();
   const ciudades = pais ? ciudadesDe(pais) : [];
+  // Etiquetas ligadas por htmlFor (no envolviendo al input): ver nota de arriba.
+  const idPais = useId();
+  const idCiudad = useId();
 
   return (
     <div className="deleg-grid">
-      <label className="deleg-field">
-        <span className="deleg-label">{t("camp.campos.pais")}</span>
+      <div className="deleg-field">
+        <label className="deleg-label" htmlFor={idPais}>{t("camp.campos.pais")}</label>
         <PaisCombobox
+          id={idPais}
           value={pais}
           onChange={(nuevoPais) => {
             // Al cambiar de país, conservar la ciudad solo si pertenece al
@@ -217,17 +236,18 @@ export default function DelegacionSelect({
             onChange(pertenece ? delegacion : "", nuevoPais);
           }}
         />
-      </label>
-      <label className="deleg-field">
-        <span className="deleg-label">{t("form.delegacion")}</span>
+      </div>
+      <div className="deleg-field">
+        <label className="deleg-label" htmlFor={idCiudad}>{t("form.delegacion")}</label>
         <CiudadCombobox
+          id={idCiudad}
           value={delegacion}
           ciudades={ciudades}
           disabled={!pais}
           maxLen={maxLen}
           onChange={(ciudad) => onChange(ciudad, pais)}
         />
-      </label>
+      </div>
 
       <style>{`
         .deleg-grid {
@@ -239,6 +259,7 @@ export default function DelegacionSelect({
         .deleg-label {
           font-size: 0.8rem; font-weight: 800; text-transform: uppercase;
           letter-spacing: 0.08em; color: var(--text-muted);
+          cursor: pointer;
         }
       `}</style>
     </div>

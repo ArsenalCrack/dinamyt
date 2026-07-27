@@ -25,7 +25,10 @@ export default function ClubCombobox({
   const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [abierto, setAbierto] = useState(false);
-  const [filtro, setFiltro] = useState("");
+  // null = no se está filtrando → el input muestra el club elegido. Si aquí se
+  // usara "" el campo se veía vacío al reenfocarlo (p. ej. cuando el <label>
+  // que lo envuelve reenvía al input el clic hecho sobre una opción).
+  const [filtro, setFiltro] = useState<string | null>(null);
   // Modo texto libre tras elegir «Otro…»: el input escribe directo el valor.
   const [libre, setLibre] = useState(false);
 
@@ -53,11 +56,11 @@ export default function ClubCombobox({
     function fuera(e: MouseEvent | TouchEvent) {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setAbierto(false);
-        setFiltro("");
+        setFiltro(null);
       }
     }
     function tecla(e: KeyboardEvent) {
-      if (e.key === "Escape") { setAbierto(false); setFiltro(""); }
+      if (e.key === "Escape") { setAbierto(false); setFiltro(null); }
     }
     document.addEventListener("mousedown", fuera);
     document.addEventListener("touchstart", fuera);
@@ -70,13 +73,13 @@ export default function ClubCombobox({
   }, [abierto]);
 
   const filtradas = opciones.filter((o) =>
-    o.toLowerCase().includes(filtro.trim().toLowerCase())
+    o.toLowerCase().includes((filtro ?? "").trim().toLowerCase())
   );
 
   function elegir(club: string) {
     onChange(club);
     setAbierto(false);
-    setFiltro("");
+    setFiltro(null);
     setLibre(false);
   }
 
@@ -110,11 +113,14 @@ export default function ClubCombobox({
     <div ref={rootRef} style={{ position: "relative" }}>
       <input
         className="input"
-        value={abierto ? filtro : value}
+        value={filtro ?? value}
         placeholder={placeholder || t("form.clubSelecc")}
-        onFocus={() => { setAbierto(true); setFiltro(""); }}
-        onClick={() => { setAbierto(true); }}
+        // Al enfocar se selecciona el texto: la primera tecla reemplaza el
+        // club mostrado en vez de escribir pegado a él.
+        onFocus={(e) => { setAbierto(true); e.currentTarget.select(); }}
+        onClick={(e) => { setAbierto(true); if (filtro === null) e.currentTarget.select(); }}
         onChange={(e) => { setAbierto(true); setFiltro(e.target.value); }}
+        autoComplete="off"
       />
       {abierto && (
         <ul
@@ -132,7 +138,9 @@ export default function ClubCombobox({
               key={o}
               role="option"
               aria-selected={o === value}
-              onClick={() => elegir(o)}
+              // preventDefault: el <label> que envuelve este campo reenviaría
+              // el clic al input, reabriendo la lista recién cerrada.
+              onClick={(e) => { e.preventDefault(); elegir(o); }}
               style={{
                 padding: "8px 10px", cursor: "pointer", borderRadius: 6,
                 fontWeight: o === value ? 800 : 500,
@@ -152,7 +160,7 @@ export default function ClubCombobox({
           {/* «Otro…»: pasar a texto libre */}
           <li
             role="option"
-            onClick={() => { setLibre(true); setAbierto(false); onChange(""); }}
+            onClick={(e) => { e.preventDefault(); setLibre(true); setAbierto(false); onChange(""); }}
             style={{
               padding: "8px 10px", cursor: "pointer", borderRadius: 6,
               marginTop: 4, borderTop: "1px solid var(--border)",
