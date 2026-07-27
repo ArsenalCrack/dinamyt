@@ -216,6 +216,75 @@ De ahí salen dos reglas que no hay que romper:
 
 ---
 
+## 4 bis. Si ya habías desplegado antes
+
+Al hacer `git push`, Render **sí** reconstruye y redespliega el código solo
+(Auto-Deploy viene activado). Lo compruebas en la pestaña **Events** del
+servicio.
+
+Lo que **no** viaja solo son las variables del `render.yaml`. Un despliegue
+normal no vuelve a leer ese archivo: hay que sincronizar el Blueprint. Entra a
+**Blueprints → tu blueprint** y aplica los cambios pendientes.
+
+Después, verifica en **Environment** que estas tres estén puestas (son nuevas y
+sin ellas la app queda a medias):
+
+| Variable | Valor | Sin ella |
+|---|---|---|
+| `TRUST_PROXY_HOPS` | `2` | El límite de peticiones por IP se vuelve un cupo global: un solo usuario pesado bloquea a todo el club |
+| `COOKIE_SAMESITE` | `lax` | — (es el valor por defecto, pero mejor explícito) |
+| `COOKIE_SECURE` | `true` | La cookie de sesión viajaría también por HTTP |
+
+Si prefieres no pelear con el Blueprint, ponlas a mano en **Environment**: es el
+mismo resultado.
+
+### Y revisa con qué rol te conectaste
+
+Si en el primer despliegue usaste el usuario `postgres` de Supabase, tus tablas
+son suyas y **RLS no te está protegiendo** (tiene `BYPASSRLS`). El nuevo código
+te lo dirá en los logs al arrancar:
+
+```
+[SEGURIDAD] RLS no está protegiendo: el rol de conexión es SUPERUSER…
+```
+
+Para arreglarlo sin perder datos, en el **SQL Editor** de Supabase:
+
+```sql
+-- 1. El rol de la aplicación, que NO se salta las políticas.
+create role membresias_app with login password 'UNA_CLAVE_LARGA' nobypassrls;
+grant create on database postgres to membresias_app;
+
+-- 2. Pasarle lo que ya existe. Hace falta que sea el DUEÑO: las migraciones
+--    futuras hacen ALTER TABLE, y eso solo lo puede el dueño.
+alter schema membresias owner to membresias_app;
+
+do $$
+declare r record;
+begin
+  for r in select tablename from pg_tables where schemaname = 'membresias' loop
+    execute format('alter table membresias.%I owner to membresias_app', r.tablename);
+  end loop;
+  for r in
+    select t.typname from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'membresias' and t.typtype = 'e'
+  loop
+    execute format('alter type membresias.%I owner to membresias_app', r.typname);
+  end loop;
+end $$;
+```
+
+Luego cambia el usuario de `MEMBRESIAS_DATABASE_URL` en Render por
+`membresias_app` (conservando el sufijo `.PROJECT_REF` del pooler) y su
+contraseña. Al reiniciar, ese mensaje de `[SEGURIDAD]` debe desaparecer.
+
+> Ojo: el bloque de arriba solo toca el esquema `membresias`. No uses
+> `reassign owned by postgres`, que arrastraría también los objetos internos de
+> Supabase.
+
+---
+
 ## 5. Comprobar que quedó bien
 
 Entra a la web y recorre esto de una sentada:
