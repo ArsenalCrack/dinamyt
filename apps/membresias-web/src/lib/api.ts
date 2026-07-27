@@ -139,13 +139,37 @@ api.interceptors.response.use(
   },
 );
 
+/**
+ * Saca un texto de lo que sea que venga en el cuerpo del error.
+ *
+ * Nuestra API manda siempre `{"error":"texto plano"}`, pero cuando quien
+ * responde es el proxy de Vercel —porque no consiguió hablar con Render— el
+ * cuerpo es `{"error":{"code":"…","message":"…"}}`. Devolver ese objeto tal
+ * cual es lo que reventaba la app entera: React no sabe pintar un objeto
+ * (error #31), la excepción escapaba del render y se llevaba la pantalla por
+ * delante en vez de mostrar un aviso rojo y ya.
+ *
+ * El `code` se anexa a propósito: es lo único que distingue «Render estaba
+ * dormido» de «el rewrite apunta a ninguna parte», y sin él no hay forma de
+ * diagnosticarlo desde la pantalla.
+ */
+function textoDeError(valor: unknown): string | null {
+  if (typeof valor === 'string') return valor.trim() || null;
+  if (!valor || typeof valor !== 'object') return null;
+
+  const o = valor as { message?: unknown; code?: unknown };
+  const message = typeof o.message === 'string' ? o.message.trim() : '';
+  const code = typeof o.code === 'string' ? o.code.trim() : '';
+
+  if (message && code) return `${message} (${code})`;
+  return message || code || null;
+}
+
 /** Texto legible de un error de la API, para mostrárselo al usuario tal cual. */
 export function mensajeError(err: unknown, porDefecto: string): string {
-  if (axios.isAxiosError(err)) {
-    const data = err.response?.data as { error?: string; message?: string } | undefined;
-    return data?.error ?? data?.message ?? porDefecto;
-  }
-  return porDefecto;
+  if (!axios.isAxiosError(err)) return porDefecto;
+  const data = err.response?.data as { error?: unknown; message?: unknown } | undefined;
+  return textoDeError(data?.error) ?? textoDeError(data?.message) ?? porDefecto;
 }
 
 export interface RespuestaLogin {
