@@ -6,7 +6,17 @@ import axios from 'axios';
  * Cliente de la API de Membresías. Un solo servidor: esta app ya no consulta al
  * ecosistema DINAMYT para nada — ni login, ni roster, ni perfiles.
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004';
+/**
+ * La API se consume bajo el MISMO origen que la web, vía el rewrite de
+ * `next.config.ts`. De eso depende que la sesión sobreviva a una recarga: si el
+ * navegador hablara directo con Render, la cookie sería de terceros y Safari la
+ * bloquearía (Firefox la aísla).
+ *
+ * `NEXT_PUBLIC_API_URL` sigue existiendo para apuntar a un origen absoluto en
+ * casos sueltos, pero eso reintroduce el problema de la cookie de terceros: no
+ * usarlo en el despliegue normal.
+ */
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 /**
  * La sesión vive en una cookie httpOnly que pone la API: no es accesible desde

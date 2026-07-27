@@ -28,10 +28,16 @@ services:
       - key: PORT
         value: "3004"
 
-      # Render pone exactamente un proxy delante. Sin esto, req.ip es la IP de
-      # ese proxy para todo el mundo y el rate limit por IP deja de servir.
+      # Saltos de proxy hasta el cliente. Son DOS porque la web no llama a esta
+      # API directamente: el navegador pide a Vercel y Vercel reenvía aquí (ver
+      # el rewrite de apps/membresias-web/next.config.ts). La cadena queda
+      # "cliente, vercel" y Render añade su propio salto.
+      # Contrapartida: quien llame a esta API saltándose Vercel puede escribir
+      # un X-Forwarded-For a mano y falsear su IP, con lo que esquiva el tope
+      # por IP. El tope por CORREO del login (5 cada 5 min), que es el que
+      # protege las cuentas, no depende de la IP y sigue en pie.
       - key: TRUST_PROXY_HOPS
-        value: "1"
+        value: "2"
 
       # Base de datos. En Supabase: la cadena del "Transaction pooler"
       # (puerto 6543), NO la conexión directa — esa solo responde por IPv6 y
@@ -63,22 +69,13 @@ services:
       - key: MEMBRESIAS_WEB_URL
         sync: false
 
-      # La web (vercel.app) y la API (onrender.com) son sitios DISTINTOS, así
-      # que la cookie de sesión es de terceros: con el `lax` por defecto el
-      # navegador no la manda y la sesión no sobrevive a recargar la página.
-      # `none` obliga a `Secure`, que en Render se cumple solo (todo es HTTPS).
-      # Aun así Safari bloquea las cookies de terceros pase lo que pase: la
-      # solución de fondo es servir ambos bajo un mismo dominio propio.
+      # Cookie de sesión. "lax" y NO "none" a propósito: la web consume la API
+      # bajo su propio dominio (rewrite de Next), así que la cookie es de
+      # primera parte. Ponerla en "none" la convertiría en cookie de terceros y
+      # Safari volvería a bloquearla, que es justo lo que rompía la sesión al
+      # recargar.
       - key: COOKIE_SAMESITE
-        value: none
-
-      # Cookie de sesión. Con la web en Vercel y la API aquí son dominios
-      # distintos, así que la cookie es de terceros y necesita SameSite=None
-      # (+ Secure). Safari la bloqueará igual: para una sesión que aguante en
-      # todos los navegadores hay que servir ambas bajo un mismo dominio y
-      # entonces bajar esto a "lax".
-      - key: COOKIE_SAMESITE
-        value: none
+        value: lax
       - key: COOKIE_SECURE
         value: "true"
 

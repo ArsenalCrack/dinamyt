@@ -38,6 +38,20 @@ describe('sesión por cookie', () => {
     expect(sesion!.path).toBe('/');
   });
 
+  it('la cookie no fija Domain ni SameSite=None: es de PRIMERA parte', async () => {
+    const e = await crearEscenario();
+    const res = await login(e);
+    const sesion = res.cookies.find((c) => c.name === COOKIE_SESION)!;
+
+    // Estas dos condiciones son las que hacen que la sesión aguante una
+    // recarga. Sin Domain, la cookie queda asociada al dominio que sirvió la
+    // respuesta — el de la web, porque la API se consume por su proxy — y no
+    // es cookie de terceros. Con SameSite=None sí lo sería, y Safari la
+    // bloquearía: exactamente el fallo de "se cierra la sesión al recargar".
+    expect(sesion.domain).toBeUndefined();
+    expect(sesion.sameSite?.toLowerCase()).not.toBe('none');
+  });
+
   it('la cookie de CSRF SÍ es legible: el cliente tiene que copiarla', async () => {
     const e = await crearEscenario();
     const res = await login(e);

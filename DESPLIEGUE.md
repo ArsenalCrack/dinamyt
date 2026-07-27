@@ -148,7 +148,17 @@ puerta de entrada: sin ella nadie puede crear el primer club.
 
    | Variable | Valor |
    |---|---|
-   | `NEXT_PUBLIC_API_URL` | La URL de Render, **sin barra al final** |
+   | `MEMBRESIAS_API_ORIGIN` | La URL de Render, **sin barra al final** |
+
+   > **No definas `NEXT_PUBLIC_API_URL`.** El navegador no habla con Render
+   > directamente: pide a `/api` en el propio dominio de la web y Next reenvía
+   > al servidor (ver el rewrite de `next.config.ts`). Así la cookie de sesión
+   > la pone el dominio de la web, es de primera parte y ningún navegador la
+   > descarta. Si pones ahí la URL de Render, el navegador vuelve a llamar
+   > directo y la sesión se pierde al recargar en Safari.
+   >
+   > Fíjate en que `MEMBRESIAS_API_ORIGIN` **no** lleva el prefijo
+   > `NEXT_PUBLIC_`: es a propósito, solo la usa el servidor.
 
    Opcionales:
 
@@ -162,9 +172,9 @@ puerta de entrada: sin ella nadie puede crear el primer club.
 
 ---
 
-## 4. Cerrar el círculo (CORS)
+## 4. Cerrar el círculo
 
-La API todavía no deja que la web le hable. Vuelve a Render → **Environment**:
+Vuelve a Render → **Environment** y rellena lo que dejaste pendiente:
 
 | Variable | Valor |
 |---|---|
@@ -173,28 +183,36 @@ La API todavía no deja que la web le hable. Vuelve a Render → **Environment**
 
 Guarda: Render reinicia el servicio solo.
 
-> Si te saltas este paso, la web carga pero se queda muerta y el login no
-> responde. El error solo se ve en la consola del navegador, no en pantalla —
-> es la causa número uno de "no funciona" y no deja ninguna pista útil.
+> Con el rewrite de Next, las peticiones llegan a Render desde el **servidor**
+> de Vercel, no desde el navegador, así que CORS casi no interviene. Aun así
+> conviene dejarlo bien puesto: cubre el acceso directo a la API y es lo que
+> evita que cualquier otro sitio la use desde un navegador.
 
 Si más adelante conectas un dominio propio, añádelo separado por comas:
 `https://membresias.tudominio.com,https://tu-web.vercel.app`
 
-### Por qué conviene un dominio propio (y no es solo estética)
+### Cómo viaja la sesión
 
-Con `vercel.app` + `onrender.com`, la web y la API son **sitios distintos**, así
-que la cookie de sesión es una cookie de terceros. El `render.yaml` ya la marca
-`SameSite=None` para que funcione, pero:
+Vale la pena entenderlo porque explica varias decisiones de la configuración:
 
-- **Safari las bloquea siempre**, y Firefox las aísla. En un iPhone, la sesión
-  se pierde al recargar la página. La app tiene un respaldo en memoria, así que
-  se puede trabajar con la pestaña abierta, pero no es lo que quieres para una
-  PWA instalada.
+```
+navegador  ──►  tu-web.vercel.app/api/...   (mismo origen: la cookie viaja)
+                        │
+                        ▼  rewrite de Next, servidor a servidor
+                dinamyt-membresias-api.onrender.com
+```
 
-La solución de fondo es servir ambos bajo el mismo dominio, por ejemplo
-`membresias.tudominio.com` (Vercel) y `api.tudominio.com` (Render). Ahí la
-cookie deja de ser de terceros y todo el problema desaparece. Cuando lo hagas,
-cambia `COOKIE_SAMESITE` a `lax` en Render.
+El navegador **nunca** habla con Render. Si lo hiciera, la cookie de sesión
+sería de terceros: Safari las bloquea siempre y Firefox las aísla, y la sesión
+se perdería en cada recarga — justo lo que rompía la app en el iPhone. Pasando
+por `/api`, quien pone la cookie es el dominio de la web y ningún navegador la
+descarta.
+
+De ahí salen dos reglas que no hay que romper:
+
+- En Vercel va `MEMBRESIAS_API_ORIGIN`, **no** `NEXT_PUBLIC_API_URL`.
+- En Render, `COOKIE_SAMESITE=lax`. Ponerlo en `none` la volvería de terceros
+  otra vez.
 
 ---
 
@@ -252,4 +270,5 @@ llegar a dispararse.
 | No veo mis tablas en Supabase | Están en el esquema `membresias`, no en `public` |
 | `[SEGURIDAD] RLS no está protegiendo` en los logs | Te conectaste como `postgres`, que tiene `BYPASSRLS`. Usa el rol `membresias_app` del paso 1.4 |
 | `permission denied for schema membresias` | Al rol `membresias_app` le falta `grant create on database` |
-| Al recargar la página se cierra la sesión (sobre todo en iPhone) | Cookie de terceros bloqueada por el navegador. Ver el apartado del dominio propio |
+| Al recargar la página se cierra la sesión (sobre todo en iPhone) | Tienes `NEXT_PUBLIC_API_URL` puesta en Vercel: el navegador llama directo a Render y la cookie pasa a ser de terceros. Bórrala y deja solo `MEMBRESIAS_API_ORIGIN` |
+| Todas las peticiones dan 404 sobre `/api/...` | Falta `MEMBRESIAS_API_ORIGIN` en Vercel, así que el rewrite apunta a `127.0.0.1` |
