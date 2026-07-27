@@ -3,24 +3,23 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import { haySesionProbable, obtenerUsuario } from "@/lib/sesion";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to login on first visit
-    const token = localStorage.getItem("dinamyt_token");
-    if (token) {
-      const user = localStorage.getItem("dinamyt_user");
-      if (user) {
-        const parsed = JSON.parse(user);
-        router.replace(
-          parsed.rol === "admin" ? "/admin"
-          : parsed.rol === "maestro" ? "/maestro"
-          : "/juez"
-        );
-        return;
-      }
+    // La cookie de sesión no se ve desde aquí: se usa la de CSRF como pista de
+    // que hay sesión y el perfil cacheado para saber a dónde mandar. Si no
+    // cuadra, /login o el propio backend corrigen.
+    const parsed = haySesionProbable() ? obtenerUsuario<{ rol?: string }>() : null;
+    if (parsed?.rol) {
+      router.replace(
+        parsed.rol === "admin" ? "/admin"
+        : parsed.rol === "maestro" ? "/maestro"
+        : "/juez"
+      );
+      return;
     }
     router.replace("/login");
   }, [router]);

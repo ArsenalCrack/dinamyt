@@ -11,7 +11,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getMeAPI } from "@/lib/api";
+import { abrirSesionConToken } from "@/lib/api";
+import { guardarToken, guardarUsuario, limpiarSesion } from "@/lib/sesion";
 import Logo from "@/components/Logo";
 import { useI18n } from "@/lib/i18n";
 
@@ -34,15 +35,17 @@ export default function AccesoPage() {
           if (!cancelled) setError("incompleto");
           return;
         }
-        localStorage.setItem("dinamyt_token", token);
-        // Validar el token contra el servidor y guardar los datos del juez
-        const user = await getMeAPI();
+        // El token del QR se canjea por la cookie httpOnly en vez de quedarse
+        // en localStorage: así valida contra el servidor y abre sesión de un
+        // paso, y el token no queda al alcance de ningún script de la página.
+        const { user } = await abrirSesionConToken(token);
         if (cancelled) return;
-        localStorage.setItem("dinamyt_user", JSON.stringify(user));
+        guardarToken(token);
+        guardarUsuario(user);
         router.replace(`/tatami/${tatami}?rol=${rol}`);
       } catch {
         if (!cancelled) {
-          localStorage.removeItem("dinamyt_token");
+          limpiarSesion();
           setError("invalido");
         }
       }

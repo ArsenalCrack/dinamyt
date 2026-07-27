@@ -12,6 +12,7 @@ import {
   fmtSigno,
   type CombateState,
 } from "@/hooks/useCombate";
+import { useSocketTicket } from "@/hooks/useSocketTicket";
 import {
   activarAudio,
   sfxAviso10s,
@@ -2945,7 +2946,10 @@ function TatamiContent() {
   const tatamiId = params.id as string;
   const rol = searchParams.get("rol") || "pantalla";
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("dinamyt_token") : null;
+  // La sesión vive en una cookie httpOnly, ilegible desde aquí: el socket usa
+  // un ticket que se pide al backend (null en la pantalla pública, que no tiene
+  // sesión y conecta sin identidad).
+  const token = useSocketTicket();
   const { state, connected, offline, sesionReemplazada, reconectar, registroResuelto, hasServerState, socketError, pendingEvents, enviarEvento, broadcast, alerts: socketAlerts, clearAlert } = useCombate(tatamiId, rol, token);
   // En modo offline el juez elige localmente qué necesita puntuar
   // (no se sabe cuánto dura la caída ni qué categoría corre el tatami).

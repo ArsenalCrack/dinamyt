@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginAPI } from "@/lib/api";
+import { guardarToken, guardarUsuario } from "@/lib/sesion";
 import Logo from "@/components/Logo";
 import { IDIOMAS, useI18n } from "@/lib/i18n";
 import { aplicarTema, getTema, type Tema } from "@/lib/theme";
@@ -34,8 +35,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await loginAPI(email, password);
-      localStorage.setItem("dinamyt_token", data.token);
-      localStorage.setItem("dinamyt_user", JSON.stringify(data.user));
+      // La sesión ya viene en la cookie httpOnly de la respuesta; aquí solo se
+      // guarda el token en memoria (socket y descargas) y el perfil cacheado.
+      guardarToken(data.token);
+      guardarUsuario(data.user);
       router.push(
         data.user.rol === "admin" ? "/admin"
         : data.user.rol === "maestro" ? "/maestro"

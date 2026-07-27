@@ -6,6 +6,7 @@ CRUD para campeonatos — solo Admin.
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from ..extensions import db
+from ..security import limitar
 from ..models.campeonato import ESTADOS_CAMPEONATO, Campeonato
 from ..models.tatami import Tatami
 from .scoping import (
@@ -49,6 +50,7 @@ def listar():
 
 
 @campeonatos_bp.route("/publico", methods=["GET"])
+@limitar(60, 60, nombre="camp-publico")
 def listar_publico():
     """
     GET /api/campeonatos/publico — Campeonatos activos con sus tatamis.
@@ -510,6 +512,7 @@ def preview_secciones(camp_id):
 
 @campeonatos_bp.route("/<int:camp_id>/generar-llaves", methods=["POST"])
 @jwt_required()
+@limitar(10, 60, nombre="generar-llaves")
 def generar_llaves_auto(camp_id):
     """
     POST /api/campeonatos/:id/generar-llaves

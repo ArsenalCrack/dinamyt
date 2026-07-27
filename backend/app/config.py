@@ -26,17 +26,50 @@ class Config:
     )
     # 72 h: cubre un campeonato de fin de semana sin re-login de jueces
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=72)
-    JWT_TOKEN_LOCATION = ["headers"]
     JWT_HEADER_NAME = "Authorization"
     JWT_HEADER_TYPE = "Bearer"
+
+    # ── Sesión en cookie httpOnly ────────────────────────────────────────────
+    # El token deja de vivir en localStorage, donde cualquier script inyectado
+    # en la página lo lee entero. Una cookie httpOnly no es visible desde
+    # JavaScript: un XSS podrá actuar mientras la pestaña esté abierta, pero no
+    # llevarse la sesión para usarla desde otro sitio.
+    #
+    # Se aceptan las dos ubicaciones: la cookie es la del navegador, y la
+    # cabecera sigue viva para las pantallas de tatami y cualquier cliente que
+    # no sea un navegador.
+    JWT_TOKEN_LOCATION = ["headers", "cookies"]
+    JWT_ACCESS_COOKIE_NAME = "dinamyt_session"
+    JWT_COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "Lax")
+    # `None` obliga a Secure; si no, el navegador descarta la cookie sin avisar.
+    JWT_COOKIE_SECURE = (
+        os.getenv("COOKIE_SECURE", "").lower() == "true"
+        or os.getenv("COOKIE_SAMESITE", "Lax").lower() == "none"
+    )
+    # La contrapartida de la cookie: viaja sola en cada petición, incluidas las
+    # que dispare otra web. Flask-JWT-Extended deja el valor en una cookie que
+    # SÍ es legible (csrf_access_token) y exige verlo repetido en la cabecera —
+    # el atacante puede provocar el envío, pero no leerlo desde su dominio.
+    # Solo se aplica a lo que entra por cookie, no a la cabecera Authorization.
+    JWT_COOKIE_CSRF_PROTECT = True
+    JWT_CSRF_IN_COOKIES = True
+    JWT_ACCESS_CSRF_HEADER_NAME = "X-CSRF-TOKEN"
 
     # CORS
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-    # Admin inicial
+    # Admin inicial. Sin valor por defecto a propósito: una contraseña en el
+    # código acaba en el historial de git y en todos los despliegues que la
+    # copien. Si falta, el seed avisa y no crea al admin.
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@dinamyt.com")
-    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Amy2026*")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
     ADMIN_NOMBRE = os.getenv("ADMIN_NOMBRE", "Administrador DINAMYT")
+
+    # Número de proxies de confianza delante de la app (Render pone 1). Con 0
+    # se ignora X-Forwarded-For y se usa la IP del socket: es lo correcto en la
+    # LAN, donde cualquiera podría falsear la cabecera para saltarse el límite
+    # de intentos.
+    TRUST_PROXY_HOPS = int(os.getenv("TRUST_PROXY_HOPS", "0") or 0)
 
     # Flask-SocketIO
     SOCKETIO_ASYNC_MODE = "threading"
@@ -60,6 +93,10 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     SOCKETIO_ASYNC_MODE = "eventlet"
+    # Render (y cualquier PaaS con balanceador) termina TLS en su proxy y pone
+    # la IP real del cliente en X-Forwarded-For. Sin esto, todas las peticiones
+    # llegan con la IP del proxy y el límite por IP se vuelve un cupo global.
+    TRUST_PROXY_HOPS = int(os.getenv("TRUST_PROXY_HOPS", "1") or 0)
     # Bajo gunicorn -k eventlet, el QueuePool de SQLAlchemy es inutilizable:
     # eventlet no parchea threading.RLock (no distingue greenlets) y el
     # Condition del pool muere con "cannot notify on un-acquired lock" en

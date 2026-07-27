@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
+import { logoutAPI } from "@/lib/api";
 
 /**
  * Botón de cerrar sesión con confirmación.
@@ -30,10 +31,11 @@ export default function LogoutButton({ label }: { label?: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [confirming]);
 
-  function handleLogout() {
+  async function handleLogout() {
     setLoggingOut(true);
-    localStorage.removeItem("dinamyt_token");
-    localStorage.removeItem("dinamyt_user");
+    // La cookie de sesión es httpOnly: solo el backend puede borrarla, así
+    // que limpiar aquí a secas dejaría la sesión viva en el servidor.
+    await logoutAPI();
     router.replace("/login");
   }
 

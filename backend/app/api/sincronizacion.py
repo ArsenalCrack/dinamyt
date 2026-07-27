@@ -48,6 +48,7 @@ from flask import Blueprint, Response, jsonify, request
 from flask_jwt_extended import jwt_required
 
 from ..extensions import db
+from ..security import limitar
 from ..models.asignacion import AsignacionJuez
 from ..models.campeonato import ESTADOS_CAMPEONATO, Campeonato
 from ..models.competidor import (
@@ -956,6 +957,7 @@ def _es_si(valor):
 
 @sincronizacion_bp.route("/importar", methods=["POST"])
 @jwt_required()
+@limitar(10, 60, nombre="sincronizacion-importar")
 def importar():
     """
     POST /api/sincronizacion/importar

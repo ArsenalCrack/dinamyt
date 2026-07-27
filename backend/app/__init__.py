@@ -5,6 +5,7 @@ DINAMYT Backend — Flask Application Factory
 import os
 from flask import Flask
 from dotenv import load_dotenv
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import config_by_name
 from .extensions import db, migrate, jwt, cors, socketio
@@ -43,6 +44,18 @@ def create_app(config_name=None):
                 "[SEGURIDAD] ADMIN_PASSWORD usa un valor por defecto o vacío. "
                 "Define una contraseña fuerte como variable de entorno antes de desplegar."
             )
+
+    # ── IP real del cliente detrás de un proxy ───────────────────────────────
+    # Render termina TLS en su balanceador: sin esto request.remote_addr es la
+    # IP del proxy para TODO el mundo, y el límite de 20 intentos por IP pasa a
+    # ser un cupo global que un solo atacante agota para todos los demás.
+    # Se confía en un número FIJO de saltos: X-Forwarded-For lo puede escribir
+    # cualquiera, y leer el extremo equivocado permite falsear la IP a voluntad.
+    hops = app.config.get("TRUST_PROXY_HOPS", 0)
+    if hops > 0:
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops, x_port=hops
+        )
 
     # ── Inicializar extensiones ──
     db.init_app(app)
@@ -95,6 +108,13 @@ def create_app(config_name=None):
         competidor, resultado_publicado,
     )
 
+    # ── Techo global de peticiones por IP ──
+    from .security import registrar_limite_global
+    registrar_limite_global(app)
+
+    # ── Contexto de workspace para RLS ──
+    registrar_contexto_rls(app)
+
     # ── Registrar Blueprints (API REST) ──
     from .api import register_blueprints
     register_blueprints(app)
@@ -107,6 +127,33 @@ def create_app(config_name=None):
     register_cli_commands(app)
 
     return app
+
+
+def registrar_contexto_rls(app):
+    """Fija en cada request el workspace con el que se consultará la BD.
+
+    Va en un `before_request` y no dentro de `@jwt_required()` porque el
+    contexto tiene que estar puesto ANTES de la primera consulta del endpoint.
+    El token se lee en modo opcional: las rutas públicas no llevan, y ahí el
+    contexto queda en acceso total (ver `rls.contexto_de_usuario`).
+    """
+    from flask_jwt_extended import verify_jwt_in_request
+    from .rls import contexto_de_usuario, fijar_contexto
+
+    @app.before_request
+    def _contexto_rls():
+        usuario = None
+        try:
+            verify_jwt_in_request(optional=True)
+            from .api.scoping import usuario_actual
+            usuario = usuario_actual()
+        except Exception:
+            # Token ausente, caducado o ilegible: se sigue sin contexto. Quien
+            # decide si la petición pasa es el @jwt_required() del endpoint,
+            # no esto.
+            usuario = None
+        workspace_id, acceso_total = contexto_de_usuario(usuario)
+        fijar_contexto(workspace_id, acceso_total)
 
 
 def register_cli_commands(app):
@@ -140,6 +187,17 @@ def register_cli_commands(app):
         db.session.commit()
         print(f"[OK] Contraseña de '{email}' actualizada con el valor de ADMIN_PASSWORD.")
 
+    @app.cli.command("rls")
+    def rls_command():
+        """Crea/actualiza las políticas de RLS y reporta si protegen de verdad."""
+        from .rls import ensure_rls, estado_rls
+
+        if not ensure_rls():
+            print("[--] SQLite: RLS no aplica. El filtro por workspace lo hace la app.")
+            return
+        ok, motivo = estado_rls()
+        print("[OK] Políticas de RLS aplicadas." if ok else f"[ERR] RLS no protege: {motivo}")
+
     @app.cli.command("init-db")
     def init_db_command():
         """Crea todas las tablas y ejecuta seeds."""
@@ -147,6 +205,10 @@ def register_cli_commands(app):
         from .schema_compat import ensure_optional_columns
         ensure_optional_columns()
         print("[OK] Tablas creadas.")
+
+        from .rls import ensure_rls
+        if ensure_rls():
+            print("[OK] Políticas de RLS aplicadas.")
 
         from .seeds.seed_categorias import seed_categorias
         from .seeds.seed_admin import seed_admin

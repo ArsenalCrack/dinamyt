@@ -10,13 +10,25 @@ from flask_jwt_extended import (
     create_access_token,
     jwt_required,
     get_jwt_identity,
+    set_access_cookies,
+    unset_jwt_cookies,
 )
 from ..extensions import db
 from ..geo import pais_de_ciudad, pais_valido
 from ..models.asignacion import AsignacionJuez
 from ..models.usuario import ROLES_VALIDOS, Usuario
-from ..security import intento_bloqueado, limpiar_intentos, segundos_restantes
-from .scoping import es_dueno_usuario, require_admin, workspace_owner_id
+from ..security import (
+    intento_bloqueado,
+    ip_cliente,
+    limpiar_intentos,
+    segundos_restantes,
+)
+from .scoping import (
+    es_dueno_usuario,
+    require_admin,
+    usuario_actual,
+    workspace_owner_id,
+)
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -71,7 +83,7 @@ def login():
     if not email or not password:
         return jsonify({"error": "Email y contraseña son requeridos"}), 400
 
-    ip = request.remote_addr or "?"
+    ip = ip_cliente()
     clave_email = f"login:{email}"
     clave_ip = f"login-ip:{ip}"
     if (
@@ -110,10 +122,90 @@ def login():
         },
     )
 
-    return jsonify({
+    # La sesión del navegador va en cookie httpOnly; el token sigue en el
+    # cuerpo para las pantallas de tatami y cualquier cliente que no sea
+    # navegador (ahí el JWT viaja por cabecera, como siempre).
+    respuesta = jsonify({
         "token": token,
         "user": user.to_dict(),
-    }), 200
+    })
+    set_access_cookies(respuesta, token)
+    return respuesta, 200
+
+
+@auth_bp.route("/sesion", methods=["POST"])
+@jwt_required()
+def abrir_sesion():
+    """
+    POST /api/auth/sesion — Canjea un token de cabecera por la cookie httpOnly.
+
+    Lo usa el acceso por QR: el enlace del juez trae el token en el fragmento de
+    la URL. Antes se guardaba en localStorage; ahora se cambia aquí por la
+    cookie, y el token deja de estar al alcance de cualquier script.
+    """
+    user = usuario_actual()
+    if not user or not user.activo:
+        return jsonify({"error": "Usuario no válido"}), 401
+
+    token = create_access_token(
+        identity=str(user.id),
+        additional_claims={
+            "rol": user.rol,
+            "nombre": user.nombre,
+            "email": user.email,
+        },
+    )
+    respuesta = jsonify({"user": user.to_dict()})
+    set_access_cookies(respuesta, token)
+    return respuesta, 200
+
+
+@auth_bp.route("/socket-ticket", methods=["POST"])
+@jwt_required()
+def socket_ticket():
+    """
+    POST /api/auth/socket-ticket — Token corto para abrir el Socket.IO.
+
+    El socket manda su credencial en el payload `auth`, así que necesita un
+    valor que JavaScript pueda leer — justo lo que la cookie httpOnly ya no
+    deja. En vez de exponer la sesión de 72 h se entrega uno de 12: cubre una
+    jornada de competencia (incluidas las reconexiones por caídas de WiFi, que
+    reusan el mismo payload) y caduca esa noche.
+
+    Vive solo en memoria del navegador, así que se pierde al recargar. Es la
+    diferencia con lo de antes: el token de 72 h estaba en localStorage, y ahí
+    seguía disponible para cualquier script hasta que expiraba.
+    """
+    from datetime import timedelta
+
+    user = usuario_actual()
+    if not user or not user.activo:
+        return jsonify({"error": "Usuario no válido"}), 401
+
+    ticket = create_access_token(
+        identity=str(user.id),
+        additional_claims={
+            "rol": user.rol,
+            "nombre": user.nombre,
+            "email": user.email,
+        },
+        expires_delta=timedelta(hours=12),
+    )
+    return jsonify({"ticket": ticket}), 200
+
+
+@auth_bp.route("/logout", methods=["POST"])
+def logout():
+    """
+    POST /api/auth/logout — Borra la cookie de sesión.
+
+    Sin @jwt_required a propósito: si la cookie ya caducó, cerrar sesión tiene
+    que funcionar igual. Exigir un token válido para poder salir deja al usuario
+    atrapado con una sesión rota que no puede ni cerrar.
+    """
+    respuesta = jsonify({"ok": True})
+    unset_jwt_cookies(respuesta)
+    return respuesta, 200
 
 
 @auth_bp.route("/register", methods=["POST"])

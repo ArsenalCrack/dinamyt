@@ -10,7 +10,7 @@ from ..models.usuario import Usuario
 def seed_admin(config):
     """Crea el usuario admin inicial si no existe."""
     email = config.get("ADMIN_EMAIL", "admin@dinamyt.com")
-    password = config.get("ADMIN_PASSWORD", "Amy2026*")
+    password = config.get("ADMIN_PASSWORD") or ""
     nombre = config.get("ADMIN_NOMBRE", "Administrador DINAMYT")
 
     admin = Usuario.query.filter_by(email=email).first()
@@ -23,6 +23,15 @@ def seed_admin(config):
             print(f"  [OK] Admin '{email}' promovido a superadmin.")
         else:
             print(f"  [OK] Admin '{email}' ya existe (superadmin).")
+        return
+
+    # Sin ADMIN_PASSWORD no se siembra nada. Crear la cuenta con la cadena
+    # vacía dejaría un superadmin cuyo hash valida "" como contraseña buena.
+    if not password:
+        print(
+            f"  [ERR] ADMIN_PASSWORD no está definida: no se creó '{email}'. "
+            "Defínela en el entorno y vuelve a ejecutar el seed."
+        )
         return
 
     admin = Usuario(

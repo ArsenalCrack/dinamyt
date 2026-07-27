@@ -6,6 +6,7 @@ import api, { getCampeonatoAPI, idiomaArchivo, listTatamisAPI, resolverApiUrl, e
 import PodioLlave from "@/components/PodioLlave";
 import type { PodioItem } from "@/lib/llaves";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
+import { obtenerToken } from "@/lib/sesion";
 
 interface RankingItem {
   id?: number;
@@ -215,8 +216,13 @@ export default function ReportesCampeonatoPage() {
     setExporting(claveExporting);
     setExportError("");
     try {
-      const token = localStorage.getItem("dinamyt_token");
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      // La descarga va por fetch, no por el cliente axios, así que hay que
+      // pedir las cookies a mano: `credentials` es lo que manda la de sesión.
+      const token = obtenerToken();
+      const res = await fetch(url, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       if (!res.ok) throw new Error(await getExportError(res));
 
       const contentType = res.headers.get("content-type") || "";

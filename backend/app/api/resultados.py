@@ -29,6 +29,7 @@ from flask import Blueprint, jsonify, request, Response
 from flask_jwt_extended import jwt_required
 
 from ..extensions import db
+from ..security import limitar
 from ..models.campeonato import Campeonato
 from ..models.tatami import Tatami, SesionTatami
 from ..models.combate import Combate
@@ -44,6 +45,7 @@ FORMATO_EXPORT = "dinamyt-resultados"
 
 
 @resultados_bp.route("/campeonatos", methods=["GET"])
+@limitar(60, 60, nombre="resultados-campeonatos")
 def listar_campeonatos():
     """
     GET /api/resultados/campeonatos — Campeonatos con resultados para el selector.
@@ -233,6 +235,7 @@ def _construir_resultados(camp_id):
 
 
 @resultados_bp.route("/campeonato/<camp_id>", methods=["GET"])
+@limitar(60, 60, nombre="resultados-campeonato")
 def resultados_campeonato(camp_id):
     """
     GET /api/resultados/campeonato/:id — Resultados públicos del campeonato.

@@ -28,3 +28,12 @@ with app.app_context():
     from app.seeds.seed_admin import seed_admin
     seed_categorias()
     seed_admin(app.config)
+
+    # Red de seguridad por workspace. Se aplica DESPUÉS de los seeds: las
+    # políticas filtran por created_by, y sembrar con ellas puestas obligaría a
+    # dar contexto a cada seed sin ganar nada (aquí no hay petición de nadie).
+    # En SQLite es un no-op; solo hace algo con PostgreSQL.
+    from app.rls import ensure_rls, estado_rls
+    if ensure_rls():
+        ok, motivo = estado_rls()
+        print("[OK] RLS activo." if ok else f"[SEGURIDAD] RLS no protege: {motivo}")

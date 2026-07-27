@@ -18,6 +18,7 @@ from flask_jwt_extended import jwt_required
 from sqlalchemy import func
 
 from ..extensions import db
+from ..security import limitar
 from ..filei18n import trad, idioma_request
 from ..models.campeonato import Campeonato
 from ..models.competidor import (
@@ -550,6 +551,7 @@ def _parse_modalidades(valor):
 
 @competidores_bp.route("/import", methods=["POST"])
 @jwt_required()
+@limitar(10, 60, nombre="competidores-import")
 def importar_excel():
     """
     POST /api/competidores/import  (multipart/form-data)
@@ -1023,6 +1025,7 @@ def maestro_reenviar(ins_id):
 # ══════════════════════════════════════════════════════════════════
 
 @inscripciones_bp.route("/publico/campeonato/<int:camp_id>", methods=["GET"])
+@limitar(60, 60, nombre="inscripciones-publico")
 def publico_campeonato(camp_id):
     """
     GET /api/inscripciones/publico/campeonato/:id — Sin login.

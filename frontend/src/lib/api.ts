@@ -1,6 +1,7 @@
 "use client";
 
 import axios from "axios";
+import { limpiarSesion, obtenerToken, tokenCsrf } from "./sesion";
 
 // Despliegue local (LAN): el navegador habla DIRECTO con el backend (puerto
 // 5000, mismo host que la página) en vez de pasar por el proxy de Next. Menos
@@ -36,15 +37,26 @@ const api = axios.create({
   // caído y conviene enterarse rápido (activa el modo local) en vez de dejar
   // pantallas de carga colgadas.
   timeout: 20000,
+  // Hace que la cookie de sesión viaje (y que el navegador acepte la que
+  // devuelve el login) aunque el backend esté en otro puerto.
+  withCredentials: true,
 });
 
-// Interceptor: inyectar JWT en cada request
 api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("dinamyt_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  // La cookie httpOnly va sola. La cabecera solo hace falta cuando quedó el
+  // token en memoria (QR de acceso, o cookie bloqueada por ser de terceros).
+  const token = obtenerToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Doble envío de CSRF: el backend compara esta cabecera con la cookie
+  // csrf_access_token. Solo lo exige en lo que cambia estado y entra por
+  // cookie, así que en GET sobra.
+  const metodo = (config.method || "get").toUpperCase();
+  if (metodo !== "GET" && metodo !== "HEAD" && metodo !== "OPTIONS") {
+    const csrf = tokenCsrf();
+    if (csrf) config.headers["X-CSRF-TOKEN"] = csrf;
   }
   return config;
 });
@@ -54,8 +66,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("dinamyt_token");
-      localStorage.removeItem("dinamyt_user");
+      limpiarSesion();
       // Redirigir a login si no estamos ya ahí
       if (!window.location.pathname.includes("/login")) {
         window.location.href = "/login";
@@ -69,6 +80,36 @@ api.interceptors.response.use(
 export async function loginAPI(email: string, password: string) {
   const res = await api.post("/auth/login", { email, password });
   return res.data as { token: string; user: UserData };
+}
+
+/** Cierra la sesión en el servidor: la cookie httpOnly solo la borra él. */
+export async function logoutAPI() {
+  try {
+    await api.post("/auth/logout");
+  } catch {
+    // Si el backend no responde, la sesión local se limpia igual: dejar al
+    // usuario "dentro" porque falló la red sería peor.
+  }
+  limpiarSesion();
+}
+
+/** Token corto para abrir el Socket.IO (ver hooks/useSocketTicket). */
+export async function obtenerSocketTicketAPI(): Promise<string> {
+  const res = await api.post("/auth/socket-ticket");
+  return (res.data as { ticket: string }).ticket;
+}
+
+/**
+ * Convierte un token de cabecera en cookie de sesión.
+ *
+ * Lo usa el acceso por QR: el enlace trae el token en el fragmento de la URL,
+ * y en vez de guardarlo en localStorage se canjea aquí por la cookie httpOnly.
+ */
+export async function abrirSesionConToken(token: string) {
+  const res = await api.post("/auth/sesion", null, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data as { user: UserData };
 }
 
 export async function registerUserAPI(data: {

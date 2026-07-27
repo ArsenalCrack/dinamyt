@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..extensions import db
+from ..security import limitar
 from ..models.usuario import Usuario
 from ..models.combate import Combate
 from ..models.tatami import Tatami, SesionTatami
@@ -1189,6 +1190,7 @@ def _generar_pdf(rows, subtitulo="", t=None):
 
 @reportes_bp.route("/combates/export/excel", methods=["GET"])
 @jwt_required()
+@limitar(10, 60, nombre="exportar-excel")
 def exportar_excel():
     """GET /api/reportes/combates/export/excel — Exportar combates en Excel."""
     admin = _require_admin()
@@ -1215,6 +1217,7 @@ def exportar_excel():
 
 @reportes_bp.route("/combates/export/pdf", methods=["GET"])
 @jwt_required()
+@limitar(10, 60, nombre="exportar-pdf")
 def exportar_pdf():
     """GET /api/reportes/combates/export/pdf — Exportar combates en PDF."""
     admin = _require_admin()
@@ -1241,6 +1244,7 @@ def exportar_pdf():
 
 @reportes_bp.route("/combates/export/zip", methods=["GET"])
 @jwt_required()
+@limitar(10, 60, nombre="exportar-zip")
 def exportar_zip():
     """
     GET /api/reportes/combates/export/zip?formato=excel|pdf
