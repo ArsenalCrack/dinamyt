@@ -171,6 +171,20 @@ puerta de entrada: sin ella nadie puede crear el primer club.
    > Comprueba también que esté marcada para el entorno **Production**, no solo
    > para Preview.
 
+   > **Si añades una variable nueva, declárala en `turbo.json`.** Turbo 2 corre
+   > cada tarea en un entorno limpio: lo que no esté en el `env` de la tarea
+   > `build` **no llega al build**, aunque esté perfectamente puesta en Vercel.
+   > El propio Turbo lo avisa en el log del despliegue:
+   >
+   > ```
+   > Warning - the following environment variables are set on your Vercel
+   > project, but missing from "turbo.json"
+   >   - MEMBRESIAS_API_ORIGIN
+   > ```
+   >
+   > Las `NEXT_PUBLIC_*` tampoco se salvan solas. Todas están ya declaradas en
+   > `turbo.json`; si mañana agregas otra, va ahí también.
+
    **Cómo saber si quedó mal.** La web carga, pero cualquier llamada a la API
    responde 404 con este cuerpo:
 
