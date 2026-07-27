@@ -12,11 +12,15 @@ import axios from 'axios';
  * navegador hablara directo con Render, la cookie sería de terceros y Safari la
  * bloquearía (Firefox la aísla).
  *
- * `NEXT_PUBLIC_API_URL` sigue existiendo para apuntar a un origen absoluto en
- * casos sueltos, pero eso reintroduce el problema de la cookie de terceros: no
- * usarlo en el despliegue normal.
+ * Es el camino por defecto y no depende de ninguna variable: dejar esto a una
+ * variable que hay que acordarse de poner es justo lo que dejaba la sesión
+ * muerta al recargar. Para volver al modo directo hacen falta las DOS:
+ * `NEXT_PUBLIC_API_MODE=directo` y `NEXT_PUBLIC_API_URL`.
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_MODE === 'directo' && process.env.NEXT_PUBLIC_API_URL
+    ? process.env.NEXT_PUBLIC_API_URL
+    : '/api';
 
 /**
  * La sesión vive en una cookie httpOnly que pone la API: no es accesible desde
