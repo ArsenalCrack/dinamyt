@@ -104,18 +104,13 @@ el cálculo de vencimientos y las reglas del check-in.
 
 ## Despliegue
 
-**API en Render** — hay un `render.yaml` listo: New → Blueprint → este repo.
-Solo hay que pegar `MEMBRESIAS_DATABASE_URL`, las credenciales del superadmin y
-`CORS_ORIGINS` con el dominio de la web. Las migraciones se aplican solas al
-arrancar.
+**Paso a paso completo en [DESPLIEGUE.md](DESPLIEGUE.md)** — Neon (base de
+datos) + Render (API) + Vercel (web), con la lista de variables y las trampas
+que cuestan una tarde.
 
-**Web en Vercel** — hay un `vercel.json` en la raíz. Importa el repositorio
-dejando el *Root Directory* en la raíz (no en `apps/membresias-web`) y define
-`NEXT_PUBLIC_API_URL` con la URL de la API.
-
-> En la capa gratuita de Render el servicio se duerme a los 15 minutos y el
-> primer acceso puede tardar cerca de un minuto. Para un club de verdad, vale la
-> pena el plan de pago.
+En corto: hay un `render.yaml` y un `vercel.json` listos; las migraciones se
+aplican solas al arrancar la API, y lo único que hay que recordar es poner
+`CORS_ORIGINS` en Render con el dominio de Vercel.
 
 ### Conectar con el ecosistema DINAMYT (opcional)
 
