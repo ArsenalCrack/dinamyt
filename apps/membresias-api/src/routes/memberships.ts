@@ -3,6 +3,7 @@ import { and, asc, eq, desc } from 'drizzle-orm';
 import { memberships, plans, payments, attendances, users } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireClub, requireRole } from '../plugins/auth';
 import { ensureMembership } from '../lib/memberships';
+import { LIMITES, dinero, textoOpcional } from '../lib/validacion';
 import {
   nextDue,
   estado,
@@ -167,6 +168,18 @@ export async function membershipsRoutes(app: FastifyInstance) {
           ? (body.status as EstadoMem)
           : undefined;
 
+      // El PIN se teclea en el kiosco: solo dígitos, y los que caben en la
+      // columna. Uno con letras jamás lo acertaría nadie en esa pantalla.
+      let pin: string | null | undefined;
+      if (body.checkinPin !== undefined) {
+        const p = textoOpcional(body.checkinPin, LIMITES.checkinPin, 'El PIN');
+        if (!p.ok) return reply.code(422).send({ error: p.error });
+        if (p.valor && !/^\d+$/.test(p.valor)) {
+          return reply.code(422).send({ error: 'El PIN solo puede tener dígitos.' });
+        }
+        pin = p.valor;
+      }
+
       const [upd] = await db
         .update(memberships)
         .set({
@@ -176,7 +189,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
           ...(body.currentPlanId !== undefined && {
             currentPlanId: body.currentPlanId,
           }),
-          ...(body.checkinPin !== undefined && { checkinPin: body.checkinPin }),
+          ...(pin !== undefined && { checkinPin: pin }),
           updatedAt: new Date(),
         })
         .where(eq(memberships.id, m.id))
@@ -204,9 +217,10 @@ export async function membershipsRoutes(app: FastifyInstance) {
       const db = req.db;
 
       if (!body.planId) return reply.code(422).send({ error: 'Falta el plan del pago.' });
-      if (body.amount === undefined || isNaN(parseFloat(body.amount))) {
-        return reply.code(422).send({ error: 'Monto inválido.' });
-      }
+      const monto = dinero(body.amount, 'El monto');
+      if (!monto.ok) return reply.code(422).send({ error: monto.error });
+      const notas = textoOpcional(body.notes, 500, 'Las notas');
+      if (!notas.ok) return reply.code(422).send({ error: notas.error });
 
       const [plan] = await db
         .select()
@@ -254,11 +268,11 @@ export async function membershipsRoutes(app: FastifyInstance) {
         .values({
           membershipId: m.id,
           planId: plan.id,
-          amount: body.amount,
+          amount: monto.valor,
           method,
           status,
           registeredByUserId: req.user!.sub,
-          notes: body.notes ?? null,
+          notes: notas.valor,
         })
         .returning();
 

@@ -17,11 +17,13 @@ import { orgDelRequest } from './auth';
 
 /**
  * Rutas que operan fuera de cualquier club y no deben abrir transacción.
- * `/auth/logout` solo borra cookies y `/health` ni toca la BD: envolverlas
- * costaría un BEGIN/COMMIT por petición para nada.
+ * `/auth/logout` solo borra cookies, y `/health` y `/geo/*` ni tocan la BD:
+ * envolverlas costaría un BEGIN/COMMIT por petición para nada.
  */
 const SIN_CONTEXTO = new Set([
   '/health',
+  '/geo/paises',
+  '/geo/ciudades',
   '/auth/login',
   '/auth/logout',
   '/auth/config',

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { and, eq } from 'drizzle-orm';
 import { clubSchedule, scheduleExceptions } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireRole } from '../plugins/auth';
+import { LIMITES, textoOpcional } from '../lib/validacion';
 
 interface DiaBody {
   weekday: number;
@@ -43,15 +44,27 @@ export async function scheduleRoutes(app: FastifyInstance) {
       const dias = (body.dias ?? []).filter((d) => d.weekday >= 0 && d.weekday <= 6);
       const db = req.db;
 
+      // `opens_at`/`closes_at` son varchar(5): cualquier cosa que no sea HH:MM
+      // no cabe en la columna y acabaría en un 500.
+      for (const d of dias) {
+        for (const [campo, hora] of [['La apertura', d.opensAt], ['El cierre', d.closesAt]] as const) {
+          if (hora != null && hora !== '' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) {
+            return reply.code(422).send({ error: `${campo} debe venir como HH:MM.` });
+          }
+        }
+        const grupo = textoOpcional(d.grupo, LIMITES.grupo, 'El grupo');
+        if (!grupo.ok) return reply.code(422).send({ error: grupo.error });
+      }
+
       await db.delete(clubSchedule).where(eq(clubSchedule.orgId, orgId));
       if (dias.length) {
         await db.insert(clubSchedule).values(
           dias.map((d) => ({
             orgId,
             weekday: d.weekday,
-            opensAt: d.opensAt ?? null,
-            closesAt: d.closesAt ?? null,
-            grupo: d.grupo ?? null,
+            opensAt: d.opensAt || null,
+            closesAt: d.closesAt || null,
+            grupo: d.grupo?.trim() || null,
           })),
         );
       }
@@ -68,13 +81,19 @@ export async function scheduleRoutes(app: FastifyInstance) {
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const body = req.body as { date: string; isClosed?: boolean; note?: string };
       if (!body.date) return reply.code(422).send({ error: 'Falta la fecha.' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+        return reply.code(422).send({ error: 'La fecha debe venir como AAAA-MM-DD.' });
+      }
+      const nota = textoOpcional(body.note, LIMITES.notaCalendario, 'La nota');
+      if (!nota.ok) return reply.code(422).send({ error: nota.error });
+
       const [row] = await req.db
         .insert(scheduleExceptions)
         .values({
           orgId,
           date: body.date,
           isClosed: body.isClosed ?? true,
-          note: body.note ?? null,
+          note: nota.valor,
         })
         .returning();
       return reply.code(201).send(row);

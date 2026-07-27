@@ -3,6 +3,13 @@ import { and, eq } from 'drizzle-orm';
 import { plans } from '@dinamyt/membresias-db';
 import type { PlanType } from '../lib/billing';
 import { orgDelRequest, requireRole } from '../plugins/auth';
+import {
+  LIMITES,
+  MAX_CLASES,
+  dinero,
+  enteroOpcional,
+  textoObligatorio,
+} from '../lib/validacion';
 
 const TIPOS: PlanType[] = ['mensual', 'semanal', 'clase', 'paquete', 'matricula'];
 
@@ -37,25 +44,25 @@ export async function plansRoutes(app: FastifyInstance) {
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const body = req.body as PlanBody;
 
-      if (!body.name?.trim()) {
-        return reply.code(422).send({ error: 'El plan necesita un nombre.' });
-      }
+      const nombre = textoObligatorio(body.name, LIMITES.planNombre, 'El nombre del plan');
+      if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
       if (!TIPOS.includes(body.type)) {
         return reply.code(422).send({ error: `Tipo de plan inválido.` });
       }
-      if (body.price === undefined || isNaN(parseFloat(body.price))) {
-        return reply.code(422).send({ error: 'El plan necesita un precio válido.' });
-      }
+      const precio = dinero(body.price, 'El precio');
+      if (!precio.ok) return reply.code(422).send({ error: precio.error });
+      const clases = enteroOpcional(body.nClasses, MAX_CLASES, 'El número de clases');
+      if (!clases.ok) return reply.code(422).send({ error: clases.error });
 
       const [plan] = await req.db
         .insert(plans)
         .values({
           orgId,
-          name: body.name.trim(),
+          name: nombre.valor,
           type: body.type,
-          price: body.price,
+          price: precio.valor,
           durationDays: body.durationDays ?? (body.type === 'semanal' ? 7 : null),
-          nClasses: body.nClasses ?? null,
+          nClasses: clases.valor,
         })
         .returning();
       return reply.code(201).send(plan);
@@ -79,16 +86,32 @@ export async function plansRoutes(app: FastifyInstance) {
         .limit(1);
       if (!existing) return reply.code(404).send({ error: 'Plan no encontrado.' });
 
+      const cambios: Record<string, unknown> = { updatedAt: new Date() };
+      if (body.name !== undefined) {
+        const nombre = textoObligatorio(body.name, LIMITES.planNombre, 'El nombre del plan');
+        if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
+        cambios.name = nombre.valor;
+      }
+      if (body.price !== undefined) {
+        const precio = dinero(body.price, 'El precio');
+        if (!precio.ok) return reply.code(422).send({ error: precio.error });
+        cambios.price = precio.valor;
+      }
+      if (body.nClasses !== undefined) {
+        const clases = enteroOpcional(body.nClasses, MAX_CLASES, 'El número de clases');
+        if (!clases.ok) return reply.code(422).send({ error: clases.error });
+        cambios.nClasses = clases.valor;
+      }
+      if (body.durationDays !== undefined) {
+        const dias = enteroOpcional(body.durationDays, 3650, 'La duración en días');
+        if (!dias.ok) return reply.code(422).send({ error: dias.error });
+        cambios.durationDays = dias.valor;
+      }
+      if (body.isActive !== undefined) cambios.isActive = Boolean(body.isActive);
+
       const [plan] = await db
         .update(plans)
-        .set({
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.price !== undefined && { price: body.price }),
-          ...(body.durationDays !== undefined && { durationDays: body.durationDays }),
-          ...(body.nClasses !== undefined && { nClasses: body.nClasses }),
-          ...(body.isActive !== undefined && { isActive: body.isActive }),
-          updatedAt: new Date(),
-        })
+        .set(cambios)
         .where(eq(plans.id, id))
         .returning();
       return plan;

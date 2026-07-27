@@ -3,6 +3,7 @@ import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { orgs, users } from '@dinamyt/membresias-db';
 import { requireSuperAdmin } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
+import { LIMITES, textoObligatorio, textoOpcional } from '../lib/validacion';
 
 /**
  * Panel del SUPERADMIN: qué clubes existen y qué maestros tienen acceso.
@@ -62,10 +63,14 @@ export async function orgsRoutes(app: FastifyInstance) {
       city?: string;
       country?: string;
     };
-    const name = (body.name ?? '').trim();
-    if (!name) return reply.code(422).send({ error: 'El nombre del club es obligatorio.' });
+    const nombre = textoObligatorio(body.name, LIMITES.orgNombre, 'El nombre del club');
+    if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
+    const ciudad = textoOpcional(body.city, LIMITES.ciudad, 'La ciudad');
+    if (!ciudad.ok) return reply.code(422).send({ error: ciudad.error });
+    const pais = textoOpcional(body.country, LIMITES.pais, 'El país');
+    if (!pais.ok) return reply.code(422).send({ error: pais.error });
 
-    const slug = aSlug(body.slug || name);
+    const slug = aSlug(body.slug || nombre.valor);
     if (!slug) return reply.code(422).send({ error: 'No se pudo derivar un identificador del nombre.' });
 
     const db = req.db;
@@ -75,10 +80,10 @@ export async function orgsRoutes(app: FastifyInstance) {
     const [creado] = await db
       .insert(orgs)
       .values({
-        name,
+        name: nombre.valor,
         slug,
-        city: body.city?.trim() || null,
-        country: body.country?.trim() || null,
+        city: ciudad.valor,
+        country: pais.valor,
       })
       .returning();
     return reply.code(201).send(creado);
@@ -100,12 +105,20 @@ export async function orgsRoutes(app: FastifyInstance) {
 
     const cambios: Record<string, unknown> = { updatedAt: new Date() };
     if (body.name !== undefined) {
-      const name = body.name.trim();
-      if (!name) return reply.code(422).send({ error: 'El nombre no puede quedar vacío.' });
-      cambios.name = name;
+      const nombre = textoObligatorio(body.name, LIMITES.orgNombre, 'El nombre del club');
+      if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
+      cambios.name = nombre.valor;
     }
-    if (body.city !== undefined) cambios.city = body.city?.trim() || null;
-    if (body.country !== undefined) cambios.country = body.country?.trim() || null;
+    if (body.city !== undefined) {
+      const ciudad = textoOpcional(body.city, LIMITES.ciudad, 'La ciudad');
+      if (!ciudad.ok) return reply.code(422).send({ error: ciudad.error });
+      cambios.city = ciudad.valor;
+    }
+    if (body.country !== undefined) {
+      const pais = textoOpcional(body.country, LIMITES.pais, 'El país');
+      if (!pais.ok) return reply.code(422).send({ error: pais.error });
+      cambios.country = pais.valor;
+    }
     if (body.isActive !== undefined) cambios.isActive = Boolean(body.isActive);
 
     const [upd] = await db.update(orgs).set(cambios).where(eq(orgs.id, id)).returning();
@@ -135,11 +148,13 @@ export async function orgsRoutes(app: FastifyInstance) {
       phone?: string;
     };
 
-    const email = (body.email ?? '').trim().toLowerCase();
-    const fullName = (body.fullName ?? '').trim();
-    if (!email || !fullName) {
-      return reply.code(422).send({ error: 'El correo y el nombre son obligatorios.' });
-    }
+    const correo = textoObligatorio(body.email, LIMITES.correo, 'El correo');
+    if (!correo.ok) return reply.code(422).send({ error: correo.error });
+    const email = correo.valor.toLowerCase();
+    const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+    if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
+    const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
+    if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
     const errorPass = validarPassword(body.password ?? '');
     if (errorPass) return reply.code(422).send({ error: errorPass });
 
@@ -154,9 +169,9 @@ export async function orgsRoutes(app: FastifyInstance) {
       .insert(users)
       .values({
         email,
-        fullName,
+        fullName: nombre.valor,
         passwordHash: await hashPassword(body.password!),
-        phone: body.phone?.trim() || null,
+        phone: telefono.valor,
         role: 'owner',
         orgId: id,
         createdById: req.user!.sub,
@@ -192,13 +207,14 @@ export async function orgsRoutes(app: FastifyInstance) {
 
       const cambios: Record<string, unknown> = { updatedAt: new Date() };
       if (body.fullName !== undefined) {
-        const nombre = body.fullName.trim();
-        if (!nombre) return reply.code(422).send({ error: 'El nombre no puede quedar vacío.' });
-        cambios.fullName = nombre;
+        const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+        if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
+        cambios.fullName = nombre.valor;
       }
       if (body.email !== undefined) {
-        const email = body.email.trim().toLowerCase();
-        if (!email) return reply.code(422).send({ error: 'El correo no puede quedar vacío.' });
+        const correo = textoObligatorio(body.email, LIMITES.correo, 'El correo');
+        if (!correo.ok) return reply.code(422).send({ error: correo.error });
+        const email = correo.valor.toLowerCase();
         const [otro] = await db
           .select({ id: users.id })
           .from(users)
@@ -207,7 +223,11 @@ export async function orgsRoutes(app: FastifyInstance) {
         if (otro) return reply.code(409).send({ error: `El correo '${email}' ya está registrado.` });
         cambios.email = email;
       }
-      if (body.phone !== undefined) cambios.phone = body.phone?.trim() || null;
+      if (body.phone !== undefined) {
+        const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
+        if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
+        cambios.phone = telefono.valor;
+      }
       if (body.role !== undefined) {
         const validos = ['owner', 'staff', 'guardian', 'student'];
         if (!validos.includes(body.role)) {

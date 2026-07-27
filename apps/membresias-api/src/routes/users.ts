@@ -3,6 +3,7 @@ import { and, asc, eq, ne } from 'drizzle-orm';
 import { users, type Db } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireAuth, requireRole } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
+import { LIMITES, textoObligatorio, textoOpcional } from '../lib/validacion';
 import type { MembresiasRole } from '../types/auth';
 
 /**
@@ -80,11 +81,14 @@ export async function usersRoutes(app: FastifyInstance) {
       avatarUrl?: string;
     };
 
-    const email = (body.email ?? '').trim().toLowerCase();
-    const fullName = (body.fullName ?? '').trim();
-    if (!email || !fullName) {
-      return reply.code(422).send({ error: 'El correo y el nombre son obligatorios.' });
-    }
+    const correo = textoObligatorio(body.email, LIMITES.correo, 'El correo');
+    if (!correo.ok) return reply.code(422).send({ error: correo.error });
+    const email = correo.valor.toLowerCase();
+    const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+    if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
+    const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
+    if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
+
     const rol = (body.role ?? 'student') as MembresiasRole;
     if (!ROLES_ASIGNABLES.includes(rol)) {
       return reply.code(422).send({
@@ -102,9 +106,9 @@ export async function usersRoutes(app: FastifyInstance) {
       .insert(users)
       .values({
         email,
-        fullName,
+        fullName: nombre.valor,
         passwordHash: await hashPassword(body.password!),
-        phone: body.phone?.trim() || null,
+        phone: telefono.valor,
         avatarUrl: body.avatarUrl || null,
         role: rol,
         orgId,
@@ -160,13 +164,14 @@ export async function usersRoutes(app: FastifyInstance) {
       const cambios: Record<string, unknown> = { updatedAt: new Date() };
 
       if (body.fullName !== undefined) {
-        const nombre = body.fullName.trim();
-        if (!nombre) return reply.code(422).send({ error: 'El nombre no puede quedar vacío.' });
-        cambios.fullName = nombre;
+        const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+        if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
+        cambios.fullName = nombre.valor;
       }
       if (body.email !== undefined) {
-        const email = body.email.trim().toLowerCase();
-        if (!email) return reply.code(422).send({ error: 'El correo no puede quedar vacío.' });
+        const correo = textoObligatorio(body.email, LIMITES.correo, 'El correo');
+        if (!correo.ok) return reply.code(422).send({ error: correo.error });
+        const email = correo.valor.toLowerCase();
         const [otro] = await db
           .select({ id: users.id })
           .from(users)
@@ -175,7 +180,11 @@ export async function usersRoutes(app: FastifyInstance) {
         if (otro) return reply.code(409).send({ error: `El correo '${email}' ya está registrado.` });
         cambios.email = email;
       }
-      if (body.phone !== undefined) cambios.phone = body.phone?.trim() || null;
+      if (body.phone !== undefined) {
+        const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
+        if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
+        cambios.phone = telefono.valor;
+      }
       if (body.avatarUrl !== undefined) cambios.avatarUrl = body.avatarUrl || null;
 
       // El rol solo lo mueve el maestro, y nunca hacia `owner`: el dueño del

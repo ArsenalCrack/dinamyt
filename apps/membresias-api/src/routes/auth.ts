@@ -16,6 +16,7 @@ import {
   segundosRestantes,
 } from '../lib/auth/rate-limit';
 import { cerrarSesion, darSesion } from '../lib/auth/cookies';
+import { LIMITES, textoObligatorio, textoOpcional } from '../lib/validacion';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { ssoHabilitado } from '../config';
 
@@ -180,11 +181,15 @@ export async function authRoutes(app: FastifyInstance) {
     const cambios: Record<string, unknown> = { updatedAt: new Date() };
 
     if (body.fullName !== undefined) {
-      const nombre = body.fullName.trim();
-      if (!nombre) return reply.code(422).send({ error: 'El nombre no puede quedar vacío.' });
-      cambios.fullName = nombre;
+      const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+      if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
+      cambios.fullName = nombre.valor;
     }
-    if (body.phone !== undefined) cambios.phone = body.phone?.trim() || null;
+    if (body.phone !== undefined) {
+      const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
+      if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
+      cambios.phone = telefono.valor;
+    }
     if (body.avatarUrl !== undefined) cambios.avatarUrl = body.avatarUrl || null;
 
     const [u] = await req.db

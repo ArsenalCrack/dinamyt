@@ -9,6 +9,7 @@ import { registrarContextoRls } from './plugins/rls';
 import { registrarLimiteGlobal } from './lib/auth/rate-limit';
 import { AlumnoNoDelClub } from './lib/memberships';
 import { healthRoutes } from './routes/health';
+import { geoRoutes } from './routes/geo';
 import { authRoutes } from './routes/auth';
 import { orgsRoutes } from './routes/orgs';
 import { usersRoutes } from './routes/users';
@@ -60,6 +61,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   registrarContextoRls(app);
 
   void app.register(healthRoutes);
+  void app.register(geoRoutes);
   void app.register(authRoutes);
   void app.register(orgsRoutes);
   void app.register(usersRoutes);
