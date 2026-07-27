@@ -176,6 +176,9 @@ Variables de entorno:
 | `ADMIN_PASSWORD` | tu contraseña fuerte                                                                         |
 | `ADMIN_NOMBRE`   | `Administrador DINAMYT`                                                                      |
 | `FRONTEND_URL`   | tu URL de Vercel (temporalmente `http://localhost:3000`)                                     |
+| `COOKIE_SECURE`  | `true` (la sesión viaja por HTTPS)                                                           |
+| `COOKIE_SAMESITE`| `Lax` — **no** `None`: la web llama a la API por su propio dominio (ver paso 3)              |
+| `TRUST_PROXY_HOPS` | `2` — el navegador pide a Vercel y Vercel reenvía a Render, así que hay dos saltos         |
 
 Verifica que responde abriendo
 `https://<tu-backend>.onrender.com/api/campeonatos/publico`.
@@ -184,10 +187,23 @@ Verifica que responde abriendo
 
 **Add New → Project**, importa el repo con **Root Directory** `frontend` y agrega:
 
-| Variable                 | Valor                                  |
-| ------------------------ | -------------------------------------- |
-| `NEXT_PUBLIC_API_URL`    | `https://<tu-backend>.onrender.com`    |
-| `NEXT_PUBLIC_SOCKET_URL` | `https://<tu-backend>.onrender.com`    |
+| Variable                 | Valor                               |
+| ------------------------ | ----------------------------------- |
+| `BACKEND_URL`            | `https://<tu-backend>.onrender.com` |
+| `NEXT_PUBLIC_SOCKET_URL` | `https://<tu-backend>.onrender.com` |
+
+Con `BACKEND_URL` definida, el navegador llama a `/api` en el dominio de Vercel
+y Next reenvía a Render por detrás. Eso es lo que mantiene la cookie de sesión
+como de primera parte: si el navegador fuera directo a Render, la cookie sería
+de terceros, Safari la bloquearía y **la sesión se perdería en cada recarga**.
+Se activa solo, no hay que indicarlo aparte.
+
+`NEXT_PUBLIC_API_URL` ya no hace falta y se ignora cuando el proxy está
+configurado. Para forzar el modo antiguo: `NEXT_PUBLIC_API_MODE=directo`.
+
+`NEXT_PUBLIC_SOCKET_URL` sí va directo a Render: el tiempo real usa un token en
+el `auth` del socket, no la cookie, y así conserva el WebSocket real (los
+rewrites de Vercel no lo soportan y lo degradarían a long-polling).
 
 ### 4. Conectar las dos partes (CORS)
 

@@ -9,7 +9,30 @@ import { limpiarSesion, obtenerToken, tokenCsrf } from "./sesion";
 // origen de la red privada y abrir-firewall.bat abre el puerto 5000.
 const BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "5000";
 
+/**
+ * ¿Se consume la API por el MISMO origen que la web (`/api`, vía el rewrite de
+ * next.config) o directo contra el backend?
+ *
+ * En la nube (Vercel + Render) tiene que ser por el proxy: web y backend están
+ * en dominios distintos, así que sin él la cookie de sesión sería de terceros
+ * — Safari la bloquea y Firefox la aísla — y la sesión se pierde en cada
+ * recarga. En la LAN va directo: mismo host, la cookie ya es de primera parte,
+ * y el proxy sería un punto único de falla con decenas de dispositivos.
+ *
+ * Se decide solo, según si el despliegue configuró el proxy (`BACKEND_URL`).
+ * `NEXT_PUBLIC_API_MODE` ("proxy" | "directo") lo fuerza si hace falta.
+ */
+function usarProxy(): boolean {
+  if (process.env.NEXT_PUBLIC_API_MODE === "proxy") return true;
+  if (process.env.NEXT_PUBLIC_API_MODE === "directo") return false;
+  return process.env.DINAMYT_PROXY_LISTO === "1";
+}
+
 export function resolverApiUrl(): string {
+  // Cadena vacía = rutas relativas: baseURL queda en "/api", el mismo origen.
+  // Va ANTES de NEXT_PUBLIC_API_URL: si el proxy está configurado, apuntar el
+  // navegador a un dominio absoluto es exactamente lo que rompe la sesión.
+  if (usarProxy()) return "";
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   if (typeof window !== "undefined") {
     return `${window.location.protocol}//${window.location.hostname}:${BACKEND_PORT}`;
