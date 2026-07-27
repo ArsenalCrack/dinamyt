@@ -50,7 +50,35 @@ puerta de entrada: sin ella nadie puede crear el primer club.
    > salidas por IPv6: la API no conectaría nunca y el error no dice por qué.
    > El *pooler* funciona por IPv4 y además aguanta más conexiones.
 
-4. **No hay que crear tablas a mano.** La API aplica las migraciones sola cada
+4. **Crea un rol propio para la aplicación.** Este paso no es opcional si
+   quieres que el aislamiento entre clubes de la base de datos sirva de algo.
+
+   El usuario `postgres` que Supabase te da por defecto tiene `BYPASSRLS`: se
+   salta **todas** las políticas de Row Level Security sin avisar. Conectando
+   con él, esa capa de seguridad queda de adorno y nada te lo dice.
+
+   En **SQL Editor**, ejecuta (cambia la contraseña):
+
+   ```sql
+   create role membresias_app with login password 'UNA_CLAVE_LARGA' nobypassrls;
+   grant create on database postgres to membresias_app;
+   ```
+
+   Después, en la cadena de conexión del paso 3, reemplaza el usuario
+   `postgres` por `membresias_app` (conservando el sufijo `.PROJECT_REF` que
+   usa el pooler) y pon la contraseña que acabas de crear.
+
+   La API crea el esquema y las tablas con ese rol, así que las posee — y como
+   las políticas usan `FORCE ROW LEVEL SECURITY`, se le aplican igual. Al
+   arrancar verás en los logs de Render si quedó bien:
+
+   ```
+   [SEGURIDAD] RLS no está protegiendo: el rol de conexión es SUPERUSER…
+   ```
+
+   Si ese mensaje aparece, te conectaste con el rol equivocado.
+
+5. **No hay que crear tablas a mano.** La API aplica las migraciones sola cada
    vez que arranca.
 
 > Supabase da la cadena **sin** `sslmode`, y con eso el cliente de PostgreSQL
@@ -98,10 +126,23 @@ puerta de entrada: sin ella nadie puede crear el primer club.
 1. En [vercel.com](https://vercel.com): **Add New → Project** → importa
    `ArsenalCrack/dinamyt-membresias`.
 
-2. **Root Directory: déjalo en la raíz del repositorio.** No lo apuntes a
-   `apps/membresias-web`. El `vercel.json` de la raíz ya dice qué construir y
-   dónde queda la salida; si mueves el root, se rompe la resolución del
-   workspace de pnpm.
+2. **Root Directory: `apps/membresias-web`.**
+
+   Es el paso que hay que hacer bien. Vercel busca `next` en el `package.json`
+   **de esa carpeta** para saber que es un proyecto Next.js; si lo dejas en la
+   raíz del repositorio, el build muere con:
+
+   ```
+   Error: No Next.js version detected.
+   ```
+
+   Vercel reconoce solo el `pnpm-workspace.yaml` de la raíz e instala desde
+   ahí. Si aun así el install fallara por no encontrar el lockfile, entra a
+   **Settings → Build and Deployment** y activa *Include source files outside
+   of the Root Directory in the Build Step*.
+
+   No toques Build Command ni Output Directory: con el Root Directory bien
+   puesto, los valores por defecto son los correctos.
 
 3. En **Environment Variables**:
 
@@ -138,6 +179,22 @@ Guarda: Render reinicia el servicio solo.
 
 Si más adelante conectas un dominio propio, añádelo separado por comas:
 `https://membresias.tudominio.com,https://tu-web.vercel.app`
+
+### Por qué conviene un dominio propio (y no es solo estética)
+
+Con `vercel.app` + `onrender.com`, la web y la API son **sitios distintos**, así
+que la cookie de sesión es una cookie de terceros. El `render.yaml` ya la marca
+`SameSite=None` para que funcione, pero:
+
+- **Safari las bloquea siempre**, y Firefox las aísla. En un iPhone, la sesión
+  se pierde al recargar la página. La app tiene un respaldo en memoria, así que
+  se puede trabajar con la pestaña abierta, pero no es lo que quieres para una
+  PWA instalada.
+
+La solución de fondo es servir ambos bajo el mismo dominio, por ejemplo
+`membresias.tudominio.com` (Vercel) y `api.tudominio.com` (Render). Ahí la
+cookie deja de ser de terceros y todo el problema desaparece. Cuando lo hagas,
+cambia `COOKIE_SAMESITE` a `lax` en Render.
 
 ---
 
@@ -184,6 +241,7 @@ llegar a dispararse.
 
 | Síntoma | Causa casi segura |
 |---|---|
+| `No Next.js version detected` en Vercel | El **Root Directory** no es `apps/membresias-web` |
 | Web en blanco, login no responde | Falta `CORS_ORIGINS` en Render, o lleva barra final |
 | La API no conecta y el error no dice nada claro | Usaste la conexión **directa** de Supabase (IPv6). Cambia a la del *transaction pooler* |
 | `password authentication failed` | No reemplazaste `[TU-PASSWORD]` en la cadena, o la contraseña lleva caracteres que hay que escapar en una URL (`@`, `:`, `/`, `#`) |
@@ -192,3 +250,6 @@ llegar a dispararse.
 | El primer acceso del día tarda un minuto | Render dormido. Es el plan gratis |
 | El check-in dice "hoy no hay clase" | Falta marcar los días en **Calendario** |
 | No veo mis tablas en Supabase | Están en el esquema `membresias`, no en `public` |
+| `[SEGURIDAD] RLS no está protegiendo` en los logs | Te conectaste como `postgres`, que tiene `BYPASSRLS`. Usa el rol `membresias_app` del paso 1.4 |
+| `permission denied for schema membresias` | Al rol `membresias_app` le falta `grant create on database` |
+| Al recargar la página se cierra la sesión (sobre todo en iPhone) | Cookie de terceros bloqueada por el navegador. Ver el apartado del dominio propio |

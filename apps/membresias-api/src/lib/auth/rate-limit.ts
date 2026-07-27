@@ -6,6 +6,8 @@
  * moverlo a un backend compartido (Redis).
  */
 
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+
 interface Registro {
   marcas: number[];
   ventanaMs: number;
@@ -66,4 +68,48 @@ export function segundosRestantes(clave: string): number {
 /** Solo para tests: deja el contador en blanco. */
 export function reiniciarLimites() {
   intentos.clear();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Límites de tráfico general (no solo login)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function responder429(reply: FastifyReply, espera: number) {
+  return reply
+    .code(429)
+    .header('Retry-After', String(espera))
+    .send({ error: `Demasiadas peticiones. Intenta de nuevo en ${espera} segundos.` });
+}
+
+/**
+ * preHandler que limita un endpoint por IP.
+ *
+ * Para lo que cuesta caro aunque venga con token (reportes, importaciones,
+ * envío de avisos): el tope del login no cubre nada de eso.
+ */
+export function limitarPorIp(nombre: string, maxPeticiones: number, ventanaSeg: number) {
+  return async function (req: FastifyRequest, reply: FastifyReply) {
+    const clave = `rl:${nombre}:${req.ip || '?'}`;
+    if (intentoBloqueado(clave, maxPeticiones, ventanaSeg)) {
+      return responder429(reply, Math.max(segundosRestantes(clave), 1));
+    }
+  };
+}
+
+/**
+ * Techo global por IP. Generoso a propósito: no busca afinar el uso normal,
+ * sino que nadie barra la API entera ni martille una ruta que se nos pasara.
+ */
+export const GLOBAL_MAX_POR_MINUTO = 600;
+
+export function registrarLimiteGlobal(app: FastifyInstance, max = GLOBAL_MAX_POR_MINUTO) {
+  app.addHook('onRequest', async (req, reply) => {
+    // El preflight de CORS lo manda el navegador solo: ni consume cupo ni
+    // debería recibir un 429 que reviente la petición real que viene detrás.
+    if (req.method === 'OPTIONS') return;
+    const clave = `rl:global:${req.ip || '?'}`;
+    if (intentoBloqueado(clave, max, 60)) {
+      return responder429(reply, Math.max(segundosRestantes(clave), 1));
+    }
+  });
 }

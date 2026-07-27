@@ -28,6 +28,11 @@ services:
       - key: PORT
         value: "3004"
 
+      # Render pone exactamente un proxy delante. Sin esto, req.ip es la IP de
+      # ese proxy para todo el mundo y el rate limit por IP deja de servir.
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+
       # Base de datos. En Supabase: la cadena del "Transaction pooler"
       # (puerto 6543), NO la conexión directa — esa solo responde por IPv6 y
       # Render no hace salidas por IPv6.
@@ -57,6 +62,25 @@ services:
         sync: false
       - key: MEMBRESIAS_WEB_URL
         sync: false
+
+      # La web (vercel.app) y la API (onrender.com) son sitios DISTINTOS, así
+      # que la cookie de sesión es de terceros: con el `lax` por defecto el
+      # navegador no la manda y la sesión no sobrevive a recargar la página.
+      # `none` obliga a `Secure`, que en Render se cumple solo (todo es HTTPS).
+      # Aun así Safari bloquea las cookies de terceros pase lo que pase: la
+      # solución de fondo es servir ambos bajo un mismo dominio propio.
+      - key: COOKIE_SAMESITE
+        value: none
+
+      # Cookie de sesión. Con la web en Vercel y la API aquí son dominios
+      # distintos, así que la cookie es de terceros y necesita SameSite=None
+      # (+ Secure). Safari la bloqueará igual: para una sesión que aguante en
+      # todos los navegadores hay que servir ambas bajo un mismo dominio y
+      # entonces bajar esto a "lax".
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: COOKIE_SECURE
+        value: "true"
 
       # Avisos push (opcional). Generar con:
       #   pnpm --filter @dinamyt/membresias-api gen:vapid

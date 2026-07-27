@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { users, type Db } from '@dinamyt/membresias-db';
 import { config } from '../config';
 import { hashPassword } from '../lib/auth/passwords';
+import { sinFiltroDeClub } from '../lib/db-contexto';
 
 /**
  * Siembra del superadmin.
@@ -18,16 +19,24 @@ export async function seedSuperadmin(db: Db): Promise<'creado' | 'ya-existia' | 
   const password = config.superadminPassword;
   if (!email || !password) return 'omitido';
 
-  const [ya] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-  if (ya) return 'ya-existia';
+  // El superadmin no pertenece a ningún club (org_id NULL), así que bajo el
+  // filtro de RLS ninguna consulta con contexto podría verlo ni crearlo.
+  return sinFiltroDeClub(db, async (tx) => {
+    const [ya] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    if (ya) return 'ya-existia' as const;
 
-  await db.insert(users).values({
-    email,
-    fullName: config.superadminNombre,
-    passwordHash: await hashPassword(password),
-    role: 'owner', // el rol no aplica a quien atraviesa todos los clubes
-    isSuperAdmin: true,
-    orgId: null,
+    await tx.insert(users).values({
+      email,
+      fullName: config.superadminNombre,
+      passwordHash: await hashPassword(password),
+      role: 'owner', // el rol no aplica a quien atraviesa todos los clubes
+      isSuperAdmin: true,
+      orgId: null,
+    });
+    return 'creado' as const;
   });
-  return 'creado';
 }

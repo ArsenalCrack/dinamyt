@@ -67,8 +67,11 @@ export function NavBar() {
     </Link>
   );
 
-  function salir() {
-    logout();
+  // Se espera al logout antes de navegar: la cookie de sesión la borra el
+  // servidor, y si se cambia de página antes el navegador puede cancelar la
+  // petición y dejar la sesión viva en la API.
+  async function salir() {
+    await logout();
     setAbierto(false);
     router.replace('/login');
   }

@@ -4,6 +4,7 @@ import { createTestDb } from '@dinamyt/membresias-db/testing';
 import { buildApp } from '../app';
 import { firmarToken } from '../lib/auth/tokens';
 import { hashPassword } from '../lib/auth/passwords';
+import { reiniciarLimites } from '../lib/auth/rate-limit';
 
 /**
  * Escenario base de los tests: un club con su maestro, un auxiliar y dos
@@ -35,6 +36,11 @@ export interface Escenario {
 }
 
 export async function crearEscenario(): Promise<Escenario> {
+  // El contador de rate limiting vive en el proceso y todos los `app.inject`
+  // salen de la misma IP: sin esto los tests se van sumando entre ellos y en
+  // algún punto de la suite empiezan a salir 429 donde no toca.
+  reiniciarLimites();
+
   const db = (await createTestDb()) as unknown as Db;
   const hash = await hashPassword(PASSWORD);
 

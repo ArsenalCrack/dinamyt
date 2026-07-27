@@ -1,4 +1,4 @@
-import { db, migrarBd } from '@dinamyt/membresias-db';
+import { db, migrarBd, verificarRls } from '@dinamyt/membresias-db';
 import { buildApp } from './app';
 import { config, ssoHabilitado } from './config';
 import { seedSuperadmin } from './scripts/seed';
@@ -23,6 +23,17 @@ async function main() {
   } catch (err) {
     console.error('No se pudieron aplicar las migraciones:', err);
     process.exit(1);
+  }
+
+  // RLS se puede activar y aun así no proteger nada: un rol SUPERUSER o con
+  // BYPASSRLS se salta las políticas sin avisar y desde fuera todo parece bien.
+  // Avisa en vez de abortar: la API sigue siendo correcta sin RLS (el filtro
+  // por club lo hace igualmente), solo se queda sin la red de abajo.
+  try {
+    const rls = await verificarRls(db);
+    if (!rls.ok) console.warn(`[SEGURIDAD] RLS no está protegiendo: ${rls.motivo}`);
+  } catch (err) {
+    console.warn('[SEGURIDAD] No se pudo comprobar el estado de RLS:', err);
   }
 
   try {

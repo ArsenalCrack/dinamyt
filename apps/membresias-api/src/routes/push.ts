@@ -17,7 +17,7 @@ export async function pushRoutes(app: FastifyInstance) {
     if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
       return reply.code(422).send({ error: 'Suscripción Push inválida.' });
     }
-    const db = req.server.db;
+    const db = req.db;
     const [existing] = await db
       .select()
       .from(pushSubscriptions)

@@ -27,6 +27,32 @@ export const config = {
 
   /** URL pública de la web (para armar enlaces). */
   webUrl: process.env.MEMBRESIAS_WEB_URL ?? 'http://localhost:3006',
+
+  /**
+   * Proxies de confianza delante de la API (Render pone 1). Con 0 se ignora
+   * X-Forwarded-For y se usa la IP del socket. Importa para el rate limit: sin
+   * esto, detrás de Render todas las peticiones comparten la IP del proxy y el
+   * tope por IP se convierte en un cupo global que cualquiera agota para todos.
+   * Es un número de saltos y no `true` a propósito: X-Forwarded-For lo escribe
+   * quien quiera, y confiar en toda la cadena deja falsear la IP a voluntad.
+   */
+  trustProxyHops: parseInt(process.env.TRUST_PROXY_HOPS ?? '0', 10),
+
+  /**
+   * Cookie de sesión.
+   *
+   * `sameSite` decide si la sesión sobrevive al despliegue: con la web y la API
+   * en el MISMO sitio (localhost, o `app.midominio.com` + `api.midominio.com`)
+   * vale `lax` y todo funciona. Con dominios distintos —el caso de Vercel +
+   * Render— hace falta `none`, y entonces la cookie es de terceros: Safari la
+   * bloquea siempre y Firefox la aísla. Por eso el cliente conserva el token en
+   * memoria como respaldo, y por eso lo suyo es servir ambos bajo un dominio.
+   */
+  cookieSameSite: (process.env.COOKIE_SAMESITE ?? 'lax') as 'lax' | 'strict' | 'none',
+  /** `none` exige `Secure`, así que ahí se fuerza aunque nadie lo pida. */
+  cookieSecure:
+    process.env.COOKIE_SECURE === 'true' ||
+    (process.env.COOKIE_SAMESITE ?? 'lax') === 'none',
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3006')
     .split(',')
     .map((o) => o.trim())

@@ -108,9 +108,10 @@ el cálculo de vencimientos y las reglas del check-in.
 datos) + Render (API) + Vercel (web), con la lista de variables y las trampas
 que cuestan una tarde.
 
-En corto: hay un `render.yaml` y un `vercel.json` listos; las migraciones se
-aplican solas al arrancar la API, y lo único que hay que recordar es poner
-`CORS_ORIGINS` en Render con el dominio de Vercel.
+En corto: hay un `render.yaml` listo para el Blueprint de Render; en Vercel el
+*Root Directory* va en `apps/membresias-web`. Las migraciones se aplican solas
+al arrancar la API, y lo único que queda por recordar es poner `CORS_ORIGINS`
+en Render con el dominio de Vercel.
 
 ### Conectar con el ecosistema DINAMYT (opcional)
 

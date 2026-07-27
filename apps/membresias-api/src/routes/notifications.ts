@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { and, eq, gte, desc } from 'drizzle-orm';
 import { memberships, notifications, pushSubscriptions } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireClub, requireRole } from '../plugins/auth';
+import { limitarPorIp } from '../lib/auth/rate-limit';
 import { planNotificaciones, textoAviso } from '../lib/notifications';
 import { todayStr } from '../lib/billing';
 import { enviarPush } from '../lib/push';
@@ -10,13 +11,15 @@ export async function notificationsRoutes(app: FastifyInstance) {
   // ── POST /notifications/run — evalúa vencimientos y encola avisos ──────────
   // Pensado para dispararse desde un cron diario. Crea avisos in-app (idempotente
   // por día) y los empuja por Web Push. Sin correo: Membresías no envía emails.
+  // Recorre todas las membresías del club y manda push, así que es la ruta más
+  // cara de la API: un cron diario necesita una llamada y 6 por hora sobran.
   app.post(
     '/notifications/run',
-    { preHandler: requireRole(['owner']) },
+    { preHandler: [limitarPorIp('notifications-run', 6, 3600), requireRole(['owner'])] },
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
-      const db = req.server.db;
+      const db = req.db;
       const today = todayStr();
       const startToday = new Date(`${today}T00:00:00.000Z`);
 
@@ -90,7 +93,7 @@ export async function notificationsRoutes(app: FastifyInstance) {
     { preHandler: requireClub() },
     async (req, reply) => {
       const orgId = orgDelRequest(req);
-      const db = req.server.db;
+      const db = req.db;
       const rol = req.user?.role_membresias;
       const esStaff = req.user?.is_super_admin || rol === 'owner' || rol === 'staff';
       const all = (req.query as { all?: string }).all === '1';

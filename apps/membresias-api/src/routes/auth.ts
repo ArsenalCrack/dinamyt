@@ -11,9 +11,12 @@ import {
 } from '../lib/auth/passwords';
 import {
   intentoBloqueado,
+  limitarPorIp,
   limpiarIntentos,
   segundosRestantes,
 } from '../lib/auth/rate-limit';
+import { cerrarSesion, darSesion } from '../lib/auth/cookies';
+import { sinFiltroDeClub } from '../lib/db-contexto';
 import { ssoHabilitado } from '../config';
 
 // Tope de intentos de login: 5 por correo y 20 por IP cada 5 minutos.
@@ -64,67 +67,83 @@ export async function authRoutes(app: FastifyInstance) {
       });
     }
 
-    const db = req.server.db;
-    const [u] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    // Cruza clubes por diseño: se busca por correo, cuando todavía no se sabe
+    // de qué club es quien intenta entrar (ver `lib/db-contexto.ts`).
+    return sinFiltroDeClub(req.server.db, async (db) => {
+      const [u] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
-    // Mismo mensaje para correo inexistente y contraseña errada: no se revela
-    // cuáles correos están dados de alta.
-    if (!u || !(await verificarPassword(password, u.passwordHash))) {
-      return reply.code(401).send({ error: 'Correo o contraseña incorrectos.' });
-    }
+      // Mismo mensaje para correo inexistente y contraseña errada: no se revela
+      // cuáles correos están dados de alta.
+      if (!u || !(await verificarPassword(password, u.passwordHash))) {
+        return reply.code(401).send({ error: 'Correo o contraseña incorrectos.' });
+      }
 
-    if (!u.isActive) {
-      return reply
-        .code(403)
-        .send({ error: 'Tu cuenta está desactivada. Habla con tu maestro.' });
-    }
-
-    let club: { id: string; name: string; slug: string; isActive: boolean } | null =
-      null;
-    if (u.orgId) {
-      const [c] = await db
-        .select({
-          id: orgs.id,
-          name: orgs.name,
-          slug: orgs.slug,
-          isActive: orgs.isActive,
-        })
-        .from(orgs)
-        .where(eq(orgs.id, u.orgId))
-        .limit(1);
-      club = c ?? null;
-      if (club && !club.isActive && !u.isSuperAdmin) {
+      if (!u.isActive) {
         return reply
           .code(403)
-          .send({ error: 'El acceso de tu club está suspendido.' });
+          .send({ error: 'Tu cuenta está desactivada. Habla con tu maestro.' });
       }
-    }
 
-    limpiarIntentos(claveEmail);
+      let club: { id: string; name: string; slug: string; isActive: boolean } | null =
+        null;
+      if (u.orgId) {
+        const [c] = await db
+          .select({
+            id: orgs.id,
+            name: orgs.name,
+            slug: orgs.slug,
+            isActive: orgs.isActive,
+          })
+          .from(orgs)
+          .where(eq(orgs.id, u.orgId))
+          .limit(1);
+        club = c ?? null;
+        if (club && !club.isActive && !u.isSuperAdmin) {
+          return reply
+            .code(403)
+            .send({ error: 'El acceso de tu club está suspendido.' });
+        }
+      }
 
-    // Migración transparente del costo de bcrypt (ver `necesitaRehash`).
-    if (necesitaRehash(u.passwordHash)) {
-      await db
-        .update(users)
-        .set({ passwordHash: await hashPassword(password), updatedAt: new Date() })
-        .where(eq(users.id, u.id));
-    }
+      limpiarIntentos(claveEmail);
 
-    const token = await firmarToken({
-      sub: u.id,
-      email: u.email,
-      fullName: u.fullName,
-      org_id: u.orgId,
-      role_membresias: u.role,
-      is_super_admin: u.isSuperAdmin,
+      // Migración transparente del costo de bcrypt (ver `necesitaRehash`).
+      if (necesitaRehash(u.passwordHash)) {
+        await db
+          .update(users)
+          .set({ passwordHash: await hashPassword(password), updatedAt: new Date() })
+          .where(eq(users.id, u.id));
+      }
+
+      const token = await firmarToken({
+        sub: u.id,
+        email: u.email,
+        fullName: u.fullName,
+        org_id: u.orgId,
+        role_membresias: u.role,
+        is_super_admin: u.isSuperAdmin,
+      });
+
+      // La sesión va en cookie httpOnly: es lo que el navegador usará a partir
+      // de aquí. El token se sigue devolviendo en el cuerpo para los clientes
+      // que no son navegador y para el respaldo en memoria de la web cuando la
+      // cookie es de terceros y el navegador la bloquea (ver `config`).
+      const csrf = darSesion(reply, token);
+      return { token, csrf, user: vistaUsuario(u), club };
     });
+  });
 
-    return { token, user: vistaUsuario(u), club };
+  // ── POST /auth/logout — cierra la sesión del navegador ────────────────────
+  // Sin guard: si la cookie ya no vale, borrarla debe funcionar igual. Lo
+  // contrario deja al usuario con una sesión rota que no puede ni cerrar.
+  app.post('/auth/logout', async (_req, reply) => {
+    cerrarSesion(reply);
+    return { ok: true };
   });
 
   // ── GET /auth/me — quién soy y en qué club estoy ──────────────────────────
   app.get('/auth/me', { preHandler: requireAuth() }, async (req, reply) => {
-    const db = req.server.db;
+    const db = req.db;
     const [u] = await db
       .select()
       .from(users)
@@ -168,7 +187,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (body.phone !== undefined) cambios.phone = body.phone?.trim() || null;
     if (body.avatarUrl !== undefined) cambios.avatarUrl = body.avatarUrl || null;
 
-    const [u] = await req.server.db
+    const [u] = await req.db
       .update(users)
       .set(cambios)
       .where(eq(users.id, req.user!.sub))
@@ -179,15 +198,17 @@ export async function authRoutes(app: FastifyInstance) {
   // ── POST /auth/change-password — cambiar MI contraseña ────────────────────
   // Requiere la actual. No hay recuperación por correo: quien la olvida se la
   // pide a su maestro (o al superadmin, si es maestro).
+  // El límite va aquí porque pide la contraseña ACTUAL: sin él, un token
+  // robado sirve para adivinarla a fuerza bruta y quedarse con la cuenta.
   app.post(
     '/auth/change-password',
-    { preHandler: requireAuth() },
+    { preHandler: [limitarPorIp('change-password', 10, 300), requireAuth()] },
     async (req, reply) => {
       const body = (req.body ?? {}) as { actual?: string; nueva?: string };
       const error = validarPassword(body.nueva ?? '');
       if (error) return reply.code(422).send({ error });
 
-      const db = req.server.db;
+      const db = req.db;
       const [u] = await db
         .select()
         .from(users)

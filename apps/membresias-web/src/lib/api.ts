@@ -8,8 +8,21 @@ import axios from 'axios';
  */
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004';
 
-const TOKEN_KEY = 'membresias_token';
+/**
+ * La sesión vive en una cookie httpOnly que pone la API: no es accesible desde
+ * aquí, y por eso un script inyectado en la página no puede robarla.
+ *
+ * `tokenEnMemoria` es el plan B para cuando la web y la API están en dominios
+ * distintos (Vercel + Render): ahí la cookie es de terceros y Safari la bloquea
+ * de plano. En ese caso la sesión funciona igual, pero muere al recargar. La
+ * solución de fondo es servir ambas bajo el mismo dominio — nunca volver a
+ * localStorage, que es lo que se acaba de quitar.
+ */
+let tokenEnMemoria: string | null = null;
+
+/** Solo el perfil, para pintar rápido. Sin él, nada: el token no se guarda. */
 const USER_KEY = 'membresias_user';
+const COOKIE_CSRF = 'membresias_csrf';
 
 export type Rol = 'owner' | 'staff' | 'guardian' | 'student';
 
@@ -33,11 +46,23 @@ export interface Club {
 }
 
 export function guardarToken(token: string) {
-  if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
+  tokenEnMemoria = token;
 }
 export function obtenerToken(): string | null {
-  return typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+  return tokenEnMemoria;
 }
+
+/** Valor de una cookie legible por JavaScript (la de CSRF lo es a propósito). */
+function leerCookie(nombre: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const partes = document.cookie.split('; ');
+  for (const p of partes) {
+    const i = p.indexOf('=');
+    if (i > 0 && p.slice(0, i) === nombre) return decodeURIComponent(p.slice(i + 1));
+  }
+  return null;
+}
+
 export function guardarUsuario(u: Usuario) {
   if (typeof window !== 'undefined') localStorage.setItem(USER_KEY, JSON.stringify(u));
 }
@@ -51,15 +76,31 @@ export function obtenerUsuario(): Usuario | null {
   }
 }
 export function cerrarSesion() {
+  tokenEnMemoria = null;
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  // Restos de la versión anterior, cuando el token vivía aquí. Se borra para
+  // no dejar sesiones viejas al alcance de cualquier script.
+  localStorage.removeItem('membresias_token');
 }
 
-export const api = axios.create({ baseURL: API_URL });
+// `withCredentials` es lo que hace que la cookie de sesión viaje (y que el
+// navegador acepte la que responde el login) cuando la API está en otro origen.
+export const api = axios.create({ baseURL: API_URL, withCredentials: true });
+
 api.interceptors.request.use((cfg) => {
+  // La cookie httpOnly va sola; la cabecera solo se usa cuando el navegador
+  // bloqueó la cookie y quedó el respaldo en memoria.
   const t = obtenerToken();
   if (t) cfg.headers.Authorization = `Bearer ${t}`;
+
+  // Token de doble envío: la API compara esta cabecera con la cookie de CSRF.
+  // Solo hace falta en lo que cambia estado.
+  const metodo = (cfg.method ?? 'get').toUpperCase();
+  if (metodo !== 'GET' && metodo !== 'HEAD' && metodo !== 'OPTIONS') {
+    const csrf = leerCookie(COOKIE_CSRF);
+    if (csrf) cfg.headers['X-CSRF-Token'] = csrf;
+  }
   return cfg;
 });
 
@@ -95,6 +136,7 @@ export function mensajeError(err: unknown, porDefecto: string): string {
 
 export interface RespuestaLogin {
   token: string;
+  csrf: string;
   user: Usuario;
   club: Club | null;
 }
@@ -104,6 +146,17 @@ export async function login(email: string, password: string): Promise<RespuestaL
   guardarToken(data.token);
   guardarUsuario(data.user);
   return data;
+}
+
+/** Cierra la sesión también en el servidor: la cookie httpOnly solo la borra él. */
+export async function logout(): Promise<void> {
+  try {
+    await api.post('/auth/logout');
+  } catch {
+    // Si la API no responde, la sesión local se limpia igual: dejar al usuario
+    // "dentro" porque falló la red sería peor.
+  }
+  cerrarSesion();
 }
 
 /** Revalida la sesión contra el servidor (rol y club pueden haber cambiado). */

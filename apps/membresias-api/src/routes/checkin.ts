@@ -31,7 +31,7 @@ export async function checkinRoutes(app: FastifyInstance) {
         identifier: { type: string; value: string };
         grupo?: string;
       };
-      const db = req.server.db;
+      const db = req.db;
 
       const type = body.identifier?.type as MetodoCheckin;
       const value = body.identifier?.value;
@@ -161,7 +161,7 @@ export async function checkinRoutes(app: FastifyInstance) {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const { userId, date } = req.query as { userId?: string; date?: string };
-      const db = req.server.db;
+      const db = req.db;
 
       const conds = [eq(memberships.orgId, orgId)];
       if (userId) conds.push(eq(memberships.userId, userId));

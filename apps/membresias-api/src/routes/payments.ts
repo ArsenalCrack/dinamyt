@@ -12,7 +12,7 @@ export async function paymentsRoutes(app: FastifyInstance) {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const { userId } = req.query as { userId?: string };
-      const db = req.server.db;
+      const db = req.db;
 
       const where = userId
         ? and(eq(memberships.orgId, orgId), eq(memberships.userId, userId))

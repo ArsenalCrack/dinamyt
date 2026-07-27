@@ -24,7 +24,7 @@ export async function plansRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
-      return req.server.db.select().from(plans).where(eq(plans.orgId, orgId));
+      return req.db.select().from(plans).where(eq(plans.orgId, orgId));
     },
   );
 
@@ -47,7 +47,7 @@ export async function plansRoutes(app: FastifyInstance) {
         return reply.code(422).send({ error: 'El plan necesita un precio válido.' });
       }
 
-      const [plan] = await req.server.db
+      const [plan] = await req.db
         .insert(plans)
         .values({
           orgId,
@@ -70,7 +70,7 @@ export async function plansRoutes(app: FastifyInstance) {
       const orgId = orgDelRequest(req);
       const { id } = req.params as { id: string };
       const body = req.body as Partial<PlanBody>;
-      const db = req.server.db;
+      const db = req.db;
 
       const [existing] = await db
         .select()
@@ -102,7 +102,7 @@ export async function plansRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       const { id } = req.params as { id: string };
-      const [plan] = await req.server.db
+      const [plan] = await req.db
         .update(plans)
         .set({ isActive: false, updatedAt: new Date() })
         .where(and(eq(plans.id, id), eq(plans.orgId, orgId ?? '')))

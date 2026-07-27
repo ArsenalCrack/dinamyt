@@ -4,8 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import {
   cerrarSesion as limpiar,
   login as loginApi,
+  logout as logoutApi,
   obtenerMe,
-  obtenerToken,
   obtenerUsuario,
   type Club,
   type Usuario,
@@ -15,9 +15,13 @@ import type { ClaveTexto } from './i18n';
 /**
  * Sesión de la app.
  *
- * Al montar se cree del usuario guardado en localStorage para pintar rápido, y
- * en paralelo lo revalida contra `/auth/me`. Si el maestro te cambió el rol o
- * el superadmin suspendió el club, el servidor manda: la sesión se cae sola.
+ * Al montar se cree del perfil cacheado para pintar rápido, y en paralelo lo
+ * revalida contra `/auth/me`. Si el maestro te cambió el rol o el superadmin
+ * suspendió el club, el servidor manda: la sesión se cae sola.
+ *
+ * Quién dice si hay sesión es el servidor, no el cliente: el token vive en una
+ * cookie httpOnly que este código no puede leer. Por eso se pregunta siempre,
+ * en vez de mirar antes si hay algo guardado.
  */
 
 interface AuthCtx {
@@ -25,7 +29,7 @@ interface AuthCtx {
   club: Club | null;
   cargando: boolean;
   login: (email: string, password: string) => Promise<Usuario>;
-  logout: () => void;
+  logout: () => Promise<void>;
   /** Refresca el usuario tras editar el propio perfil. */
   refrescar: () => Promise<void>;
   esStaff: boolean;
@@ -41,10 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelado = false;
-    if (!obtenerToken()) {
-      setCargando(false);
-      return;
-    }
     setUser(obtenerUsuario());
     obtenerMe()
       .then(({ user: u, club: c }) => {
@@ -73,7 +73,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data.user;
   }, []);
 
-  const logout = useCallback(() => {
+  // La cookie de sesión es httpOnly: solo el servidor puede borrarla, así que
+  // cerrar sesión pasa por pedírselo. Limpiar aquí a secas dejaría la sesión
+  // viva en la API.
+  const logout = useCallback(async () => {
+    await logoutApi();
     limpiar();
     setUser(null);
     setClub(null);

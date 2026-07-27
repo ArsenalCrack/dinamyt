@@ -28,7 +28,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
 
-      const db = req.server.db;
+      const db = req.db;
 
       // El roster sale de la propia BD: los alumnos los da de alta el maestro
       // (ver `routes/users.ts`). Antes esto era una llamada HTTP al ecosistema.
@@ -78,7 +78,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
-      const db = req.server.db;
+      const db = req.db;
       const [m] = await db
         .select()
         .from(memberships)
@@ -159,7 +159,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
         currentPlanId?: string | null;
         checkinPin?: string | null;
       };
-      const db = req.server.db;
+      const db = req.db;
       const m = await ensureMembership(db, orgId, userId);
 
       const status =
@@ -201,7 +201,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
         status?: string;
         notes?: string;
       };
-      const db = req.server.db;
+      const db = req.db;
 
       if (!body.planId) return reply.code(422).send({ error: 'Falta el plan del pago.' });
       if (body.amount === undefined || isNaN(parseFloat(body.amount))) {

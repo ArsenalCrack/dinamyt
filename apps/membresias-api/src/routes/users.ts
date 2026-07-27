@@ -63,7 +63,7 @@ export async function usersRoutes(app: FastifyInstance) {
     }
     if (includeInactive !== '1') conds.push(eq(users.isActive, true));
 
-    const filas = await req.server.db.select().from(users).where(and(...conds)).orderBy(asc(users.fullName));
+    const filas = await req.db.select().from(users).where(and(...conds)).orderBy(asc(users.fullName));
     return filas.map(vista);
   });
 
@@ -94,7 +94,7 @@ export async function usersRoutes(app: FastifyInstance) {
     const errorPass = validarPassword(body.password ?? '');
     if (errorPass) return reply.code(422).send({ error: errorPass });
 
-    const db = req.server.db;
+    const db = req.db;
     const [ya] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (ya) return reply.code(409).send({ error: `El correo '${email}' ya está registrado.` });
 
@@ -118,7 +118,7 @@ export async function usersRoutes(app: FastifyInstance) {
   // Lo ve el staff del club; y cada quien puede ver el suyo.
   app.get('/users/:id', { preHandler: requireAuth() }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const db = req.server.db;
+    const db = req.db;
 
     if (id === req.user!.sub) {
       const [yo] = await db.select().from(users).where(eq(users.id, id)).limit(1);
@@ -143,7 +143,7 @@ export async function usersRoutes(app: FastifyInstance) {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const { id } = req.params as { id: string };
-      const db = req.server.db;
+      const db = req.db;
 
       const u = await delClub(db, orgId, id);
       if (!u) return reply.code(404).send({ error: 'No encontrado.' });
@@ -218,7 +218,7 @@ export async function usersRoutes(app: FastifyInstance) {
       const error = validarPassword(body.password ?? '');
       if (error) return reply.code(422).send({ error });
 
-      const db = req.server.db;
+      const db = req.db;
       const u = await delClub(db, orgId, id);
       if (!u || u.isSuperAdmin) return reply.code(404).send({ error: 'No encontrado.' });
 
@@ -239,7 +239,7 @@ export async function usersRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'No puedes desactivar tu propia cuenta.' });
     }
 
-    const db = req.server.db;
+    const db = req.db;
     const u = await delClub(db, orgId, id);
     if (!u || u.isSuperAdmin) return reply.code(404).send({ error: 'No encontrado.' });
 

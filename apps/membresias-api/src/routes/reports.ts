@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { memberships, payments, plans, attendances } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireRole } from '../plugins/auth';
+import { limitarPorIp } from '../lib/auth/rate-limit';
 import { todayStr } from '../lib/billing';
 
 /** Rango [primer día, último día] de un mes 'YYYY-MM'. */
@@ -17,13 +18,13 @@ export async function reportsRoutes(app: FastifyInstance) {
   // ── GET /reports/revenue?month=YYYY-MM — esperado vs recaudado ────────────
   app.get(
     '/reports/revenue',
-    { preHandler: requireRole(['owner', 'staff']) },
+    { preHandler: [limitarPorIp('reports', 60, 60), requireRole(['owner', 'staff'])] },
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const month = (req.query as { month?: string }).month ?? todayStr().slice(0, 7);
       const { start, end } = monthRange(month);
-      const db = req.server.db;
+      const db = req.db;
 
       const pagos = await db
         .select({ amount: payments.amount, planId: payments.planId })
@@ -55,12 +56,12 @@ export async function reportsRoutes(app: FastifyInstance) {
   // ── GET /reports/overdue — cartera vencida (morosos) ──────────────────────
   app.get(
     '/reports/overdue',
-    { preHandler: requireRole(['owner', 'staff']) },
+    { preHandler: [limitarPorIp('reports', 60, 60), requireRole(['owner', 'staff'])] },
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const today = todayStr();
-      const rows = await req.server.db
+      const rows = await req.db
         .select({
           userId: memberships.userId,
           venceEl: memberships.venceEl,
@@ -87,7 +88,7 @@ export async function reportsRoutes(app: FastifyInstance) {
   // ── GET /reports/attendance?from&to — asistencia por día ──────────────────
   app.get(
     '/reports/attendance',
-    { preHandler: requireRole(['owner', 'staff']) },
+    { preHandler: [limitarPorIp('reports', 60, 60), requireRole(['owner', 'staff'])] },
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
@@ -96,7 +97,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       const from = q.from ?? `${today.slice(0, 7)}-01`;
       const to = q.to ?? today;
 
-      const rows = await req.server.db
+      const rows = await req.db
         .select({ checkinDate: attendances.checkinDate })
         .from(attendances)
         .innerJoin(memberships, eq(attendances.membershipId, memberships.id))

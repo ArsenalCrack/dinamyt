@@ -1,9 +1,12 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import { db as defaultDb, type Db } from '@dinamyt/membresias-db';
 import type { JwtPayload } from './types/auth';
 import { config } from './config';
 import { crearVerificador } from './plugins/auth';
+import { registrarContextoRls } from './plugins/rls';
+import { registrarLimiteGlobal } from './lib/auth/rate-limit';
 import { AlumnoNoDelClub } from './lib/memberships';
 import { healthRoutes } from './routes/health';
 import { authRoutes } from './routes/auth';
@@ -27,7 +30,11 @@ export interface BuildAppDeps {
 }
 
 export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
-  const app = Fastify({ logger: false });
+  const app = Fastify({
+    logger: false,
+    // Ver `config.trustProxyHops`. `false` = usar la IP del socket tal cual.
+    trustProxy: config.trustProxyHops > 0 ? config.trustProxyHops : false,
+  });
 
   app.decorate('verifyToken', deps.verifyToken ?? crearVerificador());
   app.decorate('db', deps.db ?? defaultDb);
@@ -41,7 +48,17 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
     return reply.send(err);
   });
 
-  void app.register(cors, { origin: config.corsOrigins });
+  void app.register(cookie);
+  // `credentials` es imprescindible con sesión por cookie: sin él el navegador
+  // ni la manda ni acepta la que responde el login.
+  void app.register(cors, { origin: config.corsOrigins, credentials: true });
+
+  // Ambos van ANTES de registrar rutas: `onRoute` solo alcanza las que se
+  // declaren después, y el techo global debe cubrir también las que se añadan
+  // mañana sin que nadie se acuerde de limitarlas.
+  registrarLimiteGlobal(app);
+  registrarContextoRls(app);
+
   void app.register(healthRoutes);
   void app.register(authRoutes);
   void app.register(orgsRoutes);

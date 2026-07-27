@@ -42,7 +42,7 @@ function vistaUsuario(u: typeof users.$inferSelect) {
 export async function orgsRoutes(app: FastifyInstance) {
   // ── GET /orgs — todos los clubes, con cuántos usuarios tiene cada uno ──────
   app.get('/orgs', { preHandler: requireSuperAdmin() }, async (req) => {
-    const db = req.server.db;
+    const db = req.db;
     const clubes = await db.select().from(orgs).orderBy(asc(orgs.name));
     const conteos = await db
       .select({ orgId: users.orgId, total: sql<number>`count(*)::int` })
@@ -68,7 +68,7 @@ export async function orgsRoutes(app: FastifyInstance) {
     const slug = aSlug(body.slug || name);
     if (!slug) return reply.code(422).send({ error: 'No se pudo derivar un identificador del nombre.' });
 
-    const db = req.server.db;
+    const db = req.db;
     const [ya] = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.slug, slug)).limit(1);
     if (ya) return reply.code(409).send({ error: `Ya existe un club con el identificador '${slug}'.` });
 
@@ -93,7 +93,7 @@ export async function orgsRoutes(app: FastifyInstance) {
       country?: string | null;
       isActive?: boolean;
     };
-    const db = req.server.db;
+    const db = req.db;
 
     const [club] = await db.select().from(orgs).where(eq(orgs.id, id)).limit(1);
     if (!club) return reply.code(404).send({ error: 'Club no encontrado.' });
@@ -115,7 +115,7 @@ export async function orgsRoutes(app: FastifyInstance) {
   // ── GET /orgs/:id/users — la gente de un club ─────────────────────────────
   app.get('/orgs/:id/users', { preHandler: requireSuperAdmin() }, async (req) => {
     const { id } = req.params as { id: string };
-    const filas = await req.server.db
+    const filas = await req.db
       .select()
       .from(users)
       .where(eq(users.orgId, id))
@@ -143,7 +143,7 @@ export async function orgsRoutes(app: FastifyInstance) {
     const errorPass = validarPassword(body.password ?? '');
     if (errorPass) return reply.code(422).send({ error: errorPass });
 
-    const db = req.server.db;
+    const db = req.db;
     const [club] = await db.select().from(orgs).where(eq(orgs.id, id)).limit(1);
     if (!club) return reply.code(404).send({ error: 'Club no encontrado.' });
 
@@ -180,7 +180,7 @@ export async function orgsRoutes(app: FastifyInstance) {
         orgId?: string | null;
         isActive?: boolean;
       };
-      const db = req.server.db;
+      const db = req.db;
 
       const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
       if (!u) return reply.code(404).send({ error: 'Usuario no encontrado.' });
@@ -240,7 +240,7 @@ export async function orgsRoutes(app: FastifyInstance) {
       const error = validarPassword(body.password ?? '');
       if (error) return reply.code(422).send({ error });
 
-      const db = req.server.db;
+      const db = req.db;
       const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
       if (!u) return reply.code(404).send({ error: 'Usuario no encontrado.' });
 

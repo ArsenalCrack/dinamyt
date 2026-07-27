@@ -19,7 +19,7 @@ export async function scheduleRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
-      const db = req.server.db;
+      const db = req.db;
       const dias = await db
         .select()
         .from(clubSchedule)
@@ -41,7 +41,7 @@ export async function scheduleRoutes(app: FastifyInstance) {
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const body = req.body as { dias: DiaBody[] };
       const dias = (body.dias ?? []).filter((d) => d.weekday >= 0 && d.weekday <= 6);
-      const db = req.server.db;
+      const db = req.db;
 
       await db.delete(clubSchedule).where(eq(clubSchedule.orgId, orgId));
       if (dias.length) {
@@ -68,7 +68,7 @@ export async function scheduleRoutes(app: FastifyInstance) {
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const body = req.body as { date: string; isClosed?: boolean; note?: string };
       if (!body.date) return reply.code(422).send({ error: 'Falta la fecha.' });
-      const [row] = await req.server.db
+      const [row] = await req.db
         .insert(scheduleExceptions)
         .values({
           orgId,
@@ -88,7 +88,7 @@ export async function scheduleRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       const { id } = req.params as { id: string };
-      const [row] = await req.server.db
+      const [row] = await req.db
         .delete(scheduleExceptions)
         .where(
           and(

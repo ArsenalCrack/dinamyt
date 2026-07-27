@@ -4,6 +4,8 @@ import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import type { JwtPayload, MembresiasRole } from '../types/auth';
 import { config, ssoHabilitado } from '../config';
 import { verificarTokenPropio, verificadorEcosystem } from '../lib/auth/tokens';
+import { csrfValido, tokenDelRequest } from '../lib/auth/cookies';
+import { sinFiltroDeClub } from '../lib/db-contexto';
 
 /**
  * Guards de la API.
@@ -55,23 +57,30 @@ async function usuarioVigente(
   const correo = (payload.email ?? '').toLowerCase();
   if (!correo) return null;
 
-  const [fila] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, correo))
-    .limit(1);
-
-  if (!fila || !fila.isActive) return null;
-
-  let orgActiva = true;
-  if (fila.orgId) {
-    const [club] = await db
-      .select({ isActive: orgs.isActive })
-      .from(orgs)
-      .where(eq(orgs.id, fila.orgId))
+  // Cruza clubes por necesidad: este paso ES el que averigua a cuál pertenece
+  // quien llama, así que todavía no hay contexto con el que filtrar.
+  const { fila, orgActiva } = await sinFiltroDeClub(db, async (tx) => {
+    const [fila] = await tx
+      .select()
+      .from(users)
+      .where(eq(users.email, correo))
       .limit(1);
-    orgActiva = Boolean(club?.isActive);
-  }
+
+    if (!fila || !fila.isActive) return { fila: null, orgActiva: true };
+
+    let orgActiva = true;
+    if (fila.orgId) {
+      const [club] = await tx
+        .select({ isActive: orgs.isActive })
+        .from(orgs)
+        .where(eq(orgs.id, fila.orgId))
+        .limit(1);
+      orgActiva = Boolean(club?.isActive);
+    }
+    return { fila, orgActiva };
+  });
+
+  if (!fila) return null;
 
   return {
     payload: {
@@ -92,14 +101,21 @@ async function usuarioVigente(
  */
 export function requireAuth() {
   return async function (req: FastifyRequest, reply: FastifyReply) {
-    const auth = req.headers.authorization;
-    if (!auth?.startsWith('Bearer ')) {
+    const token = tokenDelRequest(req);
+    if (!token) {
       return reply.code(401).send({ error: 'Token de autenticación requerido.' });
+    }
+
+    // La sesión por cookie viaja sola en cada petición, incluidas las que
+    // dispare otra web: sin esta comprobación, un formulario ajeno podría
+    // ejecutar acciones en nombre de quien tenga la sesión abierta.
+    if (!csrfValido(req)) {
+      return reply.code(403).send({ error: 'Petición sin token CSRF válido.' });
     }
 
     let payload: JwtPayload;
     try {
-      payload = await req.server.verifyToken(auth.slice(7));
+      payload = await req.server.verifyToken(token);
     } catch {
       return reply.code(401).send({ error: 'Token inválido o expirado.' });
     }
