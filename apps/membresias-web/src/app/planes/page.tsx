@@ -7,8 +7,9 @@ import { api, mensajeError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { fmtMoneda } from '@/lib/formato';
-import { LIM, soloDigitos, soloDinero } from '@/lib/campos';
+import { LIM, soloDigitos } from '@/lib/campos';
 import { SelectMenu } from '@/components/SelectMenu';
+import { CampoDinero } from '@/components/CampoDinero';
 
 interface Plan {
   id: string;
@@ -144,15 +145,13 @@ export default function Planes() {
           <label className="muted" style={{ fontSize: '0.75rem' }}>
             {t('planes.precio')}
           </label>
-          {/* `inputMode` solo elige el teclado del móvil: en un escritorio se
-              podían teclear letras y el precio llegaba roto a la API. El filtro
-              del onChange es lo que de verdad impide escribir algo que no sea
-              un número. */}
-          <input
-            inputMode="decimal"
-            value={form.price}
-            onChange={(e) => setForm((f) => ({ ...f, price: soloDinero(e.target.value) }))}
-            maxLength={LIM.precioEnteros + 3}
+          {/* El campo filtra lo que no sea un número y de paso lo escribe como
+              se lee: `$ 35.000` en vez de `35000`. Un cero de más en el precio
+              de un plan no se nota hasta que se cobra. */}
+          <CampoDinero
+            valor={form.price}
+            onChange={(price) => setForm((f) => ({ ...f, price }))}
+            ariaLabel={t('planes.precio')}
             required
           />
         </div>

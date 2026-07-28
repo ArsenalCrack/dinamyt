@@ -97,33 +97,42 @@ export function SelectMenu({
 
   // Cerrar al tocar fuera (ratón y táctil) o con Escape. Los tres, no uno:
   // en el celular no hay `mousedown`, y sin la tecla el menú atrapa al teclado.
-  // Al hacer scroll se cierra también: el panel va en coordenadas de ventana y
-  // seguir a su botón mientras la página se mueve costaría más de lo que vale.
+  // Si la PÁGINA se mueve, el panel se cierra: va en coordenadas de ventana y
+  // seguir a su botón mientras todo se desplaza costaría más de lo que vale.
+  //
+  // Pero el scroll DENTRO de la propia lista no cuenta. Ese detalle es el que
+  // hacía que la lista de cinturones se cerrara sola al intentar bajar por
+  // ella: el listener va en fase de captura, así que también le llegaban los
+  // desplazamientos del panel.
   useEffect(() => {
     if (!abierto) return;
+    function dentro(destino: Node | null) {
+      return (
+        Boolean(raizRef.current?.contains(destino)) ||
+        Boolean(panelRef.current?.contains(destino))
+      );
+    }
     function fuera(e: MouseEvent | TouchEvent) {
-      const destino = e.target as Node;
-      if (
-        !raizRef.current?.contains(destino) &&
-        !panelRef.current?.contains(destino)
-      ) {
-        setAbierto(false);
-      }
+      if (!dentro(e.target as Node)) setAbierto(false);
     }
     function tecla(e: globalThis.KeyboardEvent) {
       if (e.key === 'Escape') setAbierto(false);
+    }
+    function alDesplazar(e: Event) {
+      if (dentro(e.target as Node)) return;
+      setAbierto(false);
     }
     const cerrar = () => setAbierto(false);
     document.addEventListener('mousedown', fuera);
     document.addEventListener('touchstart', fuera);
     document.addEventListener('keydown', tecla);
-    window.addEventListener('scroll', cerrar, true);
+    window.addEventListener('scroll', alDesplazar, true);
     window.addEventListener('resize', cerrar);
     return () => {
       document.removeEventListener('mousedown', fuera);
       document.removeEventListener('touchstart', fuera);
       document.removeEventListener('keydown', tecla);
-      window.removeEventListener('scroll', cerrar, true);
+      window.removeEventListener('scroll', alDesplazar, true);
       window.removeEventListener('resize', cerrar);
     };
   }, [abierto]);

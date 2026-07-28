@@ -9,7 +9,6 @@ import { useI18n } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { Avatar } from '@/components/Avatar';
 import { Cinturon } from '@/components/Cinturon';
-import { SelectMenu } from '@/components/SelectMenu';
 
 interface RosterItem {
   userId: string;
@@ -25,14 +24,11 @@ interface RosterItem {
   diasFaltantes: number | null;
   estado: string;
 }
-interface Plan {
-  id: string;
-  name: string;
-  type: string;
-  price: string;
-}
 interface Revenue {
+  /** Lo que ENTRÓ este mes, sin importar qué meses cubra. */
   recaudado: number;
+  /** Lo que le CORRESPONDE a este mes, aunque se cobrara en otro. */
+  devengado: number;
   esperadoMensual: number;
   numPagos: number;
   month: string;
@@ -53,26 +49,22 @@ export default function Panel() {
   const { user, cargando: cargandoSesion, esStaff } = useAuth();
 
   const [roster, setRoster] = useState<RosterItem[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
   const [revenue, setRevenue] = useState<Revenue | null>(null);
   const [overdue, setOverdue] = useState<Overdue[]>([]);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
-  const [planPorFila, setPlanPorFila] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [cargando, setCargando] = useState(true);
 
   const cargar = useCallback(async () => {
     try {
-      const [r, p, rev, ov, at] = await Promise.all([
+      const [r, rev, ov, at] = await Promise.all([
         api.get<RosterItem[]>('/memberships'),
-        api.get<Plan[]>('/plans'),
         api.get<Revenue>('/reports/revenue'),
         api.get<Overdue[]>('/reports/overdue'),
         api.get<Attendance>('/reports/attendance'),
       ]);
       setRoster(r.data);
-      setPlans(p.data);
       setRevenue(rev.data);
       setOverdue(ov.data);
       setAttendance(at.data);
@@ -96,24 +88,6 @@ export default function Panel() {
     }
     void cargar();
   }, [cargandoSesion, user, esStaff, router, cargar]);
-
-  async function registrarPago(userId: string) {
-    const planId = planPorFila[userId] ?? plans[0]?.id;
-    const plan = plans.find((p) => p.id === planId);
-    if (!plan) return;
-    setError('');
-    try {
-      await api.post(`/memberships/${userId}/payments`, {
-        planId: plan.id,
-        amount: plan.price,
-        method: 'efectivo',
-      });
-      setAviso(t('pago.registrado'));
-      await cargar();
-    } catch (e) {
-      setError(mensajeError(e, t('pago.titulo')));
-    }
-  }
 
   async function enviarAvisos() {
     setAviso('');
@@ -180,9 +154,12 @@ export default function Panel() {
           marginBottom: '1.25rem',
         }}
       >
+        {/* Dos números y no uno: lo que entró en caja, y cuánto de eso le toca
+            a ESTE mes. Quien paga tres meses de golpe no recauda el triple en
+            julio; adelanta agosto y septiembre. */}
         <div className="card" style={{ padding: '0.9rem' }}>
           <div className="muted" style={{ fontSize: '0.75rem' }}>
-            {revenue?.month}
+            {revenue?.month} · {t('panel.enCaja')}
           </div>
           <div
             className="mono"
@@ -191,7 +168,8 @@ export default function Panel() {
             {fmtMoneda(revenue?.recaudado ?? 0)}
           </div>
           <div className="muted" style={{ fontSize: '0.72rem' }}>
-            / {fmtMoneda(revenue?.esperadoMensual ?? 0)}
+            {fmtMoneda(revenue?.devengado ?? 0)} / {fmtMoneda(revenue?.esperadoMensual ?? 0)}{' '}
+            {t('panel.deEsperado')}
           </div>
         </div>
         <div className="card" style={{ padding: '0.9rem' }}>
@@ -276,26 +254,17 @@ export default function Panel() {
                       : '—'}
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    <SelectMenu
-                      valor={planPorFila[a.userId] ?? ''}
-                      onChange={(v) => setPlanPorFila((s) => ({ ...s, [a.userId]: v }))}
-                      etiquetaAria={t('pago.plan')}
-                      placeholder={`${t('pago.plan')}…`}
-                      style={{ width: 190 }}
-                      opciones={plans.map((p) => ({
-                        valor: p.id,
-                        etiqueta: `${p.name} · ${fmtMoneda(p.price)}`,
-                      }))}
-                    />
-                    <button
-                      className="btn btn-gold btn-sm"
-                      disabled={!(planPorFila[a.userId] ?? plans[0]?.id)}
-                      onClick={() => registrarPago(a.userId)}
-                    >
-                      {t('pago.registrar')}
-                    </button>
-                  </div>
+                  {/* Cobrar es una acción con consecuencias —mueve fechas y
+                      dinero—, así que vive en la ficha del alumno y en ningún
+                      otro sitio. Tenerla también aquí era lo que hacía tan
+                      fácil registrar el mismo pago dos y tres veces yendo y
+                      viniendo entre pantallas. */}
+                  <Link
+                    href={`/alumnos/${a.userId}#cobrar`}
+                    className="btn btn-gold btn-sm"
+                  >
+                    {t('panel.cobrar')} →
+                  </Link>
                 </td>
               </tr>
             ))}

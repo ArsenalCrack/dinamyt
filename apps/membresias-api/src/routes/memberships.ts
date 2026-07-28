@@ -1,11 +1,18 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, desc } from 'drizzle-orm';
+import { and, asc, eq, desc, gte, lte } from 'drizzle-orm';
 import { memberships, plans, payments, attendances, users } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireClub, requireRole } from '../plugins/auth';
 import { ensureMembership } from '../lib/memberships';
-import { LIMITES, dinero, textoOpcional } from '../lib/validacion';
 import {
-  nextDue,
+  LIMITES,
+  MAX_CLASES,
+  dinero,
+  enteroOpcional,
+  fecha,
+  textoOpcional,
+} from '../lib/validacion';
+import {
+  nextDueVarios,
   estado,
   diasFaltantes,
   todayStr,
@@ -19,6 +26,12 @@ const ESTADOS_PAGO = ['PAGADO', 'PARCIAL', 'PENDIENTE'] as const;
 type EstadoPago = (typeof ESTADOS_PAGO)[number];
 const ESTADOS_MEM = ['activo', 'inactivo', 'suspendido', 'retirado'] as const;
 type EstadoMem = (typeof ESTADOS_MEM)[number];
+
+/**
+ * Tope de periodos en un solo pago. Doce meses de golpe es una matrícula anual;
+ * más que eso, casi seguro es un dedo que se quedó pulsado.
+ */
+const MAX_PERIODOS = 12;
 
 export async function membershipsRoutes(app: FastifyInstance) {
   // ── GET /memberships — roster del club + estado local (owner/staff) ───────
@@ -162,6 +175,8 @@ export async function membershipsRoutes(app: FastifyInstance) {
         payerUserId?: string | null;
         currentPlanId?: string | null;
         checkinPin?: string | null;
+        venceEl?: string | null;
+        clasesRestantes?: number | string | null;
       };
       const db = req.db;
       const m = await ensureMembership(db, orgId, userId);
@@ -170,6 +185,33 @@ export async function membershipsRoutes(app: FastifyInstance) {
         body.status && (ESTADOS_MEM as readonly string[]).includes(body.status)
           ? (body.status as EstadoMem)
           : undefined;
+
+      /**
+       * El vencimiento a mano.
+       *
+       * Hace falta porque el alumno llega con una historia previa: entró en
+       * marzo, pagó por fuera de la app, o su mensualidad va por otro día del
+       * mes. Sin esto, la única forma de fijar una fecha era registrar pagos
+       * falsos hasta que cuadrara.
+       *
+       * Al ponerla se recalcula el día ancla: a partir de aquí, sus renovaciones
+       * caen ese mismo día de cada mes.
+       */
+      let venceEl: string | null | undefined;
+      let anchorDay: number | null | undefined;
+      if (body.venceEl !== undefined) {
+        const f = fecha(body.venceEl, 'La fecha de vencimiento');
+        if (!f.ok) return reply.code(422).send({ error: f.error });
+        venceEl = f.valor;
+        anchorDay = f.valor ? anchorFrom(f.valor) : null;
+      }
+
+      let clases: number | null | undefined;
+      if (body.clasesRestantes !== undefined) {
+        const n = enteroOpcional(body.clasesRestantes, MAX_CLASES, 'Las clases restantes');
+        if (!n.ok) return reply.code(422).send({ error: n.error });
+        clases = n.valor;
+      }
 
       // El PIN se teclea en el kiosco: solo dígitos, y los que caben en la
       // columna. Uno con letras jamás lo acertaría nadie en esa pantalla.
@@ -193,6 +235,8 @@ export async function membershipsRoutes(app: FastifyInstance) {
             currentPlanId: body.currentPlanId,
           }),
           ...(pin !== undefined && { checkinPin: pin }),
+          ...(venceEl !== undefined && { venceEl, anchorDay }),
+          ...(clases !== undefined && { clasesRestantes: clases }),
           updatedAt: new Date(),
         })
         .where(eq(memberships.id, m.id))
@@ -216,6 +260,12 @@ export async function membershipsRoutes(app: FastifyInstance) {
         method?: string;
         status?: string;
         notes?: string;
+        /** Fecha real del pago. Por defecto, hoy. */
+        paidAt?: string;
+        /** Cuántas mensualidades (o semanas, o paquetes) cubre. Por defecto 1. */
+        periodos?: number | string;
+        /** Registrar aunque se parezca a uno recién hecho. */
+        confirmarRepetido?: boolean;
       };
       const db = req.db;
 
@@ -225,6 +275,17 @@ export async function membershipsRoutes(app: FastifyInstance) {
       const notas = textoOpcional(body.notes, 500, 'Las notas');
       if (!notas.ok) return reply.code(422).send({ error: notas.error });
 
+      const today = todayStr();
+      // Un pago se puede registrar días después de recibirlo, pero no antes de
+      // recibirlo: una fecha futura descuadraría el cierre del mes.
+      const f = fecha(body.paidAt, 'La fecha del pago', { max: today });
+      if (!f.ok) return reply.code(422).send({ error: f.error });
+      const fechaPago = f.valor ?? today;
+
+      const p = enteroOpcional(body.periodos, MAX_PERIODOS, 'Los periodos');
+      if (!p.ok) return reply.code(422).send({ error: p.error });
+      const periodos = Math.max(1, p.valor ?? 1);
+
       const [plan] = await db
         .select()
         .from(plans)
@@ -233,26 +294,67 @@ export async function membershipsRoutes(app: FastifyInstance) {
       if (!plan) return reply.code(404).send({ error: 'Plan no encontrado en este club.' });
 
       const m = await ensureMembership(db, orgId, userId);
-      const today = todayStr();
       const planType = plan.type as PlanType;
+
+      /**
+       * Guardarraíl contra el pago registrado dos veces.
+       *
+       * Pasa de verdad: se cobra desde el panel, se abre la ficha, se vuelve a
+       * dar y el alumno acaba con tres meses pagados sin haber pagado tres. Un
+       * mismo alumno, mismo plan y mismo monto en el mismo día es casi siempre
+       * un descuido — y si no lo es, se repite con `confirmarRepetido`.
+       *
+       * Para cobrar varios meses de una vez está `periodos`, que es lo que hay
+       * que usar en lugar de pulsar el botón tres veces.
+       */
+      if (!body.confirmarRepetido) {
+        const [gemelo] = await db
+          .select({ id: payments.id })
+          .from(payments)
+          .where(
+            and(
+              eq(payments.membershipId, m.id),
+              eq(payments.planId, plan.id),
+              eq(payments.amount, monto.valor),
+              gte(payments.paidAt, new Date(`${fechaPago}T00:00:00.000Z`)),
+              lte(payments.paidAt, new Date(`${fechaPago}T23:59:59.999Z`)),
+            ),
+          )
+          .limit(1);
+        if (gemelo) {
+          return reply.code(409).send({
+            error:
+              'Ya hay un pago igual de este alumno con este plan hoy. Si son varios meses, ' +
+              'usa el número de periodos; si de verdad es otro pago, confírmalo.',
+            codigo: 'PAGO_REPETIDO',
+          });
+        }
+      }
 
       let venceEl = m.venceEl;
       let anchorDay = m.anchorDay;
       let clasesRestantes = m.clasesRestantes;
       let matriculado = m.matriculado;
+      let periodoDesde: string | null = null;
+      let periodoHasta: string | null = null;
 
       if (planType === 'mensual' || planType === 'semanal') {
-        const base = m.venceEl && m.venceEl > today ? m.venceEl : today;
+        // La base es la fecha del PAGO, no la de hoy: así registrar el lunes lo
+        // que se cobró el viernes da el vencimiento que de verdad le toca.
+        const base = m.venceEl && m.venceEl > fechaPago ? m.venceEl : fechaPago;
         if (anchorDay == null) anchorDay = anchorFrom(base);
-        venceEl = nextDue({
-          today,
+        periodoDesde = base;
+        venceEl = nextDueVarios({
+          today: fechaPago,
           prevDue: m.venceEl,
           planType,
           durationDays: plan.durationDays,
           anchorDay,
+          periodos,
         });
+        periodoHasta = venceEl;
       } else if (planType === 'clase' || planType === 'paquete') {
-        clasesRestantes = (clasesRestantes ?? 0) + (plan.nClasses ?? 1);
+        clasesRestantes = (clasesRestantes ?? 0) + (plan.nClasses ?? 1) * periodos;
       } else if (planType === 'matricula') {
         matriculado = true;
       }
@@ -274,6 +376,10 @@ export async function membershipsRoutes(app: FastifyInstance) {
           amount: monto.valor,
           method,
           status,
+          paidAt: new Date(`${fechaPago}T12:00:00.000Z`),
+          periodos,
+          periodoDesde,
+          periodoHasta,
           registeredByUserId: req.user!.sub,
           notes: notas.valor,
         })

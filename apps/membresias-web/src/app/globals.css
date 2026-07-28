@@ -446,6 +446,25 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   }
 }
 
+/* ── Campo de dinero: el símbolo dentro, pegado al borde izquierdo ─────── */
+.campo-dinero { position: relative; width: 100%; }
+.campo-dinero-simbolo {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.campo-dinero input {
+  /* Sitio para el símbolo. `ch` y no `rem`: un `S/` ocupa más que un `$`. */
+  padding-left: calc(1rem + 1.6ch);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    DESPLEGABLES PROPIOS (<SelectMenu>)
    El `<select>` nativo se pinta con los colores del sistema operativo y

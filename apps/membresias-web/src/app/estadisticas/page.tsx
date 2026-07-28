@@ -22,10 +22,13 @@ interface Estadisticas {
     sin_plan: number;
   };
   dinero: {
+    /** Lo que ENTRÓ en el mes. */
     recaudadoMes: number;
+    /** Lo que le CORRESPONDE al mes, repartiendo los pagos adelantados. */
+    devengadoMes: number;
     pagosMes: number;
     esperadoMensual: number;
-    porMes: { month: string; total: number; pagos: number }[];
+    porMes: { month: string; total: number; devengado: number; pagos: number }[];
   };
   asistencia: {
     hoy: number;
@@ -211,14 +214,19 @@ export default function EstadisticasPage() {
     );
   }
 
-  const maxMes = Math.max(...s.dinero.porMes.map((m) => m.total), 1);
+  const maxMes = Math.max(
+    ...s.dinero.porMes.map((m) => Math.max(m.total, m.devengado)),
+    1,
+  );
   const maxDia = Math.max(...s.asistencia.porDia.map((d) => d.count), 1);
   const maxPlan = Math.max(...s.planes.map((p) => p.alumnos), 1);
   const maxCinturon = Math.max(...s.cinturones.map((c) => c.alumnos), 1);
   const maxEstado = Math.max(s.alumnos.activos, 1);
+  // El porcentaje se calcula con lo DEVENGADO, no con la caja: si no, un
+  // alumno que paga tres meses de golpe hace que julio marque 300 %.
   const cumplimiento =
     s.dinero.esperadoMensual > 0
-      ? Math.round((s.dinero.recaudadoMes / s.dinero.esperadoMensual) * 100)
+      ? Math.round((s.dinero.devengadoMes / s.dinero.esperadoMensual) * 100)
       : null;
 
   const estados: { clave: ClaveTexto; valor: number; color: string }[] = [
@@ -272,7 +280,7 @@ export default function EstadisticasPage() {
           valor={fmtMoneda(s.dinero.recaudadoMes)}
           pie={
             cumplimiento != null
-              ? `${cumplimiento}% ${t('stats.esperado')} (${fmtMoneda(s.dinero.esperadoMensual)})`
+              ? `${fmtMoneda(s.dinero.devengadoMes)} ${t('stats.devengadoMes').toLowerCase()} · ${cumplimiento}% ${t('stats.esperado')}`
               : `${s.dinero.pagosMes} ${t('stats.pagosMes')}`
           }
           color="var(--gold)"
@@ -299,10 +307,35 @@ export default function EstadisticasPage() {
         }}
       >
         {/* ── Recaudo de los últimos seis meses ── */}
+        {/* Dos barras por mes: lo que entró (caja) y lo que le corresponde al
+            mes (devengado). Cuando alguien paga varios meses de golpe, la
+            primera se dispara y la segunda se reparte hacia adelante. */}
         <section className="card" style={{ padding: '1rem' }}>
-          <h2 className="eyebrow" style={{ marginBottom: '0.9rem' }}>
+          <h2 className="eyebrow" style={{ marginBottom: '0.5rem' }}>
             {t('stats.recaudo6')}
           </h2>
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.9rem',
+              fontSize: '0.68rem',
+              marginBottom: '0.7rem',
+            }}
+            className="muted"
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span
+                style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--gold)' }}
+              />
+              {t('stats.caja')}
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span
+                style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accion)' }}
+              />
+              {t('stats.devengado')}
+            </span>
+          </div>
           <div
             style={{
               display: 'flex',
@@ -323,7 +356,7 @@ export default function EstadisticasPage() {
                   height: '100%',
                   justifyContent: 'flex-end',
                 }}
-                title={`${m.month}: ${fmtMoneda(m.total)}`}
+                title={`${m.month} · ${t('stats.caja')}: ${fmtMoneda(m.total)} · ${t('stats.devengado')}: ${fmtMoneda(m.devengado)}`}
               >
                 <span className="mono muted" style={{ fontSize: '0.62rem' }}>
                   {m.total > 0 ? Math.round(m.total / 1000) + 'k' : ''}
@@ -331,19 +364,42 @@ export default function EstadisticasPage() {
                 <div
                   style={{
                     width: '100%',
-                    height: `${Math.max((m.total / maxMes) * 100, m.total > 0 ? 3 : 1)}%`,
-                    borderRadius: '0.3rem 0.3rem 0 0',
-                    background:
-                      m.month === s.mes ? 'var(--gold)' : 'var(--accion)',
-                    minHeight: 2,
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    gap: 2,
+                    height: '100%',
                   }}
-                />
+                >
+                  <div
+                    style={{
+                      flex: 1,
+                      height: `${Math.max((m.total / maxMes) * 100, m.total > 0 ? 3 : 1)}%`,
+                      borderRadius: '0.3rem 0.3rem 0 0',
+                      background: 'var(--gold)',
+                      opacity: m.month === s.mes ? 1 : 0.7,
+                      minHeight: 2,
+                    }}
+                  />
+                  <div
+                    style={{
+                      flex: 1,
+                      height: `${Math.max((m.devengado / maxMes) * 100, m.devengado > 0 ? 3 : 1)}%`,
+                      borderRadius: '0.3rem 0.3rem 0 0',
+                      background: 'var(--accion)',
+                      opacity: m.month === s.mes ? 1 : 0.7,
+                      minHeight: 2,
+                    }}
+                  />
+                </div>
                 <span className="muted" style={{ fontSize: '0.65rem' }}>
                   {nombreMes(m.month, idioma)}
                 </span>
               </div>
             ))}
           </div>
+          <p className="muted" style={{ fontSize: '0.68rem', marginTop: '0.6rem' }}>
+            {t('stats.adelantos')}
+          </p>
         </section>
 
         {/* ── Estado de las mensualidades ── */}

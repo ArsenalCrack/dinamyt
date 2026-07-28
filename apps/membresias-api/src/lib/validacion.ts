@@ -117,6 +117,37 @@ export function dinero(valor: unknown, campo: string): Campo<string> {
   return bien(n.toFixed(2));
 }
 
+/**
+ * Una fecha `YYYY-MM-DD` de verdad.
+ *
+ * No basta con la forma: `2026-02-31` la cumple y PostgreSQL la rechaza con un
+ * error que no se le puede enseñar a nadie. Se comprueba reconstruyéndola, que
+ * es lo único que descarta los días que no existen.
+ *
+ * El rango por defecto (2000–2100) es el mismo que aceptan los formularios de
+ * la web: un `type="date"` sin acotar admite años de cinco cifras.
+ */
+export function fecha(
+  valor: unknown,
+  campo: string,
+  rango: { min?: string; max?: string } = {},
+): Campo<string | null> {
+  const texto = String(valor ?? '').trim();
+  if (!texto) return bien(null);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+    return mal(`${campo} debe tener el formato AAAA-MM-DD.`);
+  }
+  const d = new Date(`${texto}T00:00:00.000Z`);
+  if (isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== texto) {
+    return mal(`${campo} no es una fecha real.`);
+  }
+  const min = rango.min ?? '2000-01-01';
+  const max = rango.max ?? '2100-12-31';
+  if (texto < min) return mal(`${campo} no puede ser anterior a ${min}.`);
+  if (texto > max) return mal(`${campo} no puede ser posterior a ${max}.`);
+  return bien(texto);
+}
+
 /** Un entero de 0 a `max`. `null`, `undefined` y '' pasan como `null`. */
 export function enteroOpcional(
   valor: unknown,

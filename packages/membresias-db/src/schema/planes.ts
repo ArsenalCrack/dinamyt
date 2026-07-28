@@ -85,6 +85,18 @@ export const payments = mem.table('payments', {
   method: metodoPagoEnum('method').notNull(),
   status: estadoPagoEnum('status').notNull().default('PAGADO'),
   paidAt: timestamp('paid_at').defaultNow(),
+  /**
+   * Qué periodo compró este pago. Son las tres columnas que permiten decir
+   * cuánto dinero le CORRESPONDE a cada mes, y no solo cuánto entró en caja:
+   * un alumno que paga dos meses en julio metía 160 000 en julio y cero en
+   * agosto, y el panel del club leía el doble de lo esperado.
+   *
+   * `periodos` es cuántas mensualidades (o semanas) cubre el pago. Nulos en
+   * clase, paquete y matrícula: esos no compran tiempo.
+   */
+  periodos: integer('periodos').notNull().default(1),
+  periodoDesde: date('periodo_desde'),
+  periodoHasta: date('periodo_hasta'),
   /** user_id del ecosistema que registró el pago (maestro o auxiliar). */
   registeredByUserId: uuid('registered_by_user_id').notNull(),
   notes: text('notes'),

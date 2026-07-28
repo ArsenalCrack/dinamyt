@@ -25,21 +25,61 @@ export function claveEstado(estado: string): ClaveTexto {
 }
 
 /**
- * Moneda del club. El precio se guarda como texto decimal en la BD para no
- * perder centavos; aquí solo se formatea para leerlo.
+ * Moneda del club.
+ *
+ * `NEXT_PUBLIC_MONEDA` es el código ISO-4217 (COP, USD, EUR, MXN…) y decide el
+ * SÍMBOLO. `NEXT_PUBLIC_LOCALE_MONEDA` decide la ORTOGRAFÍA del número: dónde
+ * va el símbolo y qué separa los miles de los decimales — `$ 35.000` en
+ * Colombia, `$35,000` en Estados Unidos, `35.000 €` en España.
+ *
+ * Se leen al CONSTRUIR, no al arrancar: llevan el prefijo `NEXT_PUBLIC_`, así
+ * que Next las mete dentro del bundle. Cambiarlas en Vercel no surte efecto
+ * hasta el siguiente despliegue.
+ *
+ * El precio se guarda como texto decimal en la BD para no perder centavos; esto
+ * es solo la capa de presentación.
  */
-const MONEDA = process.env.NEXT_PUBLIC_MONEDA || 'COP';
-const LOCALE_MONEDA = process.env.NEXT_PUBLIC_LOCALE_MONEDA || 'es-CO';
+export const MONEDA = process.env.NEXT_PUBLIC_MONEDA || 'COP';
+export const LOCALE_MONEDA = process.env.NEXT_PUBLIC_LOCALE_MONEDA || 'es-CO';
+
+const formatoMoneda = new Intl.NumberFormat(LOCALE_MONEDA, {
+  style: 'currency',
+  currency: MONEDA,
+  maximumFractionDigits: 0,
+});
 
 export function fmtMoneda(valor: number | string): string {
   const n = typeof valor === 'string' ? parseFloat(valor) : valor;
   if (!isFinite(n)) return '—';
-  return n.toLocaleString(LOCALE_MONEDA, {
-    style: 'currency',
-    currency: MONEDA,
-    maximumFractionDigits: 0,
-  });
+  return formatoMoneda.format(n);
 }
+
+/**
+ * Las piezas sueltas de la moneda, sacadas del MISMO formateador que pinta los
+ * importes: el símbolo y los dos separadores.
+ *
+ * Se sacan de `Intl` y no de una tabla propia porque cualquier tabla se queda
+ * corta: hay monedas con el símbolo detrás, con espacio duro en medio y con
+ * separadores que no son ni punto ni coma. Esto lo usa el campo de dinero para
+ * que ESCRIBIR un precio se vea igual que leerlo.
+ */
+function piezaDe(tipo: Intl.NumberFormatPartTypes, muestra: number): string | null {
+  return formatoMoneda.formatToParts(muestra).find((p) => p.type === tipo)?.value ?? null;
+}
+
+export const SIMBOLO_MONEDA = piezaDe('currency', 0) ?? '$';
+/** Separador de miles: `.` en es-CO, `,` en en-US. */
+export const SEPARADOR_MILES = piezaDe('group', 1_000_000) ?? '.';
+/**
+ * Separador decimal: `,` en es-CO, `.` en en-US.
+ *
+ * El formateador de arriba no lo enseña (los importes se pintan sin decimales),
+ * así que se pregunta aparte por el mismo idioma.
+ */
+export const SEPARADOR_DECIMAL =
+  new Intl.NumberFormat(LOCALE_MONEDA)
+    .formatToParts(1.5)
+    .find((p) => p.type === 'decimal')?.value ?? ',';
 
 /** Fecha ISO (YYYY-MM-DD) en el formato del idioma activo. */
 export function fmtFecha(iso: string | null | undefined, idioma: Idioma): string {

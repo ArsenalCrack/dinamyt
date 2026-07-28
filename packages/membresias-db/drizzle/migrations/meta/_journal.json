@@ -36,6 +36,13 @@
       "when": 1785990000000,
       "tag": "0004_cinturon_y_avisos",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785991000000,
+      "tag": "0005_periodo_del_pago",
+      "breakpoints": true
     }
   ]
 }

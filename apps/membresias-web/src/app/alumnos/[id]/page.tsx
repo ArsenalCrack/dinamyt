@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import axios from 'axios';
 import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
@@ -14,6 +15,7 @@ import { CarnetQR } from '@/components/CarnetQR';
 import { AccesoQR } from '@/components/AccesoQR';
 import { Cinturon } from '@/components/Cinturon';
 import { SelectMenu } from '@/components/SelectMenu';
+import { CampoDinero } from '@/components/CampoDinero';
 
 interface Persona {
   id: string;
@@ -58,6 +60,14 @@ interface Attendance {
 const ESTADOS_MEM = ['activo', 'inactivo', 'suspendido', 'retirado'] as const;
 const METODOS = ['efectivo', 'transferencia', 'nequi', 'daviplata'] as const;
 
+/** Hoy en formato de `<input type="date">`, en hora LOCAL (no UTC). */
+function hoyISO(): string {
+  const d = new Date();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
 /**
  * Ficha del alumno, vista por el maestro. Es la pantalla donde se hace TODO lo
  * que le concierne a una persona: corregir sus datos, ponerle plan, cobrarle,
@@ -85,9 +95,23 @@ export default function Ficha() {
   const [nuevaPass, setNuevaPass] = useState('');
 
   const [datos, setDatos] = useState({ fullName: '', phone: '', belt: '' });
-  const [plan, setPlan] = useState({ currentPlanId: '', status: 'activo', checkinPin: '' });
-  const [cobro, setCobro] = useState({ planId: '', amount: '', method: 'efectivo' });
+  const [plan, setPlan] = useState({
+    currentPlanId: '',
+    status: 'activo',
+    checkinPin: '',
+    venceEl: '',
+    clasesRestantes: '',
+  });
+  const [cobro, setCobro] = useState({
+    planId: '',
+    amount: '',
+    method: 'efectivo',
+    paidAt: hoyISO(),
+    periodos: '1',
+  });
   const [guardando, setGuardando] = useState('');
+  /** Pago que la API considera repetido y espera que se confirme. */
+  const [repetido, setRepetido] = useState('');
 
   const cargar = useCallback(async () => {
     try {
@@ -114,6 +138,8 @@ export default function Ficha() {
         currentPlanId: m?.currentPlanId ?? '',
         status: m?.status ?? 'activo',
         checkinPin: m?.checkinPin ?? '',
+        venceEl: m?.venceEl ?? '',
+        clasesRestantes: m?.clasesRestantes != null ? String(m.clasesRestantes) : '',
       });
     } catch (e) {
       setError(mensajeError(e, t('comun.ninguno')));
@@ -167,6 +193,8 @@ export default function Ficha() {
         ...(plan.currentPlanId ? { currentPlanId: plan.currentPlanId } : {}),
         status: plan.status,
         checkinPin: plan.checkinPin || null,
+        venceEl: plan.venceEl || null,
+        clasesRestantes: plan.clasesRestantes === '' ? null : Number(plan.clasesRestantes),
       });
       setAviso(t('ficha.guardado'));
       await cargar();
@@ -177,10 +205,16 @@ export default function Ficha() {
     }
   }
 
-  async function registrarPago(e: FormEvent) {
+  /**
+   * Registra el pago. `confirmarRepetido` solo viaja cuando el maestro insiste
+   * tras el aviso de la API: es el guardarraíl contra el pago que se registra
+   * dos veces por ir y volver entre pantallas.
+   */
+  async function registrarPago(e: FormEvent, confirmarRepetido = false) {
     e.preventDefault();
     setError('');
     setAviso('');
+    setRepetido('');
     const elegido = planes.find((p) => p.id === cobro.planId);
     if (!elegido) return;
     setGuardando('pago');
@@ -189,12 +223,24 @@ export default function Ficha() {
         planId: elegido.id,
         amount: cobro.amount || elegido.price,
         method: cobro.method,
+        paidAt: cobro.paidAt,
+        periodos: Number(cobro.periodos) || 1,
+        ...(confirmarRepetido ? { confirmarRepetido: true } : {}),
       });
       setAviso(t('pago.registrado'));
-      setCobro({ planId: '', amount: '', method: 'efectivo' });
+      setCobro({
+        planId: '',
+        amount: '',
+        method: 'efectivo',
+        paidAt: hoyISO(),
+        periodos: '1',
+      });
       await cargar();
     } catch (err) {
-      setError(mensajeError(err, t('pago.titulo')));
+      const mensaje = mensajeError(err, t('pago.titulo'));
+      // 409 con código PAGO_REPETIDO: no es un error, es una pregunta.
+      if (axios.isAxiosError(err) && err.response?.status === 409) setRepetido(mensaje);
+      else setError(mensaje);
     } finally {
       setGuardando('');
     }
@@ -214,6 +260,24 @@ export default function Ficha() {
   }
 
   const nombre = persona?.fullName ?? membership?.fullName ?? '—';
+  const planCobro = planes.find((p) => p.id === cobro.planId) ?? null;
+
+  /** Precio del plan por el número de periodos, sin decimales de más. */
+  function montoSugerido(planId: string, periodos: string): string {
+    const p = planes.find((x) => x.id === planId);
+    if (!p) return '';
+    const n = Math.max(1, Number(periodos) || 1);
+    const total = parseFloat(p.price) * (p.type === 'matricula' ? 1 : n);
+    return String(Math.round(total * 100) / 100);
+  }
+
+  /** Cómo se llama «uno más» según el plan: un mes, una semana, un paquete. */
+  function clavePeriodos(tipo: string): ClaveTexto {
+    if (tipo === 'semanal') return 'pago.periodos.semanal';
+    if (tipo === 'clase' || tipo === 'paquete') return 'pago.periodos.paquete';
+    return 'pago.periodos.mensual';
+  }
+
   const opcionesPlan = planes.map((p) => ({
     valor: p.id,
     etiqueta: `${p.name} · ${fmtMoneda(p.price)}`,
@@ -418,6 +482,40 @@ export default function Ficha() {
                 }))}
               />
             </div>
+            {/* La fecha a mano: el alumno que llega de otro sistema, o que
+                pagó por fuera, tiene un vencimiento que la app no calculó. Sin
+                esto, la única salida era inventar pagos hasta que cuadrara. */}
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.venceEl')}
+            </label>
+            <input
+              type="date"
+              min="2000-01-01"
+              max="2100-12-31"
+              value={plan.venceEl}
+              onChange={(e) => setPlan({ ...plan, venceEl: e.target.value })}
+              style={{ margin: '0.25rem 0 0.2rem' }}
+            />
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('ficha.venceAyuda')} <em>{t('ficha.soloPorTiempo')}</em>
+            </p>
+
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.clases')}
+            </label>
+            <input
+              inputMode="numeric"
+              value={plan.clasesRestantes}
+              onChange={(e) =>
+                setPlan({ ...plan, clasesRestantes: soloDigitos(e.target.value, LIM.clases) })
+              }
+              maxLength={LIM.clases}
+              style={{ margin: '0.25rem 0 0.2rem' }}
+            />
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('ficha.soloPorClases')}
+            </p>
+
             <label className="muted" style={{ fontSize: '0.75rem' }}>
               {t('ficha.pin')}
             </label>
@@ -438,8 +536,17 @@ export default function Ficha() {
             </button>
           </form>
 
-          {/* ── Registrar un pago ── */}
-          <form onSubmit={registrarPago} className="card" style={{ padding: '1rem' }}>
+          {/* ── Registrar un pago ──
+              El ÚNICO sitio donde se cobra. Antes también se podía desde la
+              tabla del panel, y entre las dos pantallas era fácil registrar el
+              mismo pago tres veces sin notarlo. Aquí, además, se elige el día
+              y cuántos meses cubre. */}
+          <form
+            id="cobrar"
+            onSubmit={(e) => registrarPago(e)}
+            className="card"
+            style={{ padding: '1rem' }}
+          >
             <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
               {t('pago.titulo')}
             </h2>
@@ -449,13 +556,14 @@ export default function Ficha() {
             <div style={{ margin: '0.25rem 0 0.7rem' }}>
               <SelectMenu
                 valor={cobro.planId}
-                // Elegir el plan rellena el monto con su precio: es lo que se
-                // cobra el 99 % de las veces, y se puede corregir a mano.
+                // Elegir el plan rellena el monto con su precio por el número
+                // de periodos: es lo que se cobra el 99 % de las veces, y se
+                // puede corregir a mano.
                 onChange={(v) =>
                   setCobro({
                     ...cobro,
                     planId: v,
-                    amount: planes.find((p) => p.id === v)?.price ?? '',
+                    amount: montoSugerido(v, cobro.periodos),
                   })
                 }
                 etiquetaAria={t('pago.plan')}
@@ -464,15 +572,64 @@ export default function Ficha() {
                 disabled={planes.length === 0}
               />
             </div>
+
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('pago.fecha')}
+            </label>
+            <input
+              type="date"
+              max={hoyISO()}
+              min="2000-01-01"
+              value={cobro.paidAt}
+              onChange={(e) => setCobro({ ...cobro, paidAt: e.target.value })}
+              style={{ margin: '0.25rem 0 0.2rem' }}
+            />
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('pago.fechaAyuda')}
+            </p>
+
+            {/* Cuántos periodos cubre. Es la respuesta correcta a «pagó tres
+                meses»: uno solo pago de tres, no tres pagos. La matrícula no
+                lo lleva, porque se paga una vez y ya. */}
+            {planCobro && planCobro.type !== 'matricula' && (
+              <>
+                <label className="muted" style={{ fontSize: '0.75rem' }}>
+                  {t(clavePeriodos(planCobro.type))}
+                </label>
+                <input
+                  inputMode="numeric"
+                  value={cobro.periodos}
+                  onChange={(e) => {
+                    const periodos = soloDigitos(e.target.value, 2) || '1';
+                    setCobro({
+                      ...cobro,
+                      periodos,
+                      amount: montoSugerido(cobro.planId, periodos),
+                    });
+                  }}
+                  maxLength={2}
+                  style={{ margin: '0.25rem 0 0.2rem' }}
+                />
+                <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                  {t(`pago.efecto.${planCobro.type}` as ClaveTexto)}
+                </p>
+              </>
+            )}
+
             <label className="muted" style={{ fontSize: '0.75rem' }}>
               {t('pago.monto')}
             </label>
-            <input
-              inputMode="decimal"
-              value={cobro.amount}
-              onChange={(e) => setCobro({ ...cobro, amount: e.target.value })}
-              style={{ margin: '0.25rem 0 0.7rem' }}
-            />
+            <div style={{ margin: '0.25rem 0 0.2rem' }}>
+              <CampoDinero
+                valor={cobro.amount}
+                onChange={(amount) => setCobro({ ...cobro, amount })}
+                ariaLabel={t('pago.monto')}
+              />
+            </div>
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('pago.montoSugerido')}
+            </p>
+
             <label className="muted" style={{ fontSize: '0.75rem' }}>
               {t('pago.metodo')}
             </label>
@@ -490,6 +647,32 @@ export default function Ficha() {
             <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
               {t('ficha.cobrarAyuda')}
             </p>
+
+            {/* La API cree que este pago ya se registró. No es un error: es una
+                pregunta, y por eso lleva su propio botón en vez de un aviso
+                rojo que no deja seguir. */}
+            {repetido && (
+              <div
+                className="card"
+                style={{
+                  padding: '0.7rem',
+                  marginBottom: '0.7rem',
+                  borderColor: 'var(--gold-dim)',
+                }}
+              >
+                <p style={{ fontSize: '0.78rem', color: 'var(--gold)' }}>⚠ {repetido}</p>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  style={{ marginTop: '0.5rem' }}
+                  disabled={guardando === 'pago'}
+                  onClick={(e) => registrarPago(e as unknown as FormEvent, true)}
+                >
+                  {t('pago.repetidoConfirmar')}
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               className="btn btn-cta btn-sm"

@@ -74,6 +74,58 @@ export function nextDue(input: {
   return prevDue;
 }
 
+/**
+ * Vencimiento tras pagar VARIOS periodos de golpe (tres meses, dos semanas…).
+ *
+ * Es `nextDue` aplicado en cadena, y no una multiplicación, porque el día ancla
+ * manda: quien paga el 31 de enero vence el 28 de febrero y el 31 de marzo, no
+ * el 28 de marzo. Multiplicar días perdería ese día cada vez que se pasa por un
+ * mes corto.
+ */
+export function nextDueVarios(input: {
+  today: string;
+  prevDue: string | null;
+  planType: PlanType;
+  durationDays?: number | null;
+  anchorDay?: number | null;
+  periodos: number;
+}): string | null {
+  let due = input.prevDue;
+  for (let i = 0; i < Math.max(1, input.periodos); i++) {
+    due = nextDue({ ...input, prevDue: due });
+  }
+  return due;
+}
+
+/**
+ * Dónde EMPIEZA cada periodo que compró un pago.
+ *
+ * Sirve para repartir el dinero por meses: un pago de dos mensualidades hecho
+ * el 27 de julio arranca periodos el 27 de julio y el 27 de agosto, así que la
+ * mitad del importe le toca a julio y la otra mitad a agosto. Sin esto, el
+ * panel del club sumaba los dos meses en julio y leía el doble de lo esperado.
+ */
+export function iniciosDePeriodo(input: {
+  desde: string;
+  planType: PlanType;
+  durationDays?: number | null;
+  periodos: number;
+}): string[] {
+  const { desde, planType } = input;
+  const total = Math.max(1, input.periodos);
+  const anchor = anchorFrom(desde);
+  const out: string[] = [];
+  let actual = desde;
+  for (let i = 0; i < total; i++) {
+    out.push(actual);
+    actual =
+      planType === 'semanal'
+        ? addDays(actual, input.durationDays ?? 7)
+        : addMonthsClamped(actual, 1, anchor);
+  }
+  return out;
+}
+
 /** Días que faltan para el vencimiento (negativo si ya venció). */
 export function diasFaltantes(venceEl: string | null, today: string): number | null {
   if (!venceEl) return null;

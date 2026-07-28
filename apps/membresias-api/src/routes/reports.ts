@@ -9,7 +9,42 @@ import {
 } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireRole } from '../plugins/auth';
 import { limitarPorIp } from '../lib/auth/rate-limit';
-import { estado, todayStr } from '../lib/billing';
+import { estado, iniciosDePeriodo, todayStr, type PlanType } from '../lib/billing';
+
+/**
+ * Reparte un pago entre los meses a los que de verdad corresponde.
+ *
+ * Dos meses pagados de golpe en julio son 160 000 en la CAJA de julio, pero
+ * 80 000 de julio y 80 000 de agosto en lo DEVENGADO. Sin esta distinción, el
+ * panel decía que el club recaudó el doble de lo esperado en julio y la mitad
+ * en agosto, y no había forma de explicarle eso a nadie.
+ *
+ * Los pagos anteriores a esta función —y los de clase, paquete y matrícula, que
+ * no compran tiempo— cuentan enteros en el mes en que se recibieron.
+ */
+function porMesDevengado(pago: {
+  amount: string;
+  paidAt: Date | null;
+  periodos: number;
+  periodoDesde: string | null;
+  type: string;
+  durationDays: number | null;
+}): { mes: string; monto: number }[] {
+  const total = parseFloat(pago.amount);
+  const mesCaja = (pago.paidAt ?? new Date()).toISOString().slice(0, 7);
+
+  const porTiempo = pago.type === 'mensual' || pago.type === 'semanal';
+  if (!porTiempo || !pago.periodoDesde) return [{ mes: mesCaja, monto: total }];
+
+  const inicios = iniciosDePeriodo({
+    desde: pago.periodoDesde,
+    planType: pago.type as PlanType,
+    durationDays: pago.durationDays,
+    periodos: pago.periodos,
+  });
+  const porPeriodo = total / inicios.length;
+  return inicios.map((i) => ({ mes: i.slice(0, 7), monto: porPeriodo }));
+}
 
 /** Rango [primer día, último día] de un mes 'YYYY-MM'. */
 function monthRange(month: string) {
@@ -17,6 +52,12 @@ function monthRange(month: string) {
   const start = `${month}-01`;
   const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
   return { start, end };
+}
+
+/** El mes 'YYYY-MM' que queda `n` meses antes de `mes`. */
+function mesesAtras(mes: string, n: number): string {
+  const [y, m] = mes.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 - n, 1)).toISOString().slice(0, 7);
 }
 
 /** Los `n` últimos meses en 'YYYY-MM', del más antiguo al actual. */
@@ -50,6 +91,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       const { start, end } = monthRange(month);
       const db = req.db;
 
+      // La CAJA del mes: los pagos recibidos entre el 1 y el último día.
       const pagos = await db
         .select({ amount: payments.amount, planId: payments.planId })
         .from(payments)
@@ -63,6 +105,33 @@ export async function reportsRoutes(app: FastifyInstance) {
         );
       const recaudado = pagos.reduce((s, p) => s + parseFloat(p.amount), 0);
 
+      // Lo DEVENGADO: lo que le corresponde a este mes aunque se haya cobrado
+      // en otro. Hay que mirar un año hacia atrás, no solo este mes: quien pagó
+      // el semestre en enero sigue cubriendo junio (ver `porMesDevengado`).
+      const alrededor = await db
+        .select({
+          amount: payments.amount,
+          paidAt: payments.paidAt,
+          periodos: payments.periodos,
+          periodoDesde: payments.periodoDesde,
+          type: plans.type,
+          durationDays: plans.durationDays,
+        })
+        .from(payments)
+        .innerJoin(memberships, eq(payments.membershipId, memberships.id))
+        .innerJoin(plans, eq(payments.planId, plans.id))
+        .where(
+          and(
+            eq(memberships.orgId, orgId),
+            gte(payments.paidAt, new Date(`${mesesAtras(month, 12)}-01T00:00:00.000Z`)),
+            lte(payments.paidAt, new Date(`${end}T23:59:59.999Z`)),
+          ),
+        );
+      const devengado = alrededor
+        .flatMap(porMesDevengado)
+        .filter((x) => x.mes === month)
+        .reduce((s, x) => s + x.monto, 0);
+
       // Esperado mensual: suma del precio del plan vigente de los activos (mensual).
       const activos = await db
         .select({ price: plans.price, type: plans.type })
@@ -73,7 +142,7 @@ export async function reportsRoutes(app: FastifyInstance) {
         .filter((a) => a.type === 'mensual')
         .reduce((s, a) => s + parseFloat(a.price), 0);
 
-      return { month, recaudado, numPagos: pagos.length, esperadoMensual };
+      return { month, recaudado, devengado, numPagos: pagos.length, esperadoMensual };
     },
   );
 
@@ -137,18 +206,27 @@ export async function reportsRoutes(app: FastifyInstance) {
         db.select().from(users).where(eq(users.orgId, orgId)),
         db.select().from(memberships).where(eq(memberships.orgId, orgId)),
         db.select().from(plans).where(eq(plans.orgId, orgId)),
+        // Un año hacia atrás, aunque el gráfico enseñe seis meses: un pago
+        // viejo de varios meses puede seguir cubriendo uno de los que se ven.
         db
           .select({
             amount: payments.amount,
             paidAt: payments.paidAt,
-            planId: payments.planId,
+            periodos: payments.periodos,
+            periodoDesde: payments.periodoDesde,
+            type: plans.type,
+            durationDays: plans.durationDays,
           })
           .from(payments)
           .innerJoin(memberships, eq(payments.membershipId, memberships.id))
+          .innerJoin(plans, eq(payments.planId, plans.id))
           .where(
             and(
               eq(memberships.orgId, orgId),
-              gte(payments.paidAt, new Date(`${desdeMeses}T00:00:00.000Z`)),
+              gte(
+                payments.paidAt,
+                new Date(`${mesesAtras(mes, 12)}-01T00:00:00.000Z`),
+              ),
             ),
           ),
         db
@@ -171,14 +249,24 @@ export async function reportsRoutes(app: FastifyInstance) {
         porEstado[estado(memPorUsuario.get(a.id)?.venceEl ?? null, today)]++;
       }
 
-      // ── Dinero: seis meses de recaudo ───────────────────────────────────
-      const recaudoPorMes = new Map(meses.map((m) => [m, { total: 0, pagos: 0 }]));
+      // ── Dinero: seis meses, en caja y en devengado ──────────────────────
+      // `total` es lo que ENTRÓ ese mes; `devengado`, lo que le CORRESPONDE.
+      // Se separan porque quien paga tres meses de golpe no recauda el triple
+      // ese mes: adelanta los dos siguientes.
+      const recaudoPorMes = new Map(
+        meses.map((m) => [m, { total: 0, devengado: 0, pagos: 0 }]),
+      );
       for (const p of pagos) {
-        const m = (p.paidAt ?? new Date()).toISOString().slice(0, 7);
-        const acc = recaudoPorMes.get(m);
-        if (!acc) continue;
-        acc.total += parseFloat(p.amount);
-        acc.pagos++;
+        const mesCaja = (p.paidAt ?? new Date()).toISOString().slice(0, 7);
+        const caja = recaudoPorMes.get(mesCaja);
+        if (caja) {
+          caja.total += parseFloat(p.amount);
+          caja.pagos++;
+        }
+        for (const trozo of porMesDevengado(p)) {
+          const acc = recaudoPorMes.get(trozo.mes);
+          if (acc) acc.devengado += trozo.monto;
+        }
       }
       const precioPlan = new Map(tarifas.map((p) => [p.id, p]));
       const esperadoMensual = activos.reduce((suma, a) => {
@@ -222,11 +310,13 @@ export async function reportsRoutes(app: FastifyInstance) {
         },
         dinero: {
           recaudadoMes: recaudoPorMes.get(mes)?.total ?? 0,
+          devengadoMes: Math.round(recaudoPorMes.get(mes)?.devengado ?? 0),
           pagosMes: recaudoPorMes.get(mes)?.pagos ?? 0,
           esperadoMensual,
           porMes: meses.map((m) => ({
             month: m,
             total: recaudoPorMes.get(m)?.total ?? 0,
+            devengado: Math.round(recaudoPorMes.get(m)?.devengado ?? 0),
             pagos: recaudoPorMes.get(m)?.pagos ?? 0,
           })),
         },

@@ -41,20 +41,13 @@ export function soloDigitos(valor: string, max: number): string {
   return valor.replace(/\D/g, '').slice(0, max);
 }
 
-/**
- * Un importe: dígitos y como mucho un separador decimal con dos cifras detrás.
- * Se admite la coma porque es lo que se teclea en español, y se normaliza a
- * punto, que es lo que entiende la API.
+/*
+ * El filtro de los importes ya no vive aquí: lo hace `<CampoDinero>`
+ * (`components/CampoDinero.tsx`), que además los escribe con el símbolo de la
+ * moneda y los miles separados. Tuvo que mudarse porque cuál es el separador
+ * decimal depende del idioma configurado, y aquí se daba por hecho que era la
+ * coma.
  */
-export function soloDinero(valor: string): string {
-  const limpio = valor.replace(/[^\d.,]/g, '').replace(',', '.');
-  const [enteros = '', ...resto] = limpio.split('.');
-  const cabeza = enteros.slice(0, LIM.precioEnteros);
-  if (resto.length === 0) return cabeza;
-  // Todo lo que venga tras el primer punto es la parte decimal: si el usuario
-  // teclea varios, los de más se ignoran en vez de partir el número.
-  return `${cabeza}.${resto.join('').slice(0, 2)}`;
-}
 
 /**
  * Un teléfono. Dígitos y los signos que la gente escribe de verdad
