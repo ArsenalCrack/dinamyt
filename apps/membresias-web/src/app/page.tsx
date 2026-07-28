@@ -8,7 +8,9 @@ import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { Avatar } from '@/components/Avatar';
+import { CampoImagen } from '@/components/CampoImagen';
 import { Cinturon } from '@/components/Cinturon';
+import { LogoClub } from '@/components/LogoClub';
 
 interface RosterItem {
   userId: string;
@@ -46,8 +48,10 @@ interface Attendance {
 export default function Panel() {
   const router = useRouter();
   const { t, idioma } = useI18n();
-  const { user, cargando: cargandoSesion, esStaff } = useAuth();
+  const { user, club, cargando: cargandoSesion, esStaff, refrescar } = useAuth();
+  const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
 
+  const [editandoLogo, setEditandoLogo] = useState(false);
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [revenue, setRevenue] = useState<Revenue | null>(null);
   const [overdue, setOverdue] = useState<Overdue[]>([]);
@@ -89,6 +93,20 @@ export default function Panel() {
     void cargar();
   }, [cargandoSesion, user, esStaff, router, cargar]);
 
+  /**
+   * El escudo del club. Se refresca la sesión y no la pantalla: el club viaja
+   * dentro de `/auth/me`, así que al recargarlo el logo cambia a la vez en la
+   * barra, en el panel del alumno y en el carnet.
+   */
+  async function guardarLogo(logoUrl: string | null) {
+    setError('');
+    setAviso('');
+    await api.patch('/mi-club', { logoUrl });
+    await refrescar();
+    setAviso(t('logo.guardado'));
+    setEditandoLogo(false);
+  }
+
   async function enviarAvisos() {
     setAviso('');
     try {
@@ -122,10 +140,31 @@ export default function Panel() {
           flexWrap: 'wrap',
         }}
       >
-        <h1 className="display" style={{ fontSize: '1.5rem' }}>
-          {t('panel.titulo')}
-        </h1>
+        {/* El escudo del club preside su propio panel. Es también donde se
+            pone: el maestro lo ve en su pantalla de todos los días y no tiene
+            que buscar una pantalla de ajustes que esta app no tiene. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
+          <LogoClub src={club?.logoUrl} nombre={club?.name ?? 'DINAMYT'} size={46} />
+          <div style={{ minWidth: 0 }}>
+            <h1 className="display" style={{ fontSize: '1.5rem' }}>
+              {club?.name ?? t('panel.titulo')}
+            </h1>
+            <p className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('panel.titulo')}
+              {club?.city ? ` · ${club.city}` : ''}
+            </p>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {esMaestro && (
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => setEditandoLogo((v) => !v)}
+              aria-expanded={editandoLogo}
+            >
+              {club?.logoUrl ? t('logo.cambiar') : t('logo.poner')}
+            </button>
+          )}
           <Link href="/estadisticas" className="btn btn-outline btn-sm">
             📊 {t('menu.estadisticas')}
           </Link>
@@ -134,6 +173,20 @@ export default function Panel() {
           </button>
         </div>
       </header>
+
+      {editandoLogo && esMaestro && (
+        <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
+            {t('logo.titulo')}
+          </h2>
+          <CampoImagen
+            variante="logo"
+            src={club?.logoUrl}
+            nombre={club?.name ?? 'DINAMYT'}
+            onCambiar={guardarLogo}
+          />
+        </div>
+      )}
 
       {error && (
         <p className="msg-error" style={{ marginBottom: '1rem' }}>

@@ -1,8 +1,19 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, desc, gte, lte } from 'drizzle-orm';
-import { memberships, plans, payments, attendances, users } from '@dinamyt/membresias-db';
+import { and, asc, eq, desc, gte, lte, ne, sql } from 'drizzle-orm';
+import {
+  memberships,
+  plans,
+  payments,
+  attendances,
+  users,
+  clubSchedule,
+  scheduleExceptions,
+  type Db,
+} from '@dinamyt/membresias-db';
 import { orgDelRequest, requireClub, requireRole } from '../plugins/auth';
 import { ensureMembership } from '../lib/memberships';
+import { esDiaClase } from '../lib/schedule';
+import { columnaImagenLigera, direccionFoto } from '../lib/imagenes';
 import {
   LIMITES,
   MAX_CLASES,
@@ -33,6 +44,70 @@ type EstadoMem = (typeof ESTADOS_MEM)[number];
  */
 const MAX_PERIODOS = 12;
 
+/** Días hacia adelante que se miran buscando la próxima clase. */
+const HORIZONTE_CLASES = 14;
+
+/** Suma días a una fecha `YYYY-MM-DD`, en UTC para no cruzar husos. */
+function masDias(fecha: string, dias: number): string {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * El calendario del club, contestado en vez de descrito.
+ *
+ * Lo que el alumno abre la app para saber es si hoy hay entreno, y —si no— qué
+ * día vuelve. Devolverle los días de la semana y la lista de festivos sería
+ * pasarle la cuenta a la pantalla, que tendría que repetir la lógica de
+ * `esDiaClase` en el navegador.
+ *
+ * `dias` viaja igual porque «martes y jueves» es lo que el alumno se aprende;
+ * `hoy` y `proxima` son la respuesta.
+ */
+async function calendarioDelAlumno(db: Db, orgId: string, today: string) {
+  const [dias, excepciones] = await Promise.all([
+    db
+      .select({ weekday: clubSchedule.weekday })
+      .from(clubSchedule)
+      .where(eq(clubSchedule.orgId, orgId)),
+    db
+      .select({
+        date: scheduleExceptions.date,
+        isClosed: scheduleExceptions.isClosed,
+        note: scheduleExceptions.note,
+      })
+      .from(scheduleExceptions)
+      .where(
+        and(
+          eq(scheduleExceptions.orgId, orgId),
+          gte(scheduleExceptions.date, today),
+          lte(scheduleExceptions.date, masDias(today, HORIZONTE_CLASES)),
+        ),
+      ),
+  ]);
+
+  const weekdays = dias.map((d) => d.weekday);
+  const hoy = esDiaClase(weekdays, excepciones, today);
+
+  let proxima: string | null = null;
+  for (let i = 1; i <= HORIZONTE_CLASES && !proxima; i++) {
+    const dia = masDias(today, i);
+    if (esDiaClase(weekdays, excepciones, dia)) proxima = dia;
+  }
+
+  // Solo la excepción de HOY, y solo si cierra: es la que explica por qué el
+  // club está cerrado un martes que normalmente hay clase.
+  const excepcionHoy = excepciones.find((e) => e.date === today && e.isClosed);
+
+  return {
+    hoy,
+    proxima,
+    dias: weekdays.sort((a, b) => a - b),
+    motivo: excepcionHoy?.note ?? null,
+  };
+}
+
 export async function membershipsRoutes(app: FastifyInstance) {
   // ── GET /memberships — roster del club + estado local (owner/staff) ───────
   app.get(
@@ -46,8 +121,21 @@ export async function membershipsRoutes(app: FastifyInstance) {
 
       // El roster sale de la propia BD: los alumnos los da de alta el maestro
       // (ver `routes/users.ts`). Antes esto era una llamada HTTP al ecosistema.
+      //
+      // Las columnas van explícitas por la foto: con `select()` a secas, un
+      // club de 200 alumnos arrastraba su retrato entero —decenas de KB por
+      // cabeza— desde PostgreSQL hasta aquí para no mandarlo. Ver `lib/imagenes.ts`.
       const personas = await db
-        .select()
+        .select({
+          id: users.id,
+          fullName: users.fullName,
+          email: users.email,
+          phone: users.phone,
+          avatarUrl: columnaImagenLigera(users.avatarUrl),
+          belt: users.belt,
+          role: users.role,
+          updatedAt: users.updatedAt,
+        })
         .from(users)
         .where(and(eq(users.orgId, orgId), eq(users.isActive, true)))
         .orderBy(asc(users.fullName));
@@ -68,7 +156,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
             fullName: p.fullName,
             email: p.email,
             phone: p.phone,
-            avatarUrl: p.avatarUrl,
+            avatarUrl: direccionFoto(p),
             belt: p.belt,
             /** Carnet QR del alumno: lo que lee la cámara en el check-in. */
             qr: p.id,
@@ -87,8 +175,9 @@ export async function membershipsRoutes(app: FastifyInstance) {
   );
 
   // ── GET /mi — estado del propio alumno (cualquiera con scope) ─────────────
-  // Devuelve además su plan vigente, sus últimos pagos y asistencias: es el
-  // panel personal del alumno/acudiente (NO ve datos de otros miembros).
+  // Devuelve además su plan vigente, sus últimos pagos y asistencias, cuándo
+  // hay clase y cómo va viniendo: es el panel personal del alumno/acudiente
+  // (NO ve datos de otros miembros).
   app.get(
     '/mi',
     { preHandler: requireClub() },
@@ -107,6 +196,27 @@ export async function membershipsRoutes(app: FastifyInstance) {
         )
         .limit(1);
       const today = todayStr();
+
+      // El calendario del club se calcula aquí y no en la web: el alumno no
+      // tiene permiso para leer `/schedule` —es configuración del maestro— y
+      // tampoco tiene por qué saber de excepciones ni de días de la semana.
+      // Lo que necesita es la respuesta: ¿hay clase hoy?, ¿cuándo es la
+      // próxima?
+      const clases = await calendarioDelAlumno(db, orgId, today);
+
+      // Desde cuándo entrena. Lo que manda es la fecha que puso el maestro: un
+      // club que estrena la app trae gente con años encima, y contarles la
+      // antigüedad desde que se les creó la cuenta les borraría todo lo
+      // anterior. Sin ella se cae de vuelta a la fecha de alta, que es lo único
+      // que se sabe con certeza.
+      const [cuenta] = await db
+        .select({ trainsSince: users.trainsSince, createdAt: users.createdAt })
+        .from(users)
+        .where(eq(users.id, req.user!.sub))
+        .limit(1);
+      const desde =
+        cuenta?.trainsSince ?? (cuenta?.createdAt ? cuenta.createdAt.toISOString() : null);
+
       if (!m) {
         return {
           status: null,
@@ -114,6 +224,9 @@ export async function membershipsRoutes(app: FastifyInstance) {
           venceEl: null,
           diasFaltantes: null,
           plan: null,
+          clases,
+          desde,
+          asistencia: { total: 0, esteMes: 0, ultima: null },
           pagos: [],
           asistencias: [],
         };
@@ -150,11 +263,32 @@ export async function membershipsRoutes(app: FastifyInstance) {
         .orderBy(desc(attendances.checkedInAt))
         .limit(15);
 
+      // Cuánto ha venido. Se cuenta en la base y no sobre las quince últimas
+      // que viajan abajo: «has venido 9 veces este mes» con una lista de 15 es
+      // una cuenta que se equivoca en cuanto el alumno es constante.
+      const [conteo] = await db
+        .select({
+          total: sql<number>`count(*)::int`,
+          esteMes: sql<number>`count(*) filter (
+            where ${attendances.checkinDate} >= ${`${today.slice(0, 7)}-01`}
+          )::int`,
+          ultima: sql<string | null>`max(${attendances.checkinDate})`,
+        })
+        .from(attendances)
+        .where(eq(attendances.membershipId, m.id));
+
       return {
         ...m,
         diasFaltantes: diasFaltantes(m.venceEl, today),
         estado: estado(m.venceEl, today),
         plan: plan ? { id: plan.id, name: plan.name, type: plan.type, price: plan.price } : null,
+        clases,
+        desde,
+        asistencia: {
+          total: conteo?.total ?? 0,
+          esteMes: conteo?.esteMes ?? 0,
+          ultima: conteo?.ultima ?? null,
+        },
         pagos,
         asistencias,
       };
@@ -223,6 +357,33 @@ export async function membershipsRoutes(app: FastifyInstance) {
           return reply.code(422).send({ error: 'El PIN solo puede tener dígitos.' });
         }
         pin = p.valor;
+
+        // Que no sea el de otro alumno del club. La base ya lo impide con un
+        // índice único, pero eso llega como un 500 sin explicación: el maestro
+        // ve «error del servidor» donde debería leer «ese PIN ya es de Juan».
+        if (pin) {
+          const [duenoActual] = await db
+            .select({ userId: memberships.userId })
+            .from(memberships)
+            .where(
+              and(
+                eq(memberships.orgId, orgId),
+                eq(memberships.checkinPin, pin),
+                ne(memberships.userId, userId),
+              ),
+            )
+            .limit(1);
+          if (duenoActual) {
+            const [otro] = await db
+              .select({ fullName: users.fullName })
+              .from(users)
+              .where(eq(users.id, duenoActual.userId))
+              .limit(1);
+            return reply.code(409).send({
+              error: `Ese PIN ya es el de ${otro?.fullName ?? 'otro alumno'}. Elige otro o deja que la app genere uno.`,
+            });
+          }
+        }
       }
 
       const [upd] = await db

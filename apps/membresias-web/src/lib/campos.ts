@@ -24,8 +24,14 @@ export const LIM = {
   correo: 255,
   telefono: 40,
   planNombre: 120,
-  notaCalendario: 200,
-  checkinPin: 12,
+  /** El motivo de una excepción del calendario: es una frase, no un dato. */
+  notaCalendario: 500,
+  /**
+   * PIN de check-in. La columna acepta doce dígitos, pero la app genera de
+   * cuatro y el maestro los teclea a mano solo para corregirlos: dejar escribir
+   * doce era ofrecer un PIN que ningún niño va a acertar en el kiosco.
+   */
+  checkinPin: 6,
   /** bcrypt solo mira los primeros 72 bytes; más allá es decorado. */
   password: 72,
   /** El precio es `decimal(10,2)`: ocho dígitos enteros. */
@@ -35,6 +41,14 @@ export const LIM = {
   /** Cuadro de búsqueda: no viaja a ninguna columna, pero tampoco es infinito. */
   busqueda: 80,
 } as const;
+
+/**
+ * Los ocho grupos sanguíneos del sistema ABO/Rh. Lista cerrada y no campo
+ * libre: un tipo escrito a mano —«O positivo», «0+», «o +»— no le sirve a nadie
+ * el día que hay que leerlo deprisa. Mismos valores que valida la API
+ * (`TIPOS_SANGRE` en `lib/validacion.ts`).
+ */
+export const TIPOS_SANGRE = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'] as const;
 
 /** Solo dígitos, recortado a `max` cifras. */
 export function soloDigitos(valor: string, max: number): string {
@@ -53,9 +67,27 @@ export function soloDigitos(valor: string, max: number): string {
  * Un teléfono. Dígitos y los signos que la gente escribe de verdad
  * (`+57 300 123-4567`, `(1) 555 0000`): filtrar a dígitos puros obligaría a
  * borrar el formato con el que cada quien se sabe su número.
+ *
+ * El tope real son los DÍGITOS, no los caracteres. Antes el campo dejaba
+ * teclear cuarenta caracteres —el ancho de la columna— y el aviso de «entre 7
+ * y 15 dígitos» aparecía debajo mientras el número seguía creciendo: se podía
+ * escribir un teléfono de veinte cifras y descubrir al enviar que no valía.
+ * Ahora el dígito dieciséis simplemente no entra, y los separadores se siguen
+ * pudiendo escribir y borrar con normalidad.
  */
 export function soloTelefono(valor: string): string {
-  return valor.replace(/[^\d+()\-.\s]/g, '').slice(0, LIM.telefono);
+  const limpio = valor.replace(/[^\d+()\-.\s]/g, '').slice(0, LIM.telefono);
+
+  let digitos = 0;
+  let cortado = '';
+  for (const c of limpio) {
+    if (/\d/.test(c)) {
+      if (digitos >= TELEFONO_DIGITOS_MAX) continue;
+      digitos++;
+    }
+    cortado += c;
+  }
+  return cortado;
 }
 
 /**

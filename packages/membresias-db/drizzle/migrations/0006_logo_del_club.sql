@@ -1,0 +1,12 @@
+-- El escudo del club.
+--
+-- Hasta aquí el único logo que existía era el de la app: el carnet de un alumno
+-- del Dojo Peñalosa y el de uno de otro club salían idénticos. El escudo lo
+-- sube el MAESTRO —el superadmin no conoce la insignia de cada club— y de ahí
+-- pasa al carnet y al panel de sus alumnos.
+--
+-- La columna es `text` y no una ruta a un archivo por la misma razón que la
+-- foto del alumno: ni Render ni Vercel tienen disco donde guardar nada. La
+-- imagen viaja dentro de la fila, ya reducida por el navegador. Ver
+-- `apps/membresias-api/src/lib/fotos.ts`.
+ALTER TABLE "membresias"."orgs" ADD COLUMN "logo_url" text;

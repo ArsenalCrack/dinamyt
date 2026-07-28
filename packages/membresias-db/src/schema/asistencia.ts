@@ -28,7 +28,13 @@ export const scheduleExceptions = mem.table('schedule_exceptions', {
   orgId: uuid('org_id').notNull(),
   date: date('date').notNull(),
   isClosed: boolean('is_closed').notNull(),
-  note: varchar('note', { length: 200 }),
+  /**
+   * Por qué el club abre o cierra ese día. Más largo que el resto de textos a
+   * propósito: aquí no cabe un dato, cabe una explicación —«cerrado por el
+   * campeonato departamental, volvemos el lunes»—, y es lo que el alumno lee
+   * en su panel el día que no hay clase.
+   */
+  note: varchar('note', { length: 500 }),
 });
 
 // ── Kioscos / dispositivos registrados ───────────────────────────────────────

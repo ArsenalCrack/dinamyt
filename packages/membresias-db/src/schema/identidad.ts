@@ -3,6 +3,7 @@ import {
   varchar,
   text,
   boolean,
+  date,
   timestamp,
   index,
 } from 'drizzle-orm/pg-core';
@@ -27,6 +28,12 @@ export const orgs = mem.table('orgs', {
   slug: varchar('slug', { length: 60 }).notNull().unique(),
   city: varchar('city', { length: 80 }),
   country: varchar('country', { length: 80 }),
+  /**
+   * Escudo del club: data-URL o http, igual que la foto de un alumno. Lo sube
+   * el MAESTRO —es su club— y sale en el carnet y en el panel de sus alumnos.
+   * Ver `apps/membresias-api/src/lib/fotos.ts`.
+   */
+  logoUrl: text('logo_url'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -57,6 +64,22 @@ export const users = mem.table(
      * DINAMYT-LOCAL con sus competidores.
      */
     belt: varchar('belt', { length: 40 }),
+    /**
+     * Desde cuándo entrena, que NO es desde cuándo tiene cuenta.
+     *
+     * Un club que estrena la app trae alumnos con años encima: si su antigüedad
+     * saliera de `created_at`, todos empezarían de cero el día que el maestro
+     * los dio de alta. La pone el maestro y, si no la pone, se cae de vuelta a
+     * `created_at`.
+     */
+    trainsSince: date('trains_since'),
+    /**
+     * Datos que solo importan el día que importan: si a alguien le pasa algo en
+     * el tatami, están en su carnet y no hay que buscar a nadie.
+     */
+    bloodType: varchar('blood_type', { length: 8 }),
+    emergencyName: varchar('emergency_name', { length: 150 }),
+    emergencyPhone: varchar('emergency_phone', { length: 40 }),
     role: rolUsuarioEnum('role').notNull().default('student'),
     /** Atraviesa todos los clubes. Ver `rolUsuarioEnum`. */
     isSuperAdmin: boolean('is_super_admin').notNull().default(false),

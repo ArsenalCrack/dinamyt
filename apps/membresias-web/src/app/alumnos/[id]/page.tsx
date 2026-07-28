@@ -8,10 +8,12 @@ import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
-import { LIM, soloDigitos, soloTelefono, telefonoValido } from '@/lib/campos';
+import { LIM, TIPOS_SANGRE, soloDigitos, soloTelefono, telefonoValido } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
-import { CarnetQR } from '@/components/CarnetQR';
+import { CampoImagen } from '@/components/CampoImagen';
+import { Contador } from '@/components/Contador';
+import { Carnet } from '@/components/Carnet';
 import { AccesoQR } from '@/components/AccesoQR';
 import { Cinturon } from '@/components/Cinturon';
 import { SelectMenu } from '@/components/SelectMenu';
@@ -24,6 +26,10 @@ interface Persona {
   phone: string | null;
   avatarUrl: string | null;
   belt: string | null;
+  trainsSince: string | null;
+  bloodType: string | null;
+  emergencyName: string | null;
+  emergencyPhone: string | null;
   role: Rol;
   isActive: boolean;
 }
@@ -60,6 +66,17 @@ interface Attendance {
 const ESTADOS_MEM = ['activo', 'inactivo', 'suspendido', 'retirado'] as const;
 const METODOS = ['efectivo', 'transferencia', 'nequi', 'daviplata'] as const;
 
+/**
+ * Un PIN de cuatro dígitos al azar, para el botón del dado.
+ *
+ * No comprueba si está libre: eso lo sabe el servidor, que tiene el índice
+ * único por club y contesta con el nombre de quien ya lo tiene. Aquí sirve
+ * para no quedarse mirando el teclado pensando un número.
+ */
+function pinAlAzar(): string {
+  return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+}
+
 /** Hoy en formato de `<input type="date">`, en hora LOCAL (no UTC). */
 function hoyISO(): string {
   const d = new Date();
@@ -94,7 +111,15 @@ export default function Ficha() {
   const [error, setError] = useState('');
   const [nuevaPass, setNuevaPass] = useState('');
 
-  const [datos, setDatos] = useState({ fullName: '', phone: '', belt: '' });
+  const [datos, setDatos] = useState({
+    fullName: '',
+    phone: '',
+    belt: '',
+    trainsSince: '',
+    bloodType: '',
+    emergencyName: '',
+    emergencyPhone: '',
+  });
   const [plan, setPlan] = useState({
     currentPlanId: '',
     status: 'activo',
@@ -133,6 +158,10 @@ export default function Ficha() {
         fullName: pe.data.fullName,
         phone: pe.data.phone ?? '',
         belt: pe.data.belt ?? '',
+        trainsSince: pe.data.trainsSince ?? '',
+        bloodType: pe.data.bloodType ?? '',
+        emergencyName: pe.data.emergencyName ?? '',
+        emergencyPhone: pe.data.emergencyPhone ?? '',
       });
       setPlan({
         currentPlanId: m?.currentPlanId ?? '',
@@ -163,7 +192,7 @@ export default function Ficha() {
     e.preventDefault();
     setError('');
     setAviso('');
-    if (!telefonoValido(datos.phone)) {
+    if (!telefonoValido(datos.phone) || !telefonoValido(datos.emergencyPhone)) {
       setError(t('comun.telefonoCorto'));
       return;
     }
@@ -173,6 +202,10 @@ export default function Ficha() {
         fullName: datos.fullName,
         phone: datos.phone || null,
         belt: datos.belt || null,
+        trainsSince: datos.trainsSince || null,
+        bloodType: datos.bloodType || null,
+        emergencyName: datos.emergencyName || null,
+        emergencyPhone: datos.emergencyPhone || null,
       });
       setAviso(t('ficha.guardado'));
       await cargar();
@@ -181,6 +214,19 @@ export default function Ficha() {
     } finally {
       setGuardando('');
     }
+  }
+
+  /**
+   * La foto va sola a la API: `CampoFoto` avisa cuando ya la recortó y la
+   * comprimió. Si falla, el error sube al componente, que es quien lo enseña
+   * pegado al botón — donde el maestro está mirando.
+   */
+  async function guardarFoto(avatarUrl: string | null) {
+    setError('');
+    setAviso('');
+    await api.patch(`/users/${id}`, { avatarUrl });
+    setAviso(t('ficha.guardado'));
+    await cargar();
   }
 
   async function guardarPlan(e: FormEvent) {
@@ -261,6 +307,8 @@ export default function Ficha() {
 
   const nombre = persona?.fullName ?? membership?.fullName ?? '—';
   const planCobro = planes.find((p) => p.id === cobro.planId) ?? null;
+  /** El plan que el alumno tiene puesto: va impreso en su carnet. */
+  const planActual = planes.find((p) => p.id === membership?.currentPlanId) ?? null;
 
   /** Precio del plan por el número de periodos, sin decimales de más. */
   function montoSugerido(planId: string, periodos: string): string {
@@ -294,7 +342,7 @@ export default function Ficha() {
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem' }}>
       <header
-        className="no-imprimir"
+       
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -322,12 +370,12 @@ export default function Ficha() {
       </header>
 
       {error && (
-        <p className="msg-error no-imprimir" style={{ marginBottom: '1rem' }}>
+        <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
         </p>
       )}
       {aviso && (
-        <p className="msg-ok no-imprimir" style={{ marginBottom: '1rem' }}>
+        <p className="msg-ok" style={{ marginBottom: '1rem' }}>
           {aviso}
         </p>
       )}
@@ -340,26 +388,31 @@ export default function Ficha() {
           marginBottom: '1.25rem',
         }}
       >
-        {/* ── Carnet QR: el motivo por el que esta pantalla se imprime ─────── */}
+        {/* ── El carnet: el motivo por el que existe esta pantalla ─────────── */}
         <div className="card" style={{ padding: '1rem' }}>
-          <h2
-            className="no-imprimir"
-            style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}
-          >
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}>
             {t('qr.titulo')}
           </h2>
-          <p className="muted no-imprimir" style={{ fontSize: '0.75rem', marginBottom: '0.9rem' }}>
+          <p className="muted" style={{ fontSize: '0.75rem', marginBottom: '0.9rem' }}>
             {t('qr.descripcion')}
           </p>
-          <CarnetQR
-            valor={id}
+          <Carnet
+            id={id}
             nombre={nombre}
             club={club?.name}
+            logoClub={club?.logoUrl}
+            rol={t(`rol.${persona?.role ?? 'student'}` as ClaveTexto)}
+            tipo={t(`carnet.tipo.${persona?.role ?? 'student'}` as ClaveTexto)}
+            foto={persona?.avatarUrl}
+            cinturon={persona?.belt}
+            sangre={persona?.bloodType}
+            emergenciaNombre={persona?.emergencyName}
+            emergenciaTelefono={persona?.emergencyPhone}
             pin={membership?.checkinPin}
           />
         </div>
 
-        <div className="no-imprimir" style={{ display: 'grid', gap: '1rem', alignContent: 'start' }}>
+        <div style={{ display: 'grid', gap: '1rem', alignContent: 'start' }}>
           <div className="card" style={{ padding: '1rem' }}>
             <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
               {t('ficha.membresia')}
@@ -391,7 +444,7 @@ export default function Ficha() {
 
       {esMaestro && (
         <div
-          className="no-imprimir"
+         
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
@@ -404,6 +457,16 @@ export default function Ficha() {
             <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
               {t('ficha.datos')}
             </h2>
+            {/* La foto se guarda al elegirla, sin esperar al botón: es lo que
+                se espera de una foto, y además la vista previa del carnet la
+                necesita ya puesta para enseñar cómo va a quedar. */}
+            <div style={{ marginBottom: '0.9rem' }}>
+              <CampoImagen
+                src={persona?.avatarUrl}
+                nombre={nombre}
+                onCambiar={guardarFoto}
+              />
+            </div>
             <label className="muted" style={{ fontSize: '0.75rem' }}>
               {t('comun.nombre')}
             </label>
@@ -412,8 +475,9 @@ export default function Ficha() {
               onChange={(e) => setDatos({ ...datos, fullName: e.target.value })}
               maxLength={LIM.nombrePersona}
               required
-              style={{ margin: '0.25rem 0 0.7rem' }}
+              style={{ margin: '0.25rem 0 0.2rem' }}
             />
+            <Contador valor={datos.fullName} max={LIM.nombrePersona} />
             <label className="muted" style={{ fontSize: '0.75rem' }}>
               {t('comun.telefono')}
             </label>
@@ -445,6 +509,71 @@ export default function Ficha() {
                 opciones={opcionesCinturon}
               />
             </div>
+
+            {/* La antigüedad real: un club que estrena la app trae alumnos con
+                años encima, y su cuenta es de esta semana. */}
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.entrenaDesde')}
+            </label>
+            <input
+              type="date"
+              min="1950-01-01"
+              max={hoyISO()}
+              value={datos.trainsSince}
+              onChange={(e) => setDatos({ ...datos, trainsSince: e.target.value })}
+              style={{ margin: '0.25rem 0 0.2rem' }}
+            />
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('ficha.entrenaDesdeAyuda')}
+            </p>
+
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.sangre')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.9rem' }}>
+              <SelectMenu
+                valor={datos.bloodType}
+                onChange={(v) => setDatos({ ...datos, bloodType: v })}
+                etiquetaAria={t('ficha.sangre')}
+                placeholder={t('ficha.sinSangre')}
+                opciones={[
+                  { valor: '', etiqueta: t('ficha.sinSangre') },
+                  ...TIPOS_SANGRE.map((s) => ({ valor: s, etiqueta: s })),
+                ]}
+              />
+            </div>
+
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.emergenciaNombre')}
+            </label>
+            <input
+              value={datos.emergencyName}
+              onChange={(e) => setDatos({ ...datos, emergencyName: e.target.value })}
+              maxLength={LIM.nombrePersona}
+              style={{ margin: '0.25rem 0 0.2rem' }}
+            />
+            <Contador valor={datos.emergencyName} max={LIM.nombrePersona} />
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.emergenciaTelefono')}
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={datos.emergencyPhone}
+              onChange={(e) =>
+                setDatos({ ...datos, emergencyPhone: soloTelefono(e.target.value) })
+              }
+              maxLength={LIM.telefono}
+              style={{
+                margin: '0.25rem 0 0.2rem',
+                borderColor: telefonoValido(datos.emergencyPhone) ? undefined : 'var(--danger)',
+              }}
+            />
+            <Contador valor={datos.emergencyPhone} max={LIM.telefono} />
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('ficha.emergenciaAyuda')}
+            </p>
+
             <button type="submit" className="btn btn-gold btn-sm" disabled={guardando === 'datos'}>
               {guardando === 'datos' ? t('comun.guardando') : t('comun.guardar')}
             </button>
@@ -516,18 +645,34 @@ export default function Ficha() {
               {t('ficha.soloPorClases')}
             </p>
 
+            {/* El PIN lo pone la app sola al inscribir al alumno; esto es para
+                corregirlo —el que le tocó es difícil de teclear, o se lo contó
+                a un compañero—. Si el nuevo ya es de otro, la API responde 409
+                diciendo de quién, en vez de reventar contra el índice único. */}
             <label className="muted" style={{ fontSize: '0.75rem' }}>
               {t('ficha.pin')}
             </label>
-            <input
-              inputMode="numeric"
-              value={plan.checkinPin}
-              onChange={(e) =>
-                setPlan({ ...plan, checkinPin: soloDigitos(e.target.value, LIM.checkinPin) })
-              }
-              maxLength={LIM.checkinPin}
-              style={{ margin: '0.25rem 0 0.2rem' }}
-            />
+            <div style={{ display: 'flex', gap: '0.4rem', margin: '0.25rem 0 0.2rem' }}>
+              <input
+                inputMode="numeric"
+                value={plan.checkinPin}
+                onChange={(e) =>
+                  setPlan({ ...plan, checkinPin: soloDigitos(e.target.value, LIM.checkinPin) })
+                }
+                maxLength={LIM.checkinPin}
+                className="mono"
+                style={{ letterSpacing: '0.18em' }}
+              />
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setPlan({ ...plan, checkinPin: pinAlAzar() })}
+                title={t('ficha.pinOtro')}
+                style={{ flexShrink: 0 }}
+              >
+                🎲
+              </button>
+            </div>
             <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
               {t('ficha.pinAyuda')}
             </p>
@@ -696,6 +841,7 @@ export default function Ficha() {
               onChange={(e) => setNuevaPass(e.target.value)}
               placeholder={t('mi.contrasenaNueva')}
             />
+            <Contador valor={nuevaPass} max={LIM.password} />
             <p className="muted" style={{ fontSize: '0.7rem', margin: '0.35rem 0 0.6rem' }}>
               {t('alumnos.contrasenaAyuda')}
             </p>
@@ -707,7 +853,7 @@ export default function Ficha() {
       )}
 
       <div
-        className="card tabla-scroll no-imprimir"
+        className="card tabla-scroll"
         style={{ padding: '0.5rem 1rem', marginBottom: '1.25rem' }}
       >
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
@@ -742,7 +888,7 @@ export default function Ficha() {
         </table>
       </div>
 
-      <div className="card no-imprimir" style={{ padding: '0.5rem 1rem' }}>
+      <div className="card" style={{ padding: '0.5rem 1rem' }}>
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
           {t('ficha.asistencias')}
         </h2>

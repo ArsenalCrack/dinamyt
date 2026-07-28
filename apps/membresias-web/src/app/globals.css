@@ -37,6 +37,11 @@ body {
   margin: 0;
   min-height: 100vh;
 }
+
+/* La barra es sticky y tapa los primeros 57 px: sin esto, saltar a un ancla
+   —«Cobrar →» lleva a #cobrar— dejaba el título del formulario debajo de la
+   barra y parecía que el salto se había pasado de largo. */
+html { scroll-padding-top: 4.5rem; }
 a { color: inherit; text-decoration: none; }
 ::selection { background: var(--gold); color: #14141e; }
 
@@ -188,16 +193,46 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
    dentro de la capa las clases que no reconoce en el contenido escaneado.) */
 .tabla-scroll { overflow-x: auto; }
 
+/* ── Pie legal ──
+   Discreto y al final de todo. `margin-top: auto` no sirve aquí (el body no es
+   flex), así que se separa con margen y una línea. */
+.pie-legal {
+  max-width: 1180px;
+  margin: 3rem auto 0;
+  padding: 1.25rem 1.5rem 2rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.pie-legal strong { color: var(--text); font-weight: 700; }
+.pie-legal-nota { margin-top: 0.2rem; opacity: 0.75; }
+
+/* ── Excepciones del calendario ──
+   Fecha y tipo comparten renglón; el motivo va debajo, a lo ancho, porque es
+   una frase y no un dato. En móvil todo se apila solo. */
+.excepcion-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.excepcion-fila {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    BARRA Y MENÚ DE HAMBURGUESA
    (fuera de @layer, misma razón que .tabla-scroll)
 
-   Un solo menú para las dos pantallas, como en DINAMYT-LOCAL: un panel
-   ANCLADO al botón, del tamaño de lo que trae. Antes, en PC, el desplegable
-   era una franja del ancho de la ventana para mostrar tres botones.
-
-   En móvil el panel añade los enlaces de navegación; en PC esos ya están en
-   línea en la barra, así que el panel solo lleva sesión, tema, idioma y salir.
+   Arriba solo van los enlaces del día a día; el resto vive en el panel, que
+   es el mapa completo (ver el reparto `principal` en NavBar.tsx). Y la
+   identidad —foto, nombre, rol y club— tiene su propio sitio: el botón del
+   menú. Antes competía por el hueco que dejaban los enlaces y, en cuanto el
+   nombre o el club eran largos, se veía apretada contra ellos.
    ════════════════════════════════════════════════════════════════════════ */
 .navbar {
   position: sticky;
@@ -205,6 +240,10 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   z-index: 30;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+  /* La sombra dice que la barra está ENCIMA y que lo demás pasa por debajo.
+     Sin ella, al bajar por un formulario largo el borde de una tarjeta llegaba
+     a ras de la barra y parecía que la estaba tocando o empujando. */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
 }
 .navbar-inner {
   max-width: 1180px;
@@ -221,7 +260,9 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   gap: 0.5rem;
 }
 .navbar-marca span { font-size: 1rem; white-space: nowrap; }
-.navbar-links { display: none; flex: 1; align-items: center; gap: 0.15rem; }
+/* `min-width: 0` es lo que permite que los enlaces cedan ancho antes que
+   empujar el chip de identidad fuera de la pantalla. */
+.navbar-links { display: none; flex: 1 1 auto; min-width: 0; align-items: center; gap: 0.15rem; }
 .navbar-link {
   border-radius: 0.5rem;
   padding: 0.45rem 0.7rem;
@@ -234,32 +275,38 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
 .navbar-link[data-activo='true'] { background: var(--bg-elevated); color: var(--gold); }
 .navbar-derecha {
   margin-left: auto;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
-/* Identidad en la barra: solo en PC, donde hay sitio. En móvil vive dentro
-   del panel, que es donde se va a mirar. */
-.navbar-quien { display: none; font-size: 0.72rem; text-align: right; line-height: 1.25; }
-.navbar-quien b { display: block; font-weight: 600; color: var(--text); }
-.navbar-quien span { color: var(--gold); }
 
-/* ── Botón de hamburguesa (las tres rayas se vuelven una X al abrir) ── */
+/* ── Botón del menú: foto + nombre de pila + las tres rayas ──
+   Las rayas se vuelven una X al abrir. El nombre se recorta con puntos
+   suspensivos: un nombre de pila largo estrecha el chip, nunca la barra. */
 .navbar-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  height: 36px;
-  padding: 0 0.7rem;
+  gap: 0.45rem;
+  height: 38px;
+  max-width: 12rem;
+  padding: 0 0.55rem;
   background: transparent;
   border: 1px solid var(--border-strong);
-  border-radius: 0.5rem;
+  border-radius: 999px;
   color: var(--text);
   font: inherit;
   font-weight: 600;
   font-size: 0.8rem;
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
+}
+.navbar-toggle-nombre {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .navbar-toggle:hover,
 .navbar-toggle[aria-expanded='true'] { border-color: var(--gold); color: var(--gold); }
@@ -279,7 +326,6 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
 .navbar-rayas[data-abierto='true'] span:nth-child(1) { top: 5px; transform: rotate(45deg); }
 .navbar-rayas[data-abierto='true'] span:nth-child(2) { opacity: 0; }
 .navbar-rayas[data-abierto='true'] span:nth-child(3) { top: 5px; transform: rotate(-45deg); }
-.navbar-toggle-texto { display: none; }
 
 /* ── El panel ── */
 .navbar-panel {
@@ -299,19 +345,34 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   animation: aparecer 0.15s ease;
 }
+/* La identidad completa. Aquí SÍ hay sitio: el nombre parte de línea y el
+   club se lee entero, por largo que sea. */
 .navbar-panel-quien {
-  padding: 0.2rem 0.55rem 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.55rem 0.7rem;
   margin-bottom: 0.2rem;
   border-bottom: 1px solid var(--border);
   font-size: 0.8rem;
 }
-.navbar-panel-quien b { display: block; font-weight: 700; overflow-wrap: anywhere; }
-.navbar-panel-quien span {
-  font-size: 0.72rem;
+.navbar-panel-datos { min-width: 0; }
+.navbar-panel-quien b {
+  display: block;
   font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.navbar-panel-datos > span {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.3;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--gold);
+  overflow-wrap: anywhere;
 }
 .navbar-item {
   display: flex;
@@ -365,18 +426,138 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   color: var(--text-muted);
 }
 
-@media (min-width: 768px) {
+/* ── Vista previa del carnet ──
+   El iframe trae el documento a tamaño de tarjeta y se escala desde el
+   componente cuando la columna es más estrecha (ver Carnet.tsx). El marco solo
+   recorta lo que sobra y le pone fondo, para que la tarjeta blanca se lea
+   igual en modo claro que en oscuro. */
+.carnet-marco {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border);
+  background: #e9e9ee;
+}
+.carnet-marco iframe { display: block; }
+
+/* ── Semana de clases del club, en el panel del alumno ──
+   Siete casillas: las del club encendidas. Se lee de un vistazo «martes y
+   jueves» sin tener que interpretar una lista escrita. */
+.clases-semana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+  margin-top: 1rem;
+}
+.clases-dia {
+  padding: 0.4rem 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clases-dia[data-activo='true'] {
+  background: var(--gold-soft);
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* ── Escalera de cinturones del panel del alumno ──
+   Once puntos, el suyo con un anillo. No es una barra de progreso: subir de
+   grado lo decide el maestro, no el tiempo. */
+.grados {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+.grado {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+}
+.grado[data-activo='true'] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-soft);
+}
+.grado-punto {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+}
+.grado[data-activo='true'] .grado-punto { width: 1rem; height: 1rem; }
+
+/* ── PIN de respaldo, en el panel del alumno ── */
+.pin-respaldo {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 0.9rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 0.6rem;
+}
+.pin-respaldo strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+}
+.pin-respaldo .muted { font-size: 0.72rem; flex-basis: 100%; }
+
+.carnet-formatos { display: flex; gap: 0.35rem; }
+.carnet-formato {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.carnet-formato:hover { color: var(--text); background: var(--bg-elevated); }
+.carnet-formato[data-activo='true'] {
+  background: var(--gold-soft);
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* De aquí para arriba caben los enlaces principales en línea. Por debajo, la
+   barra se queda en marca + campana + chip, y TODO lo demás está a un toque
+   dentro del menú. */
+@media (min-width: 860px) {
   .navbar-links { display: flex; }
-  .navbar-quien { display: block; }
-  .navbar-toggle-texto { display: inline; }
-  .navbar-panel-links { display: none; }
+  .navbar-toggle-nombre { display: block; }
+  /* Lo que ya se ve arriba no se repite dentro. Y si al alumno o al superadmin
+     no les queda nada que repetir, se va también el rótulo: un «Ir a» sobre
+     una lista vacía es peor que no ponerlo. */
+  .navbar-panel-links .navbar-item[data-principal='true'] { display: none; }
+  .navbar-panel-nav[data-solo-principales='true'] { display: none; }
   .navbar-panel { right: calc((100vw - 1180px) / 2 + 1rem); }
 }
 /* Por debajo de 1180 + márgenes, el contenedor ya no está centrado: el panel
    vuelve a colgar del borde de la ventana. */
-@media (min-width: 768px) and (max-width: 1212px) {
+@media (min-width: 860px) and (max-width: 1212px) {
   .navbar-panel { right: 1rem; }
 }
+
 
 /* ════════════════════════════════════════════════════════════════════════
    CAMPANA DE AVISOS
@@ -642,30 +823,27 @@ html[data-theme="light"] .badge-danger {
   color: var(--danger);
 }
 
-/* ── Impresión: el carnet QR sale limpio en papel ────────────────────────
-   Se imprime en claro pase lo que pase (tinta negra sobre blanco) y solo la
-   tarjeta marcada .solo-imprimir llega al papel. */
+/* ── Impresión ───────────────────────────────────────────────────────────
+   El carnet YA NO se imprime desde aquí: tiene su propio documento, a tamaño
+   de tarjeta, dentro de un iframe (ver `lib/carnet.ts`). Lo que queda es lo
+   que pasa cuando alguien pulsa Ctrl+P en cualquier pantalla: tinta negra
+   sobre blanco, sin la barra ni los botones, y sin partir una tarjeta en dos
+   hojas. */
 @media print {
   body {
     background: #ffffff !important;
     color: #000000 !important;
   }
-  .no-imprimir,
-  header,
-  nav {
+  .navbar,
+  .carnet-formatos,
+  button {
     display: none !important;
   }
-  .solo-imprimir {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    border: 2px solid #000000 !important;
+  .card {
+    border-color: #cccccc !important;
     background: #ffffff !important;
-    color: #000000 !important;
     box-shadow: none !important;
-    page-break-inside: avoid;
+    break-inside: avoid;
   }
-  .solo-imprimir .muted {
-    color: #444444 !important;
-  }
+  .muted { color: #444444 !important; }
 }

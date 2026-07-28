@@ -40,7 +40,7 @@ const es = {
   'menu.miEstado': 'Mi estado',
   'menu.estadisticas': 'Estadísticas',
   'menu.admin': 'Clubes y maestros',
-  'menu.etiqueta': 'Menú',
+  'menu.navegacion': 'Ir a',
   'menu.abrir': 'Abrir menú',
   'menu.cerrar': 'Cerrar menú',
   'menu.salir': 'Salir',
@@ -99,7 +99,19 @@ const es = {
   'comun.imprimir': 'Imprimir',
   'comun.fecha': 'Fecha',
   'comun.opcional': 'opcional',
+  'comun.tope': 'no cabe más',
   'comun.telefonoCorto': 'Un teléfono tiene entre 7 y 15 dígitos.',
+
+  // Ficha de seguridad: lo que hay que saber el día que pasa algo
+  'ficha.entrenaDesde': 'Entrena desde',
+  'ficha.entrenaDesdeAyuda':
+    'Cuándo empezó a entrenar de verdad, aunque su cuenta sea de ayer. Si la dejas vacía se cuenta desde el día que lo inscribiste.',
+  'ficha.sangre': 'Tipo de sangre',
+  'ficha.sinSangre': 'Sin registrar',
+  'ficha.emergencia': 'Contacto de emergencia',
+  'ficha.emergenciaNombre': 'A quién llamar',
+  'ficha.emergenciaTelefono': 'Teléfono de emergencia',
+  'ficha.emergenciaAyuda': 'Va impreso en el reverso del carnet.',
 
   // Estado de la membresía en el club (lo pone el maestro a mano)
   'memb.activo': 'Activo',
@@ -117,7 +129,9 @@ const es = {
   'ficha.planActual': 'Plan actual',
   'ficha.sinPlanAsignado': 'Sin plan asignado',
   'ficha.pin': 'PIN de check-in',
-  'ficha.pinAyuda': 'Solo dígitos. Es el respaldo cuando el alumno olvida el carnet.',
+  'ficha.pinAyuda':
+    'La app se lo asignó solo al inscribirlo. Cámbialo si hace falta: si el nuevo ya es de otro alumno, te lo dirá.',
+  'ficha.pinOtro': 'Generar otro PIN',
   'ficha.venceEl': 'Vence el',
   'ficha.venceAyuda':
     'Ponla a mano si el alumno venía de otro lado o pagó por fuera. A partir de ahí, sus renovaciones caen ese día del mes.',
@@ -159,7 +173,12 @@ const es = {
   // Alumnos (CRUD del maestro)
   'alumnos.titulo': 'Alumnos del club',
   'alumnos.nuevo': 'Nuevo alumno',
-  'alumnos.crearTitulo': 'Dar de alta',
+  // «Dar de alta» es vocabulario de oficina: el maestro inscribe gente en su
+  // club, no da de alta registros. Y dice «a alguien» porque por aquí entran
+  // también acudientes y auxiliares, no solo alumnos.
+  'alumnos.crearTitulo': 'Inscribir a alguien en el club',
+  'alumnos.noTeDesactivas':
+    'No puedes cortarte el acceso a ti mismo: el club se quedaría sin maestro.',
   'alumnos.contrasenaInicial': 'Contraseña inicial',
   'alumnos.contrasenaAyuda': 'Mínimo 8 caracteres. Se la entregas al alumno.',
   'alumnos.rolAyuda': 'Alumno, acudiente o auxiliar del club.',
@@ -171,8 +190,33 @@ const es = {
   'alumnos.contrasenaCambiada': 'Contraseña actualizada.',
   'alumnos.incluirInactivos': 'Ver también los inactivos',
 
+  // Foto de perfil (la misma que va al carnet)
+  'foto.poner': 'Poner foto',
+  'foto.cambiar': 'Cambiar foto',
+  'foto.quitar': 'Quitar',
+  'foto.procesando': 'Procesando…',
+  'foto.ayuda': 'Se recorta cuadrada y se reduce sola. Es la que sale en el carnet.',
+  'foto.errorTipo': 'Ese archivo no es una imagen.',
+  'foto.errorLeer': 'No se pudo abrir esa imagen. Prueba con otra.',
+  'foto.errorPeso': 'Esa imagen es demasiado grande. Prueba con otra.',
+  'foto.errorGuardar': 'No se pudo guardar la foto.',
+
+  // Escudo del club: lo pone el maestro y lo ven todos sus alumnos
+  'logo.titulo': 'Escudo del club',
+  'logo.poner': 'Poner escudo',
+  'logo.cambiar': 'Cambiar escudo',
+  'logo.ayuda':
+    'Sale en el carnet de tus alumnos y en su panel. Si tiene fondo transparente, se respeta.',
+  'logo.guardado': 'Escudo actualizado.',
+
+  // Días de clase, vistos por el alumno
+  'clases.titulo': 'Clases del club',
+  'clases.hoySi': 'Hoy hay clase',
+  'clases.hoyNo': 'Hoy no hay clase',
+  'clases.proxima': 'Próxima clase',
+
   // Carnet QR
-  'qr.titulo': 'Carnet QR',
+  'qr.titulo': 'Carnet del alumno',
   'qr.descripcion':
     'Imprímelo y entrégaselo al alumno. Lo trae a clase y el maestro lo escanea con la cámara del celular.',
   'qr.descripcionMia':
@@ -181,6 +225,33 @@ const es = {
   'qr.pin': 'PIN de respaldo',
   'qr.sinPin': 'Sin PIN asignado',
   'qr.instruccion': 'Presenta este carnet al entrar a clase',
+
+  // El carnet en sí (lo que se imprime, a tamaño de tarjeta de verdad)
+  'carnet.frente': 'Frente',
+  'carnet.reverso': 'Reverso',
+  // Qué dice la cabecera del carnet. Depende del rol: el del maestro no puede
+  // decir «Carnet de alumno».
+  'carnet.tipo.student': 'Carnet de alumno',
+  'carnet.tipo.owner': 'Carnet de maestro',
+  'carnet.tipo.staff': 'Carnet de auxiliar',
+  'carnet.tipo.guardian': 'Carnet de acudiente',
+  'carnet.numero': 'N.º',
+  'carnet.emitido': 'Emitido',
+  'carnet.vigenteHasta': 'Vigente hasta',
+  'carnet.sangre': 'Sangre',
+  'carnet.emergencia': 'En caso de emergencia',
+  'carnet.pin': 'PIN de respaldo',
+  'carnet.instruccion': 'Presenta este carnet al entrar a clase.',
+  'carnet.intransferible':
+    'Personal e intransferible. Si lo encuentras, devuélvelo al club.',
+  'carnet.recorta': 'Recorta por la línea punteada y pega las dos caras.',
+  'carnet.formato': 'Cómo lo vas a imprimir',
+  'carnet.formatoHoja': 'Hoja normal',
+  'carnet.formatoTarjeta': 'Impresora de tarjetas',
+  'carnet.formatoHojaAyuda':
+    'Sale a tamaño real (85,6 × 54 mm) en una hoja carta o A4, con el borde marcado para recortarlo.',
+  'carnet.formatoTarjetaAyuda':
+    'Cada cara en su propia tarjeta de 85,6 × 54 mm, para impresoras de PVC.',
 
   // Kiosco / check-in
   'kiosco.titulo': 'Check-in de clase',
@@ -234,6 +305,12 @@ const es = {
   'calendario.abierto': 'Abierto extra',
   'calendario.nota': 'Motivo',
   'calendario.sinExcepciones': 'Sin excepciones registradas.',
+  'calendario.notaEjemplo':
+    'Ej.: cerrado por el campeonato departamental, volvemos el lunes.',
+
+  // Pie legal
+  'legal.derechos': 'Todos los derechos reservados.',
+  'legal.nota': 'DINAMYT Membresías es una obra protegida por el derecho de autor.',
 
   // Mi estado
   'mi.titulo': 'Mi estado',
@@ -249,6 +326,21 @@ const es = {
   'mi.activarPush': 'Activar avisos',
   'mi.pushActivo': 'Avisos activados',
   'mi.miPerfil': 'Mi perfil',
+  'mi.nombreLoCambiaElMaestro':
+    'Tu nombre lo cambia tu maestro. Pídeselo si está mal escrito.',
+  'mi.comoVengo': 'Cómo vengo viniendo',
+  'mi.esteMes': 'Clases este mes',
+  'mi.totalClases': 'Clases en total',
+  'mi.ultimaVez': 'Última vez',
+  'mi.enElClub': 'En el club',
+  'mi.meses': 'meses',
+  'mi.dias': 'días',
+  'mi.desde': 'desde',
+  'mi.miGrado': 'Mi grado',
+  'mi.gradoAyuda': 'Tu cinturón lo cambia tu maestro cuando te lo ganas.',
+  'mi.pinAyuda':
+    'Dilo en el kiosco si el QR no lee o si dejaste el carnet en casa. Apréndetelo de memoria.',
+  'mi.sinPin': 'Tu maestro todavía no te asignó un PIN. Pídeselo.',
   'mi.cambiarContrasena': 'Cambiar contraseña',
   'mi.contrasenaActual': 'Contraseña actual',
   'mi.contrasenaNueva': 'Contraseña nueva',
@@ -355,7 +447,7 @@ const en: Record<ClaveTexto, string> = {
   'menu.miEstado': 'My status',
   'menu.estadisticas': 'Statistics',
   'menu.admin': 'Clubs and masters',
-  'menu.etiqueta': 'Menu',
+  'menu.navegacion': 'Go to',
   'menu.abrir': 'Open menu',
   'menu.cerrar': 'Close menu',
   'menu.salir': 'Sign out',
@@ -410,7 +502,18 @@ const en: Record<ClaveTexto, string> = {
   'comun.imprimir': 'Print',
   'comun.fecha': 'Date',
   'comun.opcional': 'optional',
+  'comun.tope': 'no room left',
   'comun.telefonoCorto': 'A phone number has between 7 and 15 digits.',
+
+  'ficha.entrenaDesde': 'Training since',
+  'ficha.entrenaDesdeAyuda':
+    'When they actually started training, even if their account is from yesterday. Leave it empty and it counts from the day you enrolled them.',
+  'ficha.sangre': 'Blood type',
+  'ficha.sinSangre': 'Not recorded',
+  'ficha.emergencia': 'Emergency contact',
+  'ficha.emergenciaNombre': 'Who to call',
+  'ficha.emergenciaTelefono': 'Emergency phone',
+  'ficha.emergenciaAyuda': 'Printed on the back of the card.',
 
   'memb.activo': 'Active',
   'memb.inactivo': 'Inactive',
@@ -426,7 +529,9 @@ const en: Record<ClaveTexto, string> = {
   'ficha.planActual': 'Current plan',
   'ficha.sinPlanAsignado': 'No plan assigned',
   'ficha.pin': 'Check-in PIN',
-  'ficha.pinAyuda': 'Digits only. The backup for when the student forgets the card.',
+  'ficha.pinAyuda':
+    'The app assigned it when you enrolled them. Change it if you need to: if the new one belongs to another student, it will tell you.',
+  'ficha.pinOtro': 'Generate another PIN',
   'ficha.venceEl': 'Due on',
   'ficha.venceAyuda':
     'Set it by hand if the student came from somewhere else or paid outside the app. From then on, renewals land on that day of the month.',
@@ -465,7 +570,9 @@ const en: Record<ClaveTexto, string> = {
 
   'alumnos.titulo': 'Club students',
   'alumnos.nuevo': 'New student',
-  'alumnos.crearTitulo': 'Add someone',
+  'alumnos.crearTitulo': 'Enrol someone in the club',
+  'alumnos.noTeDesactivas':
+    "You can't cut off your own access: the club would be left without a master.",
   'alumnos.contrasenaInicial': 'Initial password',
   'alumnos.contrasenaAyuda': 'At least 8 characters. Hand it to the student.',
   'alumnos.rolAyuda': 'Student, guardian or club assistant.',
@@ -476,8 +583,29 @@ const en: Record<ClaveTexto, string> = {
   'alumnos.nuevaContrasena': 'Set a new password',
   'alumnos.contrasenaCambiada': 'Password updated.',
   'alumnos.incluirInactivos': 'Show inactive too',
+  'foto.poner': 'Add photo',
+  'foto.cambiar': 'Change photo',
+  'foto.quitar': 'Remove',
+  'foto.procesando': 'Working…',
+  'foto.ayuda': 'Cropped square and shrunk for you. This is the one on the card.',
+  'foto.errorTipo': 'That file is not an image.',
+  'foto.errorLeer': "Couldn't open that image. Try another one.",
+  'foto.errorPeso': 'That image is too large. Try another one.',
+  'foto.errorGuardar': "Couldn't save the photo.",
 
-  'qr.titulo': 'QR card',
+  'logo.titulo': 'Club crest',
+  'logo.poner': 'Add crest',
+  'logo.cambiar': 'Change crest',
+  'logo.ayuda':
+    "It shows on your students' cards and in their panel. A transparent background is kept.",
+  'logo.guardado': 'Crest updated.',
+
+  'clases.titulo': 'Club classes',
+  'clases.hoySi': 'There is class today',
+  'clases.hoyNo': 'No class today',
+  'clases.proxima': 'Next class',
+
+  'qr.titulo': 'Student card',
   'qr.descripcion':
     'Print it and hand it to the student. They bring it to class and the master scans it with a phone camera.',
   'qr.descripcionMia':
@@ -486,6 +614,30 @@ const en: Record<ClaveTexto, string> = {
   'qr.pin': 'Backup PIN',
   'qr.sinPin': 'No PIN assigned',
   'qr.instruccion': 'Show this card when you arrive at class',
+
+  'carnet.frente': 'Front',
+  'carnet.reverso': 'Back',
+  'carnet.tipo.student': 'Student card',
+  'carnet.tipo.owner': 'Master card',
+  'carnet.tipo.staff': 'Assistant card',
+  'carnet.tipo.guardian': 'Guardian card',
+  'carnet.numero': 'No.',
+  'carnet.emitido': 'Issued',
+  'carnet.vigenteHasta': 'Valid until',
+  'carnet.sangre': 'Blood',
+  'carnet.emergencia': 'In case of emergency',
+  'carnet.pin': 'Backup PIN',
+  'carnet.instruccion': 'Show this card when you arrive at class.',
+  'carnet.intransferible':
+    'Personal and non-transferable. If found, please return it to the club.',
+  'carnet.recorta': 'Cut along the dashed line and glue both sides together.',
+  'carnet.formato': 'How you will print it',
+  'carnet.formatoHoja': 'Regular paper',
+  'carnet.formatoTarjeta': 'Card printer',
+  'carnet.formatoHojaAyuda':
+    'Comes out at real size (85.6 × 54 mm) on a Letter or A4 sheet, with the edge marked for cutting.',
+  'carnet.formatoTarjetaAyuda':
+    'Each side on its own 85.6 × 54 mm card, for PVC printers.',
 
   'kiosco.titulo': 'Class check-in',
   'kiosco.escanear': '📷 Scan QR card',
@@ -533,6 +685,11 @@ const en: Record<ClaveTexto, string> = {
   'calendario.abierto': 'Extra opening',
   'calendario.nota': 'Reason',
   'calendario.sinExcepciones': 'No exceptions recorded.',
+  'calendario.notaEjemplo':
+    'E.g. closed for the regional championship, back on Monday.',
+
+  'legal.derechos': 'All rights reserved.',
+  'legal.nota': 'DINAMYT Membresías is a work protected by copyright.',
 
   'mi.titulo': 'My status',
   'mi.estado': 'Status',
@@ -547,6 +704,21 @@ const en: Record<ClaveTexto, string> = {
   'mi.activarPush': 'Enable notifications',
   'mi.pushActivo': 'Notifications enabled',
   'mi.miPerfil': 'My profile',
+  'mi.nombreLoCambiaElMaestro':
+    'Your master changes your name. Ask them if it is misspelled.',
+  'mi.comoVengo': 'How my attendance is going',
+  'mi.esteMes': 'Classes this month',
+  'mi.totalClases': 'Classes in total',
+  'mi.ultimaVez': 'Last time',
+  'mi.enElClub': 'At the club',
+  'mi.meses': 'months',
+  'mi.dias': 'days',
+  'mi.desde': 'since',
+  'mi.miGrado': 'My grade',
+  'mi.gradoAyuda': 'Your master changes your belt when you earn it.',
+  'mi.pinAyuda':
+    "Say it at the kiosk if the QR won't scan or you left your card at home. Learn it by heart.",
+  'mi.sinPin': 'Your master has not assigned you a PIN yet. Ask them for one.',
   'mi.cambiarContrasena': 'Change password',
   'mi.contrasenaActual': 'Current password',
   'mi.contrasenaNueva': 'New password',

@@ -16,7 +16,14 @@ import {
   segundosRestantes,
 } from '../lib/auth/rate-limit';
 import { cerrarSesion, darSesion } from '../lib/auth/cookies';
-import { LIMITES, telefono, textoObligatorio } from '../lib/validacion';
+import {
+  LIMITES,
+  telefono,
+  textoObligatorio,
+  textoOpcional,
+  tipoSangre,
+} from '../lib/validacion';
+import { direccionFoto, direccionLogo, imagenGuardada } from '../lib/imagenes';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { ssoHabilitado } from '../config';
 
@@ -32,13 +39,45 @@ function vistaUsuario(u: typeof users.$inferSelect) {
     email: u.email,
     fullName: u.fullName,
     phone: u.phone,
-    avatarUrl: u.avatarUrl,
+    // La dirección de la foto, no la foto. Ver `lib/imagenes.ts`.
+    avatarUrl: direccionFoto(u),
     belt: u.belt,
+    trainsSince: u.trainsSince,
+    bloodType: u.bloodType,
+    emergencyName: u.emergencyName,
+    emergencyPhone: u.emergencyPhone,
     role: u.role,
     isSuperAdmin: u.isSuperAdmin,
     orgId: u.orgId,
     isActive: u.isActive,
   };
+}
+
+/**
+ * Vista del club para quien pertenece a él.
+ *
+ * Lleva el escudo porque lo enseña TODO el mundo: el panel del alumno, el
+ * carnet y el panel del maestro. Va aquí, dentro de `/auth/me`, y no en una
+ * ruta propia, para que ninguna pantalla tenga que pedirlo aparte: el club ya
+ * viaja con la sesión.
+ */
+async function vistaClub(db: Db, orgId: string) {
+  const [c] = await db
+    .select({
+      id: orgs.id,
+      name: orgs.name,
+      slug: orgs.slug,
+      city: orgs.city,
+      logoUrl: orgs.logoUrl,
+      isActive: orgs.isActive,
+      updatedAt: orgs.updatedAt,
+    })
+    .from(orgs)
+    .where(eq(orgs.id, orgId))
+    .limit(1);
+  if (!c) return null;
+  const { updatedAt, ...resto } = c;
+  return { ...resto, logoUrl: direccionLogo({ ...c, updatedAt }) };
 }
 
 /**
@@ -58,22 +97,9 @@ async function abrirSesion(
     return reply.code(403).send({ error: 'Tu cuenta está desactivada. Habla con tu maestro.' });
   }
 
-  let club: { id: string; name: string; slug: string; isActive: boolean } | null = null;
-  if (u.orgId) {
-    const [c] = await db
-      .select({
-        id: orgs.id,
-        name: orgs.name,
-        slug: orgs.slug,
-        isActive: orgs.isActive,
-      })
-      .from(orgs)
-      .where(eq(orgs.id, u.orgId))
-      .limit(1);
-    club = c ?? null;
-    if (club && !club.isActive && !u.isSuperAdmin) {
-      return reply.code(403).send({ error: 'El acceso de tu club está suspendido.' });
-    }
+  const club = u.orgId ? await vistaClub(db, u.orgId) : null;
+  if (club && !club.isActive && !u.isSuperAdmin) {
+    return reply.code(403).send({ error: 'El acceso de tu club está suspendido.' });
   }
 
   const token = await firmarToken({
@@ -199,35 +225,64 @@ export async function authRoutes(app: FastifyInstance) {
       .limit(1);
     if (!u) return reply.code(404).send({ error: 'Usuario no encontrado.' });
 
-    let club = null;
-    if (u.orgId) {
-      const [c] = await db
-        .select({
-          id: orgs.id,
-          name: orgs.name,
-          slug: orgs.slug,
-          isActive: orgs.isActive,
-        })
-        .from(orgs)
-        .where(eq(orgs.id, u.orgId))
-        .limit(1);
-      club = c ?? null;
-    }
+    const club = u.orgId ? await vistaClub(db, u.orgId) : null;
     return { user: vistaUsuario(u), club };
   });
 
   // ── PATCH /auth/me — editar MI perfil ──────────────────────────────────────
-  // Cada quien mantiene su nombre, teléfono y foto. El correo y el rol no: los
-  // cambia quien administra (maestro o superadmin).
+  // Cada quien mantiene su teléfono y su foto. El correo, el rol y el cinturón
+  // los pone quien administra.
+  //
+  // **El nombre tampoco es de quien lo lleva.** El del alumno es lo que sale en
+  // su carnet, en el roster y en el recibo de sus pagos: si cada quien pudiera
+  // reescribirlo, el maestro acabaría con una lista de apodos que cambian de
+  // semana en semana y sin forma de saber quién es quién. Lo cambia el maestro
+  // desde la ficha del alumno, que es donde se corrige un apellido mal escrito
+  // el día de la inscripción. El maestro sí mantiene el suyo: por encima de él
+  // solo está el superadmin, y no se le va a molestar por una tilde.
   app.patch('/auth/me', { preHandler: requireAuth() }, async (req, reply) => {
     const body = (req.body ?? {}) as {
       fullName?: string;
       phone?: string | null;
       avatarUrl?: string | null;
+      bloodType?: string | null;
+      emergencyName?: string | null;
+      emergencyPhone?: string | null;
     };
     const cambios: Record<string, unknown> = { updatedAt: new Date() };
 
+    // El tipo de sangre y a quién llamar SÍ los mantiene cada quien, al
+    // contrario que el nombre. Son datos que cambian —el hermano que se mudó,
+    // el teléfono nuevo de la mamá— y que el maestro no tiene por qué
+    // enterarse de que cambiaron. Un contacto de emergencia desactualizado es
+    // peor que no tener ninguno.
+    if (body.bloodType !== undefined) {
+      const sangre = tipoSangre(body.bloodType);
+      if (!sangre.ok) return reply.code(422).send({ error: sangre.error });
+      cambios.bloodType = sangre.valor;
+    }
+    if (body.emergencyName !== undefined) {
+      const quien = textoOpcional(
+        body.emergencyName,
+        LIMITES.nombrePersona,
+        'El contacto de emergencia',
+      );
+      if (!quien.ok) return reply.code(422).send({ error: quien.error });
+      cambios.emergencyName = quien.valor;
+    }
+    if (body.emergencyPhone !== undefined) {
+      const tel = telefono(body.emergencyPhone, 'El teléfono de emergencia');
+      if (!tel.ok) return reply.code(422).send({ error: tel.error });
+      cambios.emergencyPhone = tel.valor;
+    }
+
     if (body.fullName !== undefined) {
+      const administra = req.user!.is_super_admin || req.user!.role_membresias === 'owner';
+      if (!administra) {
+        return reply.code(403).send({
+          error: 'Tu nombre lo cambia tu maestro. Pídeselo si está mal escrito.',
+        });
+      }
       const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
       if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
       cambios.fullName = nombre.valor;
@@ -237,7 +292,11 @@ export async function authRoutes(app: FastifyInstance) {
       if (!tel.ok) return reply.code(422).send({ error: tel.error });
       cambios.phone = tel.valor;
     }
-    if (body.avatarUrl !== undefined) cambios.avatarUrl = body.avatarUrl || null;
+    if (body.avatarUrl !== undefined) {
+      const retrato = imagenGuardada(body.avatarUrl, 'La foto');
+      if (!retrato.ok) return reply.code(422).send({ error: retrato.error });
+      cambios.avatarUrl = retrato.valor;
+    }
 
     const [u] = await req.db
       .update(users)

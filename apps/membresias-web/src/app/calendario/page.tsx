@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { fmtFecha } from '@/lib/formato';
 import { LIM } from '@/lib/campos';
+import { Contador } from '@/components/Contador';
 import { SelectMenu } from '@/components/SelectMenu';
 
 interface Exc {
@@ -166,56 +167,58 @@ export default function Calendario() {
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
           {t('calendario.excepciones')}
         </h2>
-        <form
-          onSubmit={agregarExc}
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
-            alignItems: 'end',
-            marginBottom: '0.9rem',
-          }}
-        >
-          <div>
-            <label className="muted" style={{ fontSize: '0.72rem' }}>
-              {t('comun.fecha')}
-            </label>
-            {/* Un `type="date"` sin acotar admite años de cinco cifras, que la
-                columna `date` no acepta y acaban en un error del servidor. */}
-            <input
-              type="date"
-              min="2000-01-01"
-              max="2100-12-31"
-              value={nueva.date}
-              onChange={(e) => setNueva((n) => ({ ...n, date: e.target.value }))}
-            />
+        {/* La fila de arriba (fecha y tipo) se reparte el ancho; el motivo va
+            debajo y a lo ancho de la tarjeta. Antes compartía renglón con los
+            otros dos y le quedaban 120 px: el maestro escribía a ciegas en una
+            rendija de la que solo veía las últimas cinco palabras. */}
+        <form onSubmit={agregarExc} className="excepcion-form">
+          <div className="excepcion-fila">
+            <div>
+              <label className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('comun.fecha')}
+              </label>
+              {/* Un `type="date"` sin acotar admite años de cinco cifras, que
+                  la columna `date` no acepta y acaban en un error del servidor. */}
+              <input
+                type="date"
+                min="2000-01-01"
+                max="2100-12-31"
+                value={nueva.date}
+                onChange={(e) => setNueva((n) => ({ ...n, date: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('planes.tipo')}
+              </label>
+              <SelectMenu
+                valor={nueva.isClosed ? 'closed' : 'open'}
+                onChange={(v) => setNueva((n) => ({ ...n, isClosed: v === 'closed' }))}
+                etiquetaAria={t('planes.tipo')}
+                opciones={[
+                  { valor: 'closed', etiqueta: t('calendario.cerrado') },
+                  { valor: 'open', etiqueta: t('calendario.abierto') },
+                ]}
+              />
+            </div>
           </div>
+
           <div>
-            <label className="muted" style={{ fontSize: '0.72rem' }}>
-              {t('planes.tipo')}
-            </label>
-            <SelectMenu
-              valor={nueva.isClosed ? 'closed' : 'open'}
-              onChange={(v) => setNueva((n) => ({ ...n, isClosed: v === 'closed' }))}
-              etiquetaAria={t('planes.tipo')}
-              style={{ minWidth: 150 }}
-              opciones={[
-                { valor: 'closed', etiqueta: t('calendario.cerrado') },
-                { valor: 'open', etiqueta: t('calendario.abierto') },
-              ]}
-            />
-          </div>
-          <div style={{ flex: 1, minWidth: 120 }}>
             <label className="muted" style={{ fontSize: '0.72rem' }}>
               {t('calendario.nota')}
             </label>
-            <input
+            <textarea
+              rows={3}
               value={nueva.note}
               onChange={(e) => setNueva((n) => ({ ...n, note: e.target.value }))}
               maxLength={LIM.notaCalendario}
+              placeholder={t('calendario.notaEjemplo')}
+              style={{ marginTop: '0.25rem', resize: 'vertical', minHeight: '4.5rem' }}
             />
+            <Contador valor={nueva.note} max={LIM.notaCalendario} />
           </div>
-          <button className="btn btn-outline" type="submit">
+
+          <button className="btn btn-outline" type="submit" style={{ alignSelf: 'start' }}>
             {t('calendario.agregarExcepcion')}
           </button>
         </form>

@@ -482,6 +482,71 @@ un servicio despierto todo el mes consume ~730. Cabe si es el único servicio
 gratis de la cuenta; si hay más, se reparten el cupo y alguno se quedará sin
 horas antes de fin de mes.
 
+### Migraciones: el `when` tiene que subir siempre
+
+Drizzle **no** aplica las migraciones por número de archivo, sino por la marca
+`when` del `meta/_journal.json`: corre las que superen a la última aplicada, y
+guarda ese número en su tabla de control. Una migración con un `when` más bajo
+que la anterior **se da por aplicada y no se ejecuta nunca** — sin error y sin
+aviso; la columna no aparece y la API responde 500 la primera vez que la use.
+
+Las migraciones 0003 a 0005 llevan marcas escritas a mano con fechas futuras,
+así que **toda migración generada por `drizzle-kit` nace por debajo** y hay que
+subirle el `when` a mano antes de desplegarla.
+
+No se renumeran esas tres porque bajarlas rompería las bases que ya las
+aplicaron: la tabla de control guarda el número viejo y cualquier migración
+futura por debajo quedaría ignorada para siempre. La marca de una migración
+publicada es historia, no configuración.
+
+La regla la vigila un test (`packages/membresias-db/src/migraciones.spec.ts`):
+si falla, sube el `when` de la migración nueva por encima de la anterior.
+
+```bash
+pnpm --filter @dinamyt/membresias-db test
+```
+
+### Las imágenes: dónde caben y hasta cuándo
+
+Son dos: la **foto de cada alumno** y el **escudo del club** (uno por club, así
+que en la cuenta de abajo no pesa).
+
+**Ni Render ni Vercel guardan archivos.** El disco de Render se borra en cada
+despliegue y en cada reinicio del plan gratuito; el de Vercel es de solo
+lectura. Así que una imagen subida «al servidor» desaparecería sola. Por eso va
+dentro de la fila —`users.avatar_url`, `orgs.logo_url`—, en Supabase (ver
+`apps/membresias-api/src/lib/imagenes.ts`).
+
+Para que eso no se convierta en un problema, el navegador recorta la foto a un
+cuadrado, la reduce a 400×400 y la recomprime en JPEG antes de mandarla. Sale
+en torno a **25 KB**, y la API rechaza cualquier cosa por encima de 66 KB.
+
+Con eso, la cuenta de los 500 MB del plan gratis de Supabase:
+
+| Alumnos con foto | Ocupan | De los 500 MB |
+|---|---|---|
+| 100 | ~2,5 MB | 0,5 % |
+| 1 000 | ~25 MB | 5 % |
+| 5 000 | ~125 MB | 25 % |
+| 10 000 | ~250 MB | 50 % |
+
+Las fotos no son el límite: **el resto de la base crece más rápido que ellas.**
+Un club de 100 alumnos con dos años de pagos y asistencias pesa más que sus 100
+retratos. Y 10 000 alumnos con foto siguen entrando en el plan gratis.
+
+Lo que sí había que cuidar es el **tráfico**, no el disco: si la foto viajara
+dentro del JSON, cada carga del roster de 200 alumnos serían ~5 MB, y los 5 GB
+de salida mensual de Supabase se irían en unas mil pantallas. No pasa: la API
+devuelve la *dirección* de la foto (`GET /users/:id/foto`), que responde la
+imagen en binario con caché de un año. El navegador la pide una vez por alumno
+y luego la saca de su propia caché.
+
+**Cuándo mudarse a un bucket** (Supabase Storage, Cloudflare R2): cuando quieras
+imágenes de más resolución que la del carnet, o pases de las decenas de miles de
+alumnos. Ese día solo cambia dónde se guardan: las columnas ya aceptan un
+`https://` y toda la web pasa por `urlFoto()`, así que ni las pantallas ni el
+carnet se enteran.
+
 ---
 
 ## Si algo falla

@@ -25,13 +25,26 @@ export const LIMITES = {
   correo: 255,
   telefono: 40,
   planNombre: 120,
-  notaCalendario: 200,
+  /**
+   * El motivo de una excepción del calendario. Más largo que el resto a
+   * propósito: aquí no cabe un dato, cabe una explicación —«cerrado por el
+   * campeonato departamental, volvemos el lunes»— y con 200 se cortaba a
+   * media frase.
+   */
+  notaCalendario: 500,
   notaPago: 500,
   grupo: 80,
   checkinPin: 12,
   /** bcrypt ignora todo lo que pase de 72 bytes: aceptar más engaña al usuario. */
   password: 72,
 } as const;
+
+/**
+ * Los ocho grupos sanguíneos del sistema ABO/Rh. Es una lista cerrada a
+ * propósito: un tipo de sangre escrito a mano —«O positivo», «0+», «o+»— no le
+ * sirve a nadie el día que hay que leerlo deprisa.
+ */
+export const TIPOS_SANGRE = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'] as const;
 
 /** Precio/monto: `decimal(10,2)` → ocho enteros y dos decimales. */
 export const MAX_DINERO = 99_999_999.99;
@@ -88,6 +101,42 @@ export function telefono(
     return mal(`${campo} no puede pasar de ${TELEFONO_DIGITOS_MAX} dígitos.`);
   }
   return texto;
+}
+
+/**
+ * Un correo con forma de correo.
+ *
+ * Hasta aquí solo se comprobaba que viniera algo y que cupiera, así que
+ * `pepito` entraba como correo válido: el `type="email"` del navegador no es
+ * validación, es una sugerencia que se salta cualquiera que llame a la API sin
+ * pasar por la web. Y ese correo es la llave con la que el alumno entra —una
+ * cuenta con un correo imposible no la puede usar nadie y solo el maestro
+ * puede arreglarla—.
+ *
+ * La expresión es deliberadamente tolerante: no existe una que acepte todos
+ * los correos legales y rechace todos los ilegales. Lo que sí atrapa es el
+ * error de verdad —falta la arroba, falta el dominio, hay espacios— sin
+ * rechazar direcciones raras pero válidas.
+ */
+export function correo(valor: string | null | undefined): Campo<string> {
+  const texto = textoObligatorio(valor, LIMITES.correo, 'El correo');
+  if (!texto.ok) return texto;
+
+  const limpio = texto.valor.toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(limpio)) {
+    return mal('El correo debe tener la forma nombre@dominio.com.');
+  }
+  return bien(limpio);
+}
+
+/** Un grupo sanguíneo de la lista, o nada. */
+export function tipoSangre(valor: string | null | undefined): Campo<string | null> {
+  const texto = (valor ?? '').trim().toUpperCase();
+  if (!texto) return bien(null);
+  if (!(TIPOS_SANGRE as readonly string[]).includes(texto)) {
+    return mal(`El tipo de sangre debe ser uno de: ${TIPOS_SANGRE.join(', ')}.`);
+  }
+  return bien(texto);
 }
 
 /** Igual que `textoOpcional`, pero además exige que venga algo. */

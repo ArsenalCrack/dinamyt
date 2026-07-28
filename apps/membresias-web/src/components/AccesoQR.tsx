@@ -74,7 +74,7 @@ export function AccesoQR({ userId }: { userId: string }) {
   const segundos = String(restan % 60).padStart(2, '0');
 
   return (
-    <div className="card no-imprimir" style={{ padding: '1rem' }}>
+    <div className="card" style={{ padding: '1rem' }}>
       <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}>
         {t('ficha.accesoTitulo')}
       </h2>

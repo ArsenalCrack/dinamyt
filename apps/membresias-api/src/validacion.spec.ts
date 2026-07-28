@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { crearEscenario, type Escenario } from './testing/escenario';
+import { LIMITES } from './lib/validacion';
 
 /**
  * Lo que se escribe en un formulario tiene que caber en la columna.
@@ -175,9 +176,26 @@ describe('membresias-api — límites de los campos', () => {
       method: 'POST',
       url: '/schedule/exceptions',
       headers: e.auth(e.ids.owner),
-      payload: { date: '2026-12-25', isClosed: true, note: largo(201) },
+      // El tope sale de `LIMITES` y no de un número escrito aquí: la nota ya
+      // se alargó una vez (de 200 a 500) y este test se quedó comprobando el
+      // límite viejo, que el nuevo aceptaba sin rechistar.
+      payload: { date: '2026-12-25', isClosed: true, note: largo(LIMITES.notaCalendario + 1) },
     });
     expect(r.statusCode).toBe(422);
+  });
+
+  it('una nota de calendario larga PERO que cabe se acepta', async () => {
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/schedule/exceptions',
+      headers: e.auth(e.ids.owner),
+      payload: {
+        date: '2026-12-26',
+        isClosed: true,
+        note: largo(LIMITES.notaCalendario),
+      },
+    });
+    expect(r.statusCode).toBe(201);
   });
 });
 

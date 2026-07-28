@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
-import { LIM, soloTelefono, telefonoValido } from '@/lib/campos';
+import { LIM, TIPOS_SANGRE, soloTelefono, telefonoValido } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
 import { Cinturon } from '@/components/Cinturon';
+import { Contador } from '@/components/Contador';
 import { SelectMenu } from '@/components/SelectMenu';
 
 interface Persona {
@@ -19,8 +20,20 @@ interface Persona {
   phone: string | null;
   avatarUrl: string | null;
   belt: string | null;
+  trainsSince: string | null;
+  bloodType: string | null;
+  emergencyName: string | null;
+  emergencyPhone: string | null;
   role: Rol;
   isActive: boolean;
+}
+
+/** Hoy en formato de `<input type="date">`, en hora LOCAL (no UTC). */
+function hoyISO(): string {
+  const d = new Date();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
 const ROLES: { valor: Rol; clave: 'rol.student' | 'rol.guardian' | 'rol.staff' }[] = [
@@ -37,6 +50,10 @@ interface FormPersona {
   phone: string;
   role: Rol;
   belt: string;
+  trainsSince: string;
+  bloodType: string;
+  emergencyName: string;
+  emergencyPhone: string;
   /**
    * El maestro del club no cambia de rol aquí: a `owner` solo llega alguien por
    * mano del superadmin. Sin esta marca, editarle el teléfono al maestro
@@ -52,6 +69,10 @@ const VACIO: FormPersona = {
   phone: '',
   role: 'student',
   belt: '',
+  trainsSince: '',
+  bloodType: '',
+  emergencyName: '',
+  emergencyPhone: '',
   rolFijo: false,
 };
 
@@ -124,6 +145,10 @@ export default function Alumnos() {
       phone: p.phone ?? '',
       role: p.role,
       belt: p.belt ?? '',
+      trainsSince: p.trainsSince ?? '',
+      bloodType: p.bloodType ?? '',
+      emergencyName: p.emergencyName ?? '',
+      emergencyPhone: p.emergencyPhone ?? '',
       rolFijo: p.role === 'owner',
     });
     setEditando(p.id);
@@ -133,11 +158,19 @@ export default function Alumnos() {
     e.preventDefault();
     setError('');
     setAviso('');
-    if (!telefonoValido(form.phone)) {
+    if (!telefonoValido(form.phone) || !telefonoValido(form.emergencyPhone)) {
       setError(t('comun.telefonoCorto'));
       return;
     }
     setEnviando(true);
+    // La ficha de seguridad va igual en el alta y en la edición: son los mismos
+    // cuatro campos y el mismo criterio de vacío.
+    const ficha = {
+      trainsSince: form.trainsSince || null,
+      bloodType: form.bloodType || null,
+      emergencyName: form.emergencyName || null,
+      emergencyPhone: form.emergencyPhone || null,
+    };
     try {
       if (editando === 'nuevo') {
         await api.post('/users', {
@@ -147,6 +180,7 @@ export default function Alumnos() {
           phone: form.phone || undefined,
           role: form.role,
           belt: form.belt || undefined,
+          ...ficha,
         });
         setAviso(t('alumnos.creado'));
       } else {
@@ -158,6 +192,7 @@ export default function Alumnos() {
           phone: form.phone || null,
           ...(form.rolFijo ? {} : { role: form.role }),
           belt: form.belt || null,
+          ...ficha,
         });
         setAviso(t('alumnos.actualizado'));
       }
@@ -227,6 +262,7 @@ export default function Alumnos() {
             required
             style={{ marginTop: '0.25rem' }}
           />
+          <Contador valor={form.fullName} max={LIM.nombrePersona} />
         </label>
         <label style={{ display: 'block' }}>
           <span className="muted" style={{ fontSize: '0.78rem' }}>
@@ -240,6 +276,7 @@ export default function Alumnos() {
             required
             style={{ marginTop: '0.25rem' }}
           />
+          <Contador valor={form.email} max={LIM.correo} />
         </label>
         <label style={{ display: 'block' }}>
           <span className="muted" style={{ fontSize: '0.78rem' }}>
@@ -263,6 +300,7 @@ export default function Alumnos() {
               {t('comun.telefonoCorto')}
             </span>
           )}
+          <Contador valor={form.phone} max={LIM.telefono} />
         </label>
         <label style={{ display: 'block' }}>
           <span className="muted" style={{ fontSize: '0.78rem' }}>
@@ -298,6 +336,78 @@ export default function Alumnos() {
             />
           </div>
         </label>
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('ficha.entrenaDesde')} <span style={{ opacity: 0.7 }}>({t('comun.opcional')})</span>
+          </span>
+          <input
+            type="date"
+            min="1950-01-01"
+            max={hoyISO()}
+            value={form.trainsSince}
+            onChange={(e) => setForm({ ...form, trainsSince: e.target.value })}
+            style={{ marginTop: '0.25rem' }}
+          />
+          <span className="muted" style={{ fontSize: '0.7rem' }}>
+            {t('ficha.entrenaDesdeAyuda')}
+          </span>
+        </label>
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('ficha.sangre')}
+          </span>
+          <div style={{ marginTop: '0.25rem' }}>
+            <SelectMenu
+              valor={form.bloodType}
+              onChange={(v) => setForm({ ...form, bloodType: v })}
+              etiquetaAria={t('ficha.sangre')}
+              placeholder={t('ficha.sinSangre')}
+              opciones={[
+                { valor: '', etiqueta: t('ficha.sinSangre') },
+                ...TIPOS_SANGRE.map((s) => ({ valor: s, etiqueta: s })),
+              ]}
+            />
+          </div>
+        </label>
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('ficha.emergenciaNombre')}
+          </span>
+          <input
+            value={form.emergencyName}
+            onChange={(e) => setForm({ ...form, emergencyName: e.target.value })}
+            maxLength={LIM.nombrePersona}
+            style={{ marginTop: '0.25rem' }}
+          />
+          <span className="muted" style={{ fontSize: '0.7rem' }}>
+            {t('ficha.emergenciaAyuda')}
+          </span>
+          <Contador valor={form.emergencyName} max={LIM.nombrePersona} />
+        </label>
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('ficha.emergenciaTelefono')}
+          </span>
+          <input
+            type="tel"
+            inputMode="tel"
+            value={form.emergencyPhone}
+            onChange={(e) =>
+              setForm({ ...form, emergencyPhone: soloTelefono(e.target.value) })
+            }
+            maxLength={LIM.telefono}
+            style={{
+              marginTop: '0.25rem',
+              borderColor: telefonoValido(form.emergencyPhone) ? undefined : 'var(--danger)',
+            }}
+          />
+          {!telefonoValido(form.emergencyPhone) && (
+            <span className="msg-error" style={{ fontSize: '0.7rem' }}>
+              {t('comun.telefonoCorto')}
+            </span>
+          )}
+          <Contador valor={form.emergencyPhone} max={LIM.telefono} />
+        </label>
         {editando === 'nuevo' && (
           <label style={{ display: 'block' }}>
             <span className="muted" style={{ fontSize: '0.78rem' }}>
@@ -315,6 +425,7 @@ export default function Alumnos() {
             <span className="muted" style={{ fontSize: '0.7rem' }}>
               {t('alumnos.contrasenaAyuda')}
             </span>
+            <Contador valor={form.password} max={LIM.password} />
           </label>
         )}
       </div>
@@ -458,9 +569,16 @@ export default function Alumnos() {
                       <Link href={`/alumnos/${p.id}`} className="btn btn-outline btn-sm">
                         {t('panel.verFicha')}
                       </Link>
+                      {/* Cortarse el acceso a uno mismo deja el club sin
+                          maestro y sin forma de volver a entrar. La API lo
+                          rechaza con un 400, pero enterarse DESPUÉS de pulsar
+                          es peor que ver el botón apagado: aquí ya se ve que
+                          no se puede, y por qué. */}
                       <button
                         className="btn btn-outline btn-sm"
                         onClick={() => alternarAcceso(p)}
+                        disabled={p.id === user?.id}
+                        title={p.id === user?.id ? t('alumnos.noTeDesactivas') : undefined}
                       >
                         {p.isActive ? t('alumnos.desactivar') : t('alumnos.activar')}
                       </button>

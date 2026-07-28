@@ -7,10 +7,15 @@ import { claveRol, useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { activarPush } from '@/lib/push';
-import { LIM, soloTelefono, telefonoValido } from '@/lib/campos';
+import { LIM, TIPOS_SANGRE, soloTelefono, telefonoValido } from '@/lib/campos';
+import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
-import { CarnetQR } from '@/components/CarnetQR';
+import { LogoClub } from '@/components/LogoClub';
+import { CampoImagen } from '@/components/CampoImagen';
+import { Contador } from '@/components/Contador';
+import { Carnet } from '@/components/Carnet';
 import { Cinturon } from '@/components/Cinturon';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface Pago {
   id: string;
@@ -26,6 +31,15 @@ interface Asistencia {
   checkedInAt: string;
   method: string;
 }
+/** El calendario del club, ya contestado por la API (ver `GET /mi`). */
+interface Clases {
+  hoy: boolean;
+  proxima: string | null;
+  /** Días de la semana con clase, 0 = domingo. */
+  dias: number[];
+  /** Por qué está cerrado hoy, si es una excepción del calendario. */
+  motivo: string | null;
+}
 interface MiEstado {
   status: string | null;
   estado: 'al_dia' | 'por_vencer' | 'vencido' | 'sin_plan';
@@ -34,13 +48,48 @@ interface MiEstado {
   clasesRestantes: number | null;
   checkinPin?: string | null;
   plan: { id: string; name: string; type: string; price: string } | null;
+  clases: Clases;
+  /** Cuándo entró al club (fecha ISO completa). */
+  desde: string | null;
+  asistencia: { total: number; esteMes: number; ultima: string | null };
   pagos: Pago[];
   asistencias: Asistencia[];
 }
+/** Solo lo que hace falta del aviso para enseñarlo en una línea. */
+interface AvisoBreve {
+  id: string;
+  type: 'pre_venc' | 'venc' | 'mora' | 'maestro';
+  readAt: string | null;
+  venceEl: string | null;
+}
+
+/** Meses cumplidos desde una fecha. Debajo de uno se cuenta en días. */
+function antiguedad(desde: string): { meses: number; dias: number } {
+  const inicio = new Date(desde);
+  const ahora = new Date();
+  const dias = Math.max(0, Math.floor((ahora.getTime() - inicio.getTime()) / 86_400_000));
+  return { meses: Math.floor(dias / 30.44), dias };
+}
+
+/** Nombres cortos de los días en el idioma activo, sin diccionario propio. */
+function diasCortos(idioma: string): string[] {
+  const fmt = new Intl.DateTimeFormat(idioma === 'en' ? 'en-GB' : 'es-CO', {
+    weekday: 'short',
+  });
+  // 2024-01-07 fue domingo: el índice 0..6 coincide con el `weekday` de la API.
+  return Array.from({ length: 7 }, (_, i) => {
+    const nombre = fmt.format(new Date(2024, 0, 7 + i)).replace('.', '');
+    return nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  });
+}
 
 /**
- * Panel personal: MI estado, MIS pagos y asistencias, MI carnet QR. Aquí no
- * aparece jamás un dato de otro miembro del club.
+ * Panel personal: MI club, MI estado, cuándo hay clase, cómo vengo viniendo,
+ * MIS pagos y MI carnet. Aquí no aparece jamás un dato de otro miembro.
+ *
+ * Lo que el alumno NO puede tocar: su nombre y su cinturón. El nombre es lo que
+ * sale en su carnet y en el recibo de sus pagos; si cada quien lo reescribiera,
+ * el maestro acabaría con una lista de apodos. Lo corrige él desde la ficha.
  */
 export default function MiPanel() {
   const router = useRouter();
@@ -48,10 +97,16 @@ export default function MiPanel() {
   const { user, club, cargando: cargandoSesion, refrescar } = useAuth();
 
   const [mi, setMi] = useState<MiEstado | null>(null);
+  const [avisos, setAvisos] = useState<AvisoBreve[]>([]);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [pass, setPass] = useState({ actual: '', nueva: '' });
-  const [perfil, setPerfil] = useState({ fullName: '', phone: '' });
+  const [perfil, setPerfil] = useState({
+    phone: '',
+    bloodType: '',
+    emergencyName: '',
+    emergencyPhone: '',
+  });
 
   const cargar = useCallback(async () => {
     try {
@@ -59,6 +114,14 @@ export default function MiPanel() {
       setMi(data);
     } catch (e) {
       setError(mensajeError(e, t('mi.sinPlan')));
+    }
+    // Los avisos van aparte y sin romper la pantalla si fallan: son un extra
+    // sobre el panel, no la razón de abrirlo.
+    try {
+      const { data } = await api.get<AvisoBreve[]>('/notifications');
+      setAvisos(data);
+    } catch {
+      setAvisos([]);
     }
   }, [t]);
 
@@ -68,7 +131,12 @@ export default function MiPanel() {
       router.replace('/login');
       return;
     }
-    setPerfil({ fullName: user.fullName, phone: user.phone ?? '' });
+    setPerfil({
+      phone: user.phone ?? '',
+      bloodType: user.bloodType ?? '',
+      emergencyName: user.emergencyName ?? '',
+      emergencyPhone: user.emergencyPhone ?? '',
+    });
     void cargar();
   }, [cargandoSesion, user, router, cargar]);
 
@@ -84,20 +152,35 @@ export default function MiPanel() {
     e.preventDefault();
     setError('');
     setAviso('');
-    if (!telefonoValido(perfil.phone)) {
+    if (!telefonoValido(perfil.phone) || !telefonoValido(perfil.emergencyPhone)) {
       setError(t('comun.telefonoCorto'));
       return;
     }
     try {
+      // El nombre no viaja: lo cambia el maestro, y la API lo rechaza igual
+      // aunque alguien lo mande a mano (ver `PATCH /auth/me`). El contacto de
+      // emergencia sí es de cada quien: un teléfono desactualizado ahí es peor
+      // que no tener ninguno.
       await api.patch('/auth/me', {
-        fullName: perfil.fullName,
         phone: perfil.phone || null,
+        bloodType: perfil.bloodType || null,
+        emergencyName: perfil.emergencyName || null,
+        emergencyPhone: perfil.emergencyPhone || null,
       });
       await refrescar();
       setAviso(t('alumnos.actualizado'));
     } catch (err) {
       setError(mensajeError(err, t('mi.miPerfil')));
     }
+  }
+
+  /** La foto va sola: `CampoImagen` la manda ya recortada y comprimida. */
+  async function guardarFoto(avatarUrl: string | null) {
+    setError('');
+    setAviso('');
+    await api.patch('/auth/me', { avatarUrl });
+    await refrescar();
+    setAviso(t('alumnos.actualizado'));
   }
 
   async function cambiarPassword(e: FormEvent) {
@@ -121,10 +204,44 @@ export default function MiPanel() {
     );
   }
 
+  /**
+   * El aviso que hay que leer sí o sí. Vienen del más nuevo al más viejo, así
+   * que el primero sin leer es el que importa.
+   *
+   * Sube a la pantalla en vez de quedarse solo en la campana porque el alumno
+   * que deja vencer su mensualidad es justo el que no abre la campana.
+   */
+  const urgente = avisos.find((a) => !a.readAt && a.type !== 'maestro') ?? null;
+  const tiempo = mi.desde ? antiguedad(mi.desde) : null;
+
   return (
     <main style={{ maxWidth: 780, margin: '0 auto', padding: '1.5rem' }}>
+      {/* ── El club al que pertenece ──
+          Va arriba del todo y con su escudo: el alumno entra a SU club, no a
+          una aplicación de mensualidades. El nombre completo del club solo
+          cabía antes en una línea diminuta al lado del rol. */}
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.85rem',
+          padding: '0.85rem 1rem',
+          marginBottom: '1rem',
+        }}
+      >
+        <LogoClub src={club?.logoUrl} nombre={club?.name ?? 'DINAMYT'} size={46} />
+        <div style={{ minWidth: 0 }}>
+          <p className="display" style={{ fontSize: '1.05rem', lineHeight: 1.15 }}>
+            {club?.name ?? 'DINAMYT'}
+          </p>
+          <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>
+            {[club?.city, t(claveRol(user))].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+      </div>
+
       <header
-        className="no-imprimir"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -134,35 +251,71 @@ export default function MiPanel() {
           marginBottom: '1.25rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
           <Avatar src={user?.avatarUrl} nombre={user?.fullName ?? '?'} size={52} />
-          <div>
-            <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>
-              {t(claveRol(user))}
-              {club ? ` · ${club.name}` : ''}
-            </p>
+          <div style={{ minWidth: 0 }}>
             <h1 className="display" style={{ fontSize: '1.5rem' }}>
               {user?.fullName?.split(' ')[0] ?? ''}
             </h1>
-            <Cinturon nombre={user?.belt} />
+            <p className="muted" style={{ fontSize: '0.78rem', overflowWrap: 'anywhere' }}>
+              {user?.fullName}
+            </p>
+            <div style={{ marginTop: '0.25rem' }}>
+              <Cinturon nombre={user?.belt} />
+            </div>
           </div>
         </div>
       </header>
 
       {aviso && (
-        <p className="msg-ok no-imprimir" style={{ marginBottom: '1rem' }}>
+        <p className="msg-ok" style={{ marginBottom: '1rem' }}>
           {aviso}
         </p>
       )}
       {error && (
-        <p className="msg-error no-imprimir" style={{ marginBottom: '1rem' }}>
+        <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
         </p>
       )}
 
+      {/* ── El aviso que no puede pasar desapercibido ── */}
+      {urgente && (
+        <div
+          className="card"
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.7rem',
+            padding: '0.9rem 1rem',
+            marginBottom: '1rem',
+            borderColor: urgente.type === 'pre_venc' ? 'var(--gold-dim)' : 'var(--danger)',
+          }}
+        >
+          <span aria-hidden="true" style={{ fontSize: '1.1rem', lineHeight: 1.2 }}>
+            {urgente.type === 'pre_venc' ? '⚠' : '⛔'}
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <p
+              style={{
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                color: urgente.type === 'pre_venc' ? 'var(--gold)' : 'var(--danger)',
+              }}
+            >
+              {t(`aviso.${urgente.type}` as ClaveTexto)}
+            </p>
+            <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.15rem' }}>
+              {urgente.venceEl
+                ? `${t(urgente.type === 'pre_venc' ? 'aviso.venceEl' : 'aviso.vencioEl')} ${fmtFecha(urgente.venceEl, idioma)}`
+                : t('aviso.sinFecha')}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Mi membresía ── */}
       <div
-        className="card no-imprimir"
+        className="card"
         style={{
           padding: '1.25rem',
           marginBottom: '1rem',
@@ -239,22 +392,174 @@ export default function MiPanel() {
         </button>
       </div>
 
-      {/* ── Mi carnet QR: se imprime y se lleva a clase ── */}
+      {/* ── ¿Hay clase hoy? ──
+          Es la pregunta que trae al alumno a abrir la app entre semana. La
+          respuesta la calcula la API: el alumno no tiene permiso para leer el
+          calendario del club, y aunque lo tuviera, tocaría repetir aquí la
+          lógica de festivos y cierres. */}
+      <div
+        className="card"
+        style={{ padding: '1.25rem', marginBottom: '1rem' }}
+      >
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+          {t('clases.titulo')}
+        </h2>
+        <p className="display" style={{ fontSize: '1.35rem', color: mi.clases.hoy ? 'var(--ok)' : 'var(--text-muted)' }}>
+          {mi.clases.hoy ? t('clases.hoySi') : t('clases.hoyNo')}
+        </p>
+        {mi.clases.motivo && (
+          <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.3rem' }}>
+            {mi.clases.motivo}
+          </p>
+        )}
+        {!mi.clases.hoy && mi.clases.proxima && (
+          <p style={{ fontSize: '0.85rem', marginTop: '0.4rem' }}>
+            <span className="muted">{t('clases.proxima')}: </span>
+            <strong>{fmtFecha(mi.clases.proxima, idioma)}</strong>
+          </p>
+        )}
+
+        {mi.clases.dias.length > 0 && (
+          <div className="clases-semana" aria-label={t('calendario.diasSemana')}>
+            {diasCortos(idioma).map((nombre, i) => (
+              <span key={i} className="clases-dia" data-activo={mi.clases.dias.includes(i)}>
+                {nombre}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Cómo vengo viniendo ──
+          Tres números que el alumno no tenía en ningún lado: la lista de abajo
+          enseña las últimas quince, y contar ahí «cuántas llevo este mes» no es
+          algo que nadie haga. */}
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
-        <h2
-          className="no-imprimir"
-          style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.8rem' }}>
+          {t('mi.comoVengo')}
+        </h2>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))',
+            gap: '0.75rem',
+          }}
         >
+          <div>
+            <div className="muted" style={{ fontSize: '0.72rem' }}>
+              {t('mi.esteMes')}
+            </div>
+            <div className="display" style={{ fontSize: '1.6rem', color: 'var(--gold)' }}>
+              {mi.asistencia.esteMes}
+            </div>
+          </div>
+          <div>
+            <div className="muted" style={{ fontSize: '0.72rem' }}>
+              {t('mi.totalClases')}
+            </div>
+            <div className="display" style={{ fontSize: '1.6rem' }}>
+              {mi.asistencia.total}
+            </div>
+          </div>
+          <div>
+            <div className="muted" style={{ fontSize: '0.72rem' }}>
+              {t('mi.ultimaVez')}
+            </div>
+            <div className="mono" style={{ fontSize: '1rem', fontWeight: 600, paddingTop: '0.35rem' }}>
+              {mi.asistencia.ultima ? fmtFecha(mi.asistencia.ultima, idioma) : '—'}
+            </div>
+          </div>
+          {tiempo && (
+            <div>
+              <div className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('mi.enElClub')}
+              </div>
+              <div style={{ paddingTop: '0.35rem' }}>
+                <span className="display" style={{ fontSize: '1.35rem' }}>
+                  {tiempo.meses >= 1 ? tiempo.meses : tiempo.dias}
+                </span>{' '}
+                <span className="muted" style={{ fontSize: '0.8rem' }}>
+                  {t(tiempo.meses >= 1 ? 'mi.meses' : 'mi.dias')}
+                </span>
+                <div className="muted mono" style={{ fontSize: '0.7rem' }}>
+                  {t('mi.desde')} {fmtFecha(mi.desde!.slice(0, 10), idioma)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Mi grado ──
+          La escalera completa con el suyo encendido. Es lo que un alumno mira
+          cuando lleva meses en el mismo cinturón: dónde está y qué viene.
+          Deliberadamente NO promete cuándo sube: eso lo decide el maestro. */}
+      <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}>
+          {t('mi.miGrado')}
+        </h2>
+        <p className="display" style={{ fontSize: '1.35rem', marginBottom: '0.8rem' }}>
+          {user?.belt || t('comun.sinCinturon')}
+        </p>
+        <div className="grados" aria-label={t('mi.miGrado')}>
+          {CINTURONES.map((c) => {
+            const esElSuyo = c.nombre.toLowerCase() === (user?.belt ?? '').toLowerCase();
+            return (
+              <span
+                key={c.nombre}
+                className="grado"
+                data-activo={esElSuyo}
+                title={c.nombre}
+                aria-current={esElSuyo ? 'step' : undefined}
+              >
+                <span className="grado-punto" style={{ background: fondoCinturon(c) }} />
+              </span>
+            );
+          })}
+        </div>
+        <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.6rem' }}>
+          {t('mi.gradoAyuda')}
+        </p>
+      </div>
+
+      {/* ── Mi carnet: se imprime y se lleva a clase ── */}
+      <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}>
           {t('mi.miCarnet')}
         </h2>
-        <p className="muted no-imprimir" style={{ fontSize: '0.78rem', marginBottom: '0.9rem' }}>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.9rem' }}>
           {t('qr.descripcionMia')}
         </p>
+
+        {/* ── El PIN, delante y no escondido en el reverso del carnet ──
+            Es el plan B de verdad: la cámara del maestro falla, el carnet se
+            queda en casa, el celular no tiene batería. Que el alumno se lo
+            sepa de memoria vale más que tenerlo impreso. */}
+        <div className="pin-respaldo">
+          <span className="eyebrow">{t('qr.pin')}</span>
+          {mi.checkinPin ? (
+            <>
+              <strong className="mono">{mi.checkinPin}</strong>
+              <span className="muted">{t('mi.pinAyuda')}</span>
+            </>
+          ) : (
+            <span className="muted">{t('mi.sinPin')}</span>
+          )}
+        </div>
+
         {user && (
-          <CarnetQR
-            valor={user.id}
+          <Carnet
+            id={user.id}
             nombre={user.fullName}
             club={club?.name}
+            logoClub={club?.logoUrl}
+            rol={t(claveRol(user))}
+            tipo={t(`carnet.tipo.${user.role}` as ClaveTexto)}
+            foto={user.avatarUrl}
+            cinturon={user.belt}
+            sangre={user.bloodType}
+            emergenciaNombre={user.emergencyName}
+            emergenciaTelefono={user.emergencyPhone}
             pin={mi.checkinPin}
           />
         )}
@@ -262,7 +567,6 @@ export default function MiPanel() {
 
       {/* ── Mi perfil y mi contraseña ── */}
       <div
-        className="no-imprimir"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
@@ -274,16 +578,27 @@ export default function MiPanel() {
           <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
             {t('mi.miPerfil')}
           </h2>
+          {/* La foto se guarda al elegirla; el resto del formulario, al pulsar
+              «Guardar». Son dos gestos distintos a propósito: nadie espera
+              tener que confirmar una foto que ya se está viendo puesta. */}
+          <div style={{ marginBottom: '0.9rem' }}>
+            <CampoImagen
+              src={user?.avatarUrl}
+              nombre={user?.fullName ?? '?'}
+              onCambiar={guardarFoto}
+            />
+          </div>
+          {/* El nombre se enseña, no se edita: lo cambia el maestro desde la
+              ficha del alumno. Ver la cabecera de este archivo. */}
           <label className="muted" style={{ fontSize: '0.75rem' }}>
             {t('comun.nombre')}
           </label>
-          <input
-            value={perfil.fullName}
-            onChange={(e) => setPerfil({ ...perfil, fullName: e.target.value })}
-            maxLength={LIM.nombrePersona}
-            required
-            style={{ margin: '0.25rem 0 0.7rem' }}
-          />
+          <p style={{ margin: '0.25rem 0 0.1rem', fontWeight: 600, overflowWrap: 'anywhere' }}>
+            {user?.fullName}
+          </p>
+          <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+            {t('mi.nombreLoCambiaElMaestro')}
+          </p>
           <label className="muted" style={{ fontSize: '0.75rem' }}>
             {t('comun.telefono')}
           </label>
@@ -304,6 +619,57 @@ export default function MiPanel() {
           >
             {t('comun.telefonoCorto')}
           </p>
+
+          {/* ── Lo que hay que saber si algo pasa ──
+              Esto SÍ lo mantiene cada quien, al revés que el nombre: el
+              hermano que se mudó, el teléfono nuevo de la mamá. Un contacto de
+              emergencia desactualizado es peor que no tener ninguno. */}
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('ficha.sangre')}
+          </label>
+          <div style={{ margin: '0.25rem 0 0.7rem' }}>
+            <SelectMenu
+              valor={perfil.bloodType}
+              onChange={(v) => setPerfil({ ...perfil, bloodType: v })}
+              etiquetaAria={t('ficha.sangre')}
+              placeholder={t('ficha.sinSangre')}
+              opciones={[
+                { valor: '', etiqueta: t('ficha.sinSangre') },
+                ...TIPOS_SANGRE.map((s) => ({ valor: s, etiqueta: s })),
+              ]}
+            />
+          </div>
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('ficha.emergenciaNombre')}
+          </label>
+          <input
+            value={perfil.emergencyName}
+            onChange={(e) => setPerfil({ ...perfil, emergencyName: e.target.value })}
+            maxLength={LIM.nombrePersona}
+            style={{ margin: '0.25rem 0 0.2rem' }}
+          />
+          <Contador valor={perfil.emergencyName} max={LIM.nombrePersona} />
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('ficha.emergenciaTelefono')}
+          </label>
+          <input
+            type="tel"
+            inputMode="tel"
+            value={perfil.emergencyPhone}
+            onChange={(e) =>
+              setPerfil({ ...perfil, emergencyPhone: soloTelefono(e.target.value) })
+            }
+            maxLength={LIM.telefono}
+            style={{
+              margin: '0.25rem 0 0.2rem',
+              borderColor: telefonoValido(perfil.emergencyPhone) ? undefined : 'var(--danger)',
+            }}
+          />
+          <Contador valor={perfil.emergencyPhone} max={LIM.telefono} />
+          <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+            {t('ficha.emergenciaAyuda')}
+          </p>
+
           <button type="submit" className="btn btn-outline btn-sm">
             {t('comun.guardar')}
           </button>
@@ -336,8 +702,10 @@ export default function MiPanel() {
             value={pass.nueva}
             onChange={(e) => setPass({ ...pass, nueva: e.target.value })}
             required
-            style={{ margin: '0.25rem 0 0.9rem' }}
+            style={{ margin: '0.25rem 0 0.2rem' }}
           />
+          <Contador valor={pass.nueva} max={LIM.password} />
+          <div style={{ height: '0.7rem' }} />
           <button type="submit" className="btn btn-outline btn-sm">
             {t('comun.guardar')}
           </button>
@@ -346,7 +714,7 @@ export default function MiPanel() {
 
       {/* ── Mis pagos ── */}
       <div
-        className="card tabla-scroll no-imprimir"
+        className="card tabla-scroll"
         style={{ padding: '0.5rem 1rem', marginBottom: '1rem' }}
       >
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
@@ -384,7 +752,7 @@ export default function MiPanel() {
       </div>
 
       {/* ── Mis asistencias ── */}
-      <div className="card tabla-scroll no-imprimir" style={{ padding: '0.5rem 1rem' }}>
+      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
           {t('mi.asistencias')}
         </h2>

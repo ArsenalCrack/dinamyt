@@ -47,6 +47,12 @@ export interface Usuario {
   phone: string | null;
   avatarUrl: string | null;
   belt: string | null;
+  /** Desde cuándo entrena, si el maestro lo puso. Ver `GET /mi`. */
+  trainsSince: string | null;
+  /** Ficha de seguridad: va impresa en el carnet. */
+  bloodType: string | null;
+  emergencyName: string | null;
+  emergencyPhone: string | null;
   role: Rol;
   isSuperAdmin: boolean;
   orgId: string | null;
@@ -57,7 +63,27 @@ export interface Club {
   id: string;
   name: string;
   slug: string;
+  city: string | null;
+  /** Escudo del club: dirección, no la imagen. Ver `urlFoto`. */
+  logoUrl: string | null;
   isActive: boolean;
+}
+
+/**
+ * Dirección real de una foto de perfil.
+ *
+ * La API no devuelve la imagen dentro del JSON —sería medio mega de roster en
+ * cada pantalla—, sino la ruta que la sirve: `/users/<id>/foto?v=…`. Esa ruta
+ * es relativa a la API, y quién es la API depende del despliegue, así que el
+ * prefijo se pone aquí y no en el servidor. Ver `lib/fotos.ts` de la API.
+ *
+ * Lo que ya viene absoluto (`https://…`) o incrustado (`data:…`) pasa tal cual:
+ * un club puede alojar las fotos donde quiera.
+ */
+export function urlFoto(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  if (/^(https?:|data:|blob:)/i.test(valor)) return valor;
+  return `${API_URL}${valor}`;
 }
 
 export function guardarToken(token: string) {

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { NavBar } from '@/components/NavBar';
+import { PieLegal } from '@/components/PieLegal';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
 import { AuthProvider } from '@/lib/auth';
 import { I18nProvider } from '@/lib/i18n';
@@ -69,6 +70,8 @@ export default function RootLayout({
                 en /login y /kiosco. */}
             <NavBar />
             {children}
+            {/* Al pie de TODA la app, incluido el panel del alumno. */}
+            <PieLegal />
             <RegistrarServiceWorker />
           </AuthProvider>
         </I18nProvider>

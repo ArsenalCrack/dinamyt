@@ -43,6 +43,34 @@
       "when": 1785991000000,
       "tag": "0005_periodo_del_pago",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785992000000,
+      "tag": "0006_logo_del_club",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785993000000,
+      "tag": "0007_ficha_de_seguridad",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785994000000,
+      "tag": "0008_pin_para_todos",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785995000000,
+      "tag": "0009_motivo_mas_largo",
+      "breakpoints": true
     }
   ]
 }

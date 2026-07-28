@@ -6,20 +6,36 @@ import { useEffect, useRef, useState } from 'react';
 import { claveRol, useAuth } from '@/lib/auth';
 import { IDIOMAS, useI18n, type ClaveTexto } from '@/lib/i18n';
 import { aplicarTema, getTema, type Tema } from '@/lib/theme';
+import { Avatar } from './Avatar';
 import { Avisos } from './Avisos';
 
 /**
- * Barra de navegación con menú de hamburguesa, al estilo de DINAMYT-LOCAL.
+ * Barra de navegación.
  *
- * Un único panel para las dos pantallas, ANCLADO al botón y del tamaño de lo
- * que trae: en PC el desplegable anterior era una franja del ancho de la
- * ventana para enseñar tres botones. En móvil ese mismo panel añade los
- * enlaces, que arriba no caben.
+ * **Qué se ve arriba y qué no.** Antes subían a la barra los ocho enlaces del
+ * rol y, al lado, el nombre del maestro con su club: en un portátil normal eso
+ * llegaba al borde y el nombre se apretaba contra los enlaces. Ahora arriba
+ * quedan solo los enlaces del día a día (`principal`) y el resto vive en el
+ * menú, que es donde se busca lo que se usa una vez por semana.
  *
- * Se cierra como se espera que se cierre: al elegir algo, al tocar fuera, con
- * Escape y al cambiar de página. Que no se cerrara al hacer clic fuera era, de
- * hecho, la queja: el menú se quedaba abierto tapando la pantalla.
+ * **Dónde está el nombre.** En el botón del menú, como un chip con la foto y el
+ * nombre de pila, y completo —nombre, rol y club— dentro del panel. Un nombre
+ * largo o el club «Academia de Artes Marciales del Norte» ya no tienen que
+ * caber en un hueco de la barra: se recortan con puntos suspensivos en el chip
+ * y se leen enteros al abrir.
+ *
+ * El panel se cierra como se espera: al elegir algo, al tocar fuera, con Escape
+ * y al cambiar de página.
  */
+
+interface Enlace {
+  href: string;
+  clave: ClaveTexto;
+  visible: boolean;
+  /** Del día a día: se gana un sitio en la barra. El resto va al menú. */
+  principal: boolean;
+}
+
 export function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -63,21 +79,30 @@ export function NavBar() {
   if (pathname === '/login' || pathname === '/kiosco') return null;
   if (!user) return null;
 
-  const links: { href: string; clave: ClaveTexto; visible: boolean }[] = [
-    { href: '/admin', clave: 'menu.admin', visible: esSuper },
-    { href: '/', clave: 'menu.panel', visible: esStaff },
-    { href: '/alumnos', clave: 'menu.alumnos', visible: esStaff },
-    { href: '/asistencia', clave: 'menu.asistencia', visible: esStaff },
-    { href: '/estadisticas', clave: 'menu.estadisticas', visible: esStaff },
-    { href: '/kiosco', clave: 'menu.kiosco', visible: esStaff },
-    { href: '/planes', clave: 'menu.planes', visible: esStaff },
-    { href: '/calendario', clave: 'menu.calendario', visible: esStaff },
-    { href: '/mi', clave: 'menu.miEstado', visible: !esSuper },
+  // El orden es el de la barra. `principal` marca lo que se abre a diario: el
+  // panel, el roster, la asistencia y el kiosco de la puerta. Planes,
+  // calendario y estadísticas se tocan al empezar el mes.
+  const links: Enlace[] = [
+    { href: '/admin', clave: 'menu.admin', visible: esSuper, principal: true },
+    { href: '/', clave: 'menu.panel', visible: esStaff, principal: true },
+    { href: '/alumnos', clave: 'menu.alumnos', visible: esStaff, principal: true },
+    { href: '/asistencia', clave: 'menu.asistencia', visible: esStaff, principal: true },
+    { href: '/kiosco', clave: 'menu.kiosco', visible: esStaff, principal: true },
+    { href: '/estadisticas', clave: 'menu.estadisticas', visible: esStaff, principal: false },
+    { href: '/planes', clave: 'menu.planes', visible: esStaff, principal: false },
+    { href: '/calendario', clave: 'menu.calendario', visible: esStaff, principal: false },
+    { href: '/mi', clave: 'menu.miEstado', visible: !esSuper, principal: true },
   ];
   const visibles = links.filter((l) => l.visible);
+  const enLaBarra = visibles.filter((l) => l.principal);
 
   const activo = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href);
+
+  /** El nombre de pila: es lo que cabe en el chip sin apretar nada. */
+  const nombre = user.fullName || user.email;
+  const primerNombre = nombre.split(' ')[0];
+  const rolYClub = `${t(claveRol(user))}${club ? ` · ${club.name}` : ''}`;
 
   function alternarTema() {
     const nuevo: Tema = tema === 'dark' ? 'light' : 'dark';
@@ -106,8 +131,8 @@ export function NavBar() {
           <span className="display">{t('app.nombre')}</span>
         </Link>
 
-        <nav className="navbar-links">
-          {visibles.map((l) => (
+        <nav className="navbar-links" aria-label={t('menu.navegacion')}>
+          {enLaBarra.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -120,18 +145,13 @@ export function NavBar() {
         </nav>
 
         <div className="navbar-derecha">
-          <span className="navbar-quien">
-            <b>{user.fullName || user.email}</b>
-            <span>
-              {t(claveRol(user))}
-              {club ? ` · ${club.name}` : ''}
-            </span>
-          </span>
-
           {/* La campana vive en la barra: los avisos importan en cualquier
               pantalla, no solo en la que los estrenó. */}
           {!esSuper && <Avisos deTodoElClub={esStaff} />}
 
+          {/* El botón del menú ES la identidad: foto, nombre de pila y las tres
+              rayas. Así el nombre tiene su propio sitio en vez de disputárselo
+              a los enlaces. */}
           <button
             type="button"
             className="navbar-toggle"
@@ -140,12 +160,13 @@ export function NavBar() {
             aria-haspopup="menu"
             onClick={() => setAbierto((a) => !a)}
           >
+            <Avatar src={user.avatarUrl} nombre={nombre} size={24} />
+            <span className="navbar-toggle-nombre">{primerNombre}</span>
             <span className="navbar-rayas" data-abierto={abierto} aria-hidden="true">
               <span />
               <span />
               <span />
             </span>
-            <span className="navbar-toggle-texto">{t('menu.etiqueta')}</span>
           </button>
         </div>
       </div>
@@ -153,25 +174,36 @@ export function NavBar() {
       {abierto && (
         <div className="navbar-panel" role="menu">
           <div className="navbar-panel-quien">
-            <b>{user.fullName || user.email}</b>
-            <span>
-              {t(claveRol(user))}
-              {club ? ` · ${club.name}` : ''}
+            <Avatar src={user.avatarUrl} nombre={nombre} size={38} />
+            <span className="navbar-panel-datos">
+              <b>{nombre}</b>
+              <span>{rolYClub}</span>
             </span>
           </div>
 
-          <div className="navbar-panel-links">
-            {visibles.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                role="menuitem"
-                className="navbar-item"
-                data-activo={activo(l.href)}
-              >
-                {t(l.clave)}
-              </Link>
-            ))}
+          {/* Todos los enlaces, no solo los que faltan: en móvil el menú es la
+              única navegación que hay. En PC, los que ya se ven arriba se
+              ocultan por CSS, y si no queda ninguno se va el bloque entero
+              (`data-solo-principales`). */}
+          <div
+            className="navbar-panel-nav"
+            data-solo-principales={visibles.every((l) => l.principal)}
+          >
+            <p className="navbar-etiqueta">{t('menu.navegacion')}</p>
+            <div className="navbar-panel-links">
+              {visibles.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  role="menuitem"
+                  className="navbar-item"
+                  data-activo={activo(l.href)}
+                  data-principal={l.principal}
+                >
+                  {t(l.clave)}
+                </Link>
+              ))}
+            </div>
             <div className="navbar-sep" />
           </div>
 

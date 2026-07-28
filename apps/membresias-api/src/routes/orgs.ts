@@ -1,9 +1,21 @@
 import type { FastifyInstance } from 'fastify';
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { orgs, users } from '@dinamyt/membresias-db';
-import { requireSuperAdmin } from '../plugins/auth';
+import {
+  orgDelRequest,
+  requireAuth,
+  requireRole,
+  requireSuperAdmin,
+} from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
-import { LIMITES, telefono, textoObligatorio, textoOpcional } from '../lib/validacion';
+import {
+  LIMITES,
+  correo as validarCorreo,
+  telefono,
+  textoObligatorio,
+  textoOpcional,
+} from '../lib/validacion';
+import { decodificarImagen, direccionLogo, imagenGuardada } from '../lib/imagenes';
 
 /**
  * Panel del SUPERADMIN: qué clubes existen y qué maestros tienen acceso.
@@ -41,6 +53,65 @@ function vistaUsuario(u: typeof users.$inferSelect) {
 }
 
 export async function orgsRoutes(app: FastifyInstance) {
+  // ── PATCH /mi-club — el maestro pone el escudo de SU club ─────────────────
+  //
+  // No vive con el resto de `/orgs/:id` porque el resto es del superadmin: él
+  // decide qué clubes existen, pero no conoce la insignia de ninguno. El escudo
+  // es lo único del club que sabe el maestro, así que es lo único que edita.
+  app.patch('/mi-club', { preHandler: requireRole(['owner']) }, async (req, reply) => {
+    const orgId = orgDelRequest(req);
+    if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
+    const body = (req.body ?? {}) as { logoUrl?: string | null };
+    if (body.logoUrl === undefined) {
+      return reply.code(422).send({ error: 'No hay nada que cambiar.' });
+    }
+
+    const escudo = imagenGuardada(body.logoUrl, 'El logo');
+    if (!escudo.ok) return reply.code(422).send({ error: escudo.error });
+
+    const [upd] = await req.db
+      .update(orgs)
+      .set({ logoUrl: escudo.valor, updatedAt: new Date() })
+      .where(eq(orgs.id, orgId))
+      .returning();
+    if (!upd) return reply.code(404).send({ error: 'Club no encontrado.' });
+    return { id: upd.id, name: upd.name, logoUrl: direccionLogo(upd) };
+  });
+
+  // ── GET /orgs/:id/logo — el escudo, en binario y cacheado ─────────────────
+  //
+  // Lo ve cualquiera del club: sale en el panel del alumno y en su carnet, y lo
+  // pide el propio `<img>` del navegador con la cookie de sesión. Un club no ve
+  // el escudo de otro — no es secreto, pero tampoco hay razón para servirlo.
+  //
+  // Mismo trato que la foto de una persona (ver `lib/imagenes.ts`): caché de un
+  // año, `private` porque en medio hay un proxy, y el `?v=` de la dirección es
+  // lo que la refresca cuando el maestro lo cambia.
+  app.get('/orgs/:id/logo', { preHandler: requireAuth() }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!req.user!.is_super_admin && req.user!.org_id !== id) {
+      return reply.code(404).send({ error: 'No encontrado.' });
+    }
+
+    const [club] = await req.db
+      .select({ logoUrl: orgs.logoUrl })
+      .from(orgs)
+      .where(eq(orgs.id, id))
+      .limit(1);
+    if (!club?.logoUrl) return reply.code(404).send({ error: 'Sin logo.' });
+    if (!club.logoUrl.startsWith('data:')) return reply.redirect(club.logoUrl, 302);
+
+    const img = decodificarImagen(club.logoUrl);
+    if (!img) return reply.code(404).send({ error: 'Sin logo.' });
+    if (req.headers['if-none-match'] === img.etag) return reply.code(304).send();
+
+    return reply
+      .header('Content-Type', img.tipo)
+      .header('Cache-Control', 'private, max-age=31536000, immutable')
+      .header('ETag', img.etag)
+      .send(img.datos);
+  });
+
   // ── GET /orgs — todos los clubes, con cuántos usuarios tiene cada uno ──────
   app.get('/orgs', { preHandler: requireSuperAdmin() }, async (req) => {
     const db = req.db;
@@ -148,9 +219,9 @@ export async function orgsRoutes(app: FastifyInstance) {
       phone?: string;
     };
 
-    const correo = textoObligatorio(body.email, LIMITES.correo, 'El correo');
+    const correo = validarCorreo(body.email);
     if (!correo.ok) return reply.code(422).send({ error: correo.error });
-    const email = correo.valor.toLowerCase();
+    const email = correo.valor;
     const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
     if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
     const tel = telefono(body.phone);
@@ -212,9 +283,9 @@ export async function orgsRoutes(app: FastifyInstance) {
         cambios.fullName = nombre.valor;
       }
       if (body.email !== undefined) {
-        const correo = textoObligatorio(body.email, LIMITES.correo, 'El correo');
+        const correo = validarCorreo(body.email);
         if (!correo.ok) return reply.code(422).send({ error: correo.error });
-        const email = correo.valor.toLowerCase();
+        const email = correo.valor;
         const [otro] = await db
           .select({ id: users.id })
           .from(users)
