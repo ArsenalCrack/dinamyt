@@ -107,14 +107,30 @@ export default function Panel() {
     setEditandoLogo(false);
   }
 
+  /**
+   * Adelanta a mano el repaso diario de mensualidades: la API mira quién está
+   * por vencer o vencido, le crea el aviso que verá en la campana y —a quien
+   * haya dado permiso en su navegador— se lo manda al celular. No cobra nada ni
+   * cambia ninguna fecha, y no repite el aviso que ya se dio hoy.
+   *
+   * El resultado se cuenta con palabras y no con dos números sueltos: «0 · 0»
+   * no dejaba claro si el botón había fallado o si sencillamente no había a
+   * quién avisar, que es lo normal a mitad de mes.
+   */
   async function enviarAvisos() {
+    setError('');
     setAviso('');
     try {
       const r = await api.post<{ creados: number; pushEnviados: number }>(
         '/notifications/run',
         {},
       );
-      setAviso(`${t('panel.avisos')}: ${r.data.creados} · push: ${r.data.pushEnviados}`);
+      setAviso(
+        r.data.creados === 0
+          ? t('panel.avisosNinguno')
+          : `${t('panel.avisosCreados')}: ${r.data.creados} · ` +
+            `${r.data.pushEnviados} ${t('panel.avisosPush')}`,
+      );
     } catch (e) {
       setError(mensajeError(e, t('panel.avisos')));
     }
@@ -168,8 +184,12 @@ export default function Panel() {
           <Link href="/estadisticas" className="btn btn-outline btn-sm">
             📊 {t('menu.estadisticas')}
           </Link>
-          <button className="btn btn-outline btn-sm" onClick={enviarAvisos}>
-            {t('panel.avisos')}
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={enviarAvisos}
+            title={t('panel.avisosAyuda')}
+          >
+            🔔 {t('panel.avisos')}
           </button>
         </div>
       </header>
@@ -202,7 +222,7 @@ export default function Panel() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(min(160px, 100%), 1fr))',
           gap: '0.75rem',
           marginBottom: '1.25rem',
         }}

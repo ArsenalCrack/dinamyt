@@ -265,7 +265,7 @@ export default function EstadisticasPage() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(min(150px, 100%), 1fr))',
           gap: '0.75rem',
           marginBottom: '1.25rem',
         }}
@@ -302,7 +302,7 @@ export default function EstadisticasPage() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(min(300px, 100%), 1fr))',
           gap: '1rem',
         }}
       >

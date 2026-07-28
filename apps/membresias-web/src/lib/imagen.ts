@@ -36,8 +36,14 @@ export const MAX_CARACTERES = 45_000;
  */
 export const LADO_LOGO = 512;
 
-/** Lo más grande que se acepta ABRIR. Por encima, ni se intenta decodificar. */
-const MAX_ARCHIVO = 20 * 1024 * 1024;
+/**
+ * Lo más grande que se acepta ABRIR. Por encima, ni se intenta decodificar.
+ *
+ * Este número está escrito también en los textos de ayuda y de error
+ * (`foto.ayuda`, `logo.ayuda`, `foto.errorPesoArchivo` en `lib/i18n.tsx`): si
+ * cambia aquí, hay que cambiarlo allí.
+ */
+export const MAX_ARCHIVO = 20 * 1024 * 1024;
 
 /** Calidades que se prueban, de mejor a peor, hasta que la foto quepa. */
 const CALIDADES = [0.82, 0.72, 0.62, 0.52, 0.42];
@@ -47,7 +53,15 @@ const CALIDADES = [0.82, 0.72, 0.62, 0.52, 0.42];
  * en vez de inventarse un mensaje: los idiomas viven en un solo sitio.
  */
 export class ErrorFoto extends Error {
-  constructor(readonly clave: 'foto.errorTipo' | 'foto.errorLeer' | 'foto.errorPeso') {
+  constructor(
+    readonly clave:
+      | 'foto.errorTipo'
+      | 'foto.errorLeer'
+      /** El archivo no cabe ni para abrirlo: pasa de {@link MAX_ARCHIVO}. */
+      | 'foto.errorPesoArchivo'
+      /** Se abrió, pero no hay forma de dejarlo bajo {@link MAX_CARACTERES}. */
+      | 'foto.errorPeso',
+  ) {
     super(clave);
     this.name = 'ErrorFoto';
   }
@@ -88,7 +102,7 @@ async function decodificar(file: File): Promise<ImageBitmap | HTMLImageElement> 
  */
 export async function fotoDesdeArchivo(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new ErrorFoto('foto.errorTipo');
-  if (file.size > MAX_ARCHIVO) throw new ErrorFoto('foto.errorPeso');
+  if (file.size > MAX_ARCHIVO) throw new ErrorFoto('foto.errorPesoArchivo');
 
   const fuente = await decodificar(file);
   const ancho = fuente.width;
@@ -145,7 +159,7 @@ export async function fotoDesdeArchivo(file: File): Promise<string> {
  */
 export async function logoDesdeArchivo(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new ErrorFoto('foto.errorTipo');
-  if (file.size > MAX_ARCHIVO) throw new ErrorFoto('foto.errorPeso');
+  if (file.size > MAX_ARCHIVO) throw new ErrorFoto('foto.errorPesoArchivo');
 
   const fuente = await decodificar(file);
   const ancho = fuente.width;

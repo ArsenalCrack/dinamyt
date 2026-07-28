@@ -94,7 +94,7 @@ function diasCortos(idioma: string): string[] {
 export default function MiPanel() {
   const router = useRouter();
   const { t, idioma } = useI18n();
-  const { user, club, cargando: cargandoSesion, refrescar } = useAuth();
+  const { user, club, cargando: cargandoSesion, refrescar, esStaff } = useAuth();
 
   const [mi, setMi] = useState<MiEstado | null>(null);
   const [avisos, setAvisos] = useState<AvisoBreve[]>([]);
@@ -113,7 +113,7 @@ export default function MiPanel() {
       const { data } = await api.get<MiEstado>('/mi');
       setMi(data);
     } catch (e) {
-      setError(mensajeError(e, t('mi.sinPlan')));
+      setError(mensajeError(e, t('comun.ninguno')));
     }
     // Los avisos van aparte y sin romper la pantalla si fallan: son un extra
     // sobre el panel, no la razón de abrirlo.
@@ -313,81 +313,88 @@ export default function MiPanel() {
         </div>
       )}
 
-      {/* ── Mi membresía ── */}
-      <div
-        className="card"
-        style={{
-          padding: '1.25rem',
-          marginBottom: '1rem',
-          borderColor:
-            mi.estado === 'vencido'
-              ? 'var(--danger)'
-              : mi.estado === 'al_dia'
-                ? 'var(--ok)'
-                : 'var(--border)',
-        }}
-      >
+      {/* ── Mi membresía ──
+          Solo para quien paga. El maestro y el auxiliar entran aquí por su
+          carnet, su foto y su contraseña; mensualidad no tienen —el roster del
+          club solo lista alumnos—, así que esta tarjeta les decía «Sin plan»
+          para siempre, como si les faltara algo por hacer. */}
+      {!esStaff && (
         <div
+          className="card"
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '0.75rem',
-            flexWrap: 'wrap',
+            padding: '1.25rem',
+            marginBottom: '1rem',
+            borderColor:
+              mi.estado === 'vencido'
+                ? 'var(--danger)'
+                : mi.estado === 'al_dia'
+                  ? 'var(--ok)'
+                  : 'var(--border)',
           }}
         >
-          <div>
-            <p className="muted" style={{ fontSize: '0.78rem' }}>
-              {mi.plan ? mi.plan.name : t('mi.sinPlan')}
-            </p>
-            <p className="display" style={{ fontSize: '1.6rem' }}>
-              {t(claveEstado(mi.estado))}
-            </p>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <p className="muted" style={{ fontSize: '0.78rem' }}>
+                {mi.plan ? mi.plan.name : t('mi.sinPlan')}
+              </p>
+              <p className="display" style={{ fontSize: '1.6rem' }}>
+                {t(claveEstado(mi.estado))}
+              </p>
+            </div>
+            <span className={claseEstado(mi.estado)}>{t(claveEstado(mi.estado))}</span>
           </div>
-          <span className={claseEstado(mi.estado)}>{t(claveEstado(mi.estado))}</span>
-        </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))',
-            gap: '0.75rem',
-            marginTop: '1rem',
-          }}
-        >
-          {mi.venceEl && (
-            <div>
-              <div className="muted" style={{ fontSize: '0.72rem' }}>
-                {t('mi.vence')}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(min(140px, 100%), 1fr))',
+              gap: '0.75rem',
+              marginTop: '1rem',
+            }}
+          >
+            {mi.venceEl && (
+              <div>
+                <div className="muted" style={{ fontSize: '0.72rem' }}>
+                  {t('mi.vence')}
+                </div>
+                <div className="mono" style={{ fontSize: '1.1rem', fontWeight: 600 }}>
+                  {fmtFecha(mi.venceEl, idioma)}
+                  {mi.diasFaltantes != null && mi.diasFaltantes >= 0 && (
+                    <span className="muted" style={{ fontSize: '0.8rem' }}>
+                      {' '}
+                      ({mi.diasFaltantes} d)
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="mono" style={{ fontSize: '1.1rem', fontWeight: 600 }}>
-                {fmtFecha(mi.venceEl, idioma)}
-                {mi.diasFaltantes != null && mi.diasFaltantes >= 0 && (
-                  <span className="muted" style={{ fontSize: '0.8rem' }}>
-                    {' '}
-                    ({mi.diasFaltantes} d)
-                  </span>
-                )}
+            )}
+            {mi.clasesRestantes != null && (
+              <div>
+                <div className="muted" style={{ fontSize: '0.72rem' }}>
+                  {t('mi.clasesRestantes')}
+                </div>
+                <div className="mono" style={{ fontSize: '1.1rem', fontWeight: 600 }}>
+                  {mi.clasesRestantes}
+                </div>
               </div>
-            </div>
-          )}
-          {mi.clasesRestantes != null && (
-            <div>
-              <div className="muted" style={{ fontSize: '0.72rem' }}>
-                {t('mi.clasesRestantes')}
-              </div>
-              <div className="mono" style={{ fontSize: '1.1rem', fontWeight: 600 }}>
-                {mi.clasesRestantes}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+      )}
 
-        <button
-          className="btn btn-outline btn-sm"
-          onClick={activarNotis}
-          style={{ marginTop: '1rem' }}
-        >
+      {/* Los avisos push valen para todos: al alumno le avisan de su
+          mensualidad y al maestro, de las de su club. Por eso el botón vive
+          fuera de la tarjeta de membresía, que el maestro ya no ve. */}
+      <div style={{ marginBottom: '1rem' }}>
+        <button className="btn btn-outline btn-sm" onClick={activarNotis}>
           🔔 {t('mi.activarPush')}
         </button>
       </div>
@@ -441,7 +448,7 @@ export default function MiPanel() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(min(120px, 100%), 1fr))',
             gap: '0.75rem',
           }}
         >
@@ -569,7 +576,7 @@ export default function MiPanel() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(min(260px, 100%), 1fr))',
           gap: '1rem',
           marginBottom: '1rem',
         }}
@@ -712,44 +719,49 @@ export default function MiPanel() {
         </form>
       </div>
 
-      {/* ── Mis pagos ── */}
-      <div
-        className="card tabla-scroll"
-        style={{ padding: '0.5rem 1rem', marginBottom: '1rem' }}
-      >
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
-          {t('mi.pagos')}
-        </h2>
-        <table>
-          <thead>
-            <tr>
-              <th>{t('comun.fecha')}</th>
-              <th>{t('pago.plan')}</th>
-              <th>{t('pago.metodo')}</th>
-              <th>{t('pago.monto')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mi.pagos.length === 0 && (
+      {/* ── Mis pagos ──
+          Va con la membresía: quien no paga mensualidad no tiene pagos que
+          mirar, y una tabla eternamente vacía solo hace dudar de si falta
+          algo. El maestro ve el dinero del club en «Estadísticas». */}
+      {!esStaff && (
+        <div
+          className="card tabla-scroll"
+          style={{ padding: '0.5rem 1rem', marginBottom: '1rem' }}
+        >
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
+            {t('mi.pagos')}
+          </h2>
+          <table>
+            <thead>
               <tr>
-                <td colSpan={4} className="muted" style={{ padding: '0.9rem' }}>
-                  {t('comun.ninguno')}
-                </td>
+                <th>{t('comun.fecha')}</th>
+                <th>{t('pago.plan')}</th>
+                <th>{t('pago.metodo')}</th>
+                <th>{t('pago.monto')}</th>
               </tr>
-            )}
-            {mi.pagos.map((p) => (
-              <tr key={p.id}>
-                <td className="mono">{fmtFecha(p.paidAt?.slice(0, 10), idioma)}</td>
-                <td>{p.planName}</td>
-                <td className="muted">
-                  {t(`pago.metodo.${p.method}` as ClaveTexto)}
-                </td>
-                <td className="mono">{fmtMoneda(p.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {mi.pagos.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="muted" style={{ padding: '0.9rem' }}>
+                    {t('comun.ninguno')}
+                  </td>
+                </tr>
+              )}
+              {mi.pagos.map((p) => (
+                <tr key={p.id}>
+                  <td className="mono">{fmtFecha(p.paidAt?.slice(0, 10), idioma)}</td>
+                  <td>{p.planName}</td>
+                  <td className="muted">
+                    {t(`pago.metodo.${p.method}` as ClaveTexto)}
+                  </td>
+                  <td className="mono">{fmtMoneda(p.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* ── Mis asistencias ── */}
       <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>

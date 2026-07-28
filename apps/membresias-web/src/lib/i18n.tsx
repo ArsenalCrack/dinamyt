@@ -128,6 +128,9 @@ const es = {
   'ficha.planYEstado': 'Plan y estado en el club',
   'ficha.planActual': 'Plan actual',
   'ficha.sinPlanAsignado': 'Sin plan asignado',
+  // Encabezado de la tarjeta cuando la ficha NO es de un alumno: el maestro y
+  // los auxiliares no tienen mensualidad que enseñar, solo cómo ubicarlos.
+  'ficha.contacto': 'Contacto',
   'ficha.pin': 'PIN de check-in',
   'ficha.pinAyuda':
     'La app se lo asignó solo al inscribirlo. Cámbialo si hace falta: si el nuevo ya es de otro alumno, te lo dirá.',
@@ -166,6 +169,14 @@ const es = {
   'panel.vence': 'Vence',
   'panel.clases': 'Clases',
   'panel.avisos': 'Generar avisos',
+  // Qué hace el botón, dicho antes de pulsarlo: revisa mensualidades y crea
+  // avisos. Nadie debería tener que pulsar un botón para averiguar qué hace.
+  'panel.avisosAyuda':
+    'Repasa las mensualidades del club y crea un aviso para quien esté por vencer o ya vencido. A quien tenga las notificaciones activadas le llega además al celular. Esto se hace solo cada mañana; el botón lo adelanta.',
+  'panel.avisosCreados': 'Avisos creados',
+  'panel.avisosPush': 'notificaciones enviadas',
+  'panel.avisosNinguno':
+    'Ningún aviso nuevo: hoy nadie está por vencer ni vencido, o ya se le avisó.',
   'panel.cobrar': 'Cobrar',
   'panel.enCaja': 'entró en caja',
   'panel.deEsperado': 'de lo esperado este mes',
@@ -195,10 +206,16 @@ const es = {
   'foto.cambiar': 'Cambiar foto',
   'foto.quitar': 'Quitar',
   'foto.procesando': 'Procesando…',
-  'foto.ayuda': 'Se recorta cuadrada y se reduce sola. Es la que sale en el carnet.',
-  'foto.errorTipo': 'Ese archivo no es una imagen.',
+  // El aviso se lee ANTES de elegir el archivo: dice qué se acepta y qué va a
+  // pasar con la imagen, para que nadie ande recortándola a mano por si acaso.
+  'foto.ayuda':
+    'Cualquier imagen (JPG, PNG, WebP…) de hasta 20 MB. Se recorta cuadrada y se reduce sola a 400 × 400 px: no tienes que prepararla. Es la foto que sale en el carnet.',
+  'foto.errorTipo': 'Ese archivo no es una imagen. Elige un JPG, un PNG o un WebP.',
   'foto.errorLeer': 'No se pudo abrir esa imagen. Prueba con otra.',
-  'foto.errorPeso': 'Esa imagen es demasiado grande. Prueba con otra.',
+  'foto.errorPesoArchivo':
+    'Esa imagen pesa más de 20 MB y no se puede abrir. Elige una más liviana.',
+  'foto.errorPeso':
+    'No se pudo comprimir esa imagen lo suficiente. Prueba con una menos cargada de detalle.',
   'foto.errorGuardar': 'No se pudo guardar la foto.',
 
   // Escudo del club: lo pone el maestro y lo ven todos sus alumnos
@@ -206,7 +223,7 @@ const es = {
   'logo.poner': 'Poner escudo',
   'logo.cambiar': 'Cambiar escudo',
   'logo.ayuda':
-    'Sale en el carnet de tus alumnos y en su panel. Si tiene fondo transparente, se respeta.',
+    'Cualquier imagen de hasta 20 MB. Entra entera —no se recorta— y se reduce sola a 512 × 512 px; si tiene fondo transparente, se respeta. Sale en el carnet de tus alumnos y en su panel.',
   'logo.guardado': 'Escudo actualizado.',
 
   // Días de clase, vistos por el alumno
@@ -528,6 +545,7 @@ const en: Record<ClaveTexto, string> = {
   'ficha.planYEstado': 'Plan and club status',
   'ficha.planActual': 'Current plan',
   'ficha.sinPlanAsignado': 'No plan assigned',
+  'ficha.contacto': 'Contact',
   'ficha.pin': 'Check-in PIN',
   'ficha.pinAyuda':
     'The app assigned it when you enrolled them. Change it if you need to: if the new one belongs to another student, it will tell you.',
@@ -564,6 +582,12 @@ const en: Record<ClaveTexto, string> = {
   'panel.vence': 'Due',
   'panel.clases': 'Classes',
   'panel.avisos': 'Generate notices',
+  'panel.avisosAyuda':
+    "Goes through the club's memberships and creates a notice for anyone due soon or already overdue. Whoever turned notifications on also gets it on their phone. This runs on its own every morning; the button brings it forward.",
+  'panel.avisosCreados': 'Notices created',
+  'panel.avisosPush': 'notifications sent',
+  'panel.avisosNinguno':
+    'No new notices: nobody is due soon or overdue today, or they were told already.',
   'panel.cobrar': 'Charge',
   'panel.enCaja': 'came in',
   'panel.deEsperado': 'of what this month expects',
@@ -587,17 +611,19 @@ const en: Record<ClaveTexto, string> = {
   'foto.cambiar': 'Change photo',
   'foto.quitar': 'Remove',
   'foto.procesando': 'Working…',
-  'foto.ayuda': 'Cropped square and shrunk for you. This is the one on the card.',
-  'foto.errorTipo': 'That file is not an image.',
+  'foto.ayuda':
+    'Any image (JPG, PNG, WebP…) up to 20 MB. It gets cropped square and shrunk to 400 × 400 px for you — no need to prepare it. This is the photo on the card.',
+  'foto.errorTipo': 'That file is not an image. Pick a JPG, a PNG or a WebP.',
   'foto.errorLeer': "Couldn't open that image. Try another one.",
-  'foto.errorPeso': 'That image is too large. Try another one.',
+  'foto.errorPesoArchivo': "That image is over 20 MB and can't be opened. Pick a lighter one.",
+  'foto.errorPeso': "Couldn't compress that image enough. Try one with less detail.",
   'foto.errorGuardar': "Couldn't save the photo.",
 
   'logo.titulo': 'Club crest',
   'logo.poner': 'Add crest',
   'logo.cambiar': 'Change crest',
   'logo.ayuda':
-    "It shows on your students' cards and in their panel. A transparent background is kept.",
+    "Any image up to 20 MB. It fits in whole — no cropping — and is shrunk to 512 × 512 px for you; a transparent background is kept. It shows on your students' cards and in their panel.",
   'logo.guardado': 'Crest updated.',
 
   'clases.titulo': 'Club classes',

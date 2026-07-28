@@ -28,6 +28,35 @@ import { Avisos } from './Avisos';
  * y al cambiar de página.
  */
 
+/**
+ * El símbolo de encendido de «Salir», dibujado en vez de escrito.
+ *
+ * Antes era el carácter ⏻ (U+23FB). No es un emoji: es un símbolo técnico que
+ * casi ninguna fuente de Android trae, así que en el Chrome del celular el
+ * botón salía con un hueco —o con el cuadrito de «glifo que no tengo»— delante
+ * del texto. Un SVG se ve igual en todos lados y hereda el color del botón,
+ * que en este caso es el rojo de acción destructiva.
+ */
+function IconoSalir() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+      style={{ flexShrink: 0 }}
+    >
+      <path d="M12 2.8v9.4" />
+      <path d="M6.3 6.3a8 8 0 1 0 11.4 0" />
+    </svg>
+  );
+}
+
 interface Enlace {
   href: string;
   clave: ClaveTexto;
@@ -233,7 +262,8 @@ export function NavBar() {
             className="btn btn-danger"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            ⏻ {t('menu.salir')}
+            <IconoSalir />
+            {t('menu.salir')}
           </button>
         </div>
       )}

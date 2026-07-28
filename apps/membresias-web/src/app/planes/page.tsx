@@ -111,7 +111,7 @@ export default function Planes() {
           padding: '1rem',
           marginBottom: '1.25rem',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(min(140px, 100%), 1fr))',
           gap: '0.6rem',
           alignItems: 'end',
         }}
