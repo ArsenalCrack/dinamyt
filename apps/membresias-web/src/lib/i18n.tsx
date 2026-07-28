@@ -209,21 +209,30 @@ const es = {
   // El aviso se lee ANTES de elegir el archivo: dice qué se acepta y qué va a
   // pasar con la imagen, para que nadie ande recortándola a mano por si acaso.
   'foto.ayuda':
-    'Cualquier imagen (JPG, PNG, WebP…) de hasta 20 MB. Se recorta cuadrada y se reduce sola a 400 × 400 px: no tienes que prepararla. Es la foto que sale en el carnet.',
+    'Cualquier imagen (JPG, PNG, WebP…) de hasta 20 MB. Al elegirla podrás encuadrarla, y se reduce sola a 400 × 400 px: no tienes que prepararla. Es la foto que sale en el carnet.',
   'foto.errorTipo': 'Ese archivo no es una imagen. Elige un JPG, un PNG o un WebP.',
   'foto.errorLeer': 'No se pudo abrir esa imagen. Prueba con otra.',
   'foto.errorPesoArchivo':
     'Esa imagen pesa más de 20 MB y no se puede abrir. Elige una más liviana.',
-  'foto.errorPeso':
-    'No se pudo comprimir esa imagen lo suficiente. Prueba con una menos cargada de detalle.',
   'foto.errorGuardar': 'No se pudo guardar la foto.',
+
+  // Editor de encuadre (components/AjustarImagen.tsx)
+  'encuadre.titulo': 'Ajusta el encuadre',
+  'encuadre.ayudaFoto':
+    'Arrastra la foto y usa el control para acercarla. El marco punteado es lo que se ve en el carnet: deja la cara dentro.',
+  'encuadre.ayudaLogo':
+    'Arrastra el escudo y usa el control para acercarlo o alejarlo. No se recorta nada: lo que sobra queda transparente.',
+  'encuadre.zoom': 'Acercar',
+  'encuadre.centrar': 'Volver al centro',
+  'encuadre.enElCarnet': 'En el carnet',
+  'encuadre.guardar': 'Usar así',
 
   // Escudo del club: lo pone el maestro y lo ven todos sus alumnos
   'logo.titulo': 'Escudo del club',
   'logo.poner': 'Poner escudo',
   'logo.cambiar': 'Cambiar escudo',
   'logo.ayuda':
-    'Cualquier imagen de hasta 20 MB. Entra entera —no se recorta— y se reduce sola a 512 × 512 px; si tiene fondo transparente, se respeta. Sale en el carnet de tus alumnos y en su panel.',
+    'Cualquier imagen de hasta 20 MB. Entra entera —no se recorta— y se reduce sola a 512 × 512 px; si tiene fondo transparente, se respeta. Al elegirla podrás moverla y ajustar su tamaño. Sale en el carnet de tus alumnos y en su panel.',
   'logo.guardado': 'Escudo actualizado.',
 
   // Días de clase, vistos por el alumno
@@ -612,18 +621,27 @@ const en: Record<ClaveTexto, string> = {
   'foto.quitar': 'Remove',
   'foto.procesando': 'Working…',
   'foto.ayuda':
-    'Any image (JPG, PNG, WebP…) up to 20 MB. It gets cropped square and shrunk to 400 × 400 px for you — no need to prepare it. This is the photo on the card.',
+    'Any image (JPG, PNG, WebP…) up to 20 MB. You get to frame it after picking it, and it is shrunk to 400 × 400 px for you — no need to prepare it. This is the photo on the card.',
   'foto.errorTipo': 'That file is not an image. Pick a JPG, a PNG or a WebP.',
   'foto.errorLeer': "Couldn't open that image. Try another one.",
   'foto.errorPesoArchivo': "That image is over 20 MB and can't be opened. Pick a lighter one.",
-  'foto.errorPeso': "Couldn't compress that image enough. Try one with less detail.",
   'foto.errorGuardar': "Couldn't save the photo.",
+
+  'encuadre.titulo': 'Adjust the framing',
+  'encuadre.ayudaFoto':
+    'Drag the photo and use the slider to zoom in. The dashed frame is what the card shows: keep the face inside it.',
+  'encuadre.ayudaLogo':
+    'Drag the crest and use the slider to zoom in or out. Nothing is cropped: whatever is left over stays transparent.',
+  'encuadre.zoom': 'Zoom',
+  'encuadre.centrar': 'Back to centre',
+  'encuadre.enElCarnet': 'On the card',
+  'encuadre.guardar': 'Use it like this',
 
   'logo.titulo': 'Club crest',
   'logo.poner': 'Add crest',
   'logo.cambiar': 'Change crest',
   'logo.ayuda':
-    "Any image up to 20 MB. It fits in whole — no cropping — and is shrunk to 512 × 512 px for you; a transparent background is kept. It shows on your students' cards and in their panel.",
+    "Any image up to 20 MB. It fits in whole — no cropping — and is shrunk to 512 × 512 px for you; a transparent background is kept. After picking it you can move it and resize it. It shows on your students' cards and in their panel.",
   'logo.guardado': 'Crest updated.',
 
   'clases.titulo': 'Club classes',

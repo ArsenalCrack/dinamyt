@@ -627,6 +627,93 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   EDITOR DE ENCUADRE (<AjustarImagen>)
+   El visor es el cuadrado que se guarda; la imagen se arrastra por debajo.
+   El tablero de ajedrez del fondo solo aparece en el escudo: es lo que hace
+   ver que el fondo es transparente y no blanco.
+   ════════════════════════════════════════════════════════════════════════ */
+.encuadre {
+  padding: 0.9rem;
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.7rem;
+  background: var(--bg-elevated);
+}
+.encuadre-quien {
+  margin-bottom: 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.encuadre-visor {
+  position: relative;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-strong);
+  background: #14141e;
+  cursor: grab;
+  touch-action: none; /* el arrastre es nuestro, no del scroll de la página */
+  user-select: none;
+}
+.encuadre-visor:active { cursor: grabbing; }
+.encuadre-visor img { pointer-events: none; }
+.encuadre-visor[data-logo='true'] {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, #d8d8e2 25%, transparent 25%),
+    linear-gradient(-45deg, #d8d8e2 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d8d8e2 75%),
+    linear-gradient(-45deg, transparent 75%, #d8d8e2 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* El hueco del carnet (22 × 29 mm) sobre el encuadre: más alto que ancho, así
+   que de un cuadrado se come los lados. Verlo aquí evita descubrirlo al
+   imprimir cincuenta carnets. */
+.encuadre-carnet {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px dashed rgba(240, 184, 0, 0.85);
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+.encuadre-carnet span {
+  position: absolute;
+  bottom: 0.3rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #f0b800;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.encuadre-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+  font-size: 0.75rem;
+}
+.encuadre-zoom input[type='range'] { flex: 1; accent-color: var(--gold); }
+.encuadre-ayuda { margin-top: 0.4rem; font-size: 0.7rem; }
+.encuadre-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
 /* ── Campo de dinero: el símbolo dentro, pegado al borde izquierdo ─────── */
 .campo-dinero { position: relative; width: 100%; }
 .campo-dinero-simbolo {
