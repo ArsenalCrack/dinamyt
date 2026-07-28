@@ -87,3 +87,10 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         sync: false
+
+      # Secreto del disparo diario de avisos. NO se genera aquí: tiene que ser
+      # el MISMO valor que en Vercel, que es quien lleva el reloj (el plan
+      # gratuito de Render no tiene tareas programadas). Sin él, la ruta
+      # /notifications/cron responde 404 y los avisos se quedan a mano.
+      - key: CRON_SECRET
+        sync: false

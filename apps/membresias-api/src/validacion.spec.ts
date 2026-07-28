@@ -94,6 +94,67 @@ describe('membresias-api — límites de los campos', () => {
     expect(r.statusCode).toBe(422);
   });
 
+  it('un teléfono de dos dígitos no es un teléfono', async () => {
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: {
+        email: 'corto@club.com',
+        fullName: 'Alumno Corto',
+        password: 'Prueba1234',
+        phone: '30',
+      },
+    });
+    expect(r.statusCode).toBe(422);
+    expect(r.json().error).toContain('7');
+  });
+
+  it('un teléfono con separadores sí pasa: se cuentan los dígitos, no los signos', async () => {
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: {
+        email: 'contel@club.com',
+        fullName: 'Alumno Con Teléfono',
+        password: 'Prueba1234',
+        phone: '+57 (300) 123-4567',
+      },
+    });
+    expect(r.statusCode).toBe(201);
+    expect(r.json().phone).toBe('+57 (300) 123-4567');
+  });
+
+  it('un cinturón fuera del catálogo se rechaza; uno del catálogo se normaliza', async () => {
+    const malo = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: {
+        email: 'cinturon@club.com',
+        fullName: 'Alumno Cinturón',
+        password: 'Prueba1234',
+        belt: 'Morado',
+      },
+    });
+    expect(malo.statusCode).toBe(422);
+
+    const bueno = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: {
+        email: 'cinturon@club.com',
+        fullName: 'Alumno Cinturón',
+        password: 'Prueba1234',
+        belt: 'negro',
+      },
+    });
+    expect(bueno.statusCode).toBe(201);
+    expect(bueno.json().belt).toBe('Negro');
+  });
+
   it('una contraseña de más de 72 caracteres se rechaza (bcrypt la truncaría)', async () => {
     const r = await e.app.inject({
       method: 'POST',

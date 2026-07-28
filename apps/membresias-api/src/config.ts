@@ -61,3 +61,16 @@ export const config = {
 
 /** `true` si el SSO con el ecosistema DINAMYT está configurado. */
 export const ssoHabilitado = () => Boolean(config.ecosystemJwksUrl);
+
+/**
+ * Secreto del disparo diario de avisos (`POST /notifications/cron`).
+ *
+ * Sin él esa ruta responde 404: es la única que actúa sin sesión, y dejarla
+ * abierta permitiría a cualquiera generar avisos y push para todos los clubes.
+ * Debe valer lo mismo aquí (Render) y en la web (Vercel), que es quien la llama
+ * desde su cron.
+ *
+ * Se lee en cada llamada, y no una vez al arrancar, para poder cambiarla sin
+ * reconstruir el proceso — y para que las pruebas puedan ponerla y quitarla.
+ */
+export const cronSecret = () => process.env.CRON_SECRET ?? '';

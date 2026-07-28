@@ -13,18 +13,42 @@ const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 export default function Login() {
   const router = useRouter();
   const { t } = useI18n();
-  const { login, user, cargando } = useAuth();
+  const { login, loginConCodigo, user, cargando } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [sso, setSso] = useState(false);
+  const [conCodigo, setConCodigo] = useState(false);
 
   // Quien ya tiene sesión no debería quedarse mirando el formulario.
   useEffect(() => {
-    if (!cargando && user) router.replace(rutaInicio(user));
-  }, [cargando, user, router]);
+    if (!cargando && user && !conCodigo) router.replace(rutaInicio(user));
+  }, [cargando, user, router, conCodigo]);
+
+  /**
+   * Entrada por QR: el maestro genera el código en la ficha del alumno y este
+   * lo escanea con la cámara de su celular, que abre esta página con
+   * `?acceso=<token>`.
+   *
+   * El token se borra de la barra de direcciones en cuanto se lee: si no, se
+   * queda en el historial del navegador y en cualquier captura de pantalla.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const codigo = params.get('acceso');
+    if (!codigo) return;
+
+    setConCodigo(true);
+    window.history.replaceState(null, '', window.location.pathname);
+    loginConCodigo(codigo)
+      .then((u) => router.replace(rutaInicio(u)))
+      .catch((err) => {
+        setError(mensajeError(err, t('login.qrCaducado')));
+        setConCodigo(false);
+      });
+  }, [loginConCodigo, router, t]);
 
   // El botón de SSO solo se dibuja si esta instalación lo tiene configurado.
   useEffect(() => {
@@ -92,7 +116,7 @@ export default function Login() {
           <span style={{ color: 'var(--gold)' }}>{t('login.tituloAcento')}</span>
         </h1>
         <p className="muted" style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-          {t('login.subtitulo')}
+          {conCodigo ? t('login.conQr') : t('login.subtitulo')}
         </p>
 
         <label className="muted" style={{ fontSize: '0.8rem' }} htmlFor="email">

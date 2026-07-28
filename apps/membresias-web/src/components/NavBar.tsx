@@ -2,26 +2,62 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { claveRol, useAuth } from '@/lib/auth';
-import { useI18n, type ClaveTexto } from '@/lib/i18n';
-import { ControlesApariencia } from './ControlesApariencia';
+import { IDIOMAS, useI18n, type ClaveTexto } from '@/lib/i18n';
+import { aplicarTema, getTema, type Tema } from '@/lib/theme';
+import { Avisos } from './Avisos';
 
 /**
- * Barra de navegación: enlaces según el rol, tema e idioma, y «Salir» siempre
- * diferenciado por ser la única acción destructiva. En móvil todo vive en el
- * menú de hamburguesa.
+ * Barra de navegación con menú de hamburguesa, al estilo de DINAMYT-LOCAL.
+ *
+ * Un único panel para las dos pantallas, ANCLADO al botón y del tamaño de lo
+ * que trae: en PC el desplegable anterior era una franja del ancho de la
+ * ventana para enseñar tres botones. En móvil ese mismo panel añade los
+ * enlaces, que arriba no caben.
+ *
+ * Se cierra como se espera que se cierre: al elegir algo, al tocar fuera, con
+ * Escape y al cambiar de página. Que no se cerrara al hacer clic fuera era, de
+ * hecho, la queja: el menú se quedaba abierto tapando la pantalla.
  */
 export function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { t } = useI18n();
+  const { t, idioma, setIdioma } = useI18n();
   const { user, club, logout, esStaff, esSuper } = useAuth();
   const [abierto, setAbierto] = useState(false);
+  // Se arranca en 'dark', igual que el servidor, y se corrige tras montar: el
+  // tema real vive en localStorage y leerlo aquí rompería la hidratación.
+  const [tema, setTema] = useState<Tema>('dark');
+  const raizRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    setAbierto(false); // al navegar se cierra el menú móvil
+    setTema(getTema());
+  }, []);
+
+  useEffect(() => {
+    setAbierto(false); // al navegar se cierra
   }, [pathname]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    function fuera(e: MouseEvent | TouchEvent) {
+      if (raizRef.current && !raizRef.current.contains(e.target as Node)) {
+        setAbierto(false);
+      }
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAbierto(false);
+    }
+    document.addEventListener('mousedown', fuera);
+    document.addEventListener('touchstart', fuera);
+    document.addEventListener('keydown', tecla);
+    return () => {
+      document.removeEventListener('mousedown', fuera);
+      document.removeEventListener('touchstart', fuera);
+      document.removeEventListener('keydown', tecla);
+    };
+  }, [abierto]);
 
   // Pantallas sin barra: login (aún sin sesión) y kiosco (pantalla completa).
   if (pathname === '/login' || pathname === '/kiosco') return null;
@@ -32,6 +68,7 @@ export function NavBar() {
     { href: '/', clave: 'menu.panel', visible: esStaff },
     { href: '/alumnos', clave: 'menu.alumnos', visible: esStaff },
     { href: '/asistencia', clave: 'menu.asistencia', visible: esStaff },
+    { href: '/estadisticas', clave: 'menu.estadisticas', visible: esStaff },
     { href: '/kiosco', clave: 'menu.kiosco', visible: esStaff },
     { href: '/planes', clave: 'menu.planes', visible: esStaff },
     { href: '/calendario', clave: 'menu.calendario', visible: esStaff },
@@ -42,26 +79,11 @@ export function NavBar() {
   const activo = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href);
 
-  const itemNav = (l: (typeof links)[number], enMenu = false) => (
-    <Link
-      key={l.href}
-      href={l.href}
-      style={{
-        borderRadius: '0.5rem',
-        padding: '0.45rem 0.7rem',
-        fontSize: '0.85rem',
-        fontWeight: 600,
-        // Nunca partir una etiqueta en dos líneas.
-        whiteSpace: 'nowrap',
-        display: enMenu ? 'block' : undefined,
-        ...(activo(l.href)
-          ? { background: 'var(--bg-elevated)', color: 'var(--gold)' }
-          : { color: 'var(--text-muted)' }),
-      }}
-    >
-      {t(l.clave)}
-    </Link>
-  );
+  function alternarTema() {
+    const nuevo: Tema = tema === 'dark' ? 'light' : 'dark';
+    aplicarTema(nuevo);
+    setTema(nuevo);
+  }
 
   // Se espera al logout antes de navegar: la cookie de sesión la borra el
   // servidor, y si se cambia de página antes el navegador puede cancelar la
@@ -72,125 +94,115 @@ export function NavBar() {
     router.replace('/login');
   }
 
-  const identidad = (
-    <span
-      className="muted"
-      style={{ fontSize: '0.72rem', textAlign: 'right', whiteSpace: 'nowrap' }}
-    >
-      <span style={{ display: 'block', fontWeight: 600, color: 'var(--text)' }}>
-        {user.fullName || user.email}
-      </span>
-      <span style={{ color: 'var(--gold)' }}>
-        {t(claveRol(user))}
-        {club ? ` · ${club.name}` : ''}
-      </span>
-    </span>
-  );
-
   return (
-    <header
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 20,
-        background: 'var(--bg)',
-        borderBottom: '1px solid var(--border)',
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1180,
-          margin: '0 auto',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          padding: '0.6rem 1rem',
-        }}
-      >
+    <header ref={raizRef} className="navbar">
+      <div className="navbar-inner">
         <Link
           href={esSuper ? '/admin' : esStaff ? '/' : '/mi'}
-          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          className="navbar-marca"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="DINAMYT" width={30} height={30} />
-          <span className="display" style={{ fontSize: '1rem', whiteSpace: 'nowrap' }}>
-            {t('app.nombre')}
-          </span>
+          <span className="display">{t('app.nombre')}</span>
         </Link>
 
-        <nav
-          className="nav-desktop"
-          style={{ flex: 1, alignItems: 'center', gap: '0.15rem', flexWrap: 'nowrap' }}
-        >
-          {visibles.map((l) => itemNav(l))}
+        <nav className="navbar-links">
+          {visibles.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="navbar-link"
+              data-activo={activo(l.href)}
+            >
+              {t(l.clave)}
+            </Link>
+          ))}
         </nav>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div className="nav-user" style={{ alignItems: 'center', gap: '0.5rem' }}>
-            {identidad}
-            <button
-              onClick={() => setAbierto(!abierto)}
-              className="btn btn-outline btn-sm"
-              aria-label={t('menu.apariencia')}
-              aria-expanded={abierto}
-              title={t('menu.apariencia')}
-            >
-              🌐
-            </button>
-            <button
-              onClick={salir}
-              className="btn btn-danger btn-sm"
-              title={t('menu.salir')}
-              style={{ whiteSpace: 'nowrap' }}
-            >
-              ⏻ {t('menu.salir')}
-            </button>
-          </div>
+        <div className="navbar-derecha">
+          <span className="navbar-quien">
+            <b>{user.fullName || user.email}</b>
+            <span>
+              {t(claveRol(user))}
+              {club ? ` · ${club.name}` : ''}
+            </span>
+          </span>
 
-          {/* Hamburguesa: SOLO móvil */}
+          {/* La campana vive en la barra: los avisos importan en cualquier
+              pantalla, no solo en la que los estrenó. */}
+          {!esSuper && <Avisos deTodoElClub={esStaff} />}
+
           <button
-            onClick={() => setAbierto(!abierto)}
-            className="nav-burger btn btn-outline btn-sm"
+            type="button"
+            className="navbar-toggle"
             aria-label={abierto ? t('menu.cerrar') : t('menu.abrir')}
             aria-expanded={abierto}
+            aria-haspopup="menu"
+            onClick={() => setAbierto((a) => !a)}
           >
-            {abierto ? '✕' : '☰'}
+            <span className="navbar-rayas" data-abierto={abierto} aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span className="navbar-toggle-texto">{t('menu.etiqueta')}</span>
           </button>
         </div>
       </div>
 
-      {/* Desplegable: en móvil trae los enlaces; en PC, solo tema e idioma. */}
       {abierto && (
-        <div
-          style={{
-            borderTop: '1px solid var(--border)',
-            background: 'var(--bg-card)',
-            padding: '0.75rem 1rem',
-          }}
-        >
-          <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-            <div className="nav-movil">
-              <p className="muted" style={{ fontSize: '0.72rem', padding: '0 0.75rem 0.5rem' }}>
-                {user.fullName || user.email} ·{' '}
-                <span style={{ color: 'var(--gold)' }}>{t(claveRol(user))}</span>
-                {club ? ` · ${club.name}` : ''}
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {visibles.map((l) => itemNav(l, true))}
-              </div>
-              <div style={{ height: 1, background: 'var(--border)', margin: '0.6rem 0' }} />
-            </div>
-
-            <ControlesApariencia variante="menu" />
-
-            <button
-              onClick={salir}
-              className="nav-movil btn btn-danger"
-              style={{ marginTop: '0.6rem', width: '100%' }}
-            >
-              ⏻ {t('menu.salir')}
-            </button>
+        <div className="navbar-panel" role="menu">
+          <div className="navbar-panel-quien">
+            <b>{user.fullName || user.email}</b>
+            <span>
+              {t(claveRol(user))}
+              {club ? ` · ${club.name}` : ''}
+            </span>
           </div>
+
+          <div className="navbar-panel-links">
+            {visibles.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                role="menuitem"
+                className="navbar-item"
+                data-activo={activo(l.href)}
+              >
+                {t(l.clave)}
+              </Link>
+            ))}
+            <div className="navbar-sep" />
+          </div>
+
+          <button type="button" role="menuitem" className="navbar-item" onClick={alternarTema}>
+            {tema === 'dark' ? t('menu.modoClaro') : t('menu.modoOscuro')}
+          </button>
+
+          <p className="navbar-etiqueta">🌐 {t('menu.idioma')}</p>
+          <div className="navbar-idiomas" role="group" aria-label={t('menu.idioma')}>
+            {IDIOMAS.map((l) => (
+              <button
+                key={l.codigo}
+                type="button"
+                className="navbar-idioma"
+                data-activo={idioma === l.codigo}
+                aria-pressed={idioma === l.codigo}
+                onClick={() => setIdioma(l.codigo)}
+              >
+                {l.etiqueta}
+              </button>
+            ))}
+          </div>
+
+          <div className="navbar-sep" />
+          <button
+            onClick={salir}
+            className="btn btn-danger"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+          >
+            ⏻ {t('menu.salir')}
+          </button>
         </div>
       )}
     </header>

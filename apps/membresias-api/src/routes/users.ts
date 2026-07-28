@@ -3,7 +3,9 @@ import { and, asc, eq, ne } from 'drizzle-orm';
 import { users, type Db } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireAuth, requireRole } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
-import { LIMITES, textoObligatorio, textoOpcional } from '../lib/validacion';
+import { LIMITES, telefono, textoObligatorio } from '../lib/validacion';
+import { cinturon } from '../lib/cinturones';
+import { firmarTokenAcceso, VIDA_TOKEN_ACCESO } from '../lib/auth/tokens';
 import type { MembresiasRole } from '../types/auth';
 
 /**
@@ -28,6 +30,7 @@ function vista(u: typeof users.$inferSelect) {
     fullName: u.fullName,
     phone: u.phone,
     avatarUrl: u.avatarUrl,
+    belt: u.belt,
     role: u.role,
     orgId: u.orgId,
     isActive: u.isActive,
@@ -79,6 +82,7 @@ export async function usersRoutes(app: FastifyInstance) {
       role?: string;
       phone?: string;
       avatarUrl?: string;
+      belt?: string;
     };
 
     const correo = textoObligatorio(body.email, LIMITES.correo, 'El correo');
@@ -86,8 +90,10 @@ export async function usersRoutes(app: FastifyInstance) {
     const email = correo.valor.toLowerCase();
     const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
     if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
-    const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
-    if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
+    const tel = telefono(body.phone);
+    if (!tel.ok) return reply.code(422).send({ error: tel.error });
+    const grado = cinturon(body.belt);
+    if (!grado.ok) return reply.code(422).send({ error: grado.error });
 
     const rol = (body.role ?? 'student') as MembresiasRole;
     if (!ROLES_ASIGNABLES.includes(rol)) {
@@ -108,8 +114,9 @@ export async function usersRoutes(app: FastifyInstance) {
         email,
         fullName: nombre.valor,
         passwordHash: await hashPassword(body.password!),
-        phone: telefono.valor,
+        phone: tel.valor,
         avatarUrl: body.avatarUrl || null,
+        belt: grado.valor,
         role: rol,
         orgId,
         createdById: req.user!.sub,
@@ -158,6 +165,7 @@ export async function usersRoutes(app: FastifyInstance) {
         email?: string;
         phone?: string | null;
         avatarUrl?: string | null;
+        belt?: string | null;
         role?: string;
         isActive?: boolean;
       };
@@ -181,11 +189,16 @@ export async function usersRoutes(app: FastifyInstance) {
         cambios.email = email;
       }
       if (body.phone !== undefined) {
-        const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
-        if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
-        cambios.phone = telefono.valor;
+        const tel = telefono(body.phone);
+        if (!tel.ok) return reply.code(422).send({ error: tel.error });
+        cambios.phone = tel.valor;
       }
       if (body.avatarUrl !== undefined) cambios.avatarUrl = body.avatarUrl || null;
+      if (body.belt !== undefined) {
+        const grado = cinturon(body.belt);
+        if (!grado.ok) return reply.code(422).send({ error: grado.error });
+        cambios.belt = grado.valor;
+      }
 
       // El rol solo lo mueve el maestro, y nunca hacia `owner`: el dueño del
       // club lo nombra el superadmin.
@@ -236,6 +249,35 @@ export async function usersRoutes(app: FastifyInstance) {
         .set({ passwordHash: await hashPassword(body.password!), updatedAt: new Date() })
         .where(eq(users.id, u.id));
       return { ok: true };
+    },
+  );
+
+  // ── POST /users/:id/acceso-qr — QR para que el alumno entre sin teclear ───
+  // El maestro lo genera en la ficha, el alumno lo escanea con la cámara de su
+  // celular y queda dentro. Pensado para el alumno que no se sabe el correo o
+  // que teclea la contraseña mal cinco veces seguidas en la puerta del club.
+  //
+  // El token dura diez minutos y se enseña en PANTALLA, no se imprime: un
+  // acceso pegado al carnet sería una contraseña en papel para quien lo
+  // encuentre. Ver `EMISOR_ACCESO` en `lib/auth/tokens.ts`.
+  app.post(
+    '/users/:id/acceso-qr',
+    { preHandler: requireRole(['owner']) },
+    async (req, reply) => {
+      const orgId = orgDelRequest(req);
+      if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
+      const { id } = req.params as { id: string };
+
+      const u = await delClub(req.db, orgId, id);
+      if (!u || u.isSuperAdmin) return reply.code(404).send({ error: 'No encontrado.' });
+      if (!u.isActive) {
+        return reply.code(409).send({ error: 'Esa cuenta está desactivada.' });
+      }
+
+      return {
+        token: await firmarTokenAcceso(u.id, u.email),
+        expiraEnSegundos: VIDA_TOKEN_ACCESO,
+      };
     },
   );
 

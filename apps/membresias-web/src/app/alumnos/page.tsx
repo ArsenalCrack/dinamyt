@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { useI18n } from '@/lib/i18n';
-import { LIM, soloTelefono } from '@/lib/campos';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { LIM, soloTelefono, telefonoValido } from '@/lib/campos';
+import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
+import { Cinturon } from '@/components/Cinturon';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface Persona {
   id: string;
@@ -15,6 +18,7 @@ interface Persona {
   fullName: string;
   phone: string | null;
   avatarUrl: string | null;
+  belt: string | null;
   role: Rol;
   isActive: boolean;
 }
@@ -25,9 +29,39 @@ const ROLES: { valor: Rol; clave: 'rol.student' | 'rol.guardian' | 'rol.staff' }
   { valor: 'staff', clave: 'rol.staff' },
 ];
 
+/** Lo que se edita de una persona. La contraseña va aparte, en su ficha. */
+interface FormPersona {
+  fullName: string;
+  email: string;
+  password: string;
+  phone: string;
+  role: Rol;
+  belt: string;
+  /**
+   * El maestro del club no cambia de rol aquí: a `owner` solo llega alguien por
+   * mano del superadmin. Sin esta marca, editarle el teléfono al maestro
+   * mandaba `role: 'owner'` y la API lo rechazaba con un 422 desconcertante.
+   */
+  rolFijo: boolean;
+}
+
+const VACIO: FormPersona = {
+  fullName: '',
+  email: '',
+  password: '',
+  phone: '',
+  role: 'student',
+  belt: '',
+  rolFijo: false,
+};
+
 /**
  * Gente del club, a cargo del maestro. Aquí nacen las cuentas: no hay registro
  * abierto en la app, así que esta pantalla es la puerta de entrada del alumno.
+ *
+ * Y aquí también se corrigen: antes solo se podía dar de alta y cortar el
+ * acceso, así que un correo mal escrito no había forma de arreglarlo desde la
+ * aplicación.
  */
 export default function Alumnos() {
   const router = useRouter();
@@ -37,18 +71,14 @@ export default function Alumnos() {
 
   const [gente, setGente] = useState<Persona[]>([]);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
 
-  const [abierto, setAbierto] = useState(false);
-  const [form, setForm] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    phone: '',
-    role: 'student' as Rol,
-  });
+  /** `null` = formulario cerrado · `'nuevo'` = alta · un id = editando. */
+  const [editando, setEditando] = useState<string | null>(null);
+  const [form, setForm] = useState<FormPersona>(VACIO);
   const [enviando, setEnviando] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -77,22 +107,62 @@ export default function Alumnos() {
     void cargar();
   }, [cargandoSesion, user, esStaff, router, cargar]);
 
-  async function crear(e: FormEvent) {
+  function abrirAlta() {
+    setForm(VACIO);
+    setEditando(editando === 'nuevo' ? null : 'nuevo');
+  }
+
+  function abrirEdicion(p: Persona) {
+    if (editando === p.id) {
+      setEditando(null);
+      return;
+    }
+    setForm({
+      fullName: p.fullName,
+      email: p.email,
+      password: '',
+      phone: p.phone ?? '',
+      role: p.role,
+      belt: p.belt ?? '',
+      rolFijo: p.role === 'owner',
+    });
+    setEditando(p.id);
+  }
+
+  async function guardar(e: FormEvent) {
     e.preventDefault();
     setError('');
     setAviso('');
+    if (!telefonoValido(form.phone)) {
+      setError(t('comun.telefonoCorto'));
+      return;
+    }
     setEnviando(true);
     try {
-      await api.post('/users', {
-        fullName: form.fullName,
-        email: form.email,
-        password: form.password,
-        phone: form.phone || undefined,
-        role: form.role,
-      });
-      setAviso(t('alumnos.creado'));
-      setForm({ fullName: '', email: '', password: '', phone: '', role: 'student' });
-      setAbierto(false);
+      if (editando === 'nuevo') {
+        await api.post('/users', {
+          fullName: form.fullName,
+          email: form.email,
+          password: form.password,
+          phone: form.phone || undefined,
+          role: form.role,
+          belt: form.belt || undefined,
+        });
+        setAviso(t('alumnos.creado'));
+      } else {
+        // El cinturón y el teléfono viajan aunque estén vacíos: quitarlos es
+        // una edición tan válida como ponerlos.
+        await api.patch(`/users/${editando}`, {
+          fullName: form.fullName,
+          email: form.email,
+          phone: form.phone || null,
+          ...(form.rolFijo ? {} : { role: form.role }),
+          belt: form.belt || null,
+        });
+        setAviso(t('alumnos.actualizado'));
+      }
+      setForm(VACIO);
+      setEditando(null);
       await cargar();
     } catch (err) {
       setError(mensajeError(err, t('alumnos.crearTitulo')));
@@ -119,6 +189,150 @@ export default function Alumnos() {
     );
   }
 
+  const q = busqueda.trim().toLowerCase();
+  const visibles = gente.filter(
+    (p) =>
+      !q || p.fullName.toLowerCase().includes(q) || p.email.toLowerCase().includes(q),
+  );
+
+  const opcionesCinturon = [
+    { valor: '', etiqueta: t('comun.sinCinturon') },
+    ...CINTURONES.map((c) => ({
+      valor: c.nombre,
+      etiqueta: c.nombre,
+      punto: fondoCinturon(c),
+    })),
+  ];
+
+  const formulario = (
+    <form onSubmit={guardar} className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
+      <h2 className="display" style={{ fontSize: '1rem', marginBottom: '0.9rem' }}>
+        {editando === 'nuevo' ? t('alumnos.crearTitulo') : t('ficha.datos')}
+      </h2>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
+          gap: '0.75rem',
+        }}
+      >
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('comun.nombre')}
+          </span>
+          <input
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            maxLength={LIM.nombrePersona}
+            required
+            style={{ marginTop: '0.25rem' }}
+          />
+        </label>
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('comun.correo')}
+          </span>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            maxLength={LIM.correo}
+            required
+            style={{ marginTop: '0.25rem' }}
+          />
+        </label>
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('comun.telefono')} <span style={{ opacity: 0.7 }}>({t('comun.opcional')})</span>
+          </span>
+          <input
+            type="tel"
+            inputMode="tel"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: soloTelefono(e.target.value) })}
+            maxLength={LIM.telefono}
+            style={{
+              marginTop: '0.25rem',
+              // El aviso aparece MIENTRAS se escribe, no al enviar: así nadie
+              // descubre que le faltan dígitos después de rellenar el resto.
+              borderColor: telefonoValido(form.phone) ? undefined : 'var(--danger)',
+            }}
+          />
+          {!telefonoValido(form.phone) && (
+            <span className="msg-error" style={{ fontSize: '0.7rem' }}>
+              {t('comun.telefonoCorto')}
+            </span>
+          )}
+        </label>
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('comun.rol')}
+          </span>
+          <div style={{ marginTop: '0.25rem' }}>
+            {form.rolFijo ? (
+              <p style={{ padding: '0.55rem 0', fontWeight: 600 }}>{t('rol.owner')}</p>
+            ) : (
+              <SelectMenu
+                valor={form.role}
+                onChange={(v) => setForm({ ...form, role: v as Rol })}
+                etiquetaAria={t('comun.rol')}
+                opciones={ROLES.map((r) => ({ valor: r.valor, etiqueta: t(r.clave) }))}
+              />
+            )}
+          </div>
+          <span className="muted" style={{ fontSize: '0.7rem' }}>
+            {t('alumnos.rolAyuda')}
+          </span>
+        </label>
+        <label style={{ display: 'block' }}>
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            {t('comun.cinturon')}
+          </span>
+          <div style={{ marginTop: '0.25rem' }}>
+            <SelectMenu
+              valor={form.belt}
+              onChange={(v) => setForm({ ...form, belt: v })}
+              etiquetaAria={t('comun.cinturon')}
+              placeholder={t('comun.sinCinturon')}
+              opciones={opcionesCinturon}
+            />
+          </div>
+        </label>
+        {editando === 'nuevo' && (
+          <label style={{ display: 'block' }}>
+            <span className="muted" style={{ fontSize: '0.78rem' }}>
+              {t('alumnos.contrasenaInicial')}
+            </span>
+            <input
+              type="text"
+              minLength={8}
+              maxLength={LIM.password}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+              style={{ marginTop: '0.25rem' }}
+            />
+            <span className="muted" style={{ fontSize: '0.7rem' }}>
+              {t('alumnos.contrasenaAyuda')}
+            </span>
+          </label>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+        <button type="submit" className="btn btn-cta" disabled={enviando}>
+          {enviando
+            ? t('comun.guardando')
+            : editando === 'nuevo'
+              ? t('comun.crear')
+              : t('comun.guardar')}
+        </button>
+        <button type="button" className="btn btn-outline" onClick={() => setEditando(null)}>
+          {t('comun.cancelar')}
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}>
       <header
@@ -135,8 +349,8 @@ export default function Alumnos() {
           {t('alumnos.titulo')}
         </h1>
         {esMaestro && (
-          <button className="btn btn-cta btn-sm" onClick={() => setAbierto((a) => !a)}>
-            {abierto ? t('comun.cancelar') : `+ ${t('alumnos.nuevo')}`}
+          <button className="btn btn-cta btn-sm" onClick={abrirAlta}>
+            {editando === 'nuevo' ? t('comun.cancelar') : `+ ${t('alumnos.nuevo')}`}
           </button>
         )}
       </header>
@@ -152,127 +366,44 @@ export default function Alumnos() {
         </p>
       )}
 
-      {abierto && esMaestro && (
-        <form onSubmit={crear} className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-          <h2 className="display" style={{ fontSize: '1rem', marginBottom: '0.9rem' }}>
-            {t('alumnos.crearTitulo')}
-          </h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
-              gap: '0.75rem',
-            }}
-          >
-            <label style={{ display: 'block' }}>
-              <span className="muted" style={{ fontSize: '0.78rem' }}>
-                {t('comun.nombre')}
-              </span>
-              <input
-                value={form.fullName}
-                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                maxLength={LIM.nombrePersona}
-                required
-                style={{ marginTop: '0.25rem' }}
-              />
-            </label>
-            <label style={{ display: 'block' }}>
-              <span className="muted" style={{ fontSize: '0.78rem' }}>
-                {t('comun.correo')}
-              </span>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                maxLength={LIM.correo}
-                required
-                style={{ marginTop: '0.25rem' }}
-              />
-            </label>
-            <label style={{ display: 'block' }}>
-              <span className="muted" style={{ fontSize: '0.78rem' }}>
-                {t('comun.telefono')}
-              </span>
-              <input
-                type="tel"
-                inputMode="tel"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: soloTelefono(e.target.value) })}
-                maxLength={LIM.telefono}
-                style={{ marginTop: '0.25rem' }}
-              />
-            </label>
-            <label style={{ display: 'block' }}>
-              <span className="muted" style={{ fontSize: '0.78rem' }}>
-                {t('comun.rol')}
-              </span>
-              <select
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value as Rol })}
-                style={{ marginTop: '0.25rem' }}
-              >
-                {ROLES.map((r) => (
-                  <option key={r.valor} value={r.valor}>
-                    {t(r.clave)}
-                  </option>
-                ))}
-              </select>
-              <span className="muted" style={{ fontSize: '0.7rem' }}>
-                {t('alumnos.rolAyuda')}
-              </span>
-            </label>
-            <label style={{ display: 'block' }}>
-              <span className="muted" style={{ fontSize: '0.78rem' }}>
-                {t('alumnos.contrasenaInicial')}
-              </span>
-              <input
-                type="text"
-                minLength={8}
-                maxLength={LIM.password}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                required
-                style={{ marginTop: '0.25rem' }}
-              />
-              <span className="muted" style={{ fontSize: '0.7rem' }}>
-                {t('alumnos.contrasenaAyuda')}
-              </span>
-            </label>
-          </div>
-          <button
-            type="submit"
-            className="btn btn-cta"
-            disabled={enviando}
-            style={{ marginTop: '1rem' }}
-          >
-            {enviando ? t('comun.guardando') : t('comun.crear')}
-          </button>
-        </form>
-      )}
+      {editando && esMaestro && formulario}
 
-      <label
-        className="muted"
+      <div
         style={{
           display: 'flex',
+          gap: '0.75rem',
           alignItems: 'center',
-          gap: '0.4rem',
-          fontSize: '0.8rem',
+          flexWrap: 'wrap',
           marginBottom: '0.75rem',
         }}
       >
         <input
-          type="checkbox"
-          checked={incluirInactivos}
-          onChange={(e) => setIncluirInactivos(e.target.checked)}
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          maxLength={LIM.busqueda}
+          placeholder={t('comun.buscar')}
+          aria-label={t('comun.buscar')}
+          style={{ flex: 1, minWidth: 180 }}
         />
-        {t('alumnos.incluirInactivos')}
-      </label>
+        <label
+          className="muted"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
+        >
+          <input
+            type="checkbox"
+            checked={incluirInactivos}
+            onChange={(e) => setIncluirInactivos(e.target.checked)}
+          />
+          {t('alumnos.incluirInactivos')}
+        </label>
+      </div>
 
       <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <table>
           <thead>
             <tr>
               <th>{t('comun.nombre')}</th>
+              <th>{t('comun.cinturon')}</th>
               <th>{t('comun.rol')}</th>
               <th>{t('comun.telefono')}</th>
               <th>{t('comun.estado')}</th>
@@ -280,14 +411,14 @@ export default function Alumnos() {
             </tr>
           </thead>
           <tbody>
-            {gente.length === 0 && (
+            {visibles.length === 0 && (
               <tr>
-                <td colSpan={5} className="muted" style={{ padding: '1rem' }}>
+                <td colSpan={6} className="muted" style={{ padding: '1rem' }}>
                   {t('comun.ninguno')}
                 </td>
               </tr>
             )}
-            {gente.map((p) => (
+            {visibles.map((p) => (
               <tr key={p.id}>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -305,7 +436,10 @@ export default function Alumnos() {
                     </div>
                   </div>
                 </td>
-                <td className="muted">{t(`rol.${p.role}` as 'rol.student')}</td>
+                <td>
+                  <Cinturon nombre={p.belt} />
+                </td>
+                <td className="muted">{t(`rol.${p.role}` as ClaveTexto)}</td>
                 <td className="muted">{p.phone || '—'}</td>
                 <td>
                   <span className={p.isActive ? 'badge badge-ok' : 'badge badge-danger'}>
@@ -314,12 +448,23 @@ export default function Alumnos() {
                 </td>
                 <td>
                   {esMaestro && (
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={() => alternarAcceso(p)}
-                    >
-                      {p.isActive ? t('alumnos.desactivar') : t('alumnos.activar')}
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => abrirEdicion(p)}
+                      >
+                        ✎ {t('comun.editar')}
+                      </button>
+                      <Link href={`/alumnos/${p.id}`} className="btn btn-outline btn-sm">
+                        {t('panel.verFicha')}
+                      </Link>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => alternarAcceso(p)}
+                      >
+                        {p.isActive ? t('alumnos.desactivar') : t('alumnos.activar')}
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>

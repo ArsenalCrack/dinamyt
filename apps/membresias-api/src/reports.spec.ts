@@ -1,6 +1,59 @@
 import { describe, it, expect } from 'vitest';
-import { memberships } from '@dinamyt/membresias-db';
+import { eq } from 'drizzle-orm';
+import { memberships, plans, users } from '@dinamyt/membresias-db';
 import { crearEscenario } from './testing/escenario';
+
+describe('membresias-api — estadísticas del maestro', () => {
+  it('resume alumnos, dinero, asistencia y planes en una sola llamada', async () => {
+    const { app, db, auth, ids, orgId } = await crearEscenario();
+    const headers = auth(ids.owner);
+
+    const [plan] = await db
+      .insert(plans)
+      .values({ orgId, name: 'Mensual', type: 'mensual', price: '60000' })
+      .returning();
+    await db.update(users).set({ belt: 'Azul' }).where(eq(users.id, ids.alumno));
+    await app.inject({
+      method: 'POST',
+      url: `/memberships/${ids.alumno}/payments`,
+      headers,
+      payload: { planId: plan.id, amount: '60000', method: 'efectivo' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/checkin',
+      headers,
+      payload: { identifier: { type: 'manual', value: ids.alumno } },
+    });
+
+    const r = await app.inject({ method: 'GET', url: '/reports/estadisticas', headers });
+    expect(r.statusCode).toBe(200);
+    const s = r.json();
+
+    expect(s.alumnos.total).toBe(2);
+    expect(s.alumnos.al_dia).toBe(1);
+    expect(s.alumnos.sin_plan).toBe(1);
+    expect(s.dinero.recaudadoMes).toBe(60000);
+    expect(s.dinero.porMes).toHaveLength(6);
+    expect(s.dinero.esperadoMensual).toBe(60000);
+    expect(s.asistencia.hoy).toBe(1);
+    expect(s.asistencia.masConstantes[0].fullName).toBe('Alumno Uno');
+    expect(s.planes[0]).toMatchObject({ name: 'Mensual', alumnos: 1 });
+    expect(s.cinturones).toEqual([{ belt: 'Azul', alumnos: 1 }]);
+    await app.close();
+  });
+
+  it('el alumno no ve las estadísticas del club', async () => {
+    const { app, auth, ids } = await crearEscenario();
+    const r = await app.inject({
+      method: 'GET',
+      url: '/reports/estadisticas',
+      headers: auth(ids.alumno),
+    });
+    expect(r.statusCode).toBe(403);
+    await app.close();
+  });
+});
 
 describe('membresias-api — reportes', () => {
   it('revenue: recaudado y esperado reflejan el pago del mes', async () => {

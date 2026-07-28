@@ -7,8 +7,9 @@ import { api, mensajeError } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
-import { Avisos } from '@/components/Avisos';
 import { Avatar } from '@/components/Avatar';
+import { Cinturon } from '@/components/Cinturon';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface RosterItem {
   userId: string;
@@ -16,6 +17,7 @@ interface RosterItem {
   email: string;
   phone: string | null;
   avatarUrl: string | null;
+  belt: string | null;
   qr: string;
   status: string | null;
   venceEl: string | null;
@@ -150,7 +152,9 @@ export default function Panel() {
           {t('panel.titulo')}
         </h1>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Avisos deTodoElClub />
+          <Link href="/estadisticas" className="btn btn-outline btn-sm">
+            📊 {t('menu.estadisticas')}
+          </Link>
           <button className="btn btn-outline btn-sm" onClick={enviarAvisos}>
             {t('panel.avisos')}
           </button>
@@ -222,6 +226,7 @@ export default function Panel() {
           <thead>
             <tr>
               <th>{t('panel.alumnos')}</th>
+              <th>{t('comun.cinturon')}</th>
               <th>{t('comun.estado')}</th>
               <th>
                 {t('panel.vence')} / {t('panel.clases')}
@@ -232,7 +237,7 @@ export default function Panel() {
           <tbody>
             {roster.length === 0 && (
               <tr>
-                <td colSpan={4} className="muted" style={{ padding: '1rem' }}>
+                <td colSpan={5} className="muted" style={{ padding: '1rem' }}>
                   {t('panel.sinAlumnos')}
                 </td>
               </tr>
@@ -256,6 +261,9 @@ export default function Panel() {
                   </div>
                 </td>
                 <td>
+                  <Cinturon nombre={a.belt} />
+                </td>
+                <td>
                   <span className={claseEstado(a.estado)}>{t(claveEstado(a.estado))}</span>
                 </td>
                 <td className="muted">
@@ -268,22 +276,18 @@ export default function Panel() {
                       : '—'}
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <select
-                      aria-label={t('pago.plan')}
-                      value={planPorFila[a.userId] ?? ''}
-                      onChange={(e) =>
-                        setPlanPorFila((s) => ({ ...s, [a.userId]: e.target.value }))
-                      }
-                      style={{ maxWidth: 160 }}
-                    >
-                      <option value="">{t('pago.plan')}…</option>
-                      {plans.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} · {fmtMoneda(p.price)}
-                        </option>
-                      ))}
-                    </select>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <SelectMenu
+                      valor={planPorFila[a.userId] ?? ''}
+                      onChange={(v) => setPlanPorFila((s) => ({ ...s, [a.userId]: v }))}
+                      etiquetaAria={t('pago.plan')}
+                      placeholder={`${t('pago.plan')}…`}
+                      style={{ width: 190 }}
+                      opciones={plans.map((p) => ({
+                        valor: p.id,
+                        etiqueta: `${p.name} · ${fmtMoneda(p.price)}`,
+                      }))}
+                    />
                     <button
                       className="btn btn-gold btn-sm"
                       disabled={!(planPorFila[a.userId] ?? plans[0]?.id)}

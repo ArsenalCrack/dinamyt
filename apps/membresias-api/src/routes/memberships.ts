@@ -56,10 +56,13 @@ export async function membershipsRoutes(app: FastifyInstance) {
             email: p.email,
             phone: p.phone,
             avatarUrl: p.avatarUrl,
+            belt: p.belt,
             /** Carnet QR del alumno: lo que lee la cámara en el check-in. */
             qr: p.id,
             checkinPin: m?.checkinPin ?? null,
             status: m?.status ?? null,
+            /** Plan de referencia del alumno: lo que la ficha muestra elegido. */
+            currentPlanId: m?.currentPlanId ?? null,
             matriculado: m?.matriculado ?? false,
             venceEl: m?.venceEl ?? null,
             clasesRestantes: m?.clasesRestantes ?? null,

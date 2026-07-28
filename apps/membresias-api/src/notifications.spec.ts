@@ -48,6 +48,51 @@ describe('notificaciones', () => {
       await app.close();
     });
 
+    it('el aviso trae el nombre y el vencimiento: la pantalla no tiene que preguntarlos', async () => {
+      const { app, db, auth, ids, orgId } = await crearEscenario();
+      const headers = auth(ids.owner);
+      await db
+        .insert(memberships)
+        .values({ orgId, userId: ids.alumno, venceEl: '2000-01-01' });
+      await app.inject({ method: 'POST', url: '/notifications/run', headers });
+
+      const [aviso] = (
+        await app.inject({ method: 'GET', url: '/notifications?all=1', headers })
+      ).json();
+      expect(aviso.fullName).toBe('Alumno Uno');
+      expect(aviso.venceEl).toBe('2000-01-01');
+      expect(aviso.readAt).toBeNull();
+      await app.close();
+    });
+
+    it('abrir la campana marca como leídos los MÍOS y solo los míos', async () => {
+      const { app, db, auth, ids, orgId } = await crearEscenario();
+      await db.insert(memberships).values([
+        { orgId, userId: ids.alumno, venceEl: '2000-01-01' },
+        { orgId, userId: ids.alumno2, venceEl: '2000-01-01' },
+      ]);
+      await app.inject({
+        method: 'POST',
+        url: '/notifications/run',
+        headers: auth(ids.owner),
+      });
+
+      const marcado = await app.inject({
+        method: 'POST',
+        url: '/notifications/leidos',
+        headers: auth(ids.alumno),
+      });
+      expect(marcado.json().marcados).toBe(1);
+
+      const delOtro = await app.inject({
+        method: 'GET',
+        url: '/notifications',
+        headers: auth(ids.alumno2),
+      });
+      expect(delOtro.json()[0].readAt).toBeNull();
+      await app.close();
+    });
+
     it('el alumno solo ve SUS avisos', async () => {
       const { app, db, auth, ids, orgId } = await crearEscenario();
       await db.insert(memberships).values([
@@ -67,6 +112,62 @@ describe('notificaciones', () => {
       });
       expect(mios.json()).toHaveLength(1);
       expect(mios.json()[0].userId).toBe(ids.alumno);
+      await app.close();
+    });
+  });
+
+  /**
+   * El disparo diario. Es la diferencia entre unos avisos que existen porque el
+   * maestro se acordó de pulsar un botón y unos que salen solos cada mañana.
+   */
+  describe('POST /notifications/cron', () => {
+    it('sin CRON_SECRET la ruta no existe', async () => {
+      const { app } = await crearEscenario();
+      delete process.env.CRON_SECRET;
+      const r = await app.inject({ method: 'POST', url: '/notifications/cron' });
+      expect(r.statusCode).toBe(404);
+      await app.close();
+    });
+
+    it('con el secreto equivocado no pasa', async () => {
+      const { app } = await crearEscenario();
+      process.env.CRON_SECRET = 'el-bueno';
+      const r = await app.inject({
+        method: 'POST',
+        url: '/notifications/cron',
+        headers: { 'x-cron-secret': 'el-malo' },
+      });
+      expect(r.statusCode).toBe(401);
+      delete process.env.CRON_SECRET;
+      await app.close();
+    });
+
+    it('con el secreto correcto genera los avisos de TODOS los clubes', async () => {
+      const { app, db, ids, orgId, otroOrgId } = await crearEscenario();
+      process.env.CRON_SECRET = 'el-bueno';
+      await db.insert(memberships).values([
+        { orgId, userId: ids.alumno, venceEl: '2000-01-01' },
+        { orgId: otroOrgId, userId: ids.alumnoAjeno, venceEl: '2000-01-01' },
+      ]);
+
+      const r = await app.inject({
+        method: 'POST',
+        url: '/notifications/cron',
+        headers: { 'x-cron-secret': 'el-bueno' },
+      });
+      expect(r.statusCode).toBe(200);
+      expect(r.json().clubes).toBe(2);
+      expect(r.json().creados).toBe(2); // uno de cada club
+
+      // Y no se duplican si el cron corre dos veces el mismo día.
+      const otra = await app.inject({
+        method: 'POST',
+        url: '/notifications/cron',
+        headers: { 'x-cron-secret': 'el-bueno' },
+      });
+      expect(otra.json().creados).toBe(0);
+
+      delete process.env.CRON_SECRET;
       await app.close();
     });
   });

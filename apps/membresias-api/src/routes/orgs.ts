@@ -3,7 +3,7 @@ import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { orgs, users } from '@dinamyt/membresias-db';
 import { requireSuperAdmin } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
-import { LIMITES, textoObligatorio, textoOpcional } from '../lib/validacion';
+import { LIMITES, telefono, textoObligatorio, textoOpcional } from '../lib/validacion';
 
 /**
  * Panel del SUPERADMIN: qué clubes existen y qué maestros tienen acceso.
@@ -153,8 +153,8 @@ export async function orgsRoutes(app: FastifyInstance) {
     const email = correo.valor.toLowerCase();
     const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
     if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
-    const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
-    if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
+    const tel = telefono(body.phone);
+    if (!tel.ok) return reply.code(422).send({ error: tel.error });
     const errorPass = validarPassword(body.password ?? '');
     if (errorPass) return reply.code(422).send({ error: errorPass });
 
@@ -171,7 +171,7 @@ export async function orgsRoutes(app: FastifyInstance) {
         email,
         fullName: nombre.valor,
         passwordHash: await hashPassword(body.password!),
-        phone: telefono.valor,
+        phone: tel.valor,
         role: 'owner',
         orgId: id,
         createdById: req.user!.sub,
@@ -224,9 +224,9 @@ export async function orgsRoutes(app: FastifyInstance) {
         cambios.email = email;
       }
       if (body.phone !== undefined) {
-        const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
-        if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
-        cambios.phone = telefono.valor;
+        const tel = telefono(body.phone);
+        if (!tel.ok) return reply.code(422).send({ error: tel.error });
+        cambios.phone = tel.valor;
       }
       if (body.role !== undefined) {
         const validos = ['owner', 'staff', 'guardian', 'student'];

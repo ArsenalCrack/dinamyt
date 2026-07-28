@@ -6,10 +6,16 @@ Producto **independiente**: identidad, base de datos y despliegue propios. No
 necesita ningún otro servicio para funcionar.
 
 - **Multi-club.** Un superadmin decide qué clubes existen y qué maestros entran.
-- **El maestro manda en su club.** Da de alta a sus alumnos, les pone la
-  contraseña y se la restablece si la olvidan.
+- **El maestro manda en su club.** Da de alta a sus alumnos, los edita, les pone
+  el cinturón y el plan, y les restablece la contraseña si la olvidan.
 - **Check-in con carnet QR.** Cada alumno imprime el suyo y lo lleva a clase; el
   maestro lo escanea con la cámara de su celular. PIN y lista manual de respaldo.
+- **Acceso rápido con QR.** Para el alumno que no se acuerda de su correo: el
+  maestro genera un código de diez minutos y él entra escaneándolo.
+- **Estadísticas del club.** Recaudo de seis meses, estado de las mensualidades,
+  asistencia, planes y cinturones en una sola pantalla.
+- **Avisos que salen solos.** Un cron diario recorre los clubes y avisa de lo que
+  está por vencer, por la campana y por push. Ver [DESPLIEGUE.md](DESPLIEGUE.md).
 - **PWA instalable**, con modo claro/oscuro y español/inglés.
 
 ---

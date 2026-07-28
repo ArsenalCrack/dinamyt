@@ -1,29 +1,50 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { aplicarTema, getTema, type Tema } from '@/lib/theme';
 import { IDIOMAS, useI18n } from '@/lib/i18n';
 
 /**
- * Tema e idioma en un solo control.
+ * Tema e idioma en un botón flotante 🌐.
  *
- * Se usa en dos sitios: dentro del menú de la NavBar (`variante="menu"`) y como
- * botón flotante 🌐 en las pantallas SIN sesión — login y kiosco — donde no hay
- * barra de navegación y, sin esto, nadie podría cambiar el tema ni el idioma.
+ * Solo para las pantallas SIN barra de navegación —login y kiosco—, donde sin
+ * esto nadie podría cambiar el tema ni el idioma. Con sesión, ese control vive
+ * en el menú de la barra (ver `NavBar`).
+ *
+ * Se cierra al tocar fuera y con Escape: un panel flotante que solo se cierra
+ * volviendo a pulsar su propio botón se queda tapando la pantalla, que es justo
+ * lo que pasaba.
  */
-export function ControlesApariencia({
-  variante = 'flotante',
-}: {
-  variante?: 'flotante' | 'menu';
-}) {
+export function ControlesApariencia() {
   const { t, idioma, setIdioma } = useI18n();
   const [tema, setTema] = useState<Tema>('dark');
   const [abierto, setAbierto] = useState(false);
+  const raizRef = useRef<HTMLDivElement | null>(null);
 
   // El servidor siempre renderiza 'dark'; el tema real se lee tras montar.
   useEffect(() => {
     setTema(getTema());
   }, []);
+
+  useEffect(() => {
+    if (!abierto) return;
+    function fuera(e: MouseEvent | TouchEvent) {
+      if (raizRef.current && !raizRef.current.contains(e.target as Node)) {
+        setAbierto(false);
+      }
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAbierto(false);
+    }
+    document.addEventListener('mousedown', fuera);
+    document.addEventListener('touchstart', fuera);
+    document.addEventListener('keydown', tecla);
+    return () => {
+      document.removeEventListener('mousedown', fuera);
+      document.removeEventListener('touchstart', fuera);
+      document.removeEventListener('keydown', tecla);
+    };
+  }, [abierto]);
 
   function alternarTema() {
     const nuevo: Tema = tema === 'dark' ? 'light' : 'dark';
@@ -31,56 +52,50 @@ export function ControlesApariencia({
     setTema(nuevo);
   }
 
-  const panel = (
-    <div className="apar-panel" role="group" aria-label={t('menu.apariencia')}>
-      <button type="button" className="apar-item" onClick={alternarTema}>
-        {tema === 'dark' ? t('menu.modoClaro') : t('menu.modoOscuro')}
-      </button>
-      <div className="apar-langs">
-        {IDIOMAS.map((l) => (
-          <button
-            key={l.codigo}
-            type="button"
-            className="apar-lang"
-            data-activo={idioma === l.codigo}
-            aria-pressed={idioma === l.codigo}
-            onClick={() => setIdioma(l.codigo)}
-          >
-            {l.etiqueta}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
   return (
-    <div className={variante === 'flotante' ? 'apar apar-flotante' : 'apar'}>
-      {variante === 'menu' ? (
-        panel
-      ) : (
-        <>
-          {abierto && panel}
-          <button
-            type="button"
-            className="apar-toggle"
-            aria-label={t('menu.apariencia')}
-            aria-expanded={abierto}
-            title={t('menu.apariencia')}
-            onClick={() => setAbierto((o) => !o)}
-          >
-            🌐
+    <div ref={raizRef} className="apar">
+      {abierto && (
+        <div className="apar-panel" role="group" aria-label={t('menu.apariencia')}>
+          <button type="button" className="apar-item" onClick={alternarTema}>
+            {tema === 'dark' ? t('menu.modoClaro') : t('menu.modoOscuro')}
           </button>
-        </>
+          <div className="apar-langs">
+            {IDIOMAS.map((l) => (
+              <button
+                key={l.codigo}
+                type="button"
+                className="apar-lang"
+                data-activo={idioma === l.codigo}
+                aria-pressed={idioma === l.codigo}
+                onClick={() => setIdioma(l.codigo)}
+              >
+                {l.etiqueta}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
+      <button
+        type="button"
+        className="apar-toggle"
+        aria-label={t('menu.apariencia')}
+        aria-expanded={abierto}
+        title={t('menu.apariencia')}
+        onClick={() => setAbierto((o) => !o)}
+      >
+        🌐
+      </button>
 
       <style>{`
-        .apar { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
-        .apar-flotante {
+        .apar {
           position: fixed;
           right: 14px;
           bottom: 16px;
           z-index: 60;
+          display: flex;
+          flex-direction: column;
           align-items: flex-end;
+          gap: 8px;
         }
         .apar-toggle {
           width: 42px;
@@ -98,17 +113,18 @@ export function ControlesApariencia({
           justify-content: center;
         }
         .apar-toggle:hover,
-        .apar-toggle:focus-visible { opacity: 1; border-color: var(--gold); }
+        .apar-toggle:focus-visible,
+        .apar-toggle[aria-expanded="true"] { opacity: 1; border-color: var(--gold); }
         .apar-panel {
           background: var(--bg-card);
-          border: 1px solid var(--border);
+          border: 1px solid var(--gold-dim);
           border-radius: 0.6rem;
           padding: 10px;
           display: flex;
           flex-direction: column;
           gap: 8px;
-          box-shadow: 0 6px 24px rgba(0,0,0,0.25);
-          min-width: 180px;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+          min-width: 190px;
         }
         .apar-item {
           padding: 8px 12px;

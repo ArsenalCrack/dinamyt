@@ -7,10 +7,10 @@ import { claveRol, useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { activarPush } from '@/lib/push';
-import { LIM, soloTelefono } from '@/lib/campos';
-import { Avisos } from '@/components/Avisos';
+import { LIM, soloTelefono, telefonoValido } from '@/lib/campos';
 import { Avatar } from '@/components/Avatar';
 import { CarnetQR } from '@/components/CarnetQR';
+import { Cinturon } from '@/components/Cinturon';
 
 interface Pago {
   id: string;
@@ -84,6 +84,10 @@ export default function MiPanel() {
     e.preventDefault();
     setError('');
     setAviso('');
+    if (!telefonoValido(perfil.phone)) {
+      setError(t('comun.telefonoCorto'));
+      return;
+    }
     try {
       await api.patch('/auth/me', {
         fullName: perfil.fullName,
@@ -140,9 +144,9 @@ export default function MiPanel() {
             <h1 className="display" style={{ fontSize: '1.5rem' }}>
               {user?.fullName?.split(' ')[0] ?? ''}
             </h1>
+            <Cinturon nombre={user?.belt} />
           </div>
         </div>
-        <Avisos />
       </header>
 
       {aviso && (
@@ -289,8 +293,17 @@ export default function MiPanel() {
             value={perfil.phone}
             onChange={(e) => setPerfil({ ...perfil, phone: soloTelefono(e.target.value) })}
             maxLength={LIM.telefono}
-            style={{ margin: '0.25rem 0 0.9rem' }}
+            style={{
+              margin: '0.25rem 0 0.2rem',
+              borderColor: telefonoValido(perfil.phone) ? undefined : 'var(--danger)',
+            }}
           />
+          <p
+            className={telefonoValido(perfil.phone) ? 'muted' : 'msg-error'}
+            style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}
+          >
+            {t('comun.telefonoCorto')}
+          </p>
           <button type="submit" className="btn btn-outline btn-sm">
             {t('comun.guardar')}
           </button>

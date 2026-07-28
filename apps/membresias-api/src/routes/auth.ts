@@ -1,8 +1,8 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { eq } from 'drizzle-orm';
-import { orgs, users } from '@dinamyt/membresias-db';
+import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { requireAuth } from '../plugins/auth';
-import { firmarToken } from '../lib/auth/tokens';
+import { firmarToken, verificarTokenAcceso } from '../lib/auth/tokens';
 import {
   hashPassword,
   necesitaRehash,
@@ -16,7 +16,7 @@ import {
   segundosRestantes,
 } from '../lib/auth/rate-limit';
 import { cerrarSesion, darSesion } from '../lib/auth/cookies';
-import { LIMITES, textoObligatorio, textoOpcional } from '../lib/validacion';
+import { LIMITES, telefono, textoObligatorio } from '../lib/validacion';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { ssoHabilitado } from '../config';
 
@@ -33,11 +33,64 @@ function vistaUsuario(u: typeof users.$inferSelect) {
     fullName: u.fullName,
     phone: u.phone,
     avatarUrl: u.avatarUrl,
+    belt: u.belt,
     role: u.role,
     isSuperAdmin: u.isSuperAdmin,
     orgId: u.orgId,
     isActive: u.isActive,
   };
+}
+
+/**
+ * Comprueba que la cuenta y su club siguen vigentes y deja la sesión puesta.
+ *
+ * Lo comparten el login por contraseña y el canje del QR de acceso rápido: son
+ * dos formas de demostrar quién eres, pero lo que pasa DESPUÉS —el club
+ * suspendido corta igual, la cookie se pone igual— tiene que ser lo mismo en
+ * ambas, o una acaba con un agujero que la otra no tiene.
+ */
+async function abrirSesion(
+  db: Db,
+  reply: FastifyReply,
+  u: typeof users.$inferSelect,
+) {
+  if (!u.isActive) {
+    return reply.code(403).send({ error: 'Tu cuenta está desactivada. Habla con tu maestro.' });
+  }
+
+  let club: { id: string; name: string; slug: string; isActive: boolean } | null = null;
+  if (u.orgId) {
+    const [c] = await db
+      .select({
+        id: orgs.id,
+        name: orgs.name,
+        slug: orgs.slug,
+        isActive: orgs.isActive,
+      })
+      .from(orgs)
+      .where(eq(orgs.id, u.orgId))
+      .limit(1);
+    club = c ?? null;
+    if (club && !club.isActive && !u.isSuperAdmin) {
+      return reply.code(403).send({ error: 'El acceso de tu club está suspendido.' });
+    }
+  }
+
+  const token = await firmarToken({
+    sub: u.id,
+    email: u.email,
+    fullName: u.fullName,
+    org_id: u.orgId,
+    role_membresias: u.role,
+    is_super_admin: u.isSuperAdmin,
+  });
+
+  // La sesión va en cookie httpOnly: es lo que el navegador usará a partir de
+  // aquí. El token se sigue devolviendo en el cuerpo para los clientes que no
+  // son navegador y para el respaldo en memoria de la web cuando la cookie es
+  // de terceros y el navegador la bloquea (ver `config`).
+  const csrf = darSesion(reply, token);
+  return { token, csrf, user: vistaUsuario(u), club };
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -79,60 +132,54 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.code(401).send({ error: 'Correo o contraseña incorrectos.' });
       }
 
-      if (!u.isActive) {
-        return reply
-          .code(403)
-          .send({ error: 'Tu cuenta está desactivada. Habla con tu maestro.' });
-      }
-
-      let club: { id: string; name: string; slug: string; isActive: boolean } | null =
-        null;
-      if (u.orgId) {
-        const [c] = await db
-          .select({
-            id: orgs.id,
-            name: orgs.name,
-            slug: orgs.slug,
-            isActive: orgs.isActive,
-          })
-          .from(orgs)
-          .where(eq(orgs.id, u.orgId))
-          .limit(1);
-        club = c ?? null;
-        if (club && !club.isActive && !u.isSuperAdmin) {
-          return reply
-            .code(403)
-            .send({ error: 'El acceso de tu club está suspendido.' });
-        }
-      }
-
       limpiarIntentos(claveEmail);
 
       // Migración transparente del costo de bcrypt (ver `necesitaRehash`).
-      if (necesitaRehash(u.passwordHash)) {
+      if (u.isActive && necesitaRehash(u.passwordHash)) {
         await db
           .update(users)
           .set({ passwordHash: await hashPassword(password), updatedAt: new Date() })
           .where(eq(users.id, u.id));
       }
 
-      const token = await firmarToken({
-        sub: u.id,
-        email: u.email,
-        fullName: u.fullName,
-        org_id: u.orgId,
-        role_membresias: u.role,
-        is_super_admin: u.isSuperAdmin,
-      });
-
-      // La sesión va en cookie httpOnly: es lo que el navegador usará a partir
-      // de aquí. El token se sigue devolviendo en el cuerpo para los clientes
-      // que no son navegador y para el respaldo en memoria de la web cuando la
-      // cookie es de terceros y el navegador la bloquea (ver `config`).
-      const csrf = darSesion(reply, token);
-      return { token, csrf, user: vistaUsuario(u), club };
+      return abrirSesion(db, reply, u);
     });
   });
+
+  // ── POST /auth/acceso-qr — canjear el QR del maestro por una sesión ───────
+  // El maestro genera el código en la ficha del alumno (`/users/:id/acceso-qr`)
+  // y el alumno lo escanea con su celular. Ruta pública por necesidad —quien la
+  // usa todavía no tiene sesión—, pero solo abre paso con un token firmado por
+  // esta misma API, de emisor propio y con diez minutos de vida.
+  //
+  // El tope por IP está porque es la única ruta que entrega una sesión sin
+  // contraseña: sin él, un token robado se podría intentar canjear en bucle
+  // mientras se prueban variantes.
+  app.post(
+    '/auth/acceso-qr',
+    { preHandler: limitarPorIp('acceso-qr', 20, 300) },
+    async (req, reply) => {
+      const { token } = (req.body ?? {}) as { token?: string };
+      if (!token) return reply.code(400).send({ error: 'Falta el código de acceso.' });
+
+      let datos: { sub: string; email: string };
+      try {
+        datos = await verificarTokenAcceso(token);
+      } catch {
+        return reply
+          .code(401)
+          .send({ error: 'Este código ya caducó. Pídele otro a tu maestro.' });
+      }
+
+      // Cruza clubes por el mismo motivo que el login: todavía no se sabe de
+      // qué club es quien entra (ver `lib/db-contexto.ts`).
+      return sinFiltroDeClub(req.server.db, async (db) => {
+        const [u] = await db.select().from(users).where(eq(users.id, datos.sub)).limit(1);
+        if (!u) return reply.code(401).send({ error: 'Este código ya no es válido.' });
+        return abrirSesion(db, reply, u);
+      });
+    },
+  );
 
   // ── POST /auth/logout — cierra la sesión del navegador ────────────────────
   // Sin guard: si la cookie ya no vale, borrarla debe funcionar igual. Lo
@@ -186,9 +233,9 @@ export async function authRoutes(app: FastifyInstance) {
       cambios.fullName = nombre.valor;
     }
     if (body.phone !== undefined) {
-      const telefono = textoOpcional(body.phone, LIMITES.telefono, 'El teléfono');
-      if (!telefono.ok) return reply.code(422).send({ error: telefono.error });
-      cambios.phone = telefono.valor;
+      const tel = telefono(body.phone);
+      if (!tel.ok) return reply.code(422).send({ error: tel.error });
+      cambios.phone = tel.valor;
     }
     if (body.avatarUrl !== undefined) cambios.avatarUrl = body.avatarUrl || null;
 

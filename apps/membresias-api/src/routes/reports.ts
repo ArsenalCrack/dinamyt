@@ -1,9 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { and, eq, gte, lte } from 'drizzle-orm';
-import { memberships, payments, plans, attendances } from '@dinamyt/membresias-db';
+import {
+  memberships,
+  payments,
+  plans,
+  attendances,
+  users,
+} from '@dinamyt/membresias-db';
 import { orgDelRequest, requireRole } from '../plugins/auth';
 import { limitarPorIp } from '../lib/auth/rate-limit';
-import { todayStr } from '../lib/billing';
+import { estado, todayStr } from '../lib/billing';
 
 /** Rango [primer día, último día] de un mes 'YYYY-MM'. */
 function monthRange(month: string) {
@@ -11,6 +17,24 @@ function monthRange(month: string) {
   const start = `${month}-01`;
   const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
   return { start, end };
+}
+
+/** Los `n` últimos meses en 'YYYY-MM', del más antiguo al actual. */
+function ultimosMeses(n: number, hasta: string): string[] {
+  const [y, m] = hasta.split('-').map(Number);
+  const out: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1));
+    out.push(d.toISOString().slice(0, 7));
+  }
+  return out;
+}
+
+/** Resta días a una fecha 'YYYY-MM-DD'. */
+function menosDias(fecha: string, dias: number): string {
+  const d = new Date(`${fecha}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - dias);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Reportes para el maestro: recaudo, cartera vencida y asistencia. */
@@ -82,6 +106,165 @@ export async function reportsRoutes(app: FastifyInstance) {
           ),
         }))
         .sort((a, b) => b.diasVencido - a.diasVencido);
+    },
+  );
+
+  // ── GET /reports/estadisticas — el club de un vistazo ─────────────────────
+  //
+  // Una sola llamada con TODO lo que el maestro necesita para saber cómo va su
+  // club: cuánto entra cada mes, en qué estado está su gente, quién viene a
+  // clase y con qué planes y cinturones se queda. Va junto y no en cinco rutas
+  // porque son cinco tarjetas de la misma pantalla, y pedirlas por separado
+  // multiplicaría por cinco los viajes de un panel que se abre a diario.
+  //
+  // Las cuentas se hacen aquí, en memoria, y no con GROUP BY: el roster de un
+  // club son decenas de personas, no millones de filas, y el código se lee.
+  app.get(
+    '/reports/estadisticas',
+    { preHandler: [limitarPorIp('reports', 60, 60), requireRole(['owner', 'staff'])] },
+    async (req, reply) => {
+      const orgId = orgDelRequest(req);
+      if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
+      const db = req.db;
+
+      const today = todayStr();
+      const mes = today.slice(0, 7);
+      const meses = ultimosMeses(6, mes);
+      const desdeMeses = `${meses[0]}-01`;
+      const desde30 = menosDias(today, 29);
+
+      const [gente, locales, tarifas, pagos, checkins] = await Promise.all([
+        db.select().from(users).where(eq(users.orgId, orgId)),
+        db.select().from(memberships).where(eq(memberships.orgId, orgId)),
+        db.select().from(plans).where(eq(plans.orgId, orgId)),
+        db
+          .select({
+            amount: payments.amount,
+            paidAt: payments.paidAt,
+            planId: payments.planId,
+          })
+          .from(payments)
+          .innerJoin(memberships, eq(payments.membershipId, memberships.id))
+          .where(
+            and(
+              eq(memberships.orgId, orgId),
+              gte(payments.paidAt, new Date(`${desdeMeses}T00:00:00.000Z`)),
+            ),
+          ),
+        db
+          .select({
+            checkinDate: attendances.checkinDate,
+            userId: memberships.userId,
+          })
+          .from(attendances)
+          .innerJoin(memberships, eq(attendances.membershipId, memberships.id))
+          .where(and(eq(memberships.orgId, orgId), gte(attendances.checkinDate, desde30))),
+      ]);
+
+      const alumnos = gente.filter((u) => u.role === 'student');
+      const activos = alumnos.filter((u) => u.isActive);
+      const memPorUsuario = new Map(locales.map((m) => [m.userId, m]));
+
+      // ── Estado de la gente ──────────────────────────────────────────────
+      const porEstado = { al_dia: 0, por_vencer: 0, vencido: 0, sin_plan: 0 };
+      for (const a of activos) {
+        porEstado[estado(memPorUsuario.get(a.id)?.venceEl ?? null, today)]++;
+      }
+
+      // ── Dinero: seis meses de recaudo ───────────────────────────────────
+      const recaudoPorMes = new Map(meses.map((m) => [m, { total: 0, pagos: 0 }]));
+      for (const p of pagos) {
+        const m = (p.paidAt ?? new Date()).toISOString().slice(0, 7);
+        const acc = recaudoPorMes.get(m);
+        if (!acc) continue;
+        acc.total += parseFloat(p.amount);
+        acc.pagos++;
+      }
+      const precioPlan = new Map(tarifas.map((p) => [p.id, p]));
+      const esperadoMensual = activos.reduce((suma, a) => {
+        const plan = precioPlan.get(memPorUsuario.get(a.id)?.currentPlanId ?? '');
+        return plan?.type === 'mensual' ? suma + parseFloat(plan.price) : suma;
+      }, 0);
+
+      // ── Asistencia de los últimos 30 días ───────────────────────────────
+      const porDia = new Map<string, number>();
+      const porAlumno = new Map<string, number>();
+      for (const c of checkins) {
+        const d = c.checkinDate as string;
+        porDia.set(d, (porDia.get(d) ?? 0) + 1);
+        porAlumno.set(c.userId, (porAlumno.get(c.userId) ?? 0) + 1);
+      }
+      const diasConClase = porDia.size;
+      const nombrePorId = new Map(gente.map((u) => [u.id, u.fullName]));
+
+      // ── Planes y cinturones ─────────────────────────────────────────────
+      const porPlan = new Map<string, number>();
+      for (const a of activos) {
+        const id = memPorUsuario.get(a.id)?.currentPlanId;
+        if (id) porPlan.set(id, (porPlan.get(id) ?? 0) + 1);
+      }
+      const porCinturon = new Map<string, number>();
+      for (const a of activos) {
+        const b = a.belt ?? '';
+        if (b) porCinturon.set(b, (porCinturon.get(b) ?? 0) + 1);
+      }
+
+      return {
+        mes,
+        alumnos: {
+          total: alumnos.length,
+          activos: activos.length,
+          inactivos: alumnos.length - activos.length,
+          nuevosEsteMes: alumnos.filter(
+            (a) => (a.createdAt?.toISOString().slice(0, 7) ?? '') === mes,
+          ).length,
+          ...porEstado,
+        },
+        dinero: {
+          recaudadoMes: recaudoPorMes.get(mes)?.total ?? 0,
+          pagosMes: recaudoPorMes.get(mes)?.pagos ?? 0,
+          esperadoMensual,
+          porMes: meses.map((m) => ({
+            month: m,
+            total: recaudoPorMes.get(m)?.total ?? 0,
+            pagos: recaudoPorMes.get(m)?.pagos ?? 0,
+          })),
+        },
+        asistencia: {
+          hoy: porDia.get(today) ?? 0,
+          total30: checkins.length,
+          diasConClase,
+          // Promedio POR DÍA CON CLASE, no por día del mes: dividir entre 30
+          // castigaría a un club que abre tres veces por semana.
+          promedioPorDia: diasConClase
+            ? Math.round((checkins.length / diasConClase) * 10) / 10
+            : 0,
+          porDia: [...porDia.entries()]
+            .map(([date, count]) => ({ date, count }))
+            .sort((a, b) => (a.date < b.date ? -1 : 1)),
+          masConstantes: [...porAlumno.entries()]
+            .map(([userId, asistencias]) => ({
+              userId,
+              fullName: nombrePorId.get(userId) ?? '—',
+              asistencias,
+            }))
+            .sort((a, b) => b.asistencias - a.asistencias)
+            .slice(0, 5),
+        },
+        planes: tarifas
+          .filter((p) => p.isActive)
+          .map((p) => ({
+            planId: p.id,
+            name: p.name,
+            type: p.type,
+            price: p.price,
+            alumnos: porPlan.get(p.id) ?? 0,
+          }))
+          .sort((a, b) => b.alumnos - a.alumnos),
+        cinturones: [...porCinturon.entries()]
+          .map(([belt, alumnos]) => ({ belt, alumnos }))
+          .sort((a, b) => b.alumnos - a.alumnos),
+      };
     },
   );
 

@@ -12,7 +12,8 @@ import {
 } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { LIM, soloTelefono } from '@/lib/campos';
+import { LIM, soloTelefono, telefonoValido } from '@/lib/campos';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface Club {
   id: string;
@@ -177,6 +178,10 @@ export default function Admin() {
     e.preventDefault();
     setError('');
     setAviso('');
+    if (!telefonoValido(nuevoMaestro.phone)) {
+      setError(t('comun.telefonoCorto'));
+      return;
+    }
     try {
       await api.post(`/orgs/${clubId}/maestros`, nuevoMaestro);
       setNuevoMaestro({ email: '', fullName: '', password: '', phone: '' });
@@ -271,25 +276,24 @@ export default function Admin() {
               {t('admin.pais')}
             </span>
             {paisesTraducidos.length > 0 ? (
-              <select
-                value={paisIso}
-                // Cambiar de país deja obsoleta la ciudad elegida: se borra
-                // para no acabar con "Bogotá, México".
-                onChange={(e) => {
-                  const iso = e.target.value;
-                  setPaisIso(iso);
-                  const nombre = paisesTraducidos.find((p) => p.iso2 === iso)?.nombre ?? '';
-                  setNuevoClub((c) => ({ ...c, country: nombre, city: '' }));
-                }}
-                style={{ marginTop: '0.25rem' }}
-              >
-                <option value="">{t('admin.selecciona')}</option>
-                {paisesTraducidos.map((p) => (
-                  <option key={p.iso2} value={p.iso2}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
+              <div style={{ marginTop: '0.25rem' }}>
+                <SelectMenu
+                  valor={paisIso}
+                  // Cambiar de país deja obsoleta la ciudad elegida: se borra
+                  // para no acabar con "Bogotá, México".
+                  onChange={(iso) => {
+                    setPaisIso(iso);
+                    const nombre = paisesTraducidos.find((p) => p.iso2 === iso)?.nombre ?? '';
+                    setNuevoClub((c) => ({ ...c, country: nombre, city: '' }));
+                  }}
+                  etiquetaAria={t('admin.pais')}
+                  placeholder={t('admin.selecciona')}
+                  opciones={paisesTraducidos.map((p) => ({
+                    valor: p.iso2,
+                    etiqueta: p.nombre,
+                  }))}
+                />
+              </div>
             ) : (
               <input
                 value={nuevoClub.country}
@@ -475,6 +479,11 @@ export default function Admin() {
                         })
                       }
                       maxLength={LIM.telefono}
+                      style={{
+                        borderColor: telefonoValido(nuevoMaestro.phone)
+                          ? undefined
+                          : 'var(--danger)',
+                      }}
                     />
                     <input
                       type="text"

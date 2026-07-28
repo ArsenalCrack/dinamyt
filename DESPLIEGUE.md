@@ -102,6 +102,7 @@ puerta de entrada: sin ella nadie puede crear el primer club.
    | `CORS_ORIGINS` | *Déjala vacía por ahora* — se llena en el paso 4 |
    | `MEMBRESIAS_WEB_URL` | *Igual, en el paso 4* |
    | `VAPID_*` | Opcionales; sáltalas si no quieres avisos push todavía |
+   | `CRON_SECRET` | *Se llena en el paso 4 ter*, junto con el de Vercel |
 
    `JWT_SECRET` no te la pide: Render la genera sola y nadie tiene que verla.
 
@@ -154,6 +155,7 @@ puerta de entrada: sin ella nadie puede crear el primer club.
    | Variable | Valor |
    |---|---|
    | `MEMBRESIAS_API_ORIGIN` | La URL de Render, **sin barra al final** |
+   | `CRON_SECRET` | El secreto de los avisos diarios; el **mismo** que en Render (ver el paso 4 ter) |
 
    > **No definas `NEXT_PUBLIC_API_URL`.** El navegador no habla con Render
    > directamente: pide a `/api` en el propio dominio de la web y Next reenvía
@@ -352,6 +354,65 @@ contraseña. Al reiniciar, ese mensaje de `[SEGURIDAD]` debe desaparecer.
 > Ojo: el bloque de arriba solo toca el esquema `membresias`. No uses
 > `reassign owned by postgres`, que arrastraría también los objetos internos de
 > Supabase.
+
+---
+
+## 4 ter. Los avisos, cada mañana y sin que nadie pulse nada
+
+Sin esto, los avisos de vencimiento solo existen cuando el maestro entra al
+panel y pulsa **Generar avisos**. Con esto salen solos a las 8 de la mañana,
+para todos los clubes.
+
+Por qué el reloj lo lleva **Vercel** y no la API: el plan gratuito de Render
+apaga el servicio cuando nadie lo usa y no ofrece tareas programadas, así que un
+temporizador dentro del proceso moriría con él. Vercel trae cron incluido.
+
+La cadena queda así:
+
+```
+cron de Vercel  →  GET  /cron/avisos  (en la web)
+                →  POST /notifications/cron  (en la API, con x-cron-secret)
+                →  recorre los clubes, encola avisos y manda los push
+```
+
+**Qué hay que hacer:**
+
+1. Genera un secreto:
+
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+   ```
+
+2. Ponlo como `CRON_SECRET` en **Vercel** (Settings → Environment Variables,
+   marcado para *Production*) **y** en **Render** (Environment). **El mismo
+   valor en los dos.**
+
+3. Vuelve a desplegar la web. El horario vive en
+   `apps/membresias-web/vercel.json` (`0 13 * * *` = 13:00 UTC = 8:00 en
+   Colombia); cámbialo ahí si tu club va con otro huso.
+
+4. Compruébalo a mano:
+
+   ```bash
+   curl -H "Authorization: Bearer TU_CRON_SECRET" https://tu-web.vercel.app/cron/avisos
+   ```
+
+   Debe responder algo como `{"ok":true,"clubes":1,"creados":0,"pushEnviados":0}`.
+   `creados: 0` está bien si hoy no vence nadie.
+
+Detalles que cuestan una tarde:
+
+- **Sin `CRON_SECRET` en Render, la API responde 404** a esa ruta. Es a
+  propósito: es la única que actúa sin sesión y no puede quedar abierta.
+- **Sin `CRON_SECRET` en Vercel**, Vercel no firma la llamada y la ruta de la
+  web responde 503.
+- **El plan Hobby de Vercel ejecuta los crons una vez al día** y con una hora de
+  margen sobre lo programado. Para avisos de vencimiento sobra.
+- **La primera llamada del día despierta a Render** y puede tardar cerca de un
+  minuto; por eso la ruta reintenta y espera hasta 60 segundos.
+- **Los push necesitan además las llaves `VAPID_*`** en Render y
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY` en Vercel. Sin ellas los avisos se generan
+  igual y se ven en la campana, pero no llega nada al celular.
 
 ---
 

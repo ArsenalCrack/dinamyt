@@ -46,6 +46,7 @@ export interface Usuario {
   fullName: string;
   phone: string | null;
   avatarUrl: string | null;
+  belt: string | null;
   role: Rol;
   isSuperAdmin: boolean;
   orgId: string | null;
@@ -200,6 +201,20 @@ export async function logout(): Promise<void> {
 /** Revalida la sesión contra el servidor (rol y club pueden haber cambiado). */
 export async function obtenerMe(): Promise<{ user: Usuario; club: Club | null }> {
   const { data } = await api.get<{ user: Usuario; club: Club | null }>('/auth/me');
+  guardarUsuario(data.user);
+  return data;
+}
+
+/**
+ * Canjea el código del QR de acceso rápido por una sesión.
+ *
+ * Lo genera el maestro en la ficha del alumno y dura diez minutos. Termina en
+ * el mismo sitio que el login normal: cookie de sesión puesta por la API y
+ * perfil cacheado para pintar rápido.
+ */
+export async function entrarConCodigo(token: string): Promise<RespuestaLogin> {
+  const { data } = await api.post<RespuestaLogin>('/auth/acceso-qr', { token });
+  guardarToken(data.token);
   guardarUsuario(data.user);
   return data;
 }

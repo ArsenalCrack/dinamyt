@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   cerrarSesion as limpiar,
+  entrarConCodigo as codigoApi,
   login as loginApi,
   logout as logoutApi,
   obtenerMe,
@@ -29,6 +30,8 @@ interface AuthCtx {
   club: Club | null;
   cargando: boolean;
   login: (email: string, password: string) => Promise<Usuario>;
+  /** Entrar con el código del QR que genera el maestro (sin teclear nada). */
+  loginConCodigo: (token: string) => Promise<Usuario>;
   logout: () => Promise<void>;
   /** Refresca el usuario tras editar el propio perfil. */
   refrescar: () => Promise<void>;
@@ -73,6 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data.user;
   }, []);
 
+  const loginConCodigo = useCallback(async (token: string) => {
+    const data = await codigoApi(token);
+    setUser(data.user);
+    setClub(data.club);
+    return data.user;
+  }, []);
+
   // La cookie de sesión es httpOnly: solo el servidor puede borrarla, así que
   // cerrar sesión pasa por pedírselo. Limpiar aquí a secas dejaría la sesión
   // viva en la API.
@@ -96,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         club,
         cargando,
         login,
+        loginConCodigo,
         logout,
         refrescar,
         esStaff: esStaff(user),

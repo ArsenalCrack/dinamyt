@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { fmtFecha } from '@/lib/formato';
 import { LIM } from '@/lib/campos';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface Exc {
   id: string;
@@ -193,13 +194,16 @@ export default function Calendario() {
             <label className="muted" style={{ fontSize: '0.72rem' }}>
               {t('planes.tipo')}
             </label>
-            <select
-              value={nueva.isClosed ? 'closed' : 'open'}
-              onChange={(e) => setNueva((n) => ({ ...n, isClosed: e.target.value === 'closed' }))}
-            >
-              <option value="closed">{t('calendario.cerrado')}</option>
-              <option value="open">{t('calendario.abierto')}</option>
-            </select>
+            <SelectMenu
+              valor={nueva.isClosed ? 'closed' : 'open'}
+              onChange={(v) => setNueva((n) => ({ ...n, isClosed: v === 'closed' }))}
+              etiquetaAria={t('planes.tipo')}
+              style={{ minWidth: 150 }}
+              opciones={[
+                { valor: 'closed', etiqueta: t('calendario.cerrado') },
+                { valor: 'open', etiqueta: t('calendario.abierto') },
+              ]}
+            />
           </div>
           <div style={{ flex: 1, minWidth: 120 }}>
             <label className="muted" style={{ fontSize: '0.72rem' }}>

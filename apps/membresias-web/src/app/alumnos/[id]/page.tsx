@@ -7,9 +7,13 @@ import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
-import { LIM } from '@/lib/campos';
+import { LIM, soloDigitos, soloTelefono, telefonoValido } from '@/lib/campos';
+import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
 import { CarnetQR } from '@/components/CarnetQR';
+import { AccesoQR } from '@/components/AccesoQR';
+import { Cinturon } from '@/components/Cinturon';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface Persona {
   id: string;
@@ -17,6 +21,7 @@ interface Persona {
   fullName: string;
   phone: string | null;
   avatarUrl: string | null;
+  belt: string | null;
   role: Rol;
   isActive: boolean;
 }
@@ -24,10 +29,18 @@ interface Membership {
   userId: string;
   fullName: string;
   estado: string;
+  status: string | null;
+  currentPlanId: string | null;
   venceEl: string | null;
   clasesRestantes: number | null;
   diasFaltantes: number | null;
   checkinPin: string | null;
+}
+interface Plan {
+  id: string;
+  name: string;
+  type: string;
+  price: string;
 }
 interface Payment {
   id: string;
@@ -42,6 +55,18 @@ interface Attendance {
   method: string;
 }
 
+const ESTADOS_MEM = ['activo', 'inactivo', 'suspendido', 'retirado'] as const;
+const METODOS = ['efectivo', 'transferencia', 'nequi', 'daviplata'] as const;
+
+/**
+ * Ficha del alumno, vista por el maestro. Es la pantalla donde se hace TODO lo
+ * que le concierne a una persona: corregir sus datos, ponerle plan, cobrarle,
+ * darle su carnet y, si hace falta, abrirle la sesión con un QR.
+ *
+ * Antes solo mostraba y dejaba cambiar la contraseña: para asignar un plan
+ * había que ir al panel del club y adivinar que el desplegable de una fila
+ * servía para eso.
+ */
 export default function Ficha() {
   const router = useRouter();
   const params = useParams();
@@ -52,24 +77,44 @@ export default function Ficha() {
 
   const [persona, setPersona] = useState<Persona | null>(null);
   const [membership, setMembership] = useState<Membership | null>(null);
+  const [planes, setPlanes] = useState<Plan[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
   const [aviso, setAviso] = useState('');
   const [error, setError] = useState('');
   const [nuevaPass, setNuevaPass] = useState('');
 
+  const [datos, setDatos] = useState({ fullName: '', phone: '', belt: '' });
+  const [plan, setPlan] = useState({ currentPlanId: '', status: 'activo', checkinPin: '' });
+  const [cobro, setCobro] = useState({ planId: '', amount: '', method: 'efectivo' });
+  const [guardando, setGuardando] = useState('');
+
   const cargar = useCallback(async () => {
     try {
-      const [pe, mem, pays, ats] = await Promise.all([
+      const [pe, mem, pl, pays, ats] = await Promise.all([
         api.get<Persona>(`/users/${id}`),
         api.get<Membership[]>('/memberships'),
+        api.get<Plan[]>('/plans'),
         api.get<Payment[]>(`/payments?userId=${id}`),
         api.get<Attendance[]>(`/attendances?userId=${id}`),
       ]);
+      const m = mem.data.find((x) => x.userId === id) ?? null;
       setPersona(pe.data);
-      setMembership(mem.data.find((m) => m.userId === id) ?? null);
+      setMembership(m);
+      setPlanes(pl.data);
       setPayments(pays.data);
       setAttendances(ats.data);
+
+      setDatos({
+        fullName: pe.data.fullName,
+        phone: pe.data.phone ?? '',
+        belt: pe.data.belt ?? '',
+      });
+      setPlan({
+        currentPlanId: m?.currentPlanId ?? '',
+        status: m?.status ?? 'activo',
+        checkinPin: m?.checkinPin ?? '',
+      });
     } catch (e) {
       setError(mensajeError(e, t('comun.ninguno')));
     }
@@ -88,6 +133,73 @@ export default function Ficha() {
     if (id) void cargar();
   }, [cargandoSesion, user, esStaff, id, router, cargar]);
 
+  async function guardarDatos(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setAviso('');
+    if (!telefonoValido(datos.phone)) {
+      setError(t('comun.telefonoCorto'));
+      return;
+    }
+    setGuardando('datos');
+    try {
+      await api.patch(`/users/${id}`, {
+        fullName: datos.fullName,
+        phone: datos.phone || null,
+        belt: datos.belt || null,
+      });
+      setAviso(t('ficha.guardado'));
+      await cargar();
+    } catch (err) {
+      setError(mensajeError(err, t('ficha.datos')));
+    } finally {
+      setGuardando('');
+    }
+  }
+
+  async function guardarPlan(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setAviso('');
+    setGuardando('plan');
+    try {
+      await api.patch(`/memberships/${id}`, {
+        ...(plan.currentPlanId ? { currentPlanId: plan.currentPlanId } : {}),
+        status: plan.status,
+        checkinPin: plan.checkinPin || null,
+      });
+      setAviso(t('ficha.guardado'));
+      await cargar();
+    } catch (err) {
+      setError(mensajeError(err, t('ficha.planYEstado')));
+    } finally {
+      setGuardando('');
+    }
+  }
+
+  async function registrarPago(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setAviso('');
+    const elegido = planes.find((p) => p.id === cobro.planId);
+    if (!elegido) return;
+    setGuardando('pago');
+    try {
+      await api.post(`/memberships/${id}/payments`, {
+        planId: elegido.id,
+        amount: cobro.amount || elegido.price,
+        method: cobro.method,
+      });
+      setAviso(t('pago.registrado'));
+      setCobro({ planId: '', amount: '', method: 'efectivo' });
+      await cargar();
+    } catch (err) {
+      setError(mensajeError(err, t('pago.titulo')));
+    } finally {
+      setGuardando('');
+    }
+  }
+
   async function cambiarPassword(e: FormEvent) {
     e.preventDefault();
     setError('');
@@ -102,6 +214,18 @@ export default function Ficha() {
   }
 
   const nombre = persona?.fullName ?? membership?.fullName ?? '—';
+  const opcionesPlan = planes.map((p) => ({
+    valor: p.id,
+    etiqueta: `${p.name} · ${fmtMoneda(p.price)}`,
+  }));
+  const opcionesCinturon = [
+    { valor: '', etiqueta: t('comun.sinCinturon') },
+    ...CINTURONES.map((c) => ({
+      valor: c.nombre,
+      etiqueta: c.nombre,
+      punto: fondoCinturon(c),
+    })),
+  ];
 
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem' }}>
@@ -123,6 +247,9 @@ export default function Ficha() {
             <p className="muted" style={{ fontSize: '0.78rem' }}>
               {persona?.email}
             </p>
+            <div style={{ marginTop: '0.2rem' }}>
+              <Cinturon nombre={persona?.belt} />
+            </div>
           </div>
         </div>
         <Link href="/alumnos" className="btn btn-outline btn-sm">
@@ -194,30 +321,207 @@ export default function Ficha() {
             </p>
           </div>
 
-          {esMaestro && (
-            <form onSubmit={cambiarPassword} className="card" style={{ padding: '1rem' }}>
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
-                {t('alumnos.nuevaContrasena')}
-              </h2>
-              <input
-                type="text"
-                minLength={8}
-                maxLength={LIM.password}
-                required
-                value={nuevaPass}
-                onChange={(e) => setNuevaPass(e.target.value)}
-                placeholder={t('mi.contrasenaNueva')}
-              />
-              <p className="muted" style={{ fontSize: '0.7rem', margin: '0.35rem 0 0.6rem' }}>
-                {t('alumnos.contrasenaAyuda')}
-              </p>
-              <button type="submit" className="btn btn-outline btn-sm">
-                {t('comun.guardar')}
-              </button>
-            </form>
-          )}
+          {esMaestro && <AccesoQR userId={id} />}
         </div>
       </div>
+
+      {esMaestro && (
+        <div
+          className="no-imprimir"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
+            gap: '1rem',
+            marginBottom: '1.25rem',
+          }}
+        >
+          {/* ── Datos del alumno ── */}
+          <form onSubmit={guardarDatos} className="card" style={{ padding: '1rem' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
+              {t('ficha.datos')}
+            </h2>
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('comun.nombre')}
+            </label>
+            <input
+              value={datos.fullName}
+              onChange={(e) => setDatos({ ...datos, fullName: e.target.value })}
+              maxLength={LIM.nombrePersona}
+              required
+              style={{ margin: '0.25rem 0 0.7rem' }}
+            />
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('comun.telefono')}
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={datos.phone}
+              onChange={(e) => setDatos({ ...datos, phone: soloTelefono(e.target.value) })}
+              maxLength={LIM.telefono}
+              style={{
+                margin: '0.25rem 0 0.2rem',
+                borderColor: telefonoValido(datos.phone) ? undefined : 'var(--danger)',
+              }}
+            />
+            {!telefonoValido(datos.phone) && (
+              <p className="msg-error" style={{ fontSize: '0.7rem', marginBottom: '0.4rem' }}>
+                {t('comun.telefonoCorto')}
+              </p>
+            )}
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('comun.cinturon')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.9rem' }}>
+              <SelectMenu
+                valor={datos.belt}
+                onChange={(v) => setDatos({ ...datos, belt: v })}
+                etiquetaAria={t('comun.cinturon')}
+                placeholder={t('comun.sinCinturon')}
+                opciones={opcionesCinturon}
+              />
+            </div>
+            <button type="submit" className="btn btn-gold btn-sm" disabled={guardando === 'datos'}>
+              {guardando === 'datos' ? t('comun.guardando') : t('comun.guardar')}
+            </button>
+          </form>
+
+          {/* ── Plan, estado y PIN ── */}
+          <form onSubmit={guardarPlan} className="card" style={{ padding: '1rem' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
+              {t('ficha.planYEstado')}
+            </h2>
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.planActual')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.7rem' }}>
+              <SelectMenu
+                valor={plan.currentPlanId}
+                onChange={(v) => setPlan({ ...plan, currentPlanId: v })}
+                etiquetaAria={t('ficha.planActual')}
+                placeholder={t('ficha.sinPlanAsignado')}
+                opciones={opcionesPlan}
+                disabled={planes.length === 0}
+              />
+            </div>
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('comun.estado')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.7rem' }}>
+              <SelectMenu
+                valor={plan.status}
+                onChange={(v) => setPlan({ ...plan, status: v })}
+                etiquetaAria={t('comun.estado')}
+                opciones={ESTADOS_MEM.map((s) => ({
+                  valor: s,
+                  etiqueta: t(`memb.${s}` as ClaveTexto),
+                }))}
+              />
+            </div>
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.pin')}
+            </label>
+            <input
+              inputMode="numeric"
+              value={plan.checkinPin}
+              onChange={(e) =>
+                setPlan({ ...plan, checkinPin: soloDigitos(e.target.value, LIM.checkinPin) })
+              }
+              maxLength={LIM.checkinPin}
+              style={{ margin: '0.25rem 0 0.2rem' }}
+            />
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('ficha.pinAyuda')}
+            </p>
+            <button type="submit" className="btn btn-gold btn-sm" disabled={guardando === 'plan'}>
+              {guardando === 'plan' ? t('comun.guardando') : t('comun.guardar')}
+            </button>
+          </form>
+
+          {/* ── Registrar un pago ── */}
+          <form onSubmit={registrarPago} className="card" style={{ padding: '1rem' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
+              {t('pago.titulo')}
+            </h2>
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('pago.plan')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.7rem' }}>
+              <SelectMenu
+                valor={cobro.planId}
+                // Elegir el plan rellena el monto con su precio: es lo que se
+                // cobra el 99 % de las veces, y se puede corregir a mano.
+                onChange={(v) =>
+                  setCobro({
+                    ...cobro,
+                    planId: v,
+                    amount: planes.find((p) => p.id === v)?.price ?? '',
+                  })
+                }
+                etiquetaAria={t('pago.plan')}
+                placeholder={t('pago.plan')}
+                opciones={opcionesPlan}
+                disabled={planes.length === 0}
+              />
+            </div>
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('pago.monto')}
+            </label>
+            <input
+              inputMode="decimal"
+              value={cobro.amount}
+              onChange={(e) => setCobro({ ...cobro, amount: e.target.value })}
+              style={{ margin: '0.25rem 0 0.7rem' }}
+            />
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('pago.metodo')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.7rem' }}>
+              <SelectMenu
+                valor={cobro.method}
+                onChange={(v) => setCobro({ ...cobro, method: v })}
+                etiquetaAria={t('pago.metodo')}
+                opciones={METODOS.map((m) => ({
+                  valor: m,
+                  etiqueta: t(`pago.metodo.${m}` as ClaveTexto),
+                }))}
+              />
+            </div>
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('ficha.cobrarAyuda')}
+            </p>
+            <button
+              type="submit"
+              className="btn btn-cta btn-sm"
+              disabled={!cobro.planId || guardando === 'pago'}
+            >
+              {guardando === 'pago' ? t('comun.guardando') : t('pago.registrar')}
+            </button>
+          </form>
+
+          {/* ── Contraseña ── */}
+          <form onSubmit={cambiarPassword} className="card" style={{ padding: '1rem' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+              {t('alumnos.nuevaContrasena')}
+            </h2>
+            <input
+              type="text"
+              minLength={8}
+              maxLength={LIM.password}
+              required
+              value={nuevaPass}
+              onChange={(e) => setNuevaPass(e.target.value)}
+              placeholder={t('mi.contrasenaNueva')}
+            />
+            <p className="muted" style={{ fontSize: '0.7rem', margin: '0.35rem 0 0.6rem' }}>
+              {t('alumnos.contrasenaAyuda')}
+            </p>
+            <button type="submit" className="btn btn-outline btn-sm">
+              {t('comun.guardar')}
+            </button>
+          </form>
+        </div>
+      )}
 
       <div
         className="card tabla-scroll no-imprimir"
@@ -247,9 +551,7 @@ export default function Ficha() {
               <tr key={p.id}>
                 <td>{fmtFecha(p.paidAt?.slice(0, 10), idioma)}</td>
                 <td className="mono">{fmtMoneda(p.amount)}</td>
-                <td className="muted">
-                  {t(`pago.metodo.${p.method}` as ClaveTexto)}
-                </td>
+                <td className="muted">{t(`pago.metodo.${p.method}` as ClaveTexto)}</td>
                 <td>{p.status}</td>
               </tr>
             ))}

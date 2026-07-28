@@ -61,6 +61,35 @@ export function textoOpcional(
   return bien(limpio || null);
 }
 
+/**
+ * Un teléfono.
+ *
+ * Se guarda tal cual lo escribió su dueño —`+57 300 123 4567`, `(1) 555 0000`—
+ * porque así lo reconoce, pero lo que se cuenta son los DÍGITOS: sin un mínimo,
+ * un «3» suelto pasaba por teléfono válido y el maestro se quedaba con un
+ * número al que no puede llamar. Siete es el abonado local más corto que existe
+ * y quince el máximo del plan de numeración internacional (E.164).
+ */
+export const TELEFONO_DIGITOS_MIN = 7;
+export const TELEFONO_DIGITOS_MAX = 15;
+
+export function telefono(
+  valor: string | null | undefined,
+  campo = 'El teléfono',
+): Campo<string | null> {
+  const texto = textoOpcional(valor, LIMITES.telefono, campo);
+  if (!texto.ok || !texto.valor) return texto;
+
+  const digitos = texto.valor.replace(/\D/g, '').length;
+  if (digitos < TELEFONO_DIGITOS_MIN) {
+    return mal(`${campo} debe tener al menos ${TELEFONO_DIGITOS_MIN} dígitos.`);
+  }
+  if (digitos > TELEFONO_DIGITOS_MAX) {
+    return mal(`${campo} no puede pasar de ${TELEFONO_DIGITOS_MAX} dígitos.`);
+  }
+  return texto;
+}
+
 /** Igual que `textoOpcional`, pero además exige que venga algo. */
 export function textoObligatorio(
   valor: string | null | undefined,

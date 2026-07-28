@@ -27,6 +27,13 @@ const SIN_CONTEXTO = new Set([
   '/auth/login',
   '/auth/logout',
   '/auth/config',
+  // Canjea el QR del maestro por una sesión: como el login, se resuelve antes
+  // de saber a qué club pertenece quien entra y abre su propio contexto.
+  '/auth/acceso-qr',
+  // El cron diario recorre TODOS los clubes: abre su propia transacción sin
+  // filtro (ver `routes/notifications.ts`), así que envolverla en el contexto
+  // de un club —que no tiene— solo abriría una transacción de más.
+  '/notifications/cron',
 ]);
 
 function contextoDe(req: FastifyRequest) {

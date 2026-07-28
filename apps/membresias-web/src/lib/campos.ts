@@ -64,3 +64,28 @@ export function soloDinero(valor: string): string {
 export function soloTelefono(valor: string): string {
   return valor.replace(/[^\d+()\-.\s]/g, '').slice(0, LIM.telefono);
 }
+
+/**
+ * Cuántos dígitos tiene que tener un teléfono para ser uno.
+ *
+ * Se cuentan los DÍGITOS y no los caracteres: `+57 (300) 123-4567` son
+ * diecinueve caracteres y doce dígitos, y lo que importa es lo segundo. Siete
+ * es el abonado local más corto que existe; quince, el máximo internacional
+ * (E.164). Mismos números que la API — ver `lib/validacion.ts`.
+ */
+export const TELEFONO_DIGITOS_MIN = 7;
+export const TELEFONO_DIGITOS_MAX = 15;
+
+export function digitosDe(valor: string): number {
+  return valor.replace(/\D/g, '').length;
+}
+
+/**
+ * `true` si el teléfono está vacío (es opcional) o si es plausible. Se usa para
+ * avisar MIENTRAS se escribe, en vez de dejar que el formulario viaje y vuelva
+ * con un 422.
+ */
+export function telefonoValido(valor: string): boolean {
+  const n = digitosDe(valor);
+  return n === 0 || (n >= TELEFONO_DIGITOS_MIN && n <= TELEFONO_DIGITOS_MAX);
+}

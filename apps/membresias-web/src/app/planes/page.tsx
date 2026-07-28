@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { fmtMoneda } from '@/lib/formato';
 import { LIM, soloDigitos, soloDinero } from '@/lib/campos';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface Plan {
   id: string;
@@ -129,16 +130,15 @@ export default function Planes() {
           <label className="muted" style={{ fontSize: '0.75rem' }}>
             {t('planes.tipo')}
           </label>
-          <select
-            value={form.type}
-            onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-          >
-            {TIPOS.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {t(`planes.tipo.${tipo}` as ClaveTexto)}
-              </option>
-            ))}
-          </select>
+          <SelectMenu
+            valor={form.type}
+            onChange={(v) => setForm((f) => ({ ...f, type: v }))}
+            etiquetaAria={t('planes.tipo')}
+            opciones={TIPOS.map((tipo) => ({
+              valor: tipo,
+              etiqueta: t(`planes.tipo.${tipo}` as ClaveTexto),
+            }))}
+          />
         </div>
         <div>
           <label className="muted" style={{ fontSize: '0.75rem' }}>

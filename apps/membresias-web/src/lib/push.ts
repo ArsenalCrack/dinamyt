@@ -13,6 +13,29 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return arr;
 }
 
+/**
+ * Si este navegador ya tiene los avisos activados, si puede activarlos o si no
+ * hay nada que hacer.
+ *
+ * `imposible` cubre dos casos que se parecen desde fuera: el navegador no
+ * soporta Web Push (Safari sin instalar la app, por ejemplo) o esta instalación
+ * no tiene llaves VAPID. En ambos, ofrecer el botón sería prometer algo que no
+ * va a pasar, así que la campana lo esconde.
+ */
+export async function estadoPush(): Promise<'activo' | 'inactivo' | 'imposible'> {
+  if (typeof window === 'undefined') return 'imposible';
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'imposible';
+  if (!VAPID_PUBLIC) return 'imposible';
+  if (Notification.permission === 'denied') return 'imposible';
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    return sub ? 'activo' : 'inactivo';
+  } catch {
+    return 'inactivo';
+  }
+}
+
 /** Registra el service worker, pide permiso y suscribe al usuario a Web Push. */
 export async function activarPush(): Promise<{ ok: boolean; motivo?: string }> {
   if (typeof window === 'undefined') return { ok: false, motivo: 'no-window' };

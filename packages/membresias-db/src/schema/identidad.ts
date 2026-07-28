@@ -50,6 +50,13 @@ export const users = mem.table(
     phone: varchar('phone', { length: 40 }),
     /** Foto de perfil: data-URL o http. La ve el maestro en el roster. */
     avatarUrl: text('avatar_url'),
+    /**
+     * Cinturón del alumno, por nombre y no por enum: el catálogo lo fija la
+     * aplicación (ver `lib/cinturones.ts`) y así añadir un grado nuevo no
+     * obliga a migrar el tipo en las bases que ya existen — mismo criterio que
+     * DINAMYT-LOCAL con sus competidores.
+     */
+    belt: varchar('belt', { length: 40 }),
     role: rolUsuarioEnum('role').notNull().default('student'),
     /** Atraviesa todos los clubes. Ver `rolUsuarioEnum`. */
     isSuperAdmin: boolean('is_super_admin').notNull().default(false),

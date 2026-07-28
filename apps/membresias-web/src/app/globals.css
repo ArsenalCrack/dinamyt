@@ -188,17 +188,345 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
    dentro de la capa las clases que no reconoce en el contenido escaneado.) */
 .tabla-scroll { overflow-x: auto; }
 
-/* ── Navegación responsive (fuera de @layer, misma razón que .tabla-scroll):
-   en PC los enlaces van en línea; en móvil, un menú de hamburguesa. ── */
-.nav-desktop { display: none; }
-.nav-user { display: none; }
-.nav-burger { display: inline-flex; }
-.nav-movil { display: block; }
+/* ════════════════════════════════════════════════════════════════════════
+   BARRA Y MENÚ DE HAMBURGUESA
+   (fuera de @layer, misma razón que .tabla-scroll)
+
+   Un solo menú para las dos pantallas, como en DINAMYT-LOCAL: un panel
+   ANCLADO al botón, del tamaño de lo que trae. Antes, en PC, el desplegable
+   era una franja del ancho de la ventana para mostrar tres botones.
+
+   En móvil el panel añade los enlaces de navegación; en PC esos ya están en
+   línea en la barra, así que el panel solo lleva sesión, tema, idioma y salir.
+   ════════════════════════════════════════════════════════════════════════ */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.navbar-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1rem;
+}
+.navbar-marca {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.navbar-marca span { font-size: 1rem; white-space: nowrap; }
+.navbar-links { display: none; flex: 1; align-items: center; gap: 0.15rem; }
+.navbar-link {
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+.navbar-link:hover { color: var(--text); }
+.navbar-link[data-activo='true'] { background: var(--bg-elevated); color: var(--gold); }
+.navbar-derecha {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* Identidad en la barra: solo en PC, donde hay sitio. En móvil vive dentro
+   del panel, que es donde se va a mirar. */
+.navbar-quien { display: none; font-size: 0.72rem; text-align: right; line-height: 1.25; }
+.navbar-quien b { display: block; font-weight: 600; color: var(--text); }
+.navbar-quien span { color: var(--gold); }
+
+/* ── Botón de hamburguesa (las tres rayas se vuelven una X al abrir) ── */
+.navbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 36px;
+  padding: 0 0.7rem;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.navbar-toggle:hover,
+.navbar-toggle[aria-expanded='true'] { border-color: var(--gold); color: var(--gold); }
+.navbar-rayas { position: relative; width: 18px; height: 12px; flex-shrink: 0; }
+.navbar-rayas span {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform 0.2s ease, opacity 0.2s ease, top 0.2s ease;
+}
+.navbar-rayas span:nth-child(1) { top: 0; }
+.navbar-rayas span:nth-child(2) { top: 5px; }
+.navbar-rayas span:nth-child(3) { top: 10px; }
+.navbar-rayas[data-abierto='true'] span:nth-child(1) { top: 5px; transform: rotate(45deg); }
+.navbar-rayas[data-abierto='true'] span:nth-child(2) { opacity: 0; }
+.navbar-rayas[data-abierto='true'] span:nth-child(3) { top: 5px; transform: rotate(-45deg); }
+.navbar-toggle-texto { display: none; }
+
+/* ── El panel ── */
+.navbar-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0.75rem;
+  z-index: 40;
+  width: 250px;
+  max-width: calc(100vw - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.7rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: aparecer 0.15s ease;
+}
+.navbar-panel-quien {
+  padding: 0.2rem 0.55rem 0.6rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+.navbar-panel-quien b { display: block; font-weight: 700; overflow-wrap: anywhere; }
+.navbar-panel-quien span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+}
+.navbar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.55rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0.45rem;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.navbar-item:hover,
+.navbar-item:focus-visible { background: var(--bg-elevated); outline: none; }
+.navbar-item[data-activo='true'] { color: var(--gold); }
+.navbar-sep { height: 1px; margin: 0.35rem 0; background: var(--border); }
+.navbar-panel-links { display: flex; flex-direction: column; gap: 0.15rem; }
+
+/* ── Idiomas ── */
+.navbar-idiomas { display: flex; gap: 0.35rem; padding: 0.15rem 0.55rem 0.35rem; }
+.navbar-idioma {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.navbar-idioma:hover { color: var(--text); background: var(--bg-elevated); }
+.navbar-idioma[data-activo='true'] {
+  background: var(--gold-soft);
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  font-weight: 800;
+}
+.navbar-etiqueta {
+  padding: 0.35rem 0.55rem 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+
 @media (min-width: 768px) {
-  .nav-desktop { display: flex; }
-  .nav-user { display: flex; }
-  .nav-burger { display: none; }
-  .nav-movil { display: none; }
+  .navbar-links { display: flex; }
+  .navbar-quien { display: block; }
+  .navbar-toggle-texto { display: inline; }
+  .navbar-panel-links { display: none; }
+  .navbar-panel { right: calc((100vw - 1180px) / 2 + 1rem); }
+}
+/* Por debajo de 1180 + márgenes, el contenedor ya no está centrado: el panel
+   vuelve a colgar del borde de la ventana. */
+@media (min-width: 768px) and (max-width: 1212px) {
+  .navbar-panel { right: 1rem; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   CAMPANA DE AVISOS
+   En PC cuelga del botón. En MÓVIL se centra en la pantalla con un velo
+   detrás: anclada a la derecha se salía del borde y el texto del aviso
+   quedaba cortado justo donde dice qué pasa.
+   ════════════════════════════════════════════════════════════════════════ */
+.avisos { position: relative; }
+.avisos-badge {
+  min-width: 1.1rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+}
+.avisos-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.5);
+}
+.avisos-panel {
+  position: fixed;
+  z-index: 51;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - 2rem));
+  max-height: min(70vh, 30rem);
+  overflow-y: auto;
+  padding: 0.9rem;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.8rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+.avisos-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.avisos-item:last-child { border-bottom: 0; }
+.avisos-item[data-nuevo='true'] { border-left: 3px solid var(--gold); padding-left: 0.5rem; }
+.avisos-titulo { font-size: 0.85rem; font-weight: 700; }
+.avisos-texto { font-size: 0.8rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.avisos-fecha {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+@media (min-width: 768px) {
+  .avisos-velo { display: none; }
+  .avisos-panel {
+    position: absolute;
+    left: auto;
+    right: 0;
+    top: calc(100% + 6px);
+    transform: none;
+    width: 340px;
+    max-width: 90vw;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   DESPLEGABLES PROPIOS (<SelectMenu>)
+   El `<select>` nativo se pinta con los colores del sistema operativo y
+   rompe la pantalla; este es el mismo menú dorado de DINAMYT-LOCAL.
+   ════════════════════════════════════════════════════════════════════════ */
+.selectmenu { position: relative; width: 100%; }
+.selectmenu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.selectmenu-btn:hover:not(:disabled) { border-color: var(--border-strong); }
+.selectmenu-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.selectmenu-btn[aria-expanded='true'] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.selectmenu-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selectmenu-label[data-vacio='true'] { color: var(--text-muted); }
+.selectmenu-flecha {
+  flex-shrink: 0;
+  color: var(--gold);
+  font-size: 0.8rem;
+  transition: rotate 0.18s ease-out;
+}
+.selectmenu-flecha[data-abierto='true'] { rotate: 180deg; }
+.selectmenu-punto {
+  flex-shrink: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+}
+/* `fixed` y no `absolute`: el panel se monta en el <body> con las coordenadas
+   del botón (ver SelectMenu.tsx). Dentro de la tarjeta del roster hay un
+   `overflow-x: auto` que lo recortaba. */
+.selectmenu-panel {
+  position: fixed;
+  z-index: 55;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  max-height: 17rem;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.6rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.selectmenu-opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.selectmenu-opcion[data-activa='true'] { background: var(--bg-elevated); }
+.selectmenu-opcion[aria-selected='true'] {
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-weight: 800;
 }
 
 main { animation: aparecer 0.25s ease; }
@@ -267,6 +595,15 @@ html[data-theme="light"] ::selection {
    luminoso: el truco del modo oscuro aquí se ve sucio. */
 html[data-theme="light"] .card {
   box-shadow: 0 1px 3px rgba(22, 22, 31, 0.06), 0 1px 2px rgba(22, 22, 31, 0.04);
+}
+
+/* Las sombras del modo oscuro son negro al 45 %: sobre fondo claro se ven
+   sucias. Los paneles flotantes usan una mucho más suave. */
+html[data-theme="light"] .navbar-panel,
+html[data-theme="light"] .avisos-panel,
+html[data-theme="light"] .selectmenu-panel,
+html[data-theme="light"] .apar-panel {
+  box-shadow: 0 8px 24px rgba(22, 22, 31, 0.14);
 }
 
 html[data-theme="light"] .btn-danger {

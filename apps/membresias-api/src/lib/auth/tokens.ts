@@ -39,6 +39,46 @@ export async function firmarToken(payload: JwtPayload): Promise<string> {
 /** Marca los tokens propios, para distinguirlos de los del ecosistema. */
 export const EMISOR = 'dinamyt-membresias';
 
+/**
+ * Emisor DISTINTO para los tokens del QR de acceso rápido.
+ *
+ * Es la pieza que hace segura esta función: los dos tokens se firman con el
+ * mismo secreto, así que si compartieran emisor, el del QR valdría como sesión
+ * — y una sesión de 24 h dibujada en un código de barras es justo lo que no se
+ * quiere. Con emisores separados, `verificarTokenPropio` rechaza el del QR y la
+ * única puerta que abre es `/auth/acceso-qr`, que lo canjea por una sesión de
+ * verdad tras comprobar que la cuenta y el club siguen activos.
+ */
+export const EMISOR_ACCESO = 'dinamyt-membresias-acceso';
+
+/**
+ * Vida del token del QR: diez minutos. El alumno lo escanea delante del
+ * maestro, en clase; pasado ese rato la pantalla ya no sirve para nada y hay
+ * que generar otro.
+ */
+export const VIDA_TOKEN_ACCESO = 600;
+
+/** Token de un solo propósito: canjearse por una sesión en `/auth/acceso-qr`. */
+export async function firmarTokenAcceso(sub: string, email: string): Promise<string> {
+  return new SignJWT({ sub, email })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setIssuer(EMISOR_ACCESO)
+    .setExpirationTime(Math.floor(Date.now() / 1000) + VIDA_TOKEN_ACCESO)
+    .sign(claveSecreta());
+}
+
+/** Verifica un token de acceso rápido. Lanza si caducó o no es de este emisor. */
+export async function verificarTokenAcceso(
+  token: string,
+): Promise<{ sub: string; email: string }> {
+  const { payload } = await jwtVerify(token, claveSecreta(), {
+    algorithms: ['HS256'],
+    issuer: EMISOR_ACCESO,
+  });
+  return payload as unknown as { sub: string; email: string };
+}
+
 /** Verifica un token propio (HS256). Lanza si la firma o el emisor no cuadran. */
 export async function verificarTokenPropio(token: string): Promise<JwtPayload> {
   const { payload } = await jwtVerify(token, claveSecreta(), {

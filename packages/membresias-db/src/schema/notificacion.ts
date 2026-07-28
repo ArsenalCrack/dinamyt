@@ -27,6 +27,13 @@ export const notifications = mem.table('notifications', {
   scheduledFor: timestamp('scheduled_for'),
   sentAt: timestamp('sent_at'),
   status: estadoNotifEnum('status').notNull().default('PENDIENTE'),
+  /**
+   * Cuándo lo abrió su destinatario. `null` = sin leer, y eso es exactamente
+   * lo que cuenta la campana: antes el contador miraba la fecha del aviso, así
+   * que al día siguiente los pendientes desaparecían del número aunque nadie
+   * los hubiera mirado nunca.
+   */
+  readAt: timestamp('read_at'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
