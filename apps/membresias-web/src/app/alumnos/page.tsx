@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { hoyISO } from '@/lib/formato';
 import { LIM, TIPOS_SANGRE, soloTelefono, telefonoValido } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
 import { Cinturon } from '@/components/Cinturon';
 import { Contador } from '@/components/Contador';
 import { SelectMenu } from '@/components/SelectMenu';
+import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
 interface Persona {
   id: string;
@@ -26,14 +28,6 @@ interface Persona {
   emergencyPhone: string | null;
   role: Rol;
   isActive: boolean;
-}
-
-/** Hoy en formato de `<input type="date">`, en hora LOCAL (no UTC). */
-function hoyISO(): string {
-  const d = new Date();
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
 const ROLES: { valor: Rol; clave: 'rol.student' | 'rol.guardian' | 'rol.staff' }[] = [
@@ -91,8 +85,18 @@ export default function Alumnos() {
   const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
 
   const [gente, setGente] = useState<Persona[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  /**
+   * La búsqueda que de verdad viajó a la API.
+   *
+   * Va aparte de `busqueda` porque el filtro es del SERVIDOR: no se puede
+   * llamar en cada tecla. Se espera a que la mano pare (ver el `useEffect` con
+   * el temporizador), y así «Ana» son dos peticiones y no tres.
+   */
+  const [buscado, setBuscado] = useState('');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
@@ -104,16 +108,35 @@ export default function Alumnos() {
 
   const cargar = useCallback(async () => {
     try {
-      const { data } = await api.get<Persona[]>('/users', {
-        params: incluirInactivos ? { includeInactive: '1' } : {},
+      const { data } = await api.get<{ items: Persona[]; total: number }>('/users', {
+        params: {
+          ...(incluirInactivos ? { includeInactive: '1' } : {}),
+          ...(buscado ? { q: buscado } : {}),
+          limit: POR_PAGINA,
+          offset,
+        },
       });
-      setGente(data);
+      setGente(data.items);
+      setTotal(data.total);
     } catch (e) {
       setError(mensajeError(e, t('comun.ninguno')));
     } finally {
       setCargando(false);
     }
-  }, [incluirInactivos, t]);
+  }, [incluirInactivos, buscado, offset, t]);
+
+  // Al cambiar lo que se busca o el filtro de inactivos se vuelve a la primera
+  // página: quedarse en la página 4 de un resultado de 6 personas deja la
+  // pantalla vacía y parece que la búsqueda no encontró nada.
+  useEffect(() => {
+    setOffset(0);
+  }, [buscado, incluirInactivos]);
+
+  // Se espera a que deje de escribir antes de preguntarle a la API.
+  useEffect(() => {
+    const id = setTimeout(() => setBuscado(busqueda.trim()), 300);
+    return () => clearTimeout(id);
+  }, [busqueda]);
 
   useEffect(() => {
     if (cargandoSesion) return;
@@ -224,11 +247,10 @@ export default function Alumnos() {
     );
   }
 
-  const q = busqueda.trim().toLowerCase();
-  const visibles = gente.filter(
-    (p) =>
-      !q || p.fullName.toLowerCase().includes(q) || p.email.toLowerCase().includes(q),
-  );
+  // Ya no se filtra aquí: lo hace la API (ver `cargar`). Filtrar en el
+  // navegador sobre una página de 25 escondería a todo el que no estuviera en
+  // ella, que es justo lo contrario de lo que hace un buscador.
+  const visibles = gente;
 
   const opcionesCinturon = [
     { valor: '', etiqueta: t('comun.sinCinturon') },
@@ -492,8 +514,8 @@ export default function Alumnos() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           maxLength={LIM.busqueda}
-          placeholder={t('comun.buscar')}
-          aria-label={t('comun.buscar')}
+          placeholder={t('pag.buscarAlumno')}
+          aria-label={t('pag.buscarAlumno')}
           style={{ flex: 1, minWidth: 180 }}
         />
         <label
@@ -525,7 +547,7 @@ export default function Alumnos() {
             {visibles.length === 0 && (
               <tr>
                 <td colSpan={6} className="muted" style={{ padding: '1rem' }}>
-                  {t('comun.ninguno')}
+                  {buscado ? t('pag.sinResultados') : t('comun.ninguno')}
                 </td>
               </tr>
             )}
@@ -590,6 +612,8 @@ export default function Alumnos() {
           </tbody>
         </table>
       </div>
+
+      <Paginacion offset={offset} limit={POR_PAGINA} total={total} onIr={setOffset} />
     </main>
   );
 }

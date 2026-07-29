@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { requireAuth } from '../plugins/auth';
 import { firmarToken, verificarTokenAcceso } from '../lib/auth/tokens';
@@ -43,6 +43,8 @@ function vistaUsuario(u: typeof users.$inferSelect) {
     avatarUrl: direccionFoto(u),
     belt: u.belt,
     trainsSince: u.trainsSince,
+    /** Cuándo se expidió su carnet: de aquí sale la vigencia que va impresa. */
+    carnetEmitidoEl: u.carnetEmitidoEl,
     bloodType: u.bloodType,
     emergencyName: u.emergencyName,
     emergencyPhone: u.emergencyPhone,
@@ -60,6 +62,15 @@ function vistaUsuario(u: typeof users.$inferSelect) {
  * carnet y el panel del maestro. Va aquí, dentro de `/auth/me`, y no en una
  * ruta propia, para que ninguna pantalla tenga que pedirlo aparte: el club ya
  * viaja con la sesión.
+ *
+ * Y lleva el NOMBRE DEL MAESTRO por lo mismo: el carnet lo firma él —un carnet
+ * de club sin decir quién lo expide no lo respalda nadie— y esa es una consulta
+ * que si no habría que repetir en cada pantalla que pinta un carnet.
+ *
+ * Se busca por rol y no por una columna `owner_id` en `orgs` porque esa columna
+ * no existe: el maestro es, por definición, la cuenta con rol `owner` del club.
+ * Si hubiera más de una (no debería), manda la más antigua, que es la que
+ * fundó el club.
  */
 async function vistaClub(db: Db, orgId: string) {
   const [c] = await db
@@ -76,8 +87,20 @@ async function vistaClub(db: Db, orgId: string) {
     .where(eq(orgs.id, orgId))
     .limit(1);
   if (!c) return null;
+
+  const [maestro] = await db
+    .select({ fullName: users.fullName })
+    .from(users)
+    .where(and(eq(users.orgId, orgId), eq(users.role, 'owner'), eq(users.isActive, true)))
+    .orderBy(asc(users.createdAt))
+    .limit(1);
+
   const { updatedAt, ...resto } = c;
-  return { ...resto, logoUrl: direccionLogo({ ...c, updatedAt }) };
+  return {
+    ...resto,
+    logoUrl: direccionLogo({ ...c, updatedAt }),
+    ownerName: maestro?.fullName ?? null,
+  };
 }
 
 /**

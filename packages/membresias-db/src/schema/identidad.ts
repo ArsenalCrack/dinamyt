@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   uuid,
   varchar,
@@ -73,6 +74,18 @@ export const users = mem.table(
      * `created_at`.
      */
     trainsSince: date('trains_since'),
+    /**
+     * Cuándo se expidió su carnet. De aquí sale la vigencia impresa.
+     *
+     * Existe porque antes no existía: el carnet se imprimía con «emitido hoy,
+     * vence dentro de un año» calculado en el navegador en el momento de
+     * imprimir. Así el papel jamás vencía —reimprimirlo ERA renovarlo— y dos
+     * copias del mismo carnet decían cosas distintas según el día.
+     *
+     * Se fija al dar de alta a la persona y solo la mueve un acto deliberado
+     * del maestro: reexpedir el carnet (ver `POST /users/:id/carnet`).
+     */
+    carnetEmitidoEl: date('carnet_emitido_el').notNull().default(sql`CURRENT_DATE`),
     /**
      * Datos que solo importan el día que importan: si a alguien le pasa algo en
      * el tatami, están en su carnet y no hay que buscar a nadie.

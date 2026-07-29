@@ -81,6 +81,24 @@ export const SEPARADOR_DECIMAL =
     .formatToParts(1.5)
     .find((p) => p.type === 'decimal')?.value ?? ',';
 
+/**
+ * Hoy en formato ISO corto (YYYY-MM-DD), en hora LOCAL.
+ *
+ * Nunca `new Date().toISOString()`: eso da el día en UTC, y en husos negativos
+ * como el de Colombia (UTC−5) a partir de las siete de la tarde ya es el día
+ * siguiente. Con eso, la lista de la clase salía vacía en pleno horario de
+ * entrenamiento y el carnet se imprimía fechado mañana.
+ *
+ * Vive aquí y no repetida en cada pantalla porque estaba repetida en tres, y la
+ * cuarta copia —la del carnet— era justo la que usaba UTC.
+ */
+export function hoyISO(): string {
+  const d = new Date();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
 /** Fecha ISO (YYYY-MM-DD) en el formato del idioma activo. */
 export function fmtFecha(iso: string | null | undefined, idioma: Idioma): string {
   if (!iso) return '—';

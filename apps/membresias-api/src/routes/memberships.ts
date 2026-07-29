@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, desc, gte, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, desc, gte, ilike, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import {
   memberships,
   plans,
@@ -13,6 +13,7 @@ import {
 import { orgDelRequest, requireClub, requireRole } from '../plugins/auth';
 import { ensureMembership } from '../lib/memberships';
 import { esDiaClase } from '../lib/schedule';
+import { leerPagina, patron } from '../lib/paginacion';
 import { columnaImagenLigera, direccionFoto } from '../lib/imagenes';
 import {
   LIMITES,
@@ -46,6 +47,17 @@ const MAX_PERIODOS = 12;
 
 /** Días hacia adelante que se miran buscando la próxima clase. */
 const HORIZONTE_CLASES = 14;
+
+/**
+ * Cuánta historia propia se le manda al alumno en `GET /mi`.
+ *
+ * Holgado a propósito: doscientos pagos son dieciséis años de mensualidades y
+ * quinientas asistencias son más de tres años entrenando tres veces por
+ * semana. Junto a cada lista viaja el total real, así que si alguien pasara de
+ * ahí lo sabría —y el maestro conserva el registro completo en la ficha—.
+ */
+const MAX_HISTORIAL_PAGOS = 200;
+const MAX_HISTORIAL_ASISTENCIAS = 500;
 
 /** Suma días a una fecha `YYYY-MM-DD`, en UTC para no cruzar husos. */
 function masDias(fecha: string, dias: number): string {
@@ -109,7 +121,23 @@ async function calendarioDelAlumno(db: Db, orgId: string, today: string) {
 }
 
 export async function membershipsRoutes(app: FastifyInstance) {
-  // ── GET /memberships — roster del club + estado local (owner/staff) ───────
+  // ── GET /memberships — roster del club, por páginas (owner/staff) ─────────
+  //
+  // Responde `{ items, total }`. Acepta `q` (nombre o correo), `limit`,
+  // `offset` y `userId`.
+  //
+  // Dos avisos sobre el filtrado, porque los dos eran errores de verdad:
+  //
+  // 1. **`q` se resuelve en SQL.** El buscador de «Asistencia» filtraba en el
+  //    navegador sobre lo que se hubiera descargado; en cuanto el listado se
+  //    pagina, eso deja fuera a todo el que no esté en la página actual.
+  // 2. **Solo alumnos, y en la CONSULTA.** Antes se traía el club entero y se
+  //    descartaba al maestro y a los auxiliares aquí, en JavaScript. Con
+  //    páginas eso da una página de 25 que enseña 23: el filtro tiene que
+  //    contar igual para el `total` que para las filas.
+  //
+  // `userId` es para la ficha del alumno, que necesita UNA membresía. Antes se
+  // descargaba el roster completo para hacerle un `find` en el navegador.
   app.get(
     '/memberships',
     { preHandler: requireRole(['owner', 'staff']) },
@@ -118,59 +146,81 @@ export async function membershipsRoutes(app: FastifyInstance) {
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
 
       const db = req.db;
+      const { limit, offset, q } = leerPagina(req.query);
+      const { userId } = req.query as { userId?: string };
 
-      // El roster sale de la propia BD: los alumnos los da de alta el maestro
-      // (ver `routes/users.ts`). Antes esto era una llamada HTTP al ecosistema.
-      //
+      const conds = [
+        eq(users.orgId, orgId),
+        eq(users.isActive, true),
+        eq(users.role, 'student' as const),
+      ];
+      if (userId) conds.push(eq(users.id, userId));
+      if (q) {
+        const p = patron(q);
+        conds.push(or(ilike(users.fullName, p), ilike(users.email, p))!);
+      }
+      const donde = and(...conds);
+
       // Las columnas van explícitas por la foto: con `select()` a secas, un
       // club de 200 alumnos arrastraba su retrato entero —decenas de KB por
       // cabeza— desde PostgreSQL hasta aquí para no mandarlo. Ver `lib/imagenes.ts`.
-      const personas = await db
-        .select({
-          id: users.id,
-          fullName: users.fullName,
-          email: users.email,
-          phone: users.phone,
-          avatarUrl: columnaImagenLigera(users.avatarUrl),
-          belt: users.belt,
-          role: users.role,
-          updatedAt: users.updatedAt,
-        })
-        .from(users)
-        .where(and(eq(users.orgId, orgId), eq(users.isActive, true)))
-        .orderBy(asc(users.fullName));
+      const [personas, [cuenta]] = await Promise.all([
+        db
+          .select({
+            id: users.id,
+            fullName: users.fullName,
+            email: users.email,
+            phone: users.phone,
+            avatarUrl: columnaImagenLigera(users.avatarUrl),
+            belt: users.belt,
+            role: users.role,
+            updatedAt: users.updatedAt,
+          })
+          .from(users)
+          .where(donde)
+          .orderBy(asc(users.fullName))
+          .limit(limit)
+          .offset(offset),
+        db.select({ n: sql<number>`count(*)::int` }).from(users).where(donde),
+      ]);
 
-      const local = await db
-        .select()
-        .from(memberships)
-        .where(eq(memberships.orgId, orgId));
+      // Solo las membresías de quienes salen en ESTA página: traer las del
+      // club entero para usar veinticinco era el mismo gasto que se acaba de
+      // quitar del listado de personas.
+      const ids = personas.map((p) => p.id);
+      const local = ids.length
+        ? await db
+            .select()
+            .from(memberships)
+            .where(and(eq(memberships.orgId, orgId), inArray(memberships.userId, ids)))
+        : [];
       const byUser = new Map(local.map((m) => [m.userId, m]));
       const today = todayStr();
 
-      return personas
-        .filter((p) => p.role === 'student')
-        .map((p) => {
-          const m = byUser.get(p.id);
-          return {
-            userId: p.id,
-            fullName: p.fullName,
-            email: p.email,
-            phone: p.phone,
-            avatarUrl: direccionFoto(p),
-            belt: p.belt,
-            /** Carnet QR del alumno: lo que lee la cámara en el check-in. */
-            qr: p.id,
-            checkinPin: m?.checkinPin ?? null,
-            status: m?.status ?? null,
-            /** Plan de referencia del alumno: lo que la ficha muestra elegido. */
-            currentPlanId: m?.currentPlanId ?? null,
-            matriculado: m?.matriculado ?? false,
-            venceEl: m?.venceEl ?? null,
-            clasesRestantes: m?.clasesRestantes ?? null,
-            diasFaltantes: diasFaltantes(m?.venceEl ?? null, today),
-            estado: estado(m?.venceEl ?? null, today),
-          };
-        });
+      const items = personas.map((p) => {
+        const m = byUser.get(p.id);
+        return {
+          userId: p.id,
+          fullName: p.fullName,
+          email: p.email,
+          phone: p.phone,
+          avatarUrl: direccionFoto(p),
+          belt: p.belt,
+          /** Carnet QR del alumno: lo que lee la cámara en el check-in. */
+          qr: p.id,
+          checkinPin: m?.checkinPin ?? null,
+          status: m?.status ?? null,
+          /** Plan de referencia del alumno: lo que la ficha muestra elegido. */
+          currentPlanId: m?.currentPlanId ?? null,
+          matriculado: m?.matriculado ?? false,
+          venceEl: m?.venceEl ?? null,
+          clasesRestantes: m?.clasesRestantes ?? null,
+          diasFaltantes: diasFaltantes(m?.venceEl ?? null, today),
+          estado: estado(m?.venceEl ?? null, today),
+        };
+      });
+
+      return { items, total: cuenta?.n ?? 0 };
     },
   );
 
@@ -228,7 +278,9 @@ export async function membershipsRoutes(app: FastifyInstance) {
           desde,
           asistencia: { total: 0, esteMes: 0, ultima: null },
           pagos: [],
+          pagosTotal: 0,
           asistencias: [],
+          asistenciasTotal: 0,
         };
       }
 
@@ -249,7 +301,12 @@ export async function membershipsRoutes(app: FastifyInstance) {
         .innerJoin(plans, eq(payments.planId, plans.id))
         .where(eq(payments.membershipId, m.id))
         .orderBy(desc(payments.paidAt))
-        .limit(10);
+        // Antes eran 10 y 15, sin decirlo. El alumno con dos años en el club
+        // veía quince asistencias y creía que esas eran todas las que tenía.
+        // Ahora el tope es holgado —cabe la historia entera de casi cualquiera—
+        // y, sobre todo, viaja el TOTAL: la pantalla dice «15 de 312», así que
+        // lo que no se enseña al menos se sabe que existe.
+        .limit(MAX_HISTORIAL_PAGOS);
 
       const asistencias = await db
         .select({
@@ -261,11 +318,11 @@ export async function membershipsRoutes(app: FastifyInstance) {
         .from(attendances)
         .where(eq(attendances.membershipId, m.id))
         .orderBy(desc(attendances.checkedInAt))
-        .limit(15);
+        .limit(MAX_HISTORIAL_ASISTENCIAS);
 
-      // Cuánto ha venido. Se cuenta en la base y no sobre las quince últimas
-      // que viajan abajo: «has venido 9 veces este mes» con una lista de 15 es
-      // una cuenta que se equivoca en cuanto el alumno es constante.
+      // Cuánto ha venido. Se cuenta en la base y no sobre las que viajan abajo:
+      // «has venido 9 veces este mes» sobre una lista recortada es una cuenta
+      // que se equivoca en cuanto el alumno es constante.
       const [conteo] = await db
         .select({
           total: sql<number>`count(*)::int`,
@@ -276,6 +333,11 @@ export async function membershipsRoutes(app: FastifyInstance) {
         })
         .from(attendances)
         .where(eq(attendances.membershipId, m.id));
+
+      const [pagosCuenta] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(payments)
+        .where(eq(payments.membershipId, m.id));
 
       return {
         ...m,
@@ -290,7 +352,10 @@ export async function membershipsRoutes(app: FastifyInstance) {
           ultima: conteo?.ultima ?? null,
         },
         pagos,
+        pagosTotal: pagosCuenta?.n ?? 0,
         asistencias,
+        // El total de asistencias ya está contado arriba: es el mismo número.
+        asistenciasTotal: conteo?.total ?? 0,
       };
     },
   );

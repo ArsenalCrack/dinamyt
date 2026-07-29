@@ -83,7 +83,10 @@ describe('membresias-api — identidad y permisos', () => {
 
     const roster = await app.inject({ method: 'GET', url: '/memberships', headers: owner });
     expect(roster.statusCode).toBe(200);
-    const lista = roster.json();
+    // El roster viene paginado: `{ items, total }`. `total` cuenta TODO lo que
+    // cumple el filtro, no lo que cabe en la página.
+    const lista = roster.json().items;
+    expect(roster.json().total).toBe(3);
     expect(lista).toHaveLength(3); // los 2 sembrados + el nuevo
     // El carnet QR del alumno es su id: lo que escanea la cámara en el check-in.
     expect(lista.every((a: { qr: string; userId: string }) => a.qr === a.userId)).toBe(true);
@@ -170,7 +173,9 @@ describe('membresias-api — identidad y permisos', () => {
     expect(pago.json().membership.estado).toBe('al_dia');
 
     const roster = await app.inject({ method: 'GET', url: '/memberships', headers: owner });
-    const alumno = roster.json().find((a: { userId: string }) => a.userId === ids.alumno);
+    const alumno = roster
+      .json()
+      .items.find((a: { userId: string }) => a.userId === ids.alumno);
     expect(alumno.estado).toBe('al_dia');
     expect(alumno.venceEl).toBe(pago.json().membership.venceEl);
     await app.close();
@@ -337,8 +342,8 @@ describe('membresias-api — superadmin', () => {
       headers: jefe,
     });
     expect(roster.statusCode).toBe(200);
-    expect(roster.json()).toHaveLength(1);
-    expect(roster.json()[0].fullName).toBe('Alumno Rival');
+    expect(roster.json().items).toHaveLength(1);
+    expect(roster.json().items[0].fullName).toBe('Alumno Rival');
     await app.close();
   });
 

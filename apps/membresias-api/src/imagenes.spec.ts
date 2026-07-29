@@ -44,7 +44,9 @@ describe('membresias-api — fotos de perfil', () => {
       url: '/memberships',
       headers: e.auth(e.ids.owner),
     });
-    const alumno = roster.json().find((m: { userId: string }) => m.userId === e.ids.alumno);
+    const alumno = roster
+      .json()
+      .items.find((m: { userId: string }) => m.userId === e.ids.alumno);
     expect(alumno.avatarUrl).toMatch(/^\/users\/.+\/foto\?v=\d+$/);
   });
 

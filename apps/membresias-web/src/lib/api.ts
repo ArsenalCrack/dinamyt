@@ -49,6 +49,11 @@ export interface Usuario {
   belt: string | null;
   /** Desde cuándo entrena, si el maestro lo puso. Ver `GET /mi`. */
   trainsSince: string | null;
+  /**
+   * Cuándo se expidió su carnet ('YYYY-MM-DD'). De aquí sale la vigencia
+   * impresa, y solo la mueve reexpedirlo: ver `POST /users/:id/carnet`.
+   */
+  carnetEmitidoEl: string | null;
   /** Ficha de seguridad: va impresa en el carnet. */
   bloodType: string | null;
   emergencyName: string | null;
@@ -66,6 +71,11 @@ export interface Club {
   city: string | null;
   /** Escudo del club: dirección, no la imagen. Ver `urlFoto`. */
   logoUrl: string | null;
+  /**
+   * El maestro del club (la cuenta con rol `owner`). Viene con la sesión
+   * porque lo firma el carnet, y así ninguna pantalla lo pide aparte.
+   */
+  ownerName: string | null;
   isActive: boolean;
 }
 

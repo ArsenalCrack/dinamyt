@@ -29,6 +29,13 @@ interface Resultado {
   error?: string;
 }
 
+/**
+ * A partir de cuántos alumnos la parrilla manual deja de ser una lista y pasa a
+ * ser un muro. Por encima aparece el buscador y solo se dibujan los primeros
+ * que coincidan: el resto está a dos letras de distancia.
+ */
+const TOPE_BOTONES = 40;
+
 const QKEY = 'membresias_checkin_queue';
 interface Encolado {
   identifier: { type: string; value: string };
@@ -45,6 +52,7 @@ export default function Kiosco() {
   const { user, cargando: cargandoSesion, esStaff } = useAuth();
 
   const [roster, setRoster] = useState<RosterItem[]>([]);
+  const [filtro, setFiltro] = useState('');
   const [pin, setPin] = useState('');
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [pendientes, setPendientes] = useState(0);
@@ -75,10 +83,21 @@ export default function Kiosco() {
     setPendientes(rest.length);
   }, []);
 
+  /**
+   * El roster del kiosco NO se pagina, y es la excepción a propósito.
+   *
+   * En la puerta del salón no hay tiempo de pasar páginas: el alumno que se
+   * dejó el carnet en casa y no se sabe el PIN tiene que estar en esta
+   * pantalla, sea el primero de la lista o el número doscientos. Así que se
+   * pide entero (la API deja hasta 500 sin `limit`) y el filtrado se hace aquí
+   * mismo, sobre lo que ya está descargado — que además es lo que permite
+   * seguir marcando gente cuando se cae la conexión, igual que la cola de
+   * check-ins de arriba.
+   */
   const cargar = useCallback(async () => {
     try {
-      const r = await api.get<RosterItem[]>('/memberships');
-      setRoster(r.data);
+      const r = await api.get<{ items: RosterItem[] }>('/memberships');
+      setRoster(r.data.items);
     } catch {
       /* el kiosco puede operar sin roster (solo QR/PIN) */
     }
@@ -119,6 +138,12 @@ export default function Kiosco() {
   function nombreDe(id?: string) {
     return roster.find((r) => r.userId === id)?.fullName ?? id ?? '';
   }
+
+  const q = filtro.trim().toLowerCase();
+  const coincidencias = q
+    ? roster.filter((a) => a.fullName.toLowerCase().includes(q))
+    : roster;
+  const enPantalla = coincidencias.slice(0, TOPE_BOTONES);
 
   const color = resultado?.bloqueado
     ? 'var(--danger)'
@@ -247,6 +272,21 @@ export default function Kiosco() {
           <div className="muted" style={{ fontSize: '0.75rem', padding: '0.5rem 0' }}>
             {t('kiosco.manual')}
           </div>
+          {/* Con veinte alumnos la parrilla de botones se lee de un vistazo;
+              con doscientos es un muro por el que hay que bajar con el dedo
+              mientras alguien espera en la puerta. El buscador filtra lo que
+              ya está descargado —el roster viene entero, ver `cargar`—, así
+              que sigue funcionando sin conexión. */}
+          {roster.length > TOPE_BOTONES && (
+            <input
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+              maxLength={LIM.busqueda}
+              placeholder={t('pag.buscarAlumno')}
+              aria-label={t('pag.buscarAlumno')}
+              style={{ marginBottom: '0.6rem' }}
+            />
+          )}
           <div
             style={{
               display: 'grid',
@@ -255,7 +295,7 @@ export default function Kiosco() {
               paddingBottom: '0.75rem',
             }}
           >
-            {roster.map((a) => (
+            {enPantalla.map((a) => (
               <button
                 key={a.userId}
                 className="btn btn-outline"
@@ -265,6 +305,16 @@ export default function Kiosco() {
               </button>
             ))}
           </div>
+          {enPantalla.length === 0 && (
+            <p className="muted" style={{ fontSize: '0.78rem', paddingBottom: '0.75rem' }}>
+              {t('pag.sinResultados')}
+            </p>
+          )}
+          {coincidencias.length > enPantalla.length && (
+            <p className="muted" style={{ fontSize: '0.72rem', paddingBottom: '0.75rem' }}>
+              {enPantalla.length} {t('pag.de')} {coincidencias.length} · {t('kiosco.afina')}
+            </p>
+          )}
         </div>
       )}
 

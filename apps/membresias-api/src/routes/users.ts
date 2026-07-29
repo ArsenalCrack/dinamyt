@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, ilike, ne, or, sql } from 'drizzle-orm';
 import { users, type Db } from '@dinamyt/membresias-db';
 import { esStaff, orgDelRequest, requireAuth, requireRole } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
@@ -20,6 +20,8 @@ import {
   imagenGuardada,
 } from '../lib/imagenes';
 import { cinturon } from '../lib/cinturones';
+import { leerPagina, patron } from '../lib/paginacion';
+import { todayStr } from '../lib/billing';
 import { ensureMembership } from '../lib/memberships';
 import { firmarTokenAcceso, VIDA_TOKEN_ACCESO } from '../lib/auth/tokens';
 import type { MembresiasRole } from '../types/auth';
@@ -53,6 +55,7 @@ interface FilaVista {
   avatarUrl: string | null;
   belt: string | null;
   trainsSince?: string | null;
+  carnetEmitidoEl?: string | null;
   bloodType?: string | null;
   emergencyName?: string | null;
   emergencyPhone?: string | null;
@@ -72,6 +75,8 @@ function vista(u: FilaVista) {
     avatarUrl: direccionFoto(u),
     belt: u.belt,
     trainsSince: u.trainsSince ?? null,
+    /** Cuándo se expidió su carnet. Ver `POST /users/:id/carnet`. */
+    carnetEmitidoEl: u.carnetEmitidoEl ?? null,
     bloodType: u.bloodType ?? null,
     emergencyName: u.emergencyName ?? null,
     emergencyPhone: u.emergencyPhone ?? null,
@@ -91,6 +96,7 @@ const COLUMNAS_VISTA = {
   avatarUrl: columnaImagenLigera(users.avatarUrl),
   belt: users.belt,
   trainsSince: users.trainsSince,
+  carnetEmitidoEl: users.carnetEmitidoEl,
   bloodType: users.bloodType,
   emergencyName: users.emergencyName,
   emergencyPhone: users.emergencyPhone,
@@ -126,9 +132,12 @@ function fichaDeSeguridad(body: CuerpoFicha): Campo<Record<string, unknown>> {
   if (body.trainsSince !== undefined) {
     // Sin tope por arriba en el pasado: hay maestros con alumnos de los
     // noventa. El futuro sí se corta hoy — nadie empezó a entrenar mañana.
-    const desde = fecha(body.trainsSince, 'La fecha de inicio', {
-      max: new Date().toISOString().slice(0, 10),
-    });
+    //
+    // `todayStr` y no `toISOString()`: aquello da el día en UTC, así que en
+    // Colombia (UTC−5) desde las siete de la tarde ya contaba como «hoy» el
+    // día siguiente y dejaba pasar una fecha futura. El resto de la API decide
+    // el día con esta misma función.
+    const desde = fecha(body.trainsSince, 'La fecha de inicio', { max: todayStr() });
     if (!desde.ok) return desde;
     cambios.trainsSince = desde.valor;
   }
@@ -164,7 +173,16 @@ async function delClub(db: Db, orgId: string, id: string) {
 }
 
 export async function usersRoutes(app: FastifyInstance) {
-  // ── GET /users — gente del club ───────────────────────────────────────────
+  // ── GET /users — gente del club, por páginas ──────────────────────────────
+  //
+  // Responde `{ items, total }`. `total` es la cuenta de TODO lo que cumple el
+  // filtro, no lo que cabe en la página: sin él, la pantalla no puede decir
+  // «26–50 de 213» ni saber si hay una página siguiente.
+  //
+  // La búsqueda (`q`) se hace AQUÍ, contra nombre y correo, y no en el
+  // navegador. Es la parte que no se puede omitir: filtrando en el cliente,
+  // buscar solo encontraría a quien ya estuviera descargado, así que el alumno
+  // de la página tres sería inencontrable — que es peor que no paginar.
   app.get('/users', { preHandler: requireRole(['owner', 'staff']) }, async (req, reply) => {
     const orgId = orgDelRequest(req);
     if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
@@ -172,19 +190,30 @@ export async function usersRoutes(app: FastifyInstance) {
       role?: string;
       includeInactive?: string;
     };
+    const { limit, offset, q } = leerPagina(req.query);
 
     const conds = [eq(users.orgId, orgId)];
     if (role && (ROLES_ASIGNABLES as string[]).concat('owner').includes(role)) {
       conds.push(eq(users.role, role as MembresiasRole));
     }
     if (includeInactive !== '1') conds.push(eq(users.isActive, true));
+    if (q) {
+      const p = patron(q);
+      conds.push(or(ilike(users.fullName, p), ilike(users.email, p))!);
+    }
+    const donde = and(...conds);
 
-    const filas = await req.db
-      .select(COLUMNAS_VISTA)
-      .from(users)
-      .where(and(...conds))
-      .orderBy(asc(users.fullName));
-    return filas.map(vista);
+    const [filas, [cuenta]] = await Promise.all([
+      req.db
+        .select(COLUMNAS_VISTA)
+        .from(users)
+        .where(donde)
+        .orderBy(asc(users.fullName))
+        .limit(limit)
+        .offset(offset),
+      req.db.select({ n: sql<number>`count(*)::int` }).from(users).where(donde),
+    ]);
+    return { items: filas.map(vista), total: cuenta?.n ?? 0 };
   });
 
   // ── POST /users — dar de alta a alguien en mi club ────────────────────────
@@ -244,6 +273,11 @@ export async function usersRoutes(app: FastifyInstance) {
         ...ficha.valor,
         role: rol,
         orgId,
+        // Su carnet se expide hoy. Va explícito y no por el DEFAULT de la
+        // columna porque `CURRENT_DATE` es el día del servidor de base de
+        // datos, que en producción va en UTC: quien se dio de alta a las siete
+        // de la tarde en Colombia estrenaría un carnet fechado mañana.
+        carnetEmitidoEl: todayStr(),
         createdById: req.user!.sub,
       })
       .returning();
@@ -370,6 +404,37 @@ export async function usersRoutes(app: FastifyInstance) {
       return vista(upd);
     },
   );
+
+  // ── POST /users/:id/carnet — reexpedir el carnet ──────────────────────────
+  //
+  // Lo único que renueva la vigencia de un carnet. Antes no hacía falta porque
+  // el carnet no vencía: la vista previa se inventaba «emitido hoy» cada vez
+  // que se abría, así que reimprimirlo ya era renovarlo y el papel no caducaba
+  // jamás. Con la fecha guardada, imprimir cien veces da cien papeles idénticos
+  // y renovar es esto: un gesto del maestro, con su día registrado.
+  //
+  // Cuándo se usa: al vencer el año, y cuando el carnet se pierde o se daña y
+  // hay que dar por muerto el anterior.
+  //
+  // Solo el maestro. Un auxiliar administra el día a día del club —cobra,
+  // marca asistencia—, pero quien expide un documento que lo acredita es quien
+  // lo firma, y el carnet lleva impreso el nombre del maestro.
+  app.post('/users/:id/carnet', { preHandler: requireRole(['owner']) }, async (req, reply) => {
+    const orgId = orgDelRequest(req);
+    if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
+    const { id } = req.params as { id: string };
+    const db = req.db;
+
+    const u = await delClub(db, orgId, id);
+    if (!u) return reply.code(404).send({ error: 'No encontrado.' });
+
+    const [upd] = await db
+      .update(users)
+      .set({ carnetEmitidoEl: todayStr(), updatedAt: new Date() })
+      .where(eq(users.id, u.id))
+      .returning();
+    return vista(upd);
+  });
 
   // ── GET /users/:id/foto — la foto, en binario y cacheada ─────────────────
   //

@@ -11,6 +11,7 @@ import { Avatar } from '@/components/Avatar';
 import { CampoImagen } from '@/components/CampoImagen';
 import { Cinturon } from '@/components/Cinturon';
 import { LogoClub } from '@/components/LogoClub';
+import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
 interface RosterItem {
   userId: string;
@@ -53,6 +54,11 @@ export default function Panel() {
 
   const [editandoLogo, setEditandoLogo] = useState(false);
   const [roster, setRoster] = useState<RosterItem[]>([]);
+  const [totalRoster, setTotalRoster] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [busqueda, setBusqueda] = useState('');
+  /** Lo que de verdad viajó a la API. Ver el temporizador de más abajo. */
+  const [buscado, setBuscado] = useState('');
   const [revenue, setRevenue] = useState<Revenue | null>(null);
   const [overdue, setOverdue] = useState<Overdue[]>([]);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
@@ -63,12 +69,15 @@ export default function Panel() {
   const cargar = useCallback(async () => {
     try {
       const [r, rev, ov, at] = await Promise.all([
-        api.get<RosterItem[]>('/memberships'),
+        api.get<{ items: RosterItem[]; total: number }>('/memberships', {
+          params: { limit: POR_PAGINA, offset, ...(buscado ? { q: buscado } : {}) },
+        }),
         api.get<Revenue>('/reports/revenue'),
         api.get<Overdue[]>('/reports/overdue'),
         api.get<Attendance>('/reports/attendance'),
       ]);
-      setRoster(r.data);
+      setRoster(r.data.items);
+      setTotalRoster(r.data.total);
       setRevenue(rev.data);
       setOverdue(ov.data);
       setAttendance(at.data);
@@ -77,7 +86,16 @@ export default function Panel() {
     } finally {
       setCargando(false);
     }
-  }, [t]);
+  }, [offset, buscado, t]);
+
+  useEffect(() => {
+    setOffset(0); // buscar siempre empieza por el principio
+  }, [buscado]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setBuscado(busqueda.trim()), 300);
+    return () => clearTimeout(id);
+  }, [busqueda]);
 
   useEffect(() => {
     if (cargandoSesion) return;
@@ -272,6 +290,18 @@ export default function Panel() {
         </Link>
       </div>
 
+      {/* El roster va por páginas, así que necesita buscador SÍ o SÍ: sin él,
+          el alumno de la página tres no aparece por ningún lado. Filtra la
+          API, no el navegador. */}
+      <input
+        value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)}
+        maxLength={80}
+        placeholder={t('pag.buscarAlumno')}
+        aria-label={t('pag.buscarAlumno')}
+        style={{ marginBottom: '0.75rem' }}
+      />
+
       <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <table>
           <thead>
@@ -289,7 +319,7 @@ export default function Panel() {
             {roster.length === 0 && (
               <tr>
                 <td colSpan={5} className="muted" style={{ padding: '1rem' }}>
-                  {t('panel.sinAlumnos')}
+                  {buscado ? t('pag.sinResultados') : t('panel.sinAlumnos')}
                 </td>
               </tr>
             )}
@@ -344,6 +374,8 @@ export default function Panel() {
           </tbody>
         </table>
       </div>
+
+      <Paginacion offset={offset} limit={POR_PAGINA} total={totalRoster} onIr={setOffset} />
     </main>
   );
 }

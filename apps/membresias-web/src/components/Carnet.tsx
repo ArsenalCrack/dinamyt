@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { urlFoto } from '@/lib/api';
-import { fmtFecha } from '@/lib/formato';
-import { useI18n } from '@/lib/i18n';
+import { urlFoto, type Rol } from '@/lib/api';
+import { fmtFecha, hoyISO } from '@/lib/formato';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import {
   documentoCarnet,
+  vigenciaCarnet,
   type DatosCarnet,
   type FormatoCarnet,
 } from '@/lib/carnet';
@@ -26,6 +27,19 @@ import {
  * El QR se dibuja SIEMPRE negro sobre blanco, aunque la app esté en oscuro: un
  * QR claro sobre fondo oscuro lo leen mal casi todas las cámaras, y en papel
  * saldría en negativo.
+ *
+ * ── La vigencia no se calcula aquí ──
+ *
+ * Las fechas del carnet salen de `emitidoEl`, que es una columna de la base de
+ * datos. Antes se calculaban en el momento de pintar la vista previa —«emitido
+ * hoy, vence dentro de un año»— y eso hacía dos cosas mal:
+ *
+ * - El carnet no vencía nunca: volver a imprimirlo era renovarlo por otro año.
+ * - Dos copias del mismo carnet no coincidían, porque cada una llevaba la
+ *   fecha del día en que se imprimió.
+ *
+ * Ahora imprimirlo cien veces da cien papeles idénticos, y renovar es un acto
+ * aparte: el botón «Reexpedir», que solo tiene el maestro.
  */
 /**
  * Ancho y alto de la vista previa, en píxeles. Salen de la medida real: una
@@ -35,21 +49,17 @@ import {
 const ANCHO_PREVIA = 372;
 const ALTO_PREVIA = 570;
 
-/**
- * Cuánto vale un carnet antes de renovarlo, en años.
- *
- * Antes el carnet llevaba impreso el vencimiento de la MENSUALIDAD, que cambia
- * cada mes: eso obligaba a reimprimirlo doce veces al año para que el papel no
- * mintiera. Lo que caduca aquí es el carnet, no la cuota — el estado de la
- * mensualidad lo dice el kiosco al escanear, que es donde importa y donde
- * siempre está al día.
- */
-const AÑOS_DE_VIGENCIA = 1;
+/** Quién no pasa por el kiosco: su carnet no lleva PIN de check-in. */
+function esDelStaff(rol: Rol | undefined): boolean {
+  return rol === 'owner' || rol === 'staff';
+}
 
 export function Carnet({
   id,
   nombre,
   club,
+  maestro,
+  role,
   rol,
   tipo,
   logoClub,
@@ -59,22 +69,38 @@ export function Carnet({
   emergenciaNombre,
   emergenciaTelefono,
   pin,
+  emitidoEl,
+  desde,
+  onReexpedir,
 }: {
   id: string;
   nombre: string;
   club?: string | null;
-  /** Escudo del club. Sin él va el de la app. */
-  logoClub?: string | null;
+  /** Quien expide el carnet: el maestro del club (`club.ownerName`). */
+  maestro?: string | null;
+  /** El rol, en crudo: decide qué lleva el reverso. Ver `esDelStaff`. */
+  role?: Rol;
   /** Etiqueta del rol: sale al pie del frente. */
   rol: string;
   /** «Carnet de alumno», «Carnet de maestro»… Preside la cabecera. */
   tipo: string;
+  /** Escudo del club. Sin él va el de la app. */
+  logoClub?: string | null;
   foto?: string | null;
   cinturon?: string | null;
   sangre?: string | null;
   emergenciaNombre?: string | null;
   emergenciaTelefono?: string | null;
   pin?: string | null;
+  /**
+   * Cuándo se expidió el carnet ('YYYY-MM-DD'), tal cual lo guarda la API. NO
+   * es «hoy»: ver el apunte sobre la vigencia en la cabecera de este archivo.
+   */
+  emitidoEl?: string | null;
+  /** Desde cuándo está en el club. Ocupa el sitio del PIN en el carnet del staff. */
+  desde?: string | null;
+  /** Reexpedir: renueva la vigencia. Solo lo puede el maestro (ver `POST /users/:id/carnet`). */
+  onReexpedir?: () => Promise<void> | void;
 }) {
   const { t, idioma } = useI18n();
   const marco = useRef<HTMLIFrameElement | null>(null);
@@ -82,6 +108,18 @@ export function Carnet({
   const [qr, setQr] = useState('');
   const [formato, setFormato] = useState<FormatoCarnet>('hoja');
   const [escala, setEscala] = useState(1);
+  const [reexpidiendo, setReexpidiendo] = useState(false);
+
+  /**
+   * La vigencia impresa. Sale de la fecha guardada y del día de HOY en hora
+   * local — nunca de `toISOString()`, que da el día en UTC y en Colombia
+   * adelanta el carnet a mañana a partir de las siete de la tarde.
+   *
+   * Sin `emitidoEl` (una sesión vieja en caché, un club recién migrado) se cae
+   * de vuelta a hoy: eso es lo que hacía SIEMPRE hasta ahora.
+   */
+  const vigencia = vigenciaCarnet(emitidoEl?.slice(0, 10) || hoyISO(), hoyISO());
+  const staff = esDelStaff(role);
 
   /**
    * El documento del carnet mide lo que mide una tarjeta —no se encoge, ese es
@@ -123,14 +161,11 @@ export function Carnet({
   const documento = useMemo(() => {
     if (!qr) return '';
 
-    const hoy = new Date();
-    const caduca = new Date(hoy);
-    caduca.setFullYear(caduca.getFullYear() + AÑOS_DE_VIGENCIA);
-
     const datos: DatosCarnet = {
       id,
       nombre,
       club: club || 'DINAMYT',
+      maestro,
       rol,
       qr,
       foto: urlFoto(foto),
@@ -138,9 +173,12 @@ export function Carnet({
       sangre,
       emergenciaNombre,
       emergenciaTelefono,
-      emitido: fmtFecha(hoy.toISOString().slice(0, 10), idioma),
-      vigenteHasta: fmtFecha(caduca.toISOString().slice(0, 10), idioma),
-      pin,
+      emitido: fmtFecha(vigencia.emitido, idioma),
+      vigenteHasta: fmtFecha(vigencia.vence, idioma),
+      // El PIN es del kiosco, y por el kiosco pasan los alumnos. En el carnet
+      // del maestro va en su lugar desde cuándo está en el club.
+      pin: staff ? null : pin,
+      enElClubDesde: staff && desde ? fmtFecha(desde.slice(0, 10), idioma) : null,
       // Los DOS logos: el escudo del club preside el frente, y el de la app
       // firma abajo. Mientras el maestro no ponga escudo, arriba va el de la
       // app y abajo también — que es mejor que un hueco.
@@ -152,13 +190,19 @@ export function Carnet({
       datos,
       {
         tipo,
+        expide: t('carnet.expide'),
         numero: t('carnet.numero'),
         emitido: t('carnet.emitido'),
         vigenteHasta: t('carnet.vigenteHasta'),
         sangre: t('carnet.sangre'),
         emergencia: t('carnet.emergencia'),
         pin: t('carnet.pin'),
-        instruccion: t('carnet.instruccion'),
+        enElClub: t('carnet.enElClub'),
+        // «Presenta este carnet al entrar a clase» no le dice nada a quien DA
+        // la clase: el suyo no se presenta, acredita.
+        instruccion: t(
+          (staff ? `carnet.instruccion.${role}` : 'carnet.instruccion') as ClaveTexto,
+        ),
         intransferible: t('carnet.intransferible'),
         recorta: t('carnet.recorta'),
         frente: t('carnet.frente'),
@@ -172,8 +216,11 @@ export function Carnet({
     id,
     nombre,
     club,
+    maestro,
     logoClub,
     rol,
+    role,
+    staff,
     tipo,
     foto,
     cinturon,
@@ -181,6 +228,9 @@ export function Carnet({
     emergenciaNombre,
     emergenciaTelefono,
     pin,
+    desde,
+    vigencia.emitido,
+    vigencia.vence,
     formato,
     idioma,
     t,
@@ -192,6 +242,16 @@ export function Carnet({
     // El foco es lo que hace que Safari imprima el iframe y no la página.
     ventana.focus();
     ventana.print();
+  }
+
+  async function reexpedir() {
+    if (!onReexpedir || reexpidiendo) return;
+    setReexpidiendo(true);
+    try {
+      await onReexpedir();
+    } finally {
+      setReexpidiendo(false);
+    }
   }
 
   return (
@@ -218,6 +278,34 @@ export function Carnet({
           <p className="muted" style={{ padding: '2rem', textAlign: 'center' }}>
             {t('comun.cargando')}
           </p>
+        )}
+      </div>
+
+      {/* ── Hasta cuándo vale este carnet ──
+          Se dice AQUÍ, y no solo impreso en la tarjeta, porque es lo que
+          decide si vale la pena gastar papel: un carnet vencido no se
+          reimprime, se reexpide. */}
+      <div className="carnet-vigencia" data-vencido={vigencia.vencido || undefined}>
+        <div style={{ minWidth: 0 }}>
+          <span className="eyebrow">{t('carnet.vigenteHasta')}</span>
+          <p className="mono" style={{ fontWeight: 600 }}>
+            {fmtFecha(vigencia.vence, idioma)}
+          </p>
+          <p className="muted" style={{ fontSize: '0.72rem' }}>
+            {vigencia.vencido
+              ? t('carnet.vencido')
+              : `${t('carnet.emitido')} ${fmtFecha(vigencia.emitido, idioma)} · ${vigencia.diasFaltantes} d`}
+          </p>
+        </div>
+        {onReexpedir && (
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={reexpedir}
+            disabled={reexpidiendo}
+          >
+            {reexpidiendo ? t('comun.cargando') : t('carnet.reexpedir')}
+          </button>
         )}
       </div>
 

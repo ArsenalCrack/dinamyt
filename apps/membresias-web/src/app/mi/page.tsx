@@ -16,6 +16,7 @@ import { Contador } from '@/components/Contador';
 import { Carnet } from '@/components/Carnet';
 import { Cinturon } from '@/components/Cinturon';
 import { SelectMenu } from '@/components/SelectMenu';
+import { VerMas } from '@/components/Paginacion';
 
 interface Pago {
   id: string;
@@ -53,8 +54,27 @@ interface MiEstado {
   desde: string | null;
   asistencia: { total: number; esteMes: number; ultima: string | null };
   pagos: Pago[];
+  /** Cuántos pagos tiene EN TOTAL, no cuántos vinieron en `pagos`. */
+  pagosTotal: number;
   asistencias: Asistencia[];
+  asistenciasTotal: number;
 }
+/**
+ * Los números del club, para el maestro y el auxiliar.
+ *
+ * Ocupan el sitio de «Cómo vengo viniendo»: el staff no marca asistencia en el
+ * kiosco —el check-in es de alumnos—, así que esa tarjeta le salía en cero para
+ * siempre. Lo que sí le corresponde es cómo viene viniendo SU GENTE.
+ */
+interface Labor {
+  /** Alumnos activos del club. */
+  alumnos: number;
+  /** Cuántos entrenaron hoy. */
+  hoy: number;
+  /** Asistencias en lo que va del mes. */
+  mes: number;
+}
+
 /** Solo lo que hace falta del aviso para enseñarlo en una línea. */
 interface AvisoBreve {
   id: string;
@@ -62,6 +82,9 @@ interface AvisoBreve {
   readAt: string | null;
   venceEl: string | null;
 }
+
+/** Cuántas filas de historial destapa cada «ver más». */
+const PASO_HISTORIAL = 12;
 
 /** Meses cumplidos desde una fecha. Debajo de uno se cuenta en días. */
 function antiguedad(desde: string): { meses: number; dias: number } {
@@ -95,12 +118,18 @@ export default function MiPanel() {
   const router = useRouter();
   const { t, idioma } = useI18n();
   const { user, club, cargando: cargandoSesion, refrescar, esStaff } = useAuth();
+  /** Quien firma los carnets del club: el único que puede reexpedirlos. */
+  const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
 
   const [mi, setMi] = useState<MiEstado | null>(null);
+  const [labor, setLabor] = useState<Labor | null>(null);
   const [avisos, setAvisos] = useState<AvisoBreve[]>([]);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [pass, setPass] = useState({ actual: '', nueva: '' });
+  /** Cuánto historial propio se destapa. Ver `VerMas`. */
+  const [verPagos, setVerPagos] = useState(PASO_HISTORIAL);
+  const [verAsistencias, setVerAsistencias] = useState(PASO_HISTORIAL);
   const [perfil, setPerfil] = useState({
     phone: '',
     bloodType: '',
@@ -123,7 +152,21 @@ export default function MiPanel() {
     } catch {
       setAvisos([]);
     }
-  }, [t]);
+    // Los números del club, solo para quien puede verlos. Las dos rutas son de
+    // staff: pedirlas siendo alumno sería un 403 en cada carga de la pantalla.
+    if (esStaff) {
+      try {
+        const [as, roster] = await Promise.all([
+          api.get<{ hoy: number; total: number }>('/reports/attendance'),
+          // Una sola fila: lo que interesa es el `total`, no la lista.
+          api.get<{ total: number }>('/memberships', { params: { limit: 1 } }),
+        ]);
+        setLabor({ alumnos: roster.data.total, hoy: as.data.hoy, mes: as.data.total });
+      } catch {
+        setLabor(null);
+      }
+    }
+  }, [t, esStaff]);
 
   useEffect(() => {
     if (cargandoSesion) return;
@@ -171,6 +214,25 @@ export default function MiPanel() {
       setAviso(t('alumnos.actualizado'));
     } catch (err) {
       setError(mensajeError(err, t('mi.miPerfil')));
+    }
+  }
+
+  /**
+   * Reexpedir MI carnet: le pone la fecha de hoy y con ella otro año de
+   * vigencia. Es lo único que la mueve — imprimir no cambia nada.
+   *
+   * Se refresca la sesión y no la pantalla: la fecha vive en el usuario, así
+   * que al recargarlo la vista previa se repinta sola con la nueva vigencia.
+   */
+  async function reexpedirCarnet() {
+    setError('');
+    setAviso('');
+    try {
+      await api.post(`/users/${user!.id}/carnet`, {});
+      await refrescar();
+      setAviso(t('carnet.reexpedido'));
+    } catch (err) {
+      setError(mensajeError(err, t('carnet.reexpedir')));
     }
   }
 
@@ -439,63 +501,137 @@ export default function MiPanel() {
 
       {/* ── Cómo vengo viniendo ──
           Tres números que el alumno no tenía en ningún lado: la lista de abajo
-          enseña las últimas quince, y contar ahí «cuántas llevo este mes» no es
-          algo que nadie haga. */}
-      <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.8rem' }}>
-          {t('mi.comoVengo')}
-        </h2>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(min(120px, 100%), 1fr))',
-            gap: '0.75rem',
-          }}
-        >
-          <div>
-            <div className="muted" style={{ fontSize: '0.72rem' }}>
-              {t('mi.esteMes')}
-            </div>
-            <div className="display" style={{ fontSize: '1.6rem', color: 'var(--gold)' }}>
-              {mi.asistencia.esteMes}
-            </div>
-          </div>
-          <div>
-            <div className="muted" style={{ fontSize: '0.72rem' }}>
-              {t('mi.totalClases')}
-            </div>
-            <div className="display" style={{ fontSize: '1.6rem' }}>
-              {mi.asistencia.total}
-            </div>
-          </div>
-          <div>
-            <div className="muted" style={{ fontSize: '0.72rem' }}>
-              {t('mi.ultimaVez')}
-            </div>
-            <div className="mono" style={{ fontSize: '1rem', fontWeight: 600, paddingTop: '0.35rem' }}>
-              {mi.asistencia.ultima ? fmtFecha(mi.asistencia.ultima, idioma) : '—'}
-            </div>
-          </div>
-          {tiempo && (
+          es un extracto, y contar ahí «cuántas llevo este mes» no es algo que
+          nadie haga.
+
+          Solo para quien entrena. El maestro no pasa por el kiosco —el
+          check-in es de alumnos—, así que estos contadores le salían en cero
+          para siempre y la lista de abajo, vacía. */}
+      {!esStaff && (
+        <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.8rem' }}>
+            {t('mi.comoVengo')}
+          </h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(min(120px, 100%), 1fr))',
+              gap: '0.75rem',
+            }}
+          >
             <div>
               <div className="muted" style={{ fontSize: '0.72rem' }}>
-                {t('mi.enElClub')}
+                {t('mi.esteMes')}
               </div>
-              <div style={{ paddingTop: '0.35rem' }}>
-                <span className="display" style={{ fontSize: '1.35rem' }}>
-                  {tiempo.meses >= 1 ? tiempo.meses : tiempo.dias}
-                </span>{' '}
-                <span className="muted" style={{ fontSize: '0.8rem' }}>
-                  {t(tiempo.meses >= 1 ? 'mi.meses' : 'mi.dias')}
-                </span>
-                <div className="muted mono" style={{ fontSize: '0.7rem' }}>
-                  {t('mi.desde')} {fmtFecha(mi.desde!.slice(0, 10), idioma)}
-                </div>
+              <div className="display" style={{ fontSize: '1.6rem', color: 'var(--gold)' }}>
+                {mi.asistencia.esteMes}
               </div>
             </div>
-          )}
+            <div>
+              <div className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('mi.totalClases')}
+              </div>
+              <div className="display" style={{ fontSize: '1.6rem' }}>
+                {mi.asistencia.total}
+              </div>
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('mi.ultimaVez')}
+              </div>
+              <div className="mono" style={{ fontSize: '1rem', fontWeight: 600, paddingTop: '0.35rem' }}>
+                {mi.asistencia.ultima ? fmtFecha(mi.asistencia.ultima, idioma) : '—'}
+              </div>
+            </div>
+            {tiempo && (
+              <div>
+                <div className="muted" style={{ fontSize: '0.72rem' }}>
+                  {t('mi.enElClub')}
+                </div>
+                <div style={{ paddingTop: '0.35rem' }}>
+                  <span className="display" style={{ fontSize: '1.35rem' }}>
+                    {tiempo.meses >= 1 ? tiempo.meses : tiempo.dias}
+                  </span>{' '}
+                  <span className="muted" style={{ fontSize: '0.8rem' }}>
+                    {t(tiempo.meses >= 1 ? 'mi.meses' : 'mi.dias')}
+                  </span>
+                  <div className="muted mono" style={{ fontSize: '0.7rem' }}>
+                    {t('mi.desde')} {fmtFecha(mi.desde!.slice(0, 10), idioma)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Mi labor en el club ──
+          Lo que ve el maestro donde el alumno ve su asistencia. No es relleno:
+          es el mismo hueco contestado con la pregunta que sí le corresponde
+          —cuánta gente enseña y cuánta vino hoy— más su propia antigüedad, que
+          antes vivía dentro de la tarjeta que se le acaba de quitar.
+
+          El detalle largo no se repite aquí: para eso está «Estadísticas». */}
+      {esStaff && (
+        <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.8rem' }}>
+            {t('mi.miLabor')}
+          </h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(min(120px, 100%), 1fr))',
+              gap: '0.75rem',
+            }}
+          >
+            <div>
+              <div className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('mi.misAlumnos')}
+              </div>
+              <div className="display" style={{ fontSize: '1.6rem' }}>
+                {labor?.alumnos ?? '—'}
+              </div>
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('mi.entrenaronHoy')}
+              </div>
+              <div className="display" style={{ fontSize: '1.6rem', color: 'var(--gold)' }}>
+                {labor?.hoy ?? '—'}
+              </div>
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('mi.esteMesClub')}
+              </div>
+              <div className="display" style={{ fontSize: '1.6rem' }}>
+                {labor?.mes ?? '—'}
+              </div>
+            </div>
+            {tiempo && (
+              <div>
+                <div className="muted" style={{ fontSize: '0.72rem' }}>
+                  {t('mi.enElClub')}
+                </div>
+                <div style={{ paddingTop: '0.35rem' }}>
+                  <span className="display" style={{ fontSize: '1.35rem' }}>
+                    {tiempo.meses >= 1 ? tiempo.meses : tiempo.dias}
+                  </span>{' '}
+                  <span className="muted" style={{ fontSize: '0.8rem' }}>
+                    {t(tiempo.meses >= 1 ? 'mi.meses' : 'mi.dias')}
+                  </span>
+                  <div className="muted mono" style={{ fontSize: '0.7rem' }}>
+                    {t('mi.desde')} {fmtFecha(mi.desde!.slice(0, 10), idioma)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.6rem' }}>
+            {t('mi.laborAyuda')}
+          </p>
+        </div>
+      )}
 
       {/* ── Mi grado ──
           La escalera completa con el suyo encendido. Es lo que un alumno mira
@@ -534,32 +670,42 @@ export default function MiPanel() {
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}>
           {t('mi.miCarnet')}
         </h2>
+        {/* Al alumno se le explica para qué sirve —marcar asistencia—; al
+            maestro, que el suyo no es para eso. */}
         <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.9rem' }}>
-          {t('qr.descripcionMia')}
+          {t(esStaff ? 'qr.descripcionStaff' : 'qr.descripcionMia')}
         </p>
 
         {/* ── El PIN, delante y no escondido en el reverso del carnet ──
             Es el plan B de verdad: la cámara del maestro falla, el carnet se
             queda en casa, el celular no tiene batería. Que el alumno se lo
-            sepa de memoria vale más que tenerlo impreso. */}
-        <div className="pin-respaldo">
-          <span className="eyebrow">{t('qr.pin')}</span>
-          {mi.checkinPin ? (
-            <>
-              <strong className="mono">{mi.checkinPin}</strong>
-              <span className="muted">{t('mi.pinAyuda')}</span>
-            </>
-          ) : (
-            <span className="muted">{t('mi.sinPin')}</span>
-          )}
-        </div>
+            sepa de memoria vale más que tenerlo impreso.
+
+            Solo para quien marca asistencia. El maestro y el auxiliar no pasan
+            por el kiosco, así que su PIN no abría ninguna puerta: era un dato
+            de adorno en el sitio más visible de su carnet. */}
+        {!esStaff && (
+          <div className="pin-respaldo">
+            <span className="eyebrow">{t('qr.pin')}</span>
+            {mi.checkinPin ? (
+              <>
+                <strong className="mono">{mi.checkinPin}</strong>
+                <span className="muted">{t('mi.pinAyuda')}</span>
+              </>
+            ) : (
+              <span className="muted">{t('mi.sinPin')}</span>
+            )}
+          </div>
+        )}
 
         {user && (
           <Carnet
             id={user.id}
             nombre={user.fullName}
             club={club?.name}
+            maestro={club?.ownerName}
             logoClub={club?.logoUrl}
+            role={user.role}
             rol={t(claveRol(user))}
             tipo={t(`carnet.tipo.${user.role}` as ClaveTexto)}
             foto={user.avatarUrl}
@@ -568,6 +714,11 @@ export default function MiPanel() {
             emergenciaNombre={user.emergencyName}
             emergenciaTelefono={user.emergencyPhone}
             pin={mi.checkinPin}
+            emitidoEl={user.carnetEmitidoEl}
+            desde={mi.desde}
+            // Reexpedir su propio carnet: solo el maestro, que es quien los
+            // firma. Al alumno se lo reexpide él desde la ficha.
+            onReexpedir={esMaestro ? reexpedirCarnet : undefined}
           />
         )}
       </div>
@@ -748,7 +899,7 @@ export default function MiPanel() {
                   </td>
                 </tr>
               )}
-              {mi.pagos.map((p) => (
+              {mi.pagos.slice(0, verPagos).map((p) => (
                 <tr key={p.id}>
                   <td className="mono">{fmtFecha(p.paidAt?.slice(0, 10), idioma)}</td>
                   <td>{p.planName}</td>
@@ -760,40 +911,54 @@ export default function MiPanel() {
               ))}
             </tbody>
           </table>
+          <VerMas
+            visibles={Math.min(verPagos, mi.pagos.length)}
+            total={mi.pagosTotal}
+            onMas={() => setVerPagos((n) => n + PASO_HISTORIAL)}
+          />
         </div>
       )}
 
-      {/* ── Mis asistencias ── */}
-      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
-          {t('mi.asistencias')}
-        </h2>
-        <table>
-          <thead>
-            <tr>
-              <th>{t('comun.fecha')}</th>
-              <th>{t('pago.metodo')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mi.asistencias.length === 0 && (
+      {/* ── Mis asistencias ──
+          Va con lo de arriba: quien no registra asistencia no tiene ninguna
+          que leer. Al maestro le salía siempre «Ninguno». */}
+      {!esStaff && (
+        <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
+            {t('mi.asistencias')}
+          </h2>
+          <table>
+            <thead>
               <tr>
-                <td colSpan={2} className="muted" style={{ padding: '0.9rem' }}>
-                  {t('comun.ninguno')}
-                </td>
+                <th>{t('comun.fecha')}</th>
+                <th>{t('pago.metodo')}</th>
               </tr>
-            )}
-            {mi.asistencias.map((a) => (
-              <tr key={a.id}>
-                <td className="mono">{fmtFecha(a.checkinDate, idioma)}</td>
-                <td className="muted">
-                  {t(`asistencia.metodo.${a.method}` as ClaveTexto)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {mi.asistencias.length === 0 && (
+                <tr>
+                  <td colSpan={2} className="muted" style={{ padding: '0.9rem' }}>
+                    {t('comun.ninguno')}
+                  </td>
+                </tr>
+              )}
+              {mi.asistencias.slice(0, verAsistencias).map((a) => (
+                <tr key={a.id}>
+                  <td className="mono">{fmtFecha(a.checkinDate, idioma)}</td>
+                  <td className="muted">
+                    {t(`asistencia.metodo.${a.method}` as ClaveTexto)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <VerMas
+            visibles={Math.min(verAsistencias, mi.asistencias.length)}
+            total={mi.asistenciasTotal}
+            onMas={() => setVerAsistencias((n) => n + PASO_HISTORIAL)}
+          />
+        </div>
+      )}
     </main>
   );
 }

@@ -517,6 +517,24 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
 }
 .pin-respaldo .muted { font-size: 0.72rem; flex-basis: 100%; }
 
+/* ── Hasta cuándo vale el carnet, junto a la vista previa ──
+   Es lo que se mira ANTES de imprimir. Vencido se pone en rojo y el botón de
+   al lado deja de ser un extra: sin reexpedirlo, lo que sale de la impresora
+   es un documento caducado. */
+.carnet-vigencia {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+}
+.carnet-vigencia[data-vencido] {
+  border-color: var(--danger);
+}
+.carnet-vigencia[data-vencido] .mono { color: var(--danger); }
+
 .carnet-formatos { display: flex; gap: 0.35rem; }
 .carnet-formato {
   flex: 1;
@@ -625,6 +643,32 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
     width: 340px;
     max-width: 90vw;
   }
+}
+
+/* ── Paso de páginas y «ver más» ────────────────────────────────────────── */
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+}
+.paginacion-cuenta {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.ver-mas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0 0.4rem;
+  font-size: 0.72rem;
 }
 
 /* ════════════════════════════════════════════════════════════════════════

@@ -71,6 +71,13 @@
       "when": 1785995000000,
       "tag": "0009_motivo_mas_largo",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785996000000,
+      "tag": "0010_carnet_con_fecha",
+      "breakpoints": true
     }
   ]
 }

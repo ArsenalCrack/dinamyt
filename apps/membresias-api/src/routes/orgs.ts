@@ -16,6 +16,7 @@ import {
   textoOpcional,
 } from '../lib/validacion';
 import { decodificarImagen, direccionLogo, imagenGuardada } from '../lib/imagenes';
+import { todayStr } from '../lib/billing';
 
 /**
  * Panel del SUPERADMIN: qué clubes existen y qué maestros tienen acceso.
@@ -245,6 +246,9 @@ export async function orgsRoutes(app: FastifyInstance) {
         phone: tel.valor,
         role: 'owner',
         orgId: id,
+        // El maestro estrena carnet el día que se le nombra. Ver el mismo
+        // apunte en `POST /users`: la fecha la pone la API, no la BD.
+        carnetEmitidoEl: todayStr(),
         createdById: req.user!.sub,
       })
       .returning();

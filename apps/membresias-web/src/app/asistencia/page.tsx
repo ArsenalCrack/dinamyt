@@ -6,9 +6,10 @@ import Link from 'next/link';
 import { api, mensajeError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { fmtFecha } from '@/lib/formato';
+import { fmtFecha, hoyISO } from '@/lib/formato';
 import { LIM } from '@/lib/campos';
 import { Avatar } from '@/components/Avatar';
+import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
 interface RosterItem {
   userId: string;
@@ -26,16 +27,6 @@ interface Asistencia {
   method: string;
 }
 
-const hoyISO = () => {
-  // Fecha LOCAL, no toISOString(): en husos negativos como el de Colombia, la
-  // fecha UTC ya es la de mañana después de las 7 de la noche, y la lista de
-  // la clase saldría vacía justo en el horario de entrenamiento.
-  const d = new Date();
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mes}-${dia}`;
-};
-
 /**
  * Pasar lista. El maestro marca a cada alumno presente, o deja que entren con
  * su carnet QR o su PIN en el kiosco: la lista recoge todo, venga por donde
@@ -47,8 +38,12 @@ export default function AsistenciaPage() {
   const { user, cargando: cargandoSesion, esStaff } = useAuth();
 
   const [roster, setRoster] = useState<RosterItem[]>([]);
+  const [totalRoster, setTotalRoster] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [asistencias, setAsistencias] = useState<Asistencia[]>([]);
   const [busqueda, setBusqueda] = useState('');
+  /** Lo que de verdad viajó a la API: el filtro es suyo, no del navegador. */
+  const [buscado, setBuscado] = useState('');
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error' | 'aviso'; texto: string } | null>(
     null,
   );
@@ -58,17 +53,32 @@ export default function AsistenciaPage() {
   const cargar = useCallback(async () => {
     try {
       const [r, a] = await Promise.all([
-        api.get<RosterItem[]>('/memberships'),
+        api.get<{ items: RosterItem[]; total: number }>('/memberships', {
+          params: { limit: POR_PAGINA, offset, ...(buscado ? { q: buscado } : {}) },
+        }),
+        // Las de HOY, sin paginar: son las que ya entraron, y en un día de
+        // clase eso es una fracción del club. Se necesitan enteras para pintar
+        // el ✓ de quien ya está dentro.
         api.get<Asistencia[]>('/attendances', { params: { date: hoyISO() } }),
       ]);
-      setRoster(r.data);
+      setRoster(r.data.items);
+      setTotalRoster(r.data.total);
       setAsistencias(a.data);
     } catch (e) {
       setMsg({ tipo: 'error', texto: mensajeError(e, t('comun.ninguno')) });
     } finally {
       setCargando(false);
     }
-  }, [t]);
+  }, [offset, buscado, t]);
+
+  useEffect(() => {
+    setOffset(0);
+  }, [buscado]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setBuscado(busqueda.trim()), 300);
+    return () => clearTimeout(id);
+  }, [busqueda]);
 
   useEffect(() => {
     if (cargandoSesion) return;
@@ -107,10 +117,9 @@ export default function AsistenciaPage() {
     }
   }
 
-  const q = busqueda.trim().toLowerCase();
-  const visibles = roster.filter(
-    (a) => !q || a.fullName.toLowerCase().includes(q) || a.email.toLowerCase().includes(q),
-  );
+  // El filtro lo hace la API: ver `cargar`. Filtrar aquí sobre una página de
+  // veinticinco escondería a quien no esté en ella.
+  const visibles = roster;
 
   if (cargandoSesion || cargando) {
     return (
@@ -159,13 +168,15 @@ export default function AsistenciaPage() {
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
         maxLength={LIM.busqueda}
-        placeholder={t('comun.buscar')}
-        aria-label={t('comun.buscar')}
+        placeholder={t('pag.buscarAlumno')}
+        aria-label={t('pag.buscarAlumno')}
         style={{ marginBottom: '0.9rem', width: '100%' }}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {visibles.length === 0 && <p className="muted">{t('comun.ninguno')}</p>}
+        {visibles.length === 0 && (
+          <p className="muted">{buscado ? t('pag.sinResultados') : t('comun.ninguno')}</p>
+        )}
         {visibles.map((a) => {
           const asistencia = presentes.get(a.userId);
           return (
@@ -219,6 +230,8 @@ export default function AsistenciaPage() {
           );
         })}
       </div>
+
+      <Paginacion offset={offset} limit={POR_PAGINA} total={totalRoster} onIr={setOffset} />
     </main>
   );
 }

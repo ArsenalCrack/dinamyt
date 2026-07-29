@@ -7,7 +7,7 @@ import axios from 'axios';
 import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
-import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
+import { claseEstado, claveEstado, fmtFecha, fmtMoneda, hoyISO } from '@/lib/formato';
 import { LIM, TIPOS_SANGRE, soloDigitos, soloTelefono, telefonoValido } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
@@ -18,6 +18,7 @@ import { AccesoQR } from '@/components/AccesoQR';
 import { Cinturon } from '@/components/Cinturon';
 import { SelectMenu } from '@/components/SelectMenu';
 import { CampoDinero } from '@/components/CampoDinero';
+import { VerMas } from '@/components/Paginacion';
 
 interface Persona {
   id: string;
@@ -27,6 +28,8 @@ interface Persona {
   avatarUrl: string | null;
   belt: string | null;
   trainsSince: string | null;
+  /** Cuándo se le expidió el carnet. Ver `POST /users/:id/carnet`. */
+  carnetEmitidoEl: string | null;
   bloodType: string | null;
   emergencyName: string | null;
   emergencyPhone: string | null;
@@ -77,13 +80,8 @@ function pinAlAzar(): string {
   return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
 }
 
-/** Hoy en formato de `<input type="date">`, en hora LOCAL (no UTC). */
-function hoyISO(): string {
-  const d = new Date();
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mes}-${dia}`;
-}
+/** Cuántas filas de historial destapa cada «ver más». */
+const PASO_HISTORIAL = 20;
 
 /**
  * Ficha del alumno, vista por el maestro. Es la pantalla donde se hace TODO lo
@@ -139,17 +137,31 @@ export default function Ficha() {
   const [repetido, setRepetido] = useState('');
   const cobroRef = useRef<HTMLFormElement | null>(null);
   const saltoHecho = useRef(false);
+  /**
+   * Cuánto historial se enseña de golpe. La API los manda completos —son de un
+   * solo alumno—, así que «ver más» solo destapa lo que ya está aquí.
+   *
+   * Antes las asistencias se cortaban con un `.slice(0, 30)` y punto: un alumno
+   * con dos años venía enseñando treinta de sus trescientas, sin un número que
+   * dijera que faltaba nada.
+   */
+  const [verPagos, setVerPagos] = useState(PASO_HISTORIAL);
+  const [verAsistencias, setVerAsistencias] = useState(PASO_HISTORIAL);
 
   const cargar = useCallback(async () => {
     try {
       const [pe, mem, pl, pays, ats] = await Promise.all([
         api.get<Persona>(`/users/${id}`),
-        api.get<Membership[]>('/memberships'),
+        // UNA membresía, no el club entero. Antes se descargaba el roster
+        // completo para hacerle un `find` aquí: con el roster ya paginado eso
+        // habría dejado de encontrar a nadie que no cupiera en la primera
+        // página, además de traer doscientas filas para usar una.
+        api.get<{ items: Membership[] }>('/memberships', { params: { userId: id } }),
         api.get<Plan[]>('/plans'),
         api.get<Payment[]>(`/payments?userId=${id}`),
         api.get<Attendance[]>(`/attendances?userId=${id}`),
       ]);
-      const m = mem.data.find((x) => x.userId === id) ?? null;
+      const m = mem.data.items[0] ?? null;
       setPersona(pe.data);
       setMembership(m);
       setPlanes(pl.data);
@@ -243,6 +255,26 @@ export default function Ficha() {
       setError(mensajeError(err, t('ficha.datos')));
     } finally {
       setGuardando('');
+    }
+  }
+
+  /**
+   * Reexpedir el carnet: le pone la fecha de hoy y con ella otro año.
+   *
+   * Es lo ÚNICO que mueve la vigencia. Imprimir no la toca: dos copias del
+   * mismo carnet tienen que decir lo mismo, y hasta hace poco no era así
+   * —cada impresión se fechaba sola en el día en que se hacía, así que el
+   * carnet no vencía nunca.
+   */
+  async function reexpedirCarnet() {
+    setError('');
+    setAviso('');
+    try {
+      await api.post(`/users/${id}/carnet`, {});
+      setAviso(t('carnet.reexpedido'));
+      await cargar();
+    } catch (err) {
+      setError(mensajeError(err, t('carnet.reexpedir')));
     }
   }
 
@@ -347,6 +379,8 @@ export default function Ficha() {
    * quien sí paga; lo demás de la ficha sigue igual para todos.
    */
   const esAlumno = persona?.role === 'student';
+  /** Quien no pasa por el kiosco: su carnet no marca asistencia, acredita. */
+  const esDelStaff = persona?.role === 'owner' || persona?.role === 'staff';
   const planCobro = planes.find((p) => p.id === cobro.planId) ?? null;
   /** El plan que el alumno tiene puesto: va impreso en su carnet. */
   const planActual = planes.find((p) => p.id === membership?.currentPlanId) ?? null;
@@ -432,16 +466,21 @@ export default function Ficha() {
         {/* ── El carnet: el motivo por el que existe esta pantalla ─────────── */}
         <div className="card" style={{ padding: '1rem' }}>
           <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}>
-            {t('qr.titulo')}
+            {t(`carnet.tipo.${persona?.role ?? 'student'}` as ClaveTexto)}
           </h2>
+          {/* «Lo trae a clase y el maestro lo escanea» solo vale para quien
+              entrena. La ficha de un auxiliar enseña el mismo carnet, pero el
+              suyo no marca asistencia: acredita. */}
           <p className="muted" style={{ fontSize: '0.75rem', marginBottom: '0.9rem' }}>
-            {t('qr.descripcion')}
+            {t(esDelStaff ? 'qr.descripcionStaff' : 'qr.descripcion')}
           </p>
           <Carnet
             id={id}
             nombre={nombre}
             club={club?.name}
+            maestro={club?.ownerName}
             logoClub={club?.logoUrl}
+            role={persona?.role}
             rol={t(`rol.${persona?.role ?? 'student'}` as ClaveTexto)}
             tipo={t(`carnet.tipo.${persona?.role ?? 'student'}` as ClaveTexto)}
             foto={persona?.avatarUrl}
@@ -450,6 +489,11 @@ export default function Ficha() {
             emergenciaNombre={persona?.emergencyName}
             emergenciaTelefono={persona?.emergencyPhone}
             pin={membership?.checkinPin}
+            emitidoEl={persona?.carnetEmitidoEl}
+            desde={persona?.trainsSince}
+            // Reexpedir vale para el carnet perdido y para el vencido: es lo
+            // único que renueva el año. Solo el maestro, que es quien lo firma.
+            onReexpedir={esMaestro ? reexpedirCarnet : undefined}
           />
         </div>
 
@@ -943,7 +987,7 @@ export default function Ficha() {
                   </td>
                 </tr>
               )}
-              {payments.map((p) => (
+              {payments.slice(0, verPagos).map((p) => (
                 <tr key={p.id}>
                   <td>{fmtFecha(p.paidAt?.slice(0, 10), idioma)}</td>
                   <td className="mono">{fmtMoneda(p.amount)}</td>
@@ -953,29 +997,45 @@ export default function Ficha() {
               ))}
             </tbody>
           </table>
+          <VerMas
+            visibles={verPagos}
+            total={payments.length}
+            onMas={() => setVerPagos((n) => n + PASO_HISTORIAL)}
+          />
         </div>
       )}
 
-      <div className="card" style={{ padding: '0.5rem 1rem' }}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
-          {t('ficha.asistencias')}
-        </h2>
-        <div
-          style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', paddingBottom: '0.75rem' }}
-        >
-          {attendances.length === 0 && (
-            <span className="muted" style={{ fontSize: '0.85rem' }}>
-              {t('comun.ninguno')}
-            </span>
-          )}
-          {attendances.slice(0, 30).map((a) => (
-            <span key={a.id} className="badge">
-              {fmtFecha(a.checkinDate, idioma)} ·{' '}
-              {t(`asistencia.metodo.${a.method}` as ClaveTexto)}
-            </span>
-          ))}
+      {/* ── Asistencias ──
+          Va con los pagos: solo para quien entrena. El maestro y sus auxiliares
+          no marcan en el kiosco —el check-in es de alumnos—, así que aquí les
+          salía un «Ninguno» permanente, como si les faltara algo por hacer. */}
+      {esAlumno && (
+        <div className="card" style={{ padding: '0.5rem 1rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.5rem 0' }}>
+            {t('ficha.asistencias')}
+          </h2>
+          <div
+            style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', paddingBottom: '0.75rem' }}
+          >
+            {attendances.length === 0 && (
+              <span className="muted" style={{ fontSize: '0.85rem' }}>
+                {t('comun.ninguno')}
+              </span>
+            )}
+            {attendances.slice(0, verAsistencias).map((a) => (
+              <span key={a.id} className="badge">
+                {fmtFecha(a.checkinDate, idioma)} ·{' '}
+                {t(`asistencia.metodo.${a.method}` as ClaveTexto)}
+              </span>
+            ))}
+          </div>
+          <VerMas
+            visibles={verAsistencias}
+            total={attendances.length}
+            onMas={() => setVerAsistencias((n) => n + PASO_HISTORIAL)}
+          />
         </div>
-      </div>
+      )}
     </main>
   );
 }

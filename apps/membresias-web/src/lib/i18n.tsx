@@ -201,6 +201,15 @@ const es = {
   'alumnos.contrasenaCambiada': 'Contraseña actualizada.',
   'alumnos.incluirInactivos': 'Ver también los inactivos',
 
+  // Paso de páginas y «ver más» (components/Paginacion.tsx)
+  'pag.navegacion': 'Páginas',
+  'pag.anterior': 'Anteriores',
+  'pag.siguiente': 'Siguientes',
+  'pag.de': 'de',
+  'pag.verMas': 'Ver más',
+  'pag.sinResultados': 'Nadie coincide con esa búsqueda.',
+  'pag.buscarAlumno': 'Buscar por nombre o correo',
+
   // Foto de perfil (la misma que va al carnet)
   'foto.poner': 'Poner foto',
   'foto.cambiar': 'Cambiar foto',
@@ -247,6 +256,10 @@ const es = {
     'Imprímelo y entrégaselo al alumno. Lo trae a clase y el maestro lo escanea con la cámara del celular.',
   'qr.descripcionMia':
     'Imprímelo y llévalo a clase: el maestro lo escanea con su celular y queda registrada tu asistencia.',
+  // El del staff no sirve para marcar asistencia —ellos no pasan por el
+  // kiosco—: es la credencial que los acredita ante quien la pida.
+  'qr.descripcionStaff':
+    'Tu credencial del club: te identifica como parte del equipo y vale un año desde que se expide.',
   'qr.imprimir': 'Imprimir carnet',
   'qr.pin': 'PIN de respaldo',
   'qr.sinPin': 'Sin PIN asignado',
@@ -262,15 +275,27 @@ const es = {
   'carnet.tipo.staff': 'Carnet de auxiliar',
   'carnet.tipo.guardian': 'Carnet de acudiente',
   'carnet.numero': 'N.º',
+  /** Firma del carnet: quién lo expide. Va delante del nombre del maestro. */
+  'carnet.expide': 'Expide',
   'carnet.emitido': 'Emitido',
   'carnet.vigenteHasta': 'Vigente hasta',
   'carnet.sangre': 'Sangre',
   'carnet.emergencia': 'En caso de emergencia',
   'carnet.pin': 'PIN de respaldo',
+  /** Ocupa el sitio del PIN en el carnet del maestro y del auxiliar. */
+  'carnet.enElClub': 'En el club desde',
   'carnet.instruccion': 'Presenta este carnet al entrar a clase.',
+  // El del staff no se presenta, acredita: ni el maestro ni el auxiliar marcan
+  // asistencia en el kiosco.
+  'carnet.instruccion.owner': 'Acredita a su portador como maestro del club.',
+  'carnet.instruccion.staff': 'Acredita a su portador como auxiliar del club.',
   'carnet.intransferible':
     'Personal e intransferible. Si lo encuentras, devuélvelo al club.',
   'carnet.recorta': 'Recorta por la línea punteada y pega las dos caras.',
+  // Vigencia: la fecha la guarda la API y solo la mueve reexpedir el carnet.
+  'carnet.vencido': 'Vencido. Reexpídelo antes de imprimirlo.',
+  'carnet.reexpedir': 'Reexpedir',
+  'carnet.reexpedido': 'Carnet reexpedido: vigente por un año más.',
   'carnet.formato': 'Cómo lo vas a imprimir',
   'carnet.formatoHoja': 'Hoja normal',
   'carnet.formatoTarjeta': 'Impresora de tarjetas',
@@ -284,6 +309,7 @@ const es = {
   'kiosco.escanear': '📷 Escanear carnet QR',
   'kiosco.pin': 'Marcar con PIN',
   'kiosco.manual': 'Marcar manualmente',
+  'kiosco.afina': 'escribe para encontrar al resto',
   'kiosco.apunta': 'Apunta al carnet QR del alumno.',
   'kiosco.sinCamara':
     'Este navegador no puede escanear con la cámara. Usa el PIN del alumno o el marcado manual.',
@@ -359,6 +385,14 @@ const es = {
   'mi.totalClases': 'Clases en total',
   'mi.ultimaVez': 'Última vez',
   'mi.enElClub': 'En el club',
+  // Lo que ve el maestro donde el alumno ve su asistencia. Él no marca en el
+  // kiosco: sus números son los de la gente que enseña.
+  'mi.miLabor': 'Mi labor en el club',
+  'mi.misAlumnos': 'Alumnos activos',
+  'mi.entrenaronHoy': 'Entrenaron hoy',
+  'mi.esteMesClub': 'Asistencias este mes',
+  'mi.laborAyuda':
+    'Son los números de tu club. El detalle completo está en Estadísticas.',
   'mi.meses': 'meses',
   'mi.dias': 'días',
   'mi.desde': 'desde',
@@ -616,6 +650,14 @@ const en: Record<ClaveTexto, string> = {
   'alumnos.nuevaContrasena': 'Set a new password',
   'alumnos.contrasenaCambiada': 'Password updated.',
   'alumnos.incluirInactivos': 'Show inactive too',
+  'pag.navegacion': 'Pages',
+  'pag.anterior': 'Previous',
+  'pag.siguiente': 'Next',
+  'pag.de': 'of',
+  'pag.verMas': 'Show more',
+  'pag.sinResultados': 'Nobody matches that search.',
+  'pag.buscarAlumno': 'Search by name or email',
+
   'foto.poner': 'Add photo',
   'foto.cambiar': 'Change photo',
   'foto.quitar': 'Remove',
@@ -654,6 +696,8 @@ const en: Record<ClaveTexto, string> = {
     'Print it and hand it to the student. They bring it to class and the master scans it with a phone camera.',
   'qr.descripcionMia':
     'Print it and bring it to class: your master scans it with their phone and your attendance is recorded.',
+  'qr.descripcionStaff':
+    'Your club credential: it identifies you as part of the team and is valid for a year from the day it is issued.',
   'qr.imprimir': 'Print card',
   'qr.pin': 'Backup PIN',
   'qr.sinPin': 'No PIN assigned',
@@ -666,15 +710,22 @@ const en: Record<ClaveTexto, string> = {
   'carnet.tipo.staff': 'Assistant card',
   'carnet.tipo.guardian': 'Guardian card',
   'carnet.numero': 'No.',
+  'carnet.expide': 'Issued by',
   'carnet.emitido': 'Issued',
   'carnet.vigenteHasta': 'Valid until',
   'carnet.sangre': 'Blood',
   'carnet.emergencia': 'In case of emergency',
   'carnet.pin': 'Backup PIN',
+  'carnet.enElClub': 'At the club since',
   'carnet.instruccion': 'Show this card when you arrive at class.',
+  'carnet.instruccion.owner': 'Certifies its bearer as master of the club.',
+  'carnet.instruccion.staff': 'Certifies its bearer as assistant of the club.',
   'carnet.intransferible':
     'Personal and non-transferable. If found, please return it to the club.',
   'carnet.recorta': 'Cut along the dashed line and glue both sides together.',
+  'carnet.vencido': 'Expired. Reissue it before printing.',
+  'carnet.reexpedir': 'Reissue',
+  'carnet.reexpedido': 'Card reissued: valid for another year.',
   'carnet.formato': 'How you will print it',
   'carnet.formatoHoja': 'Regular paper',
   'carnet.formatoTarjeta': 'Card printer',
@@ -687,6 +738,7 @@ const en: Record<ClaveTexto, string> = {
   'kiosco.escanear': '📷 Scan QR card',
   'kiosco.pin': 'Check in with PIN',
   'kiosco.manual': 'Check in manually',
+  'kiosco.afina': 'type to find the rest',
   'kiosco.apunta': "Point at the student's QR card.",
   'kiosco.sinCamara':
     "This browser can't scan with the camera. Use the student's PIN or manual check-in.",
@@ -755,6 +807,11 @@ const en: Record<ClaveTexto, string> = {
   'mi.totalClases': 'Classes in total',
   'mi.ultimaVez': 'Last time',
   'mi.enElClub': 'At the club',
+  'mi.miLabor': 'My work at the club',
+  'mi.misAlumnos': 'Active students',
+  'mi.entrenaronHoy': 'Trained today',
+  'mi.esteMesClub': 'Check-ins this month',
+  'mi.laborAyuda': "These are your club's numbers. Full detail is in Statistics.",
   'mi.meses': 'months',
   'mi.dias': 'days',
   'mi.desde': 'since',

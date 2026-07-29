@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clubSchedule, scheduleExceptions } from '@dinamyt/membresias-db';
 import { crearEscenario, type Escenario } from './testing/escenario';
+import { todayStr } from './lib/billing';
 
 /**
  * Lo que el alumno ve —y lo que NO puede tocar— en su panel.
@@ -16,9 +17,17 @@ function diaDe(fecha: string): number {
   return new Date(`${fecha}T00:00:00Z`).getUTCDay();
 }
 
-function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+/**
+ * El «hoy» del test tiene que ser el MISMO que el de la API.
+ *
+ * Antes esto era `toISOString().slice(0, 10)`, que da la fecha en UTC, mientras
+ * que la API calcula el día en hora local (`todayStr`). En Colombia (UTC−5) las
+ * dos coinciden veinte horas al día y discrepan las otras cuatro: de siete de
+ * la tarde a medianoche, estos tests fallaban solos y volvían a pasar al día
+ * siguiente por la mañana. Reusando la función de producción no pueden
+ * separarse.
+ */
+const hoyISO = todayStr;
 
 describe('membresias-api — panel del alumno', () => {
   let e: Escenario;
@@ -136,7 +145,7 @@ describe('membresias-api — panel del alumno', () => {
     });
     const suyo = roster
       .json()
-      .find((m: { userId: string }) => m.userId === alta.json().id);
+      .items.find((m: { userId: string }) => m.userId === alta.json().id);
     expect(suyo.checkinPin).toMatch(/^\d{4}$/);
   });
 
@@ -280,7 +289,7 @@ describe('membresias-api — panel del alumno', () => {
     });
     expect(sangre.statusCode).toBe(422);
 
-    const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const manana = todayStr(new Date(Date.now() + 86_400_000));
     const futuro = await e.app.inject({
       method: 'PATCH',
       url: `/users/${e.ids.alumno}`,
