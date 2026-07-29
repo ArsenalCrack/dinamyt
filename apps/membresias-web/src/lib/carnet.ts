@@ -31,6 +31,12 @@ export interface DatosCarnet {
   club: string;
   /** El maestro que expide el carnet. Sin él, el pie cae de vuelta al rol. */
   maestro?: string | null;
+  /**
+   * El cargo de quien lo expide («Maestro»), delante de su nombre. Un carnet
+   * firmado por «Amir Daniel Sarmiento» a secas no dice con qué autoridad se
+   * firma; «Maestro Amir Daniel Sarmiento», sí.
+   */
+  maestroCargo?: string | null;
   rol: string;
   /** Data-URL del QR ya generado. */
   qr: string;
@@ -350,22 +356,24 @@ body { padding: 6mm; }
 
 /* Pie del frente: quién emite el carnet. No es relleno — sin él, el frente se
    quedaba con casi un centímetro en blanco bajo la foto y parecía que el
-   diseño se había caído hacia arriba. */
-/* DOS renglones, y no uno.
-   El de arriba es la firma —quién expide el carnet— y el de abajo la marca de
-   la app con el rol. Cabían en la misma línea mientras la derecha decía solo
-   «ALUMNO»; con el nombre del maestro no: «EXPIDE AMIR DANIEL SARMIENTO
-   AVELLANEDA» más «MI CLUB · DINAMYT» se pasan siete milímetros del ancho de
-   la tarjeta, así que uno de los dos salía con puntos suspensivos. Y un carnet
-   que recorta el nombre de quien lo firma no firma nada. */
+   diseño se había caído hacia arriba.
+
+   Es un BLOQUE DE FIRMA: el emblema de quien respalda el documento a la
+   izquierda y, a su derecha, dos renglones —la firma del maestro arriba y la
+   marca con el rol abajo.
+
+   Los dos renglones no son un capricho: cabían en una línea mientras la
+   derecha decía solo «ALUMNO», pero «EXPIDE MAESTRO AMIR DANIEL SARMIENTO
+   AVELLANEDA» más «MI CLUB · DINAMYT» se pasan del ancho de la tarjeta, y un
+   carnet que recorta el nombre de quien lo firma no firma nada. */
 .crn-pieFrente {
   position: absolute;
   left: 4mm;
   right: 4mm;
   bottom: 2.6mm;
   display: flex;
-  flex-direction: column;
-  gap: 0.3mm;
+  align-items: center;
+  gap: 1.8mm;
   padding-top: 1mm;
   border-top: 0.2mm solid #dcdce4;
   font-size: 2mm;
@@ -377,36 +385,46 @@ body { padding: 6mm; }
   text-transform: uppercase;
   color: #8b8b99;
 }
+.crn-pieTexto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3mm;
+}
 .crn-pieFila {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 2mm;
 }
-/* Marca de la app: su logo y su nombre. Los DOS logos están en el frente —el
-   del club preside la cabecera, el de la app firma abajo—, que es como funciona
-   cualquier carnet emitido por una entidad en nombre de otra. */
 .crn-marca {
-  display: flex;
-  align-items: center;
-  gap: 1.2mm;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* El emblema de DINAMYT, que es quien expide el carnet en nombre del club.
+   Los DOS logos están en el frente —el del club preside la cabecera, este
+   firma abajo—, que es como funciona cualquier credencial emitida por una
+   entidad en nombre de otra.
+
+   Estaba metido dentro del renglón de la marca, a 2,6 mm: del tamaño de una
+   letra, ilegible en papel. Aquí sale del renglón, se pone al principio del
+   bloque de firma y abarca los dos: casi el doble de alto y con sitio propio,
+   que es lo que hace que se lea como un sello y no como una viñeta. */
 .crn-logoApp {
-  width: 2.6mm;
-  height: 2.6mm;
+  width: 5mm;
+  height: 5mm;
   object-fit: contain;
   flex: 0 0 auto;
-  opacity: 0.75;
+  opacity: 0.9;
 }
-/* Quién expide el carnet: el maestro del club, por su nombre. Un carnet que
-   no dice quién lo firma no lo respalda nadie.
-   Se encoge (flex 0 1 auto + min-width 0) en vez de quedarse rígido: un
-   maestro de nombre largo tiene que recortarse él, no empujar la marca de la
-   app fuera de la tarjeta. */
+/* Quién expide el carnet: el maestro del club, con su cargo y su nombre. Un
+   carnet que no dice quién lo firma no lo respalda nadie, y uno que lo firma
+   sin decir con qué autoridad, tampoco.
+   Se encoge (min-width 0 + ellipsis) en vez de quedarse rígido: un maestro de
+   nombre largo tiene que recortarse él, no empujar nada fuera de la tarjeta. */
 .crn-expide {
   min-width: 0;
   overflow: hidden;
@@ -414,6 +432,9 @@ body { padding: 6mm; }
   white-space: nowrap;
   letter-spacing: 0.05em;
 }
+/* El cargo, entre el rótulo y el nombre. Ni tan apagado como «EXPIDE» ni tan
+   marcado como el nombre: es lo que los une. */
+.crn-expide i { font-style: normal; font-weight: 700; color: #6b6b7b; }
 .crn-expide b { font-weight: 800; color: #55555f; }
 .crn-rolPie {
   flex: 0 0 auto;
@@ -603,20 +624,22 @@ function frente(d: DatosCarnet, txt: TextosCarnet): string {
     </div>
   </div>
   <footer class="crn-pieFrente">
-    ${
-      // El renglón de la firma solo existe si hay maestro. Un club recién
-      // creado al que todavía no se le ha nombrado uno se queda con el pie de
-      // una línea de siempre, sin un hueco raro.
-      d.maestro
-        ? `<span class="crn-expide">${esc(txt.expide)} <b>${esc(d.maestro)}</b></span>`
-        : ''
-    }
-    <span class="crn-pieFila">
-      <span class="crn-marca">
-        <img class="crn-logoApp" src="${esc(d.logoApp)}" alt="">
-        ${esc(d.marca)}
+    <img class="crn-logoApp" src="${esc(d.logoApp)}" alt="">
+    <span class="crn-pieTexto">
+      ${
+        // El renglón de la firma solo existe si hay maestro. Un club recién
+        // creado al que todavía no se le ha nombrado uno se queda con el pie de
+        // una línea de siempre, sin un hueco raro.
+        d.maestro
+          ? `<span class="crn-expide">${esc(txt.expide)}${
+              d.maestroCargo ? ` <i>${esc(d.maestroCargo)}</i>` : ''
+            } <b>${esc(d.maestro)}</b></span>`
+          : ''
+      }
+      <span class="crn-pieFila">
+        <span class="crn-marca">${esc(d.marca)}</span>
+        <span class="crn-rolPie">${esc(d.rol)}</span>
       </span>
-      <span class="crn-rolPie">${esc(d.rol)}</span>
     </span>
   </footer>
   <div class="crn-franja"></div>

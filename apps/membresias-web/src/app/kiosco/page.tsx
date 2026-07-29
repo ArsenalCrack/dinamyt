@@ -2,13 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { LIM, soloDigitos } from '@/lib/campos';
 import { EscanerQR } from '@/components/EscanerQR';
-import { ControlesApariencia } from '@/components/ControlesApariencia';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -43,8 +41,14 @@ interface Encolado {
 }
 
 /**
- * Kiosco de check-in: pantalla completa, sin barra de navegación, pensada para
- * el celular del maestro en la puerta del salón.
+ * Kiosco de check-in: pensado para el celular del maestro en la puerta del
+ * salón, con los botones grandes y todo a un toque.
+ *
+ * Lleva la barra de navegación de siempre, como el resto de la app. Antes no:
+ * era una pantalla «completa», y por eso tenía que traerse aquí dentro un
+ * enlace de vuelta al panel y su propia esquina de tema e idioma — dos copias
+ * de algo que ya existe arriba, y aun así sin manera de saltar a «Alumnos» sin
+ * pasar por el panel.
  */
 export default function Kiosco() {
   const router = useRouter();
@@ -154,7 +158,7 @@ export default function Kiosco() {
       : 'var(--danger)';
 
   return (
-    <main style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem', minHeight: '100vh' }}>
+    <main style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem' }}>
       {escaneando && (
         <EscanerQR
           onDetectado={(valor) => {
@@ -180,12 +184,14 @@ export default function Kiosco() {
         <h1 className="display" style={{ fontSize: '1.5rem' }}>
           {t('kiosco.titulo')}
         </h1>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {pendientes > 0 && <span className="badge badge-gold">{pendientes}</span>}
-          <Link href="/" className="btn btn-outline btn-sm">
-            {t('menu.panel')}
-          </Link>
-        </div>
+        {/* Los check-ins que se guardaron sin conexión y siguen esperando. El
+            enlace de vuelta al panel se fue con la llegada de la barra: allí
+            está, y además lleva a cualquier otra pantalla. */}
+        {pendientes > 0 && (
+          <span className="badge badge-gold">
+            {pendientes} {t('kiosco.pendientes')}
+          </span>
+        )}
       </header>
 
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
@@ -317,9 +323,6 @@ export default function Kiosco() {
           )}
         </div>
       )}
-
-      {/* El kiosco no lleva NavBar: el tema y el idioma van aquí. */}
-      <ControlesApariencia />
     </main>
   );
 }

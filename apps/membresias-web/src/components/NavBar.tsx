@@ -104,8 +104,12 @@ export function NavBar() {
     };
   }, [abierto]);
 
-  // Pantallas sin barra: login (aún sin sesión) y kiosco (pantalla completa).
-  if (pathname === '/login' || pathname === '/kiosco') return null;
+  // La única pantalla sin barra es el login: todavía no hay sesión ni sitio a
+  // donde navegar. El kiosco SÍ la lleva desde ahora — se abre en la puerta del
+  // salón, sí, pero de allí se sale igual que de cualquier otra pantalla, y
+  // tenerla escondida obligaba a mantener aquí dentro un enlace de vuelta y un
+  // par de controles duplicados.
+  if (pathname === '/login') return null;
   if (!user) return null;
 
   // El orden es el de la barra. `principal` marca lo que se abre a diario: el

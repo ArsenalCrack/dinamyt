@@ -166,6 +166,9 @@ export function Carnet({
       nombre,
       club: club || 'DINAMYT',
       maestro,
+      // Quien expide el carnet es siempre el maestro del club: su cargo no se
+      // pregunta, se sabe. Va delante de su nombre en la firma del pie.
+      maestroCargo: maestro ? t('rol.owner') : null,
       rol,
       qr,
       foto: urlFoto(foto),

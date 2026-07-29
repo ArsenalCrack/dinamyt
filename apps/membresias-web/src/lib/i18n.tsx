@@ -319,6 +319,8 @@ const es = {
   'kiosco.yaMarco': 'Este alumno ya registró asistencia hoy.',
   'kiosco.bloqueado': 'Acceso bloqueado: mensualidad vencida.',
   'kiosco.sinClase': 'Hoy el club no tiene clase programada.',
+  /** Check-ins guardados sin conexión, esperando a que vuelva la señal. */
+  'kiosco.pendientes': 'sin enviar',
   'kiosco.ayuda':
     'Sin cámara: usa el PIN del alumno o márcalo en la lista manual.',
 
@@ -747,6 +749,7 @@ const en: Record<ClaveTexto, string> = {
   'kiosco.yaMarco': 'This student already checked in today.',
   'kiosco.bloqueado': 'Access blocked: membership overdue.',
   'kiosco.sinClase': 'No class scheduled today.',
+  'kiosco.pendientes': 'not sent',
   'kiosco.ayuda': "No camera: use the student's PIN or the manual list.",
 
   'asistencia.titulo': "Today's attendance",
