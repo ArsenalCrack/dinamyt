@@ -33,21 +33,21 @@ export const metadata: Metadata = {
   description: 'Tu carnet, tus asistencias y tu estado en el club.',
   manifest: '/manifest.json',
   /**
-   * El escudo de DINAMYT, con una distinción que no es capricho:
+   * El escudo de DINAMYT. Son los MISMOS archivos que usa DINAMYT-LOCAL, y
+   * declarados igual que allá: los tres transparentes, ninguno con recuadro.
    *
-   * - **La pestaña y la pantalla de carga** usan los PNG TRANSPARENTES. Ahí el
-   *   escudo se recorta contra el fondo de la app, sin recuadro, y salen del
-   *   maestro de 1024 px remuestreado a cada tamaño: nada se ve interpolado.
+   * ── Por qué no hay icono `maskable` ──
    *
-   * - **El icono instalado en el celular** usa el de FONDO BLANCO
-   *   (`apple-touch-icon`). iOS no admite transparencia en ese icono: lo que
-   *   no tiene fondo lo rellena de NEGRO, y de ahí venía el escudo dentro de
-   *   un cuadro negro. El equivalente de Android va en el manifiesto, como
-   *   icono `maskable`.
+   * Un icono maskable le promete al sistema que llena el cuadro de borde a
+   * borde, y a cambio se lo deja recortar a su antojo. Nuestro escudo no es
+   * así —es transparente y con aire alrededor—, y declararlo maskable es lo
+   * que hacía que Android lo pintara sobre un cuadro del color de fondo del
+   * manifiesto (casi negro) y que la pantalla de carga saliera con un plato
+   * detrás. Sin la declaración, Android usa el de 512 px tal cual: el escudo
+   * recortado, en alta resolución y sin fondo. Exactamente lo que hace LOCAL.
    *
-   * Va todo declarado y no se deja a que cada plataforma adivine: sin
-   * `apple-touch-icon`, iOS llega a inventarse uno con una captura de la
-   * página.
+   * Lo que sí va declarado es el `apple-touch-icon`: sin él, iOS llega a
+   * inventarse uno con una captura de la página.
    */
   icons: {
     icon: [
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
       { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
       { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
-    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    apple: [{ url: '/icon-192.png', type: 'image/png' }],
   },
   appleWebApp: {
     capable: true,
