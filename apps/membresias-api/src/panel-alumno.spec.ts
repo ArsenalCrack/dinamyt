@@ -160,7 +160,9 @@ describe('membresias-api — panel del alumno', () => {
         headers: e.auth(e.ids.owner),
         payload: {
           email: `masivo${i}@club.com`,
-          fullName: `Alumno ${i}`,
+          // Sin el número dentro: un nombre de persona no lleva cifras (ver
+          // `nombreCompleto`). Lo que distingue a estos seis es el correo.
+          fullName: 'Alumno Masivo',
           password: 'Prueba1234',
           role: 'student',
         },

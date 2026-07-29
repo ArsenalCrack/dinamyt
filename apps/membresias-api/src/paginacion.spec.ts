@@ -158,22 +158,36 @@ describe('membresias-api — listados por páginas', () => {
     await e.app.close();
   });
 
-  it('GET /users pagina y busca igual, e incluye al maestro', async () => {
+  it('GET /users pagina y busca igual, y deja fuera al maestro', async () => {
     const e = await crearEscenario();
     const owner = e.auth(e.ids.owner);
 
     const todos = await e.app.inject({ method: 'GET', url: '/users', headers: owner });
-    // Maestro + auxiliar + 2 alumnos: aquí sí sale todo el mundo, porque esta
-    // es la pantalla donde se les corrige el correo o la contraseña.
-    expect(todos.json().total).toBe(4);
+    // Auxiliar + 2 alumnos. El maestro NO: la pantalla se llama «Alumnos» y él
+    // no es alumno de su propio club. Su ficha sigue existiendo —se abre por
+    // id—, pero verse a sí mismo en la lista, con el botón de desactivar
+    // apagado, no le servía para nada y descuadraba la cuenta de páginas.
+    expect(todos.json().total).toBe(3);
+    expect(todos.json().items.some((u: { role: string }) => u.role === 'owner')).toBe(false);
 
+    // Ni siquiera buscándolo por su nombre: el filtro es del servidor, así que
+    // la búsqueda tampoco lo destapa.
     const buscado = await e.app.inject({
       method: 'GET',
       url: '/users?q=maestro',
       headers: owner,
     });
-    expect(buscado.json().total).toBe(1);
-    expect(buscado.json().items[0].role).toBe('owner');
+    expect(buscado.json().total).toBe(0);
+
+    // Pedirlo a propósito sí lo trae: la puerta queda abierta para quien la
+    // necesite (un panel de administración, un informe).
+    const soloMaestro = await e.app.inject({
+      method: 'GET',
+      url: '/users?role=owner',
+      headers: owner,
+    });
+    expect(soloMaestro.json().total).toBe(1);
+    expect(soloMaestro.json().items[0].role).toBe('owner');
 
     const pagina = await e.app.inject({
       method: 'GET',
@@ -181,7 +195,32 @@ describe('membresias-api — listados por páginas', () => {
       headers: owner,
     });
     expect(pagina.json().items).toHaveLength(2);
-    expect(pagina.json().total).toBe(4);
+    expect(pagina.json().total).toBe(3);
+    await e.app.close();
+  });
+
+  it('el maestro llega a su propia ficha aunque no salga en la lista', async () => {
+    // Es la mitad que hace justa a la otra: se le quita del listado, no el
+    // acceso a sus datos. Desde la web se entra por `/alumnos/<su id>`.
+    const e = await crearEscenario();
+    const suya = await e.app.inject({
+      method: 'GET',
+      url: `/users/${e.ids.owner}`,
+      headers: e.auth(e.ids.owner),
+    });
+    expect(suya.statusCode).toBe(200);
+    expect(suya.json().role).toBe('owner');
+
+    // Y los edita: correo, cinturón y lo demás, igual que a un alumno.
+    const cambio = await e.app.inject({
+      method: 'PATCH',
+      url: `/users/${e.ids.owner}`,
+      headers: e.auth(e.ids.owner),
+      payload: { email: 'maestro.nuevo@club.com', belt: 'Negro' },
+    });
+    expect(cambio.statusCode).toBe(200);
+    expect(cambio.json().email).toBe('maestro.nuevo@club.com');
+    expect(cambio.json().belt).toBe('Negro');
     await e.app.close();
   });
 

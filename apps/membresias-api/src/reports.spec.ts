@@ -85,6 +85,42 @@ describe('membresias-api — reportes', () => {
     await app.close();
   });
 
+  it('un plan borrado deja de esperarse: sin tarifas, no se espera nada', async () => {
+    // Borrar un plan es desactivarlo, y la membresía se queda apuntando al
+    // plan muerto. Sin filtrar por eso, el club que vaciaba sus tarifas seguía
+    // leyendo «60 000 de lo esperado este mes» con la pantalla en blanco: se
+    // esperaba el dinero de algo que ya no se le puede cobrar a nadie.
+    const { app, auth, ids } = await crearEscenario();
+    const headers = auth(ids.owner);
+
+    const plan = (
+      await app.inject({
+        method: 'POST',
+        url: '/plans',
+        headers,
+        payload: { name: 'Mensual', type: 'mensual', price: '60000' },
+      })
+    ).json();
+    await app.inject({
+      method: 'PATCH',
+      url: `/memberships/${ids.alumno}`,
+      headers,
+      payload: { currentPlanId: plan.id, status: 'activo' },
+    });
+
+    const antes = await app.inject({ method: 'GET', url: '/reports/revenue', headers });
+    expect(antes.json().esperadoMensual).toBe(60000);
+
+    await app.inject({ method: 'DELETE', url: `/plans/${plan.id}`, headers });
+
+    const despues = await app.inject({ method: 'GET', url: '/reports/revenue', headers });
+    expect(despues.json().esperadoMensual).toBe(0);
+
+    const stats = await app.inject({ method: 'GET', url: '/reports/estadisticas', headers });
+    expect(stats.json().dinero.esperadoMensual).toBe(0);
+    await app.close();
+  });
+
   it('overdue: lista a los alumnos vencidos', async () => {
     const { app, db, auth, ids, orgId } = await crearEscenario();
     await db

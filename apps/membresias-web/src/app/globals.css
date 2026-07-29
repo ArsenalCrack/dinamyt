@@ -860,6 +860,128 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   font-weight: 800;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   CALENDARIO PROPIO (<CampoFecha>)
+   El `type="date"` de Android solo se mueve mes a mes: llegar a 2016 son
+   cien toques. Aquí el título abre la rejilla de años. Ver CampoFecha.tsx.
+   ════════════════════════════════════════════════════════════════════════ */
+.campofecha { position: relative; width: 100%; }
+.fecha-panel {
+  position: fixed;
+  z-index: 56;
+  padding: 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.7rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.fecha-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+.fecha-flecha {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  color: var(--gold);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.fecha-flecha:hover:not(:disabled) { border-color: var(--gold); }
+.fecha-flecha:disabled { opacity: 0.3; cursor: not-allowed; }
+.fecha-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  flex: 1;
+  padding: 0.4rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.fecha-titulo:hover { background: var(--bg-elevated); }
+.fecha-titulo-flecha { color: var(--gold); font-size: 0.7rem; }
+.fecha-semana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 0.2rem;
+}
+.fecha-semana span {
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.fecha-rejilla {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.fecha-rejilla-meses { grid-template-columns: repeat(3, 1fr); gap: 0.3rem; }
+.fecha-rejilla-anos { grid-template-columns: repeat(4, 1fr); gap: 0.3rem; }
+.fecha-dia,
+.fecha-celda {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  /* Cuadrado y con la altura del dedo: en el celular estos botones se pulsan
+     con el pulgar, no con un ratón. */
+  min-height: 2.1rem;
+}
+.fecha-celda { min-height: 2.4rem; font-weight: 600; }
+.fecha-dia:hover:not(:disabled),
+.fecha-celda:hover:not(:disabled) { background: var(--bg-elevated); }
+.fecha-dia:disabled,
+.fecha-celda:disabled { opacity: 0.25; cursor: not-allowed; }
+.fecha-dia[data-hoy] { border-color: var(--gold-dim); }
+.fecha-dia[data-elegido],
+.fecha-celda[data-elegido] {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 800;
+}
+.fecha-pie {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+.fecha-pie .btn { flex: 1; }
+
+/* Un botón que se lee como un enlace: la sugerencia de «¿quisiste decir
+   …@gmail.com?» es una acción, no un destino, así que por dentro es un
+   <button> aunque por fuera parezca un enlace. */
+.enlace {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--gold);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 main { animation: aparecer 0.25s ease; }
 @keyframes aparecer {
   from { opacity: 0; transform: translateY(6px); }
@@ -933,6 +1055,7 @@ html[data-theme="light"] .card {
 html[data-theme="light"] .navbar-panel,
 html[data-theme="light"] .avisos-panel,
 html[data-theme="light"] .selectmenu-panel,
+html[data-theme="light"] .fecha-panel,
 html[data-theme="light"] .apar-panel {
   box-shadow: 0 8px 24px rgba(22, 22, 31, 0.14);
 }

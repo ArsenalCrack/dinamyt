@@ -7,11 +7,21 @@ import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { hoyISO } from '@/lib/formato';
-import { LIM, TIPOS_SANGRE, soloTelefono, telefonoValido } from '@/lib/campos';
+import {
+  LIM,
+  TIPOS_SANGRE,
+  correoValido,
+  dominioSugerido,
+  nombreCompletoValido,
+  soloTelefono,
+  telefonoValido,
+} from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
+import { CampoFecha } from '@/components/CampoFecha';
 import { Cinturon } from '@/components/Cinturon';
 import { Contador } from '@/components/Contador';
+import { Etiqueta, LeyendaObligatorios } from '@/components/Etiqueta';
 import { SelectMenu } from '@/components/SelectMenu';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
@@ -81,7 +91,7 @@ const VACIO: FormPersona = {
 export default function Alumnos() {
   const router = useRouter();
   const { t } = useI18n();
-  const { user, cargando: cargandoSesion, esStaff } = useAuth();
+  const { user, cargando: cargandoSesion, esStaff, refrescar } = useAuth();
   const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
 
   const [gente, setGente] = useState<Persona[]>([]);
@@ -181,6 +191,16 @@ export default function Alumnos() {
     e.preventDefault();
     setError('');
     setAviso('');
+    // Las mismas tres reglas que aplica la API, comprobadas antes de viajar:
+    // un 422 después de rellenar diez campos no explica cuál falló.
+    if (!nombreCompletoValido(form.fullName)) {
+      setError(t('comun.nombreIncompleto'));
+      return;
+    }
+    if (!correoValido(form.email)) {
+      setError(t('comun.correoInvalido'));
+      return;
+    }
     if (!telefonoValido(form.phone) || !telefonoValido(form.emergencyPhone)) {
       setError(t('comun.telefonoCorto'));
       return;
@@ -218,6 +238,10 @@ export default function Alumnos() {
           ...ficha,
         });
         setAviso(t('alumnos.actualizado'));
+        // Si me acabo de editar a mí mismo, la sesión que tiene la app en
+        // memoria quedó vieja: el cinturón nuevo no aparecía en «Mi grado»
+        // hasta recargar la página entera.
+        if (editando === user?.id) await refrescar();
       }
       setForm(VACIO);
       setEditando(null);
@@ -263,9 +287,10 @@ export default function Alumnos() {
 
   const formulario = (
     <form onSubmit={guardar} className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-      <h2 className="display" style={{ fontSize: '1rem', marginBottom: '0.9rem' }}>
+      <h2 className="display" style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>
         {editando === 'nuevo' ? t('alumnos.crearTitulo') : t('ficha.datos')}
       </h2>
+      <LeyendaObligatorios />
       <div
         style={{
           display: 'grid',
@@ -274,36 +299,63 @@ export default function Alumnos() {
         }}
       >
         <label style={{ display: 'block' }}>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            {t('comun.nombre')}
-          </span>
+          <Etiqueta obligatorio>{t('comun.nombre')}</Etiqueta>
+          {/* El aviso sale MIENTRAS se escribe, igual que el del teléfono: un
+              nombre a medias no se descubre al final del formulario. */}
           <input
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
             maxLength={LIM.nombrePersona}
             required
-            style={{ marginTop: '0.25rem' }}
+            style={{
+              marginTop: '0.25rem',
+              borderColor: nombreCompletoValido(form.fullName) ? undefined : 'var(--danger)',
+            }}
           />
+          {!nombreCompletoValido(form.fullName) && (
+            <span className="msg-error" style={{ fontSize: '0.7rem' }}>
+              {t('comun.nombreIncompleto')}
+            </span>
+          )}
           <Contador valor={form.fullName} max={LIM.nombrePersona} />
         </label>
         <label style={{ display: 'block' }}>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            {t('comun.correo')}
-          </span>
+          <Etiqueta obligatorio>{t('comun.correo')}</Etiqueta>
           <input
             type="email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             maxLength={LIM.correo}
             required
-            style={{ marginTop: '0.25rem' }}
+            style={{
+              marginTop: '0.25rem',
+              borderColor: correoValido(form.email) ? undefined : 'var(--danger)',
+            }}
           />
+          {!correoValido(form.email) && (
+            <span className="msg-error" style={{ fontSize: '0.7rem' }}>
+              {t('comun.correoInvalido')}
+            </span>
+          )}
+          {/* El dedazo típico se PREGUNTA, no se corrige solo: `gmial.com` es
+              un dominio legal, y hay clubes con correo propio parecido. */}
+          {correoValido(form.email) && dominioSugerido(form.email) && (
+            <span className="muted" style={{ fontSize: '0.7rem' }}>
+              {t('comun.correoSugerencia')}{' '}
+              <button
+                type="button"
+                className="enlace"
+                onClick={() => setForm({ ...form, email: dominioSugerido(form.email)! })}
+              >
+                {dominioSugerido(form.email)}
+              </button>
+              ?
+            </span>
+          )}
           <Contador valor={form.email} max={LIM.correo} />
         </label>
         <label style={{ display: 'block' }}>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            {t('comun.telefono')} <span style={{ opacity: 0.7 }}>({t('comun.opcional')})</span>
-          </span>
+          <Etiqueta>{t('comun.telefono')}</Etiqueta>
           <input
             type="tel"
             inputMode="tel"
@@ -325,6 +377,8 @@ export default function Alumnos() {
           <Contador valor={form.phone} max={LIM.telefono} />
         </label>
         <label style={{ display: 'block' }}>
+          {/* El rol no lleva marca: siempre trae uno puesto («Alumno»), así
+              que ni es obligatorio de rellenar ni se puede dejar en blanco. */}
           <span className="muted" style={{ fontSize: '0.78rem' }}>
             {t('comun.rol')}
           </span>
@@ -345,9 +399,7 @@ export default function Alumnos() {
           </span>
         </label>
         <label style={{ display: 'block' }}>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            {t('comun.cinturon')}
-          </span>
+          <Etiqueta>{t('comun.cinturon')}</Etiqueta>
           <div style={{ marginTop: '0.25rem' }}>
             <SelectMenu
               valor={form.belt}
@@ -359,25 +411,25 @@ export default function Alumnos() {
           </div>
         </label>
         <label style={{ display: 'block' }}>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            {t('ficha.entrenaDesde')} <span style={{ opacity: 0.7 }}>({t('comun.opcional')})</span>
-          </span>
-          <input
-            type="date"
-            min="1950-01-01"
-            max={hoyISO()}
-            value={form.trainsSince}
-            onChange={(e) => setForm({ ...form, trainsSince: e.target.value })}
-            style={{ marginTop: '0.25rem' }}
-          />
+          <Etiqueta>{t('ficha.entrenaDesde')}</Etiqueta>
+          {/* Calendario propio y no `type="date"`: esta es justo la fecha
+              vieja que en Android obligaba a cruzar los meses de uno en uno.
+              Ver `components/CampoFecha.tsx`. */}
+          <div style={{ marginTop: '0.25rem' }}>
+            <CampoFecha
+              valor={form.trainsSince}
+              onChange={(v) => setForm({ ...form, trainsSince: v })}
+              min="1950-01-01"
+              max={hoyISO()}
+              ariaLabel={t('ficha.entrenaDesde')}
+            />
+          </div>
           <span className="muted" style={{ fontSize: '0.7rem' }}>
             {t('ficha.entrenaDesdeAyuda')}
           </span>
         </label>
         <label style={{ display: 'block' }}>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            {t('ficha.sangre')}
-          </span>
+          <Etiqueta>{t('ficha.sangre')}</Etiqueta>
           <div style={{ marginTop: '0.25rem' }}>
             <SelectMenu
               valor={form.bloodType}
@@ -392,9 +444,7 @@ export default function Alumnos() {
           </div>
         </label>
         <label style={{ display: 'block' }}>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            {t('ficha.emergenciaNombre')}
-          </span>
+          <Etiqueta>{t('ficha.emergenciaNombre')}</Etiqueta>
           <input
             value={form.emergencyName}
             onChange={(e) => setForm({ ...form, emergencyName: e.target.value })}
@@ -407,9 +457,7 @@ export default function Alumnos() {
           <Contador valor={form.emergencyName} max={LIM.nombrePersona} />
         </label>
         <label style={{ display: 'block' }}>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            {t('ficha.emergenciaTelefono')}
-          </span>
+          <Etiqueta>{t('ficha.emergenciaTelefono')}</Etiqueta>
           <input
             type="tel"
             inputMode="tel"
@@ -432,9 +480,7 @@ export default function Alumnos() {
         </label>
         {editando === 'nuevo' && (
           <label style={{ display: 'block' }}>
-            <span className="muted" style={{ fontSize: '0.78rem' }}>
-              {t('alumnos.contrasenaInicial')}
-            </span>
+            <Etiqueta obligatorio>{t('alumnos.contrasenaInicial')}</Etiqueta>
             <input
               type="text"
               minLength={8}
@@ -481,11 +527,24 @@ export default function Alumnos() {
         <h1 className="display" style={{ fontSize: '1.5rem' }}>
           {t('alumnos.titulo')}
         </h1>
-        {esMaestro && (
-          <button className="btn btn-cta btn-sm" onClick={abrirAlta}>
-            {editando === 'nuevo' ? t('comun.cancelar') : `+ ${t('alumnos.nuevo')}`}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {/* El maestro ya no se lista entre sus alumnos (ver `GET /users`),
+              así que su ficha necesita una puerta: esta. */}
+          {esMaestro && user && (
+            <Link
+              href={`/alumnos/${user.id}`}
+              className="btn btn-outline btn-sm"
+              title={t('alumnos.miFichaAyuda')}
+            >
+              {t('alumnos.miFicha')}
+            </Link>
+          )}
+          {esMaestro && (
+            <button className="btn btn-cta btn-sm" onClick={abrirAlta}>
+              {editando === 'nuevo' ? t('comun.cancelar') : `+ ${t('alumnos.nuevo')}`}
+            </button>
+          )}
+        </div>
       </header>
 
       {error && (

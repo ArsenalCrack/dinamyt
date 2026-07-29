@@ -18,8 +18,8 @@ import {
 import { cerrarSesion, darSesion } from '../lib/auth/cookies';
 import {
   LIMITES,
+  nombreCompleto,
   telefono,
-  textoObligatorio,
   textoOpcional,
   tipoSangre,
 } from '../lib/validacion';
@@ -306,7 +306,7 @@ export async function authRoutes(app: FastifyInstance) {
           error: 'Tu nombre lo cambia tu maestro. Pídeselo si está mal escrito.',
         });
       }
-      const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+      const nombre = nombreCompleto(body.fullName);
       if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
       cambios.fullName = nombre.valor;
     }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { api, mensajeError } from '@/lib/api';
 import { claveRol, useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
@@ -327,6 +328,14 @@ export default function MiPanel() {
             </div>
           </div>
         </div>
+        {/* El maestro ya no se lista entre sus alumnos, así que su ficha
+            —donde se editan su correo, su cinturón y su antigüedad, y no solo
+            lo poco que cabe aquí abajo— necesita una puerta desde su panel. */}
+        {esMaestro && user && (
+          <Link href={`/alumnos/${user.id}`} className="btn btn-outline btn-sm">
+            {t('alumnos.miFicha')}
+          </Link>
+        )}
       </header>
 
       {aviso && (

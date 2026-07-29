@@ -5,8 +5,10 @@
 // cachea datos: mostrar el estado de un alumno desde caché sería peor que un
 // error claro — el maestro cobraría mal.
 
-var CACHE = 'membresias-shell-v1';
-var SHELL = ['/', '/kiosco', '/mi', '/manifest.json', '/logo.png'];
+// La versión sube al cambiar el shell: el `activate` borra las cachés viejas,
+// así que sin subirla los iconos anteriores se seguirían sirviendo de caché.
+var CACHE = 'membresias-shell-v2';
+var SHELL = ['/', '/kiosco', '/mi', '/manifest.json', '/logo.png', '/icon-512.png'];
 
 self.addEventListener('install', function (event) {
   event.waitUntil(

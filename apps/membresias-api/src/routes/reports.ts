@@ -133,11 +133,23 @@ export async function reportsRoutes(app: FastifyInstance) {
         .reduce((s, x) => s + x.monto, 0);
 
       // Esperado mensual: suma del precio del plan vigente de los activos (mensual).
+      //
+      // `plans.isActive` NO es un detalle: borrar un plan es desactivarlo (ver
+      // `DELETE /plans/:id`), y la membresía se queda apuntando al plan muerto.
+      // Sin este filtro, un club que borró su única tarifa seguía viendo «60 000
+      // de lo esperado este mes» con la pantalla entera en blanco: se esperaba
+      // el dinero de un plan que ya no se le puede cobrar a nadie.
       const activos = await db
         .select({ price: plans.price, type: plans.type })
         .from(memberships)
         .innerJoin(plans, eq(memberships.currentPlanId, plans.id))
-        .where(and(eq(memberships.orgId, orgId), eq(memberships.status, 'activo')));
+        .where(
+          and(
+            eq(memberships.orgId, orgId),
+            eq(memberships.status, 'activo'),
+            eq(plans.isActive, true),
+          ),
+        );
       const esperadoMensual = activos
         .filter((a) => a.type === 'mensual')
         .reduce((s, a) => s + parseFloat(a.price), 0);
@@ -268,10 +280,18 @@ export async function reportsRoutes(app: FastifyInstance) {
           if (acc) acc.devengado += trozo.monto;
         }
       }
+      // Lo que DEBERÍA entrar cada mes. Cuenta solo a quien está al corriente de
+      // pertenecer al club (membresía `activo`) y con un plan que siga vivo:
+      // borrar un plan es desactivarlo, y la membresía sigue apuntando al plan
+      // muerto. Sin las dos condiciones, un club recién vaciado seguía
+      // esperando el dinero de una tarifa que ya no existe.
       const precioPlan = new Map(tarifas.map((p) => [p.id, p]));
       const esperadoMensual = activos.reduce((suma, a) => {
-        const plan = precioPlan.get(memPorUsuario.get(a.id)?.currentPlanId ?? '');
-        return plan?.type === 'mensual' ? suma + parseFloat(plan.price) : suma;
+        const mem = memPorUsuario.get(a.id);
+        if (mem?.status !== 'activo') return suma;
+        const plan = precioPlan.get(mem.currentPlanId ?? '');
+        if (!plan?.isActive || plan.type !== 'mensual') return suma;
+        return suma + parseFloat(plan.price);
       }, 0);
 
       // ── Asistencia de los últimos 30 días ───────────────────────────────

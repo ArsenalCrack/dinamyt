@@ -8,11 +8,22 @@ import { api, mensajeError, type Rol } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda, hoyISO } from '@/lib/formato';
-import { LIM, TIPOS_SANGRE, soloDigitos, soloTelefono, telefonoValido } from '@/lib/campos';
+import {
+  LIM,
+  TIPOS_SANGRE,
+  correoValido,
+  dominioSugerido,
+  nombreCompletoValido,
+  soloDigitos,
+  soloTelefono,
+  telefonoValido,
+} from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
+import { CampoFecha } from '@/components/CampoFecha';
 import { CampoImagen } from '@/components/CampoImagen';
 import { Contador } from '@/components/Contador';
+import { Etiqueta, LeyendaObligatorios } from '@/components/Etiqueta';
 import { Carnet } from '@/components/Carnet';
 import { AccesoQR } from '@/components/AccesoQR';
 import { Cinturon } from '@/components/Cinturon';
@@ -97,8 +108,10 @@ export default function Ficha() {
   const params = useParams();
   const id = String(params.id ?? '');
   const { t, idioma } = useI18n();
-  const { user, club, cargando: cargandoSesion, esStaff } = useAuth();
+  const { user, club, cargando: cargandoSesion, esStaff, refrescar } = useAuth();
   const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
+  /** Esta ficha es la mía: la del maestro, que ya no sale en el listado. */
+  const esMiFicha = Boolean(user && user.id === id);
 
   const [persona, setPersona] = useState<Persona | null>(null);
   const [membership, setMembership] = useState<Membership | null>(null);
@@ -111,6 +124,11 @@ export default function Ficha() {
 
   const [datos, setDatos] = useState({
     fullName: '',
+    // El correo se edita AQUÍ, y no solo en el alta: es la llave con la que
+    // esta persona entra, y un dedazo el día de la inscripción la deja fuera.
+    // Antes solo se podía corregir desde el listado, del que el maestro ya no
+    // forma parte — así que el suyo no había forma de tocarlo.
+    email: '',
     phone: '',
     belt: '',
     trainsSince: '',
@@ -118,6 +136,15 @@ export default function Ficha() {
     emergencyName: '',
     emergencyPhone: '',
   });
+  /**
+   * El cinturón con el que se abrió la ficha.
+   *
+   * Sirve para una sola cosa: darse cuenta de que acaba de subir de grado. El
+   * carnet que el alumno lleva encima dice el cinturón anterior, y eso —al
+   * revés que corregirle el tipo de sangre— no se arregla en la próxima
+   * impresión: hay que reexpedirlo y darle el nuevo.
+   */
+  const [gradoGuardado, setGradoGuardado] = useState<string | null>(null);
   const [plan, setPlan] = useState({
     currentPlanId: '',
     status: 'activo',
@@ -170,6 +197,7 @@ export default function Ficha() {
 
       setDatos({
         fullName: pe.data.fullName,
+        email: pe.data.email,
         phone: pe.data.phone ?? '',
         belt: pe.data.belt ?? '',
         trainsSince: pe.data.trainsSince ?? '',
@@ -234,14 +262,24 @@ export default function Ficha() {
     e.preventDefault();
     setError('');
     setAviso('');
+    if (!nombreCompletoValido(datos.fullName)) {
+      setError(t('comun.nombreIncompleto'));
+      return;
+    }
+    if (!correoValido(datos.email)) {
+      setError(t('comun.correoInvalido'));
+      return;
+    }
     if (!telefonoValido(datos.phone) || !telefonoValido(datos.emergencyPhone)) {
       setError(t('comun.telefonoCorto'));
       return;
     }
+    const subioDeGrado = (datos.belt || null) !== (persona?.belt ?? null) && Boolean(datos.belt);
     setGuardando('datos');
     try {
       await api.patch(`/users/${id}`, {
         fullName: datos.fullName,
+        email: datos.email,
         phone: datos.phone || null,
         belt: datos.belt || null,
         trainsSince: datos.trainsSince || null,
@@ -250,7 +288,14 @@ export default function Ficha() {
         emergencyPhone: datos.emergencyPhone || null,
       });
       setAviso(t('ficha.guardado'));
+      // Cambió de cinturón: el aviso de reexpedir se queda en pantalla hasta
+      // que se reexpide o se recarga la ficha.
+      setGradoGuardado(subioDeGrado ? (datos.belt || null) : null);
       await cargar();
+      // Si es MI ficha, la sesión en memoria acaba de quedarse vieja: sin
+      // esto, «Mi grado» seguía enseñando el cinturón anterior —o ninguno—
+      // hasta recargar la aplicación entera.
+      if (esMiFicha) await refrescar();
     } catch (err) {
       setError(mensajeError(err, t('ficha.datos')));
     } finally {
@@ -272,7 +317,9 @@ export default function Ficha() {
     try {
       await api.post(`/users/${id}/carnet`, {});
       setAviso(t('carnet.reexpedido'));
+      setGradoGuardado(null);
       await cargar();
+      if (esMiFicha) await refrescar();
     } catch (err) {
       setError(mensajeError(err, t('carnet.reexpedir')));
     }
@@ -474,6 +521,41 @@ export default function Ficha() {
           <p className="muted" style={{ fontSize: '0.75rem', marginBottom: '0.9rem' }}>
             {t(esDelStaff ? 'qr.descripcionStaff' : 'qr.descripcion')}
           </p>
+
+          {/* ── Subió de cinturón: hay que darle otro carnet ──
+              El resto de la ficha se refleja sola en la próxima impresión —el
+              carnet se pinta con los datos de AHORA—, así que corregir una
+              sangre o un teléfono no obliga a reexpedir nada. El grado sí: el
+              papel que el alumno lleva en el bolsillo dice el anterior, y ese
+              papel es el que enseña. */}
+          {gradoGuardado && (
+            <div
+              className="card"
+              style={{
+                padding: '0.75rem',
+                marginBottom: '0.9rem',
+                borderColor: 'var(--gold-dim)',
+              }}
+            >
+              <p style={{ fontSize: '0.8rem', color: 'var(--gold)', fontWeight: 700 }}>
+                ⚠ {t('carnet.gradoCambio')}
+              </p>
+              <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.2rem' }}>
+                {t('carnet.gradoCambioAyuda')}
+              </p>
+              {esMaestro && (
+                <button
+                  type="button"
+                  className="btn btn-gold btn-sm"
+                  style={{ marginTop: '0.5rem' }}
+                  onClick={reexpedirCarnet}
+                >
+                  {t('carnet.reexpedir')}
+                </button>
+              )}
+            </div>
+          )}
+
           <Carnet
             id={id}
             nombre={nombre}
@@ -495,6 +577,9 @@ export default function Ficha() {
             // único que renueva el año. Solo el maestro, que es quien lo firma.
             onReexpedir={esMaestro ? reexpedirCarnet : undefined}
           />
+          <p className="muted" style={{ fontSize: '0.7rem', marginTop: '0.6rem' }}>
+            {t('carnet.datosAlDia')}
+          </p>
         </div>
 
         <div style={{ display: 'grid', gap: '1rem', alignContent: 'start' }}>
@@ -554,9 +639,10 @@ export default function Ficha() {
         >
           {/* ── Datos del alumno ── */}
           <form onSubmit={guardarDatos} className="card" style={{ padding: '1rem' }}>
-            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
-              {t('ficha.datos')}
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+              {t(esAlumno ? 'ficha.datos' : 'ficha.datosMiembro')}
             </h2>
+            <LeyendaObligatorios />
             {/* La foto se guarda al elegirla, sin esperar al botón: es lo que
                 se espera de una foto, y además la vista previa del carnet la
                 necesita ya puesta para enseñar cómo va a quedar. */}
@@ -567,20 +653,60 @@ export default function Ficha() {
                 onCambiar={guardarFoto}
               />
             </div>
-            <label className="muted" style={{ fontSize: '0.75rem' }}>
-              {t('comun.nombre')}
-            </label>
+            <Etiqueta obligatorio>{t('comun.nombre')}</Etiqueta>
             <input
               value={datos.fullName}
               onChange={(e) => setDatos({ ...datos, fullName: e.target.value })}
               maxLength={LIM.nombrePersona}
               required
-              style={{ margin: '0.25rem 0 0.2rem' }}
+              style={{
+                margin: '0.25rem 0 0.2rem',
+                borderColor: nombreCompletoValido(datos.fullName) ? undefined : 'var(--danger)',
+              }}
             />
+            {!nombreCompletoValido(datos.fullName) && (
+              <p className="msg-error" style={{ fontSize: '0.7rem', marginBottom: '0.4rem' }}>
+                {t('comun.nombreIncompleto')}
+              </p>
+            )}
             <Contador valor={datos.fullName} max={LIM.nombrePersona} />
-            <label className="muted" style={{ fontSize: '0.75rem' }}>
-              {t('comun.telefono')}
-            </label>
+
+            {/* El correo, aquí. Es con lo que entra: si está mal escrito, la
+                cuenta no la puede usar nadie —y esta es la única pantalla
+                desde la que el maestro puede arreglar el suyo. */}
+            <Etiqueta obligatorio>{t('comun.correo')}</Etiqueta>
+            <input
+              type="email"
+              value={datos.email}
+              onChange={(e) => setDatos({ ...datos, email: e.target.value })}
+              maxLength={LIM.correo}
+              required
+              style={{
+                margin: '0.25rem 0 0.2rem',
+                borderColor: correoValido(datos.email) ? undefined : 'var(--danger)',
+              }}
+            />
+            {!correoValido(datos.email) && (
+              <p className="msg-error" style={{ fontSize: '0.7rem', marginBottom: '0.4rem' }}>
+                {t('comun.correoInvalido')}
+              </p>
+            )}
+            {correoValido(datos.email) && dominioSugerido(datos.email) && (
+              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.4rem' }}>
+                {t('comun.correoSugerencia')}{' '}
+                <button
+                  type="button"
+                  className="enlace"
+                  onClick={() => setDatos({ ...datos, email: dominioSugerido(datos.email)! })}
+                >
+                  {dominioSugerido(datos.email)}
+                </button>
+                ?
+              </p>
+            )}
+            <Contador valor={datos.email} max={LIM.correo} />
+
+            <Etiqueta>{t('comun.telefono')}</Etiqueta>
             <input
               type="tel"
               inputMode="tel"
@@ -597,9 +723,7 @@ export default function Ficha() {
                 {t('comun.telefonoCorto')}
               </p>
             )}
-            <label className="muted" style={{ fontSize: '0.75rem' }}>
-              {t('comun.cinturon')}
-            </label>
+            <Etiqueta>{t('comun.cinturon')}</Etiqueta>
             <div style={{ margin: '0.25rem 0 0.9rem' }}>
               <SelectMenu
                 valor={datos.belt}
@@ -611,25 +735,24 @@ export default function Ficha() {
             </div>
 
             {/* La antigüedad real: un club que estrena la app trae alumnos con
-                años encima, y su cuenta es de esta semana. */}
-            <label className="muted" style={{ fontSize: '0.75rem' }}>
-              {t('ficha.entrenaDesde')}
-            </label>
-            <input
-              type="date"
-              min="1950-01-01"
-              max={hoyISO()}
-              value={datos.trainsSince}
-              onChange={(e) => setDatos({ ...datos, trainsSince: e.target.value })}
-              style={{ margin: '0.25rem 0 0.2rem' }}
-            />
+                años encima, y su cuenta es de esta semana. Por eso el
+                calendario propio: es una fecha de hace décadas, y el nativo de
+                Android obliga a cruzarlas mes a mes. */}
+            <Etiqueta>{t('ficha.entrenaDesde')}</Etiqueta>
+            <div style={{ margin: '0.25rem 0 0.2rem' }}>
+              <CampoFecha
+                valor={datos.trainsSince}
+                onChange={(v) => setDatos({ ...datos, trainsSince: v })}
+                min="1950-01-01"
+                max={hoyISO()}
+                ariaLabel={t('ficha.entrenaDesde')}
+              />
+            </div>
             <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
               {t('ficha.entrenaDesdeAyuda')}
             </p>
 
-            <label className="muted" style={{ fontSize: '0.75rem' }}>
-              {t('ficha.sangre')}
-            </label>
+            <Etiqueta>{t('ficha.sangre')}</Etiqueta>
             <div style={{ margin: '0.25rem 0 0.9rem' }}>
               <SelectMenu
                 valor={datos.bloodType}
@@ -643,9 +766,7 @@ export default function Ficha() {
               />
             </div>
 
-            <label className="muted" style={{ fontSize: '0.75rem' }}>
-              {t('ficha.emergenciaNombre')}
-            </label>
+            <Etiqueta>{t('ficha.emergenciaNombre')}</Etiqueta>
             <input
               value={datos.emergencyName}
               onChange={(e) => setDatos({ ...datos, emergencyName: e.target.value })}
@@ -653,9 +774,7 @@ export default function Ficha() {
               style={{ margin: '0.25rem 0 0.2rem' }}
             />
             <Contador valor={datos.emergencyName} max={LIM.nombrePersona} />
-            <label className="muted" style={{ fontSize: '0.75rem' }}>
-              {t('ficha.emergenciaTelefono')}
-            </label>
+            <Etiqueta>{t('ficha.emergenciaTelefono')}</Etiqueta>
             <input
               type="tel"
               inputMode="tel"
@@ -722,14 +841,15 @@ export default function Ficha() {
               <label className="muted" style={{ fontSize: '0.75rem' }}>
                 {t('ficha.venceEl')}
               </label>
-              <input
-                type="date"
-                min="2000-01-01"
-                max="2100-12-31"
-                value={plan.venceEl}
-                onChange={(e) => setPlan({ ...plan, venceEl: e.target.value })}
-                style={{ margin: '0.25rem 0 0.2rem' }}
-              />
+              <div style={{ margin: '0.25rem 0 0.2rem' }}>
+                <CampoFecha
+                  valor={plan.venceEl}
+                  onChange={(v) => setPlan({ ...plan, venceEl: v })}
+                  min="2000-01-01"
+                  max="2100-12-31"
+                  ariaLabel={t('ficha.venceEl')}
+                />
+              </div>
               <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
                 {t('ficha.venceAyuda')} <em>{t('ficha.soloPorTiempo')}</em>
               </p>
@@ -827,14 +947,18 @@ export default function Ficha() {
               <label className="muted" style={{ fontSize: '0.75rem' }}>
                 {t('pago.fecha')}
               </label>
-              <input
-                type="date"
-                max={hoyISO()}
-                min="2000-01-01"
-                value={cobro.paidAt}
-                onChange={(e) => setCobro({ ...cobro, paidAt: e.target.value })}
-                style={{ margin: '0.25rem 0 0.2rem' }}
-              />
+              <div style={{ margin: '0.25rem 0 0.2rem' }}>
+                <CampoFecha
+                  valor={cobro.paidAt}
+                  onChange={(v) => setCobro({ ...cobro, paidAt: v })}
+                  min="2000-01-01"
+                  max={hoyISO()}
+                  ariaLabel={t('pago.fecha')}
+                  // El día del pago no se deja en blanco: sin él no hay pago
+                  // que registrar (la API lo exige).
+                  borrable={false}
+                />
+              </div>
               <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
                 {t('pago.fechaAyuda')}
               </p>

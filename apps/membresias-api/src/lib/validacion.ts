@@ -113,20 +113,103 @@ export function telefono(
  * cuenta con un correo imposible no la puede usar nadie y solo el maestro
  * puede arreglarla—.
  *
- * La expresión es deliberadamente tolerante: no existe una que acepte todos
- * los correos legales y rechace todos los ilegales. Lo que sí atrapa es el
- * error de verdad —falta la arroba, falta el dominio, hay espacios— sin
- * rechazar direcciones raras pero válidas.
+ * ── Por qué no basta con «tiene arroba y un punto» ──
+ *
+ * Con eso pasaba `pepito@g.com`, que es lo que sale cuando alguien empieza a
+ * escribir «gmail» y le da a enviar antes de tiempo: el correo es sintáctico
+ * pero no existe, y la cuenta nace inservible sin que nadie se entere hasta
+ * que el alumno no puede entrar. Así que además de la forma se comprueba el
+ * DOMINIO pieza por pieza (ver `DOMINIO_*` abajo).
+ *
+ * Lo que NO se hace aquí es adivinar: no existe una expresión que acepte todos
+ * los correos legales y rechace todos los ilegales, y un correo raro pero
+ * bueno rechazado es peor que uno malo aceptado —el segundo se corrige, el
+ * primero deja a alguien fuera del club—. Corregir los despistes típicos
+ * (`gmial.com`) es cosa de la web, que los SUGIERE sin bloquear.
  */
+
+/** Longitud mínima del dominio registrable —la etiqueta antes del TLD—. */
+const DOMINIO_ETIQUETA_MIN = 2;
+/** Un TLD son solo letras: entre `.co` y los largos tipo `.international`. */
+const DOMINIO_TLD = /^[a-z]{2,24}$/;
+/** Cada etiqueta del dominio: letras, dígitos y guiones por dentro. */
+const DOMINIO_ETIQUETA = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+
 export function correo(valor: string | null | undefined): Campo<string> {
   const texto = textoObligatorio(valor, LIMITES.correo, 'El correo');
   if (!texto.ok) return texto;
 
   const limpio = texto.valor.toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(limpio)) {
+  const forma = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(limpio);
+  if (!forma) return mal('El correo debe tener la forma nombre@dominio.com.');
+
+  const arroba = limpio.lastIndexOf('@');
+  const buzon = limpio.slice(0, arroba);
+  const dominio = limpio.slice(arroba + 1);
+
+  // El buzón admite casi cualquier cosa (hay direcciones con `+`, `_` y `'`),
+  // pero no puntos sueltos en los extremos ni dobles: eso siempre es un dedazo.
+  if (buzon.length > 64 || buzon.startsWith('.') || buzon.endsWith('.') || buzon.includes('..')) {
     return mal('El correo debe tener la forma nombre@dominio.com.');
   }
+
+  const etiquetas = dominio.split('.');
+  if (etiquetas.length < 2 || etiquetas.some((e) => !DOMINIO_ETIQUETA.test(e) || e.length > 63)) {
+    return mal(`El dominio «${dominio}» no parece un dominio de correo.`);
+  }
+  const tld = etiquetas[etiquetas.length - 1];
+  if (!DOMINIO_TLD.test(tld)) {
+    return mal(`El dominio «${dominio}» no parece un dominio de correo.`);
+  }
+  // La etiqueta registrable de una letra —`g.com`— es casi siempre un dominio
+  // a medio escribir. Existen unos pocos de verdad (x.com), pero ninguno da
+  // correo a nadie, y dejarla pasar es dejar pasar el error que se cuela de
+  // verdad en la inscripción.
+  if (etiquetas[etiquetas.length - 2].length < DOMINIO_ETIQUETA_MIN) {
+    return mal(`El dominio «${dominio}» está incompleto. ¿Faltó parte del nombre?`);
+  }
   return bien(limpio);
+}
+
+/**
+ * El nombre de una persona, completo.
+ *
+ * `textoObligatorio` daba por bueno «A»: una letra suelta pasaba la validación
+ * y quedaba impresa en el carnet, en el recibo de los pagos y en la lista del
+ * maestro. Y en una lista de treinta alumnos, «Juan» a secas tampoco identifica
+ * a nadie el día que hay dos.
+ *
+ * La regla es la mínima que sirve: al menos DOS palabras con nombre de tal
+ * —dos letras o más—. Eso deja pasar «Ana M. Restrepo» (la inicial no cuenta
+ * como palabra, pero Ana y Restrepo sí) y «Li Wu», que son nombres reales, y
+ * corta «J», «Juan» y «A B».
+ *
+ * No se exige un apellido concreto ni se cuentan las palabras hacia arriba:
+ * hay gente con un nombre y cuatro apellidos, y gente con dos de cada.
+ */
+export function nombreCompleto(
+  valor: string | null | undefined,
+  campo = 'El nombre',
+): Campo<string> {
+  const base = textoObligatorio(valor, LIMITES.nombrePersona, campo);
+  if (!base.ok) return base;
+
+  // Los espacios de más se colapsan: «Ana   Restrepo» y «Ana Restrepo» son la
+  // misma persona, y guardarlos distintos rompe la búsqueda por nombre.
+  const limpio = base.valor.replace(/\s+/g, ' ');
+  if (/[^\p{L}\p{M}\s'’.-]/u.test(limpio)) {
+    return mal(`${campo} solo puede llevar letras, espacios, apóstrofos y guiones.`);
+  }
+  const palabras = limpio.split(' ').filter((p) => contarLetras(p) >= 2);
+  if (palabras.length < 2) {
+    return mal(`${campo} debe ir completo: nombre y apellido.`);
+  }
+  return bien(limpio);
+}
+
+/** Letras de verdad (con tildes y diacríticos), sin puntos ni guiones. */
+function contarLetras(texto: string): number {
+  return (texto.match(/\p{L}/gu) ?? []).length;
 }
 
 /** Un grupo sanguíneo de la lista, o nada. */

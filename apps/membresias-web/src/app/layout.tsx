@@ -32,6 +32,31 @@ export const metadata: Metadata = {
   title: 'Mi Club · DINAMYT',
   description: 'Tu carnet, tus asistencias y tu estado en el club.',
   manifest: '/manifest.json',
+  /**
+   * El escudo de DINAMYT, con una distinción que no es capricho:
+   *
+   * - **La pestaña y la pantalla de carga** usan los PNG TRANSPARENTES. Ahí el
+   *   escudo se recorta contra el fondo de la app, sin recuadro, y salen del
+   *   maestro de 1024 px remuestreado a cada tamaño: nada se ve interpolado.
+   *
+   * - **El icono instalado en el celular** usa el de FONDO BLANCO
+   *   (`apple-touch-icon`). iOS no admite transparencia en ese icono: lo que
+   *   no tiene fondo lo rellena de NEGRO, y de ahí venía el escudo dentro de
+   *   un cuadro negro. El equivalente de Android va en el manifiesto, como
+   *   icono `maskable`.
+   *
+   * Va todo declarado y no se deja a que cada plataforma adivine: sin
+   * `apple-touch-icon`, iOS llega a inventarse uno con una captura de la
+   * página.
+   */
+  icons: {
+    icon: [
+      { url: '/icon.png', type: 'image/png', sizes: '256x256' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
   appleWebApp: {
     capable: true,
     title: 'Mi Club',

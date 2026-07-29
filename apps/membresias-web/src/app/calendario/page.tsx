@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { fmtFecha } from '@/lib/formato';
 import { LIM } from '@/lib/campos';
+import { CampoFecha } from '@/components/CampoFecha';
 import { Contador } from '@/components/Contador';
 import { SelectMenu } from '@/components/SelectMenu';
 
@@ -177,14 +178,16 @@ export default function Calendario() {
               <label className="muted" style={{ fontSize: '0.72rem' }}>
                 {t('comun.fecha')}
               </label>
-              {/* Un `type="date"` sin acotar admite años de cinco cifras, que
-                  la columna `date` no acepta y acaban en un error del servidor. */}
-              <input
-                type="date"
+              {/* Calendario propio, acotado: la columna es `date` y no acepta
+                  años de cinco cifras (que el `type="date"` nativo sí dejaba
+                  teclear). Ver `components/CampoFecha.tsx`. */}
+              <CampoFecha
+                valor={nueva.date}
+                onChange={(v) => setNueva((n) => ({ ...n, date: v }))}
                 min="2000-01-01"
                 max="2100-12-31"
-                value={nueva.date}
-                onChange={(e) => setNueva((n) => ({ ...n, date: e.target.value }))}
+                ariaLabel={t('comun.fecha')}
+                borrable={false}
               />
             </div>
             <div>

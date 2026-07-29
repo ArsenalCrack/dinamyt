@@ -156,6 +156,88 @@ describe('membresias-api — límites de los campos', () => {
     expect(bueno.json().belt).toBe('Negro');
   });
 
+  // ── El nombre y el correo con los que nace la cuenta ──────────────────────
+  //
+  // Los dos se escriben una vez, en la inscripción, y los dos se arrastran
+  // para siempre: el nombre va impreso en el carnet y en los recibos, y el
+  // correo es la llave con la que se entra. Un dedazo aquí no se nota hasta
+  // que el alumno no puede entrar y hay que ir a buscar al maestro.
+
+  it('una letra suelta no es un nombre', async () => {
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: { email: 'inicial@club.com', fullName: 'A', password: 'Prueba1234' },
+    });
+    expect(r.statusCode).toBe(422);
+    expect(r.json().error).toContain('completo');
+  });
+
+  it('el nombre a secas tampoco: hace falta el apellido', async () => {
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: { email: 'juan@club.com', fullName: 'Juan', password: 'Prueba1234' },
+    });
+    expect(r.statusCode).toBe(422);
+  });
+
+  it('un nombre con inicial en medio sí pasa, y se le quitan los espacios de más', async () => {
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: {
+        email: 'inicialmedio@club.com',
+        fullName: '  Ana  M. Restrepo ',
+        password: 'Prueba1234',
+      },
+    });
+    expect(r.statusCode).toBe(201);
+    expect(r.json().fullName).toBe('Ana M. Restrepo');
+  });
+
+  it('un dominio de una letra es un correo a medio escribir', async () => {
+    // `pepito@g.com` es lo que queda cuando alguien empieza a teclear «gmail»
+    // y envía antes de tiempo: sintácticamente impecable, y no existe.
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: { email: 'pepito@g.com', fullName: 'Pepito Pérez', password: 'Prueba1234' },
+    });
+    expect(r.statusCode).toBe(422);
+    expect(r.json().error).toContain('g.com');
+  });
+
+  it('un dominio sin TLD de letras tampoco pasa', async () => {
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: { email: 'pepito@correo.1', fullName: 'Pepito Pérez', password: 'Prueba1234' },
+    });
+    expect(r.statusCode).toBe(422);
+  });
+
+  it('un correo raro pero bueno sigue entrando', async () => {
+    // El del colegio, con subdominio, guion y un buzón con `+`: rechazar esto
+    // por parecer raro deja fuera a gente de verdad.
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: {
+        email: 'ana+dojo@correo.mi-colegio.edu.co',
+        fullName: 'Ana Restrepo',
+        password: 'Prueba1234',
+      },
+    });
+    expect(r.statusCode).toBe(201);
+  });
+
   it('una contraseña de más de 72 caracteres se rechaza (bcrypt la truncaría)', async () => {
     const r = await e.app.inject({
       method: 'POST',

@@ -7,8 +7,8 @@ import {
   LIMITES,
   correo as validarCorreo,
   fecha,
+  nombreCompleto,
   telefono,
-  textoObligatorio,
   textoOpcional,
   tipoSangre,
   type Campo,
@@ -195,6 +195,19 @@ export async function usersRoutes(app: FastifyInstance) {
     const conds = [eq(users.orgId, orgId)];
     if (role && (ROLES_ASIGNABLES as string[]).concat('owner').includes(role)) {
       conds.push(eq(users.role, role as MembresiasRole));
+    } else {
+      // El maestro NO sale en la lista de su club.
+      //
+      // Salía, y era desconcertante: la pantalla se llama «Alumnos», el
+      // maestro se veía a sí mismo entre su gente, con un botón de desactivar
+      // apagado y una fila que no le decía nada. Y de rebote se colaba en la
+      // cuenta de la paginación.
+      //
+      // Sigue teniendo ficha, y completa —se llega por `/alumnos/<su id>`,
+      // enlazado desde su panel—: lo que se quita es aparecer en el listado,
+      // no poder editarse. Quien lo necesite de verdad puede pedirlo aparte
+      // con `?role=owner`.
+      conds.push(ne(users.role, 'owner'));
     }
     if (includeInactive !== '1') conds.push(eq(users.isActive, true));
     if (q) {
@@ -237,7 +250,7 @@ export async function usersRoutes(app: FastifyInstance) {
     const correo = validarCorreo(body.email);
     if (!correo.ok) return reply.code(422).send({ error: correo.error });
     const email = correo.valor;
-    const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+    const nombre = nombreCompleto(body.fullName);
     if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
     const tel = telefono(body.phone);
     if (!tel.ok) return reply.code(422).send({ error: tel.error });
@@ -347,7 +360,7 @@ export async function usersRoutes(app: FastifyInstance) {
       const cambios: Record<string, unknown> = { updatedAt: new Date(), ...ficha.valor };
 
       if (body.fullName !== undefined) {
-        const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+        const nombre = nombreCompleto(body.fullName);
         if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
         cambios.fullName = nombre.valor;
       }

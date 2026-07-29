@@ -114,3 +114,105 @@ export function telefonoValido(valor: string): boolean {
   const n = digitosDe(valor);
   return n === 0 || (n >= TELEFONO_DIGITOS_MIN && n <= TELEFONO_DIGITOS_MAX);
 }
+
+/**
+ * ¿Está completo el nombre? Dos palabras de dos letras o más.
+ *
+ * Es la misma regla que la API (`nombreCompleto` en `lib/validacion.ts`), aquí
+ * para poder decirlo MIENTRAS se escribe: descubrir al pulsar «Crear» que el
+ * nombre no valía, con el resto del formulario ya lleno, es la peor forma de
+ * enterarse. Vacío cuenta como válido: de eso se encarga el `required`, y
+ * teñir de rojo un campo que todavía no se ha tocado no ayuda a nadie.
+ *
+ * La inicial suelta no cuenta como palabra, así que «Ana M. Restrepo» pasa
+ * (Ana y Restrepo) y «Juan» o «A B» no.
+ */
+export function nombreCompletoValido(valor: string): boolean {
+  const limpio = valor.trim().replace(/\s+/g, ' ');
+  if (!limpio) return true;
+  if (/[^\p{L}\p{M}\s'’.-]/u.test(limpio)) return false;
+  return limpio.split(' ').filter((p) => (p.match(/\p{L}/gu) ?? []).length >= 2).length >= 2;
+}
+
+/**
+ * ¿Tiene forma de correo, con un dominio que exista de verdad?
+ *
+ * Mismas reglas que la API: buzón, etiquetas del dominio, TLD de solo letras y
+ * —la que importa— un dominio registrable de dos letras para arriba. `g.com`
+ * es lo que queda cuando alguien empieza a escribir «gmail» y envía antes de
+ * tiempo: la cuenta nace con una llave que no abre nada.
+ */
+export function correoValido(valor: string): boolean {
+  const limpio = valor.trim().toLowerCase();
+  if (!limpio) return true;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(limpio)) return false;
+
+  const arroba = limpio.lastIndexOf('@');
+  const buzon = limpio.slice(0, arroba);
+  if (buzon.length > 64 || buzon.startsWith('.') || buzon.endsWith('.') || buzon.includes('..')) {
+    return false;
+  }
+  const etiquetas = limpio.slice(arroba + 1).split('.');
+  if (etiquetas.length < 2) return false;
+  if (etiquetas.some((e) => e.length > 63 || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(e))) {
+    return false;
+  }
+  if (!/^[a-z]{2,24}$/.test(etiquetas[etiquetas.length - 1])) return false;
+  return etiquetas[etiquetas.length - 2].length >= 2;
+}
+
+/** Los proveedores de correo que usa casi todo el mundo por aquí. */
+const PROVEEDORES = [
+  'gmail.com',
+  'hotmail.com',
+  'outlook.com',
+  'yahoo.com',
+  'icloud.com',
+  'live.com',
+  'hotmail.es',
+  'outlook.es',
+];
+
+/**
+ * «¿Quisiste decir …?» para el dominio mal tecleado.
+ *
+ * Va SOLO en la web y no bloquea nada: `gmial.com` es sintácticamente
+ * impecable, así que la API no tiene forma de rechazarlo sin rechazar también
+ * dominios raros pero buenos —el correo del colegio, el de la empresa del
+ * papá—. Aquí, en cambio, se puede preguntar sin cerrarle la puerta a nadie.
+ *
+ * Solo se sugiere a un dedazo o dos de distancia: más allá deja de ser un
+ * despiste y empieza a ser otro dominio (`ymail.com` es de verdad, y está a
+ * una letra de `gmail.com` — por eso la sugerencia no se impone).
+ */
+export function dominioSugerido(valor: string): string | null {
+  const limpio = valor.trim().toLowerCase();
+  const arroba = limpio.lastIndexOf('@');
+  if (arroba < 0) return null;
+  const dominio = limpio.slice(arroba + 1);
+  if (!dominio || PROVEEDORES.includes(dominio)) return null;
+
+  for (const p of PROVEEDORES) {
+    const d = distancia(dominio, p);
+    if (d > 0 && d <= 2) return `${limpio.slice(0, arroba)}@${p}`;
+  }
+  return null;
+}
+
+/** Distancia de edición (Levenshtein), con una sola fila de memoria. */
+function distancia(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  let fila = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const siguiente = [i];
+    for (let j = 1; j <= b.length; j++) {
+      siguiente[j] = Math.min(
+        fila[j] + 1,
+        siguiente[j - 1] + 1,
+        fila[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    fila = siguiente;
+  }
+  return fila[b.length];
+}

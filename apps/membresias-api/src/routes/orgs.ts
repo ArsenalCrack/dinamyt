@@ -11,6 +11,7 @@ import { hashPassword, validarPassword } from '../lib/auth/passwords';
 import {
   LIMITES,
   correo as validarCorreo,
+  nombreCompleto,
   telefono,
   textoObligatorio,
   textoOpcional,
@@ -223,7 +224,7 @@ export async function orgsRoutes(app: FastifyInstance) {
     const correo = validarCorreo(body.email);
     if (!correo.ok) return reply.code(422).send({ error: correo.error });
     const email = correo.valor;
-    const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+    const nombre = nombreCompleto(body.fullName);
     if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
     const tel = telefono(body.phone);
     if (!tel.ok) return reply.code(422).send({ error: tel.error });
@@ -282,7 +283,7 @@ export async function orgsRoutes(app: FastifyInstance) {
 
       const cambios: Record<string, unknown> = { updatedAt: new Date() };
       if (body.fullName !== undefined) {
-        const nombre = textoObligatorio(body.fullName, LIMITES.nombrePersona, 'El nombre');
+        const nombre = nombreCompleto(body.fullName);
         if (!nombre.ok) return reply.code(422).send({ error: nombre.error });
         cambios.fullName = nombre.valor;
       }

@@ -99,8 +99,21 @@ const es = {
   'comun.imprimir': 'Imprimir',
   'comun.fecha': 'Fecha',
   'comun.opcional': 'opcional',
+  'comun.obligatorio': 'Obligatorio',
+  'comun.obligatoriosLeyenda': 'Los campos marcados son obligatorios. El resto se puede llenar después.',
   'comun.tope': 'no cabe más',
   'comun.telefonoCorto': 'Un teléfono tiene entre 7 y 15 dígitos.',
+  'comun.nombreIncompleto': 'Escribe el nombre completo: nombre y apellido.',
+  'comun.correoInvalido': 'Ese correo no existe. Revisa el dominio (la parte de después de la @).',
+  'comun.correoSugerencia': '¿Quisiste decir',
+
+  // Calendario propio (components/CampoFecha.tsx)
+  'fecha.elegir': 'Elegir fecha',
+  'fecha.hoy': 'Hoy',
+  'fecha.borrar': 'Quitar',
+  'fecha.mesAnterior': 'Anterior',
+  'fecha.mesSiguiente': 'Siguiente',
+  'fecha.cambiarVista': 'Cambiar de año',
 
   // Ficha de seguridad: lo que hay que saber el día que pasa algo
   'ficha.entrenaDesde': 'Entrena desde',
@@ -124,6 +137,9 @@ const es = {
   'ficha.pagos': 'Pagos',
   'ficha.asistencias': 'Asistencias',
   'ficha.datos': 'Datos del alumno',
+  // La misma ficha la usan el maestro y los auxiliares, que de alumnos no
+  // tienen nada: llamarles «datos del alumno» a sus propios datos chirría.
+  'ficha.datosMiembro': 'Datos personales',
   'ficha.guardado': 'Cambios guardados.',
   'ficha.planYEstado': 'Plan y estado en el club',
   'ficha.planActual': 'Plan actual',
@@ -200,6 +216,11 @@ const es = {
   'alumnos.nuevaContrasena': 'Poner contraseña nueva',
   'alumnos.contrasenaCambiada': 'Contraseña actualizada.',
   'alumnos.incluirInactivos': 'Ver también los inactivos',
+  // El maestro ya no sale en su propia lista (ver `GET /users`): su ficha se
+  // abre desde aquí y desde su panel.
+  'alumnos.miFicha': 'Mi ficha',
+  'alumnos.miFichaAyuda':
+    'Tú no apareces en esta lista: no eres alumno de tu club. Tus datos y tu carnet se editan en tu ficha.',
 
   // Paso de páginas y «ver más» (components/Paginacion.tsx)
   'pag.navegacion': 'Páginas',
@@ -296,6 +317,14 @@ const es = {
   'carnet.vencido': 'Vencido. Reexpídelo antes de imprimirlo.',
   'carnet.reexpedir': 'Reexpedir',
   'carnet.reexpedido': 'Carnet reexpedido: vigente por un año más.',
+  // Subir de cinturón es lo único que deja MENTIROSO al carnet que el alumno
+  // lleva en el bolsillo: el resto de correcciones salen solas en la próxima
+  // impresión, pero el grado impreso ya no es el suyo.
+  'carnet.gradoCambio': 'Cambió de cinturón: el carnet impreso dice el grado anterior.',
+  'carnet.gradoCambioAyuda':
+    'Reexpídelo y entrégale el nuevo. La vigencia arranca de cero, un año desde hoy.',
+  'carnet.datosAlDia':
+    'Lo demás del carnet (sangre, contacto de emergencia, foto) sale actualizado en la próxima impresión: no hace falta reexpedirlo por eso.',
   'carnet.formato': 'Cómo lo vas a imprimir',
   'carnet.formatoHoja': 'Hoja normal',
   'carnet.formatoTarjeta': 'Impresora de tarjetas',
@@ -564,8 +593,20 @@ const en: Record<ClaveTexto, string> = {
   'comun.imprimir': 'Print',
   'comun.fecha': 'Date',
   'comun.opcional': 'optional',
+  'comun.obligatorio': 'Required',
+  'comun.obligatoriosLeyenda': 'Marked fields are required. The rest can wait.',
   'comun.tope': 'no room left',
   'comun.telefonoCorto': 'A phone number has between 7 and 15 digits.',
+  'comun.nombreIncompleto': 'Write the full name: first name and surname.',
+  'comun.correoInvalido': 'That email does not exist. Check the domain (after the @).',
+  'comun.correoSugerencia': 'Did you mean',
+
+  'fecha.elegir': 'Pick a date',
+  'fecha.hoy': 'Today',
+  'fecha.borrar': 'Clear',
+  'fecha.mesAnterior': 'Previous',
+  'fecha.mesSiguiente': 'Next',
+  'fecha.cambiarVista': 'Change year',
 
   'ficha.entrenaDesde': 'Training since',
   'ficha.entrenaDesdeAyuda':
@@ -586,6 +627,7 @@ const en: Record<ClaveTexto, string> = {
   'ficha.pagos': 'Payments',
   'ficha.asistencias': 'Attendance',
   'ficha.datos': 'Student details',
+  'ficha.datosMiembro': 'Personal details',
   'ficha.guardado': 'Changes saved.',
   'ficha.planYEstado': 'Plan and club status',
   'ficha.planActual': 'Current plan',
@@ -652,6 +694,9 @@ const en: Record<ClaveTexto, string> = {
   'alumnos.nuevaContrasena': 'Set a new password',
   'alumnos.contrasenaCambiada': 'Password updated.',
   'alumnos.incluirInactivos': 'Show inactive too',
+  'alumnos.miFicha': 'My record',
+  'alumnos.miFichaAyuda':
+    'You are not on this list: you are not a student of your own club. Your details and card live in your record.',
   'pag.navegacion': 'Pages',
   'pag.anterior': 'Previous',
   'pag.siguiente': 'Next',
@@ -728,6 +773,11 @@ const en: Record<ClaveTexto, string> = {
   'carnet.vencido': 'Expired. Reissue it before printing.',
   'carnet.reexpedir': 'Reissue',
   'carnet.reexpedido': 'Card reissued: valid for another year.',
+  'carnet.gradoCambio': 'Belt changed: the printed card still shows the old grade.',
+  'carnet.gradoCambioAyuda':
+    'Reissue it and hand them the new one. Validity restarts: one year from today.',
+  'carnet.datosAlDia':
+    'The rest of the card (blood type, emergency contact, photo) prints up to date on its own — no need to reissue for that.',
   'carnet.formato': 'How you will print it',
   'carnet.formatoHoja': 'Regular paper',
   'carnet.formatoTarjeta': 'Card printer',
