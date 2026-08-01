@@ -327,7 +327,7 @@ export default function Panel() {
               <tr key={a.userId}>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <Avatar src={a.avatarUrl} nombre={a.fullName} size={36} />
+                    <Avatar src={a.avatarUrl} nombre={a.fullName} size={36} ampliable />
                     <div style={{ minWidth: 0 }}>
                       <Link
                         href={`/alumnos/${a.userId}`}

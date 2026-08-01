@@ -86,13 +86,27 @@ export function NavBar() {
 
   useEffect(() => {
     if (!abierto) return;
+    /**
+     * ¿Hay una foto abierta en grande encima de todo?
+     *
+     * El visor vive en un portal colgado del `<body>` (ver `VisorImagen`), así
+     * que para estos dos manejadores queda «fuera» de la barra. Sin esta
+     * salvedad, el primer toque dentro del visor —el botón de cerrar, un
+     * arrastre, un pellizco— cerraba el menú, y al cerrarse se desmontaba el
+     * avatar que lo había abierto y la foto desaparecía a media maniobra. Lo
+     * mismo con Escape: cerraba las dos cosas de golpe cuando lo que se quería
+     * era salir solo de la foto.
+     */
+    const conVisor = () => !!document.querySelector('.visor-imagen');
+
     function fuera(e: MouseEvent | TouchEvent) {
+      if (conVisor()) return;
       if (raizRef.current && !raizRef.current.contains(e.target as Node)) {
         setAbierto(false);
       }
     }
     function tecla(e: KeyboardEvent) {
-      if (e.key === 'Escape') setAbierto(false);
+      if (e.key === 'Escape' && !conVisor()) setAbierto(false);
     }
     document.addEventListener('mousedown', fuera);
     document.addEventListener('touchstart', fuera);
@@ -207,7 +221,11 @@ export function NavBar() {
       {abierto && (
         <div className="navbar-panel" role="menu">
           <div className="navbar-panel-quien">
-            <Avatar src={user.avatarUrl} nombre={nombre} size={38} />
+            {/* Ampliable aquí y no en el chip de arriba: el chip ES el botón
+                que abre el menú, y un botón dentro de otro botón no es HTML
+                válido —el navegador desarma el anidado y el toque se vuelve
+                una lotería—. Dentro del panel la foto ya no compite con nada. */}
+            <Avatar src={user.avatarUrl} nombre={nombre} size={38} ampliable />
             <span className="navbar-panel-datos">
               <b>{nombre}</b>
               <span>{rolYClub}</span>

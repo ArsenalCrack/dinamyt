@@ -191,7 +191,7 @@ export default function AsistenciaPage() {
                 borderColor: asistencia ? 'var(--ok)' : 'var(--border)',
               }}
             >
-              <Avatar src={a.avatarUrl} nombre={a.fullName} size={42} />
+              <Avatar src={a.avatarUrl} nombre={a.fullName} size={42} ampliable />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <Link
                   href={`/alumnos/${a.userId}`}

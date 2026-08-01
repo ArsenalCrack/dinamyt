@@ -14,10 +14,15 @@ import { VisorImagen } from './VisorImagen';
  * el roster se llena de iconos partidos.
  *
  * `ampliable` la abre en grande al tocarla, como en WhatsApp (ver
- * `VisorImagen`). Va apagado por defecto y se enciende donde la foto es el
- * asunto —el panel propio, la ficha, el botón de cambiarla— y no donde es un
- * adorno de una fila que ya lleva su enlace: dentro de un `<a>`, un botón que
- * hace otra cosa es una trampa.
+ * `VisorImagen`). Va apagado por defecto y se enciende casi en todas partes: el
+ * panel propio, la ficha, el botón de cambiarla, el menú de la barra y las
+ * listas de alumnos. En las listas la foto y el nombre son hermanos —la foto
+ * amplía, el nombre abre la ficha—, que es lo que se espera al tocar cada uno.
+ *
+ * Lo único donde NO se enciende es dentro de un `<a>` o de un `<button>` que ya
+ * hace otra cosa: ahí el anidado no es HTML válido y el toque se reparte entre
+ * dos acciones. Por eso el chip de la barra, que ES el botón del menú, lleva su
+ * avatar normal y el ampliable está en el panel que se abre.
  */
 export function Avatar({
   src,

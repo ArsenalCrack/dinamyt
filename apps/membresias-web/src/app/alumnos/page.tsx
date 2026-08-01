@@ -615,7 +615,11 @@ export default function Alumnos() {
               <tr key={p.id}>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <Avatar src={p.avatarUrl} nombre={p.fullName} size={34} />
+                    {/* La foto se amplía aunque la fila lleve su enlace: aquí
+                        el avatar es hermano del `<Link>`, no va dentro, así
+                        que tocar la cara abre la foto y tocar el nombre abre
+                        la ficha — cada cosa donde se espera. */}
+                    <Avatar src={p.avatarUrl} nombre={p.fullName} size={34} ampliable />
                     <div style={{ minWidth: 0 }}>
                       <Link
                         href={`/alumnos/${p.id}`}
