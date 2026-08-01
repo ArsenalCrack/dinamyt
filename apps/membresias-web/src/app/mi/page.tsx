@@ -8,7 +8,7 @@ import { claveRol, useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
 import { activarPush } from '@/lib/push';
-import { LIM, TIPOS_SANGRE, soloTelefono, telefonoValido } from '@/lib/campos';
+import { LIM, TIPOS_SANGRE, enMayusculas, soloTelefono, telefonoValido } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
 import { LogoClub } from '@/components/LogoClub';
@@ -839,7 +839,9 @@ export default function MiPanel() {
           </label>
           <input
             value={perfil.emergencyName}
-            onChange={(e) => setPerfil({ ...perfil, emergencyName: e.target.value })}
+            onChange={(e) =>
+              setPerfil({ ...perfil, emergencyName: enMayusculas(e.target.value) })
+            }
             maxLength={LIM.nombrePersona}
             style={{ margin: '0.25rem 0 0.2rem' }}
           />

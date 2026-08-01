@@ -14,6 +14,7 @@ import {
   correoValido,
   dominioSugerido,
   nombreCompletoValido,
+  enMayusculas,
   soloDigitos,
   soloTelefono,
   telefonoValido,
@@ -686,7 +687,7 @@ export default function Ficha() {
             <Etiqueta obligatorio>{t('comun.nombre')}</Etiqueta>
             <input
               value={datos.fullName}
-              onChange={(e) => setDatos({ ...datos, fullName: e.target.value })}
+              onChange={(e) => setDatos({ ...datos, fullName: enMayusculas(e.target.value) })}
               maxLength={LIM.nombrePersona}
               required
               style={{
@@ -799,7 +800,9 @@ export default function Ficha() {
             <Etiqueta>{t('ficha.emergenciaNombre')}</Etiqueta>
             <input
               value={datos.emergencyName}
-              onChange={(e) => setDatos({ ...datos, emergencyName: e.target.value })}
+              onChange={(e) =>
+                setDatos({ ...datos, emergencyName: enMayusculas(e.target.value) })
+              }
               maxLength={LIM.nombrePersona}
               style={{ margin: '0.25rem 0 0.2rem' }}
             />

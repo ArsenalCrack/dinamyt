@@ -11,6 +11,7 @@ import {
   telefono,
   textoOpcional,
   tipoSangre,
+  mayusculas,
   type Campo,
 } from '../lib/validacion';
 import {
@@ -149,7 +150,9 @@ function fichaDeSeguridad(body: CuerpoFicha): Campo<Record<string, unknown>> {
   if (body.emergencyName !== undefined) {
     const quien = textoOpcional(body.emergencyName, LIMITES.nombrePersona, 'El contacto de emergencia');
     if (!quien.ok) return quien;
-    cambios.emergencyName = quien.valor;
+    // También en mayúsculas: va impreso en el reverso del carnet, al lado del
+    // nombre del alumno, y uno en mayúsculas junto a otro en minúsculas canta.
+    cambios.emergencyName = mayusculas(quien.valor);
   }
   if (body.emergencyPhone !== undefined) {
     const tel = telefono(body.emergencyPhone, 'El teléfono de emergencia');

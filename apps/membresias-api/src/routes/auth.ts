@@ -22,6 +22,7 @@ import {
   telefono,
   textoOpcional,
   tipoSangre,
+  mayusculas,
 } from '../lib/validacion';
 import { direccionFoto, direccionLogo, imagenGuardada } from '../lib/imagenes';
 import { sinFiltroDeClub } from '../lib/db-contexto';
@@ -291,7 +292,8 @@ export async function authRoutes(app: FastifyInstance) {
         'El contacto de emergencia',
       );
       if (!quien.ok) return reply.code(422).send({ error: quien.error });
-      cambios.emergencyName = quien.valor;
+      // Igual que el nombre: va impreso en el carnet. Ver `mayusculas`.
+      cambios.emergencyName = mayusculas(quien.valor);
     }
     if (body.emergencyPhone !== undefined) {
       const tel = telefono(body.emergencyPhone, 'El teléfono de emergencia');

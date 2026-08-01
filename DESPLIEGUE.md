@@ -106,6 +106,15 @@ puerta de entrada: sin ella nadie puede crear el primer club.
 
    `JWT_SECRET` no te la pide: Render la genera sola y nadie tiene que verla.
 
+   > **`TZ` viene puesta en `America/Bogota` y conviene no dejarla en blanco.**
+   > El día del check-in, el vencimiento de las mensualidades y la fecha del
+   > carnet se calculan con la hora **local del servidor**. Render arranca en
+   > UTC y Colombia es UTC−5, así que sin `TZ` el servidor cree que ya es mañana
+   > a partir de las siete de la tarde: un club que entrena de noche ve su clase
+   > validada contra el día siguiente y el kiosco rechaza a la fila entera con
+   > «hoy el club no tiene clase programada». Si tu club está en otro país,
+   > cámbiala por su zona IANA (`America/Mexico_City`, `Europe/Madrid`…).
+
 4. **Apply**. El primer build tarda unos minutos. Cuando termine, copia la URL
    **que aparece arriba en el panel del servicio** y comprueba que responde:
 

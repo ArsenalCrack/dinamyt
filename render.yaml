@@ -28,6 +28,22 @@ services:
       - key: PORT
         value: "3004"
 
+      # Zona horaria del club. NO es cosmético: el día del check-in, el
+      # vencimiento de las mensualidades y la fecha del carnet se calculan con
+      # la hora LOCAL del servidor (`todayStr` en lib/billing.ts).
+      #
+      # Render arranca en UTC, y Colombia es UTC−5: sin esto, a partir de las
+      # siete de la tarde el servidor ya cree que es mañana. Un club que
+      # entrena martes y jueves a las ocho de la noche veía su clase validada
+      # contra el miércoles y el kiosco rechazaba a la fila entera con «hoy el
+      # club no tiene clase programada» — y las que sí entraban quedaban
+      # fechadas al día siguiente, que además rompe el candado de la doble
+      # marca (es por alumno y día).
+      #
+      # Para un club fuera de Colombia, cambiar por su zona IANA.
+      - key: TZ
+        value: America/Bogota
+
       # Saltos de proxy hasta el cliente. Son DOS porque la web no llama a esta
       # API directamente: el navegador pide a Vercel y Vercel reenvía aquí (ver
       # el rewrite de apps/membresias-web/next.config.ts). La cadena queda

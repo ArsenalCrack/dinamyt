@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { orgs, users, type Db } from '@dinamyt/membresias-db';
+import { clubSchedule, orgs, users, type Db } from '@dinamyt/membresias-db';
 import { createTestDb } from '@dinamyt/membresias-db/testing';
 import { buildApp } from '../app';
 import { firmarToken } from '../lib/auth/tokens';
@@ -9,6 +9,14 @@ import { reiniciarLimites } from '../lib/auth/rate-limit';
 /**
  * Escenario base de los tests: un club con su maestro, un auxiliar y dos
  * alumnos, más un superadmin y un club rival para probar el aislamiento.
+ *
+ * Los dos clubes abren LOS SIETE DÍAS. No es capricho: desde que el check-in
+ * exige calendario (ver `routes/checkin.ts`), un club sin días configurados no
+ * acepta ninguna asistencia, y sin esto cada test que pasa lista tendría que
+ * acordarse de sembrar el horario —y el que se olvidara fallaría con un 422
+ * que no tiene nada que ver con lo que estaba probando—. Abriendo todos los
+ * días, la fecha del test da igual. Los específicos del calendario siembran su
+ * propio horario o lo borran.
  *
  * Los tokens se firman con el MISMO código que producción (`firmarToken`), así
  * que los specs ejercitan el verificador de verdad en vez de un mock.
@@ -108,6 +116,12 @@ export async function crearEscenario(): Promise<Escenario> {
       },
     ])
     .returning();
+
+  await db.insert(clubSchedule).values(
+    [club.id, clubAjeno.id].flatMap((orgId) =>
+      [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ orgId, weekday })),
+    ),
+  );
 
   const porEmail = new Map(filas.map((u) => [u.email, u]));
   const tokens = new Map<string, string>();

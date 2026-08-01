@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { clubSchedule, scheduleExceptions } from '@dinamyt/membresias-db';
 import { crearEscenario, type Escenario } from './testing/escenario';
 import { todayStr } from './lib/billing';
@@ -42,10 +43,11 @@ describe('membresias-api — panel del alumno', () => {
   }
 
   it('sin calendario configurado no afirma que hoy hay clase', async () => {
-    // Antes contestaba que sí —la API da por abierto el club sin horario para
-    // no bloquearle el check-in—, y el alumno leía «Hoy hay clase» los 365 días
-    // del año. La respuesta honesta es que todavía no se sabe: por eso
-    // `configurado`.
+    // Antes contestaba que sí —la API daba por abierto el club sin horario—, y
+    // el alumno leía «Hoy hay clase» los 365 días del año. La respuesta honesta
+    // es que todavía no se sabe: por eso `configurado`.
+    await e.db.delete(clubSchedule).where(eq(clubSchedule.orgId, e.orgId));
+
     const mi = await miPanel(e.ids.alumno);
     expect(mi.clases.configurado).toBe(false);
     expect(mi.clases.hoy).toBe(false);
@@ -56,6 +58,7 @@ describe('membresias-api — panel del alumno', () => {
   it('un día de la semana apagado no cuenta como día de clase', async () => {
     // El check-in ya filtraba `is_active`; el panel del alumno no, así que un
     // día desactivado le seguía diciendo que fuera al salón.
+    await e.db.delete(clubSchedule).where(eq(clubSchedule.orgId, e.orgId));
     await e.db
       .insert(clubSchedule)
       .values({ orgId: e.orgId, weekday: diaDe(hoyISO()), isActive: false });
@@ -67,6 +70,7 @@ describe('membresias-api — panel del alumno', () => {
 
   it('contesta si hoy hay clase según los días del club', async () => {
     // El club abre justo el día de la semana en que NO cae hoy.
+    await e.db.delete(clubSchedule).where(eq(clubSchedule.orgId, e.orgId));
     const otroDia = (diaDe(hoyISO()) + 2) % 7;
     await e.db.insert(clubSchedule).values({ orgId: e.orgId, weekday: otroDia });
 
@@ -78,9 +82,6 @@ describe('membresias-api — panel del alumno', () => {
   });
 
   it('un cierre de hoy manda sobre el día de la semana, y explica por qué', async () => {
-    await e.db
-      .insert(clubSchedule)
-      .values({ orgId: e.orgId, weekday: diaDe(hoyISO()) });
     await e.db.insert(scheduleExceptions).values({
       orgId: e.orgId,
       date: hoyISO(),
@@ -292,7 +293,8 @@ describe('membresias-api — panel del alumno', () => {
     expect(r.statusCode).toBe(200);
     // Se normaliza a mayúsculas: «o+» y «O+» son el mismo grupo sanguíneo.
     expect(r.json().bloodType).toBe('O+');
-    expect(r.json().emergencyName).toBe('María Restrepo');
+    // En mayúsculas, y con la tilde intacta: va impreso en el carnet.
+    expect(r.json().emergencyName).toBe('MARÍA RESTREPO');
     expect(r.json().trainsSince).toBe('2019-03-15');
 
     // Y esa antigüedad es la que ve el alumno, no la de su cuenta.
@@ -389,7 +391,7 @@ describe('membresias-api — panel del alumno', () => {
       payload: { fullName: 'Maestro Corregido' },
     });
     expect(propio.statusCode).toBe(200);
-    expect(propio.json().fullName).toBe('Maestro Corregido');
+    expect(propio.json().fullName).toBe('MAESTRO CORREGIDO');
 
     const ajeno = await e.app.inject({
       method: 'PATCH',
@@ -398,6 +400,6 @@ describe('membresias-api — panel del alumno', () => {
       payload: { fullName: 'Alumno Corregido' },
     });
     expect(ajeno.statusCode).toBe(200);
-    expect(ajeno.json().fullName).toBe('Alumno Corregido');
+    expect(ajeno.json().fullName).toBe('ALUMNO CORREGIDO');
   });
 });

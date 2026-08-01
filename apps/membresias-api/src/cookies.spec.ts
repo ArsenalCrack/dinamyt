@@ -110,7 +110,9 @@ describe('sesión por cookie', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json().fullName).toBe('Maestro Renombrado');
+    // En mayúsculas: la API normaliza los nombres al guardarlos, para que la
+    // lista y el carnet no mezclen «Juan pérez» con «JUAN PEREZ».
+    expect(res.json().fullName).toBe('MAESTRO RENOMBRADO');
   });
 
   it('un token CSRF que no coincide con la cookie no sirve', async () => {

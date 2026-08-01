@@ -12,7 +12,7 @@ import {
 } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { LIM, soloTelefono, telefonoValido } from '@/lib/campos';
+import { LIM, enMayusculas, soloTelefono, telefonoValido } from '@/lib/campos';
 import { SelectMenu } from '@/components/SelectMenu';
 
 interface Club {
@@ -452,7 +452,10 @@ export default function Admin() {
                       placeholder={t('comun.nombre')}
                       value={nuevoMaestro.fullName}
                       onChange={(e) =>
-                        setNuevoMaestro({ ...nuevoMaestro, fullName: e.target.value })
+                        setNuevoMaestro({
+                          ...nuevoMaestro,
+                          fullName: enMayusculas(e.target.value),
+                        })
                       }
                       maxLength={LIM.nombrePersona}
                       required

@@ -204,7 +204,31 @@ export function nombreCompleto(
   if (palabras.length < 2) {
     return mal(`${campo} debe ir completo: nombre y apellido.`);
   }
-  return bien(limpio);
+  return bien(mayusculas(limpio));
+}
+
+/**
+ * El nombre de una persona, en MAYÚSCULAS.
+ *
+ * Se guarda así, no solo se pinta así, y esa es la diferencia que importa: los
+ * nombres los teclean personas distintas en momentos distintos —el maestro al
+ * inscribir, el auxiliar al corregir un dedazo— y salían «Juan pérez», «JUAN
+ * PEREZ» y «Juan Pérez» en la misma lista. En el carnet impreso, que es un
+ * documento, eso se nota. Normalizándolo al guardar, la lista, el carnet, el
+ * recibo del pago y el aviso dicen todos lo mismo sin que ninguna pantalla
+ * tenga que acordarse de convertirlo.
+ *
+ * `toUpperCase()` a secas y no `toLocaleUpperCase`: para el español dan el
+ * mismo resultado —las tildes se conservan (josé → JOSÉ)— y la versión con
+ * idioma solo cambia las cosas en turco, donde la «i» tiene otras reglas.
+ *
+ * Es una conversión que PIERDE información: de «JUAN PÉREZ» ya no se puede
+ * volver a «Juan Pérez». Es la decisión que se tomó a propósito.
+ */
+export function mayusculas(valor: string): string;
+export function mayusculas(valor: string | null): string | null;
+export function mayusculas(valor: string | null): string | null {
+  return valor === null ? null : valor.toUpperCase();
 }
 
 /** Letras de verdad (con tildes y diacríticos), sin puntos ni guiones. */

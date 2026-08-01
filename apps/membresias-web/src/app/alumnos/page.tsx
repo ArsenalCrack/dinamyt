@@ -12,6 +12,7 @@ import {
   TIPOS_SANGRE,
   correoValido,
   dominioSugerido,
+  enMayusculas,
   nombreCompletoValido,
   soloTelefono,
   telefonoValido,
@@ -304,7 +305,7 @@ export default function Alumnos() {
               nombre a medias no se descubre al final del formulario. */}
           <input
             value={form.fullName}
-            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            onChange={(e) => setForm({ ...form, fullName: enMayusculas(e.target.value) })}
             maxLength={LIM.nombrePersona}
             required
             style={{
@@ -447,7 +448,7 @@ export default function Alumnos() {
           <Etiqueta>{t('ficha.emergenciaNombre')}</Etiqueta>
           <input
             value={form.emergencyName}
-            onChange={(e) => setForm({ ...form, emergencyName: e.target.value })}
+            onChange={(e) => setForm({ ...form, emergencyName: enMayusculas(e.target.value) })}
             maxLength={LIM.nombrePersona}
             style={{ marginTop: '0.25rem' }}
           />

@@ -364,6 +364,11 @@ const es = {
   'kiosco.sinClase': 'Hoy el club no tiene clase programada.',
   /** Check-ins guardados sin conexión, esperando a que vuelva la señal. */
   'kiosco.pendientes': 'sin enviar',
+  // Las que se guardaron sin conexión y al mandarlas el servidor no aceptó.
+  // Antes se borraban solas y la asistencia se perdía sin dejar rastro.
+  'kiosco.rechazados': 'No se pudieron registrar',
+  'kiosco.rechazadosAyuda':
+    'Se marcaron sin conexión y el servidor no las aceptó. Si de verdad entrenaron, regístralas a mano en la ficha del alumno.',
   'kiosco.ayuda':
     'Sin cámara: usa el PIN del alumno o márcalo en la lista manual.',
 
@@ -838,6 +843,9 @@ const en: Record<ClaveTexto, string> = {
   'kiosco.bloqueado': 'Access blocked: membership overdue.',
   'kiosco.sinClase': 'No class scheduled today.',
   'kiosco.pendientes': 'not sent',
+  'kiosco.rechazados': "Couldn't be recorded",
+  'kiosco.rechazadosAyuda':
+    'They were checked in offline and the server did not accept them. If they really trained, record them by hand from the student record.',
   'kiosco.ayuda': "No camera: use the student's PIN or the manual list.",
 
   'asistencia.titulo': "Today's attendance",

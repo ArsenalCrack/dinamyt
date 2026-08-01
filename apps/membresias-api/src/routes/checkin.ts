@@ -10,9 +10,44 @@ import { orgDelRequest, requireRole } from '../plugins/auth';
 import { estado, diasFaltantes, todayStr } from '../lib/billing';
 import { esDiaClase } from '../lib/schedule';
 import { ensureMembership } from '../lib/memberships';
+import { fecha as fechaValida } from '../lib/validacion';
 
 const METODOS = ['fingerprint', 'qr', 'pin', 'manual'] as const;
 type MetodoCheckin = (typeof METODOS)[number];
+
+/**
+ * Cuántos días atrás se acepta una marca de la cola sin conexión.
+ *
+ * El kiosco guarda los check-ins cuando se cae la señal del salón y los manda
+ * al volver. Con una semana cabe de sobra un fin de semana sin datos; más allá
+ * de eso, lo que llega ya no es «la marca del sábado», es un celular con el
+ * reloj mal puesto o una cola que nadie vació en un mes.
+ */
+const MAX_DIAS_COLA = 7;
+
+/** Resta días a una fecha `YYYY-MM-DD`, en UTC para no cruzar husos. */
+function menosDias(dia: string, dias: number): string {
+  const d = new Date(`${dia}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - dias);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * El instante que manda el kiosco, si es creíble para ese día.
+ *
+ * Se acepta solo si cae dentro de la ventana de ±1 día alrededor de la fecha de
+ * la marca: eso deja sitio para cualquier huso horario sin abrir la puerta a un
+ * celular con el reloj en 1970. Lo que no pase el filtro se descarta y la
+ * columna se queda con su `defaultNow()`, que es lo que había siempre.
+ */
+function instanteCreible(valor: unknown, dia: string): Date | null {
+  if (typeof valor !== 'string' || !valor) return null;
+  const t = new Date(valor);
+  if (isNaN(t.getTime())) return null;
+  const inicio = new Date(`${dia}T00:00:00Z`).getTime() - 86_400_000;
+  const fin = new Date(`${dia}T00:00:00Z`).getTime() + 2 * 86_400_000;
+  return t.getTime() >= inicio && t.getTime() <= fin ? t : null;
+}
 
 /**
  * Check-in de clase. Funciona con o sin lector: el identificador puede venir por
@@ -30,6 +65,10 @@ export async function checkinRoutes(app: FastifyInstance) {
       const body = req.body as {
         identifier: { type: string; value: string };
         grupo?: string;
+        /** Día en que se marcó de verdad, para lo que viene de la cola. */
+        fecha?: string;
+        /** Instante exacto de esa marca (ISO). Solo para la hora que se enseña. */
+        marcadoEn?: string;
       };
       const db = req.db;
 
@@ -56,7 +95,32 @@ export async function checkinRoutes(app: FastifyInstance) {
 
       const today = todayStr();
 
-      // 2. ¿Hoy hay clase? (calendario del club)
+      /**
+       * 2. ¿QUÉ DÍA es esta marca?
+       *
+       * Casi siempre hoy. Pero el kiosco sigue funcionando sin señal —guarda
+       * los check-ins y los manda al volver—, y antes esa cola mandaba solo el
+       * identificador: la marca del sábado en el salón sin datos quedaba
+       * fechada el lunes, cuando el celular recuperó internet. Si el lunes no
+       * era día de clase, la API la rechazaba y el kiosco la tiraba a la
+       * basura sin decir nada.
+       *
+       * Por eso `fecha` viaja, pero NO se cree a ciegas: solo hacia atrás y
+       * dentro de una ventana corta. El reloj de un celular se puede cambiar a
+       * mano, y con una fecha futura cualquiera se podría regalar asistencias
+       * de la semana que viene.
+       */
+      let fecha = today;
+      if (body.fecha !== undefined && body.fecha !== null) {
+        const f = fechaValida(body.fecha, 'La fecha de la marca', {
+          max: today,
+          min: menosDias(today, MAX_DIAS_COLA),
+        });
+        if (!f.ok) return reply.code(422).send({ error: f.error });
+        if (f.valor) fecha = f.valor;
+      }
+
+      // 3. ¿Ese día hay clase? (calendario del club)
       const diasSem = (
         await db
           .select()
@@ -69,33 +133,67 @@ export async function checkinRoutes(app: FastifyInstance) {
           .from(scheduleExceptions)
           .where(eq(scheduleExceptions.orgId, orgId))
       ).map((e) => ({ date: e.date as string, isClosed: e.isClosed }));
-      if (!esDiaClase(diasSem, exc, today)) {
-        return reply
-          .code(422)
-          .send({ error: 'Hoy el club no tiene clase programada.' });
+
+      /**
+       * El club que todavía no marcó sus días NO pasa lista.
+       *
+       * Antes se daba por abierto —para no dejar tirado a un club recién
+       * creado— y el efecto era el contrario del que se buscaba: un club que
+       * nunca configuró el calendario aceptaba asistencias los domingos, los
+       * festivos y el 25 de diciembre, y las contaba en las estadísticas. La
+       * regla de «hoy no hay clase» existía pero no se activaba nunca.
+       *
+       * El mensaje dice qué hacer, porque el maestro que se encuentra esto
+       * está en la puerta con la fila esperando y necesita saber que son dos
+       * toques en Calendario, no que la aplicación se rompió.
+       */
+      if (diasSem.length === 0 && !exc.some((e) => e.date === fecha)) {
+        return reply.code(422).send({
+          codigo: 'SIN_CALENDARIO',
+          error:
+            'El club todavía no tiene días de clase configurados. Márcalos en «Calendario» para poder pasar lista.',
+        });
+      }
+      if (!esDiaClase(diasSem, exc, fecha, 'cerrado')) {
+        return reply.code(422).send({
+          codigo: 'SIN_CLASE',
+          error:
+            fecha === today
+              ? 'Hoy el club no tiene clase programada.'
+              : `El ${fecha} el club no tenía clase programada.`,
+        });
       }
 
-      // 3. Evitar doble check-in el mismo día.
+      // 4. Evitar doble check-in el mismo día.
       const [ya] = await db
         .select()
         .from(attendances)
         .where(
           and(
             eq(attendances.membershipId, m.id),
-            eq(attendances.checkinDate, today),
+            eq(attendances.checkinDate, fecha),
           ),
         )
         .limit(1);
       if (ya) {
-        return reply
-          .code(409)
-          .send({ error: 'Este alumno ya registró asistencia hoy.' });
+        return reply.code(409).send({
+          codigo: 'YA_MARCO',
+          error:
+            fecha === today
+              ? 'Este alumno ya registró asistencia hoy.'
+              : `Este alumno ya tenía registrada la asistencia del ${fecha}.`,
+        });
       }
 
-      // 4. Cobertura + regla de mora.
-      const est = estado(m, today);
+      // 5. Cobertura + regla de mora.
+      //
+      // Se juzga con la fecha de la MARCA, no con la de hoy: al alumno que
+      // entrenó el sábado estando al día no se le apunta una mora porque su
+      // mensualidad venciera el domingo y el kiosco recuperara la señal el
+      // lunes.
+      const est = estado(m, fecha);
       const cobertura =
-        (m.venceEl != null && m.venceEl >= today) ||
+        (m.venceEl != null && m.venceEl >= fecha) ||
         (m.clasesRestantes != null && m.clasesRestantes > 0);
       let clasesRestantes = m.clasesRestantes;
       let moraCheckins = m.moraCheckins ?? 0;
@@ -124,14 +222,21 @@ export async function checkinRoutes(app: FastifyInstance) {
         moraCheckins = 1;
       }
 
-      // 5. Registrar la asistencia y actualizar el estado.
+      // 6. Registrar la asistencia y actualizar el estado.
+      //
+      // `checkedInAt` es la HORA que enseña la lista del día. Para lo que llega
+      // de la cola se respeta la del momento en que se marcó, si es creíble:
+      // si no, quedaría «Sábado · 09:14» cuando el sábado el alumno entró a las
+      // siete de la tarde.
+      const marcadoEn = instanteCreible(body.marcadoEn, fecha);
       const [asistencia] = await db
         .insert(attendances)
         .values({
           membershipId: m.id,
-          checkinDate: today,
+          checkinDate: fecha,
           method: type,
           grupo: body.grupo ?? null,
+          ...(marcadoEn ? { checkedInAt: marcadoEn } : {}),
         })
         .returning();
 
@@ -146,7 +251,9 @@ export async function checkinRoutes(app: FastifyInstance) {
         asistencia,
         userId: upd.userId,
         estado: est,
-        diasFaltantes: diasFaltantes(upd.venceEl, today),
+        /** Qué día quedó registrada. Distinto de hoy solo si venía de la cola. */
+        fecha,
+        diasFaltantes: diasFaltantes(upd.venceEl, fecha),
         clasesRestantes: upd.clasesRestantes,
         accionSugerida,
       });

@@ -196,7 +196,35 @@ describe('membresias-api — límites de los campos', () => {
       },
     });
     expect(r.statusCode).toBe(201);
-    expect(r.json().fullName).toBe('Ana M. Restrepo');
+    expect(r.json().fullName).toBe('ANA M. RESTREPO');
+  });
+
+  it('los nombres se guardan en MAYÚSCULAS, con las tildes intactas', async () => {
+    // Se guardan así, no solo se pintan así: los teclean personas distintas en
+    // momentos distintos y en la misma lista salían «Juan pérez», «JUAN PEREZ»
+    // y «Juan Pérez». En el carnet impreso, que es un documento, se nota.
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: e.auth(e.ids.owner),
+      payload: {
+        email: 'tildes@club.com',
+        fullName: 'josé maría ñuñez',
+        password: 'Prueba1234',
+      },
+    });
+    expect(r.statusCode).toBe(201);
+    // Las tildes y la eñe son parte del nombre: no se quitan al subir de caja.
+    expect(r.json().fullName).toBe('JOSÉ MARÍA ÑUÑEZ');
+
+    // Y el buscador lo sigue encontrando escribiendo en minúsculas: el filtro
+    // de la API es `ilike`, que no distingue mayúsculas.
+    const busqueda = await e.app.inject({
+      method: 'GET',
+      url: '/memberships?q=jos%C3%A9',
+      headers: e.auth(e.ids.owner),
+    });
+    expect(busqueda.json().items[0].fullName).toBe('JOSÉ MARÍA ÑUÑEZ');
   });
 
   it('un dominio de una letra es un correo a medio escribir', async () => {

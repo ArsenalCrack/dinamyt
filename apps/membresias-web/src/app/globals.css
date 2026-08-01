@@ -758,6 +758,38 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
 }
 
 /* ════════════════════════════════════════════════════════════════════════
+   KIOSCO · PARRILLA DE MARCADO MANUAL
+   El plan B del carnet QR: una cuadrícula de botones con el nombre de cada
+   alumno, para el que llegó sin carnet y sin acordarse del PIN.
+   ════════════════════════════════════════════════════════════════════════ */
+.kiosco-parrilla {
+  display: grid;
+  /* Un poco más anchas que antes (140 px): con nombres completos en mayúsculas
+     —«MARÍA FERNANDA RESTREPO»— la columna estrecha obligaba a partir cada
+     nombre en cuatro líneas. */
+  grid-template-columns: repeat(auto-fill, minmax(min(165px, 100%), 1fr));
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+}
+/* ── El arreglo del nombre que se salía del botón ──
+   `.btn` lleva `white-space: nowrap`, que es lo que quiere un botón de
+   «Guardar» y lo contrario de lo que necesita uno cuyo texto es el nombre de
+   una persona: los largos se desbordaban del rectángulo y se montaban encima
+   del de al lado. Aquí el nombre se parte en líneas, los botones se estiran
+   todos a la altura del más alto (`align-items: stretch` es el defecto de la
+   cuadrícula) y el dedo sigue teniendo dónde caer. */
+.kiosco-alumno {
+  white-space: normal;
+  /* Para el apellido larguísimo que ni siquiera cabe suelto en la columna. */
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  min-height: 3rem;
+  padding: 0.55rem 0.6rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
    VISOR DE IMAGEN (<VisorImagen>)
    La foto en grande sobre negro, como en WhatsApp. Por encima de todo: la
    barra pegajosa está en 30 y el editor de encuadre en 50.

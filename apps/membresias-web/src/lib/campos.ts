@@ -55,6 +55,21 @@ export function soloDigitos(valor: string, max: number): string {
   return valor.replace(/\D/g, '').slice(0, max);
 }
 
+/**
+ * Un nombre de persona, en MAYÚSCULAS mientras se escribe.
+ *
+ * La API los guarda así de todas formas (`mayusculas` en su `lib/validacion.ts`),
+ * pero convertirlos solo allí deja al maestro tecleando «Juan Pérez» y viendo
+ * «JUAN PÉREZ» al recargar, sin saber por qué. Aplicándolo en el `onChange` lo
+ * que se escribe es exactamente lo que se guarda.
+ *
+ * `toUpperCase()` conserva las tildes: «josé» → «JOSÉ», no «JOSE». El acento es
+ * parte del nombre.
+ */
+export function enMayusculas(valor: string): string {
+  return valor.toUpperCase();
+}
+
 /*
  * El filtro de los importes ya no vive aquí: lo hace `<CampoDinero>`
  * (`components/CampoDinero.tsx`), que además los escribe con el símbolo de la
