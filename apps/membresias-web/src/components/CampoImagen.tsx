@@ -119,10 +119,13 @@ export function CampoImagen({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        {/* La miniatura se abre en grande al tocarla: es justo aquí donde hace
+            falta comprobar que la que quedó guardada es la buena y que el
+            encuadre no le cortó la cara, y a 72 píxeles eso no se ve. */}
         {esLogo ? (
-          <LogoClub src={src} nombre={nombre} size={72} />
+          <LogoClub src={src} nombre={nombre} size={72} ampliable />
         ) : (
-          <Avatar src={src} nombre={nombre} size={72} />
+          <Avatar src={src} nombre={nombre} size={72} ampliable />
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>

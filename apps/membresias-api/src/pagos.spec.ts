@@ -74,10 +74,13 @@ describe('membresias-api — registrar un pago', () => {
     await e.app.close();
   });
 
-  it('semanal: cada periodo son siete días', async () => {
+  it('semanal: cada periodo es una semana calendario, hasta el domingo', async () => {
     const e = await crearEscenario();
     const plan = await planDe(e, 'semanal', { durationDays: 7, price: '25000' });
-    const r = await cobrar(e, plan, { paidAt: '2026-03-01', periodos: 2, amount: '50000' });
+    // Miércoles 4 de marzo de 2026, dos semanas: la que corre (hasta el domingo
+    // 8) y la siguiente. No son catorce días desde el miércoles: quien paga a
+    // media semana paga «esta semana», igual que quien pagó el lunes.
+    const r = await cobrar(e, plan, { paidAt: '2026-03-04', periodos: 2, amount: '50000' });
     expect(r.json().membership.venceEl).toBe('2026-03-15');
     await e.app.close();
   });
@@ -89,6 +92,79 @@ describe('membresias-api — registrar un pago', () => {
     expect(r.json().membership.clasesRestantes).toBe(8);
     expect(r.json().membership.venceEl).toBeNull();
     expect(r.json().payment.periodoDesde).toBeNull();
+    await e.app.close();
+  });
+
+  it('quien paga por clases queda AL DÍA, aunque arrastre una fecha vieja', async () => {
+    // El error que reportó el maestro: cobraba una clase suelta y el panel del
+    // alumno seguía diciendo «Por vencer». El pago por clases no mueve la
+    // fecha —suma saldo—, y el estado se calculaba solo con la fecha.
+    const e = await crearEscenario();
+    const mensual = await planDe(e, 'mensual');
+    await cobrar(e, mensual, { paidAt: todayStr() });
+
+    // Ahora se pasa a clase suelta: su mensualidad queda atrás.
+    const suelta = await planDe(e, 'clase', { price: '15000' });
+    const r = await cobrar(e, suelta, { amount: '15000', confirmarRepetido: true });
+    expect(r.statusCode).toBe(201);
+    expect(r.json().membership.clasesRestantes).toBe(1);
+    expect(r.json().membership.estado).toBe('al_dia');
+
+    // Y lo mismo en el panel del alumno y en el roster del maestro, que es
+    // donde el maestro lo vio mal.
+    const mi = await e.app.inject({
+      method: 'GET',
+      url: '/mi',
+      headers: e.auth(e.ids.alumno),
+    });
+    expect(mi.json().estado).toBe('al_dia');
+
+    const roster = await e.app.inject({
+      method: 'GET',
+      url: `/memberships?userId=${e.ids.alumno}`,
+      headers: e.auth(e.ids.owner),
+    });
+    expect(roster.json().items[0].estado).toBe('al_dia');
+    await e.app.close();
+  });
+
+  it('gastadas las clases, vuelve a estar vencido', async () => {
+    const e = await crearEscenario();
+    const suelta = await planDe(e, 'clase', { price: '15000' });
+    await cobrar(e, suelta, { amount: '15000' });
+
+    // Marca su única clase: se queda en cero, que es lo mismo que vencido.
+    const marca = await e.app.inject({
+      method: 'POST',
+      url: '/checkin',
+      headers: e.auth(e.ids.owner),
+      payload: { identifier: { type: 'manual', value: e.ids.alumno } },
+    });
+    expect(marca.statusCode).toBe(201);
+    expect(marca.json().clasesRestantes).toBe(0);
+
+    const mi = await e.app.inject({
+      method: 'GET',
+      url: '/mi',
+      headers: e.auth(e.ids.alumno),
+    });
+    expect(mi.json().estado).toBe('vencido');
+    await e.app.close();
+  });
+
+  it('la clase suelta es UNA, aunque se pida otra cosa', async () => {
+    // «Clase suelta» y «paquete» hacían lo mismo y los dos pedían un número:
+    // nada impedía una «suelta» de ocho, y entonces los dos tipos eran el
+    // mismo con distinto nombre.
+    const e = await crearEscenario();
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/plans',
+      headers: e.auth(e.ids.owner),
+      payload: { name: 'Suelta', type: 'clase', price: '15000', nClasses: 8 },
+    });
+    expect(r.statusCode).toBe(201);
+    expect(r.json().nClasses).toBe(1);
     await e.app.close();
   });
 

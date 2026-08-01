@@ -689,9 +689,14 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+/* Mide el ancho disponible; el componente le da al visor el lado que quepa
+   (ver `useLayoutEffect` en AjustarImagen). Antes el visor traía un lado fijo
+   con `max-width: 100%`: en un celular angosto el CSS lo encogía sin que el
+   componente se enterara, y el encuadre se calculaba sobre un cuadrado que no
+   era el que estaba en pantalla. */
+.encuadre-caja { width: 100%; }
 .encuadre-visor {
   position: relative;
-  max-width: 100%;
   overflow: hidden;
   border-radius: 0.5rem;
   border: 1px solid var(--border-strong);
@@ -701,7 +706,17 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   user-select: none;
 }
 .encuadre-visor:active { cursor: grabbing; }
-.encuadre-visor img { pointer-events: none; }
+/* ── El arreglo del zoom que aplastaba la foto ──
+   El preflight de Tailwind le pone `max-width: 100%` a todo `<img>`. Aquí la
+   imagen mide a propósito MÁS que su contenedor —eso es acercarla—, así que esa
+   regla le recortaba el ancho al del visor mientras el alto seguía creciendo:
+   la cara salía estirada y corrida hacia la izquierda, y lo que se guardaba no
+   era lo que se veía. */
+.encuadre-visor img {
+  pointer-events: none;
+  max-width: none;
+  max-height: none;
+}
 .encuadre-visor[data-logo='true'] {
   background-color: #ffffff;
   background-image:
@@ -741,6 +756,72 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
   text-transform: uppercase;
   white-space: nowrap;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   VISOR DE IMAGEN (<VisorImagen>)
+   La foto en grande sobre negro, como en WhatsApp. Por encima de todo: la
+   barra pegajosa está en 30 y el editor de encuadre en 50.
+   ════════════════════════════════════════════════════════════════════════ */
+.visor-imagen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.93);
+  touch-action: none; /* el pellizco es del visor, no del navegador */
+  overscroll-behavior: contain;
+}
+.visor-imagen img {
+  max-width: min(92vw, 720px);
+  max-height: 82vh;
+  border-radius: 0.5rem;
+  /* Sin transición: acercar con la rueda o con los dedos tiene que ir pegado
+     al gesto, y una animación de por medio se siente como retraso. */
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.visor-cerrar {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: rgba(20, 20, 30, 0.75);
+  color: #f3f1e8;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.visor-cerrar:hover { border-color: var(--gold); color: var(--gold); }
+.visor-pie {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90vw;
+  color: #f3f1e8;
+  font-size: 0.8rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* La miniatura que se puede abrir en grande. El aro de foco es el mismo que el
+   del resto de la app: esto es un botón, aunque parezca solo una foto. */
+.miniatura-ampliable {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  line-height: 0;
+  border-radius: 50%;
+}
+.miniatura-ampliable[data-logo='true'] { border-radius: 0.6rem; }
 
 .encuadre-zoom {
   display: flex;

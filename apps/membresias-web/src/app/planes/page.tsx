@@ -81,7 +81,17 @@ export default function Planes() {
     }
   }
 
-  const esPorClases = form.type === 'clase' || form.type === 'paquete';
+  /**
+   * El número de clases solo se pregunta en el PAQUETE.
+   *
+   * «Clase suelta» y «paquete de clases» hacían exactamente lo mismo —los dos
+   * pedían un número y los dos sumaban saldo—, así que nada las distinguía y
+   * cualquiera podía crear una «clase suelta» de ocho. Lo que las separa es el
+   * tamaño: la suelta es UNA (la fija la API) y el paquete son las que el
+   * maestro decida. Para vender tres sueltas de una vez está el número de
+   * periodos del cobro.
+   */
+  const esPaquete = form.type === 'paquete';
   const activos = plans.filter((p) => p.isActive);
 
   return (
@@ -155,7 +165,7 @@ export default function Planes() {
             required
           />
         </div>
-        {esPorClases && (
+        {esPaquete && (
           <div>
             <label className="muted" style={{ fontSize: '0.75rem' }}>
               {t('planes.clases')}
@@ -167,12 +177,23 @@ export default function Planes() {
                 setForm((f) => ({ ...f, nClasses: soloDigitos(e.target.value, LIM.clases) }))
               }
               maxLength={LIM.clases}
+              required
             />
           </div>
         )}
         <button className="btn btn-gold" type="submit">
           {t('comun.crear')}
         </button>
+        {/* Qué compra de verdad cada tipo, dicho ANTES de crearlo. Es la
+            pregunta que nadie puede contestar mirando cinco nombres en un
+            desplegable: si «matrícula» dura un año, si la clase suelta y el
+            paquete son lo mismo, si «semanal» son siete días. */}
+        <p
+          className="muted"
+          style={{ fontSize: '0.72rem', gridColumn: '1 / -1', marginTop: '0.2rem' }}
+        >
+          {t(`planes.ayuda.${form.type}` as ClaveTexto)}
+        </p>
       </form>
 
       {error && (

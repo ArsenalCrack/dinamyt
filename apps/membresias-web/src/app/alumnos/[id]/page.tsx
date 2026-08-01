@@ -432,6 +432,25 @@ export default function Ficha() {
   /** El plan que el alumno tiene puesto: va impreso en su carnet. */
   const planActual = planes.find((p) => p.id === membership?.currentPlanId) ?? null;
 
+  /**
+   * Qué cobertura tiene sentido tocar a mano, según el plan elegido.
+   *
+   * El formulario enseñaba SIEMPRE los dos campos —la fecha de vencimiento y
+   * las clases disponibles— con una nota debajo de cada uno diciendo para qué
+   * tipo de plan valía. En un alumno de clase suelta eso es un cuadro de fecha
+   * pidiendo que alguien escriba a mano algo que no existe: su plan no vence,
+   * se le acaban las clases. Y lo que se escriba ahí manda, así que un dedazo
+   * ahí lo deja «Vencido» aunque acabe de pagar.
+   *
+   * Sin plan elegido se enseñan los dos: es el alumno que llega de otro sistema
+   * y al que hay que cuadrarle la situación antes de ponerle nada.
+   */
+  const tipoPlanElegido = planes.find((p) => p.id === plan.currentPlanId)?.type ?? null;
+  const mostrarVence =
+    tipoPlanElegido === null || tipoPlanElegido === 'mensual' || tipoPlanElegido === 'semanal';
+  const mostrarClases =
+    tipoPlanElegido === null || tipoPlanElegido === 'clase' || tipoPlanElegido === 'paquete';
+
   /** Precio del plan por el número de periodos, sin decimales de más. */
   function montoSugerido(planId: string, periodos: string): string {
     const p = planes.find((x) => x.id === planId);
@@ -441,10 +460,13 @@ export default function Ficha() {
     return String(Math.round(total * 100) / 100);
   }
 
-  /** Cómo se llama «uno más» según el plan: un mes, una semana, un paquete. */
+  /** Cómo se llama «uno más» según el plan: un mes, una semana, una clase. */
   function clavePeriodos(tipo: string): ClaveTexto {
     if (tipo === 'semanal') return 'pago.periodos.semanal';
-    if (tipo === 'clase' || tipo === 'paquete') return 'pago.periodos.paquete';
+    // Una clase suelta se lleva de a una: pedir «paquetes que lleva» donde se
+    // están vendiendo tres clases sueltas es preguntar por otra cosa.
+    if (tipo === 'clase') return 'pago.periodos.clase';
+    if (tipo === 'paquete') return 'pago.periodos.paquete';
     return 'pago.periodos.mensual';
   }
 
@@ -475,7 +497,7 @@ export default function Ficha() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-          <Avatar src={persona?.avatarUrl} nombre={nombre} size={52} />
+          <Avatar src={persona?.avatarUrl} nombre={nombre} size={52} ampliable />
           <div>
             <h1 style={{ fontSize: '1.3rem', fontWeight: 800 }}>{nombre}</h1>
             <p className="muted" style={{ fontSize: '0.78rem' }}>
@@ -597,15 +619,23 @@ export default function Ficha() {
                     {t(claveEstado(membership?.estado ?? ''))}
                   </span>
                 </p>
-                <p>
-                  <span className="muted">{t('mi.vence')}: </span>
-                  {fmtFecha(membership?.venceEl, idioma)}
-                  {membership?.diasFaltantes != null ? ` (${membership.diasFaltantes} d)` : ''}
-                </p>
-                <p>
-                  <span className="muted">{t('mi.clasesRestantes')}: </span>
-                  {membership?.clasesRestantes ?? '—'}
-                </p>
+                {/* Cada línea solo si dice algo. Un alumno de clase suelta no
+                    tiene fecha de vencimiento y uno de mensualidad no tiene
+                    saldo de clases: enseñarles «—» era invitar a pensar que
+                    faltaba por llenar un dato. */}
+                {membership?.venceEl && (
+                  <p>
+                    <span className="muted">{t('mi.vence')}: </span>
+                    {fmtFecha(membership.venceEl, idioma)}
+                    {membership.diasFaltantes != null ? ` (${membership.diasFaltantes} d)` : ''}
+                  </p>
+                )}
+                {membership?.clasesRestantes != null && (
+                  <p>
+                    <span className="muted">{t('mi.clasesRestantes')}: </span>
+                    {membership.clasesRestantes}
+                  </p>
+                )}
               </>
             ) : (
               <p>
@@ -835,40 +865,66 @@ export default function Ficha() {
                   }))}
                 />
               </div>
-              {/* La fecha a mano: el alumno que llega de otro sistema, o que
-                  pagó por fuera, tiene un vencimiento que la app no calculó. Sin
-                  esto, la única salida era inventar pagos hasta que cuadrara. */}
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('ficha.venceEl')}
-              </label>
-              <div style={{ margin: '0.25rem 0 0.2rem' }}>
-                <CampoFecha
-                  valor={plan.venceEl}
-                  onChange={(v) => setPlan({ ...plan, venceEl: v })}
-                  min="2000-01-01"
-                  max="2100-12-31"
-                  ariaLabel={t('ficha.venceEl')}
-                />
-              </div>
-              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                {t('ficha.venceAyuda')} <em>{t('ficha.soloPorTiempo')}</em>
-              </p>
+              {/* ── La cobertura, a mano ──
+                  Solo la que le corresponde al plan elegido (ver `mostrarVence`
+                  y `mostrarClases` arriba). Esto es el paracaídas: el alumno que
+                  llega de otro sistema o que pagó por fuera. Lo normal es no
+                  tocarlo — el vencimiento y las clases los calcula el cobro de
+                  abajo, y ahí no hay dedazo posible. */}
+              {mostrarVence && (
+                <>
+                  <label className="muted" style={{ fontSize: '0.75rem' }}>
+                    {t('ficha.venceEl')}
+                  </label>
+                  <div style={{ margin: '0.25rem 0 0.2rem' }}>
+                    <CampoFecha
+                      valor={plan.venceEl}
+                      onChange={(v) => setPlan({ ...plan, venceEl: v })}
+                      min="2000-01-01"
+                      max="2100-12-31"
+                      ariaLabel={t('ficha.venceEl')}
+                    />
+                  </div>
+                  <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                    {t('ficha.venceAyuda')}{' '}
+                    {tipoPlanElegido === null && <em>{t('ficha.soloPorTiempo')}</em>}
+                  </p>
+                </>
+              )}
 
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('ficha.clases')}
-              </label>
-              <input
-                inputMode="numeric"
-                value={plan.clasesRestantes}
-                onChange={(e) =>
-                  setPlan({ ...plan, clasesRestantes: soloDigitos(e.target.value, LIM.clases) })
-                }
-                maxLength={LIM.clases}
-                style={{ margin: '0.25rem 0 0.2rem' }}
-              />
-              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                {t('ficha.soloPorClases')}
-              </p>
+              {mostrarClases && (
+                <>
+                  <label className="muted" style={{ fontSize: '0.75rem' }}>
+                    {t('ficha.clases')}
+                  </label>
+                  <input
+                    inputMode="numeric"
+                    value={plan.clasesRestantes}
+                    onChange={(e) =>
+                      setPlan({
+                        ...plan,
+                        clasesRestantes: soloDigitos(e.target.value, LIM.clases),
+                      })
+                    }
+                    maxLength={LIM.clases}
+                    style={{ margin: '0.25rem 0 0.2rem' }}
+                  />
+                  <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                    {tipoPlanElegido === null
+                      ? t('ficha.soloPorClases')
+                      : t('ficha.clasesAyuda')}
+                  </p>
+                </>
+              )}
+
+              {/* La matrícula no es cobertura: no da tiempo ni clases. Sin esta
+                  línea, el formulario se quedaba sin ningún campo y parecía
+                  roto. */}
+              {tipoPlanElegido === 'matricula' && (
+                <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                  {t('planes.ayuda.matricula')}
+                </p>
+              )}
 
               {/* El PIN lo pone la app sola al inscribir al alumno; esto es para
                   corregirlo —el que le tocó es difícil de teclear, o se lo contó

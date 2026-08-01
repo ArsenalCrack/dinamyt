@@ -13,6 +13,29 @@ import {
 
 const TIPOS: PlanType[] = ['mensual', 'semanal', 'clase', 'paquete', 'matricula'];
 
+/**
+ * Cuántas clases da cada tipo de plan, y por qué el número no siempre se
+ * pregunta.
+ *
+ * `clase` y `paquete` hacen lo mismo por dentro —suman saldo de clases—, y esa
+ * era justo la confusión: en la pantalla de planes los dos pedían «Nº de
+ * clases», así que nada impedía crear una «clase suelta» de ocho ni distinguir
+ * una cosa de la otra después. Lo que las separa es el TAMAÑO:
+ *
+ * - `clase` — una. Se paga y se entra hoy. El número no se pregunta porque no
+ *   hay número que elegir; para llevar tres, el pago va con 3 periodos.
+ * - `paquete` — las que el maestro decida (un bono de 8, de 12…), y por eso el
+ *   campo solo aparece aquí.
+ *
+ * Los planes por tiempo y la matrícula no dan clases sueltas: su cobertura es
+ * la fecha (o, en la matrícula, nada — ver `nextDue`).
+ */
+function clasesDelPlan(tipo: PlanType, pedidas: number | null): number | null {
+  if (tipo === 'clase') return 1;
+  if (tipo === 'paquete') return pedidas && pedidas > 0 ? pedidas : 1;
+  return null;
+}
+
 interface PlanBody {
   name: string;
   type: PlanType;
@@ -61,8 +84,11 @@ export async function plansRoutes(app: FastifyInstance) {
           name: nombre.valor,
           type: body.type,
           price: precio.valor,
+          // El semanal cubre la SEMANA (lunes a domingo), no una cuenta de
+          // días: `durationDays` queda por compatibilidad con lo ya guardado y
+          // no lo lee nadie. Ver `nextDue` en `lib/billing.ts`.
           durationDays: body.durationDays ?? (body.type === 'semanal' ? 7 : null),
-          nClasses: clases.valor,
+          nClasses: clasesDelPlan(body.type, clases.valor),
         })
         .returning();
       return reply.code(201).send(plan);
@@ -100,7 +126,8 @@ export async function plansRoutes(app: FastifyInstance) {
       if (body.nClasses !== undefined) {
         const clases = enteroOpcional(body.nClasses, MAX_CLASES, 'El número de clases');
         if (!clases.ok) return reply.code(422).send({ error: clases.error });
-        cambios.nClasses = clases.valor;
+        // El tipo no se edita, así que manda el que ya tiene el plan.
+        cambios.nClasses = clasesDelPlan(existing.type as PlanType, clases.valor);
       }
       if (body.durationDays !== undefined) {
         const dias = enteroOpcional(body.durationDays, 3650, 'La duración en días');

@@ -93,7 +93,7 @@ export async function checkinRoutes(app: FastifyInstance) {
       }
 
       // 4. Cobertura + regla de mora.
-      const est = estado(m.venceEl, today);
+      const est = estado(m, today);
       const cobertura =
         (m.venceEl != null && m.venceEl >= today) ||
         (m.clasesRestantes != null && m.clasesRestantes > 0);

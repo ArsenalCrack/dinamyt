@@ -42,10 +42,34 @@ describe('billing — vencimiento por mes calendario', () => {
     ).toBe('2026-04-10');
   });
 
-  it('semanal: +7 días', () => {
+  it('semanal: cubre LA SEMANA, hasta el domingo', () => {
+    // 2026-03-04 es miércoles: quien paga el miércoles paga «esta semana» y
+    // vuelve a pagar el lunes, igual que quien pagó el lunes.
+    expect(nextDue({ today: '2026-03-04', prevDue: null, planType: 'semanal' })).toBe(
+      '2026-03-08',
+    );
+    // Lunes: la misma semana, no ocho días.
+    expect(nextDue({ today: '2026-03-02', prevDue: null, planType: 'semanal' })).toBe(
+      '2026-03-08',
+    );
+    // Domingo: el día en que vence sigue siendo suyo.
+    expect(nextDue({ today: '2026-03-08', prevDue: null, planType: 'semanal' })).toBe(
+      '2026-03-08',
+    );
+  });
+
+  it('semanal: renovar antes de vencer compra la semana siguiente, no la misma', () => {
     expect(
-      nextDue({ today: '2026-03-01', prevDue: null, planType: 'semanal', durationDays: 7 }),
-    ).toBe('2026-03-08');
+      nextDue({ today: '2026-03-04', prevDue: '2026-03-08', planType: 'semanal' }),
+    ).toBe('2026-03-15');
+    // Paga el mismo domingo en que le vence: se lleva la que viene.
+    expect(
+      nextDue({ today: '2026-03-08', prevDue: '2026-03-08', planType: 'semanal' }),
+    ).toBe('2026-03-15');
+    // Vuelve dos semanas tarde: no se le regalan las que no vino.
+    expect(
+      nextDue({ today: '2026-03-18', prevDue: '2026-03-08', planType: 'semanal' }),
+    ).toBe('2026-03-22');
   });
 
   it('clase/paquete: no cambian el vencimiento por tiempo', () => {
@@ -79,13 +103,14 @@ describe('billing — vencimiento por mes calendario', () => {
     ).toBe('2026-03-31');
   });
 
-  it('varias semanas: siete días por cada una', () => {
+  it('varias semanas: una semana calendario por cada una', () => {
+    // Miércoles 4 de marzo, tres semanas: esta (hasta el domingo 8) y las dos
+    // siguientes.
     expect(
       nextDueVarios({
-        today: '2026-03-01',
+        today: '2026-03-04',
         prevDue: null,
         planType: 'semanal',
-        durationDays: 7,
         periodos: 3,
       }),
     ).toBe('2026-03-22');
@@ -108,11 +133,26 @@ describe('billing — vencimiento por mes calendario', () => {
   });
 
   it('estado y días faltantes', () => {
-    expect(estado('2026-03-10', '2026-03-01')).toBe('al_dia');
-    expect(estado('2026-03-03', '2026-03-01')).toBe('por_vencer');
-    expect(estado('2026-02-27', '2026-03-01')).toBe('vencido');
-    expect(estado(null, '2026-03-01')).toBe('sin_plan');
+    expect(estado({ venceEl: '2026-03-10' }, '2026-03-01')).toBe('al_dia');
+    expect(estado({ venceEl: '2026-03-03' }, '2026-03-01')).toBe('por_vencer');
+    expect(estado({ venceEl: '2026-02-27' }, '2026-03-01')).toBe('vencido');
+    expect(estado({ venceEl: null }, '2026-03-01')).toBe('sin_plan');
     expect(diasFaltantes('2026-03-10', '2026-03-01')).toBe(9);
     expect(diasFaltantes('2026-02-27', '2026-03-01')).toBe(-2);
+  });
+
+  it('estado: las clases del paquete también son cobertura', () => {
+    // El caso que estaba mal: el alumno pasó de mensualidad a clase suelta. Su
+    // pago no mueve `venceEl` —suma clases—, así que el panel le seguía
+    // diciendo «por vencer» con una fecha que ya no significa nada.
+    expect(estado({ venceEl: '2026-03-03', clasesRestantes: 1 }, '2026-03-01')).toBe('al_dia');
+    expect(estado({ venceEl: '2026-02-01', clasesRestantes: 4 }, '2026-03-01')).toBe('al_dia');
+    // Sin fecha y sin clases gastadas: se acabó el paquete.
+    expect(estado({ venceEl: null, clasesRestantes: 0 }, '2026-03-01')).toBe('vencido');
+    expect(estado({ venceEl: null, clasesRestantes: 3 }, '2026-03-01')).toBe('al_dia');
+    // Mensualidad viva y paquete viejo agotado: manda la mejor de las dos.
+    expect(estado({ venceEl: '2026-03-20', clasesRestantes: 0 }, '2026-03-01')).toBe('al_dia');
+    // Ni fecha ni saldo: no ha comprado nada.
+    expect(estado({ venceEl: null, clasesRestantes: null }, '2026-03-01')).toBe('sin_plan');
   });
 });

@@ -76,13 +76,26 @@ function masDias(fecha: string, dias: number): string {
  *
  * `dias` viaja igual porque «martes y jueves» es lo que el alumno se aprende;
  * `hoy` y `proxima` son la respuesta.
+ *
+ * **Dos cosas daban «Hoy hay clase» donde no había ninguna:**
+ *
+ * 1. **Los días apagados contaban.** La consulta se traía TODAS las filas de
+ *    `club_schedule`, incluidas las que tienen `is_active` en falso. El
+ *    check-in sí las filtraba, así que el alumno leía «hoy hay clase» y en la
+ *    puerta le decían que el club no abría.
+ * 2. **El club sin horario contestaba que sí.** Sin días configurados,
+ *    `esDiaClase` da por abierto —lo que hace falta para no bloquear el
+ *    check-in de un club recién creado—, y de ahí salía un «hoy hay clase»
+ *    todos los días del año, incluida la próxima clase «mañana». Aquí se
+ *    pregunta con `'cerrado'` y viaja `configurado` para que la pantalla diga
+ *    lo que pasa de verdad: que el club todavía no publicó sus días.
  */
 async function calendarioDelAlumno(db: Db, orgId: string, today: string) {
   const [dias, excepciones] = await Promise.all([
     db
       .select({ weekday: clubSchedule.weekday })
       .from(clubSchedule)
-      .where(eq(clubSchedule.orgId, orgId)),
+      .where(and(eq(clubSchedule.orgId, orgId), eq(clubSchedule.isActive, true))),
     db
       .select({
         date: scheduleExceptions.date,
@@ -100,12 +113,13 @@ async function calendarioDelAlumno(db: Db, orgId: string, today: string) {
   ]);
 
   const weekdays = dias.map((d) => d.weekday);
-  const hoy = esDiaClase(weekdays, excepciones, today);
+  const hayClase = (dia: string) => esDiaClase(weekdays, excepciones, dia, 'cerrado');
+  const hoy = hayClase(today);
 
   let proxima: string | null = null;
   for (let i = 1; i <= HORIZONTE_CLASES && !proxima; i++) {
     const dia = masDias(today, i);
-    if (esDiaClase(weekdays, excepciones, dia)) proxima = dia;
+    if (hayClase(dia)) proxima = dia;
   }
 
   // Solo la excepción de HOY, y solo si cierra: es la que explica por qué el
@@ -117,6 +131,8 @@ async function calendarioDelAlumno(db: Db, orgId: string, today: string) {
     proxima,
     dias: weekdays.sort((a, b) => a - b),
     motivo: excepcionHoy?.note ?? null,
+    /** ¿El maestro llegó a marcar sus días? Sin esto no hay respuesta que dar. */
+    configurado: weekdays.length > 0,
   };
 }
 
@@ -216,7 +232,10 @@ export async function membershipsRoutes(app: FastifyInstance) {
           venceEl: m?.venceEl ?? null,
           clasesRestantes: m?.clasesRestantes ?? null,
           diasFaltantes: diasFaltantes(m?.venceEl ?? null, today),
-          estado: estado(m?.venceEl ?? null, today),
+          estado: estado(
+            { venceEl: m?.venceEl ?? null, clasesRestantes: m?.clasesRestantes ?? null },
+            today,
+          ),
         };
       });
 
@@ -342,7 +361,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
       return {
         ...m,
         diasFaltantes: diasFaltantes(m.venceEl, today),
-        estado: estado(m.venceEl, today),
+        estado: estado(m, today),
         plan: plan ? { id: plan.id, name: plan.name, type: plan.type, price: plan.price } : null,
         clases,
         desde,
@@ -567,7 +586,20 @@ export async function membershipsRoutes(app: FastifyInstance) {
       if (planType === 'mensual' || planType === 'semanal') {
         // La base es la fecha del PAGO, no la de hoy: así registrar el lunes lo
         // que se cobró el viernes da el vencimiento que de verdad le toca.
-        const base = m.venceEl && m.venceEl > fechaPago ? m.venceEl : fechaPago;
+        //
+        // En semanal el periodo que se compra arranca al día siguiente del
+        // vencimiento anterior —o sea, el lunes de la semana que viene—, porque
+        // el plan cubre la semana entera y el día que vence todavía es suyo
+        // (ver `nextDue`). En mensual sigue arrancando en el vencimiento.
+        const cubierto = m.venceEl != null && m.venceEl >= fechaPago;
+        const base =
+          planType === 'semanal'
+            ? cubierto
+              ? masDias(m.venceEl!, 1)
+              : fechaPago
+            : m.venceEl && m.venceEl > fechaPago
+              ? m.venceEl
+              : fechaPago;
         if (anchorDay == null) anchorDay = anchorFrom(base);
         periodoDesde = base;
         venceEl = nextDueVarios({
@@ -630,7 +662,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
         membership: {
           ...upd,
           diasFaltantes: diasFaltantes(upd.venceEl, today),
-          estado: estado(upd.venceEl, today),
+          estado: estado(upd, today),
         },
       });
     },

@@ -35,7 +35,12 @@ export async function generarAvisos(
 
   const filas = await db.select().from(memberships).where(eq(memberships.orgId, orgId));
   const plan = planNotificaciones(
-    filas.map((m) => ({ userId: m.userId, membershipId: m.id, venceEl: m.venceEl })),
+    filas.map((m) => ({
+      userId: m.userId,
+      membershipId: m.id,
+      venceEl: m.venceEl,
+      clasesRestantes: m.clasesRestantes,
+    })),
     today,
   );
   if (plan.length === 0) return { creados: 0, pushEnviados: 0 };

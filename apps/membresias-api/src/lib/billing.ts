@@ -27,6 +27,19 @@ function addDays(dateStr: string, n: number): string {
   return fmt(d);
 }
 
+/**
+ * El último día de la semana que contiene `dateStr`: el domingo.
+ *
+ * La semana va de LUNES A DOMINGO, que es como se cuenta aquí y como la
+ * entiende quien paga «la semana». `getUTCDay()` numera 0=domingo, así que el
+ * domingo se trata como el séptimo día y no como el primero.
+ */
+function finDeSemana(dateStr: string): string {
+  const d = parse(dateStr);
+  const diaSemana = d.getUTCDay() === 0 ? 7 : d.getUTCDay(); // 1=lunes … 7=domingo
+  return addDays(dateStr, 7 - diaSemana);
+}
+
 /** Suma `months` meses conservando `anchorDay`, recortando al último día si el mes no lo tiene. */
 function addMonthsClamped(baseStr: string, months: number, anchorDay: number): string {
   const b = parse(baseStr);
@@ -54,6 +67,17 @@ export function anchorFrom(dateStr: string): number {
  * Nuevo vencimiento tras un pago de un plan por tiempo. Se ancla en
  * `max(hoy, venceAnterior)` para no castigar al que paga anticipado ni regalar
  * días al que paga tarde. Planes por clase/paquete/matrícula no tocan la fecha.
+ *
+ * **El plan semanal cubre LA SEMANA, no siete días.** Quien paga el miércoles
+ * paga «esta semana» y vuelve a pagar el lunes, igual que quien paga el lunes:
+ * eso es lo que el maestro cobra y lo que el alumno entiende. Contando siete
+ * días, en cambio, cada alumno acababa con su propio día de renovación —el
+ * miércoles, el jueves, el sábado— y el maestro tenía siete cobros distintos
+ * repartidos por la semana en vez de uno solo.
+ *
+ * Renovar corre a la semana SIGUIENTE (`prevDue + 1 día` cae ya en el lunes de
+ * la otra), así que pagar dos semanas de golpe llega al domingo de la siguiente
+ * y no se queda en el mismo domingo dos veces.
  */
 export function nextDue(input: {
   today: string;
@@ -63,10 +87,14 @@ export function nextDue(input: {
   anchorDay?: number | null;
 }): string | null {
   const { today, prevDue, planType } = input;
-  const base = prevDue && prevDue > today ? prevDue : today;
 
-  if (planType === 'semanal') return addDays(base, input.durationDays ?? 7);
+  if (planType === 'semanal') {
+    // `>=` y no `>`: pagar el mismo día en que vence compra la semana que
+    // viene, no otra vez la que se acaba hoy.
+    return finDeSemana(prevDue && prevDue >= today ? addDays(prevDue, 1) : today);
+  }
   if (planType === 'mensual') {
+    const base = prevDue && prevDue > today ? prevDue : today;
     const anchor = input.anchorDay ?? anchorFrom(base);
     return addMonthsClamped(base, 1, anchor);
   }
@@ -132,14 +160,54 @@ export function diasFaltantes(venceEl: string | null, today: string): number | n
   return Math.round((parse(venceEl).getTime() - parse(today).getTime()) / 86_400_000);
 }
 
-/** Estado del alumno según su vencimiento y la ventana de aviso. */
+/**
+ * Lo que el alumno tiene comprado: una fecha, un saldo de clases, o las dos.
+ *
+ * Es la forma de una fila de `memberships`, así que las rutas pasan la fila y
+ * ya. Antes se pasaba solo `venceEl` y de ahí venía el error de abajo.
+ */
+export interface Cobertura {
+  venceEl: string | null;
+  clasesRestantes?: number | null;
+}
+
+/** De peor a mejor. Entre dos coberturas manda la mejor. */
+const ORDEN: EstadoMembresia[] = ['vencido', 'por_vencer', 'al_dia'];
+
+/**
+ * Estado del alumno.
+ *
+ * **Mira las DOS coberturas, y ese es el arreglo.** Antes solo miraba
+ * `venceEl`, así que un alumno que acababa de pagar una clase suelta —o un
+ * paquete— seguía apareciendo «Por vencer» o «Vencido»: su pago no mueve
+ * ninguna fecha, suma clases (ver `nextDue`), y esta función no las veía. El
+ * maestro cobraba y el panel del alumno seguía dándole la lata.
+ *
+ * Cuando hay de las dos manda la mejor: quien tiene la mensualidad al día no
+ * está vencido por haber gastado las clases de un paquete viejo, ni al revés.
+ *
+ * Un saldo de clases no tiene «por vencer»: o quedan clases o no quedan. Que se
+ * esté acabando lo dice el kiosco al marcar la última (ver `routes/checkin.ts`),
+ * que es donde el alumno está delante para oírlo.
+ */
 export function estado(
-  venceEl: string | null,
+  cobertura: Cobertura,
   today: string,
   ventanaDias = 3,
 ): EstadoMembresia {
-  if (!venceEl) return 'sin_plan';
-  if (venceEl < today) return 'vencido';
-  const dias = diasFaltantes(venceEl, today) ?? 0;
-  return dias <= ventanaDias ? 'por_vencer' : 'al_dia';
+  const { venceEl, clasesRestantes } = cobertura;
+
+  let porTiempo: EstadoMembresia | null = null;
+  if (venceEl) {
+    if (venceEl < today) porTiempo = 'vencido';
+    else porTiempo = (diasFaltantes(venceEl, today) ?? 0) <= ventanaDias ? 'por_vencer' : 'al_dia';
+  }
+
+  const porClases: EstadoMembresia | null =
+    clasesRestantes == null ? null : clasesRestantes > 0 ? 'al_dia' : 'vencido';
+
+  if (!porTiempo && !porClases) return 'sin_plan';
+  if (!porTiempo) return porClases!;
+  if (!porClases) return porTiempo;
+  return ORDEN.indexOf(porClases) > ORDEN.indexOf(porTiempo) ? porClases : porTiempo;
 }

@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { LIM, soloDigitos } from '@/lib/campos';
+import { avisar } from '@/lib/sonido';
 import { EscanerQR } from '@/components/EscanerQR';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -122,19 +123,37 @@ export default function Kiosco() {
     void flush();
   }, [cargandoSesion, user, esStaff, router, cargar, flush]);
 
+  /**
+   * Marca la asistencia y AVISA POR EL ALTAVOZ.
+   *
+   * El maestro está en la puerta con la fila delante y el celular en la mano:
+   * no está mirando la pantalla cuando el alumno pasa el carnet. El pitido dice
+   * las tres cosas que hay que saber sin bajar la vista —entró, entró pero hay
+   * algo que decirle, o no entró—; la tarjeta de abajo cuenta el detalle para
+   * cuando sí se mire. Ver `lib/sonido.ts`.
+   */
   async function checkin(identifier: { type: string; value: string }) {
     setResultado(null);
     try {
       const res = await api.post('/checkin', { identifier });
       setResultado({ ok: true, ...res.data });
+      // «Avisar» es la mensualidad que se acaba o la última clase del paquete:
+      // la marca entró, pero hay que hablar con el alumno.
+      avisar(res.data?.accionSugerida === 'avisar' ? 'aviso' : 'ok');
       void flush();
     } catch (e) {
       const err = e as { response?: { data?: Resultado } };
       if (!err.response) {
         encolar(identifier);
         setResultado({ ok: false, error: t('kiosco.ayuda') });
+        // Sin conexión no es un fallo del alumno: quedó guardado y se manda
+        // solo cuando vuelva la señal. Por eso suena a aviso y no a error.
+        avisar('aviso');
       } else {
         setResultado({ ...(err.response.data ?? {}), ok: false });
+        // Bloqueado por mora, ya marcó hoy, PIN que no existe, día sin clase:
+        // todo eso es «no pasa», y suena igual.
+        avisar('error');
       }
     }
   }

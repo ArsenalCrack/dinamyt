@@ -258,7 +258,13 @@ export async function reportsRoutes(app: FastifyInstance) {
       // ── Estado de la gente ──────────────────────────────────────────────
       const porEstado = { al_dia: 0, por_vencer: 0, vencido: 0, sin_plan: 0 };
       for (const a of activos) {
-        porEstado[estado(memPorUsuario.get(a.id)?.venceEl ?? null, today)]++;
+        const m = memPorUsuario.get(a.id);
+        porEstado[
+          estado(
+            { venceEl: m?.venceEl ?? null, clasesRestantes: m?.clasesRestantes ?? null },
+            today,
+          )
+        ]++;
       }
 
       // ── Dinero: seis meses, en caja y en devengado ──────────────────────

@@ -155,10 +155,13 @@ const es = {
   'ficha.venceAyuda':
     'Ponla a mano si el alumno venía de otro lado o pagó por fuera. A partir de ahí, sus renovaciones caen ese día del mes.',
   'ficha.clases': 'Clases disponibles',
+  'ficha.clasesAyuda':
+    'Baja sola con cada asistencia y sube al registrar el pago. Tócala solo para cuadrar un saldo que venga de antes.',
   'ficha.soloPorTiempo': 'Solo para planes por tiempo (mensual o semanal).',
   'ficha.soloPorClases': 'Solo para planes por clases (clase suelta o paquete).',
   'ficha.cobrar': 'Registrar el pago de este plan',
-  'ficha.cobrarAyuda': 'Registrar el pago renueva el vencimiento o suma las clases.',
+  'ficha.cobrarAyuda':
+    'Esta es la forma normal de poner al día a un alumno: el vencimiento y las clases los calcula la app a partir del plan y de la fecha. Los campos de arriba son solo para cuadrar a mano lo que venga de antes.',
   'ficha.accesoTitulo': 'Acceso rápido con QR',
   'ficha.accesoDescripcion':
     'El alumno apunta la cámara de su celular a este código y entra sin escribir nada. Se muestra en pantalla y caduca en 10 minutos: no lo imprimas.',
@@ -270,6 +273,10 @@ const es = {
   'clases.hoySi': 'Hoy hay clase',
   'clases.hoyNo': 'Hoy no hay clase',
   'clases.proxima': 'Próxima clase',
+  // Ni sí ni no: el club todavía no marcó sus días. Decir «hoy hay clase» sin
+  // saberlo mandaba al alumno al salón por nada.
+  'clases.sinHorario': 'Tu club todavía no publicó sus días de clase',
+  'clases.sinHorarioAyuda': 'Pregúntale a tu maestro cuándo hay entrenamiento.',
 
   // Carnet QR
   'qr.titulo': 'Carnet del alumno',
@@ -343,7 +350,14 @@ const es = {
   'kiosco.sinCamara':
     'Este navegador no puede escanear con la cámara. Usa el PIN del alumno o el marcado manual.',
   'kiosco.permisoCamara':
-    'No se pudo abrir la cámara. Revisa los permisos del navegador.',
+    'No se pudo abrir la cámara. Dale permiso desde el candado de la barra de direcciones y vuelve a intentarlo.',
+  // El navegador solo entrega la cámara por HTTPS (o en localhost). Entrando
+  // por la dirección IP del equipo desde otro aparato de la casa, no hay
+  // permiso que conceder: el problema es la dirección.
+  'kiosco.camaraInsegura':
+    'La cámara solo funciona en direcciones seguras (https:// o localhost). Entra por la dirección https del club, o usa el PIN del alumno.',
+  'kiosco.camara': 'Cámara',
+  'kiosco.camaraAuto': 'La que elija el navegador',
   'kiosco.registrado': 'Asistencia registrada',
   'kiosco.yaMarco': 'Este alumno ya registró asistencia hoy.',
   'kiosco.bloqueado': 'Acceso bloqueado: mensualidad vencida.',
@@ -378,6 +392,19 @@ const es = {
   'planes.tipo.clase': 'Clase suelta',
   'planes.tipo.paquete': 'Paquete de clases',
   'planes.tipo.matricula': 'Matrícula',
+  // Qué compra cada tipo, en una línea. Van aquí porque son la respuesta a
+  // «¿la matrícula dura un año?» y «¿la clase suelta y el paquete no son lo
+  // mismo?», que es lo que uno se pregunta mirando el desplegable.
+  'planes.ayuda.mensual':
+    'Vence el mismo día del mes siguiente. Quien paga el 5 vuelve a pagar el 5, aunque el mes tenga 28 días o 31.',
+  'planes.ayuda.semanal':
+    'Cubre LA SEMANA, de lunes a domingo, no siete días sueltos: quien paga el miércoles paga esta semana y renueva el lunes, igual que quien pagó el lunes.',
+  'planes.ayuda.clase':
+    'Una clase, una entrada. No mueve fechas: le suma 1 clase disponible. Para venderle tres de una vez, registra el pago con 3 periodos.',
+  'planes.ayuda.paquete':
+    'Un bono de varias clases (8, 12, las que pongas). No vence por tiempo: se gasta a medida que el alumno marca asistencia.',
+  'planes.ayuda.matricula':
+    'La inscripción, que se paga UNA vez al entrar al club. No da tiempo ni clases y no vence: solo deja al alumno marcado como matriculado. Si tu club cobra inscripción cada año, vuelve a registrarla ese año.',
 
   // Calendario
   'calendario.titulo': 'Días de clase',
@@ -449,6 +476,7 @@ const es = {
   'pago.fechaAyuda': 'Si lo cobraste otro día, ponlo: el vencimiento se cuenta desde ahí.',
   'pago.periodos.mensual': 'Meses que paga',
   'pago.periodos.semanal': 'Semanas que paga',
+  'pago.periodos.clase': 'Clases que lleva',
   'pago.periodos.paquete': 'Paquetes que lleva',
   'pago.efecto.mensual': 'Se suman al vencimiento que ya tiene.',
   'pago.efecto.semanal': 'Se suman al vencimiento que ya tiene.',
@@ -641,10 +669,13 @@ const en: Record<ClaveTexto, string> = {
   'ficha.venceAyuda':
     'Set it by hand if the student came from somewhere else or paid outside the app. From then on, renewals land on that day of the month.',
   'ficha.clases': 'Available classes',
+  'ficha.clasesAyuda':
+    'Goes down on its own with every check-in and up when you record a payment. Only touch it to settle a balance carried over from before.',
   'ficha.soloPorTiempo': 'Only for time-based plans (monthly or weekly).',
   'ficha.soloPorClases': 'Only for class-based plans (single class or pack).',
   'ficha.cobrar': 'Record a payment for this plan',
-  'ficha.cobrarAyuda': 'Recording a payment renews the due date or adds the classes.',
+  'ficha.cobrarAyuda':
+    'This is the normal way to bring a student up to date: the app works out the due date and the classes from the plan and the date. The fields above are only for settling what came from before.',
   'ficha.accesoTitulo': 'Quick access QR',
   'ficha.accesoDescripcion':
     'The student points their phone camera at this code and gets in without typing anything. It shows on screen and expires in 10 minutes: do not print it.',
@@ -737,6 +768,8 @@ const en: Record<ClaveTexto, string> = {
   'clases.hoySi': 'There is class today',
   'clases.hoyNo': 'No class today',
   'clases.proxima': 'Next class',
+  'clases.sinHorario': 'Your club has not published its class days yet',
+  'clases.sinHorarioAyuda': 'Ask your master when training takes place.',
 
   'qr.titulo': 'Student card',
   'qr.descripcion':
@@ -794,7 +827,12 @@ const en: Record<ClaveTexto, string> = {
   'kiosco.apunta': "Point at the student's QR card.",
   'kiosco.sinCamara':
     "This browser can't scan with the camera. Use the student's PIN or manual check-in.",
-  'kiosco.permisoCamara': "Couldn't open the camera. Check browser permissions.",
+  'kiosco.permisoCamara':
+    "Couldn't open the camera. Allow it from the padlock in the address bar and try again.",
+  'kiosco.camaraInsegura':
+    'The camera only works on secure addresses (https:// or localhost). Use the club\'s https address, or the student\'s PIN.',
+  'kiosco.camara': 'Camera',
+  'kiosco.camaraAuto': 'Whichever the browser picks',
   'kiosco.registrado': 'Attendance recorded',
   'kiosco.yaMarco': 'This student already checked in today.',
   'kiosco.bloqueado': 'Access blocked: membership overdue.',
@@ -825,6 +863,16 @@ const en: Record<ClaveTexto, string> = {
   'planes.tipo.clase': 'Single class',
   'planes.tipo.paquete': 'Class pack',
   'planes.tipo.matricula': 'Enrolment fee',
+  'planes.ayuda.mensual':
+    'Due on the same day of the following month. Pay on the 5th and you pay again on the 5th, whether the month has 28 days or 31.',
+  'planes.ayuda.semanal':
+    'Covers THE WEEK, Monday to Sunday, not seven loose days: pay on Wednesday and you have paid for this week, renewing on Monday just like whoever paid on Monday.',
+  'planes.ayuda.clase':
+    'One class, one entry. Moves no dates: it adds 1 available class. To sell three at once, record the payment with 3 periods.',
+  'planes.ayuda.paquete':
+    'A voucher for several classes (8, 12, whatever you set). It does not expire by time: it is spent as the student checks in.',
+  'planes.ayuda.matricula':
+    'The joining fee, paid ONCE on entering the club. It grants no time and no classes and never expires: it only marks the student as enrolled. If your club charges it every year, record it again that year.',
 
   'calendario.titulo': 'Class days',
   'calendario.diasSemana': 'Days of the week',
@@ -889,6 +937,7 @@ const en: Record<ClaveTexto, string> = {
   'pago.fechaAyuda': 'If you took it another day, say so: the due date counts from there.',
   'pago.periodos.mensual': 'Months paid',
   'pago.periodos.semanal': 'Weeks paid',
+  'pago.periodos.clase': 'Classes bought',
   'pago.periodos.paquete': 'Packs bought',
   'pago.efecto.mensual': 'Added to the due date they already have.',
   'pago.efecto.semanal': 'Added to the due date they already have.',

@@ -41,9 +41,27 @@ describe('membresias-api — panel del alumno', () => {
     return r.json();
   }
 
-  it('sin calendario configurado, el club se da por abierto', async () => {
+  it('sin calendario configurado no afirma que hoy hay clase', async () => {
+    // Antes contestaba que sí —la API da por abierto el club sin horario para
+    // no bloquearle el check-in—, y el alumno leía «Hoy hay clase» los 365 días
+    // del año. La respuesta honesta es que todavía no se sabe: por eso
+    // `configurado`.
     const mi = await miPanel(e.ids.alumno);
-    expect(mi.clases.hoy).toBe(true);
+    expect(mi.clases.configurado).toBe(false);
+    expect(mi.clases.hoy).toBe(false);
+    expect(mi.clases.proxima).toBeNull();
+    expect(mi.clases.dias).toEqual([]);
+  });
+
+  it('un día de la semana apagado no cuenta como día de clase', async () => {
+    // El check-in ya filtraba `is_active`; el panel del alumno no, así que un
+    // día desactivado le seguía diciendo que fuera al salón.
+    await e.db
+      .insert(clubSchedule)
+      .values({ orgId: e.orgId, weekday: diaDe(hoyISO()), isActive: false });
+
+    const mi = await miPanel(e.ids.alumno);
+    expect(mi.clases.hoy).toBe(false);
     expect(mi.clases.dias).toEqual([]);
   });
 

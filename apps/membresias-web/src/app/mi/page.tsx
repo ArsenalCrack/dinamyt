@@ -41,6 +41,15 @@ interface Clases {
   dias: number[];
   /** Por qué está cerrado hoy, si es una excepción del calendario. */
   motivo: string | null;
+  /**
+   * ¿El maestro ya marcó los días de clase de su club?
+   *
+   * Sin esto la tarjeta decía «Hoy hay clase» los 365 días del año en cuanto el
+   * club no tenía horario: la API da por abierto lo que no está configurado
+   * —hace falta para no bloquear el check-in del club recién creado— y aquí eso
+   * se leía como una afirmación.
+   */
+  configurado: boolean;
 }
 interface MiEstado {
   status: string | null;
@@ -293,7 +302,7 @@ export default function MiPanel() {
           marginBottom: '1rem',
         }}
       >
-        <LogoClub src={club?.logoUrl} nombre={club?.name ?? 'DINAMYT'} size={46} />
+        <LogoClub src={club?.logoUrl} nombre={club?.name ?? 'DINAMYT'} size={46} ampliable />
         <div style={{ minWidth: 0 }}>
           <p className="display" style={{ fontSize: '1.05rem', lineHeight: 1.15 }}>
             {club?.name ?? 'DINAMYT'}
@@ -315,7 +324,7 @@ export default function MiPanel() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
-          <Avatar src={user?.avatarUrl} nombre={user?.fullName ?? '?'} size={52} />
+          <Avatar src={user?.avatarUrl} nombre={user?.fullName ?? '?'} size={52} ampliable />
           <div style={{ minWidth: 0 }}>
             <h1 className="display" style={{ fontSize: '1.5rem' }}>
               {user?.fullName?.split(' ')[0] ?? ''}
@@ -482,12 +491,31 @@ export default function MiPanel() {
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
           {t('clases.titulo')}
         </h2>
-        <p className="display" style={{ fontSize: '1.35rem', color: mi.clases.hoy ? 'var(--ok)' : 'var(--text-muted)' }}>
-          {mi.clases.hoy ? t('clases.hoySi') : t('clases.hoyNo')}
+        {/* Tres respuestas, no dos. «Todavía no lo sabemos» es distinto de «hoy
+            no hay»: el club sin horario publicado no puede afirmar ninguna de
+            las dos, y decir que sí era mandar al alumno al salón por nada. */}
+        <p
+          className="display"
+          style={{
+            fontSize: mi.clases.configurado ? '1.35rem' : '1rem',
+            color:
+              mi.clases.configurado && mi.clases.hoy ? 'var(--ok)' : 'var(--text-muted)',
+          }}
+        >
+          {!mi.clases.configurado
+            ? t('clases.sinHorario')
+            : mi.clases.hoy
+              ? t('clases.hoySi')
+              : t('clases.hoyNo')}
         </p>
         {mi.clases.motivo && (
           <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.3rem' }}>
             {mi.clases.motivo}
+          </p>
+        )}
+        {!mi.clases.configurado && (
+          <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.3rem' }}>
+            {t('clases.sinHorarioAyuda')}
           </p>
         )}
         {!mi.clases.hoy && mi.clases.proxima && (

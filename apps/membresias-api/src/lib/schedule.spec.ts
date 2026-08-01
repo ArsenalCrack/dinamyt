@@ -23,7 +23,20 @@ describe('esDiaClase — calendario del club', () => {
     ).toBe(true);
   });
 
-  it('sin calendario configurado, siempre abierto', () => {
+  it('sin calendario configurado, el check-in da por abierto', () => {
+    // Un club recién creado no tiene calendario: negarle la asistencia a todo
+    // el mundo hasta que el maestro marque casillas dejaría la app inservible
+    // el primer día.
     expect(esDiaClase([], [], '2026-07-11')).toBe(true);
+  });
+
+  it('sin calendario configurado, el panel del alumno NO afirma que hay clase', () => {
+    // La otra respuesta a la misma pregunta: «¿hoy hay clase?» no se contesta
+    // que sí cuando el club todavía no publicó sus días.
+    expect(esDiaClase([], [], '2026-07-11', 'cerrado')).toBe(false);
+    // Pero una apertura extra explícita sigue mandando.
+    expect(
+      esDiaClase([], [{ date: '2026-07-11', isClosed: false }], '2026-07-11', 'cerrado'),
+    ).toBe(true);
   });
 });
