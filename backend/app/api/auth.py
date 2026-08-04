@@ -40,6 +40,9 @@ LOGIN_VENTANA_SEG = 300
 # Tope de caracteres del club (espejo del competidor).
 CLUB_MAX = 80
 DELEGACION_MAX = 120
+# Cuántos dojangs puede dirigir un maestro. No hay un límite "real": es un
+# tope de cordura para que un cliente no llene la columna JSON.
+CLUBES_MAX = 20
 
 
 def mayusculas(valor):
@@ -58,14 +61,42 @@ def mayusculas(valor):
     return None if valor is None else str(valor).upper()
 
 
-def _validar_club(valor):
-    """(club, error): club recortado y en mayúsculas, o None; error si excede."""
-    club = str(valor or "").strip()
-    if not club:
+def _validar_clubes(data):
+    """(clubes, error): la lista de clubes del maestro, limpia y validada.
+
+    Acepta las dos formas del cuerpo:
+      · `clubes: ["DOJANG SUR", "DOJANG NORTE"]` — un maestro con varios dojangs
+      · `club: "DOJANG SUR"` — la forma de siempre, que siguen usando el
+        importador de paquetes y cualquier cliente que no se haya actualizado
+
+    Devuelve `None` (y no `[]`) cuando el cuerpo no menciona ninguna de las dos:
+    quien llama distingue así "no me hables del club" de "déjalo sin clubes".
+    """
+    if "clubes" in data:
+        crudos = data.get("clubes")
+        if crudos is None:
+            crudos = []
+        if not isinstance(crudos, list):
+            return None, "Los clubes deben venir como una lista de nombres."
+    elif "club" in data:
+        crudos = [data.get("club")]
+    else:
         return None, None
-    if len(club) > CLUB_MAX:
-        return None, f"El club no puede superar {CLUB_MAX} caracteres."
-    return mayusculas(club), None
+
+    limpios = []
+    for valor in crudos:
+        nombre = mayusculas(str(valor or "").strip())
+        if not nombre:
+            continue
+        if len(nombre) > CLUB_MAX:
+            return None, f"El club no puede superar {CLUB_MAX} caracteres."
+        # Sin repetidos: el mismo dojang dos veces en la lista no significa nada
+        # y saldría duplicado en el desplegable al inscribir.
+        if not any(nombre == c for c in limpios):
+            limpios.append(nombre)
+    if len(limpios) > CLUBES_MAX:
+        return None, f"Un maestro no puede tener más de {CLUBES_MAX} clubes."
+    return limpios, None
 
 
 def _validar_delegacion(valor, pais_valor=None):
@@ -258,11 +289,11 @@ def register():
             "error": "Solo el superadministrador puede crear administradores"
         }), 403
 
-    # Club y permiso de juez: solo tienen sentido para un maestro.
-    club, error = _validar_club(data.get("club"))
+    # Clubes y permiso de juez: solo tienen sentido para un maestro.
+    clubes, error = _validar_clubes(data)
     if error:
         return jsonify({"error": error}), 400
-    if rol == "maestro" and not club:
+    if rol == "maestro" and not clubes:
         return jsonify({"error": "El club es obligatorio para un maestro"}), 400
     puede_juzgar = bool(data.get("puede_juzgar")) if rol == "maestro" else False
 
@@ -282,11 +313,12 @@ def register():
         rol=rol,
         activo=True,
         creado_por_id=current_user.id,
-        club=club if rol == "maestro" else None,
         delegacion=delegacion if rol == "maestro" else None,
         pais_delegacion=pais_del if rol == "maestro" else None,
         puede_juzgar=puede_juzgar,
     )
+    # Por la lista, nunca por `club`: el setter fija también el principal.
+    new_user.clubes = clubes if rol == "maestro" else []
     new_user.set_password(password)
     db.session.add(new_user)
     db.session.commit()
@@ -360,8 +392,11 @@ def listar_clubes():
     query = Usuario.query.filter(Usuario.rol == "maestro")
     if not current_user.es_super:
         query = query.filter(Usuario.creado_por_id == current_user.id)
+    # TODOS los clubes de cada maestro, no solo el principal: un maestro con
+    # dos dojangs aporta los dos. Y un mismo club dirigido por varios maestros
+    # aparece una sola vez, que es lo que ya hacía el conjunto.
     clubes = sorted(
-        {(u.club or "").strip() for u in query.all() if (u.club or "").strip()},
+        {c.strip() for u in query.all() for c in u.clubes if c.strip()},
         key=str.lower,
     )
     return jsonify(clubes), 200
@@ -430,22 +465,23 @@ def update_user(user_id):
                 # Un admin no actúa como juez de tatami: liberar sus asignaciones
                 AsignacionJuez.query.filter_by(usuario_id=user.id).delete()
             if nuevo_rol != "maestro":
-                # Al dejar de ser maestro, el club, delegación y el permiso
-                # de juez dejan de aplicar.
-                user.club = None
+                # Al dejar de ser maestro, los clubes, la delegación y el
+                # permiso de juez dejan de aplicar.
+                user.clubes = []
                 user.delegacion = None
                 user.pais_delegacion = None
                 user.puede_juzgar = False
             user.rol = nuevo_rol
 
-    # Club del maestro (lo fija/edita el admin).
-    if "club" in data:
-        club, error = _validar_club(data.get("club"))
-        if error:
-            return jsonify({"error": error}), 400
-        if user.rol == "maestro" and not club:
+    # Clubes del maestro (los fija/edita el admin). Se acepta la lista completa
+    # o el `club` suelto de siempre; ver `_validar_clubes`.
+    clubes, error = _validar_clubes(data)
+    if error:
+        return jsonify({"error": error}), 400
+    if clubes is not None:
+        if user.rol == "maestro" and not clubes:
             return jsonify({"error": "El club es obligatorio para un maestro"}), 400
-        user.club = club
+        user.clubes = clubes
 
     # Delegación del maestro (país del catálogo + ciudad de origen del club).
     if "delegacion" in data or "pais_delegacion" in data:
@@ -475,7 +511,9 @@ def update_user(user_id):
             AsignacionJuez.query.filter_by(usuario_id=user.id).delete()
             user.eliminado_at = datetime.now(timezone.utc)
 
-    if user.rol == "maestro" and not (user.club or "").strip():
+    # Red de seguridad: un juez que pasa a maestro en la misma petición que no
+    # trae clubes se quedaría sin ninguno, y no podría inscribir a nadie.
+    if user.rol == "maestro" and not user.clubes:
         return jsonify({"error": "El club es obligatorio para un maestro"}), 400
 
     db.session.commit()

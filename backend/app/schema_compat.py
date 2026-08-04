@@ -15,7 +15,11 @@ OPTIONAL_COLUMNS = {
         # solo ve lo que él creó (sus jueces, campeonatos y competidores).
         "es_superadmin": "BOOLEAN",
         # Rol maestro: club (lo fija el admin) y permiso para juzgar.
+        # `clubes` guarda la lista completa cuando dirige varios dojangs; con
+        # la columna en NULL el modelo cae a `[club]` (ver models/usuario.py),
+        # así que no hace falta rellenarla.
         "club": "VARCHAR(80)",
+        "clubes": "JSON",
         "puede_juzgar": "BOOLEAN",
         # Delegación del maestro: ciudad de origen y país derivado.
         "delegacion": "VARCHAR(120)",

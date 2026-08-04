@@ -7,6 +7,7 @@ import {
   createCampeonatoAPI,
   updateCampeonatoAPI,
   exportarUsuariosAPI,
+  listClubesAPI,
   listUsersAPI,
   registerUserAPI,
   updateUserAPI,
@@ -14,6 +15,7 @@ import {
   type UserData,
 } from "@/lib/api";
 import CampoFecha from "@/components/CampoFecha";
+import ClubesInput from "@/components/ClubesInput";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import DelegacionSelect from "@/components/DelegacionSelect";
 import ImportarPaquetePanel from "@/components/ImportarPaquetePanel";
@@ -44,6 +46,8 @@ export default function AdminPage() {
   const [user, setUser] = useState<UserData | null>(null);
   const [campeonatos, setCampeonatos] = useState<Campeonato[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
+  // Clubes ya existentes en el workspace, para elegirlos en vez de reescribirlos.
+  const [clubes, setClubes] = useState<string[]>([]);
   const [tab, setTab] = useState<"campeonatos" | "jueces">("campeonatos");
   const [showNewCamp, setShowNewCamp] = useState(false);
   const [showNewUser, setShowNewUser] = useState(false);
@@ -57,8 +61,8 @@ export default function AdminPage() {
     estado: "preparacion" as EstadoCampeonato,
   });
   const [newUser, setNewUser] = useState({
-    email: "", password: "", nombre: "", rol: "juez", club: "", puede_juzgar: false,
-    delegacion: "", pais_delegacion: "",
+    email: "", password: "", nombre: "", rol: "juez", clubes: [] as string[],
+    puede_juzgar: false, delegacion: "", pais_delegacion: "",
   });
   const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const [userSearch, setUserSearch] = useState("");
@@ -69,8 +73,8 @@ export default function AdminPage() {
   const [creandoCamp, setCreandoCamp] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [editUserData, setEditUserData] = useState({
-    nombre: "", email: "", password: "", rol: "juez", club: "", puede_juzgar: false,
-    delegacion: "", pais_delegacion: "",
+    nombre: "", email: "", password: "", rol: "juez", clubes: [] as string[],
+    puede_juzgar: false, delegacion: "", pais_delegacion: "",
   });
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
 
@@ -90,12 +94,18 @@ export default function AdminPage() {
 
   async function loadData(includeInactive = false) {
     try {
-      const [c, u] = await Promise.all([
+      const [c, u, cl] = await Promise.all([
         listCampeonatosAPI(),
         listUsersAPI(includeInactive),
+        // Clubes que ya existen en el workspace: al asignarle un dojang a un
+        // maestro se elige de aquí en vez de volver a teclearlo. Un club es un
+        // nombre, así que un dedazo al reescribirlo crea uno nuevo y parte en
+        // dos las agrupaciones por club de los reportes.
+        listClubesAPI().catch(() => [] as string[]),
       ]);
       setCampeonatos(c);
       setUsers(u);
+      setClubes(cl);
     } catch { /* */ }
   }
 
@@ -119,21 +129,21 @@ export default function AdminPage() {
     if (!editingUser) return;
     const payload: {
       nombre?: string; email?: string; password?: string; rol?: string;
-      club?: string; puede_juzgar?: boolean; delegacion?: string;
+      clubes?: string[]; puede_juzgar?: boolean; delegacion?: string;
       pais_delegacion?: string;
     } = {};
     if (editUserData.nombre.trim()) payload.nombre = editUserData.nombre.trim();
     if (editUserData.email.trim()) payload.email = editUserData.email.trim();
     if (editUserData.password) payload.password = editUserData.password;
     if (editUserData.rol && editUserData.rol !== editingUser.rol) payload.rol = editUserData.rol;
-    // Club, delegación y permiso de juez cuando el usuario es (o pasa a ser) maestro.
+    // Clubes, delegación y permiso de juez cuando el usuario es (o pasa a ser) maestro.
     const rolEfectivo = editUserData.rol || editingUser.rol;
     if (rolEfectivo === "maestro") {
-      if (!editUserData.club.trim()) {
+      if (editUserData.clubes.length === 0) {
         flash(t("admin.usuarios.clubReq"), "error");
         return;
       }
-      payload.club = editUserData.club.trim();
+      payload.clubes = editUserData.clubes;
       payload.puede_juzgar = editUserData.puede_juzgar;
       // País y ciudad siempre viajan juntos (aunque vayan vacíos) para que al
       // editar se sincronice bien la delegación e incluso pueda limpiarse.
@@ -200,7 +210,7 @@ export default function AdminPage() {
 
   async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
-    if (newUser.rol === "maestro" && !newUser.club.trim()) {
+    if (newUser.rol === "maestro" && newUser.clubes.length === 0) {
       flash(t("admin.usuarios.clubReq"), "error");
       return;
     }
@@ -212,7 +222,7 @@ export default function AdminPage() {
         rol: newUser.rol,
         ...(newUser.rol === "maestro"
           ? {
-              club: newUser.club.trim(),
+              clubes: newUser.clubes,
               puede_juzgar: newUser.puede_juzgar,
               delegacion: newUser.delegacion.trim() || undefined,
               pais_delegacion: newUser.pais_delegacion.trim() || undefined,
@@ -220,7 +230,7 @@ export default function AdminPage() {
           : {}),
       });
       setShowNewUser(false);
-      setNewUser({ email: "", password: "", nombre: "", rol: "juez", club: "", puede_juzgar: false, delegacion: "", pais_delegacion: "" });
+      setNewUser({ email: "", password: "", nombre: "", rol: "juez", clubes: [], puede_juzgar: false, delegacion: "", pais_delegacion: "" });
       loadData(showInactive);
       flash(t("admin.usuarios.creado"), "ok");
     } catch (err) {
@@ -543,10 +553,11 @@ export default function AdminPage() {
                 </select>
                 {newUser.rol === "maestro" && (
                   <>
-                    <input className="input" placeholder={t("admin.usuarios.clubPh")}
-                      value={newUser.club}
-                      onChange={(e) => setNewUser({ ...newUser, club: enMayusculas(e.target.value.slice(0, 80)) })}
-                      maxLength={80} required />
+                    <ClubesInput
+                      clubes={newUser.clubes}
+                      sugerencias={clubes}
+                      onChange={(nuevos) => setNewUser({ ...newUser, clubes: nuevos })}
+                    />
                     <DelegacionSelect
                       delegacion={newUser.delegacion}
                       pais={newUser.pais_delegacion}
@@ -635,7 +646,12 @@ export default function AdminPage() {
                     <div style={{ color: "var(--text-dim)", fontSize: "0.84rem", marginTop: 4 }}>
                       {t("admin.usuarios.agregado")} {u.created_at ? new Date(u.created_at).toLocaleDateString("es-CO") : "—"}
                       {u.creado_por ? ` ${t("comun.por")} ${u.creado_por.nombre}` : ""}
-                      {u.rol === "maestro" && u.club ? ` · ${t("admin.usuarios.club")}: ${u.club}` : ""}
+                      {/* Todos sus dojangs, no solo el principal: si dirige
+                          dos, verlos aquí es lo que evita crearle una segunda
+                          cuenta por creer que le falta uno. */}
+                      {u.rol === "maestro" && (u.clubes?.length || u.club)
+                        ? ` · ${t("admin.usuarios.club")}: ${(u.clubes?.length ? u.clubes : [u.club]).join(" · ")}`
+                        : ""}
                       {u.rol === "maestro" && u.delegacion ? ` · ${t("maestro.tuDelegacion")}: ${u.delegacion}${u.pais_delegacion ? ` (${u.pais_delegacion})` : ""}` : ""}
                       {u.rol === "maestro" && u.puede_juzgar ? ` · ${t("rol.juez")}` : ""}
                     </div>
@@ -659,7 +675,11 @@ export default function AdminPage() {
                             // Un usuario creado antes de esta regla se abre ya
                             // en mayúsculas: se ve como se va a guardar.
                             nombre: enMayusculas(u.nombre), email: u.email, password: "", rol: u.rol,
-                            club: enMayusculas(u.club || ""), puede_juzgar: !!u.puede_juzgar,
+                            // `clubes` con respaldo en `club`: un maestro
+                            // guardado antes de la lista solo trae el suelto.
+                            clubes: (u.clubes?.length ? u.clubes : [u.club || ""])
+                              .filter(Boolean).map(enMayusculas),
+                            puede_juzgar: !!u.puede_juzgar,
                             delegacion: u.delegacion || "", pais_delegacion: u.pais_delegacion || "",
                           });
                         }
@@ -710,10 +730,11 @@ export default function AdminPage() {
                     )}
                     {(editUserData.rol || u.rol) === "maestro" && (
                       <>
-                        <input className="input" placeholder={t("admin.usuarios.clubPh")}
-                          value={editUserData.club}
-                          onChange={(e) => setEditUserData({ ...editUserData, club: enMayusculas(e.target.value.slice(0, 80)) })}
-                          maxLength={80} />
+                        <ClubesInput
+                          clubes={editUserData.clubes}
+                          sugerencias={clubes}
+                          onChange={(nuevos) => setEditUserData({ ...editUserData, clubes: nuevos })}
+                        />
                         <DelegacionSelect
                           delegacion={editUserData.delegacion}
                           pais={editUserData.pais_delegacion}

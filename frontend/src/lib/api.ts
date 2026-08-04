@@ -140,7 +140,8 @@ export async function registerUserAPI(data: {
   password: string;
   nombre: string;
   rol: string;
-  club?: string;
+  /** Clubes del maestro. El primero queda como principal. */
+  clubes?: string[];
   puede_juzgar?: boolean;
   delegacion?: string;
   pais_delegacion?: string;
@@ -170,7 +171,7 @@ export async function updateUserAPI(
   id: number,
   data: {
     nombre?: string; email?: string; password?: string; activo?: boolean;
-    rol?: string; club?: string; puede_juzgar?: boolean; delegacion?: string;
+    rol?: string; clubes?: string[]; puede_juzgar?: boolean; delegacion?: string;
     pais_delegacion?: string;
   }
 ) {
@@ -1071,8 +1072,12 @@ export interface UserData {
   // Jerarquía: el superadmin ve todos los workspaces; un admin normal solo
   // los jueces, campeonatos y competidores que él creó.
   es_superadmin?: boolean;
-  // Rol maestro: club (lo fija el admin) y permiso para juzgar tatamis.
+  // Rol maestro: sus clubes (los fija el admin) y permiso para juzgar tatamis.
+  // Un maestro puede dirigir varios dojangs y un club puede tener varios
+  // maestros: `clubes` es la lista completa y `club` el principal (el primero),
+  // que sigue viajando para lo que ya lo leía.
   club?: string | null;
+  clubes?: string[];
   // Delegación: ciudad de origen del club del maestro.
   delegacion?: string | null;
   pais_delegacion?: string | null;

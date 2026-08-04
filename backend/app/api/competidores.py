@@ -149,6 +149,33 @@ def _parse_bool(valor):
     return str(valor).strip().lower() in ("1", "true", "si", "sí", "s", "x", "yes")
 
 
+def _club_del_maestro(maestro, pedido):
+    """(club, error): a qué dojang del maestro se apunta el alumno.
+
+    Un maestro puede dirigir varios (ver `clubes` en models/usuario.py), así que
+    ya no vale imponer uno: el alumno de un dojang no puede acabar compitiendo a
+    nombre de otro solo porque estaba primero en la lista. Pero tampoco se toma
+    lo que llegue del cliente tal cual — solo se acepta un club QUE SEA SUYO;
+    si no, cualquier maestro inscribiría gente a nombre de un club ajeno.
+
+    Sin `club` en el cuerpo se usa el principal, que es lo que hacía siempre y
+    lo que necesita un maestro con un solo dojang.
+    """
+    disponibles = maestro.clubes
+    if not disponibles:
+        return None, "Tu administrador aún no te asignó un club."
+
+    elegido = str(pedido or "").strip()
+    if not elegido:
+        return disponibles[0], None
+    if not maestro.dirige_club(elegido):
+        return None, f"El club '{elegido}' no es uno de los tuyos."
+    # Se devuelve el nombre tal y como está guardado, no como vino escrito: así
+    # el club del alumno coincide letra por letra con el del maestro y las
+    # agrupaciones por club de los reportes no se parten en dos.
+    return next(c for c in disponibles if c.casefold() == elegido.casefold()), None
+
+
 def _aplicar_datos(comp, data, parciales=False, actor=None):
     """
     Aplica los campos del body a un competidor validándolos. Con
@@ -892,9 +919,10 @@ def maestro_campeonatos():
 def maestro_inscribir(camp_id):
     """
     POST /api/inscripciones/maestro/campeonato/:id
-    Body: { "competidor": { ... }, "modalidades"?: [...], "peso"?: number }
-    El maestro envía una solicitud (queda 'pendiente'). El club del alumno se
-    fuerza al club del maestro; el alumno queda bajo el workspace de su admin.
+    Body: { "competidor": { ..., "club"? }, "modalidades"?: [...], "peso"?: number }
+    El maestro envía una solicitud (queda 'pendiente'). El club del alumno tiene
+    que ser uno de los suyos —si dirige varios, elige cuál; si no lo manda, se
+    usa su club principal—; el alumno queda bajo el workspace de su admin.
     Solo si el campeonato está en 'preparacion' y es del workspace del maestro.
     """
     maestro = require_maestro()
@@ -911,8 +939,10 @@ def maestro_inscribir(camp_id):
 
     data = request.get_json() or {}
     datos = dict(data.get("competidor") or {})
-    # El club SIEMPRE es el del maestro (no se toma del cliente).
-    datos["club"] = maestro.club or ""
+    club, error = _club_del_maestro(maestro, datos.get("club"))
+    if error:
+        return jsonify({"error": error}), 400
+    datos["club"] = club
     comp = Competidor(
         nombre_completo="", activo=True, created_by=workspace_owner_id(maestro)
     )
@@ -1001,8 +1031,13 @@ def maestro_reenviar(ins_id):
     data = request.get_json() or {}
     datos = dict(data.get("competidor") or {})
 
-    # El club SIEMPRE es el del maestro (no se toma del cliente).
-    datos["club"] = maestro.club or ""
+    # El club tiene que ser uno de los suyos (ver `_club_del_maestro`). Al
+    # corregir un rechazo también puede cambiarlo: a veces el rechazo es
+    # justamente porque el alumno se envió con el dojang equivocado.
+    club, error = _club_del_maestro(maestro, datos.get("club"))
+    if error:
+        return jsonify({"error": error}), 400
+    datos["club"] = club
 
     comp = inscripcion.competidor
     if not comp:

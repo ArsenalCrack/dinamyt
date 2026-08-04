@@ -107,7 +107,10 @@ def _usuario_a_dict(u):
         "email": u.email,
         "nombre": u.nombre,
         "rol": u.rol,
+        # `club` (el principal) viaja además de la lista para que una
+        # instalación vieja, que solo lee esa clave, siga importando bien.
         "club": u.club,
+        "clubes": u.clubes,
         "delegacion": u.delegacion,
         "pais_delegacion": u.pais_delegacion,
         "puede_juzgar": bool(u.puede_juzgar),
@@ -483,8 +486,17 @@ def _importar_usuarios(lista, admin, informe):
             continue
 
         nombre = _nombre(datos.get("nombre"), 150) or email
-        club = _nombre(datos.get("club"), 80) or None
-        if rol == "maestro" and not club:
+        # Un paquete de una instalación anterior solo trae `club`; uno nuevo
+        # trae la lista entera (un maestro puede dirigir varios dojangs).
+        crudos = datos.get("clubes")
+        if not isinstance(crudos, list):
+            crudos = [datos.get("club")]
+        clubes = []
+        for valor in crudos:
+            uno = _nombre(valor, 80)
+            if uno and uno not in clubes:
+                clubes.append(uno)
+        if rol == "maestro" and not clubes:
             informe.aviso(
                 f"El maestro '{email}' llega sin club: asígnaselo en Usuarios "
                 "antes de que inscriba alumnos."
@@ -513,7 +525,8 @@ def _importar_usuarios(lista, admin, informe):
             local.activo = bool(datos.get("activo", True))
             informe.actualizado("usuarios")
 
-        local.club = club if rol == "maestro" else None
+        # Por la lista: el setter fija también el club principal.
+        local.clubes = clubes if rol == "maestro" else []
         local.delegacion = _texto(datos.get("delegacion"), 120) or None if rol == "maestro" else None
         local.pais_delegacion = _texto(datos.get("pais_delegacion"), 80) or None if rol == "maestro" else None
 

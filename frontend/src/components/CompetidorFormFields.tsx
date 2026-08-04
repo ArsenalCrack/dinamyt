@@ -96,14 +96,19 @@ export default function CompetidorFormFields({
   value,
   onChange,
   clubes,
-  clubLocked = null,
+  clubesPropios = null,
 }: {
   value: CompetidorFormState;
   onChange: (next: CompetidorFormState) => void;
   /** Clubes de los maestros del workspace → el club se elige por combobox. */
   clubes?: string[];
-  /** Flujo maestro: el club va fijo a este valor (solo lectura). */
-  clubLocked?: string | null;
+  /**
+   * Flujo maestro: el alumno solo puede ir a un club DEL MAESTRO. Con uno solo
+   * el campo va fijo (como siempre); si dirige varios dojangs, elige a cuál
+   * pertenece este alumno — antes se le imponía el primero y un alumno acababa
+   * compitiendo a nombre del dojang equivocado.
+   */
+  clubesPropios?: string[] | null;
 }) {
   const { t } = useI18n();
   const set = (campo: keyof CompetidorFormState, v: string | boolean) =>
@@ -213,16 +218,37 @@ export default function CompetidorFormFields({
       </label>
       <label className="comp-field">
         <span className="comp-label">
-          {t("form.club")}{" "}
-          {clubLocked !== null ? (
-            <span className="comp-hint">{t("form.clubFijo")}</span>
+          {clubesPropios && clubesPropios.length > 1 ? (
+            <>
+              {t("form.clubElegir")}{" "}
+              <span className="comp-hint">{t("form.clubElegirAyuda")}</span>
+            </>
           ) : (
-            <span className="comp-hint">{t("form.max", { n: COMPETIDOR_LIMITES.clubMax })}</span>
+            <>
+              {t("form.club")}{" "}
+              {clubesPropios !== null ? (
+                <span className="comp-hint">{t("form.clubFijo")}</span>
+              ) : (
+                <span className="comp-hint">{t("form.max", { n: COMPETIDOR_LIMITES.clubMax })}</span>
+              )}
+            </>
           )}
         </span>
-        {clubLocked !== null ? (
-          // Flujo maestro: el club va fijo (lo asigna el admin al maestro).
-          <input className="input" value={clubLocked} disabled readOnly />
+        {clubesPropios !== null ? (
+          // Flujo maestro: solo sus dojangs. Con uno, fijo; con varios, elige.
+          clubesPropios.length > 1 ? (
+            <select
+              className="input"
+              value={value.club}
+              onChange={(e) => set("club", e.target.value)}
+            >
+              {clubesPropios.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          ) : (
+            <input className="input" value={clubesPropios[0] || ""} disabled readOnly />
+          )
         ) : clubes ? (
           <ClubCombobox
             value={value.club}

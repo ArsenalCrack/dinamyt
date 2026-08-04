@@ -42,9 +42,23 @@ class Usuario(db.Model):
     # campeonatos y competidores que él creó). Booleano aparte y no un tercer
     # valor del Enum para no requerir migración del tipo en bases existentes.
     es_superadmin = db.Column(db.Boolean, default=False, nullable=True)
-    # Club del maestro: lo fija el admin al crear al usuario maestro. Los
-    # alumnos que ese maestro inscribe toman automáticamente este club.
+    # ── Clubes del maestro ──────────────────────────────────────────────────
+    #
+    # Un maestro puede dirigir VARIOS dojangs, y un mismo club puede tener
+    # varios maestros. Lo segundo siempre funcionó (nunca hubo unicidad sobre
+    # el nombre del club); lo primero no cabía en una sola columna de texto.
+    #
+    # `clubes` (JSON) es la lista completa y la fuente de verdad. `club` se
+    # queda como el club PRINCIPAL —el primero de la lista— porque hay mucho
+    # que ya lo lee así: los paquetes de sincronización, el "solicitado por X"
+    # de una inscripción, y las instalaciones que todavía no tienen la columna
+    # nueva. Lo mantiene en su sitio el setter de `clubes`, así que no hay dos
+    # verdades que puedan discrepar: se escribe siempre por la lista.
+    #
+    # Las filas anteriores a la columna tienen `clubes` NULL y el getter cae a
+    # `[club]`, así que no hace falta ningún backfill.
     club = db.Column(db.String(80), nullable=True)
+    _clubes = db.Column("clubes", db.JSON, nullable=True)
     # Delegación del maestro: ciudad de origen del club. El país se deriva
     # automáticamente del catálogo geográfico al asignar la delegación.
     delegacion = db.Column(db.String(120), nullable=True)
@@ -108,6 +122,41 @@ class Usuario(db.Model):
         )
 
     @property
+    def clubes(self) -> list:
+        """Los clubes del maestro, en orden. El primero es el principal.
+
+        Cae a `[club]` cuando la columna nueva está vacía: así una fila
+        guardada antes de que existiera sigue respondiendo lo mismo que antes.
+        """
+        if self._clubes:
+            return [c for c in self._clubes if c]
+        return [self.club] if self.club else []
+
+    @clubes.setter
+    def clubes(self, lista):
+        """Fija la lista completa y, con ella, el club principal.
+
+        Es el ÚNICO sitio donde se escribe `club`: mantener las dos columnas a
+        mano desde cada endpoint es la forma segura de que acaben discrepando.
+        """
+        limpia = []
+        for valor in (lista or []):
+            texto = str(valor or "").strip()
+            # Sin repetir: "Dojang Sur" y "DOJANG SUR" son el mismo club, y en
+            # la lista del admin saldrían dos veces.
+            if texto and not any(texto.casefold() == c.casefold() for c in limpia):
+                limpia.append(texto)
+        self._clubes = limpia or None
+        self.club = limpia[0] if limpia else None
+
+    def dirige_club(self, nombre) -> bool:
+        """True si ese club es uno de los suyos (sin distinguir mayúsculas)."""
+        objetivo = str(nombre or "").strip().casefold()
+        if not objetivo:
+            return False
+        return any(objetivo == c.casefold() for c in self.clubes)
+
+    @property
     def es_super(self) -> bool:
         """True si es superadmin (la columna puede ser NULL en bases viejas)."""
         return self.rol == "admin" and bool(self.es_superadmin)
@@ -142,7 +191,10 @@ class Usuario(db.Model):
             "nombre": self.nombre,
             "rol": self.rol,
             "es_superadmin": self.es_super,
+            # `club` es el principal y sigue viajando para no romper a nadie
+            # que ya lo lea; `clubes` es la lista completa.
             "club": self.club,
+            "clubes": self.clubes,
             "delegacion": self.delegacion,
             "pais_delegacion": self.pais_delegacion,
             "puede_juzgar": bool(self.puede_juzgar),
