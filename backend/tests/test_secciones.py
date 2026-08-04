@@ -510,5 +510,9 @@ class TestCategoriaEspecial:
             assert llave is not None
             comps = llave.estructura["competidores"]
             marca = {c["nombre"]: c.get("especial", False) for c in comps}
-            assert marca["Pedro Especial"] is True
+            # "PEDRO ESPECIAL" y no "Pedro Especial": los nombres que entran
+            # por la API se guardan en mayúsculas (ver `_mayusculas` en
+            # api/competidores.py). Ana la creó el fixture con el modelo
+            # directamente, así que conserva como se escribió.
+            assert marca["PEDRO ESPECIAL"] is True
             assert marca["Ana"] is False

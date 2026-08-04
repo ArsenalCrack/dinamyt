@@ -421,6 +421,17 @@ def _texto(valor, tope=None):
     return texto[:tope] if tope else texto
 
 
+def _nombre(valor, tope=None):
+    """Un NOMBRE del paquete, normalizado como los que se escriben aquí.
+
+    Un paquete exportado por una instalación vieja trae los nombres tal y como
+    se teclearon entonces ("Juan pérez"). Si se importaran así, la lista de
+    inscritos volvería a mezclar mayúsculas y minúsculas justo donde se acaba de
+    ordenar. Ver `mayusculas` en `api/auth.py`.
+    """
+    return _texto(str(valor or "").upper(), tope)
+
+
 def _fecha_de(valor):
     try:
         return date.fromisoformat(valor) if valor else None
@@ -471,8 +482,8 @@ def _importar_usuarios(lista, admin, informe):
                 mapa[uid] = local
             continue
 
-        nombre = _texto(datos.get("nombre"), 150) or email
-        club = _texto(datos.get("club"), 80) or None
+        nombre = _nombre(datos.get("nombre"), 150) or email
+        club = _nombre(datos.get("club"), 80) or None
         if rol == "maestro" and not club:
             informe.aviso(
                 f"El maestro '{email}' llega sin club: asígnaselo en Usuarios "
@@ -528,7 +539,7 @@ def _importar_competidores(lista, admin, informe):
         if not isinstance(datos, dict):
             continue
         uid = _texto(datos.get("uid"))
-        nombre = _texto(datos.get("nombre_completo"), 200)
+        nombre = _nombre(datos.get("nombre_completo"), 200)
         documento = _texto(datos.get("documento"), 30) or None
         if not nombre:
             informe.omitido("competidores", "Un competidor del paquete no trae nombre: se omite.")
@@ -576,7 +587,7 @@ def _importar_competidores(lista, admin, informe):
         # cinturón no está en el catálogo (listas viejas o de otro idioma).
         local.grupo_cinturon = grupo or (_texto(datos.get("grupo_cinturon")).upper() or None)
         local.peso = datos.get("peso") if isinstance(datos.get("peso"), (int, float)) else None
-        local.club = _texto(datos.get("club"), 200) or None
+        local.club = _nombre(datos.get("club"), 200) or None
         local.categoria_especial = bool(datos.get("categoria_especial"))
         local.activo = bool(datos.get("activo", True))
 
@@ -592,7 +603,7 @@ def _importar_campeonato(datos, admin, informe):
     if not isinstance(datos, dict):
         raise ErrorImportacion("El paquete no trae los datos del campeonato.")
     uid = _texto(datos.get("uid"))
-    nombre = _texto(datos.get("nombre"), 255)
+    nombre = _nombre(datos.get("nombre"), 255)
     if not nombre:
         raise ErrorImportacion("El campeonato del paquete no trae nombre.")
 
@@ -619,7 +630,9 @@ def _importar_campeonato(datos, admin, informe):
     camp.descripcion = _texto(datos.get("descripcion")) or None
     camp.fecha_inicio = _fecha_de(datos.get("fecha_inicio"))
     camp.fecha_fin = _fecha_de(datos.get("fecha_fin"))
-    camp.lugar = _texto(datos.get("lugar"), 120) or None
+    # La sede es un nombre a mano libre; ciudad y país salen del catálogo y se
+    # comparan con él por valor exacto (ver `_validar_campo_texto`).
+    camp.lugar = _nombre(datos.get("lugar"), 120) or None
     camp.ciudad = _texto(datos.get("ciudad"), 120) or None
     camp.pais = _texto(datos.get("pais"), 120) or None
     camp.estado = estado if estado in ESTADOS_CAMPEONATO else "preparacion"
@@ -745,12 +758,12 @@ def _importar_asignaciones(lista, usuarios, tatamis, informe):
                 usuario_id=usuario.id,
                 tatami_id=tatami.id,
                 rol_tatami=rol,
-                nombre_display=_texto(datos.get("nombre_display"), 150) or usuario.nombre,
+                nombre_display=_nombre(datos.get("nombre_display"), 150) or usuario.nombre,
             ))
             informe.nuevo("asignaciones")
         else:
             existente.rol_tatami = rol
-            existente.nombre_display = _texto(datos.get("nombre_display"), 150) or usuario.nombre
+            existente.nombre_display = _nombre(datos.get("nombre_display"), 150) or usuario.nombre
             informe.actualizado("asignaciones")
 
     db.session.flush()

@@ -1064,6 +1064,14 @@ const es = {
   "geo.paisPrimero": "Elige primero un país",
   "geo.otraCiudad": "Otra ciudad…",
   "geo.ciudadLibre": "Escribe la ciudad",
+
+  // ── Selector de fecha propio (<CampoFecha>) ──
+  "fecha.elegir": "Elegir fecha",
+  "fecha.hoy": "Hoy",
+  "fecha.borrar": "Borrar",
+  "fecha.mesAnterior": "Mes anterior",
+  "fecha.mesSiguiente": "Mes siguiente",
+  "fecha.cambiarVista": "Cambiar a años o meses",
   "camp.estado.preparacion": "En preparación",
   "camp.estado.en_curso": "En curso",
   "camp.estado.finalizado": "Finalizado",
@@ -1103,6 +1111,7 @@ const es = {
   "form.paisSinResultados": "Ningún país coincide",
   "form.delegacionCiudadSelecc": "Escribe o elige una ciudad",
   "form.delegacionPaisPrimero": "Elige primero un país",
+  "form.ciudadSinResultados": "Sin coincidencias — elige «Otra ciudad…» para escribirla",
 
   // ── Panel del maestro ──
   "maestro.panel": "Panel del maestro",
@@ -2189,6 +2198,14 @@ const en: Record<ClaveTexto, string> = {
   "geo.paisPrimero": "Choose a country first",
   "geo.otraCiudad": "Other city…",
   "geo.ciudadLibre": "Type the city",
+
+  // ── Date picker (<CampoFecha>) ──
+  "fecha.elegir": "Pick a date",
+  "fecha.hoy": "Today",
+  "fecha.borrar": "Clear",
+  "fecha.mesAnterior": "Previous month",
+  "fecha.mesSiguiente": "Next month",
+  "fecha.cambiarVista": "Switch to years or months",
   "camp.estado.preparacion": "In preparation",
   "camp.estado.en_curso": "In progress",
   "camp.estado.finalizado": "Finished",
@@ -2228,6 +2245,7 @@ const en: Record<ClaveTexto, string> = {
   "form.paisSinResultados": "No matching countries",
   "form.delegacionCiudadSelecc": "Type or pick a city",
   "form.delegacionPaisPrimero": "Pick a country first",
+  "form.ciudadSinResultados": "No matches — choose “Other city…” to type it",
 
   // ── Master panel ──
   "maestro.panel": "Master panel",

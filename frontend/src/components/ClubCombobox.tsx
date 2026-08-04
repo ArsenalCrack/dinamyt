@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { enMayusculas } from "@/lib/texto";
 
 export default function ClubCombobox({
   value,
@@ -32,11 +33,14 @@ export default function ClubCombobox({
   // Modo texto libre tras elegir «Otro…»: el input escribe directo el valor.
   const [libre, setLibre] = useState(false);
 
-  const independiente = t("form.clubIndependiente");
+  // Los clubes se guardan en mayúsculas (ver lib/texto.ts), así que la lista se
+  // enseña igual: si no, la opción decía «Independiente» y el campo, una vez
+  // elegida, «INDEPENDIENTE».
+  const independiente = enMayusculas(t("form.clubIndependiente"));
 
   // Opciones "puras": clubes de maestros + "Independiente" (sin duplicar).
   const opciones = useMemo(() => {
-    const base = [...new Set(clubes.filter((c) => c && c.trim()))];
+    const base = [...new Set(clubes.filter((c) => c && c.trim()).map(enMayusculas))];
     if (!base.some((c) => c.toLowerCase() === independiente.toLowerCase())) {
       base.push(independiente);
     }

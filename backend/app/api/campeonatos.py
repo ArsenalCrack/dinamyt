@@ -9,6 +9,7 @@ from ..extensions import db
 from ..security import limitar
 from ..models.campeonato import ESTADOS_CAMPEONATO, Campeonato
 from ..models.tatami import Tatami
+from .auth import mayusculas
 from .scoping import (
     es_dueno_campeonato,
     filtrar_campeonatos,
@@ -26,14 +27,21 @@ MIN_TATAMIS = 1
 MAX_TATAMIS = 10
 
 
-def _validar_campo_texto(valor, etiqueta):
-    """(texto, error): recorta un campo opcional y valida su longitud."""
+def _validar_campo_texto(valor, etiqueta, nombre_propio=False):
+    """(texto, error): recorta un campo opcional y valida su longitud.
+
+    `nombre_propio` lo sube a MAYÚSCULAS, como el resto de nombres que escribe
+    el admin (ver `mayusculas` en api/auth.py). Se usa en la SEDE, que es un
+    nombre a mano libre ("Coliseo El Salitre"). NO en ciudad ni país: esos
+    salen de un catálogo (`app/geo.py`) y se comparan contra él por valor
+    exacto — "COLOMBIA" dejaría de reconocerse como país válido.
+    """
     texto = str(valor or "").strip()
     if not texto:
         return None, None
     if len(texto) > CAMPO_LUGAR_MAX:
         return None, f"{etiqueta} no puede superar {CAMPO_LUGAR_MAX} caracteres."
-    return texto, None
+    return (mayusculas(texto) if nombre_propio else texto), None
 
 
 @campeonatos_bp.route("", methods=["GET"])
@@ -116,7 +124,7 @@ def crear():
 
     from datetime import date
 
-    lugar, error = _validar_campo_texto(data.get("lugar"), "La sede")
+    lugar, error = _validar_campo_texto(data.get("lugar"), "La sede", nombre_propio=True)
     if error:
         return jsonify({"error": error}), 400
     ciudad, error = _validar_campo_texto(data.get("ciudad"), "La ciudad")
@@ -130,7 +138,10 @@ def crear():
         return jsonify({"error": "Estado de campeonato inválido"}), 400
 
     camp = Campeonato(
-        nombre=data["nombre"],
+        # El nombre del campeonato encabeza la pantalla pública, el acta y las
+        # llaves impresas: va en mayúsculas como los demás nombres. La
+        # descripción no — ahí cabe una frase, no un dato.
+        nombre=mayusculas(str(data["nombre"]).strip()),
         descripcion=data.get("descripcion"),
         fecha_inicio=date.fromisoformat(data["fecha_inicio"]) if data.get("fecha_inicio") else None,
         fecha_fin=date.fromisoformat(data["fecha_fin"]) if data.get("fecha_fin") else None,
@@ -181,7 +192,7 @@ def actualizar(camp_id):
     data = request.get_json()
 
     if data.get("nombre"):
-        camp.nombre = data["nombre"]
+        camp.nombre = mayusculas(str(data["nombre"]).strip())
     if "descripcion" in data:
         camp.descripcion = data["descripcion"]
     if "activo" in data:
@@ -192,9 +203,11 @@ def actualizar(camp_id):
     if data.get("fecha_fin"):
         from datetime import date
         camp.fecha_fin = date.fromisoformat(data["fecha_fin"])
-    for campo, etiqueta in (("lugar", "La sede"), ("ciudad", "La ciudad"), ("pais", "El país")):
+    for campo, etiqueta, propio in (
+        ("lugar", "La sede", True), ("ciudad", "La ciudad", False), ("pais", "El país", False),
+    ):
         if campo in data:
-            valor, error = _validar_campo_texto(data.get(campo), etiqueta)
+            valor, error = _validar_campo_texto(data.get(campo), etiqueta, nombre_propio=propio)
             if error:
                 return jsonify({"error": error}), 400
             setattr(camp, campo, valor)

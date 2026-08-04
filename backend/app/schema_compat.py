@@ -71,6 +71,74 @@ BACKFILL = {
 }
 
 
+# Nombres que se guardan en MAYÚSCULAS (ver `mayusculas` en api/auth.py).
+# tabla → columnas. Se normaliza lo que YA estaba guardado: si no, la lista de
+# inscritos seguiría mezclando "Juan pérez" con "JUAN PÉREZ" hasta que alguien
+# volviera a editar cada ficha a mano.
+# Ojo con lo que NO está aquí: `campeonatos.ciudad` y `campeonatos.pais` salen
+# del catálogo de `app/geo.py` y se comparan con él por valor exacto — pasarlos
+# a mayúsculas los dejaría sin reconocer. La descripción tampoco: ahí cabe una
+# frase, no un dato.
+COLUMNAS_EN_MAYUSCULAS = {
+    "usuarios": ("nombre", "club"),
+    "competidores": ("nombre_completo", "club"),
+    "asignaciones_juez": ("nombre_display",),
+    "campeonatos": ("nombre", "lugar"),
+}
+
+
+def _normalizar_mayusculas(table_names):
+    """Sube a mayúsculas los nombres ya guardados. Idempotente.
+
+    Se hace fila a fila desde Python y no con un `UPDATE ... SET x = upper(x)`
+    a propósito: el `upper()` de SQLite es SOLO ASCII, así que "josé pérez"
+    saldría como "JOSé PéREZ" en el despliegue local. El `str.upper()` de
+    Python entiende Unicode y respeta tildes y eñes.
+
+    Solo se tocan las filas que hacen falta, así que en los arranques siguientes
+    no escribe nada.
+    """
+    # Primero se mira el esquema ENTERO y después se escribe. No es cosmética:
+    # `inspect(db.engine)` saca su propia conexión del pool y la devuelve con un
+    # ROLLBACK — y en SQLite esa es la MISMA conexión que la de la sesión, así
+    # que preguntar por las columnas de la segunda tabla deshacía los UPDATE de
+    # la primera. Sin error y sin rastro: la migración decía "listo" y los
+    # nombres seguían en minúsculas.
+    inspector = inspect(db.engine)
+    plan = []
+    for tabla, columnas in COLUMNAS_EN_MAYUSCULAS.items():
+        if tabla not in table_names:
+            continue
+        existentes = {col["name"] for col in inspector.get_columns(tabla)}
+        columnas = [c for c in columnas if c in existentes]
+        if columnas:
+            plan.append((tabla, columnas))
+
+    total = 0
+    for tabla, columnas in plan:
+        lista = ", ".join(columnas)
+        filas = db.session.execute(
+            text(f"SELECT id, {lista} FROM {tabla}")
+        ).mappings().all()
+        for fila in filas:
+            cambios = {
+                c: fila[c].upper()
+                for c in columnas
+                if fila[c] and fila[c] != fila[c].upper()
+            }
+            if not cambios:
+                continue
+            asignaciones = ", ".join(f"{c} = :{c}" for c in cambios)
+            db.session.execute(
+                text(f"UPDATE {tabla} SET {asignaciones} WHERE id = :id"),
+                {**cambios, "id": fila["id"]},
+            )
+            total += 1
+    if total:
+        db.session.commit()
+    return total
+
+
 def _ensure_usuarios_rol_width(inspector, table_names):
     """Amplía usuarios.rol si una instalación vieja quedó con VARCHAR(5)."""
     if "usuarios" not in table_names:
@@ -142,6 +210,10 @@ def ensure_optional_columns():
     db.session.commit()
 
     _ensure_indices_uid(table_names)
+
+    normalizados = _normalizar_mayusculas(table_names)
+    if normalizados:
+        print(f"  [OK] Nombres pasados a mayúsculas en {normalizados} registro(s)")
 
     # Los uid llevan un valor DISTINTO por fila, así que no salen de un UPDATE
     # plano como el resto: los genera el backfill de app/uid.py.

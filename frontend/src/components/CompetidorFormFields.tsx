@@ -16,6 +16,8 @@ import {
   type CompetidorInput,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { enMayusculas } from "@/lib/texto";
+import CampoFecha from "@/components/CampoFecha";
 import ClubCombobox from "@/components/ClubCombobox";
 
 export interface CompetidorFormState {
@@ -42,13 +44,15 @@ export const COMPETIDOR_FORM_VACIO: CompetidorFormState = {
 
 export function competidorToForm(c: CompetidorData): CompetidorFormState {
   return {
-    nombre_completo: c.nombre_completo || "",
+    // Los datos viejos pueden venir en minúsculas: al abrirlos para editar ya
+    // se ven como se van a guardar (ver `enMayusculas`).
+    nombre_completo: enMayusculas(c.nombre_completo || ""),
     documento: c.documento || "",
     fecha_nacimiento: c.fecha_nacimiento || "",
     genero: c.genero || "",
     cinturon: c.cinturon || "",
     peso: c.peso != null ? String(c.peso) : "",
-    club: c.club || "",
+    club: enMayusculas(c.club || ""),
     categoria_especial: Boolean(c.categoria_especial),
   };
 }
@@ -117,7 +121,8 @@ export default function CompetidorFormFields({
         <input
           className="input"
           value={value.nombre_completo}
-          onChange={(e) => set("nombre_completo", e.target.value.slice(0, COMPETIDOR_LIMITES.nombreMax))}
+          // En MAYÚSCULAS mientras se escribe: es como se guarda (ver `enMayusculas`).
+          onChange={(e) => set("nombre_completo", enMayusculas(e.target.value.slice(0, COMPETIDOR_LIMITES.nombreMax)))}
           placeholder={t("form.nombrePh")}
           maxLength={COMPETIDOR_LIMITES.nombreMax}
           minLength={COMPETIDOR_LIMITES.nombreMin}
@@ -139,19 +144,21 @@ export default function CompetidorFormFields({
           maxLength={COMPETIDOR_LIMITES.documentoMax}
         />
       </label>
-      <label className="comp-field">
+      {/* Este es el campo por el que existe <CampoFecha>: la fecha de
+          nacimiento siempre está años atrás, y el calendario de Android solo
+          avanza mes a mes. Aquí el año se elige de una rejilla. */}
+      <div className="comp-field">
         <span className="comp-label">
           {t("form.fechaNacimiento")} <span className="comp-hint">{t("form.rangoEdad", { min: COMPETIDOR_LIMITES.edadMin, max: COMPETIDOR_LIMITES.edadMax })}</span>
         </span>
-        <input
-          className="input"
-          type="date"
-          value={value.fecha_nacimiento}
+        <CampoFecha
+          valor={value.fecha_nacimiento}
           min={fechas.min}
           max={fechas.max}
-          onChange={(e) => set("fecha_nacimiento", e.target.value)}
+          ariaLabel={t("form.fechaNacimiento")}
+          onChange={(v) => set("fecha_nacimiento", v)}
         />
-      </label>
+      </div>
       <label className="comp-field">
         <span className="comp-label">{t("form.genero")}</span>
         <select
@@ -219,7 +226,7 @@ export default function CompetidorFormFields({
         ) : clubes ? (
           <ClubCombobox
             value={value.club}
-            onChange={(v) => set("club", v.slice(0, COMPETIDOR_LIMITES.clubMax))}
+            onChange={(v) => set("club", enMayusculas(v.slice(0, COMPETIDOR_LIMITES.clubMax)))}
             clubes={clubes}
             maxLen={COMPETIDOR_LIMITES.clubMax}
           />
@@ -227,7 +234,7 @@ export default function CompetidorFormFields({
           <input
             className="input"
             value={value.club}
-            onChange={(e) => set("club", e.target.value.slice(0, COMPETIDOR_LIMITES.clubMax))}
+            onChange={(e) => set("club", enMayusculas(e.target.value.slice(0, COMPETIDOR_LIMITES.clubMax)))}
             placeholder={t("form.clubPh")}
             maxLength={COMPETIDOR_LIMITES.clubMax}
           />

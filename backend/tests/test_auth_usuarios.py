@@ -62,7 +62,9 @@ def test_crear_maestro_con_permiso_de_juez(app_con_admin):
     assert resp.status_code == 201
     user = resp.get_json()["user"]
     assert user["rol"] == "maestro"
-    assert user["club"] == "Club Test"
+    # Los nombres (de persona y de club) se guardan en mayúsculas.
+    assert user["nombre"] == "MAESTRO TEST"
+    assert user["club"] == "CLUB TEST"
     assert user["puede_juzgar"] is True
 
 
@@ -82,6 +84,61 @@ def test_crear_maestro_requiere_club(app_con_admin):
 
     assert resp.status_code == 400
     assert resp.get_json()["error"] == "El club es obligatorio para un maestro"
+
+
+def test_editar_usuario_tambien_sube_a_mayusculas(app_con_admin):
+    """Corregir un dedazo no puede reintroducir minúsculas en la lista."""
+    app, token = app_con_admin
+    cliente = app.test_client()
+    cabeceras = {"Authorization": f"Bearer {token}"}
+
+    creado = cliente.post(
+        "/api/auth/register",
+        headers=cabeceras,
+        json={
+            "email": "maestro-edit@test.local",
+            "password": "secret123",
+            "nombre": "maestro edit",
+            "rol": "maestro",
+            "club": "club edit",
+        },
+    ).get_json()["user"]
+
+    resp = cliente.put(
+        f"/api/auth/users/{creado['id']}",
+        headers=cabeceras,
+        json={"nombre": "josé maría ñuñez", "club": "águilas del norte"},
+    )
+
+    assert resp.status_code == 200
+    user = resp.get_json()["user"]
+    # Las tildes y la eñe sobreviven: son parte del nombre de la persona.
+    assert user["nombre"] == "JOSÉ MARÍA ÑUÑEZ"
+    assert user["club"] == "ÁGUILAS DEL NORTE"
+
+
+def test_normalizar_mayusculas_arregla_lo_ya_guardado(app_con_admin):
+    """Los usuarios creados antes de la regla se normalizan al arrancar."""
+    from app.models.usuario import Usuario
+    from app.schema_compat import _normalizar_mayusculas
+
+    app, _ = app_con_admin
+    viejo = Usuario(
+        email="viejo@test.local", nombre="josé pérez", rol="maestro",
+        club="club viejo", activo=True,
+    )
+    viejo.set_password("secret123")
+    db.session.add(viejo)
+    db.session.commit()
+
+    tocados = _normalizar_mayusculas({"usuarios", "competidores", "asignaciones_juez"})
+
+    db.session.refresh(viejo)
+    assert viejo.nombre == "JOSÉ PÉREZ"
+    assert viejo.club == "CLUB VIEJO"
+    assert tocados >= 1
+    # Idempotente: en el siguiente arranque no vuelve a escribir nada.
+    assert _normalizar_mayusculas({"usuarios", "competidores", "asignaciones_juez"}) == 0
 
 
 def test_schema_compat_ensancha_rol_viejo_en_postgres(monkeypatch):

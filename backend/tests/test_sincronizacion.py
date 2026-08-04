@@ -219,7 +219,9 @@ def test_importa_el_campeonato_completo(destino, paquete):
     from app.models.llave import Llave
     from app.models.tatami import Tatami
 
-    camp = Campeonato.query.filter_by(nombre="Copa Nacional").first()
+    # "COPA NACIONAL": el nombre se normaliza al importarlo. La ciudad NO —
+    # sale del catálogo de geo y se compara con él por valor exacto.
+    camp = Campeonato.query.filter_by(nombre="COPA NACIONAL").first()
     assert camp is not None
     assert camp.ciudad == "Cali"
     assert Tatami.query.filter_by(campeonato_id=camp.id).count() == 2
@@ -309,7 +311,9 @@ def test_un_usuario_que_ya_existia_por_correo_se_vincula(destino, paquete):
     assert resp.status_code == 200
     assert Usuario.query.filter_by(email="maestro@test.local").count() == 1
     maestro = Usuario.query.filter_by(email="maestro@test.local").first()
-    assert maestro.club == "Club Sur"          # se actualizó con el paquete
+    # "CLUB SUR": los nombres del paquete se normalizan al importarlos, igual
+    # que los que se escriben aquí (ver `_nombre` en api/sincronizacion.py).
+    assert maestro.club == "CLUB SUR"          # se actualizó con el paquete
     assert maestro.uid != uid_previo           # adoptó la identidad del paquete
     assert maestro.check_password("clave-local")  # su contraseña NO se tocó
 

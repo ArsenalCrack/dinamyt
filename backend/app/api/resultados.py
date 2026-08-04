@@ -36,6 +36,7 @@ from ..models.combate import Combate
 from ..models.llave import Llave
 from ..models.resultado_publicado import ResultadoPublicado
 from ..timeutil import iso_utc
+from .auth import mayusculas
 from .llaves import podio_llave
 from .scoping import require_admin, es_dueno_campeonato
 
@@ -349,7 +350,10 @@ def importar_resultados():
     if not export_uuid or not isinstance(resultados, list):
         return jsonify({"error": "El archivo de resultados está incompleto"}), 400
 
-    nombre = (envelope.get("campeonato") or {}).get("nombre") or "Campeonato"
+    # El nombre del campeonato encabeza la ficha pública de resultados: se
+    # normaliza igual que los de aquí, porque el archivo puede venir de una
+    # instalación anterior a la regla (ver `mayusculas` en api/auth.py).
+    nombre = mayusculas((envelope.get("campeonato") or {}).get("nombre") or "Campeonato")
     payload = {
         "resultados": resultados,
         "categorias": envelope.get("categorias", []),

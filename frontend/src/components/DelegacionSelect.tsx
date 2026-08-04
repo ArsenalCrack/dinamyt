@@ -5,8 +5,11 @@
 //  • País: se escribe para FILTRAR, pero el valor final DEBE ser un país del
 //    catálogo (no vale texto libre: lo que se escriba y no coincida se descarta
 //    al cerrar). Reutiliza el patrón abrir/cerrar de ClubCombobox.
-//  • Ciudad: sugiere las ciudades del país elegido (se escribe para filtrar),
-//    pero acepta texto libre porque no todas las ciudades están en el catálogo.
+//  • Ciudad: sugiere las ciudades del país elegido (se escribe para filtrar) y
+//    cierra la lista con «Otra ciudad…», que pasa a texto libre — igual que el
+//    selector de ciudad de "Crear campeonato" (<PaisCiudadSelect>). Antes el
+//    campo aceptaba texto libre "a la callada": quien no encontraba su ciudad
+//    en la lista no tenía forma de saber que podía escribirla igualmente.
 //    Se habilita solo tras elegir un país.
 //
 // Ojo con el marcado: el desplegable NO puede colgar dentro de un <label> que
@@ -140,7 +143,11 @@ function PaisCombobox({
 }
 
 /** Combobox de ciudad: sugiere las ciudades del país (filtra al escribir) y
- *  además acepta texto libre. Deshabilitado hasta elegir país. */
+ *  cierra la lista con «Otra ciudad…» para las que no están en el catálogo.
+ *  Deshabilitado hasta elegir país.
+ *
+ *  Se monta con `key={pais}`: al cambiar de país el componente se rehace, así
+ *  el modo texto libre no se queda pegado de la delegación anterior. */
 function CiudadCombobox({
   id, value, ciudades, disabled, maxLen, onChange,
 }: {
@@ -154,13 +161,23 @@ function CiudadCombobox({
   const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [abierto, setAbierto] = useState(false);
+  // null = no se está filtrando → el input muestra la ciudad elegida (mismo
+  // motivo que en PaisCombobox: si no, el campo se ve vacío al reenfocarlo).
+  const [filtro, setFiltro] = useState<string | null>(null);
+  // Texto libre tras elegir «Otra ciudad…». Arranca activo si la ciudad
+  // guardada no está en el catálogo del país (dato viejo o escrito a mano):
+  // así se puede ver y corregir, en vez de quedar atrapada en la lista.
+  const [libre, setLibre] = useState(
+    () => Boolean(value) && !ciudades.some((c) => normaliza(c) === normaliza(value)),
+  );
 
-  useCerrarFuera(rootRef, abierto, () => setAbierto(false));
+  const cerrar = () => { setAbierto(false); setFiltro(null); };
+  useCerrarFuera(rootRef, abierto, cerrar);
 
   const filtradas = useMemo(() => {
-    const q = normaliza(value);
+    const q = normaliza(filtro ?? "");
     return q ? ciudades.filter((c) => normaliza(c).includes(q)) : ciudades;
-  }, [ciudades, value]);
+  }, [ciudades, filtro]);
 
   if (disabled) {
     return (
@@ -169,27 +186,54 @@ function CiudadCombobox({
     );
   }
 
+  // ── Modo texto libre («Otra ciudad…») ──
+  if (libre) {
+    return (
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          id={id}
+          className="input"
+          value={value}
+          placeholder={t("geo.ciudadLibre")}
+          maxLength={maxLen}
+          onChange={(e) => onChange(e.target.value.slice(0, maxLen))}
+          style={{ flex: 1, minWidth: 0 }}
+          autoFocus
+        />
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => { onChange(""); setLibre(false); setAbierto(true); }}
+          title={t("form.delegacionCiudadSelecc")}
+        >
+          ↩
+        </button>
+      </div>
+    );
+  }
+
+  // ── Modo lista/filtro ──
   return (
     <div ref={rootRef} style={{ position: "relative" }}>
       <input
         id={id}
         className="input"
-        value={value}
+        value={filtro ?? value}
         placeholder={t("form.delegacionCiudadSelecc")}
         maxLength={maxLen}
-        onFocus={() => setAbierto(true)}
-        onClick={() => setAbierto(true)}
-        onChange={(e) => { setAbierto(true); onChange(e.target.value.slice(0, maxLen)); }}
+        onFocus={(e) => { setAbierto(true); e.currentTarget.select(); }}
+        onClick={(e) => { setAbierto(true); if (filtro === null) e.currentTarget.select(); }}
+        onChange={(e) => { setAbierto(true); setFiltro(e.target.value); }}
         autoComplete="off"
       />
-      {abierto && filtradas.length > 0 && (
+      {abierto && (
         <ul role="listbox" style={listaEstilo}>
           {filtradas.map((c) => (
             <li
               key={c}
               role="option"
               aria-selected={normaliza(c) === normaliza(value)}
-              onClick={(e) => { e.preventDefault(); onChange(c); setAbierto(false); }}
+              onClick={(e) => { e.preventDefault(); onChange(c); cerrar(); }}
               style={opcionEstilo(normaliza(c) === normaliza(value))}
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -197,6 +241,27 @@ function CiudadCombobox({
               {c}
             </li>
           ))}
+          {filtradas.length === 0 && (
+            <li style={{ padding: "8px 10px", color: "var(--text-dim)", fontSize: "0.85rem" }}>
+              {t("form.ciudadSinResultados")}
+            </li>
+          )}
+          {/* «Otra ciudad…»: el catálogo no tiene todas las ciudades del mundo,
+              y esta es la salida visible para las que faltan. */}
+          <li
+            role="option"
+            aria-selected={false}
+            onClick={(e) => { e.preventDefault(); setLibre(true); cerrar(); onChange(""); }}
+            style={{
+              padding: "8px 10px", cursor: "pointer", borderRadius: 6,
+              marginTop: 4, borderTop: "1px solid var(--border)",
+              color: "var(--chung-light)", fontWeight: 700,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            {t("geo.otraCiudad")}
+          </li>
         </ul>
       )}
     </div>
@@ -240,6 +305,9 @@ export default function DelegacionSelect({
       <div className="deleg-field">
         <label className="deleg-label" htmlFor={idCiudad}>{t("form.delegacion")}</label>
         <CiudadCombobox
+          // Rehacer el campo al cambiar de país: si no, el modo «Otra ciudad…»
+          // seguiría activo con las ciudades del país anterior.
+          key={pais}
           id={idCiudad}
           value={delegacion}
           ciudades={ciudades}

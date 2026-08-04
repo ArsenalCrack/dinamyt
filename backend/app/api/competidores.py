@@ -54,6 +54,17 @@ PESO_MIN, PESO_MAX = 10.0, 200.0
 PESO_CHARS_MAX = 6  # máx. caracteres en el string de peso (ej: "200.50")
 
 
+def _mayusculas(valor):
+    """Un NOMBRE (de persona o de club), tal y como se guarda: en MAYÚSCULAS.
+
+    Misma regla —y mismo motivo— que `mayusculas` en `api/auth.py`: la planilla
+    de inscritos, la llave impresa y el acta de resultados tienen que decir lo
+    mismo aunque el nombre lo haya escrito el maestro, el admin o una hoja de
+    Excel importada. `str.upper()` conserva tildes y eñes.
+    """
+    return None if valor is None else str(valor).upper()
+
+
 def _sin_acentos(texto):
     return "".join(
         c for c in unicodedata.normalize("NFD", str(texto))
@@ -156,7 +167,7 @@ def _aplicar_datos(comp, data, parciales=False, actor=None):
         if len(nombre) > NOMBRE_MAX:
             return f"El nombre no puede superar {NOMBRE_MAX} caracteres."
         if nombre:
-            comp.nombre_completo = nombre
+            comp.nombre_completo = _mayusculas(nombre)
 
     if "documento" in data:
         crudo = str(data.get("documento") or "").strip()
@@ -226,7 +237,7 @@ def _aplicar_datos(comp, data, parciales=False, actor=None):
         if club and len(club) > CLUB_MAX:
             return f"El club no puede superar {CLUB_MAX} caracteres."
         if club or not parciales:
-            comp.club = club
+            comp.club = _mayusculas(club)
 
     if "categoria_especial" in data:
         crudo = data.get("categoria_especial")

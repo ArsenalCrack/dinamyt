@@ -42,14 +42,30 @@ CLUB_MAX = 80
 DELEGACION_MAX = 120
 
 
+def mayusculas(valor):
+    """Un NOMBRE, tal y como se guarda: en MAYÚSCULAS.
+
+    Nombres de personas y de clubes los teclea gente distinta en momentos
+    distintos, y en la misma lista salían "Juan pérez", "JUAN PEREZ" y "Juan
+    Pérez". Normalizándolos al guardar, la lista de inscritos, la llave, el acta
+    y la planilla dicen todos lo mismo sin que ninguna pantalla tenga que
+    acordarse de convertirlo (el frontend lo aplica también mientras se escribe,
+    ver frontend/src/lib/texto.ts).
+
+    `str.upper()` de Python respeta Unicode: josé → JOSÉ, ñuñez → ÑUÑEZ. El
+    acento y la eñe son parte del nombre de la persona.
+    """
+    return None if valor is None else str(valor).upper()
+
+
 def _validar_club(valor):
-    """(club, error): club recortado o None; error si excede el tope."""
+    """(club, error): club recortado y en mayúsculas, o None; error si excede."""
     club = str(valor or "").strip()
     if not club:
         return None, None
     if len(club) > CLUB_MAX:
         return None, f"El club no puede superar {CLUB_MAX} caracteres."
-    return club, None
+    return mayusculas(club), None
 
 
 def _validar_delegacion(valor, pais_valor=None):
@@ -226,7 +242,7 @@ def register():
 
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
-    nombre = data.get("nombre", "").strip()
+    nombre = mayusculas(data.get("nombre", "").strip())
     rol = data.get("rol", "juez")
 
     if not email or not password or not nombre:
@@ -379,7 +395,7 @@ def update_user(user_id):
     data = request.get_json() or {}
 
     if data.get("nombre"):
-        user.nombre = data["nombre"].strip()
+        user.nombre = mayusculas(data["nombre"].strip())
 
     if data.get("email"):
         email = data["email"].strip().lower()

@@ -12,6 +12,7 @@ from ..extensions import db
 from ..models.usuario import Usuario
 from ..models.tatami import Tatami
 from ..models.asignacion import AsignacionJuez
+from .auth import mayusculas
 from .scoping import es_dueno_campeonato, es_dueno_usuario, usuario_actual
 
 tatamis_bp = Blueprint("tatamis", __name__)
@@ -137,7 +138,7 @@ def asignar_juez(tatami_id):
             usuario_id=user.id,
             tatami_id=tatami.id,
             rol_tatami=rol,
-            nombre_display=data.get("nombre_display", user.nombre),
+            nombre_display=mayusculas(data.get("nombre_display", user.nombre)),
             asignado_por_id=admin.id,
         )
         db.session.add(asignacion)
@@ -152,7 +153,7 @@ def asignar_juez(tatami_id):
                     "error": f"El rol '{rol}' ya está asignado a otro juez en este tatami."
                 }), 409
         existing.rol_tatami = rol
-        existing.nombre_display = data.get("nombre_display", user.nombre)
+        existing.nombre_display = mayusculas(data.get("nombre_display", user.nombre))
 
     db.session.commit()
     return jsonify({"message": f"Juez asignado como {rol} en tatami {tatami.numero}"}), 200

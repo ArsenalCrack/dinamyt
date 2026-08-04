@@ -20,9 +20,11 @@ import {
   type OpcionesExportCampeonato,
   type UserData,
 } from "@/lib/api";
+import CampoFecha from "@/components/CampoFecha";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
+import { enMayusculas } from "@/lib/texto";
 import QRCode from "qrcode";
 
 interface Tatami {
@@ -429,27 +431,33 @@ export default function CampeonatoDetailPage() {
         <form onSubmit={handleSaveEdit} className="card animate-slide"
           style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
           <div className="card-title">{t("camp.editar.titulo")}</div>
+          {/* Nombre y sede en mayúsculas (así se guardan); la descripción no:
+              ahí cabe una frase, no un dato. */}
           <input className="input" placeholder={t("admin.camp.nombre")} value={editData.nombre}
-            onChange={(e) => setEditData({ ...editData, nombre: e.target.value })} required />
+            onChange={(e) => setEditData({ ...editData, nombre: enMayusculas(e.target.value) })} required />
           <input className="input" placeholder={t("admin.camp.desc")} value={editData.descripcion}
             onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} />
+          {/* <div> y no <label>: el disparador de <CampoFecha> es un botón, y
+              un <label> que lo envuelva le reenvía el clic hecho sobre el
+              panel, reabriéndolo. */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
               {t("camp.campos.fechaInicio")}
-              <input className="input" type="date" value={editData.fecha_inicio}
-                onChange={(e) => setEditData({ ...editData, fecha_inicio: e.target.value })} />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
+              <CampoFecha valor={editData.fecha_inicio} ariaLabel={t("camp.campos.fechaInicio")}
+                onChange={(v) => setEditData({ ...editData, fecha_inicio: v })} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
               {t("camp.campos.fechaFin")}
-              <input className="input" type="date" value={editData.fecha_fin}
-                onChange={(e) => setEditData({ ...editData, fecha_fin: e.target.value })} />
-            </label>
+              <CampoFecha valor={editData.fecha_fin} ariaLabel={t("camp.campos.fechaFin")}
+                min={editData.fecha_inicio || undefined}
+                onChange={(v) => setEditData({ ...editData, fecha_fin: v })} />
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
             <label className="pcs-field" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)" }}>{t("camp.campos.lugar")}</span>
               <input className="input" placeholder={t("camp.campos.lugar")} value={editData.lugar}
-                maxLength={120} onChange={(e) => setEditData({ ...editData, lugar: e.target.value.slice(0, 120) })} />
+                maxLength={120} onChange={(e) => setEditData({ ...editData, lugar: enMayusculas(e.target.value.slice(0, 120)) })} />
             </label>
             <PaisCiudadSelect pais={editData.pais} ciudad={editData.ciudad}
               onChange={(pais, ciudad) => setEditData({ ...editData, pais, ciudad })} />

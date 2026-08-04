@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import api, { getCampeonatoAPI, idiomaArchivo, listTatamisAPI, resolverApiUrl, exportarResultadosAPI } from "@/lib/api";
+import CampoFecha from "@/components/CampoFecha";
 import PodioLlave from "@/components/PodioLlave";
 import type { PodioItem } from "@/lib/llaves";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
@@ -535,20 +536,19 @@ export default function ReportesCampeonatoPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 150px" }}>
             <label className="login-label" style={{ fontSize: "0.8rem" }}>{t("rep.desde")}</label>
-            <input
-              className="input" type="date"
-              value={filters.desde}
-              onChange={(e) => setFilters(f => ({ ...f, desde: e.target.value, page: 1 }))}
-              style={{ padding: "8px 12px", minHeight: 36, colorScheme: "dark" }}
+            <CampoFecha
+              valor={filters.desde}
+              ariaLabel={t("rep.desde")}
+              onChange={(v) => setFilters(f => ({ ...f, desde: v, page: 1 }))}
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 150px" }}>
             <label className="login-label" style={{ fontSize: "0.8rem" }}>{t("rep.hasta")}</label>
-            <input
-              className="input" type="date"
-              value={filters.hasta}
-              onChange={(e) => setFilters(f => ({ ...f, hasta: e.target.value, page: 1 }))}
-              style={{ padding: "8px 12px", minHeight: 36, colorScheme: "dark" }}
+            <CampoFecha
+              valor={filters.hasta}
+              ariaLabel={t("rep.hasta")}
+              min={filters.desde || undefined}
+              onChange={(v) => setFilters(f => ({ ...f, hasta: v, page: 1 }))}
             />
           </div>
           <button

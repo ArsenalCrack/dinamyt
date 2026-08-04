@@ -13,12 +13,14 @@ import {
   type EstadoCampeonato,
   type UserData,
 } from "@/lib/api";
+import CampoFecha from "@/components/CampoFecha";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import DelegacionSelect from "@/components/DelegacionSelect";
 import ImportarPaquetePanel from "@/components/ImportarPaquetePanel";
 import Logo from "@/components/Logo";
 import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
+import { enMayusculas } from "@/lib/texto";
 
 interface Campeonato {
   id: number;
@@ -350,27 +352,33 @@ export default function AdminPage() {
             <div className="card animate-slide" style={{ marginBottom: 16 }}>
               <div className="card-title">{t("admin.camp.crear.titulo")}</div>
               <form onSubmit={handleCreateCamp} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Nombre y sede en mayúsculas (así se guardan); la
+                    descripción no: ahí cabe una frase, no un dato. */}
                 <input className="input" placeholder={t("admin.camp.nombre")} value={newCamp.nombre}
-                  onChange={(e) => setNewCamp({ ...newCamp, nombre: e.target.value })} required />
+                  onChange={(e) => setNewCamp({ ...newCamp, nombre: enMayusculas(e.target.value) })} required />
                 <input className="input" placeholder={t("admin.camp.desc")} value={newCamp.descripcion}
                   onChange={(e) => setNewCamp({ ...newCamp, descripcion: e.target.value })} />
+                {/* <div> y no <label>: el disparador de <CampoFecha> es un
+                    botón, y un <label> que lo envuelva le reenvía el clic
+                    hecho sobre el panel, reabriéndolo. */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
                     {t("camp.campos.fechaInicio")}
-                    <input className="input" type="date" value={newCamp.fecha_inicio}
-                      onChange={(e) => setNewCamp({ ...newCamp, fecha_inicio: e.target.value })} />
-                  </label>
-                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
+                    <CampoFecha valor={newCamp.fecha_inicio} ariaLabel={t("camp.campos.fechaInicio")}
+                      onChange={(v) => setNewCamp({ ...newCamp, fecha_inicio: v })} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700 }}>
                     {t("camp.campos.fechaFin")}
-                    <input className="input" type="date" value={newCamp.fecha_fin}
-                      onChange={(e) => setNewCamp({ ...newCamp, fecha_fin: e.target.value })} />
-                  </label>
+                    <CampoFecha valor={newCamp.fecha_fin} ariaLabel={t("camp.campos.fechaFin")}
+                      min={newCamp.fecha_inicio || undefined}
+                      onChange={(v) => setNewCamp({ ...newCamp, fecha_fin: v })} />
+                  </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
                   <label className="pcs-field" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)" }}>{t("camp.campos.lugar")}</span>
                     <input className="input" placeholder={t("camp.campos.lugar")} value={newCamp.lugar}
-                      maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, lugar: e.target.value.slice(0, 120) })} />
+                      maxLength={120} onChange={(e) => setNewCamp({ ...newCamp, lugar: enMayusculas(e.target.value.slice(0, 120)) })} />
                   </label>
                   <PaisCiudadSelect pais={newCamp.pais} ciudad={newCamp.ciudad}
                     onChange={(pais, ciudad) => setNewCamp({ ...newCamp, pais, ciudad })} />
@@ -517,8 +525,10 @@ export default function AdminPage() {
             <div className="card animate-slide" style={{ marginBottom: 16 }}>
               <div className="card-title">{t("admin.usuarios.crear.titulo")}</div>
               <form onSubmit={handleCreateUser} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Nombre y club en MAYÚSCULAS mientras se escriben: así se
+                    guardan (ver lib/texto.ts y el backend). */}
                 <input className="input" placeholder={t("admin.usuarios.nombre")} value={newUser.nombre}
-                  onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })} required />
+                  onChange={(e) => setNewUser({ ...newUser, nombre: enMayusculas(e.target.value) })} required />
                 <input className="input" type="email" placeholder={t("admin.usuarios.correo")} value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} required />
                 <input className="input" type="password" placeholder={t("admin.usuarios.contrasena")} value={newUser.password}
@@ -535,7 +545,7 @@ export default function AdminPage() {
                   <>
                     <input className="input" placeholder={t("admin.usuarios.clubPh")}
                       value={newUser.club}
-                      onChange={(e) => setNewUser({ ...newUser, club: e.target.value.slice(0, 80) })}
+                      onChange={(e) => setNewUser({ ...newUser, club: enMayusculas(e.target.value.slice(0, 80)) })}
                       maxLength={80} required />
                     <DelegacionSelect
                       delegacion={newUser.delegacion}
@@ -646,8 +656,10 @@ export default function AdminPage() {
                         } else {
                           setEditingUser(u);
                           setEditUserData({
-                            nombre: u.nombre, email: u.email, password: "", rol: u.rol,
-                            club: u.club || "", puede_juzgar: !!u.puede_juzgar,
+                            // Un usuario creado antes de esta regla se abre ya
+                            // en mayúsculas: se ve como se va a guardar.
+                            nombre: enMayusculas(u.nombre), email: u.email, password: "", rol: u.rol,
+                            club: enMayusculas(u.club || ""), puede_juzgar: !!u.puede_juzgar,
                             delegacion: u.delegacion || "", pais_delegacion: u.pais_delegacion || "",
                           });
                         }
@@ -675,7 +687,7 @@ export default function AdminPage() {
                   }}>
                     <div className="card-title">{t("admin.usuarios.editarA", { nombre: u.nombre })}</div>
                     <input className="input" placeholder={t("admin.usuarios.nombre")} value={editUserData.nombre}
-                      onChange={(e) => setEditUserData({ ...editUserData, nombre: e.target.value })} />
+                      onChange={(e) => setEditUserData({ ...editUserData, nombre: enMayusculas(e.target.value) })} />
                     <input className="input" type="email" placeholder={t("admin.usuarios.correo")} value={editUserData.email}
                       onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })} />
                     <input className="input" type="password" autoComplete="new-password"
@@ -700,7 +712,7 @@ export default function AdminPage() {
                       <>
                         <input className="input" placeholder={t("admin.usuarios.clubPh")}
                           value={editUserData.club}
-                          onChange={(e) => setEditUserData({ ...editUserData, club: e.target.value.slice(0, 80) })}
+                          onChange={(e) => setEditUserData({ ...editUserData, club: enMayusculas(e.target.value.slice(0, 80)) })}
                           maxLength={80} />
                         <DelegacionSelect
                           delegacion={editUserData.delegacion}
