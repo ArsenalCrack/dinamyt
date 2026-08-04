@@ -1,6 +1,6 @@
 "use client";
 
-// Los clubes de un maestro: una lista, no un campo.
+// Los dojangs de un maestro: una lista, y cada uno con SU delegación.
 //
 // Un maestro puede dirigir VARIOS dojangs (y un mismo club puede tener varios
 // maestros, que eso siempre funcionó). Con un solo campo de texto, al admin no
@@ -8,16 +8,22 @@
 // escribir "DOJANG SUR / DOJANG NORTE" a mano dentro del nombre — y entonces
 // los reportes agrupaban por ese texto y contaban un club inventado.
 //
+// Y la delegación va en el CLUB, no en el maestro: sus dojangs suelen estar en
+// ciudades distintas, así que con una sola había que elegir cuál de las dos
+// mentir. Por eso cada fila lleva su propio <DelegacionSelect>.
+//
 // El PRIMERO de la lista es el principal: es el que se usa por defecto al
-// inscribir un alumno y el que ve todo lo que aún lee un club suelto (el
-// paquete de sincronización, el "solicitado por"). Por eso se puede reordenar.
+// inscribir un alumno, y su delegación es la que ve todo lo que aún lee una
+// suelta (el paquete de sincronización). Por eso se puede reordenar.
 //
 // Se ESCRIBE para crear un dojang nuevo, pero los que ya existen en el
-// workspace se ELIGEN de la lista. Un club es un nombre, no una entidad con
-// id: si el admin reescribe "DOJANG SUR" y se le va un dedo, nace un club
-// distinto y los reportes por club lo cuentan aparte sin avisar de nada.
+// workspace se ELIGEN de la lista, con la ciudad que ya tienen. Un club es un
+// nombre, no una entidad con id: si el admin lo reescribe y se le va un dedo,
+// nace un club distinto y los reportes por club lo cuentan aparte.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ClubMaestro } from "@/lib/api";
+import DelegacionSelect from "@/components/DelegacionSelect";
 import { useI18n } from "@/lib/i18n";
 import { enMayusculas } from "@/lib/texto";
 
@@ -33,10 +39,10 @@ export default function ClubesInput({
   maxLen = 80,
   maxClubes = 20,
 }: {
-  clubes: string[];
-  onChange: (clubes: string[]) => void;
-  /** Clubes que ya existen en el workspace (GET /auth/clubes). */
-  sugerencias?: string[];
+  clubes: ClubMaestro[];
+  onChange: (clubes: ClubMaestro[]) => void;
+  /** Clubes que ya existen en el workspace (GET /auth/clubes?detalle=1). */
+  sugerencias?: ClubMaestro[];
   maxLen?: number;
   maxClubes?: number;
 }) {
@@ -53,8 +59,8 @@ export default function ClubesInput({
   const disponibles = useMemo(() => {
     const q = normaliza(borrador);
     return sugerencias
-      .filter((s) => s && !clubes.some((c) => normaliza(c) === normaliza(s)))
-      .filter((s) => !q || normaliza(s).includes(q));
+      .filter((s) => s.nombre && !clubes.some((c) => normaliza(c.nombre) === normaliza(s.nombre)))
+      .filter((s) => !q || normaliza(s.nombre).includes(q));
   }, [sugerencias, clubes, borrador]);
 
   // Cerrar la lista al tocar fuera o con Escape (mismo patrón que los demás
@@ -77,11 +83,10 @@ export default function ClubesInput({
     };
   }, [abierto]);
 
-  function agregar(valor?: string) {
-    const crudo = valor ?? borrador;
-    const nombre = enMayusculas(crudo.trim()).slice(0, maxLen);
+  function agregar(existente?: ClubMaestro) {
+    const nombre = enMayusculas((existente?.nombre ?? borrador).trim()).slice(0, maxLen);
     if (!nombre) return;
-    if (clubes.some((c) => normaliza(c) === normaliza(nombre))) {
+    if (clubes.some((c) => normaliza(c.nombre) === normaliza(nombre))) {
       setAviso(t("form.clubesRepetido", { club: nombre }));
       return;
     }
@@ -89,10 +94,16 @@ export default function ClubesInput({
       setAviso(t("form.clubesTope", { n: maxClubes }));
       return;
     }
-    // Si coincide con uno que ya existe, se guarda TAL Y COMO está guardado
-    // allá: es lo que hace que sea el mismo club y no uno nuevo parecido.
-    const existente = sugerencias.find((s) => normaliza(s) === normaliza(nombre));
-    onChange([...clubes, existente ? enMayusculas(existente) : nombre]);
+    // Si coincide con uno que ya existe, se toma su ficha entera: el nombre tal
+    // y como está guardado allá (es lo que lo hace el MISMO club y no uno
+    // parecido) y la ciudad que ese dojang ya tiene.
+    const ficha = existente
+      ?? sugerencias.find((s) => normaliza(s.nombre) === normaliza(nombre));
+    onChange([...clubes, {
+      nombre: ficha ? enMayusculas(ficha.nombre) : nombre,
+      ciudad: ficha?.ciudad ?? "",
+      pais: ficha?.pais ?? "",
+    }]);
     setBorrador("");
     setAviso(null);
     setAbierto(false);
@@ -112,6 +123,10 @@ export default function ClubesInput({
     setAviso(null);
   }
 
+  function fijarDelegacion(indice: number, ciudad: string, pais: string) {
+    onChange(clubes.map((c, i) => (i === indice ? { ...c, ciudad, pais } : c)));
+  }
+
   return (
     <div className="clubes-campo">
       <span className="clubes-label">
@@ -124,29 +139,37 @@ export default function ClubesInput({
       {clubes.length > 0 && (
         <ul className="clubes-lista">
           {clubes.map((club, i) => (
-            <li key={club} className="clubes-item" data-principal={i === 0 || undefined}>
-              <span className="clubes-nombre">{club}</span>
-              {i === 0 ? (
-                <span className="clubes-badge">{t("form.clubesPrincipal")}</span>
-              ) : (
+            <li key={club.nombre} className="clubes-item" data-principal={i === 0 || undefined}>
+              <div className="clubes-fila">
+                <span className="clubes-nombre">{club.nombre}</span>
+                {i === 0 ? (
+                  <span className="clubes-badge">{t("form.clubesPrincipal")}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="clubes-accion"
+                    onClick={() => hacerPrincipal(i)}
+                    title={t("form.clubesHacerPrincipal")}
+                  >
+                    ↑
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="clubes-accion"
-                  onClick={() => hacerPrincipal(i)}
-                  title={t("form.clubesHacerPrincipal")}
+                  className="clubes-accion clubes-quitar"
+                  onClick={() => quitar(i)}
+                  title={t("form.clubesQuitar", { club: club.nombre })}
+                  aria-label={t("form.clubesQuitar", { club: club.nombre })}
                 >
-                  ↑
+                  ×
                 </button>
-              )}
-              <button
-                type="button"
-                className="clubes-accion clubes-quitar"
-                onClick={() => quitar(i)}
-                title={t("form.clubesQuitar", { club })}
-                aria-label={t("form.clubesQuitar", { club })}
-              >
-                ×
-              </button>
+              </div>
+              {/* La delegación de ESTE dojang. */}
+              <DelegacionSelect
+                delegacion={club.ciudad || ""}
+                pais={club.pais || ""}
+                onChange={(ciudad, pais) => fijarDelegacion(i, ciudad, pais)}
+              />
             </li>
           ))}
         </ul>
@@ -181,7 +204,7 @@ export default function ClubesInput({
               </li>
               {disponibles.map((s) => (
                 <li
-                  key={s}
+                  key={s.nombre}
                   role="option"
                   aria-selected={false}
                   className="clubes-sugerencia"
@@ -190,7 +213,8 @@ export default function ClubesInput({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => agregar(s)}
                 >
-                  {enMayusculas(s)}
+                  {enMayusculas(s.nombre)}
+                  {s.ciudad && <span className="clubes-sugerencia-ciudad">{s.ciudad}</span>}
                 </li>
               ))}
             </ul>
@@ -218,11 +242,11 @@ export default function ClubesInput({
         }
         .clubes-lista {
           list-style: none; margin: 0; padding: 0;
-          display: flex; flex-direction: column; gap: 6px;
+          display: flex; flex-direction: column; gap: 8px;
         }
         .clubes-item {
-          display: flex; align-items: center; gap: 8px;
-          padding: 8px 10px; min-height: 40px;
+          display: flex; flex-direction: column; gap: 8px;
+          padding: 10px;
           background: var(--bg-elevated);
           border: 1px solid var(--border);
           border-radius: var(--radius-sm);
@@ -231,6 +255,7 @@ export default function ClubesInput({
           border-color: var(--gold-border);
           background: var(--gold-bg);
         }
+        .clubes-fila { display: flex; align-items: center; gap: 8px; }
         .clubes-nombre {
           flex: 1; min-width: 0; font-weight: 700;
           overflow-wrap: anywhere;
@@ -268,11 +293,16 @@ export default function ClubesInput({
           color: var(--text-dim);
         }
         .clubes-sugerencia {
+          display: flex; align-items: baseline; gap: 8px;
           padding: 9px 10px; border-radius: var(--radius-xs);
           cursor: pointer; font-weight: 600; color: var(--text);
           transition: background 0.12s ease-out;
         }
         .clubes-sugerencia:hover { background: var(--bg-elevated); color: var(--gold); }
+        .clubes-sugerencia-ciudad {
+          margin-left: auto; flex-shrink: 0;
+          font-size: 0.78rem; font-weight: 600; color: var(--text-dim);
+        }
         .clubes-aviso {
           margin: 0; font-size: 0.82rem; font-weight: 700;
           color: var(--red-alert);

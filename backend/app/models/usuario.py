@@ -48,19 +48,24 @@ class Usuario(db.Model):
     # varios maestros. Lo segundo siempre funcionó (nunca hubo unicidad sobre
     # el nombre del club); lo primero no cabía en una sola columna de texto.
     #
-    # `clubes` (JSON) es la lista completa y la fuente de verdad. `club` se
-    # queda como el club PRINCIPAL —el primero de la lista— porque hay mucho
-    # que ya lo lee así: los paquetes de sincronización, el "solicitado por X"
-    # de una inscripción, y las instalaciones que todavía no tienen la columna
-    # nueva. Lo mantiene en su sitio el setter de `clubes`, así que no hay dos
-    # verdades que puedan discrepar: se escribe siempre por la lista.
+    # `clubes` (JSON) es la lista completa y la fuente de verdad. Cada dojang
+    # lleva SU PROPIA delegación —ciudad y país—, porque los dojangs de un
+    # mismo maestro suelen estar en sitios distintos: uno en Cali y otro en
+    # Popayán no son la misma delegación, y con una sola por maestro había que
+    # elegir cuál de las dos mentir.
     #
-    # Las filas anteriores a la columna tienen `clubes` NULL y el getter cae a
-    # `[club]`, así que no hace falta ningún backfill.
+    #     [{"nombre": "DOJANG SUR", "ciudad": "Cali", "pais": "Colombia"}, ...]
+    #
+    # `club`, `delegacion` y `pais_delegacion` se quedan como los del club
+    # PRINCIPAL —el primero de la lista— porque hay mucho que ya los lee así:
+    # los paquetes de sincronización y las instalaciones que todavía no tienen
+    # la columna nueva. Los mantiene en su sitio el setter de `clubes`, así que
+    # no hay dos verdades que puedan discrepar: se escribe siempre por la lista.
+    #
+    # Las filas anteriores a la columna tienen `clubes` NULL y el getter las
+    # arma con esas tres columnas, así que no hace falta ningún backfill.
     club = db.Column(db.String(80), nullable=True)
     _clubes = db.Column("clubes", db.JSON, nullable=True)
-    # Delegación del maestro: ciudad de origen del club. El país se deriva
-    # automáticamente del catálogo geográfico al asignar la delegación.
     delegacion = db.Column(db.String(120), nullable=True)
     pais_delegacion = db.Column(db.String(80), nullable=True)
     # Permiso extra para que un maestro también pueda ser asignado a un tatami
@@ -121,40 +126,87 @@ class Usuario(db.Model):
             self.password_hash.encode("utf-8"),
         )
 
+    @staticmethod
+    def _club_a_dict(valor) -> dict | None:
+        """Un dojang del JSON, en su forma canónica {nombre, ciudad, pais}.
+
+        Acepta también el texto suelto porque la lista nació guardando solo
+        nombres, antes de que cada dojang tuviera su propia delegación.
+        """
+        if isinstance(valor, dict):
+            nombre = str(valor.get("nombre") or "").strip()
+            ciudad = str(valor.get("ciudad") or "").strip()
+            pais = str(valor.get("pais") or "").strip()
+        else:
+            nombre, ciudad, pais = str(valor or "").strip(), "", ""
+        if not nombre:
+            return None
+        return {"nombre": nombre, "ciudad": ciudad or None, "pais": pais or None}
+
     @property
     def clubes(self) -> list:
-        """Los clubes del maestro, en orden. El primero es el principal.
+        """Los dojangs del maestro, en orden. El primero es el principal.
 
-        Cae a `[club]` cuando la columna nueva está vacía: así una fila
-        guardada antes de que existiera sigue respondiendo lo mismo que antes.
+        Cada uno con su ciudad y su país. Cuando la columna nueva está vacía se
+        arma con `club` + `delegacion` + `pais_delegacion`: así una fila
+        guardada antes de que existiera responde lo mismo que respondía.
         """
         if self._clubes:
-            return [c for c in self._clubes if c]
-        return [self.club] if self.club else []
+            return [c for c in map(self._club_a_dict, self._clubes) if c]
+        if not self.club:
+            return []
+        return [{
+            "nombre": self.club,
+            "ciudad": self.delegacion,
+            "pais": self.pais_delegacion,
+        }]
 
     @clubes.setter
     def clubes(self, lista):
-        """Fija la lista completa y, con ella, el club principal.
+        """Fija la lista completa y, con ella, los datos del club principal.
 
-        Es el ÚNICO sitio donde se escribe `club`: mantener las dos columnas a
-        mano desde cada endpoint es la forma segura de que acaben discrepando.
+        Es el ÚNICO sitio donde se escriben `club`, `delegacion` y
+        `pais_delegacion`: mantenerlos a mano desde cada endpoint es la forma
+        segura de que acaben discrepando de la lista.
         """
         limpia = []
         for valor in (lista or []):
-            texto = str(valor or "").strip()
+            club = self._club_a_dict(valor)
             # Sin repetir: "Dojang Sur" y "DOJANG SUR" son el mismo club, y en
             # la lista del admin saldrían dos veces.
-            if texto and not any(texto.casefold() == c.casefold() for c in limpia):
-                limpia.append(texto)
+            if club and not any(
+                club["nombre"].casefold() == c["nombre"].casefold() for c in limpia
+            ):
+                limpia.append(club)
         self._clubes = limpia or None
-        self.club = limpia[0] if limpia else None
+        principal = limpia[0] if limpia else None
+        self.club = principal["nombre"] if principal else None
+        self.delegacion = principal["ciudad"] if principal else None
+        self.pais_delegacion = principal["pais"] if principal else None
+
+    @property
+    def nombres_clubes(self) -> list:
+        """Solo los nombres, para catálogos y desplegables."""
+        return [c["nombre"] for c in self.clubes]
 
     def dirige_club(self, nombre) -> bool:
         """True si ese club es uno de los suyos (sin distinguir mayúsculas)."""
+        return self.club_por_nombre(nombre) is not None
+
+    def club_por_nombre(self, nombre) -> dict | None:
+        """El dojang (con su delegación) que se llama así, o None.
+
+        Con esto, lo que se enseña al revisar una inscripción es la delegación
+        DEL DOJANG del alumno, no la del maestro: si dirige uno en Cali y otro
+        en Popayán, decir siempre "Cali" es sencillamente falso.
+        """
         objetivo = str(nombre or "").strip().casefold()
         if not objetivo:
-            return False
-        return any(objetivo == c.casefold() for c in self.clubes)
+            return None
+        for club in self.clubes:
+            if club["nombre"].casefold() == objetivo:
+                return club
+        return None
 
     @property
     def es_super(self) -> bool:
@@ -191,8 +243,9 @@ class Usuario(db.Model):
             "nombre": self.nombre,
             "rol": self.rol,
             "es_superadmin": self.es_super,
-            # `club` es el principal y sigue viajando para no romper a nadie
-            # que ya lo lea; `clubes` es la lista completa.
+            # `club`, `delegacion` y `pais_delegacion` son los del principal y
+            # siguen viajando para no romper a nadie que ya los lea; `clubes`
+            # es la lista completa, cada dojang con su propia delegación.
             "club": self.club,
             "clubes": self.clubes,
             "delegacion": self.delegacion,

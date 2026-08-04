@@ -140,11 +140,9 @@ export async function registerUserAPI(data: {
   password: string;
   nombre: string;
   rol: string;
-  /** Clubes del maestro. El primero queda como principal. */
-  clubes?: string[];
+  /** Dojangs del maestro, cada uno con su delegación. El primero es el principal. */
+  clubes?: ClubMaestro[];
   puede_juzgar?: boolean;
-  delegacion?: string;
-  pais_delegacion?: string;
 }) {
   const res = await api.post("/auth/register", data);
   return res.data;
@@ -171,8 +169,7 @@ export async function updateUserAPI(
   id: number,
   data: {
     nombre?: string; email?: string; password?: string; activo?: boolean;
-    rol?: string; clubes?: string[]; puede_juzgar?: boolean; delegacion?: string;
-    pais_delegacion?: string;
+    rol?: string; clubes?: ClubMaestro[]; puede_juzgar?: boolean;
   }
 ) {
   const res = await api.put(`/auth/users/${id}`, data);
@@ -183,6 +180,16 @@ export async function updateUserAPI(
 export async function listClubesAPI() {
   const res = await api.get("/auth/clubes");
   return res.data as string[];
+}
+
+/**
+ * Lo mismo, pero con la delegación de cada club. Al asignarle a un maestro un
+ * dojang que ya existe, se rellena la ciudad que ese dojang ya tiene en vez de
+ * volver a elegirla — que es como el mismo club acaba en dos ciudades.
+ */
+export async function listClubesDetalleAPI() {
+  const res = await api.get("/auth/clubes", { params: { detalle: "1" } });
+  return res.data as ClubMaestro[];
 }
 
 // ── Campeonatos API ──
@@ -1064,6 +1071,20 @@ export async function listCombatesRecientesAPI(limit = 20) {
 }
 
 // ── Types ──
+/**
+ * Un dojang del maestro, con su propia delegación.
+ *
+ * La delegación va en el CLUB y no en el maestro porque sus dojangs suelen
+ * estar en ciudades distintas: uno en Cali y otro en Popayán no son la misma
+ * delegación. `ciudad` y `pais` salen del catálogo geográfico (lib/geo.ts) y
+ * por eso NO van en mayúsculas, a diferencia del nombre.
+ */
+export interface ClubMaestro {
+  nombre: string;
+  ciudad?: string | null;
+  pais?: string | null;
+}
+
 export interface UserData {
   id: number;
   email: string;
@@ -1072,13 +1093,13 @@ export interface UserData {
   // Jerarquía: el superadmin ve todos los workspaces; un admin normal solo
   // los jueces, campeonatos y competidores que él creó.
   es_superadmin?: boolean;
-  // Rol maestro: sus clubes (los fija el admin) y permiso para juzgar tatamis.
-  // Un maestro puede dirigir varios dojangs y un club puede tener varios
-  // maestros: `clubes` es la lista completa y `club` el principal (el primero),
-  // que sigue viajando para lo que ya lo leía.
+  // Rol maestro: sus dojangs (los fija el admin) y permiso para juzgar tatamis.
+  // Un maestro puede dirigir varios y un club puede tener varios maestros.
+  // `clubes` es la lista completa, cada uno con SU delegación; `club`,
+  // `delegacion` y `pais_delegacion` son los del principal (el primero) y
+  // siguen viajando para lo que ya los leía.
   club?: string | null;
-  clubes?: string[];
-  // Delegación: ciudad de origen del club del maestro.
+  clubes?: ClubMaestro[];
   delegacion?: string | null;
   pais_delegacion?: string | null;
   puede_juzgar?: boolean;

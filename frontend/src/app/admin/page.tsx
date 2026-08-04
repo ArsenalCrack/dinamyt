@@ -7,22 +7,46 @@ import {
   createCampeonatoAPI,
   updateCampeonatoAPI,
   exportarUsuariosAPI,
-  listClubesAPI,
+  listClubesDetalleAPI,
   listUsersAPI,
   registerUserAPI,
   updateUserAPI,
+  type ClubMaestro,
   type EstadoCampeonato,
   type UserData,
 } from "@/lib/api";
 import CampoFecha from "@/components/CampoFecha";
 import ClubesInput from "@/components/ClubesInput";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import DelegacionSelect from "@/components/DelegacionSelect";
 import ImportarPaquetePanel from "@/components/ImportarPaquetePanel";
 import Logo from "@/components/Logo";
 import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
 import { enMayusculas } from "@/lib/texto";
+
+/**
+ * Los dojangs de un maestro, con respaldo en los campos sueltos.
+ *
+ * Un maestro guardado antes de que la lista existiera solo trae `club` +
+ * `delegacion` + `pais_delegacion`, y el backend hace la misma reconstrucción
+ * (ver `clubes` en models/usuario.py). Aquí hace falta porque `users` también
+ * puede venir de una sesión vieja en localStorage.
+ */
+function clubesDe(u: UserData): ClubMaestro[] {
+  if (u.clubes?.length) {
+    return u.clubes.map((c) => ({
+      nombre: enMayusculas(c.nombre),
+      ciudad: c.ciudad || "",
+      pais: c.pais || "",
+    }));
+  }
+  if (!u.club) return [];
+  return [{
+    nombre: enMayusculas(u.club),
+    ciudad: u.delegacion || "",
+    pais: u.pais_delegacion || "",
+  }];
+}
 
 interface Campeonato {
   id: number;
@@ -47,7 +71,7 @@ export default function AdminPage() {
   const [campeonatos, setCampeonatos] = useState<Campeonato[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
   // Clubes ya existentes en el workspace, para elegirlos en vez de reescribirlos.
-  const [clubes, setClubes] = useState<string[]>([]);
+  const [clubes, setClubes] = useState<ClubMaestro[]>([]);
   const [tab, setTab] = useState<"campeonatos" | "jueces">("campeonatos");
   const [showNewCamp, setShowNewCamp] = useState(false);
   const [showNewUser, setShowNewUser] = useState(false);
@@ -61,8 +85,8 @@ export default function AdminPage() {
     estado: "preparacion" as EstadoCampeonato,
   });
   const [newUser, setNewUser] = useState({
-    email: "", password: "", nombre: "", rol: "juez", clubes: [] as string[],
-    puede_juzgar: false, delegacion: "", pais_delegacion: "",
+    email: "", password: "", nombre: "", rol: "juez", clubes: [] as ClubMaestro[],
+    puede_juzgar: false,
   });
   const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const [userSearch, setUserSearch] = useState("");
@@ -73,8 +97,8 @@ export default function AdminPage() {
   const [creandoCamp, setCreandoCamp] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [editUserData, setEditUserData] = useState({
-    nombre: "", email: "", password: "", rol: "juez", clubes: [] as string[],
-    puede_juzgar: false, delegacion: "", pais_delegacion: "",
+    nombre: "", email: "", password: "", rol: "juez", clubes: [] as ClubMaestro[],
+    puede_juzgar: false,
   });
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
 
@@ -101,7 +125,7 @@ export default function AdminPage() {
         // maestro se elige de aquí en vez de volver a teclearlo. Un club es un
         // nombre, así que un dedazo al reescribirlo crea uno nuevo y parte en
         // dos las agrupaciones por club de los reportes.
-        listClubesAPI().catch(() => [] as string[]),
+        listClubesDetalleAPI().catch(() => [] as ClubMaestro[]),
       ]);
       setCampeonatos(c);
       setUsers(u);
@@ -129,14 +153,14 @@ export default function AdminPage() {
     if (!editingUser) return;
     const payload: {
       nombre?: string; email?: string; password?: string; rol?: string;
-      clubes?: string[]; puede_juzgar?: boolean; delegacion?: string;
-      pais_delegacion?: string;
+      clubes?: ClubMaestro[]; puede_juzgar?: boolean;
     } = {};
     if (editUserData.nombre.trim()) payload.nombre = editUserData.nombre.trim();
     if (editUserData.email.trim()) payload.email = editUserData.email.trim();
     if (editUserData.password) payload.password = editUserData.password;
     if (editUserData.rol && editUserData.rol !== editingUser.rol) payload.rol = editUserData.rol;
-    // Clubes, delegación y permiso de juez cuando el usuario es (o pasa a ser) maestro.
+    // Clubes y permiso de juez cuando el usuario es (o pasa a ser) maestro. La
+    // delegación viaja dentro de cada club: es de cada dojang, no del maestro.
     const rolEfectivo = editUserData.rol || editingUser.rol;
     if (rolEfectivo === "maestro") {
       if (editUserData.clubes.length === 0) {
@@ -145,10 +169,6 @@ export default function AdminPage() {
       }
       payload.clubes = editUserData.clubes;
       payload.puede_juzgar = editUserData.puede_juzgar;
-      // País y ciudad siempre viajan juntos (aunque vayan vacíos) para que al
-      // editar se sincronice bien la delegación e incluso pueda limpiarse.
-      payload.delegacion = editUserData.delegacion.trim();
-      payload.pais_delegacion = editUserData.pais_delegacion.trim();
     }
     try {
       await updateUserAPI(editingUser.id, payload);
@@ -224,13 +244,11 @@ export default function AdminPage() {
           ? {
               clubes: newUser.clubes,
               puede_juzgar: newUser.puede_juzgar,
-              delegacion: newUser.delegacion.trim() || undefined,
-              pais_delegacion: newUser.pais_delegacion.trim() || undefined,
             }
           : {}),
       });
       setShowNewUser(false);
-      setNewUser({ email: "", password: "", nombre: "", rol: "juez", clubes: [], puede_juzgar: false, delegacion: "", pais_delegacion: "" });
+      setNewUser({ email: "", password: "", nombre: "", rol: "juez", clubes: [], puede_juzgar: false });
       loadData(showInactive);
       flash(t("admin.usuarios.creado"), "ok");
     } catch (err) {
@@ -558,11 +576,6 @@ export default function AdminPage() {
                       sugerencias={clubes}
                       onChange={(nuevos) => setNewUser({ ...newUser, clubes: nuevos })}
                     />
-                    <DelegacionSelect
-                      delegacion={newUser.delegacion}
-                      pais={newUser.pais_delegacion}
-                      onChange={(d, p) => setNewUser({ ...newUser, delegacion: d, pais_delegacion: p })}
-                    />
                     <label style={{
                       display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
                       fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 700, userSelect: "none",
@@ -646,13 +659,15 @@ export default function AdminPage() {
                     <div style={{ color: "var(--text-dim)", fontSize: "0.84rem", marginTop: 4 }}>
                       {t("admin.usuarios.agregado")} {u.created_at ? new Date(u.created_at).toLocaleDateString("es-CO") : "—"}
                       {u.creado_por ? ` ${t("comun.por")} ${u.creado_por.nombre}` : ""}
-                      {/* Todos sus dojangs, no solo el principal: si dirige
-                          dos, verlos aquí es lo que evita crearle una segunda
-                          cuenta por creer que le falta uno. */}
-                      {u.rol === "maestro" && (u.clubes?.length || u.club)
-                        ? ` · ${t("admin.usuarios.club")}: ${(u.clubes?.length ? u.clubes : [u.club]).join(" · ")}`
+                      {/* Cada dojang CON SU ciudad, no solo el principal: es lo
+                          que evita crearle una segunda cuenta por creer que le
+                          falta uno, y ver de un vistazo que uno está en otra
+                          delegación. */}
+                      {u.rol === "maestro" && clubesDe(u).length > 0
+                        ? ` · ${t("admin.usuarios.club")}: ${clubesDe(u).map(
+                            (c) => c.ciudad ? `${c.nombre} (${c.ciudad})` : c.nombre,
+                          ).join(" · ")}`
                         : ""}
-                      {u.rol === "maestro" && u.delegacion ? ` · ${t("maestro.tuDelegacion")}: ${u.delegacion}${u.pais_delegacion ? ` (${u.pais_delegacion})` : ""}` : ""}
                       {u.rol === "maestro" && u.puede_juzgar ? ` · ${t("rol.juez")}` : ""}
                     </div>
                   </div>
@@ -675,12 +690,8 @@ export default function AdminPage() {
                             // Un usuario creado antes de esta regla se abre ya
                             // en mayúsculas: se ve como se va a guardar.
                             nombre: enMayusculas(u.nombre), email: u.email, password: "", rol: u.rol,
-                            // `clubes` con respaldo en `club`: un maestro
-                            // guardado antes de la lista solo trae el suelto.
-                            clubes: (u.clubes?.length ? u.clubes : [u.club || ""])
-                              .filter(Boolean).map(enMayusculas),
+                            clubes: clubesDe(u),
                             puede_juzgar: !!u.puede_juzgar,
-                            delegacion: u.delegacion || "", pais_delegacion: u.pais_delegacion || "",
                           });
                         }
                       }}
@@ -734,11 +745,6 @@ export default function AdminPage() {
                           clubes={editUserData.clubes}
                           sugerencias={clubes}
                           onChange={(nuevos) => setEditUserData({ ...editUserData, clubes: nuevos })}
-                        />
-                        <DelegacionSelect
-                          delegacion={editUserData.delegacion}
-                          pais={editUserData.pais_delegacion}
-                          onChange={(d, p) => setEditUserData({ ...editUserData, delegacion: d, pais_delegacion: p })}
                         />
                         <label style={{
                           display: "flex", alignItems: "center", gap: 8, cursor: "pointer",

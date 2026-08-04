@@ -107,8 +107,9 @@ def _usuario_a_dict(u):
         "email": u.email,
         "nombre": u.nombre,
         "rol": u.rol,
-        # `club` (el principal) viaja además de la lista para que una
-        # instalación vieja, que solo lee esa clave, siga importando bien.
+        # `club` y la delegación (los del principal) viajan además de la lista
+        # para que una instalación vieja, que solo lee esas claves, siga
+        # importando bien. En `clubes` va cada dojang con la suya.
         "club": u.club,
         "clubes": u.clubes,
         "delegacion": u.delegacion,
@@ -486,16 +487,30 @@ def _importar_usuarios(lista, admin, informe):
             continue
 
         nombre = _nombre(datos.get("nombre"), 150) or email
-        # Un paquete de una instalación anterior solo trae `club`; uno nuevo
-        # trae la lista entera (un maestro puede dirigir varios dojangs).
+        # Un paquete de una instalación anterior solo trae `club` + la
+        # delegación suelta; uno nuevo trae la lista entera, con la delegación
+        # de cada dojang (un maestro puede tener uno en cada ciudad).
         crudos = datos.get("clubes")
         if not isinstance(crudos, list):
-            crudos = [datos.get("club")]
+            crudos = [{
+                "nombre": datos.get("club"),
+                "ciudad": datos.get("delegacion"),
+                "pais": datos.get("pais_delegacion"),
+            }]
         clubes = []
         for valor in crudos:
-            uno = _nombre(valor, 80)
-            if uno and uno not in clubes:
-                clubes.append(uno)
+            if not isinstance(valor, dict):
+                valor = {"nombre": valor}
+            uno = _nombre(valor.get("nombre"), 80)
+            if not uno or any(uno == c["nombre"] for c in clubes):
+                continue
+            clubes.append({
+                "nombre": uno,
+                # Ciudad y país NO se pasan a mayúsculas: salen del catálogo
+                # geográfico y se comparan con él por valor exacto.
+                "ciudad": _texto(valor.get("ciudad"), 120) or None,
+                "pais": _texto(valor.get("pais"), 80) or None,
+            })
         if rol == "maestro" and not clubes:
             informe.aviso(
                 f"El maestro '{email}' llega sin club: asígnaselo en Usuarios "
@@ -525,10 +540,9 @@ def _importar_usuarios(lista, admin, informe):
             local.activo = bool(datos.get("activo", True))
             informe.actualizado("usuarios")
 
-        # Por la lista: el setter fija también el club principal.
+        # Por la lista: el setter fija también el club principal y su
+        # delegación (`club`, `delegacion`, `pais_delegacion`).
         local.clubes = clubes if rol == "maestro" else []
-        local.delegacion = _texto(datos.get("delegacion"), 120) or None if rol == "maestro" else None
-        local.pais_delegacion = _texto(datos.get("pais_delegacion"), 80) or None if rol == "maestro" else None
 
         # Si deja de poder juzgar, sus asignaciones de tatami dejan de valer
         # (misma regla que al editarlo desde Usuarios, ver api/auth.py).

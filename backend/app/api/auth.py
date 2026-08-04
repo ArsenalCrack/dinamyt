@@ -62,38 +62,64 @@ def mayusculas(valor):
 
 
 def _validar_clubes(data):
-    """(clubes, error): la lista de clubes del maestro, limpia y validada.
+    """(clubes, error): los dojangs del maestro, limpios y validados.
 
-    Acepta las dos formas del cuerpo:
-      · `clubes: ["DOJANG SUR", "DOJANG NORTE"]` — un maestro con varios dojangs
-      · `club: "DOJANG SUR"` — la forma de siempre, que siguen usando el
-        importador de paquetes y cualquier cliente que no se haya actualizado
+    Cada uno con SU delegación, porque los dojangs de un mismo maestro suelen
+    estar en ciudades distintas:
 
-    Devuelve `None` (y no `[]`) cuando el cuerpo no menciona ninguna de las dos:
-    quien llama distingue así "no me hables del club" de "déjalo sin clubes".
+        [{"nombre": "DOJANG SUR", "ciudad": "Cali", "pais": "Colombia"}, ...]
+
+    Acepta las tres formas del cuerpo, de la más nueva a la más vieja:
+      · `clubes: [{"nombre", "ciudad", "pais"}, ...]` — la de ahora
+      · `clubes: ["DOJANG SUR", ...]` — nombres sueltos, sin delegación
+      · `club: "DOJANG SUR"` (+ `delegacion`/`pais_delegacion` arriba) — la de
+        siempre, que siguen usando el importador de paquetes y cualquier
+        cliente que no se haya actualizado
+
+    Devuelve `None` (y no `[]`) cuando el cuerpo no menciona ninguna: quien
+    llama distingue así "no me hables del club" de "déjalo sin clubes".
     """
     if "clubes" in data:
         crudos = data.get("clubes")
         if crudos is None:
             crudos = []
         if not isinstance(crudos, list):
-            return None, "Los clubes deben venir como una lista de nombres."
+            return None, "Los clubes deben venir como una lista."
     elif "club" in data:
-        crudos = [data.get("club")]
+        # Forma antigua: el club suelto se queda con la delegación que venga
+        # al nivel del usuario, que era la única que había.
+        crudos = [{
+            "nombre": data.get("club"),
+            "ciudad": data.get("delegacion"),
+            "pais": data.get("pais_delegacion"),
+        }]
     else:
         return None, None
 
     limpios = []
     for valor in crudos:
-        nombre = mayusculas(str(valor or "").strip())
+        if isinstance(valor, dict):
+            crudo_nombre = valor.get("nombre")
+            crudo_ciudad = valor.get("ciudad")
+            crudo_pais = valor.get("pais")
+        else:
+            crudo_nombre, crudo_ciudad, crudo_pais = valor, None, None
+
+        nombre = mayusculas(str(crudo_nombre or "").strip())
         if not nombre:
             continue
         if len(nombre) > CLUB_MAX:
             return None, f"El club no puede superar {CLUB_MAX} caracteres."
-        # Sin repetidos: el mismo dojang dos veces en la lista no significa nada
-        # y saldría duplicado en el desplegable al inscribir.
-        if not any(nombre == c for c in limpios):
-            limpios.append(nombre)
+        # Sin repetidos: el mismo dojang dos veces no significa nada y saldría
+        # duplicado en el desplegable al inscribir.
+        if any(nombre == c["nombre"] for c in limpios):
+            continue
+
+        ciudad, pais, error = _validar_delegacion(crudo_ciudad, crudo_pais)
+        if error:
+            return None, error
+        limpios.append({"nombre": nombre, "ciudad": ciudad, "pais": pais})
+
     if len(limpios) > CLUBES_MAX:
         return None, f"Un maestro no puede tener más de {CLUBES_MAX} clubes."
     return limpios, None
@@ -297,13 +323,6 @@ def register():
         return jsonify({"error": "El club es obligatorio para un maestro"}), 400
     puede_juzgar = bool(data.get("puede_juzgar")) if rol == "maestro" else False
 
-    # Delegación: país (del catálogo) + ciudad de origen del club del maestro.
-    delegacion, pais_del, error = _validar_delegacion(
-        data.get("delegacion"), data.get("pais_delegacion")
-    )
-    if error:
-        return jsonify({"error": error}), 400
-
     if Usuario.query.filter_by(email=email).first():
         return jsonify({"error": f"El email '{email}' ya está registrado"}), 409
 
@@ -313,11 +332,12 @@ def register():
         rol=rol,
         activo=True,
         creado_por_id=current_user.id,
-        delegacion=delegacion if rol == "maestro" else None,
-        pais_delegacion=pais_del if rol == "maestro" else None,
         puede_juzgar=puede_juzgar,
     )
-    # Por la lista, nunca por `club`: el setter fija también el principal.
+    # Por la lista y nunca campo a campo: el setter fija además el club
+    # principal y su delegación, que es lo que leen `club`, `delegacion` y
+    # `pais_delegacion`. La delegación suelta del cuerpo (clientes antiguos) ya
+    # viene doblada dentro de la lista, ver `_validar_clubes`.
     new_user.clubes = clubes if rol == "maestro" else []
     new_user.set_password(password)
     db.session.add(new_user)
@@ -381,9 +401,16 @@ def list_users():
 @jwt_required()
 def listar_clubes():
     """
-    GET /api/auth/clubes (solo Admin)
-    Clubes distintos de los maestros del workspace. Alimenta el desplegable de
-    club al inscribir competidores ("Independiente"/"Otro…" los agrega el cliente).
+    GET /api/auth/clubes[?detalle=1] (solo Admin)
+
+    Clubes distintos de los maestros del workspace. Sin `detalle` devuelve solo
+    los NOMBRES, que es lo que necesita el desplegable de club al inscribir
+    competidores ("Independiente"/"Otro…" los agrega el cliente).
+
+    Con `detalle=1` devuelve además la delegación de cada uno
+    ({nombre, ciudad, pais}), para que al asignarle a un maestro un club que ya
+    existe se rellene la ciudad que ese club ya tiene en vez de volver a
+    elegirla —y acabar con el mismo dojang en dos ciudades distintas—.
     """
     current_user = require_admin()
     if not current_user:
@@ -392,14 +419,25 @@ def listar_clubes():
     query = Usuario.query.filter(Usuario.rol == "maestro")
     if not current_user.es_super:
         query = query.filter(Usuario.creado_por_id == current_user.id)
+
     # TODOS los clubes de cada maestro, no solo el principal: un maestro con
     # dos dojangs aporta los dos. Y un mismo club dirigido por varios maestros
-    # aparece una sola vez, que es lo que ya hacía el conjunto.
-    clubes = sorted(
-        {c.strip() for u in query.all() for c in u.clubes if c.strip()},
-        key=str.lower,
-    )
-    return jsonify(clubes), 200
+    # aparece una sola vez — se queda la primera ficha que traiga delegación,
+    # porque la de un maestro que la dejó en blanco no aporta nada.
+    por_nombre = {}
+    for usuario in query.all():
+        for club in usuario.clubes:
+            nombre = club["nombre"].strip()
+            if not nombre:
+                continue
+            previo = por_nombre.get(nombre.casefold())
+            if previo is None or (not previo["ciudad"] and club["ciudad"]):
+                por_nombre[nombre.casefold()] = {**club, "nombre": nombre}
+
+    clubes = sorted(por_nombre.values(), key=lambda c: c["nombre"].lower())
+    if request.args.get("detalle") == "1":
+        return jsonify(clubes), 200
+    return jsonify([c["nombre"] for c in clubes]), 200
 
 
 @auth_bp.route("/users/<int:user_id>", methods=["PUT"])
@@ -465,16 +503,18 @@ def update_user(user_id):
                 # Un admin no actúa como juez de tatami: liberar sus asignaciones
                 AsignacionJuez.query.filter_by(usuario_id=user.id).delete()
             if nuevo_rol != "maestro":
-                # Al dejar de ser maestro, los clubes, la delegación y el
-                # permiso de juez dejan de aplicar.
+                # Al dejar de ser maestro, los clubes (con su delegación) y el
+                # permiso de juez dejan de aplicar. El setter limpia también
+                # `club`, `delegacion` y `pais_delegacion`.
                 user.clubes = []
-                user.delegacion = None
-                user.pais_delegacion = None
                 user.puede_juzgar = False
             user.rol = nuevo_rol
 
-    # Clubes del maestro (los fija/edita el admin). Se acepta la lista completa
-    # o el `club` suelto de siempre; ver `_validar_clubes`.
+    # Clubes del maestro, cada uno con su delegación (los fija/edita el admin).
+    # Se acepta la lista completa o el `club` suelto de siempre; ver
+    # `_validar_clubes`. Con la lista viaja la delegación de cada dojang, así
+    # que no hay un bloque aparte para `delegacion`/`pais_delegacion`: sería
+    # otra vía de escritura capaz de dejarlos discrepando de la lista.
     clubes, error = _validar_clubes(data)
     if error:
         return jsonify({"error": error}), 400
@@ -482,16 +522,18 @@ def update_user(user_id):
         if user.rol == "maestro" and not clubes:
             return jsonify({"error": "El club es obligatorio para un maestro"}), 400
         user.clubes = clubes
-
-    # Delegación del maestro (país del catálogo + ciudad de origen del club).
-    if "delegacion" in data or "pais_delegacion" in data:
-        delegacion, pais_del, error = _validar_delegacion(
+    elif "delegacion" in data or "pais_delegacion" in data:
+        # Cliente antiguo que solo corrige la delegación, sin tocar el club:
+        # se aplica al dojang principal, que es el único que conoce.
+        ciudad, pais, error = _validar_delegacion(
             data.get("delegacion"), data.get("pais_delegacion")
         )
         if error:
             return jsonify({"error": error}), 400
-        user.delegacion = delegacion
-        user.pais_delegacion = pais_del
+        actuales = user.clubes
+        if actuales:
+            actuales[0] = {**actuales[0], "ciudad": ciudad, "pais": pais}
+            user.clubes = actuales
 
     # Permiso de juez del maestro. Si se le revoca, se liberan sus asignaciones.
     if "puede_juzgar" in data:

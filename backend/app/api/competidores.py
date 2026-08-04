@@ -161,7 +161,7 @@ def _club_del_maestro(maestro, pedido):
     Sin `club` en el cuerpo se usa el principal, que es lo que hacía siempre y
     lo que necesita un maestro con un solo dojang.
     """
-    disponibles = maestro.clubes
+    disponibles = maestro.nombres_clubes
     if not disponibles:
         return None, "Tu administrador aún no te asignó un club."
 

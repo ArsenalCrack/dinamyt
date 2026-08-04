@@ -8,6 +8,7 @@ import {
   maestroMisInscripcionesAPI,
   maestroReenviarAPI,
   misTatamisAPI,
+  type ClubMaestro,
   type InscripcionData,
   type MaestroCampeonato,
   type UserData,
@@ -55,14 +56,16 @@ export default function MaestroPage() {
   const [reenvioModalidades, setReenvioModalidades] = useState<string[]>(["COMBATE"]);
   const [reenviando, setReenviando] = useState(false);
 
-  // Los dojangs del maestro. `clubes` con respaldo en `club`: una sesión
-  // guardada antes de que existiera la lista solo trae el suelto.
-  const misClubes = user?.clubes?.length
+  // Los dojangs del maestro, cada uno con su delegación. Con respaldo en los
+  // campos sueltos: una sesión guardada antes de que existiera la lista solo
+  // trae `club` + `delegacion` + `pais_delegacion`.
+  const misClubes: ClubMaestro[] = user?.clubes?.length
     ? user.clubes
-    : (user?.club ? [user.club] : []);
-  const club = misClubes[0] || "";
-  const delegacion = user?.delegacion || "";
-  const paisDelegacion = user?.pais_delegacion || "";
+    : (user?.club
+        ? [{ nombre: user.club, ciudad: user.delegacion, pais: user.pais_delegacion }]
+        : []);
+  const nombresClubes = misClubes.map((c) => c.nombre);
+  const club = nombresClubes[0] || "";
 
   const cargar = useCallback(async (puedeJuzgar: boolean) => {
     try {
@@ -141,7 +144,7 @@ export default function MaestroPage() {
       // El club guardado tiene que seguir siendo uno de los suyos: si el admin
       // le quitó ese dojang entretanto, el desplegable no tendría esa opción y
       // el campo se vería vacío.
-      const propio = misClubes.some((c) => c === previo.club);
+      const propio = nombresClubes.some((c) => c === previo.club);
       setReenvioForm({ ...previo, club: propio ? previo.club : club });
     } else {
       setReenvioForm({ ...COMPETIDOR_FORM_VACIO, club });
@@ -194,27 +197,38 @@ export default function MaestroPage() {
 
   if (!user) return null;
 
-  // Origen del alumno al inscribir: la delegación (país + ciudad) va fija a la
-  // del maestro y el club sale de los suyos. Se muestra dentro del formulario
-  // para que quede claro con qué delegación se registrará.
-  const infoOrigen = club ? (
-    <div style={{
-      display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
-      fontSize: "0.82rem", color: "var(--text-muted)",
-      padding: "8px 12px", borderRadius: "var(--radius-sm)",
-      background: "var(--bg-elevated)", border: "1px solid var(--border)",
-    }}>
-      <span>
-        {misClubes.length > 1 ? t("maestro.tusClubes") : t("maestro.tuClub")}:{" "}
-        <strong style={{ color: "var(--text)" }}>{misClubes.join(" · ")}</strong>
-      </span>
-      {delegacion && (
-        <span>· {t("maestro.tuDelegacion")}: <strong style={{ color: "var(--text)" }}>
-          {delegacion}{paisDelegacion ? ` (${paisDelegacion})` : ""}
-        </strong></span>
-      )}
-    </div>
-  ) : null;
+  /** La ficha del dojang elegido en un formulario (para enseñar SU delegación). */
+  const dojangDe = (nombre: string) =>
+    misClubes.find((c) => c.nombre === nombre) || misClubes[0];
+
+  /**
+   * Origen del alumno: el dojang elegido y la delegación DE ESE dojang. Se
+   * enseña dentro del formulario porque es el dato que cambia al elegir otro
+   * club — un maestro con uno en Cali y otro en Popayán inscribe en una u otra
+   * delegación según cuál marque.
+   */
+  const infoOrigen = (nombreClub: string) => {
+    const dojang = dojangDe(nombreClub);
+    if (!dojang) return null;
+    return (
+      <div style={{
+        display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
+        fontSize: "0.82rem", color: "var(--text-muted)",
+        padding: "8px 12px", borderRadius: "var(--radius-sm)",
+        background: "var(--bg-elevated)", border: "1px solid var(--border)",
+      }}>
+        <span>
+          {t("maestro.tuClub")}:{" "}
+          <strong style={{ color: "var(--text)" }}>{dojang.nombre}</strong>
+        </span>
+        {dojang.ciudad && (
+          <span>· {t("maestro.tuDelegacion")}: <strong style={{ color: "var(--text)" }}>
+            {dojang.ciudad}{dojang.pais ? ` (${dojang.pais})` : ""}
+          </strong></span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "20px" }}>
@@ -236,18 +250,20 @@ export default function MaestroPage() {
               border: "1px solid var(--gold-border)", background: "var(--gold-bg)",
               color: "var(--gold)", fontWeight: 700,
             }}>
-              {misClubes.length > 1 ? t("maestro.tusClubes") : t("maestro.tuClub")}:{" "}
-              {misClubes.join(" · ")}
+              {misClubes.length > 1 ? t("maestro.tusClubes") : t("maestro.tuClub")}
             </div>
-            {delegacion && (
-              <div style={{
+            {/* Cada dojang con SU delegación: es el dato que distingue a uno de
+                otro cuando están en ciudades distintas. */}
+            {misClubes.map((c) => (
+              <div key={c.nombre} style={{
                 padding: "4px 12px", borderRadius: "var(--radius-sm)",
                 border: "1px solid var(--border)", background: "var(--bg-elevated)",
                 color: "var(--text-muted)", fontWeight: 600, fontSize: "0.85rem",
               }}>
-                {t("maestro.tuDelegacion")}: {delegacion}{paisDelegacion ? ` · ${paisDelegacion}` : ""}
+                {c.nombre}
+                {c.ciudad ? ` · ${c.ciudad}${c.pais ? ` (${c.pais})` : ""}` : ""}
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
@@ -320,8 +336,8 @@ export default function MaestroPage() {
                 {campSel === c.id && c.puede_inscribir && (
                   <form onSubmit={(e) => enviar(e, c.id)} className="card animate-slide"
                     style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12, borderColor: "var(--gold-border)" }}>
-                    {infoOrigen}
-                    <CompetidorFormFields value={form} onChange={setForm} clubesPropios={misClubes} />
+                    {infoOrigen(form.club)}
+                    <CompetidorFormFields value={form} onChange={setForm} clubesPropios={nombresClubes} />
                     <div>
                       <div style={{ fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 6 }}>
                         {t("res.modCombate")} / {t("res.modFiguras")}
@@ -397,8 +413,8 @@ export default function MaestroPage() {
                               {reenvioId === i.id ? (
                                 <form onSubmit={enviarReenvio} className="card animate-slide"
                                   style={{ display: "flex", flexDirection: "column", gap: 12, borderColor: "var(--red-alert)", marginTop: 4 }}>
-                                  {infoOrigen}
-                                  <CompetidorFormFields value={reenvioForm} onChange={setReenvioForm} clubesPropios={misClubes} />
+                                  {infoOrigen(reenvioForm.club)}
+                                  <CompetidorFormFields value={reenvioForm} onChange={setReenvioForm} clubesPropios={nombresClubes} />
                                   <div>
                                     <div style={{ fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 6 }}>
                                       {t("res.modCombate")} / {t("res.modFiguras")}

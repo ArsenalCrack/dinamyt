@@ -164,6 +164,30 @@ class Competidor(db.Model):
         return f"<Competidor {self.nombre_completo}>"
 
 
+def _origen_del_alumno(maestro, competidor):
+    """{club, delegacion, pais_delegacion} del dojang del que viene el alumno.
+
+    Un maestro puede dirigir varios dojangs, y cada uno está donde está: el
+    admin que revisa la solicitud necesita ver la delegación DE ESE club, no la
+    del principal. Si el club del alumno no cuadra con ninguno (datos viejos,
+    o el admin le quitó ese dojang), se cae a los del maestro, que es lo que se
+    enseñaba antes.
+    """
+    club = getattr(competidor, "club", None)
+    ficha = maestro.club_por_nombre(club) if club else None
+    if ficha is None:
+        return {
+            "club": maestro.club,
+            "delegacion": maestro.delegacion,
+            "pais_delegacion": maestro.pais_delegacion,
+        }
+    return {
+        "club": ficha["nombre"],
+        "delegacion": ficha["ciudad"],
+        "pais_delegacion": ficha["pais"],
+    }
+
+
 class Inscripcion(db.Model):
     __tablename__ = "inscripciones"
     __table_args__ = (
@@ -227,14 +251,15 @@ class Inscripcion(db.Model):
             "motivo_rechazo": self.motivo_rechazo,
             # Datos del solicitante (para que el admin vea "solicitado por X" con
             # su club y delegación —país y ciudad— al revisar la inscripción).
+            # La delegación es la DEL DOJANG del alumno, no la del maestro: si
+            # dirige uno en Cali y otro en Popayán, enseñar siempre la del
+            # principal sería sencillamente falso.
             "solicitante": (
                 {
                     "id": self.autor.id,
                     "nombre": self.autor.nombre,
                     "rol": self.autor.rol,
-                    "club": self.autor.club,
-                    "delegacion": self.autor.delegacion,
-                    "pais_delegacion": self.autor.pais_delegacion,
+                    **_origen_del_alumno(self.autor, self.competidor),
                 }
                 if self.autor else None
             ),
