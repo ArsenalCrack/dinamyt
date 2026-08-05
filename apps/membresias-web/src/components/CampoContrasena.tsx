@@ -29,45 +29,67 @@ type Props = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   verInicial?: boolean;
 };
 
+/** Propiedades de margen que se llevan al envoltorio en vez de al campo. */
+const CLAVES_MARGEN = new Set([
+  'margin',
+  'marginTop',
+  'marginBottom',
+  'marginLeft',
+  'marginRight',
+  'marginBlock',
+  'marginBlockStart',
+  'marginBlockEnd',
+  'marginInline',
+  'marginInlineStart',
+  'marginInlineEnd',
+]);
+
+/**
+ * Reparte el estilo recibido: los márgenes al envoltorio, el resto al campo.
+ *
+ * Los márgenes tienen que ir fuera porque el ojo se centra respecto al
+ * envoltorio, y un `marginBottom` dentro lo dejaría flotando por encima del
+ * campo.
+ *
+ * ── Por qué se copian las claves una a una ──
+ *
+ * La primera versión desestructuraba (`const { margin, marginTop, … } = style`)
+ * y volvía a montar el objeto con las once claves. Las que no venían quedaban
+ * en `undefined`, y ahí está la trampa: al montar en el navegador, React aplica
+ * las propiedades UNA A UNA sobre `node.style`, y a las que valen `undefined`
+ * les hace `setProperty(nombre, '')` — o sea, las BORRA. Como `margin` es un
+ * atajo que expande a las cuatro longhands, escribir el atajo y limpiar
+ * `marginTop`/`marginBottom`/… justo después dejaba el margen en cero.
+ *
+ * En el servidor no se notaba —ahí el estilo se serializa a texto y los
+ * `undefined` se omiten—, así que la pantalla salía bien al abrir /login
+ * directamente y MAL al llegar por navegación interna: justo lo que pasaba al
+ * cerrar sesión, con el botón «Ingresar» pegado al campo de contraseña.
+ *
+ * Copiando solo lo que de verdad viene, no hay ningún `undefined` que borre
+ * nada.
+ */
+function repartirEstilo(style?: React.CSSProperties): {
+  envoltorio: React.CSSProperties;
+  campo: React.CSSProperties;
+} {
+  const envoltorio: Record<string, unknown> = {};
+  const campo: Record<string, unknown> = {};
+  for (const [clave, valor] of Object.entries(style ?? {})) {
+    if (CLAVES_MARGEN.has(clave)) envoltorio[clave] = valor;
+    else campo[clave] = valor;
+  }
+  return { envoltorio, campo };
+}
+
 export function CampoContrasena({ verInicial = false, style, ...props }: Props) {
   const { t } = useI18n();
   const [ver, setVer] = useState(verInicial);
 
-  // Los márgenes que traiga quien lo use van al envoltorio, no al campo: el ojo
-  // se centra respecto al envoltorio, y un `marginBottom` dentro lo dejaría
-  // flotando por encima del campo. El resto del estilo sí es del input.
-  const {
-    margin,
-    marginTop,
-    marginBottom,
-    marginLeft,
-    marginRight,
-    marginBlock,
-    marginBlockStart,
-    marginBlockEnd,
-    marginInline,
-    marginInlineStart,
-    marginInlineEnd,
-    ...estiloCampo
-  } = style ?? {};
+  const { envoltorio: estiloEnvoltorio, campo: estiloCampo } = repartirEstilo(style);
 
   return (
-    <span
-      className="campo-pass"
-      style={{
-        margin,
-        marginTop,
-        marginBottom,
-        marginLeft,
-        marginRight,
-        marginBlock,
-        marginBlockStart,
-        marginBlockEnd,
-        marginInline,
-        marginInlineStart,
-        marginInlineEnd,
-      }}
-    >
+    <span className="campo-pass" style={estiloEnvoltorio}>
       <input
         {...props}
         type={ver ? 'text' : 'password'}
