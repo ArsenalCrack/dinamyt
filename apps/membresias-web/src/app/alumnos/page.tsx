@@ -18,7 +18,9 @@ import {
   telefonoValido,
 } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
+import { avisoError, avisoOk } from '@/lib/toast';
 import { Avatar } from '@/components/Avatar';
+import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
 import { Cinturon } from '@/components/Cinturon';
 import { Contador } from '@/components/Contador';
@@ -109,8 +111,8 @@ export default function Alumnos() {
    */
   const [buscado, setBuscado] = useState('');
   const [cargando, setCargando] = useState(true);
+  /** Solo para fallos al CARGAR la lista; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
-  const [aviso, setAviso] = useState('');
 
   /** `null` = formulario cerrado · `'nuevo'` = alta · un id = editando. */
   const [editando, setEditando] = useState<string | null>(null);
@@ -190,20 +192,18 @@ export default function Alumnos() {
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     // Las mismas tres reglas que aplica la API, comprobadas antes de viajar:
     // un 422 después de rellenar diez campos no explica cuál falló.
     if (!nombreCompletoValido(form.fullName)) {
-      setError(t('comun.nombreIncompleto'));
+      avisoError(t('comun.nombreIncompleto'));
       return;
     }
     if (!correoValido(form.email)) {
-      setError(t('comun.correoInvalido'));
+      avisoError(t('comun.correoInvalido'));
       return;
     }
     if (!telefonoValido(form.phone) || !telefonoValido(form.emergencyPhone)) {
-      setError(t('comun.telefonoCorto'));
+      avisoError(t('comun.telefonoCorto'));
       return;
     }
     setEnviando(true);
@@ -215,6 +215,7 @@ export default function Alumnos() {
       emergencyName: form.emergencyName || null,
       emergencyPhone: form.emergencyPhone || null,
     };
+    const alta = editando === 'nuevo';
     try {
       if (editando === 'nuevo') {
         await api.post('/users', {
@@ -226,7 +227,6 @@ export default function Alumnos() {
           belt: form.belt || undefined,
           ...ficha,
         });
-        setAviso(t('alumnos.creado'));
       } else {
         // El cinturón y el teléfono viajan aunque estén vacíos: quitarlos es
         // una edición tan válida como ponerlos.
@@ -238,7 +238,6 @@ export default function Alumnos() {
           belt: form.belt || null,
           ...ficha,
         });
-        setAviso(t('alumnos.actualizado'));
         // Si me acabo de editar a mí mismo, la sesión que tiene la app en
         // memoria quedó vieja: el cinturón nuevo no aparecía en «Mi grado»
         // hasta recargar la página entera.
@@ -246,21 +245,25 @@ export default function Alumnos() {
       }
       setForm(VACIO);
       setEditando(null);
+      // El aviso va DESPUÉS de recargar la lista: confirma un hecho consumado.
+      // Antes se anunciaba «creado» con la tabla todavía sin la persona, y
+      // desde el final de un formulario largo no se veía ninguna de las dos
+      // cosas.
       await cargar();
+      avisoOk(alta ? t('alumnos.creado') : t('alumnos.actualizado'));
     } catch (err) {
-      setError(mensajeError(err, t('alumnos.crearTitulo')));
+      avisoError(mensajeError(err, t('alumnos.crearTitulo')));
     } finally {
       setEnviando(false);
     }
   }
 
   async function alternarAcceso(p: Persona) {
-    setError('');
     try {
       await api.patch(`/users/${p.id}`, { isActive: !p.isActive });
       await cargar();
     } catch (err) {
-      setError(mensajeError(err, t('comun.editar')));
+      avisoError(mensajeError(err, t('comun.editar')));
     }
   }
 
@@ -482,8 +485,12 @@ export default function Alumnos() {
         {editando === 'nuevo' && (
           <label style={{ display: 'block' }}>
             <Etiqueta obligatorio>{t('alumnos.contrasenaInicial')}</Etiqueta>
-            <input
-              type="text"
+            {/* Arranca VISIBLE: el maestro la está fijando y se la tiene que
+                dictar al alumno. El ojo está para taparla cuando hay gente
+                mirando la pantalla. */}
+            <CampoContrasena
+              verInicial
+              autoComplete="new-password"
               minLength={8}
               maxLength={LIM.password}
               value={form.password}
@@ -548,14 +555,12 @@ export default function Alumnos() {
         </div>
       </header>
 
+      {/* Solo un fallo al CARGAR la lista se queda escrito aquí: es permanente
+          y explica por qué la pantalla está vacía. El resultado de una acción
+          se avisa con la nube flotante (ver lib/toast.ts). */}
       {error && (
         <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
-        </p>
-      )}
-      {aviso && (
-        <p className="msg-ok" style={{ marginBottom: '1rem' }}>
-          {aviso}
         </p>
       )}
 

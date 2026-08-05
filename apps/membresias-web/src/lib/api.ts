@@ -156,6 +156,13 @@ api.interceptors.request.use((cfg) => {
 });
 
 /**
+ * Evento con el que cualquier petición avisa de que la aplicación está en
+ * mantenimiento. Lo escucha `<PorteroMantenimiento>` para enseñar la pantalla
+ * de aviso al instante, sin esperar a su siguiente sondeo.
+ */
+export const EVENTO_MANTENIMIENTO = 'membresias:mantenimiento';
+
+/**
  * Sesión expirada, cuenta desactivada o club suspendido: se limpia y se vuelve
  * al login. Nunca desde el propio /auth/login ni si ya estamos en /login.
  */
@@ -171,6 +178,17 @@ api.interceptors.response.use(
     ) {
       cerrarSesion();
       window.location.href = '/login';
+    }
+    // 503 con la marca de la API = mantenimiento, no un servidor caído. Se
+    // avisa a la app entera; la sesión NO se toca, que es todo el punto de este
+    // modo: al terminar, cada quien sigue donde estaba.
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 503 &&
+      (error.response?.data as { mantenimiento?: boolean } | undefined)?.mantenimiento &&
+      typeof window !== 'undefined'
+    ) {
+      window.dispatchEvent(new CustomEvent(EVENTO_MANTENIMIENTO));
     }
     return Promise.reject(error);
   },
@@ -258,6 +276,35 @@ export async function entrarConCodigo(token: string): Promise<RespuestaLogin> {
 /** Qué ofrece esta instalación. Se consulta ANTES del login (ruta pública). */
 export async function obtenerConfig(): Promise<{ sso: boolean }> {
   const { data } = await api.get<{ sso: boolean }>('/auth/config');
+  return data;
+}
+
+// ── Modo mantenimiento ───────────────────────────────────────────────────────
+export interface EstadoMantenimiento {
+  activo: boolean;
+  /** Aviso que escribió el superadmin, o `null` para el texto por defecto. */
+  mensaje: string | null;
+  /** ISO-8601 de cuándo se encendió, o `null` si está apagado. */
+  desde: string | null;
+  /** Si QUIEN PREGUNTA puede seguir usando la app (solo el superadmin). */
+  exento: boolean;
+}
+
+/** Estado del mantenimiento. Ruta pública: responde con o sin sesión. */
+export async function obtenerMantenimiento(): Promise<EstadoMantenimiento> {
+  const { data } = await api.get<EstadoMantenimiento>('/maintenance');
+  return data;
+}
+
+/** Enciende o apaga el mantenimiento (solo superadmin). */
+export async function fijarMantenimiento(
+  activo: boolean,
+  mensaje?: string,
+): Promise<EstadoMantenimiento> {
+  const { data } = await api.put<EstadoMantenimiento>('/maintenance', {
+    activo,
+    mensaje: mensaje ?? '',
+  });
   return data;
 }
 

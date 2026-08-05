@@ -7,8 +7,10 @@ import { config } from './config';
 import { crearVerificador } from './plugins/auth';
 import { registrarContextoRls } from './plugins/rls';
 import { registrarLimiteGlobal } from './lib/auth/rate-limit';
+import { registrarModoMantenimiento } from './lib/mantenimiento';
 import { AlumnoNoDelClub } from './lib/memberships';
 import { healthRoutes } from './routes/health';
+import { maintenanceRoutes } from './routes/maintenance';
 import { geoRoutes } from './routes/geo';
 import { authRoutes } from './routes/auth';
 import { orgsRoutes } from './routes/orgs';
@@ -54,13 +56,15 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   // ni la manda ni acepta la que responde el login.
   void app.register(cors, { origin: config.corsOrigins, credentials: true });
 
-  // Ambos van ANTES de registrar rutas: `onRoute` solo alcanza las que se
-  // declaren después, y el techo global debe cubrir también las que se añadan
-  // mañana sin que nadie se acuerde de limitarlas.
+  // Los tres van ANTES de registrar rutas: `onRoute` solo alcanza las que se
+  // declaren después, y tanto el techo global como la puerta de mantenimiento
+  // deben cubrir también las que se añadan mañana sin que nadie se acuerde.
   registrarLimiteGlobal(app);
+  registrarModoMantenimiento(app);
   registrarContextoRls(app);
 
   void app.register(healthRoutes);
+  void app.register(maintenanceRoutes);
   void app.register(geoRoutes);
   void app.register(authRoutes);
   void app.register(orgsRoutes);

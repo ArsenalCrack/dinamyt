@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { fmtFecha, hoyISO } from '@/lib/formato';
 import { LIM } from '@/lib/campos';
+import { avisoError, avisoInfo, avisoOk } from '@/lib/toast';
 import { Avatar } from '@/components/Avatar';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
@@ -44,9 +45,8 @@ export default function AsistenciaPage() {
   const [busqueda, setBusqueda] = useState('');
   /** Lo que de verdad viajó a la API: el filtro es suyo, no del navegador. */
   const [buscado, setBuscado] = useState('');
-  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error' | 'aviso'; texto: string } | null>(
-    null,
-  );
+  /** Solo para fallos al CARGAR la lista; lo demás va por la nube flotante. */
+  const [error, setError] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
 
@@ -65,7 +65,7 @@ export default function AsistenciaPage() {
       setTotalRoster(r.data.total);
       setAsistencias(a.data);
     } catch (e) {
-      setMsg({ tipo: 'error', texto: mensajeError(e, t('comun.ninguno')) });
+      setError(mensajeError(e, t('comun.ninguno')));
     } finally {
       setCargando(false);
     }
@@ -98,20 +98,23 @@ export default function AsistenciaPage() {
   const presentes = new Map(asistencias.map((a) => [a.userId, a]));
 
   async function marcar(alumno: RosterItem) {
-    setMsg(null);
     setOcupado(alumno.userId);
     try {
       const r = await api.post<{ accionSugerida?: string }>('/checkin', {
         identifier: { type: 'manual', value: alumno.userId },
       });
-      setMsg(
-        r.data.accionSugerida === 'avisar'
-          ? { tipo: 'aviso', texto: `${alumno.fullName} · ${t('estado.por_vencer')}` }
-          : { tipo: 'ok', texto: `${alumno.fullName} · ${t('asistencia.marcado')} ✓` },
-      );
+      // Se recarga ANTES de avisar: la nube sale a la vez que la persona pasa a
+      // «presente» en la lista. Pasar lista es donde más se notaba el problema
+      // —se marca a alguien del final de la lista y el mensaje salía arriba del
+      // todo, fuera de la pantalla— y donde marcar dos veces confunde el conteo.
       await cargar();
+      if (r.data.accionSugerida === 'avisar') {
+        avisoInfo(`${alumno.fullName} · ${t('estado.por_vencer')}`);
+      } else {
+        avisoOk(`${alumno.fullName} · ${t('asistencia.marcado')} ✓`);
+      }
     } catch (e) {
-      setMsg({ tipo: 'error', texto: mensajeError(e, t('asistencia.marcar')) });
+      avisoError(mensajeError(e, t('asistencia.marcar')));
     } finally {
       setOcupado(null);
     }
@@ -152,17 +155,9 @@ export default function AsistenciaPage() {
         </span>
       </div>
 
-      {msg && (
-        <p
-          className={msg.tipo === 'error' ? 'msg-error' : msg.tipo === 'ok' ? 'msg-ok' : ''}
-          style={{
-            marginBottom: '1rem',
-            ...(msg.tipo === 'aviso' ? { color: 'var(--gold)' } : {}),
-          }}
-        >
-          {msg.texto}
-        </p>
-      )}
+      {/* Solo un fallo al CARGAR la lista se queda escrito aquí; el resultado
+          de cada marcaje va por la nube flotante (ver lib/toast.ts). */}
+      {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
 
       <input
         value={busqueda}

@@ -392,6 +392,8 @@ const es = {
   'planes.precio': 'Precio',
   'planes.clases': 'Nº de clases',
   'planes.sinPlanes': 'Todavía no hay planes. Crea el primero.',
+  'planes.creado': 'Plan creado.',
+  'planes.retirado': 'Plan retirado.',
   'planes.tipo.mensual': 'Mensual',
   'planes.tipo.semanal': 'Semanal',
   'planes.tipo.clase': 'Clase suelta',
@@ -555,6 +557,39 @@ const es = {
   'admin.sinClubes': 'Todavía no hay clubes. Crea el primero.',
   'admin.gente': 'Gente de',
   'admin.restablecer': 'Restablecer contraseña',
+
+  // Campos de formulario compartidos
+  'campo.verContrasena': 'Mostrar contraseña',
+  'campo.ocultarContrasena': 'Ocultar contraseña',
+
+  // Página no encontrada (404)
+  'e404.codigo': '404',
+  'e404.titulo': 'Esta pantalla no existe',
+  'e404.desc':
+    'La dirección que abriste no corresponde a ninguna pantalla de la aplicación. Puede que el enlace esté mal copiado o que la página se haya movido.',
+  'e404.ruta': 'Dirección que pediste',
+  'e404.inicio': 'Ir a mi inicio',
+  'e404.volver': '← Volver atrás',
+
+  // Modo mantenimiento (lo activa el superadmin antes de actualizar)
+  'mant.titulo': 'Estamos actualizando la aplicación',
+  'mant.desc':
+    'Volvemos en unos minutos. Tus datos, tus pagos y tus asistencias están guardados: nada se pierde mientras tanto.',
+  'mant.reintentar': 'Reintentar',
+  'mant.comprobando': 'Comprobando…',
+  'mant.aviso': 'No cierres esta pantalla: se reactiva sola al terminar.',
+  'mant.panel': 'Modo mantenimiento',
+  'mant.panelDesc':
+    'Cierra la aplicación para todos menos para ti. Actívalo antes de subir una actualización: quien esté conectado ve un aviso en vez de quedarse a medias.',
+  'mant.estadoActivo': 'Activo — solo tú puedes entrar',
+  'mant.estadoInactivo': 'Inactivo — la aplicación está abierta',
+  'mant.activar': 'Activar mantenimiento',
+  'mant.desactivar': 'Desactivar mantenimiento',
+  'mant.mensajeLabel': 'Aviso que verán los usuarios (opcional)',
+  'mant.activadoOk': 'Modo mantenimiento activado.',
+  'mant.desactivadoOk': 'Modo mantenimiento desactivado.',
+  'mant.error': 'No se pudo cambiar el modo mantenimiento.',
+  'mant.desde': 'Activo desde',
 } as const;
 
 export type ClaveTexto = keyof typeof es;
@@ -866,6 +901,8 @@ const en: Record<ClaveTexto, string> = {
   'planes.precio': 'Price',
   'planes.clases': 'Number of classes',
   'planes.sinPlanes': 'No plans yet. Create the first one.',
+  'planes.creado': 'Plan created.',
+  'planes.retirado': 'Plan withdrawn.',
   'planes.tipo.mensual': 'Monthly',
   'planes.tipo.semanal': 'Weekly',
   'planes.tipo.clase': 'Single class',
@@ -1015,6 +1052,36 @@ const en: Record<ClaveTexto, string> = {
   'admin.sinClubes': 'No clubs yet. Create the first one.',
   'admin.gente': 'People of',
   'admin.restablecer': 'Reset password',
+
+  'campo.verContrasena': 'Show password',
+  'campo.ocultarContrasena': 'Hide password',
+
+  'e404.codigo': '404',
+  'e404.titulo': 'This screen does not exist',
+  'e404.desc':
+    'The address you opened does not match any screen in the application. The link may be mistyped, or the page may have moved.',
+  'e404.ruta': 'Address you requested',
+  'e404.inicio': 'Go to my home',
+  'e404.volver': '← Go back',
+
+  'mant.titulo': 'We are updating the application',
+  'mant.desc':
+    'Back in a few minutes. Your data, your payments and your attendance are saved: nothing is lost in the meantime.',
+  'mant.reintentar': 'Try again',
+  'mant.comprobando': 'Checking…',
+  'mant.aviso': 'Leave this screen open: it comes back on its own when we finish.',
+  'mant.panel': 'Maintenance mode',
+  'mant.panelDesc':
+    'Closes the application for everyone but you. Turn it on before uploading an update: whoever is connected sees a notice instead of being cut off mid-task.',
+  'mant.estadoActivo': 'On — only you can get in',
+  'mant.estadoInactivo': 'Off — the application is open',
+  'mant.activar': 'Turn on maintenance',
+  'mant.desactivar': 'Turn off maintenance',
+  'mant.mensajeLabel': 'Notice users will see (optional)',
+  'mant.activadoOk': 'Maintenance mode is on.',
+  'mant.desactivadoOk': 'Maintenance mode is off.',
+  'mant.error': 'Could not change maintenance mode.',
+  'mant.desde': 'On since',
 };
 
 const DICCIONARIOS: Record<Idioma, Record<ClaveTexto, string>> = { es, en };

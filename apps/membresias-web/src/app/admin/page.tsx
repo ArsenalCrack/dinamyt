@@ -4,15 +4,20 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { useRouter } from 'next/navigation';
 import {
   api,
+  fijarMantenimiento,
   listarCiudades,
   listarPaises,
   mensajeError,
+  obtenerMantenimiento,
+  type EstadoMantenimiento,
   type Pais,
   type Rol,
 } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { LIM, enMayusculas, soloTelefono, telefonoValido } from '@/lib/campos';
+import { avisoError, avisoOk } from '@/lib/toast';
+import { CampoContrasena } from '@/components/CampoContrasena';
 import { SelectMenu } from '@/components/SelectMenu';
 
 interface Club {
@@ -47,8 +52,13 @@ export default function Admin() {
 
   const [clubes, setClubes] = useState<Club[]>([]);
   const [cargando, setCargando] = useState(true);
+  /** Solo para fallos al CARGAR la pantalla; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
-  const [aviso, setAviso] = useState('');
+
+  // Modo mantenimiento: cerrar la aplicación mientras se sube una versión.
+  const [mant, setMant] = useState<EstadoMantenimiento | null>(null);
+  const [mantMensaje, setMantMensaje] = useState('');
+  const [guardandoMant, setGuardandoMant] = useState(false);
 
   const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: '' });
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -115,7 +125,31 @@ export default function Admin() {
     listarPaises()
       .then(setPaises)
       .catch(() => setPaises([]));
+    // Si falla, el panel sigue cargando igual: la tarjeta de mantenimiento
+    // simplemente no se dibuja.
+    obtenerMantenimiento()
+      .then((m) => {
+        setMant(m);
+        setMantMensaje(m.mensaje ?? '');
+      })
+      .catch(() => setMant(null));
   }, [cargandoSesion, user, esSuper, router, cargar]);
+
+  /** Enciende o apaga el modo mantenimiento. */
+  async function alternarMantenimiento() {
+    if (!mant) return;
+    setGuardandoMant(true);
+    try {
+      const nuevo = await fijarMantenimiento(!mant.activo, mantMensaje);
+      setMant(nuevo);
+      setMantMensaje(nuevo.mensaje ?? '');
+      avisoOk(nuevo.activo ? t('mant.activadoOk') : t('mant.desactivadoOk'));
+    } catch (err) {
+      avisoError(mensajeError(err, t('mant.error')));
+    } finally {
+      setGuardandoMant(false);
+    }
+  }
 
   useEffect(() => {
     if (!paisIso) {
@@ -136,26 +170,25 @@ export default function Admin() {
 
   async function crearClub(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     try {
       await api.post('/orgs', nuevoClub);
       setNuevoClub({ name: '', city: '', country: '' });
       setPaisIso('');
-      setAviso(t('admin.clubCreado'));
+      // El aviso va DESPUÉS de recargar: sale cuando la lista ya enseña el
+      // club nuevo, no mientras sigue siendo la de antes.
       await cargar();
+      avisoOk(t('admin.clubCreado'));
     } catch (err) {
-      setError(mensajeError(err, t('admin.nuevoClub')));
+      avisoError(mensajeError(err, t('admin.nuevoClub')));
     }
   }
 
   async function alternarClub(c: Club) {
-    setError('');
     try {
       await api.patch(`/orgs/${c.id}`, { isActive: !c.isActive });
       await cargar();
     } catch (err) {
-      setError(mensajeError(err, t('comun.editar')));
+      avisoError(mensajeError(err, t('comun.editar')));
     }
   }
 
@@ -165,56 +198,50 @@ export default function Admin() {
       return;
     }
     setExpandido(clubId);
-    setError('');
     try {
       const { data } = await api.get<Persona[]>(`/orgs/${clubId}/users`);
       setGente((g) => ({ ...g, [clubId]: data }));
     } catch (err) {
-      setError(mensajeError(err, t('admin.verGente')));
+      avisoError(mensajeError(err, t('admin.verGente')));
     }
   }
 
   async function crearMaestro(e: FormEvent, clubId: string) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     if (!telefonoValido(nuevoMaestro.phone)) {
-      setError(t('comun.telefonoCorto'));
+      avisoError(t('comun.telefonoCorto'));
       return;
     }
     try {
       await api.post(`/orgs/${clubId}/maestros`, nuevoMaestro);
       setNuevoMaestro({ email: '', fullName: '', password: '', phone: '' });
-      setAviso(t('admin.maestroCreado'));
       const { data } = await api.get<Persona[]>(`/orgs/${clubId}/users`);
       setGente((g) => ({ ...g, [clubId]: data }));
       await cargar();
+      avisoOk(t('admin.maestroCreado'));
     } catch (err) {
-      setError(mensajeError(err, t('admin.nuevoMaestro')));
+      avisoError(mensajeError(err, t('admin.nuevoMaestro')));
     }
   }
 
   async function alternarPersona(clubId: string, p: Persona) {
-    setError('');
     try {
       await api.patch(`/orgs/usuarios/${p.id}`, { isActive: !p.isActive });
       const { data } = await api.get<Persona[]>(`/orgs/${clubId}/users`);
       setGente((g) => ({ ...g, [clubId]: data }));
     } catch (err) {
-      setError(mensajeError(err, t('comun.editar')));
+      avisoError(mensajeError(err, t('comun.editar')));
     }
   }
 
   async function restablecer(clubId: string, p: Persona) {
     const nueva = window.prompt(`${t('admin.restablecer')} — ${p.fullName}`);
     if (!nueva) return;
-    setError('');
-    setAviso('');
     try {
       await api.post(`/orgs/usuarios/${p.id}/password`, { password: nueva });
-      setAviso(t('alumnos.contrasenaCambiada'));
+      avisoOk(t('alumnos.contrasenaCambiada'));
     } catch (err) {
-      setError(mensajeError(err, t('admin.restablecer')));
+      avisoError(mensajeError(err, t('admin.restablecer')));
     }
   }
 
@@ -237,15 +264,76 @@ export default function Admin() {
         </p>
       </header>
 
+      {/* Solo un fallo al CARGAR la pantalla se queda escrito aquí: es
+          permanente (la lista está vacía y hay que explicar por qué). El
+          resultado de una acción se avisa con la nube flotante, que se ve
+          desde donde esté mirando el usuario (ver lib/toast.ts). */}
       {error && (
         <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
         </p>
       )}
-      {aviso && (
-        <p className="msg-ok" style={{ marginBottom: '1rem' }}>
-          {aviso}
-        </p>
+
+      {/* ── Modo mantenimiento ──
+          Va arriba del todo y no dentro de una sección: se busca justo antes
+          de subir una actualización, con prisa, y esconderlo es garantizar que
+          se olvide. */}
+      {mant && (
+        <div
+          className="card"
+          style={{
+            padding: '1.25rem',
+            marginBottom: '1.5rem',
+            borderColor: mant.activo ? 'var(--danger)' : undefined,
+          }}
+        >
+          <h2 className="display" style={{ fontSize: '1rem', marginBottom: '0.4rem' }}>
+            🛠️ {t('mant.panel')}
+          </h2>
+          <p className="muted" style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+            {t('mant.panelDesc')}
+          </p>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              flexWrap: 'wrap',
+              marginBottom: '0.75rem',
+            }}
+          >
+            <span className={mant.activo ? 'badge badge-danger' : 'badge badge-ok'}>
+              {mant.activo ? t('mant.estadoActivo') : t('mant.estadoInactivo')}
+            </span>
+            {mant.desde && (
+              <span className="muted mono" style={{ fontSize: '0.72rem' }}>
+                {t('mant.desde')} {new Date(mant.desde).toLocaleString()}
+              </span>
+            )}
+          </div>
+
+          <label style={{ display: 'block' }}>
+            <span className="muted" style={{ fontSize: '0.78rem' }}>
+              {t('mant.mensajeLabel')}
+            </span>
+            <input
+              value={mantMensaje}
+              onChange={(e) => setMantMensaje(e.target.value)}
+              maxLength={300}
+              style={{ margin: '0.25rem 0 0.85rem' }}
+            />
+          </label>
+
+          <button
+            type="button"
+            className={mant.activo ? 'btn btn-cta' : 'btn btn-danger'}
+            disabled={guardandoMant}
+            onClick={() => void alternarMantenimiento()}
+          >
+            {mant.activo ? t('mant.desactivar') : t('mant.activar')}
+          </button>
+        </div>
       )}
 
       <form onSubmit={crearClub} className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
@@ -488,8 +576,12 @@ export default function Admin() {
                           : 'var(--danger)',
                       }}
                     />
-                    <input
-                      type="text"
+                    {/* Arranca VISIBLE: el superadmin la está fijando y se la
+                        tiene que pasar al maestro. El ojo la tapa cuando hace
+                        falta. */}
+                    <CampoContrasena
+                      verInicial
+                      autoComplete="new-password"
                       minLength={8}
                       maxLength={LIM.password}
                       placeholder={t('alumnos.contrasenaInicial')}

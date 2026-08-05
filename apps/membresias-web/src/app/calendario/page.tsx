@@ -11,6 +11,7 @@ import { LIM } from '@/lib/campos';
 import { CampoFecha } from '@/components/CampoFecha';
 import { Contador } from '@/components/Contador';
 import { SelectMenu } from '@/components/SelectMenu';
+import { avisoError, avisoOk } from '@/lib/toast';
 
 interface Exc {
   id: string;
@@ -41,7 +42,7 @@ export default function Calendario() {
   const [dias, setDias] = useState<number[]>([]);
   const [exc, setExc] = useState<Exc[]>([]);
   const [nueva, setNueva] = useState({ date: '', isClosed: true, note: '' });
-  const [msg, setMsg] = useState('');
+  /** Solo para fallos al CARGAR el calendario; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
 
   const cargar = useCallback(async () => {
@@ -75,37 +76,37 @@ export default function Calendario() {
   }
 
   async function guardarDias() {
-    setMsg('');
-    setError('');
     try {
       await api.put('/schedule', { dias: dias.map((w) => ({ weekday: w })) });
-      setMsg(t('alumnos.actualizado'));
+      // Tras releer el horario del servidor: lo que se confirma es lo que
+      // quedó guardado, no lo que se acaba de marcar en pantalla.
       await cargar();
+      avisoOk(t('alumnos.actualizado'));
     } catch (e) {
-      setError(mensajeError(e, t('comun.guardar')));
+      avisoError(mensajeError(e, t('comun.guardar')));
     }
   }
 
   async function agregarExc(e: FormEvent) {
     e.preventDefault();
     if (!nueva.date) return;
-    setError('');
     try {
       await api.post('/schedule/exceptions', nueva);
       setNueva({ date: '', isClosed: true, note: '' });
       await cargar();
+      avisoOk(t('alumnos.actualizado'));
     } catch (err) {
-      setError(mensajeError(err, t('calendario.agregarExcepcion')));
+      avisoError(mensajeError(err, t('calendario.agregarExcepcion')));
     }
   }
 
   async function borrarExc(id: string) {
-    setError('');
     try {
       await api.delete(`/schedule/exceptions/${id}`);
       await cargar();
+      avisoOk(t('alumnos.actualizado'));
     } catch (e) {
-      setError(mensajeError(e, t('comun.eliminar')));
+      avisoError(mensajeError(e, t('comun.eliminar')));
     }
   }
 
@@ -131,6 +132,8 @@ export default function Calendario() {
         </Link>
       </header>
 
+      {/* Solo un fallo al CARGAR el calendario se queda escrito aquí; el
+          resultado de una acción va por la nube flotante (ver lib/toast.ts). */}
       {error && (
         <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
@@ -157,11 +160,6 @@ export default function Calendario() {
         <button className="btn btn-gold" onClick={guardarDias}>
           {t('comun.guardar')}
         </button>
-        {msg && (
-          <span className="msg-ok" style={{ marginLeft: '0.75rem', fontSize: '0.85rem' }}>
-            {msg}
-          </span>
-        )}
       </div>
 
       <div className="card" style={{ padding: '1rem' }}>

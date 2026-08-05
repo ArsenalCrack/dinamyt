@@ -6,6 +6,7 @@ import { guardarToken, mensajeError, obtenerConfig, obtenerMe } from '@/lib/api'
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { LIM } from '@/lib/campos';
+import { CampoContrasena } from '@/components/CampoContrasena';
 import { ControlesApariencia } from '@/components/ControlesApariencia';
 
 const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
@@ -140,9 +141,8 @@ export default function Login() {
             fija una nueva, sino que comprueba la que ya existe. Recortar aquí
             dejaría fuera a quien tenga una más larga de lo que hoy se permite
             crear. El tope vive donde se FIJAN (perfil, alta y restablecer). */}
-        <input
+        <CampoContrasena
           id="password"
-          type="password"
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

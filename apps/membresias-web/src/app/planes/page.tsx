@@ -10,6 +10,7 @@ import { fmtMoneda } from '@/lib/formato';
 import { LIM, soloDigitos } from '@/lib/campos';
 import { SelectMenu } from '@/components/SelectMenu';
 import { CampoDinero } from '@/components/CampoDinero';
+import { avisoError, avisoOk } from '@/lib/toast';
 
 interface Plan {
   id: string;
@@ -30,6 +31,7 @@ export default function Planes() {
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [form, setForm] = useState({ name: '', type: 'mensual', price: '', nClasses: '' });
+  /** Solo para fallos al CARGAR los planes; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
 
   const cargar = useCallback(async () => {
@@ -56,7 +58,6 @@ export default function Planes() {
 
   async function crear(e: FormEvent) {
     e.preventDefault();
-    setError('');
     try {
       await api.post('/plans', {
         name: form.name,
@@ -66,18 +67,19 @@ export default function Planes() {
       });
       setForm({ name: '', type: 'mensual', price: '', nClasses: '' });
       await cargar();
+      avisoOk(t('planes.creado'));
     } catch (err) {
-      setError(mensajeError(err, t('planes.nuevo')));
+      avisoError(mensajeError(err, t('planes.nuevo')));
     }
   }
 
   async function desactivar(id: string) {
-    setError('');
     try {
       await api.delete(`/plans/${id}`);
       await cargar();
+      avisoOk(t('planes.retirado'));
     } catch (err) {
-      setError(mensajeError(err, t('comun.eliminar')));
+      avisoError(mensajeError(err, t('comun.eliminar')));
     }
   }
 

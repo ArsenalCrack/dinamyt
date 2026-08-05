@@ -27,6 +27,10 @@ const SIN_CONTEXTO = new Set([
   '/auth/login',
   '/auth/logout',
   '/auth/config',
+  // El modo mantenimiento es un ajuste GLOBAL, de ninguna organización: abre
+  // su propio acceso sin filtro (ver `lib/mantenimiento.ts`). Además el GET lo
+  // consulta gente sin sesión, donde no hay club que fijar.
+  '/maintenance',
   // Canjea el QR del maestro por una sesión: como el login, se resuelve antes
   // de saber a qué club pertenece quien entra y abre su propio contexto.
   '/auth/acceso-qr',

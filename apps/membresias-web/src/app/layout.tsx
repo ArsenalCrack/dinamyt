@@ -3,7 +3,9 @@ import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { NavBar } from '@/components/NavBar';
 import { PieLegal } from '@/components/PieLegal';
+import { PorteroMantenimiento } from '@/components/PorteroMantenimiento';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
+import { Toaster } from '@/components/Toaster';
 import { AuthProvider } from '@/lib/auth';
 import { I18nProvider } from '@/lib/i18n';
 import { SCRIPT_ANTI_FLASH } from '@/lib/theme';
@@ -91,12 +93,21 @@ export default function RootLayout({
       <body>
         <I18nProvider>
           <AuthProvider>
-            {/* Barra global: enlaces por rol + tema e idioma. Se oculta sola
-                en /login y /kiosco. */}
-            <NavBar />
-            {children}
+            {/* Con el mantenimiento puesto, todo esto se sustituye por el
+                aviso — la barra incluida: ofrecer navegación a pantallas que
+                no responden solo lleva a errores. */}
+            <PorteroMantenimiento>
+              {/* Barra global: enlaces por rol + tema e idioma. Se oculta sola
+                  en /login y /kiosco. */}
+              <NavBar />
+              {children}
+            </PorteroMantenimiento>
             {/* Al pie de TODA la app, incluido el panel del alumno. */}
             <PieLegal />
+            {/* Avisos flotantes de «guardado» / «no se pudo». Se pinta en un
+                portal sobre el <body>, así ningún contenedor de la página
+                puede recortarlo. */}
+            <Toaster />
             <RegistrarServiceWorker />
           </AuthProvider>
         </I18nProvider>

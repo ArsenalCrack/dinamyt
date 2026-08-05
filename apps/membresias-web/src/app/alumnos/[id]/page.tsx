@@ -20,7 +20,9 @@ import {
   telefonoValido,
 } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
+import { avisoError, avisoOk } from '@/lib/toast';
 import { Avatar } from '@/components/Avatar';
+import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
 import { CampoImagen } from '@/components/CampoImagen';
 import { Contador } from '@/components/Contador';
@@ -119,7 +121,7 @@ export default function Ficha() {
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
-  const [aviso, setAviso] = useState('');
+  /** Solo para fallos al CARGAR la ficha; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
   const [nuevaPass, setNuevaPass] = useState('');
 
@@ -261,18 +263,16 @@ export default function Ficha() {
 
   async function guardarDatos(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     if (!nombreCompletoValido(datos.fullName)) {
-      setError(t('comun.nombreIncompleto'));
+      avisoError(t('comun.nombreIncompleto'));
       return;
     }
     if (!correoValido(datos.email)) {
-      setError(t('comun.correoInvalido'));
+      avisoError(t('comun.correoInvalido'));
       return;
     }
     if (!telefonoValido(datos.phone) || !telefonoValido(datos.emergencyPhone)) {
-      setError(t('comun.telefonoCorto'));
+      avisoError(t('comun.telefonoCorto'));
       return;
     }
     const subioDeGrado = (datos.belt || null) !== (persona?.belt ?? null) && Boolean(datos.belt);
@@ -288,7 +288,6 @@ export default function Ficha() {
         emergencyName: datos.emergencyName || null,
         emergencyPhone: datos.emergencyPhone || null,
       });
-      setAviso(t('ficha.guardado'));
       // Cambió de cinturón: el aviso de reexpedir se queda en pantalla hasta
       // que se reexpide o se recarga la ficha.
       setGradoGuardado(subioDeGrado ? (datos.belt || null) : null);
@@ -297,8 +296,12 @@ export default function Ficha() {
       // esto, «Mi grado» seguía enseñando el cinturón anterior —o ninguno—
       // hasta recargar la aplicación entera.
       if (esMiFicha) await refrescar();
+      // La nube sale al final: con la ficha ya releída del servidor. Antes se
+      // anunciaba «guardado» antes de recargar, y desde el final del
+      // formulario —que es donde está el botón— no se veía nada de nada.
+      avisoOk(t('ficha.guardado'));
     } catch (err) {
-      setError(mensajeError(err, t('ficha.datos')));
+      avisoError(mensajeError(err, t('ficha.datos')));
     } finally {
       setGuardando('');
     }
@@ -313,16 +316,14 @@ export default function Ficha() {
    * carnet no vencía nunca.
    */
   async function reexpedirCarnet() {
-    setError('');
-    setAviso('');
     try {
       await api.post(`/users/${id}/carnet`, {});
-      setAviso(t('carnet.reexpedido'));
       setGradoGuardado(null);
       await cargar();
       if (esMiFicha) await refrescar();
+      avisoOk(t('carnet.reexpedido'));
     } catch (err) {
-      setError(mensajeError(err, t('carnet.reexpedir')));
+      avisoError(mensajeError(err, t('carnet.reexpedir')));
     }
   }
 
@@ -332,17 +333,13 @@ export default function Ficha() {
    * pegado al botón — donde el maestro está mirando.
    */
   async function guardarFoto(avatarUrl: string | null) {
-    setError('');
-    setAviso('');
     await api.patch(`/users/${id}`, { avatarUrl });
-    setAviso(t('ficha.guardado'));
     await cargar();
+    avisoOk(t('ficha.guardado'));
   }
 
   async function guardarPlan(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     setGuardando('plan');
     try {
       await api.patch(`/memberships/${id}`, {
@@ -352,10 +349,10 @@ export default function Ficha() {
         venceEl: plan.venceEl || null,
         clasesRestantes: plan.clasesRestantes === '' ? null : Number(plan.clasesRestantes),
       });
-      setAviso(t('ficha.guardado'));
       await cargar();
+      avisoOk(t('ficha.guardado'));
     } catch (err) {
-      setError(mensajeError(err, t('ficha.planYEstado')));
+      avisoError(mensajeError(err, t('ficha.planYEstado')));
     } finally {
       setGuardando('');
     }
@@ -368,8 +365,6 @@ export default function Ficha() {
    */
   async function registrarPago(e: FormEvent, confirmarRepetido = false) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     setRepetido('');
     const elegido = planes.find((p) => p.id === cobro.planId);
     if (!elegido) return;
@@ -383,7 +378,6 @@ export default function Ficha() {
         periodos: Number(cobro.periodos) || 1,
         ...(confirmarRepetido ? { confirmarRepetido: true } : {}),
       });
-      setAviso(t('pago.registrado'));
       setCobro({
         planId: '',
         amount: '',
@@ -391,12 +385,17 @@ export default function Ficha() {
         paidAt: hoyISO(),
         periodos: '1',
       });
+      // Con el estado del alumno ya releído: el aviso y el vencimiento nuevo
+      // aparecen a la vez. Cobrar es justo donde más caro sale dudar de si se
+      // registró — dos veces es dinero cobrado dos veces.
       await cargar();
+      avisoOk(t('pago.registrado'));
     } catch (err) {
       const mensaje = mensajeError(err, t('pago.titulo'));
-      // 409 con código PAGO_REPETIDO: no es un error, es una pregunta.
+      // 409 con código PAGO_REPETIDO: no es un error, es una pregunta. Se queda
+      // pegada al formulario porque hay que responderla ahí mismo.
       if (axios.isAxiosError(err) && err.response?.status === 409) setRepetido(mensaje);
-      else setError(mensaje);
+      else avisoError(mensaje);
     } finally {
       setGuardando('');
     }
@@ -404,14 +403,12 @@ export default function Ficha() {
 
   async function cambiarPassword(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     try {
       await api.post(`/users/${id}/password`, { password: nuevaPass });
       setNuevaPass('');
-      setAviso(t('alumnos.contrasenaCambiada'));
+      avisoOk(t('alumnos.contrasenaCambiada'));
     } catch (err) {
-      setError(mensajeError(err, t('alumnos.nuevaContrasena')));
+      avisoError(mensajeError(err, t('alumnos.nuevaContrasena')));
     }
   }
 
@@ -514,14 +511,12 @@ export default function Ficha() {
         </Link>
       </header>
 
+      {/* Solo un fallo al CARGAR la ficha se queda escrito aquí: es permanente
+          y explica por qué la pantalla está vacía. El resultado de una acción
+          se avisa con la nube flotante (ver lib/toast.ts). */}
       {error && (
         <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
-        </p>
-      )}
-      {aviso && (
-        <p className="msg-ok" style={{ marginBottom: '1rem' }}>
-          {aviso}
         </p>
       )}
 
@@ -1123,8 +1118,12 @@ export default function Ficha() {
             <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
               {t('alumnos.nuevaContrasena')}
             </h2>
-            <input
-              type="text"
+            {/* Arranca VISIBLE: el maestro la está fijando y se la tiene que
+                dictar al alumno. El ojo está para taparla cuando hay gente
+                mirando la pantalla. */}
+            <CampoContrasena
+              verInicial
+              autoComplete="new-password"
               minLength={8}
               maxLength={LIM.password}
               required

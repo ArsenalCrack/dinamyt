@@ -62,6 +62,14 @@ input:focus, select:focus, textarea:focus {
 }
 input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--gold); }
 
+/* ── Contraseñas: un solo ojo, el nuestro ──
+   Edge dibuja el suyo (`::-ms-reveal`) y ningún otro navegador lo hace, así que
+   el «ver contraseña» lo pone <CampoContrasena> para todos. Sin esta regla,
+   Edge —y solo Edge— enseñaría los dos, uno encima del otro. `::-ms-clear` es
+   la «x» de borrar del mismo navegador, que además tapa el ojo. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }
+
 :focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
@@ -192,6 +200,139 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
    tarjeta en lugar de romper el layout. (Fuera de @layer: Tailwind no emite
    dentro de la capa las clases que no reconoce en el contenido escaneado.) */
 .tabla-scroll { overflow-x: auto; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   AVISOS FLOTANTES (toast / snackbar) — ver components/Toaster.tsx
+   ════════════════════════════════════════════════════════════════════════
+   Abajo, como el snackbar de Android: cerca del pulgar y sin tapar el
+   formulario que se acaba de rellenar. Centrado y a todo lo ancho en el
+   teléfono; en la esquina inferior derecha en escritorio, como las
+   notificaciones del sistema. */
+.toaster {
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  right: 0;
+  /* Sobre la barra de gestos de Android y la zona segura de iOS. */
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  padding: 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  /* El contenedor ocupa el ancho de la ventana: sin esto se quedaría
+     interceptando clics en una franja invisible de la pantalla. */
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 30rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 0.6rem 0.75rem 0.85rem;
+  border-radius: 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  /* SIN `both` a propósito: con relleno hacia atrás, el estado en reposo del
+     aviso sería el primer fotograma —opacidad 0—, y basta con que la animación
+     no llegue a correr (pestaña en segundo plano, animaciones desactivadas)
+     para que el aviso quede invisible sin que nada lo delate. Así el estado
+     normal es «visible» y la animación solo lo adorna al entrar. */
+  animation: toast-entra 200ms ease-out;
+}
+/* Aquí sí hace falta el relleno: el aviso tiene que QUEDARSE transparente
+   hasta que lo quiten del DOM. */
+.toast[data-saliendo='true'] { animation: toast-sale 200ms ease-in both; }
+.toast[data-tipo='ok'] { border-color: var(--ok); }
+.toast[data-tipo='error'] { border-color: var(--danger); }
+.toast[data-tipo='info'] { border-color: var(--gold-dim); }
+
+.toast-ico {
+  flex: 0 0 auto;
+  width: 1.35rem;
+  height: 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.toast[data-tipo='ok'] .toast-ico { background: rgba(62, 207, 142, 0.14); color: var(--ok); }
+.toast[data-tipo='error'] .toast-ico { background: rgba(255, 85, 119, 0.14); color: var(--danger); }
+.toast[data-tipo='info'] .toast-ico { background: var(--gold-soft); color: var(--gold); }
+
+.toast-txt { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+
+.toast-cerrar {
+  flex: 0 0 auto;
+  /* 2.25rem: el mínimo cómodo para un dedo sin que el aviso engorde. */
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.toast-cerrar:hover,
+.toast-cerrar:focus-visible { background: var(--bg-elevated); color: var(--text); outline: none; }
+
+/* Escritorio: esquina inferior derecha, como las notificaciones del sistema.
+   El `min-width` es para que un «Guardado.» no salga como una pastilla
+   diminuta perdida en la esquina: los avisos cortos y los largos ocupan un
+   bloque reconocible (mismo criterio que el snackbar de Material). */
+@media (min-width: 640px) {
+  .toaster {
+    left: auto;
+    right: 0;
+    align-items: flex-end;
+    padding: 0 1.25rem;
+    max-width: 32rem;
+  }
+  .toast { min-width: 20rem; }
+}
+
+@keyframes toast-entra {
+  from { opacity: 0; transform: translateY(1rem) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-sale {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
+}
+
+/* Quien pidió menos movimiento en su sistema recibe solo el fundido. Con
+   nombres DISTINTOS y no redefiniendo los de arriba: dos `@keyframes` con el
+   mismo nombre compiten por él, y cuál gana no es algo en lo que convenga
+   confiar. */
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: toast-fundido 150ms ease-out; }
+  .toast[data-saliendo='true'] { animation: toast-fundido-sale 150ms ease-in both; }
+}
+@keyframes toast-fundido {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes toast-fundido-sale {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 
 /* ── Pie legal ──
    Discreto y al final de todo. `margin-top: auto` no sirve aquí (el body no es

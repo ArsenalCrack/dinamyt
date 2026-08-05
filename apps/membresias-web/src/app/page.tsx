@@ -12,6 +12,7 @@ import { CampoImagen } from '@/components/CampoImagen';
 import { Cinturon } from '@/components/Cinturon';
 import { LogoClub } from '@/components/LogoClub';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
+import { avisoError, avisoInfo, avisoOk } from '@/lib/toast';
 
 interface RosterItem {
   userId: string;
@@ -62,8 +63,8 @@ export default function Panel() {
   const [revenue, setRevenue] = useState<Revenue | null>(null);
   const [overdue, setOverdue] = useState<Overdue[]>([]);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
+  /** Solo para fallos al CARGAR el panel; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
-  const [aviso, setAviso] = useState('');
   const [cargando, setCargando] = useState(true);
 
   const cargar = useCallback(async () => {
@@ -117,12 +118,10 @@ export default function Panel() {
    * barra, en el panel del alumno y en el carnet.
    */
   async function guardarLogo(logoUrl: string | null) {
-    setError('');
-    setAviso('');
     await api.patch('/mi-club', { logoUrl });
     await refrescar();
-    setAviso(t('logo.guardado'));
     setEditandoLogo(false);
+    avisoOk(t('logo.guardado'));
   }
 
   /**
@@ -136,21 +135,23 @@ export default function Panel() {
    * quién avisar, que es lo normal a mitad de mes.
    */
   async function enviarAvisos() {
-    setError('');
-    setAviso('');
     try {
       const r = await api.post<{ creados: number; pushEnviados: number }>(
         '/notifications/run',
         {},
       );
-      setAviso(
-        r.data.creados === 0
-          ? t('panel.avisosNinguno')
-          : `${t('panel.avisosCreados')}: ${r.data.creados} · ` +
+      // «Ninguno» no es un éxito que celebrar ni un fallo: es información, y
+      // por eso va en el tono neutro y no en verde.
+      if (r.data.creados === 0) {
+        avisoInfo(t('panel.avisosNinguno'));
+      } else {
+        avisoOk(
+          `${t('panel.avisosCreados')}: ${r.data.creados} · ` +
             `${r.data.pushEnviados} ${t('panel.avisosPush')}`,
-      );
+        );
+      }
     } catch (e) {
-      setError(mensajeError(e, t('panel.avisos')));
+      avisoError(mensajeError(e, t('panel.avisos')));
     }
   }
 
@@ -226,14 +227,11 @@ export default function Panel() {
         </div>
       )}
 
+      {/* Solo un fallo al CARGAR el panel se queda escrito aquí; el resultado
+          de una acción va por la nube flotante (ver lib/toast.ts). */}
       {error && (
         <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
-        </p>
-      )}
-      {aviso && (
-        <p className="msg-ok" style={{ marginBottom: '1rem' }}>
-          {aviso}
         </p>
       )}
 

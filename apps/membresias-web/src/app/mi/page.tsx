@@ -11,6 +11,8 @@ import { activarPush } from '@/lib/push';
 import { LIM, TIPOS_SANGRE, enMayusculas, soloTelefono, telefonoValido } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
+import { CampoContrasena } from '@/components/CampoContrasena';
+import { avisoError, avisoOk } from '@/lib/toast';
 import { LogoClub } from '@/components/LogoClub';
 import { CampoImagen } from '@/components/CampoImagen';
 import { Contador } from '@/components/Contador';
@@ -134,8 +136,8 @@ export default function MiPanel() {
   const [mi, setMi] = useState<MiEstado | null>(null);
   const [labor, setLabor] = useState<Labor | null>(null);
   const [avisos, setAvisos] = useState<AvisoBreve[]>([]);
+  /** Solo para fallos al CARGAR la pantalla; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
-  const [aviso, setAviso] = useState('');
   const [pass, setPass] = useState({ actual: '', nueva: '' });
   /** Cuánto historial propio se destapa. Ver `VerMas`. */
   const [verPagos, setVerPagos] = useState(PASO_HISTORIAL);
@@ -194,19 +196,15 @@ export default function MiPanel() {
   }, [cargandoSesion, user, router, cargar]);
 
   async function activarNotis() {
-    setAviso('');
-    setError('');
     const r = await activarPush();
-    if (r.ok) setAviso(t('mi.pushActivo'));
-    else setError(r.motivo ?? t('mi.activarPush'));
+    if (r.ok) avisoOk(t('mi.pushActivo'));
+    else avisoError(r.motivo ?? t('mi.activarPush'));
   }
 
   async function guardarPerfil(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     if (!telefonoValido(perfil.phone) || !telefonoValido(perfil.emergencyPhone)) {
-      setError(t('comun.telefonoCorto'));
+      avisoError(t('comun.telefonoCorto'));
       return;
     }
     try {
@@ -220,10 +218,13 @@ export default function MiPanel() {
         emergencyName: perfil.emergencyName || null,
         emergencyPhone: perfil.emergencyPhone || null,
       });
+      // Tras releer la sesión: lo que se confirma es lo que quedó guardado.
+      // El botón está al final de una ficha larga, que es justo donde un aviso
+      // arriba del todo no se veía.
       await refrescar();
-      setAviso(t('alumnos.actualizado'));
+      avisoOk(t('alumnos.actualizado'));
     } catch (err) {
-      setError(mensajeError(err, t('mi.miPerfil')));
+      avisoError(mensajeError(err, t('mi.miPerfil')));
     }
   }
 
@@ -235,36 +236,30 @@ export default function MiPanel() {
    * que al recargarlo la vista previa se repinta sola con la nueva vigencia.
    */
   async function reexpedirCarnet() {
-    setError('');
-    setAviso('');
     try {
       await api.post(`/users/${user!.id}/carnet`, {});
       await refrescar();
-      setAviso(t('carnet.reexpedido'));
+      avisoOk(t('carnet.reexpedido'));
     } catch (err) {
-      setError(mensajeError(err, t('carnet.reexpedir')));
+      avisoError(mensajeError(err, t('carnet.reexpedir')));
     }
   }
 
   /** La foto va sola: `CampoImagen` la manda ya recortada y comprimida. */
   async function guardarFoto(avatarUrl: string | null) {
-    setError('');
-    setAviso('');
     await api.patch('/auth/me', { avatarUrl });
     await refrescar();
-    setAviso(t('alumnos.actualizado'));
+    avisoOk(t('alumnos.actualizado'));
   }
 
   async function cambiarPassword(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setAviso('');
     try {
       await api.post('/auth/change-password', pass);
       setPass({ actual: '', nueva: '' });
-      setAviso(t('mi.contrasenaOk'));
+      avisoOk(t('mi.contrasenaOk'));
     } catch (err) {
-      setError(mensajeError(err, t('mi.cambiarContrasena')));
+      avisoError(mensajeError(err, t('mi.cambiarContrasena')));
     }
   }
 
@@ -347,11 +342,8 @@ export default function MiPanel() {
         )}
       </header>
 
-      {aviso && (
-        <p className="msg-ok" style={{ marginBottom: '1rem' }}>
-          {aviso}
-        </p>
-      )}
+      {/* Solo un fallo al CARGAR la pantalla se queda escrito aquí; el
+          resultado de una acción va por la nube flotante (ver lib/toast.ts). */}
       {error && (
         <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
@@ -879,8 +871,7 @@ export default function MiPanel() {
           <label className="muted" style={{ fontSize: '0.75rem' }}>
             {t('mi.contrasenaActual')}
           </label>
-          <input
-            type="password"
+          <CampoContrasena
             autoComplete="current-password"
             value={pass.actual}
             onChange={(e) => setPass({ ...pass, actual: e.target.value })}
@@ -891,8 +882,7 @@ export default function MiPanel() {
           <label className="muted" style={{ fontSize: '0.75rem' }}>
             {t('mi.contrasenaNueva')}
           </label>
-          <input
-            type="password"
+          <CampoContrasena
             autoComplete="new-password"
             minLength={8}
             maxLength={LIM.password}
