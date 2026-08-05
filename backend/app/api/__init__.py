@@ -15,6 +15,7 @@ def register_blueprints(app):
     from .competidores import competidores_bp, inscripciones_bp
     from .resultados import resultados_bp
     from .sincronizacion import sincronizacion_bp
+    from .mantenimiento import mantenimiento_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(campeonatos_bp, url_prefix="/api/campeonatos")
@@ -27,3 +28,6 @@ def register_blueprints(app):
     app.register_blueprint(inscripciones_bp, url_prefix="/api/inscripciones")
     app.register_blueprint(resultados_bp, url_prefix="/api/resultados")
     app.register_blueprint(sincronizacion_bp, url_prefix="/api/sincronizacion")
+    # Cuelga de /api a secas: es un interruptor de toda la instalación, no un
+    # recurso de ningún módulo (queda en /api/mantenimiento).
+    app.register_blueprint(mantenimiento_bp, url_prefix="/api")

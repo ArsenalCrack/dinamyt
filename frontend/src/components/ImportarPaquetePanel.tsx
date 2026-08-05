@@ -33,8 +33,12 @@ const SECCIONES: { clave: keyof InformeImportacion["resumen"]; labelKey: ClaveTe
 interface Props {
   /** Selector de fusionar/reemplazar (solo para paquetes de campeonato). */
   conModo?: boolean;
-  /** Se llama tras una importación real satisfactoria. */
-  onImportado?: (informe: InformeImportacion) => void;
+  /** Se llama tras una importación real satisfactoria.
+   *
+   * Puede devolver una promesa (recargar la lista): se espera antes de dar la
+   * importación por terminada, para que el aviso de quien llama salga con los
+   * datos nuevos ya en pantalla. */
+  onImportado?: (informe: InformeImportacion) => void | Promise<void>;
 }
 
 export default function ImportarPaquetePanel({ conModo = false, onImportado }: Props) {
@@ -70,7 +74,7 @@ export default function ImportarPaquetePanel({ conModo = false, onImportado }: P
         setPedirForzar(false);
       } else {
         reiniciar();
-        onImportado?.(informe);
+        await onImportado?.(informe);
       }
     } catch (err) {
       const respuesta = (err as { response?: { status?: number; data?: { error?: string } } }).response;

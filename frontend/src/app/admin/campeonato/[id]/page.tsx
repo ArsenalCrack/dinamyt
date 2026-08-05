@@ -24,6 +24,7 @@ import CampoFecha from "@/components/CampoFecha";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
+import { aviso } from "@/lib/toast";
 import { enMayusculas } from "@/lib/texto";
 import QRCode from "qrcode";
 
@@ -83,7 +84,6 @@ export default function CampeonatoDetailPage() {
   // rol_tatami vacío = "aún sin elegir": el render cae al primer rol libre
   const [assignData, setAssignData] = useState({ usuario_id: 0, rol_tatami: "" });
   const [judgeSearch, setJudgeSearch] = useState("");
-  const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({
     nombre: "", descripcion: "", fecha_inicio: "", fecha_fin: "",
@@ -186,9 +186,9 @@ export default function CampeonatoDetailPage() {
     } catch { flash(t("camp.desasignar.error"), "error"); }
   }
 
+  /** Avisa del resultado de una acción con la nube flotante (ver lib/toast). */
   function flash(texto: string, tipo: "ok" | "error" = "ok") {
-    setMsg({ texto, tipo });
-    setTimeout(() => setMsg(null), 3500);
+    aviso(texto, tipo);
   }
 
   async function handleToggleActivo() {
@@ -553,15 +553,6 @@ export default function CampeonatoDetailPage() {
         </div>
       )}
 
-      {msg && (
-        <div role={msg.tipo === "error" ? "alert" : "status"} style={{
-          background: msg.tipo === "error" ? "rgba(255,68,68,0.10)" : "var(--green-bg)",
-          border: `1px solid ${msg.tipo === "error" ? "rgba(255,68,68,0.35)" : "rgba(0,196,106,.25)"}`,
-          borderRadius: "var(--radius-sm)", padding: "10px 16px",
-          color: msg.tipo === "error" ? "var(--red-alert)" : "var(--green)",
-          marginBottom: 16, fontSize: "0.9rem", fontWeight: 700,
-        }} className="animate-fade">{msg.texto}</div>
-      )}
       {dialogo}
 
       {/* Modal: QR de acceso directo de un juez */}

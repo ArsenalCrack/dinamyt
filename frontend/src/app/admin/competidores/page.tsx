@@ -22,6 +22,7 @@ import ImportarExcelPanel from "@/components/ImportarExcelPanel";
 import ImportarPaquetePanel from "@/components/ImportarPaquetePanel";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useI18n } from "@/lib/i18n";
+import { aviso } from "@/lib/toast";
 
 export default function CompetidoresPage() {
   const router = useRouter();
@@ -41,7 +42,6 @@ export default function CompetidoresPage() {
   const [form, setForm] = useState<CompetidorFormState>(COMPETIDOR_FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
 
-  const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
 
   const cargar = useCallback(async () => {
@@ -68,9 +68,9 @@ export default function CompetidoresPage() {
     return () => { cancelled = true; };
   }, [cargar, router]);
 
+  /** Avisa del resultado de una acción con la nube flotante (ver lib/toast). */
   function flash(texto: string, tipo: "ok" | "error" = "ok") {
-    setMsg({ texto, tipo });
-    setTimeout(() => setMsg(null), 4000);
+    aviso(texto, tipo);
   }
 
   function abrirCrear() {
@@ -92,15 +92,18 @@ export default function CompetidoresPage() {
     if (!form.nombre_completo.trim()) return;
     setGuardando(true);
     try {
+      const editando = Boolean(editandoId);
       if (editandoId) {
         await updateCompetidorAPI(editandoId, formToPayload(form));
-        flash(t("comp.actualizado"));
       } else {
         await createCompetidorAPI(formToPayload(form));
-        flash(t("comp.registrado"));
       }
       setFormAbierto(false);
+      // El aviso va DESPUÉS de recargar: así sale cuando la lista ya enseña el
+      // cambio. Antes se anunciaba "registrado" mientras la tabla seguía sin
+      // él, y a quien mirara la lista le parecía que se había perdido.
       await cargar();
+      flash(editando ? t("comp.actualizado") : t("comp.registrado"));
     } catch (err) {
       const m = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       flash(m || t("comp.errorGuardar"), "error");
@@ -188,15 +191,6 @@ export default function CompetidoresPage() {
         </div>
       </div>
 
-      {msg && (
-        <div role={msg.tipo === "error" ? "alert" : "status"} className="animate-fade" style={{
-          background: msg.tipo === "error" ? "rgba(255,68,68,0.10)" : "var(--green-bg)",
-          border: `1px solid ${msg.tipo === "error" ? "rgba(255,68,68,0.35)" : "rgba(0,196,106,.25)"}`,
-          borderRadius: "var(--radius-sm)", padding: "10px 16px",
-          color: msg.tipo === "error" ? "var(--red-alert)" : "var(--green)",
-          marginBottom: 14, fontSize: "0.9rem", fontWeight: 700,
-        }}>{msg.texto}</div>
-      )}
       {dialogo}
 
       {importAbierto && (
@@ -208,9 +202,9 @@ export default function CompetidoresPage() {
       {paqueteAbierto && (
         <div style={{ marginBottom: 14 }}>
           <ImportarPaquetePanel
-            onImportado={(informe) => {
+            onImportado={async (informe) => {
               setPaqueteAbierto(false);
-              void cargar();
+              await cargar();
               flash(informe.message);
             }}
           />

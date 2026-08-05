@@ -1,4 +1,5 @@
 # Modelos de la base de datos DINAMYT
+from .ajuste import Ajuste
 from .usuario import Usuario
 from .campeonato import Campeonato
 from .categoria import Categoria
@@ -8,6 +9,7 @@ from .combate import Combate, EventoCombate
 from .competidor import Competidor, Inscripcion
 
 __all__ = [
+    "Ajuste",
     "Usuario",
     "Campeonato",
     "Categoria",

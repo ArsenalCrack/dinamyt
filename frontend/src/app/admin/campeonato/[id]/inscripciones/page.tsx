@@ -42,6 +42,7 @@ import CompetidorFormFields, {
 import ImportarExcelPanel from "@/components/ImportarExcelPanel";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
+import { aviso } from "@/lib/toast";
 
 // Nombres CANÓNICOS de modalidad (viajan al servidor y a los reportes):
 // se muestran tal cual, sin traducir, para no fragmentar el registro.
@@ -100,7 +101,6 @@ export default function InscripcionesPage() {
   const [motivos, setMotivos] = useState<Record<number, string>>({});
 
   const [busquedaLista, setBusquedaLista] = useState("");
-  const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
 
   const cargar = useCallback(async () => {
@@ -151,9 +151,9 @@ export default function InscripcionesPage() {
     return () => { cancelled = true; };
   }, [campId, cargar, router]);
 
+  /** Avisa del resultado de una acción con la nube flotante (ver lib/toast). */
   function flash(texto: string, tipo: "ok" | "error" = "ok") {
-    setMsg({ texto, tipo });
-    setTimeout(() => setMsg(null), 4000);
+    aviso(texto, tipo);
   }
 
   function toggleModalidad(lista: string[], setLista: (l: string[]) => void, m: string) {
@@ -461,15 +461,6 @@ export default function InscripcionesPage() {
         </div>
       </div>
 
-      {msg && (
-        <div role={msg.tipo === "error" ? "alert" : "status"} className="animate-fade" style={{
-          background: msg.tipo === "error" ? "rgba(255,68,68,0.10)" : "var(--green-bg)",
-          border: `1px solid ${msg.tipo === "error" ? "rgba(255,68,68,0.35)" : "rgba(0,196,106,.25)"}`,
-          borderRadius: "var(--radius-sm)", padding: "10px 16px",
-          color: msg.tipo === "error" ? "var(--red-alert)" : "var(--green)",
-          marginBottom: 14, fontSize: "0.9rem", fontWeight: 700,
-        }}>{msg.texto}</div>
-      )}
       {dialogo}
 
       {/* Pestañas por estado */}

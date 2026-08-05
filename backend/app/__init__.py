@@ -104,8 +104,8 @@ def create_app(config_name=None):
 
     # ── Importar modelos (para que Alembic los detecte) ──
     from .models import (  # noqa: F401
-        usuario, campeonato, categoria, tatami, asignacion, combate, llave,
-        competidor, resultado_publicado,
+        ajuste, usuario, campeonato, categoria, tatami, asignacion, combate,
+        llave, competidor, resultado_publicado,
     )
 
     # ── Techo global de peticiones por IP ──
@@ -114,6 +114,12 @@ def create_app(config_name=None):
 
     # ── Contexto de workspace para RLS ──
     registrar_contexto_rls(app)
+
+    # ── Modo mantenimiento ──
+    # Va DESPUÉS del contexto de RLS: cuando el superadmin pasa la puerta, la
+    # consulta que lo identifica tiene que salir ya con su contexto puesto.
+    from .mantenimiento import registrar_modo_mantenimiento
+    registrar_modo_mantenimiento(app)
 
     # ── Registrar Blueprints (API REST) ──
     from .api import register_blueprints

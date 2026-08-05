@@ -21,6 +21,7 @@ import CompetidorFormFields, {
 } from "@/components/CompetidorFormFields";
 import Logo from "@/components/Logo";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
+import { aviso } from "@/lib/toast";
 
 // Modalidades canónicas (viajan al servidor tal cual, sin traducir).
 const MODALIDADES = [
@@ -48,7 +49,6 @@ export default function MaestroPage() {
   const [form, setForm] = useState<CompetidorFormState>(COMPETIDOR_FORM_VACIO);
   const [modalidades, setModalidades] = useState<string[]>(["COMBATE"]);
   const [guardando, setGuardando] = useState(false);
-  const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
 
   // Re-envío de inscripción rechazada
   const [reenvioId, setReenvioId] = useState<number | null>(null);
@@ -97,9 +97,9 @@ export default function MaestroPage() {
     return () => { cancelled = true; };
   }, [cargar, router]);
 
+  /** Avisa del resultado de una acción con la nube flotante (ver lib/toast). */
   function flash(texto: string, tipo: "ok" | "error" = "ok") {
-    setMsg({ texto, tipo });
-    setTimeout(() => setMsg(null), 3500);
+    aviso(texto, tipo);
   }
 
   function abrirForm(campId: number) {
@@ -268,15 +268,6 @@ export default function MaestroPage() {
         )}
       </div>
 
-      {msg && (
-        <div role={msg.tipo === "error" ? "alert" : "status"} style={{
-          background: msg.tipo === "error" ? "rgba(255,68,68,0.10)" : "var(--green-bg)",
-          border: `1px solid ${msg.tipo === "error" ? "rgba(255,68,68,0.35)" : "rgba(0,196,106,.25)"}`,
-          borderRadius: "var(--radius-sm)", padding: "10px 16px",
-          color: msg.tipo === "error" ? "var(--red-alert)" : "var(--green)",
-          marginBottom: 16, fontSize: "0.9rem", fontWeight: 700,
-        }} className="animate-fade">{msg.texto}</div>
-      )}
 
       {!club && (
         <div className="card" style={{

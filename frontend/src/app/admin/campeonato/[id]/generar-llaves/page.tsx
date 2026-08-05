@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useI18n } from "@/lib/i18n";
+import { aviso } from "@/lib/toast";
 
 type Paso = "config" | "preview";
 
@@ -52,7 +53,6 @@ export default function GenerarLlavesPage() {
   const [generando, setGenerando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoGeneracion | null>(null);
 
-  const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
 
   useEffect(() => {
@@ -79,9 +79,9 @@ export default function GenerarLlavesPage() {
     return () => { cancelled = true; };
   }, [campId, router]);
 
+  /** Avisa del resultado de una acción con la nube flotante (ver lib/toast). */
   function flash(texto: string, tipo: "ok" | "error" = "ok") {
-    setMsg({ texto, tipo });
-    setTimeout(() => setMsg(null), 4000);
+    aviso(texto, tipo);
   }
 
   // ── Mutadores de config (inmutables) ──
@@ -195,15 +195,6 @@ export default function GenerarLlavesPage() {
         </p>
       </div>
 
-      {msg && (
-        <div role={msg.tipo === "error" ? "alert" : "status"} className="animate-fade" style={{
-          background: msg.tipo === "error" ? "rgba(255,68,68,0.10)" : "var(--green-bg)",
-          border: `1px solid ${msg.tipo === "error" ? "rgba(255,68,68,0.35)" : "rgba(0,196,106,.25)"}`,
-          borderRadius: "var(--radius-sm)", padding: "10px 16px",
-          color: msg.tipo === "error" ? "var(--red-alert)" : "var(--green)",
-          marginBottom: 14, fontSize: "0.9rem", fontWeight: 700,
-        }}>{msg.texto}</div>
-      )}
       {dialogo}
 
       {/* Pasos */}

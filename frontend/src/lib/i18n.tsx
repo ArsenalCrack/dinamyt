@@ -124,6 +124,43 @@ const es = {
   "comun.tatamis": "tatamis",
   "comun.jueces": "jueces",
 
+  // Campos de formulario compartidos
+  "campo.verContrasena": "Mostrar contraseña",
+  "campo.ocultarContrasena": "Ocultar contraseña",
+
+  // Página no encontrada (404)
+  "e404.codigo": "404",
+  "e404.titulo": "Esta pantalla no existe",
+  "e404.desc":
+    "La dirección que abriste no corresponde a ninguna pantalla de DINAMYT. Puede que el enlace esté mal copiado o que la página se haya movido.",
+  "e404.ruta": "Dirección que pediste",
+  "e404.inicio": "Ir al inicio",
+  "e404.volver": "← Volver atrás",
+  "e404.pantalla": "📺 Pantalla pública",
+
+  // Modo mantenimiento (lo activa el superadmin antes de actualizar)
+  "mant.titulo": "Estamos actualizando DINAMYT",
+  "mant.desc":
+    "El sistema está en mantenimiento por unos minutos. Tus datos están guardados; vuelve a entrar cuando termine.",
+  "mant.reintentar": "Reintentar",
+  "mant.comprobando": "Comprobando...",
+  "mant.aviso": "No cierres esta pantalla: se reactiva sola al terminar.",
+  "mant.panel": "Modo mantenimiento",
+  "mant.panelDesc":
+    "Cierra la aplicación para todos menos para ti (el superadmin). Actívalo antes de subir una actualización: quien esté conectado ve un aviso en vez de quedarse a medias.",
+  "mant.estadoActivo": "Activo — solo tú puedes entrar",
+  "mant.estadoInactivo": "Inactivo — la aplicación está abierta",
+  "mant.activar": "Activar mantenimiento",
+  "mant.desactivar": "Desactivar mantenimiento",
+  "mant.mensajeLabel": "Aviso que verán los usuarios (opcional)",
+  "mant.activadoOk": "Modo mantenimiento activado.",
+  "mant.desactivadoOk": "Modo mantenimiento desactivado.",
+  "mant.error": "No se pudo cambiar el modo mantenimiento.",
+  "mant.desde": "Activo desde",
+  "mant.confActivar.titulo": "¿Activar el modo mantenimiento?",
+  "mant.confActivar.mensaje":
+    "Los jueces, maestros y pantallas públicas dejarán de poder usar la aplicación hasta que lo desactives. Tú seguirás entrando con normalidad.",
+
   // Panel de administración (principal)
   "admin.panel": "Panel de Administracion",
   "admin.tab.campeonatos": "Campeonatos",
@@ -1299,6 +1336,40 @@ const en: Record<ClaveTexto, string> = {
   "comun.por": "by",
   "comun.tatamis": "tatamis",
   "comun.jueces": "judges",
+
+  "campo.verContrasena": "Show password",
+  "campo.ocultarContrasena": "Hide password",
+
+  "e404.codigo": "404",
+  "e404.titulo": "This screen does not exist",
+  "e404.desc":
+    "The address you opened does not match any DINAMYT screen. The link may be mistyped, or the page may have moved.",
+  "e404.ruta": "Address you requested",
+  "e404.inicio": "Go to home",
+  "e404.volver": "← Go back",
+  "e404.pantalla": "📺 Public display",
+
+  "mant.titulo": "We are updating DINAMYT",
+  "mant.desc":
+    "The system is under maintenance for a few minutes. Your data is saved; come back in when it is done.",
+  "mant.reintentar": "Try again",
+  "mant.comprobando": "Checking...",
+  "mant.aviso": "Leave this screen open: it comes back on its own when we finish.",
+  "mant.panel": "Maintenance mode",
+  "mant.panelDesc":
+    "Closes the application for everyone but you (the superadmin). Turn it on before uploading an update: whoever is connected sees a notice instead of being cut off mid-task.",
+  "mant.estadoActivo": "On — only you can get in",
+  "mant.estadoInactivo": "Off — the application is open",
+  "mant.activar": "Turn on maintenance",
+  "mant.desactivar": "Turn off maintenance",
+  "mant.mensajeLabel": "Notice users will see (optional)",
+  "mant.activadoOk": "Maintenance mode is on.",
+  "mant.desactivadoOk": "Maintenance mode is off.",
+  "mant.error": "Could not change maintenance mode.",
+  "mant.desde": "On since",
+  "mant.confActivar.titulo": "Turn on maintenance mode?",
+  "mant.confActivar.mensaje":
+    "Judges, masters and public displays will not be able to use the application until you turn it off. You will keep working as usual.",
 
   "admin.panel": "Administration Panel",
   "admin.tab.campeonatos": "Championships",

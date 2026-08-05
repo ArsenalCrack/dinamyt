@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginAPI } from "@/lib/api";
 import { guardarToken, guardarUsuario } from "@/lib/sesion";
+import CampoContrasena from "@/components/CampoContrasena";
 import Logo from "@/components/Logo";
 import { IDIOMAS, useI18n } from "@/lib/i18n";
 import { aplicarTema, getTema, type Tema } from "@/lib/theme";
@@ -145,9 +146,7 @@ export default function LoginPage() {
 
               <div className="login-field">
                 <label className="login-label" htmlFor="login-password">{t("login.contrasena")}</label>
-                <input
-                  type="password"
-                  className="input"
+                <CampoContrasena
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

@@ -7,14 +7,18 @@ import {
   createCampeonatoAPI,
   updateCampeonatoAPI,
   exportarUsuariosAPI,
+  fijarMantenimientoAPI,
   listClubesDetalleAPI,
   listUsersAPI,
+  obtenerMantenimientoAPI,
   registerUserAPI,
   updateUserAPI,
   type ClubMaestro,
   type EstadoCampeonato,
+  type EstadoMantenimiento,
   type UserData,
 } from "@/lib/api";
+import CampoContrasena from "@/components/CampoContrasena";
 import CampoFecha from "@/components/CampoFecha";
 import ClubesInput from "@/components/ClubesInput";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -23,6 +27,7 @@ import Logo from "@/components/Logo";
 import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
 import { enMayusculas } from "@/lib/texto";
+import { aviso } from "@/lib/toast";
 
 /**
  * Los dojangs de un maestro, con respaldo en los campos sueltos.
@@ -88,13 +93,16 @@ export default function AdminPage() {
     email: "", password: "", nombre: "", rol: "juez", clubes: [] as ClubMaestro[],
     puede_juzgar: false,
   });
-  const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const [userSearch, setUserSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [rolFiltro, setRolFiltro] = useState<"todos" | "admin" | "maestro" | "juez">("todos");
   const [campSearch, setCampSearch] = useState("");
   const [campFiltro, setCampFiltro] = useState<"todos" | "activos" | "inactivos">("todos");
   const [creandoCamp, setCreandoCamp] = useState(false);
+  // Modo mantenimiento: solo lo ve y lo cambia el superadmin.
+  const [mant, setMant] = useState<EstadoMantenimiento | null>(null);
+  const [mantMensaje, setMantMensaje] = useState("");
+  const [guardandoMant, setGuardandoMant] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [editUserData, setEditUserData] = useState({
     nombre: "", email: "", password: "", rol: "juez", clubes: [] as ClubMaestro[],
@@ -118,7 +126,7 @@ export default function AdminPage() {
 
   async function loadData(includeInactive = false) {
     try {
-      const [c, u, cl] = await Promise.all([
+      const [c, u, cl, m] = await Promise.all([
         listCampeonatosAPI(),
         listUsersAPI(includeInactive),
         // Clubes que ya existen en el workspace: al asignarle un dojang a un
@@ -126,16 +134,57 @@ export default function AdminPage() {
         // nombre, así que un dedazo al reescribirlo crea uno nuevo y parte en
         // dos las agrupaciones por club de los reportes.
         listClubesDetalleAPI().catch(() => [] as ClubMaestro[]),
+        // Solo lo pinta el superadmin, pero se pide siempre: si falla, el
+        // panel entero seguiría cargando igual (de ahí el catch).
+        obtenerMantenimientoAPI().catch(() => null),
       ]);
       setCampeonatos(c);
       setUsers(u);
       setClubes(cl);
+      if (m) {
+        setMant(m);
+        setMantMensaje(m.mensaje ?? "");
+      }
     } catch { /* */ }
   }
 
+  /**
+   * Enciende o apaga el modo mantenimiento.
+   *
+   * Encenderlo pide confirmación: deja fuera a los jueces en mitad de un
+   * campeonato, y no es algo que se pulse por curiosidad. Apagarlo, no: volver
+   * a abrir nunca es la decisión peligrosa.
+   */
+  function handleMantenimiento(activar: boolean) {
+    const ejecutar = async () => {
+      setGuardandoMant(true);
+      try {
+        const nuevo = await fijarMantenimientoAPI(activar, mantMensaje);
+        setMant(nuevo);
+        setMantMensaje(nuevo.mensaje ?? "");
+        flash(activar ? t("mant.activadoOk") : t("mant.desactivadoOk"), "ok");
+      } catch {
+        flash(t("mant.error"), "error");
+      } finally {
+        setGuardandoMant(false);
+      }
+    };
+    if (!activar) {
+      void ejecutar();
+      return;
+    }
+    pedirConfirmacion({
+      titulo: t("mant.confActivar.titulo"),
+      mensaje: t("mant.confActivar.mensaje"),
+      tipo: "peligro",
+      confirmLabel: t("mant.activar"),
+      onConfirm: ejecutar,
+    });
+  }
+
+  /** Avisa del resultado de una acción con la nube flotante (ver lib/toast). */
   function flash(texto: string, tipo: "ok" | "error" = "ok") {
-    setMsg({ texto, tipo });
-    setTimeout(() => setMsg(null), 3500);
+    aviso(texto, tipo);
   }
 
   async function handleToggleCampActivo(c: Campeonato) {
@@ -218,11 +267,14 @@ export default function AdminPage() {
         fecha_inicio: "", fecha_fin: "", lugar: "", ciudad: "", pais: "",
         estado: "preparacion",
       });
-      loadData(showInactive);
+      // Con `await`: el aviso sale cuando la lista YA muestra el campeonato
+      // nuevo. Sin él, "creado" aparecía junto a una lista que todavía era la
+      // de antes, y desde la pantalla parecía que no se había hecho nada.
+      await loadData(showInactive);
       flash(t("admin.camp.creado"), "ok");
     } catch {
       flash(t("admin.camp.errorCrear"), "error");
-      loadData(showInactive);
+      await loadData(showInactive);
     } finally {
       setCreandoCamp(false);
     }
@@ -249,7 +301,7 @@ export default function AdminPage() {
       });
       setShowNewUser(false);
       setNewUser({ email: "", password: "", nombre: "", rol: "juez", clubes: [], puede_juzgar: false });
-      loadData(showInactive);
+      await loadData(showInactive);
       flash(t("admin.usuarios.creado"), "ok");
     } catch (err) {
       const m = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
@@ -283,17 +335,68 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Mensajes: verde = satisfactorio, rojo = no se pudo realizar */}
-      {msg && (
-        <div role={msg.tipo === "error" ? "alert" : "status"} style={{
-          background: msg.tipo === "error" ? "rgba(255,68,68,0.10)" : "var(--green-bg)",
-          border: `1px solid ${msg.tipo === "error" ? "rgba(255,68,68,0.35)" : "rgba(0,196,106,.25)"}`,
-          borderRadius: "var(--radius-sm)", padding: "10px 16px",
-          color: msg.tipo === "error" ? "var(--red-alert)" : "var(--green)",
-          marginBottom: 16, fontSize: "0.9rem", fontWeight: 700,
-        }} className="animate-fade">{msg.texto}</div>
-      )}
       {dialogo}
+
+      {/* ══════════════ MODO MANTENIMIENTO (solo superadmin) ══════════════
+          Va arriba del todo y no dentro de una pestaña: se busca justo antes
+          de subir una actualización, con prisa, y esconderlo en un submenú es
+          garantizar que se olvide. */}
+      {esSuper && mant && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 20,
+            borderColor: mant.activo ? "var(--gold-border)" : "var(--border)",
+            background: mant.activo ? "var(--gold-bg)" : undefined,
+          }}
+        >
+          <div className="card-title">🛠️ {t("mant.panel")}</div>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", margin: "0 0 10px" }}>
+            {t("mant.panelDesc")}
+          </p>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            flexWrap: "wrap", marginBottom: 10,
+          }}>
+            <span style={{
+              padding: "4px 10px", borderRadius: "var(--radius-sm)",
+              fontSize: "0.82rem", fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: "0.08em",
+              background: mant.activo ? "rgba(255,68,68,0.10)" : "var(--green-bg)",
+              color: mant.activo ? "var(--red-alert)" : "var(--green)",
+              border: `1px solid ${mant.activo ? "rgba(255,68,68,0.35)" : "rgba(0,196,106,.25)"}`,
+            }}>
+              {mant.activo ? t("mant.estadoActivo") : t("mant.estadoInactivo")}
+            </span>
+            {mant.desde && (
+              <span style={{ color: "var(--text-dim)", fontSize: "0.84rem" }}>
+                {t("mant.desde")} {new Date(mant.desde).toLocaleString()}
+              </span>
+            )}
+          </div>
+          <label style={{
+            display: "block", color: "var(--text-muted)",
+            fontSize: "0.84rem", fontWeight: 700, marginBottom: 6,
+          }}>
+            {t("mant.mensajeLabel")}
+          </label>
+          <input
+            className="input"
+            value={mantMensaje}
+            maxLength={300}
+            onChange={(e) => setMantMensaje(e.target.value)}
+            style={{ marginBottom: 10 }}
+          />
+          <button
+            type="button"
+            className={`btn ${mant.activo ? "btn-primary" : "btn-danger"}`}
+            disabled={guardandoMant}
+            onClick={() => handleMantenimiento(!mant.activo)}
+          >
+            {mant.activo ? t("mant.desactivar") : t("mant.activar")}
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="admin-tabs" style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
@@ -540,9 +643,9 @@ export default function AdminPage() {
           {showImportUsers && (
             <div style={{ marginBottom: 16 }}>
               <ImportarPaquetePanel
-                onImportado={(informe) => {
+                onImportado={async (informe) => {
                   setShowImportUsers(false);
-                  loadData(showInactive);
+                  await loadData(showInactive);
                   flash(informe.message, "ok");
                 }}
               />
@@ -559,7 +662,8 @@ export default function AdminPage() {
                   onChange={(e) => setNewUser({ ...newUser, nombre: enMayusculas(e.target.value) })} required />
                 <input className="input" type="email" placeholder={t("admin.usuarios.correo")} value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} required />
-                <input className="input" type="password" placeholder={t("admin.usuarios.contrasena")} value={newUser.password}
+                <CampoContrasena placeholder={t("admin.usuarios.contrasena")} value={newUser.password}
+                  autoComplete="new-password"
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} required />
                 {/* Jerarquía: cualquier admin agrega jueces y maestros a su
                     equipo; solo el superadmin puede crear administradores. */}
@@ -721,7 +825,7 @@ export default function AdminPage() {
                       onChange={(e) => setEditUserData({ ...editUserData, nombre: enMayusculas(e.target.value) })} />
                     <input className="input" type="email" placeholder={t("admin.usuarios.correo")} value={editUserData.email}
                       onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })} />
-                    <input className="input" type="password" autoComplete="new-password"
+                    <CampoContrasena autoComplete="new-password"
                       placeholder={t("admin.usuarios.nuevaContrasena")}
                       value={editUserData.password}
                       onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })} />

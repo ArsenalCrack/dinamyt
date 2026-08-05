@@ -18,13 +18,13 @@ import {
   type CampeonatoResultadoItem,
   type ImportResultadosResumen,
 } from "@/lib/api";
+import { avisoError, avisoOk } from "@/lib/toast";
 
 export default function ImportarResultadosPage() {
   const router = useRouter();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState<ImportResultadosResumen | null>(null);
-  const [msg, setMsg] = useState<{ texto: string; tipo: "ok" | "error" } | null>(null);
   const [publicados, setPublicados] = useState<CampeonatoResultadoItem[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -52,17 +52,18 @@ export default function ImportarResultadosPage() {
     if (!archivo) return;
     setImportando(true);
     setResultado(null);
-    setMsg(null);
     try {
       const res = await importarResultadosAPI(archivo);
       setResultado(res);
       setArchivo(null);
       if (inputRef.current) inputRef.current.value = "";
-      setMsg({ texto: res.message, tipo: "ok" });
+      // El aviso sale con la lista de publicados ya refrescada: confirma un
+      // hecho consumado, no una importación a medio reflejar.
       await cargarPublicados();
+      avisoOk(res.message);
     } catch (err) {
       const m = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setMsg({ texto: m || "No se pudo importar el archivo. ¿Es un export de resultados de DINAMYT?", tipo: "error" });
+      avisoError(m || "No se pudo importar el archivo. ¿Es un export de resultados de DINAMYT?");
     } finally {
       setImportando(false);
     }
@@ -73,10 +74,10 @@ export default function ImportarResultadosPage() {
     const uuid = pubId.startsWith("pub:") ? pubId.slice(4) : pubId;
     try {
       await eliminarResultadoPublicadoAPI(uuid);
-      setMsg({ texto: `Se quitó "${nombre}" de los resultados públicos.`, tipo: "ok" });
       await cargarPublicados();
+      avisoOk(`Se quitó "${nombre}" de los resultados públicos.`);
     } catch {
-      setMsg({ texto: "No se pudo quitar el snapshot.", tipo: "error" });
+      avisoError("No se pudo quitar el snapshot.");
     }
   }
 
@@ -92,23 +93,6 @@ export default function ImportarResultadosPage() {
           resultados”) para publicarlo en la página pública de resultados.
         </p>
       </div>
-
-      {msg && (
-        <div
-          role="alert"
-          style={{
-            padding: "12px 14px",
-            borderRadius: "var(--radius)",
-            fontWeight: 700,
-            fontSize: "0.92rem",
-            border: `1px solid ${msg.tipo === "ok" ? "var(--green-border)" : "rgba(255,68,68,0.35)"}`,
-            background: msg.tipo === "ok" ? "rgba(0,212,114,0.08)" : "rgba(255,68,68,0.10)",
-            color: msg.tipo === "ok" ? "var(--green)" : "#ff9a9a",
-          }}
-        >
-          {msg.texto}
-        </div>
-      )}
 
       {/* Subir archivo */}
       <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>

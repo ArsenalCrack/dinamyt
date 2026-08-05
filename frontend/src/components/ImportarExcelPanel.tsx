@@ -56,8 +56,10 @@ export default function ImportarExcelPanel({
       setResultado(res);
       setArchivo(null);
       if (inputRef.current) inputRef.current.value = "";
-      onMensaje(res.message, res.errores.length ? "error" : "ok");
+      // Primero se recarga la lista y DESPUÉS se avisa: el aviso confirma un
+      // hecho consumado, no una importación que todavía se está reflejando.
       await onImportado();
+      onMensaje(res.message, res.errores.length ? "error" : "ok");
     } catch (err) {
       const m = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
       onMensaje(m || t("excel.importarError"), "error");

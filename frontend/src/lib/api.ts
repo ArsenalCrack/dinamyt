@@ -84,6 +84,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Evento con el que cualquier petición avisa de que el sistema está en
+ * mantenimiento. Lo escucha `<PorteroMantenimiento>` para enseñar la pantalla
+ * de aviso al instante, sin esperar a su siguiente sondeo.
+ */
+export const EVENTO_MANTENIMIENTO = "dinamyt:mantenimiento";
+
 // Interceptor: si recibimos 401, limpiar sesión
 api.interceptors.response.use(
   (response) => response,
@@ -95,9 +102,41 @@ api.interceptors.response.use(
         window.location.href = "/login";
       }
     }
+    // 503 con la marca del backend = mantenimiento, no un servidor caído. Se
+    // avisa a la app entera; la sesión NO se toca, que es todo el punto de
+    // este modo: al terminar, cada quien sigue donde estaba.
+    if (
+      error.response?.status === 503
+      && error.response?.data?.mantenimiento
+      && typeof window !== "undefined"
+    ) {
+      window.dispatchEvent(new CustomEvent(EVENTO_MANTENIMIENTO));
+    }
     return Promise.reject(error);
   }
 );
+
+// ── Modo mantenimiento ──
+export interface EstadoMantenimiento {
+  activo: boolean;
+  mensaje: string | null;
+  /** ISO-8601 de cuándo se encendió, o null si está apagado. */
+  desde: string | null;
+  /** Si QUIEN PREGUNTA puede seguir usando la app (solo el superadmin). */
+  exento: boolean;
+}
+
+/** Estado del mantenimiento. Ruta pública: responde con o sin sesión. */
+export async function obtenerMantenimientoAPI() {
+  const res = await api.get("/mantenimiento");
+  return res.data as EstadoMantenimiento;
+}
+
+/** Enciende o apaga el mantenimiento (solo superadmin). */
+export async function fijarMantenimientoAPI(activo: boolean, mensaje?: string) {
+  const res = await api.put("/mantenimiento", { activo, mensaje: mensaje ?? "" });
+  return res.data as EstadoMantenimiento;
+}
 
 // ── Auth API ──
 export async function loginAPI(email: string, password: string) {

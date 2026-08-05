@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Barlow_Condensed, Bebas_Neue, Inter, Share_Tech_Mono } from "next/font/google";
 import AppMenu from "@/components/AppMenu";
+import PorteroMantenimiento from "@/components/PorteroMantenimiento";
+import Toaster from "@/components/Toaster";
 import { I18nProvider } from "@/lib/i18n";
 import "./globals.css";
 
@@ -74,8 +76,16 @@ export default function RootLayout({
       </head>
       <body>
         <I18nProvider>
-          <AppMenu />
-          {children}
+          {/* El menú va DENTRO del portero: con el mantenimiento puesto no
+              tiene sentido ofrecer navegación a pantallas que no responden. */}
+          <PorteroMantenimiento>
+            <AppMenu />
+            {children}
+          </PorteroMantenimiento>
+          {/* Avisos flotantes de "guardado" / "no se pudo". Fuera del portero
+              y al final: se pinta en un portal sobre el <body>, así ningún
+              contenedor de la página puede recortarlo. */}
+          <Toaster />
         </I18nProvider>
       </body>
     </html>

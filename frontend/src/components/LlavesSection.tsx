@@ -21,6 +21,7 @@ import PodioLlave from "@/components/PodioLlave";
 import SelectMenu from "@/components/SelectMenu";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useI18n } from "@/lib/i18n";
+import { aviso } from "@/lib/toast";
 
 interface NuevoCompetidor {
   nombre: string;
@@ -58,7 +59,6 @@ export default function LlavesSection({ campeonatoId }: { campeonatoId: number }
   const [compClub, setCompClub] = useState("");
   const [competidores, setCompetidores] = useState<NuevoCompetidor[]>([]);
 
-  const [msg, setMsg] = useState<{ texto: string; tipo: TipoMensaje } | null>(null);
   const [guardando, setGuardando] = useState(false);
   const { pedirConfirmacion, dialogo } = useConfirmDialog();
 
@@ -88,9 +88,9 @@ export default function LlavesSection({ campeonatoId }: { campeonatoId: number }
     return () => { cancelled = true; };
   }, [cargar]);
 
+  /** Avisa del resultado de una acción con la nube flotante (ver lib/toast). */
   function flash(texto: string, tipo: TipoMensaje = "error") {
-    setMsg({ texto, tipo });
-    setTimeout(() => setMsg(null), 3500);
+    aviso(texto, tipo);
   }
 
   const MAX_COMPETIDORES = tipoForm === "figuras" ? 50 : 64;
@@ -422,15 +422,6 @@ export default function LlavesSection({ campeonatoId }: { campeonatoId: number }
         </div>
       </div>
 
-      {msg && (
-        <div className="animate-fade" role={msg.tipo === "error" ? "alert" : "status"} style={{
-          background: msg.tipo === "error" ? "rgba(255,68,68,0.10)" : "var(--green-bg)",
-          border: `1px solid ${msg.tipo === "error" ? "rgba(255,68,68,0.35)" : "var(--green-border)"}`,
-          borderRadius: "var(--radius-sm)", padding: "8px 14px",
-          color: msg.tipo === "error" ? "var(--red-alert)" : "var(--green)",
-          marginBottom: 12, fontSize: "0.9rem", fontWeight: 700,
-        }}>{msg.texto}</div>
-      )}
       {dialogo}
 
       {/* ── Formulario crear / editar ── */}

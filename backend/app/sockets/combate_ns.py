@@ -463,6 +463,15 @@ class CombateNamespace(Namespace):
             token = auth.get("token")
         token = token or request.args.get("token")
 
+        # Mantenimiento: nadie entra al tatami mientras se sube una versión
+        # nueva, salvo el superadmin (ver app/mantenimiento.py).
+        from ..mantenimiento import socket_permitido
+
+        if not socket_permitido(token):
+            raise ConnectionRefusedError(
+                "El sistema está en mantenimiento. Vuelve a intentarlo en unos minutos."
+            )
+
         if not tatami_id:
             raise ConnectionRefusedError("tatami_id requerido")
 
