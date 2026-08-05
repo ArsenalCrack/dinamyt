@@ -6,6 +6,7 @@ Soporta múltiples campeonatos simultáneos.
 
 from datetime import datetime, timezone
 from ..extensions import db
+from ..timeutil import iso_utc
 from ..uid import nuevo_uid
 
 # Ciclo de vida del campeonato (independiente de `activo`, que controla la
@@ -78,7 +79,7 @@ class Campeonato(db.Model):
             "estado": self.estado or "preparacion",
             "activo": self.activo,
             "created_by": self.created_by,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
             "num_tatamis": self.tatamis.count() if self.tatamis else 0,
             "num_inscripciones": num_aceptadas,
             "num_pendientes": num_pendientes,

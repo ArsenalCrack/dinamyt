@@ -7,6 +7,7 @@ que define qué botones, puntos y reglas aplican.
 
 from datetime import datetime, timezone
 from ..extensions import db
+from ..timeutil import iso_utc
 
 
 class Categoria(db.Model):
@@ -38,7 +39,7 @@ class Categoria(db.Model):
             "descripcion": self.descripcion,
             "config_puntuacion": self.config_puntuacion,
             "activa": self.activa,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
 
     def __repr__(self):

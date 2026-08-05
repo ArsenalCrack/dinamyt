@@ -7,6 +7,7 @@ alumnos y, si el admin se lo permite, puntúa como juez) | juez (puntúa combate
 import os
 from datetime import datetime, timezone
 from ..extensions import db
+from ..timeutil import iso_utc
 from ..uid import nuevo_uid
 import bcrypt
 
@@ -261,8 +262,8 @@ class Usuario(db.Model):
                 }
                 if self.creado_por else None
             ),
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "eliminado_at": self.eliminado_at.isoformat() if self.eliminado_at else None,
+            "created_at": iso_utc(self.created_at),
+            "eliminado_at": iso_utc(self.eliminado_at),
         }
         if include_asignaciones:
             data["asignaciones"] = [

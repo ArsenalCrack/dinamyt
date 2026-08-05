@@ -179,6 +179,13 @@ Variables de entorno:
 | `COOKIE_SECURE`  | `true` (la sesión viaja por HTTPS)                                                           |
 | `COOKIE_SAMESITE`| `Lax` — **no** `None`: la web llama a la API por su propio dominio (ver paso 3)              |
 | `TRUST_PROXY_HOPS` | `2` — el navegador pide a Vercel y Vercel reenvía a Render, así que hay dos saltos         |
+| `TZ`             | `America/Bogota` — zona del evento. Es el valor por defecto, así que solo hace falta ponerla para un campeonato en otro huso (`America/Caracas`, `Europe/Madrid`…) |
+
+> **Sobre las horas.** Los timestamps se guardan y viajan en UTC, y cada
+> dispositivo los muestra en SU hora: eso no depende de `TZ`. La variable
+> decide la hora que va **impresa** en las actas y los reportes PDF/Excel, que
+> no la convierte ningún navegador y tiene que ser la del sitio donde se
+> compite. Ver `app/timeutil.py`.
 
 Verifica que responde abriendo
 `https://<tu-backend>.onrender.com/api/campeonatos/publico`.

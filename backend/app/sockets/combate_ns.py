@@ -39,6 +39,7 @@ from ..extensions import db, socketio
 from ..models.combate import Combate, EventoCombate
 from ..models.tatami import SesionTatami
 from ..models.asignacion import AccesoTatami, AsignacionJuez
+from ..timeutil import iso_utc
 
 
 # ══════════════════════════════════════════
@@ -424,7 +425,7 @@ def _meta_desde_asignacion(asig):
         "rol_tatami": asig.rol_tatami if asig else None,
         "asignacion": _rol_label(asig.rol_tatami) if asig else None,
         "origen": "asignacion",
-        "asignado_at": asig.asignado_at.isoformat() if asig and asig.asignado_at else None,
+        "asignado_at": iso_utc(asig.asignado_at) if asig else None,
         "asignado_por": (
             {
                 "id": asig.asignado_por.id,

@@ -10,6 +10,7 @@ import random
 import string
 from datetime import datetime, timezone
 from ..extensions import db
+from ..timeutil import iso_utc
 from ..uid import nuevo_uid
 
 
@@ -59,7 +60,7 @@ class Tatami(db.Model):
             "campeonato_id": self.campeonato_id,
             "numero": self.numero,
             "activo": self.activo,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
             "num_asignaciones": self.asignaciones.count(),
         }
 
@@ -96,8 +97,8 @@ class SesionTatami(db.Model):
             "tatami_id": self.tatami_id,
             "categoria_id": self.categoria_id,
             "estado": self.estado,
-            "inicio": self.inicio.isoformat() if self.inicio else None,
-            "fin": self.fin.isoformat() if self.fin else None,
+            "inicio": iso_utc(self.inicio),
+            "fin": iso_utc(self.fin),
         }
 
     def __repr__(self):

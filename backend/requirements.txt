@@ -5,6 +5,11 @@ Flask-SocketIO==5.5.1
 Flask-JWT-Extended==4.7.1
 Flask-CORS==5.0.1
 python-dotenv==1.1.0
+# tzdata: la base de datos de husos horarios que `zoneinfo` necesita para
+# resolver "America/Bogota" (ver app/timeutil.py). Windows no trae ninguna, y
+# una imagen Linux mínima tampoco tiene por qué: sin esto los reportes salen
+# con la hora del proceso, que en Render es UTC.
+tzdata==2025.2
 bcrypt==4.3.0
 openpyxl==3.1.5
 reportlab==4.4.1

@@ -7,6 +7,7 @@ AccesoTatami — Auditoría: quién entró, cuándo, con qué IP, a qué tatami.
 
 from datetime import datetime, timezone
 from ..extensions import db
+from ..timeutil import iso_utc
 from ..uid import nuevo_uid
 
 
@@ -49,7 +50,7 @@ class AsignacionJuez(db.Model):
             "rol_tatami": self.rol_tatami,
             "nombre_display": self.nombre_display,
             "asignado_por_id": self.asignado_por_id,
-            "asignado_at": self.asignado_at.isoformat() if self.asignado_at else None,
+            "asignado_at": iso_utc(self.asignado_at),
             "usuario": (
                 self.usuario.to_dict() if include_usuario and self.usuario else None
             ),
@@ -100,7 +101,7 @@ class AccesoTatami(db.Model):
             "nombre_visitante": self.nombre_visitante,
             "rol_seleccionado": self.rol_seleccionado,
             "ip_address": self.ip_address,
-            "acceso_at": self.acceso_at.isoformat() if self.acceso_at else None,
+            "acceso_at": iso_utc(self.acceso_at),
         }
 
     def __repr__(self):

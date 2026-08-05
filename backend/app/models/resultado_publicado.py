@@ -16,6 +16,7 @@ mismo campeonato REEMPLAZA el snapshot anterior, no lo duplica.
 from datetime import datetime, timezone
 
 from ..extensions import db
+from ..timeutil import iso_utc
 
 
 class ResultadoPublicado(db.Model):
@@ -46,7 +47,7 @@ class ResultadoPublicado(db.Model):
             "nombre": self.nombre,
             "num_resultados": len(self._resultados()),
             "publicado": True,
-            "importado_at": self.importado_at.isoformat() if self.importado_at else None,
+            "importado_at": iso_utc(self.importado_at),
         }
 
     def to_resultados(self):
@@ -58,7 +59,7 @@ class ResultadoPublicado(db.Model):
             "categorias": payload.get("categorias", []),
             "tatamis": payload.get("tatamis", []),
             "publicado": True,
-            "importado_at": self.importado_at.isoformat() if self.importado_at else None,
+            "importado_at": iso_utc(self.importado_at),
         }
 
     def __repr__(self):
