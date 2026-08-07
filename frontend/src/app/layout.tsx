@@ -67,6 +67,20 @@ export default function RootLayout({
         />
         {/* PWA: instalable en escritorio y móvil */}
         <link rel="manifest" href="/manifest.webmanifest" />
+        {/* Android arma la pantalla de carga con el icono MÁS GRANDE que logre
+            descargar del manifiesto, y lo estira hasta el tamaño del splash
+            (~512 px en un celular de densidad 4x). Declarar aquí el de 512
+            además del manifiesto le deja una segunda fuente en alta
+            resolución; si solo queda el de 192 —o peor, el favicon— lo que se
+            ve es ese icono ampliado, o sea pixeleado.
+
+            Ojo con `purpose: "maskable"`: nuestro escudo es transparente y con
+            aire alrededor, no llena el cuadro de borde a borde. Declararlo
+            maskable hace que Android lo pinte sobre un plato del color de
+            fondo del manifiesto. Por eso el manifiesto solo trae los dos
+            iconos `any`, igual que membresías. */}
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="application-name" content="DINAMYT" />
         <meta name="mobile-web-app-capable" content="yes" />
