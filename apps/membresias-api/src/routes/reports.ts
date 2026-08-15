@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import {
   memberships,
   payments,
@@ -9,6 +9,7 @@ import {
 } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireRole } from '../plugins/auth';
 import { limitarPorIp } from '../lib/auth/rate-limit';
+import { columnaImagenLigera, direccionFoto } from '../lib/imagenes';
 import { estado, iniciosDePeriodo, todayStr, type PlanType } from '../lib/billing';
 
 /**
@@ -422,6 +423,73 @@ export async function reportsRoutes(app: FastifyInstance) {
           .map(([date, count]) => ({ date, count }))
           .sort((a, b) => (a.date < b.date ? -1 : 1)),
       };
+    },
+  );
+
+  // ── GET /reports/birthdays — quién cumple años HOY ────────────────────────
+  //
+  // Existe para que el maestro no tenga que acordarse. Es una pregunta que solo
+  // tiene sentido contestada el día que toca, así que se resuelve en vivo y no
+  // se encola como aviso: un cumpleaños no es una tarea pendiente que haya que
+  // marcar como leída, es algo que o se dice hoy o ya no se dice.
+  //
+  // La comparación va por MES Y DÍA, nunca por la fecha entera —esa solo
+  // coincide el día que alguien nace—, y la hace PostgreSQL: traerse el club
+  // entero para filtrarlo aquí sería descargar doscientas filas para quedarse
+  // con ninguna casi todos los días.
+  app.get(
+    '/reports/birthdays',
+    { preHandler: [limitarPorIp('reports', 60, 60), requireRole(['owner', 'staff'])] },
+    async (req, reply) => {
+      const orgId = orgDelRequest(req);
+      if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
+      const today = todayStr();
+      const mmdd = today.slice(5); // 'MM-DD'
+
+      /**
+       * El 29 de febrero se celebra el 28 los años que no son bisiestos.
+       *
+       * Sin esto, quien nació un 29 de febrero no cumple años en esta
+       * aplicación tres de cada cuatro años. Es el único caso que, si no se
+       * contempla, jamás se descubre probando.
+       */
+      const esBisiesto = (() => {
+        const a = Number(today.slice(0, 4));
+        return (a % 4 === 0 && a % 100 !== 0) || a % 400 === 0;
+      })();
+      const diasQueCuentan =
+        mmdd === '02-28' && !esBisiesto ? ['02-28', '02-29'] : [mmdd];
+
+      const filas = await req.db
+        .select({
+          id: users.id,
+          fullName: users.fullName,
+          avatarUrl: columnaImagenLigera(users.avatarUrl),
+          updatedAt: users.updatedAt,
+          belt: users.belt,
+          birthDate: users.birthDate,
+        })
+        .from(users)
+        .where(
+          and(
+            eq(users.orgId, orgId),
+            eq(users.isActive, true),
+            inArray(sql`to_char(${users.birthDate}, 'MM-DD')`, diasQueCuentan),
+          ),
+        )
+        .orderBy(asc(users.fullName));
+
+      return filas.map((u) => ({
+        userId: u.id,
+        fullName: u.fullName,
+        avatarUrl: direccionFoto(u),
+        belt: u.belt,
+        birthDate: u.birthDate,
+        /** Los años que cumple HOY, que es el número que se dice en voz alta. */
+        cumple: u.birthDate
+          ? Number(today.slice(0, 4)) - Number(u.birthDate.slice(0, 4))
+          : null,
+      }));
     },
   );
 }

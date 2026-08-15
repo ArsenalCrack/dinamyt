@@ -75,6 +75,18 @@ export const users = mem.table(
      */
     trainsSince: date('trains_since'),
     /**
+     * Cuándo nació. Opcional: nadie se queda sin cuenta por no acordarse.
+     *
+     * Es el único dato de la ficha que su dueño puede poner PERO NO CORREGIR.
+     * La asimetría es a propósito: el alumno es quien mejor sabe cuándo nació,
+     * así que dejarlo rellenar el hueco ahorra una pregunta en clase; pero una
+     * vez escrita, la fecha decide qué día lo felicita el club y —el día que
+     * haya categorías por edad— en cuál compite. Un campo así no puede quedar
+     * al alcance de quien tenga una tarde aburrida. Lo corrige el maestro (ver
+     * `PATCH /auth/me` y `PATCH /users/:id`).
+     */
+    birthDate: date('birth_date'),
+    /**
      * Cuándo se expidió su carnet. De aquí sale la vigencia impresa.
      *
      * Existe porque antes no existía: el carnet se imprimía con «emitido hoy,

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { api, mensajeError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { fmtFecha } from '@/lib/formato';
+import { fmtFecha, hoyISO } from '@/lib/formato';
 import { LIM } from '@/lib/campos';
 import { CampoFecha } from '@/components/CampoFecha';
 import { Contador } from '@/components/Contador';
@@ -19,6 +19,35 @@ interface Exc {
   isClosed: boolean;
   note: string | null;
 }
+
+/** Una clase del club. `null` como id no existe: eso es «todo el club». */
+interface Grupo {
+  id: string;
+  name: string;
+  descripcion: string | null;
+}
+
+/** Un día de clase. `groupId` nulo = del club sin dividir. */
+interface Dia {
+  groupId: string | null;
+  weekday: number;
+  opensAt: string | null;
+  closesAt: string | null;
+}
+
+interface Nota {
+  groupId: string | null;
+  semana: string;
+  nota: string;
+}
+
+/**
+ * La clave con la que se identifica una clase en los diccionarios de esta
+ * pantalla. El club sin dividir es la cadena vacía, no `null`: un objeto no
+ * puede tener `null` de clave, y con `'null'` como texto se confundiría con una
+ * clase que se llamara así.
+ */
+const CLUB = '';
 
 /** Nombres de los días en el idioma activo, sin diccionario propio. */
 function nombresDias(idioma: string): string[] {
@@ -34,29 +63,103 @@ function nombresDias(idioma: string): string[] {
   });
 }
 
+/**
+ * El LUNES de la semana que contiene esa fecha.
+ *
+ * La misma regla que aplica la API al guardar la nota (`lunesDe` en su
+ * `lib/schedule.ts`): la semana va de lunes a domingo, así que el domingo
+ * pertenece a la semana que empezó SEIS días antes, no a la que empieza mañana.
+ * Sin esto, el maestro que escribe la nota un domingo la guardaría en la semana
+ * siguiente sin enterarse.
+ */
+function lunesDe(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  const dia = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (dia - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Corre la semana `n` semanas adelante (o atrás si es negativo). */
+function masSemanas(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n * 7);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Las horas que ofrece el desplegable: de 5:00 a 22:30, de media en media. */
+const HORAS = (() => {
+  const out: string[] = [];
+  for (let h = 5; h <= 22; h++) {
+    out.push(`${String(h).padStart(2, '0')}:00`);
+    out.push(`${String(h).padStart(2, '0')}:30`);
+  }
+  return out;
+})();
+
+/**
+ * Las clases del club y su calendario.
+ *
+ * **Qué cambió aquí.** Esta pantalla eran siete casillas: los días que abre el
+ * club. Eso le bastaba al club que da una sola clase, pero no al que parte a sus
+ * alumnos —los niños a las cuatro, los adultos a las seis—, que no tenía dónde
+ * decirlo: las dos mitades compartían un horario que no le servía a ninguna.
+ *
+ * Ahora el club puede tener clases, cada una con sus días, sus horas, su
+ * descripción y su nota de la semana. Si no crea ninguna, esta pantalla se
+ * comporta igual que antes: un horario y ya.
+ */
 export default function Calendario() {
   const router = useRouter();
   const { t, idioma } = useI18n();
   const { user, cargando: cargandoSesion, esStaff } = useAuth();
+  const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
 
-  const [dias, setDias] = useState<number[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  /** Los días marcados, tal como se están editando. Se guardan todos de golpe. */
+  const [dias, setDias] = useState<Dia[]>([]);
   const [exc, setExc] = useState<Exc[]>([]);
   const [nueva, setNueva] = useState({ date: '', isClosed: true, note: '' });
+  const [nuevaClase, setNuevaClase] = useState({ name: '', descripcion: '' });
+  const [creando, setCreando] = useState(false);
+  /** Qué clase está esperando confirmación para borrarse. */
+  const [borrando, setBorrando] = useState<string | null>(null);
+  /** La semana que se está mirando, siempre un lunes. */
+  const [semana, setSemana] = useState(() => lunesDe(hoyISO()));
+  /** La nota de cada clase para esa semana, indexada por id (o `CLUB`). */
+  const [notas, setNotas] = useState<Record<string, string>>({});
+  const [guardando, setGuardando] = useState(false);
   /** Solo para fallos al CARGAR el calendario; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
 
-  const cargar = useCallback(async () => {
-    try {
-      const { data } = await api.get<{
-        dias: { weekday: number }[];
-        excepciones: Exc[];
-      }>('/schedule');
-      setDias(data.dias.map((d) => d.weekday));
-      setExc(data.excepciones);
-    } catch (e) {
-      setError(mensajeError(e, t('comun.ninguno')));
-    }
-  }, [t]);
+  const cargar = useCallback(
+    async (deLaSemana: string) => {
+      try {
+        const { data } = await api.get<{
+          grupos: Grupo[];
+          dias: Dia[];
+          excepciones: Exc[];
+          semana: string;
+          notas: Nota[];
+        }>('/schedule', { params: { semana: deLaSemana } });
+        setGrupos(data.grupos);
+        setDias(
+          data.dias.map((d) => ({
+            groupId: d.groupId ?? null,
+            weekday: d.weekday,
+            opensAt: d.opensAt ?? null,
+            closesAt: d.closesAt ?? null,
+          })),
+        );
+        setExc(data.excepciones);
+        const porClase: Record<string, string> = {};
+        for (const n of data.notas) porClase[n.groupId ?? CLUB] = n.nota;
+        setNotas(porClase);
+      } catch (e) {
+        setError(mensajeError(e, t('comun.ninguno')));
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     if (cargandoSesion) return;
@@ -68,22 +171,105 @@ export default function Calendario() {
       router.replace('/mi');
       return;
     }
-    void cargar();
-  }, [cargandoSesion, user, esStaff, router, cargar]);
+    void cargar(semana);
+  }, [cargandoSesion, user, esStaff, router, cargar, semana]);
 
-  function alternarDia(w: number) {
-    setDias((d) => (d.includes(w) ? d.filter((x) => x !== w) : [...d, w]));
+  /** ¿Está marcado ese día para esa clase? */
+  function marcado(clase: string, w: number): Dia | undefined {
+    const id = clase === CLUB ? null : clase;
+    return dias.find((d) => d.groupId === id && d.weekday === w);
   }
 
-  async function guardarDias() {
+  function alternarDia(clase: string, w: number) {
+    const id = clase === CLUB ? null : clase;
+    setDias((lista) =>
+      lista.some((d) => d.groupId === id && d.weekday === w)
+        ? lista.filter((d) => !(d.groupId === id && d.weekday === w))
+        : [...lista, { groupId: id, weekday: w, opensAt: null, closesAt: null }],
+    );
+  }
+
+  function ponerHora(clase: string, w: number, campo: 'opensAt' | 'closesAt', v: string) {
+    const id = clase === CLUB ? null : clase;
+    setDias((lista) =>
+      lista.map((d) =>
+        d.groupId === id && d.weekday === w ? { ...d, [campo]: v || null } : d,
+      ),
+    );
+  }
+
+  /**
+   * Guarda el horario entero de una vez.
+   *
+   * Es un reemplazo y no una edición fila a fila porque así lo es la ruta: el
+   * `PUT` borra los días del club y escribe los que van. Con esto, quitar un
+   * martes y añadir un jueves es un solo viaje y un solo estado consistente.
+   */
+  async function guardarHorario() {
+    setGuardando(true);
     try {
-      await api.put('/schedule', { dias: dias.map((w) => ({ weekday: w })) });
-      // Tras releer el horario del servidor: lo que se confirma es lo que
-      // quedó guardado, no lo que se acaba de marcar en pantalla.
-      await cargar();
+      await api.put('/schedule', { dias });
+      // Se relee del servidor: lo que se confirma es lo que quedó guardado, no
+      // lo que se acaba de marcar en pantalla.
+      await cargar(semana);
       avisoOk(t('alumnos.actualizado'));
     } catch (e) {
       avisoError(mensajeError(e, t('comun.guardar')));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function crearClase(e: FormEvent) {
+    e.preventDefault();
+    if (!nuevaClase.name.trim()) return;
+    setCreando(true);
+    try {
+      await api.post('/schedule/groups', nuevaClase);
+      setNuevaClase({ name: '', descripcion: '' });
+      await cargar(semana);
+      avisoOk(t('grupos.creada'));
+    } catch (err) {
+      avisoError(mensajeError(err, t('grupos.nueva')));
+    } finally {
+      setCreando(false);
+    }
+  }
+
+  /** Renombrar o redescribir una clase. Va en su propio viaje, al perder el foco. */
+  async function guardarClase(g: Grupo) {
+    try {
+      await api.patch(`/schedule/groups/${g.id}`, {
+        name: g.name,
+        descripcion: g.descripcion,
+      });
+    } catch (err) {
+      avisoError(mensajeError(err, t('comun.guardar')));
+      await cargar(semana);
+    }
+  }
+
+  async function borrarClase(id: string) {
+    try {
+      await api.delete(`/schedule/groups/${id}`);
+      setBorrando(null);
+      await cargar(semana);
+      avisoOk(t('grupos.eliminada'));
+    } catch (err) {
+      avisoError(mensajeError(err, t('grupos.eliminar')));
+    }
+  }
+
+  async function guardarNota(clase: string) {
+    try {
+      await api.put('/schedule/notes', {
+        groupId: clase === CLUB ? null : clase,
+        semana,
+        nota: notas[clase] ?? '',
+      });
+      avisoOk(t('grupos.notaGuardada'));
+    } catch (err) {
+      avisoError(mensajeError(err, t('grupos.nota')));
     }
   }
 
@@ -93,7 +279,7 @@ export default function Calendario() {
     try {
       await api.post('/schedule/exceptions', nueva);
       setNueva({ date: '', isClosed: true, note: '' });
-      await cargar();
+      await cargar(semana);
       avisoOk(t('alumnos.actualizado'));
     } catch (err) {
       avisoError(mensajeError(err, t('calendario.agregarExcepcion')));
@@ -103,7 +289,7 @@ export default function Calendario() {
   async function borrarExc(id: string) {
     try {
       await api.delete(`/schedule/exceptions/${id}`);
-      await cargar();
+      await cargar(semana);
       avisoOk(t('alumnos.actualizado'));
     } catch (e) {
       avisoError(mensajeError(e, t('comun.eliminar')));
@@ -111,9 +297,103 @@ export default function Calendario() {
   }
 
   const DIAS = nombresDias(idioma);
+  const opcionesHora = [
+    { valor: '', etiqueta: '—' },
+    ...HORAS.map((h) => ({ valor: h, etiqueta: h })),
+  ];
+
+  /**
+   * El horario se dibuja igual para una clase que para el club entero: lo único
+   * que cambia es qué `groupId` llevan las filas. Por eso es una función y no
+   * dos bloques de JSX casi iguales.
+   */
+  function bloqueHorario(clase: string) {
+    return (
+      <>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+          {DIAS.map((nombre, w) => (
+            <button
+              key={w}
+              type="button"
+              className={marcado(clase, w) ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
+              aria-pressed={Boolean(marcado(clase, w))}
+              onClick={() => alternarDia(clase, w)}
+            >
+              {nombre}
+            </button>
+          ))}
+        </div>
+        {/* La hora solo aparece en los días marcados: un selector de hora para
+            un día en que no hay clase no significa nada. */}
+        {DIAS.map((nombre, w) => {
+          const d = marcado(clase, w);
+          if (!d) return null;
+          return (
+            <div
+              key={w}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginTop: '0.5rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span style={{ fontSize: '0.8rem', minWidth: '5.5rem' }}>{nombre}</span>
+              <div style={{ width: '7rem' }}>
+                <SelectMenu
+                  valor={d.opensAt ?? ''}
+                  onChange={(v) => ponerHora(clase, w, 'opensAt', v)}
+                  etiquetaAria={`${t('grupos.abre')} · ${nombre}`}
+                  placeholder={t('grupos.abre')}
+                  opciones={opcionesHora}
+                />
+              </div>
+              <div style={{ width: '7rem' }}>
+                <SelectMenu
+                  valor={d.closesAt ?? ''}
+                  onChange={(v) => ponerHora(clase, w, 'closesAt', v)}
+                  etiquetaAria={`${t('grupos.cierra')} · ${nombre}`}
+                  placeholder={t('grupos.cierra')}
+                  opciones={opcionesHora}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </>
+    );
+  }
+
+  /** La nota de la semana, igual para una clase que para el club entero. */
+  function bloqueNota(clase: string) {
+    return (
+      <div style={{ marginTop: '0.9rem' }}>
+        <label className="muted" style={{ fontSize: '0.72rem' }}>
+          {t('grupos.nota')}
+        </label>
+        <textarea
+          rows={2}
+          value={notas[clase] ?? ''}
+          onChange={(e) => setNotas((n) => ({ ...n, [clase]: e.target.value }))}
+          maxLength={LIM.notaClase}
+          placeholder={t('grupos.notaEjemplo')}
+          style={{ marginTop: '0.25rem', resize: 'vertical' }}
+        />
+        <Contador valor={notas[clase] ?? ''} max={LIM.notaClase} />
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={() => guardarNota(clase)}
+        >
+          {t('comun.guardar')}
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: '1.5rem' }}>
+    <main style={{ maxWidth: 760, margin: '0 auto', padding: '1.5rem' }}>
       <header
         style={{
           display: 'flex',
@@ -140,28 +420,232 @@ export default function Calendario() {
         </p>
       )}
 
-      <div className="card" style={{ padding: '1rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-          {t('calendario.diasSemana')}
-        </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.9rem' }}>
-          {DIAS.map((nombre, w) => (
+      {/* ── La semana que se está mirando ──
+          Manda sobre las notas de abajo, y por eso está arriba del todo: es el
+          contexto de todo lo que sigue, no un control más. */}
+      <div
+        className="card"
+        style={{
+          padding: '0.7rem 1rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={() => setSemana((s) => masSemanas(s, -1))}
+        >
+          ‹ {t('grupos.semanaAnterior')}
+        </button>
+        <div style={{ textAlign: 'center' }}>
+          <span className="muted" style={{ fontSize: '0.72rem' }}>
+            {t('grupos.semanaDel')}{' '}
+          </span>
+          <strong className="mono">{fmtFecha(semana, idioma)}</strong>
+          {semana !== lunesDe(hoyISO()) && (
             <button
-              key={w}
               type="button"
-              className={dias.includes(w) ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
-              aria-pressed={dias.includes(w)}
-              onClick={() => alternarDia(w)}
+              className="btn btn-outline btn-sm"
+              style={{ marginLeft: '0.5rem' }}
+              onClick={() => setSemana(lunesDe(hoyISO()))}
             >
-              {nombre}
+              {t('grupos.semanaActual')}
             </button>
-          ))}
+          )}
         </div>
-        <button className="btn btn-gold" onClick={guardarDias}>
-          {t('comun.guardar')}
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={() => setSemana((s) => masSemanas(s, 1))}
+        >
+          {t('grupos.semanaSiguiente')} ›
         </button>
       </div>
 
+      {/* ── Las clases ── */}
+      <div className="card" style={{ padding: '1rem', marginBottom: '1.25rem' }}>
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+          {t('grupos.titulo')}
+        </h2>
+        <p className="muted" style={{ fontSize: '0.75rem', marginBottom: '0.9rem' }}>
+          {t('grupos.ayuda')}
+        </p>
+
+        {/* Sin clases, el club tiene UN horario. No es un estado a medias ni un
+            hueco por rellenar: es como funciona la mayoría de los clubes, y por
+            eso se enseña con su horario puesto y no con un vacío. */}
+        {grupos.length === 0 ? (
+          <div>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700 }}>{t('grupos.sinClases')}</h3>
+            <p className="muted" style={{ fontSize: '0.72rem', marginBottom: '0.7rem' }}>
+              {t('grupos.sinClasesAyuda')}
+            </p>
+            {bloqueHorario(CLUB)}
+            {esMaestro && bloqueNota(CLUB)}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {grupos.map((g) => (
+              <div
+                key={g.id}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.6rem',
+                  padding: '0.85rem',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <label className="muted" style={{ fontSize: '0.72rem' }}>
+                      {t('grupos.nombre')}
+                    </label>
+                    <input
+                      value={g.name}
+                      disabled={!esMaestro}
+                      onChange={(e) =>
+                        setGrupos((lista) =>
+                          lista.map((x) =>
+                            x.id === g.id ? { ...x, name: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      onBlur={() => esMaestro && guardarClase(g)}
+                      maxLength={LIM.claseNombre}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                  </div>
+                  {esMaestro &&
+                    (borrando === g.id ? (
+                      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => borrarClase(g.id)}
+                        >
+                          {t('comun.eliminar')}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setBorrando(null)}
+                        >
+                          {t('comun.cancelar')}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        title={t('grupos.eliminarConfirma')}
+                        onClick={() => setBorrando(g.id)}
+                      >
+                        {t('grupos.eliminar')}
+                      </button>
+                    ))}
+                </div>
+
+                {borrando === g.id && (
+                  <p className="msg-error" style={{ fontSize: '0.75rem', marginTop: '0.4rem' }}>
+                    {t('grupos.eliminarConfirma')}
+                  </p>
+                )}
+
+                <label
+                  className="muted"
+                  style={{ fontSize: '0.72rem', display: 'block', marginTop: '0.6rem' }}
+                >
+                  {t('grupos.descripcion')}
+                </label>
+                <textarea
+                  rows={2}
+                  value={g.descripcion ?? ''}
+                  disabled={!esMaestro}
+                  onChange={(e) =>
+                    setGrupos((lista) =>
+                      lista.map((x) =>
+                        x.id === g.id ? { ...x, descripcion: e.target.value } : x,
+                      ),
+                    )
+                  }
+                  onBlur={() => esMaestro && guardarClase(g)}
+                  maxLength={LIM.claseDescripcion}
+                  placeholder={t('grupos.descripcionEjemplo')}
+                  style={{ marginTop: '0.2rem', resize: 'vertical' }}
+                />
+
+                <p className="muted" style={{ fontSize: '0.72rem', margin: '0.6rem 0 0.4rem' }}>
+                  {t('grupos.horarioAyuda')}
+                </p>
+                {bloqueHorario(g.id)}
+                {esMaestro && bloqueNota(g.id)}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {esMaestro && (
+          <button
+            className="btn btn-gold"
+            style={{ marginTop: '1rem' }}
+            disabled={guardando}
+            onClick={guardarHorario}
+          >
+            {guardando ? t('comun.guardando') : t('comun.guardar')}
+          </button>
+        )}
+      </div>
+
+      {/* ── Crear una clase ── */}
+      {esMaestro && (
+        <form onSubmit={crearClase} className="card" style={{ padding: '1rem', marginBottom: '1.25rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+            {t('grupos.nueva')}
+          </h2>
+          <label className="muted" style={{ fontSize: '0.72rem' }}>
+            {t('grupos.nombre')}
+          </label>
+          <input
+            value={nuevaClase.name}
+            onChange={(e) => setNuevaClase((c) => ({ ...c, name: e.target.value }))}
+            maxLength={LIM.claseNombre}
+            placeholder={t('grupos.nombreEjemplo')}
+            style={{ marginTop: '0.2rem', marginBottom: '0.6rem' }}
+          />
+          <label className="muted" style={{ fontSize: '0.72rem' }}>
+            {t('grupos.descripcion')}
+          </label>
+          <textarea
+            rows={2}
+            value={nuevaClase.descripcion}
+            onChange={(e) => setNuevaClase((c) => ({ ...c, descripcion: e.target.value }))}
+            maxLength={LIM.claseDescripcion}
+            placeholder={t('grupos.descripcionEjemplo')}
+            style={{ marginTop: '0.2rem', resize: 'vertical' }}
+          />
+          <Contador valor={nuevaClase.descripcion} max={LIM.claseDescripcion} />
+          <button
+            className="btn btn-outline"
+            type="submit"
+            disabled={creando || !nuevaClase.name.trim()}
+          >
+            {creando ? t('comun.guardando') : `+ ${t('grupos.nueva')}`}
+          </button>
+        </form>
+      )}
+
+      {/* ── Excepciones del calendario ── */}
       <div className="card" style={{ padding: '1rem' }}>
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
           {t('calendario.excepciones')}
@@ -170,59 +654,61 @@ export default function Calendario() {
             debajo y a lo ancho de la tarjeta. Antes compartía renglón con los
             otros dos y le quedaban 120 px: el maestro escribía a ciegas en una
             rendija de la que solo veía las últimas cinco palabras. */}
-        <form onSubmit={agregarExc} className="excepcion-form">
-          <div className="excepcion-fila">
+        {esMaestro && (
+          <form onSubmit={agregarExc} className="excepcion-form">
+            <div className="excepcion-fila">
+              <div>
+                <label className="muted" style={{ fontSize: '0.72rem' }}>
+                  {t('comun.fecha')}
+                </label>
+                {/* Calendario propio, acotado: la columna es `date` y no acepta
+                    años de cinco cifras (que el `type="date"` nativo sí dejaba
+                    teclear). Ver `components/CampoFecha.tsx`. */}
+                <CampoFecha
+                  valor={nueva.date}
+                  onChange={(v) => setNueva((n) => ({ ...n, date: v }))}
+                  min="2000-01-01"
+                  max="2100-12-31"
+                  ariaLabel={t('comun.fecha')}
+                  borrable={false}
+                />
+              </div>
+              <div>
+                <label className="muted" style={{ fontSize: '0.72rem' }}>
+                  {t('planes.tipo')}
+                </label>
+                <SelectMenu
+                  valor={nueva.isClosed ? 'closed' : 'open'}
+                  onChange={(v) => setNueva((n) => ({ ...n, isClosed: v === 'closed' }))}
+                  etiquetaAria={t('planes.tipo')}
+                  opciones={[
+                    { valor: 'closed', etiqueta: t('calendario.cerrado') },
+                    { valor: 'open', etiqueta: t('calendario.abierto') },
+                  ]}
+                />
+              </div>
+            </div>
+
             <div>
               <label className="muted" style={{ fontSize: '0.72rem' }}>
-                {t('comun.fecha')}
+                {t('calendario.nota')}
               </label>
-              {/* Calendario propio, acotado: la columna es `date` y no acepta
-                  años de cinco cifras (que el `type="date"` nativo sí dejaba
-                  teclear). Ver `components/CampoFecha.tsx`. */}
-              <CampoFecha
-                valor={nueva.date}
-                onChange={(v) => setNueva((n) => ({ ...n, date: v }))}
-                min="2000-01-01"
-                max="2100-12-31"
-                ariaLabel={t('comun.fecha')}
-                borrable={false}
+              <textarea
+                rows={3}
+                value={nueva.note}
+                onChange={(e) => setNueva((n) => ({ ...n, note: e.target.value }))}
+                maxLength={LIM.notaCalendario}
+                placeholder={t('calendario.notaEjemplo')}
+                style={{ marginTop: '0.25rem', resize: 'vertical', minHeight: '4.5rem' }}
               />
+              <Contador valor={nueva.note} max={LIM.notaCalendario} />
             </div>
-            <div>
-              <label className="muted" style={{ fontSize: '0.72rem' }}>
-                {t('planes.tipo')}
-              </label>
-              <SelectMenu
-                valor={nueva.isClosed ? 'closed' : 'open'}
-                onChange={(v) => setNueva((n) => ({ ...n, isClosed: v === 'closed' }))}
-                etiquetaAria={t('planes.tipo')}
-                opciones={[
-                  { valor: 'closed', etiqueta: t('calendario.cerrado') },
-                  { valor: 'open', etiqueta: t('calendario.abierto') },
-                ]}
-              />
-            </div>
-          </div>
 
-          <div>
-            <label className="muted" style={{ fontSize: '0.72rem' }}>
-              {t('calendario.nota')}
-            </label>
-            <textarea
-              rows={3}
-              value={nueva.note}
-              onChange={(e) => setNueva((n) => ({ ...n, note: e.target.value }))}
-              maxLength={LIM.notaCalendario}
-              placeholder={t('calendario.notaEjemplo')}
-              style={{ marginTop: '0.25rem', resize: 'vertical', minHeight: '4.5rem' }}
-            />
-            <Contador valor={nueva.note} max={LIM.notaCalendario} />
-          </div>
-
-          <button className="btn btn-outline" type="submit" style={{ alignSelf: 'start' }}>
-            {t('calendario.agregarExcepcion')}
-          </button>
-        </form>
+            <button className="btn btn-outline" type="submit" style={{ alignSelf: 'start' }}>
+              {t('calendario.agregarExcepcion')}
+            </button>
+          </form>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           {exc.length === 0 && (
@@ -247,9 +733,11 @@ export default function Calendario() {
                 </span>
                 {x.note ? <span className="muted"> · {x.note}</span> : null}
               </span>
-              <button className="btn btn-outline btn-sm" onClick={() => borrarExc(x.id)}>
-                {t('comun.eliminar')}
-              </button>
+              {esMaestro && (
+                <button className="btn btn-outline btn-sm" onClick={() => borrarExc(x.id)}>
+                  {t('comun.eliminar')}
+                </button>
+              )}
             </div>
           ))}
         </div>

@@ -50,6 +50,12 @@ export interface Usuario {
   /** Desde cuándo entrena, si el maestro lo puso. Ver `GET /mi`. */
   trainsSince: string | null;
   /**
+   * Cuándo nació. Viaja aunque esté vacía —y sobre todo entonces—: es lo que le
+   * dice a «Mis datos» si el campo va editable (nunca se puso) o de solo
+   * lectura (ya está, y a partir de ahí la corrige el maestro).
+   */
+  birthDate: string | null;
+  /**
    * Cuándo se expidió su carnet ('YYYY-MM-DD'). De aquí sale la vigencia
    * impresa, y solo la mueve reexpedirlo: ver `POST /users/:id/carnet`.
    */

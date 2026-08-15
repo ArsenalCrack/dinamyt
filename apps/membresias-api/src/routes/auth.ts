@@ -18,6 +18,7 @@ import {
 import { cerrarSesion, darSesion } from '../lib/auth/cookies';
 import {
   LIMITES,
+  fechaNacimiento,
   nombreCompleto,
   telefono,
   textoOpcional,
@@ -44,6 +45,12 @@ function vistaUsuario(u: typeof users.$inferSelect) {
     avatarUrl: direccionFoto(u),
     belt: u.belt,
     trainsSince: u.trainsSince,
+    /**
+     * Cuándo nació. Viaja aunque esté vacía —y sobre todo entonces—: es lo que
+     * le dice a la pantalla si el campo va editable (nunca se ha puesto) o de
+     * solo lectura (ya está, y la corrige el maestro).
+     */
+    birthDate: u.birthDate,
     /** Cuándo se expidió su carnet: de aquí sale la vigencia que va impresa. */
     carnetEmitidoEl: u.carnetEmitidoEl,
     bloodType: u.bloodType,
@@ -269,11 +276,47 @@ export async function authRoutes(app: FastifyInstance) {
       fullName?: string;
       phone?: string | null;
       avatarUrl?: string | null;
+      birthDate?: string | null;
       bloodType?: string | null;
       emergencyName?: string | null;
       emergencyPhone?: string | null;
     };
     const cambios: Record<string, unknown> = { updatedAt: new Date() };
+
+    /**
+     * La fecha de nacimiento: se pone una vez, y luego la corrige el maestro.
+     *
+     * Es la única regla asimétrica de este PATCH, y es a propósito. Quien mejor
+     * sabe cuándo nació es el propio alumno, así que dejarle rellenar el hueco
+     * ahorra una pregunta en clase y evita que el club acabe con media ficha
+     * vacía. Pero una vez escrita, la fecha decide qué día lo felicita el club
+     * —y, el día que haya categorías por edad, en cuál compite—, así que
+     * REESCRIBIRLA ya no es mantener tus datos: es cambiar un dato del que
+     * cuelgan decisiones del club.
+     *
+     * Por eso no basta con mirar el cuerpo de la petición: hay que leer lo que
+     * hay guardado. `undefined` sigue significando «no lo toques», así que el
+     * SELECT solo se paga cuando el campo viene de verdad.
+     */
+    if (body.birthDate !== undefined) {
+      const administra = req.user!.is_super_admin || req.user!.role_membresias === 'owner';
+      if (!administra) {
+        const [yo] = await req.db
+          .select({ birthDate: users.birthDate })
+          .from(users)
+          .where(eq(users.id, req.user!.sub))
+          .limit(1);
+        if (yo?.birthDate) {
+          return reply.code(403).send({
+            error:
+              'Tu fecha de nacimiento ya está registrada. Si está mal, pídele a tu maestro que la corrija.',
+          });
+        }
+      }
+      const nacimiento = fechaNacimiento(body.birthDate);
+      if (!nacimiento.ok) return reply.code(422).send({ error: nacimiento.error });
+      cambios.birthDate = nacimiento.valor;
+    }
 
     // El tipo de sangre y a quién llamar SÍ los mantiene cada quien, al
     // contrario que el nombre. Son datos que cambian —el hermano que se mudó,

@@ -36,11 +36,18 @@ interface Persona {
   avatarUrl: string | null;
   belt: string | null;
   trainsSince: string | null;
+  birthDate: string | null;
   bloodType: string | null;
   emergencyName: string | null;
   emergencyPhone: string | null;
   role: Rol;
   isActive: boolean;
+}
+
+/** Una clase del club, tal como la enseña el desplegable. */
+interface Clase {
+  id: string;
+  name: string;
 }
 
 const ROLES: { valor: Rol; clave: 'rol.student' | 'rol.guardian' | 'rol.staff' }[] = [
@@ -58,6 +65,9 @@ interface FormPersona {
   role: Rol;
   belt: string;
   trainsSince: string;
+  birthDate: string;
+  /** En qué clase del club entrena. Vacío = sin clase, o club sin dividir. */
+  groupId: string;
   bloodType: string;
   emergencyName: string;
   emergencyPhone: string;
@@ -77,6 +87,8 @@ const VACIO: FormPersona = {
   role: 'student',
   belt: '',
   trainsSince: '',
+  birthDate: '',
+  groupId: '',
   bloodType: '',
   emergencyName: '',
   emergencyPhone: '',
@@ -98,6 +110,15 @@ export default function Alumnos() {
   const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
 
   const [gente, setGente] = useState<Persona[]>([]);
+  /**
+   * Las clases del club, para repartir al alumno en el momento de inscribirlo.
+   *
+   * Reasignar a alguien que ya existe se hace en su ficha, junto al plan y al
+   * estado: la clase es de la MEMBRESÍA, no de la persona, y este listado no la
+   * trae. Ofrecerla aquí obligaría a pedir la membresía de cada fila para saber
+   * qué enseñar marcado.
+   */
+  const [clases, setClases] = useState<Clase[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
@@ -162,6 +183,14 @@ export default function Alumnos() {
       return;
     }
     void cargar();
+    // Las clases se piden una vez y aparte del listado: cambian de higos a
+    // brevas y no tienen por qué viajar en cada búsqueda ni en cada página.
+    // Que falle no rompe nada: el desplegable sale vacío y el alumno queda sin
+    // clase, que es lo mismo que pasa en un club que no las usa.
+    void api
+      .get<{ grupos: Clase[] }>('/schedule')
+      .then((r) => setClases(r.data.grupos ?? []))
+      .catch(() => setClases([]));
   }, [cargandoSesion, user, esStaff, router, cargar]);
 
   function abrirAlta() {
@@ -182,6 +211,8 @@ export default function Alumnos() {
       role: p.role,
       belt: p.belt ?? '',
       trainsSince: p.trainsSince ?? '',
+      birthDate: p.birthDate ?? '',
+      groupId: '',
       bloodType: p.bloodType ?? '',
       emergencyName: p.emergencyName ?? '',
       emergencyPhone: p.emergencyPhone ?? '',
@@ -214,6 +245,10 @@ export default function Alumnos() {
       bloodType: form.bloodType || null,
       emergencyName: form.emergencyName || null,
       emergencyPhone: form.emergencyPhone || null,
+      // La fecha de nacimiento solo la manda el maestro: la API le responde 403
+      // al auxiliar que lo intente, y eso echaría abajo el guardado del resto
+      // del formulario, que sí es suyo.
+      ...(esMaestro ? { birthDate: form.birthDate || null } : {}),
     };
     const alta = editando === 'nuevo';
     try {
@@ -225,6 +260,9 @@ export default function Alumnos() {
           phone: form.phone || undefined,
           role: form.role,
           belt: form.belt || undefined,
+          // Solo tiene sentido para un alumno: el auxiliar y el acudiente no
+          // entrenan, así que no van a ninguna clase.
+          ...(form.role === 'student' && form.groupId ? { groupId: form.groupId } : {}),
           ...ficha,
         });
       } else {
@@ -432,6 +470,48 @@ export default function Alumnos() {
             {t('ficha.entrenaDesdeAyuda')}
           </span>
         </label>
+        {/* La fecha de nacimiento es del maestro: al auxiliar ni se le dibuja,
+            porque la API le respondería 403 al guardar. */}
+        {esMaestro && (
+          <label style={{ display: 'block' }}>
+            <Etiqueta>{t('ficha.nacimiento')}</Etiqueta>
+            {/* Mismo calendario que el resto del sistema, y por el mismo motivo:
+                una fecha de nacimiento es SIEMPRE vieja, y con el selector
+                nativo de Android llegar a 1998 son cien toques en la flecha. */}
+            <div style={{ marginTop: '0.25rem' }}>
+              <CampoFecha
+                valor={form.birthDate}
+                onChange={(v) => setForm({ ...form, birthDate: v })}
+                min="1900-01-01"
+                max={hoyISO()}
+                ariaLabel={t('ficha.nacimiento')}
+              />
+            </div>
+            <span className="muted" style={{ fontSize: '0.7rem' }}>
+              {t('ficha.nacimientoAyuda')}
+            </span>
+          </label>
+        )}
+        {/* La clase solo se elige al INSCRIBIR. Cambiársela a alguien que ya
+            está se hace en su ficha, junto al plan y al estado: la clase es de
+            su membresía, y es ahí donde vive todo lo que se le cambia de ella. */}
+        {editando === 'nuevo' && form.role === 'student' && clases.length > 0 && (
+          <label style={{ display: 'block' }}>
+            <Etiqueta>{t('grupos.asignar')}</Etiqueta>
+            <div style={{ marginTop: '0.25rem' }}>
+              <SelectMenu
+                valor={form.groupId}
+                onChange={(v) => setForm({ ...form, groupId: v })}
+                etiquetaAria={t('grupos.asignar')}
+                placeholder={t('grupos.sinAsignar')}
+                opciones={[
+                  { valor: '', etiqueta: t('grupos.sinAsignar') },
+                  ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
+                ]}
+              />
+            </div>
+          </label>
+        )}
         <label style={{ display: 'block' }}>
           <Etiqueta>{t('ficha.sangre')}</Etiqueta>
           <div style={{ marginTop: '0.25rem' }}>

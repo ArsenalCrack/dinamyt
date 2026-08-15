@@ -7,6 +7,7 @@ import {
   decimal,
   timestamp,
   date,
+  index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import {
@@ -49,6 +50,19 @@ export const memberships = mem.table(
     userId: uuid('user_id').notNull(),
     /** Acudiente que paga en este club (opcional). */
     payerUserId: uuid('payer_user_id'),
+    /**
+     * En qué clase del club entrena (→ `club_groups.id`). Una sola, y de ahí
+     * sale el muro: «el alumno de una clase no ve la otra» no se sostiene si se
+     * puede estar en las dos. `null` = sin clase asignada, que es lo que son
+     * todos hasta que el maestro los reparte —y lo único que hay en un club que
+     * no divide sus clases—.
+     *
+     * La FK existe en la base (ver `0014_clases_del_club.sql`) pero no se
+     * declara aquí: `club_groups` vive en `schema/asistencia.ts`, que ya
+     * importa este archivo, y declararla cerraría el círculo entre los dos
+     * módulos.
+     */
+    groupId: uuid('group_id'),
     status: estadoMembresiaEnum('status').notNull().default('activo'),
     statusReason: text('status_reason'),
     matriculado: boolean('matriculado').default(false),
@@ -69,6 +83,7 @@ export const memberships = mem.table(
   (t) => [
     uniqueIndex('uq_membership_org_user').on(t.orgId, t.userId),
     uniqueIndex('uq_membership_pin').on(t.orgId, t.checkinPin),
+    index('ix_memberships_grupo').on(t.orgId, t.groupId),
   ],
 );
 

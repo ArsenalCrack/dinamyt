@@ -8,7 +8,7 @@ import {
 } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireRole } from '../plugins/auth';
 import { estado, diasFaltantes, todayStr } from '../lib/billing';
-import { esDiaClase } from '../lib/schedule';
+import { diasDeClase, esDiaClase } from '../lib/schedule';
 import { ensureMembership } from '../lib/memberships';
 import { fecha as fechaValida } from '../lib/validacion';
 
@@ -64,7 +64,6 @@ export async function checkinRoutes(app: FastifyInstance) {
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const body = req.body as {
         identifier: { type: string; value: string };
-        grupo?: string;
         /** Día en que se marcó de verdad, para lo que viene de la cola. */
         fecha?: string;
         /** Instante exacto de esa marca (ISO). Solo para la hora que se enseña. */
@@ -120,13 +119,19 @@ export async function checkinRoutes(app: FastifyInstance) {
         if (f.valor) fecha = f.valor;
       }
 
-      // 3. ¿Ese día hay clase? (calendario del club)
-      const diasSem = (
-        await db
-          .select()
-          .from(clubSchedule)
-          .where(and(eq(clubSchedule.orgId, orgId), eq(clubSchedule.isActive, true)))
-      ).map((d) => d.weekday);
+      // 3. ¿Ese día hay clase? (calendario de SU clase, no del club)
+      //
+      // Se pregunta por los días de la clase del alumno y no por los del club:
+      // en un club dividido, el de la clase de la tarde no entrena los días de
+      // la otra, y darle por bueno el martes porque «el club abre los martes»
+      // le apuntaría una asistencia a una clase a la que no fue. Sin clase
+      // asignada —o en un club sin dividir— cuentan todos los días, que es
+      // exactamente lo que había antes de que las clases existieran.
+      const filasHorario = await db
+        .select({ weekday: clubSchedule.weekday, groupId: clubSchedule.groupId })
+        .from(clubSchedule)
+        .where(and(eq(clubSchedule.orgId, orgId), eq(clubSchedule.isActive, true)));
+      const diasSem = diasDeClase(filasHorario, m.groupId);
       const exc = (
         await db
           .select()
@@ -147,11 +152,21 @@ export async function checkinRoutes(app: FastifyInstance) {
        * está en la puerta con la fila esperando y necesita saber que son dos
        * toques en Calendario, no que la aplicación se rompió.
        */
-      if (diasSem.length === 0 && !exc.some((e) => e.date === fecha)) {
+      if (filasHorario.length === 0 && !exc.some((e) => e.date === fecha)) {
         return reply.code(422).send({
           codigo: 'SIN_CALENDARIO',
           error:
             'El club todavía no tiene días de clase configurados. Márcalos en «Calendario» para poder pasar lista.',
+        });
+      }
+      // El club sí tiene horario, pero la clase de este alumno no: es un caso
+      // distinto y merece un mensaje distinto. Con el de arriba, el maestro
+      // saldría a marcar unos días que ya están marcados.
+      if (diasSem.length === 0 && !exc.some((e) => e.date === fecha)) {
+        return reply.code(422).send({
+          codigo: 'SIN_CLASE',
+          error:
+            'La clase de este alumno todavía no tiene días asignados en «Calendario».',
         });
       }
       if (!esDiaClase(diasSem, exc, fecha, 'cerrado')) {
@@ -235,7 +250,11 @@ export async function checkinRoutes(app: FastifyInstance) {
           membershipId: m.id,
           checkinDate: fecha,
           method: type,
-          grupo: body.grupo ?? null,
+          // A qué clase asistió: sale de SU membresía, no del cuerpo de la
+          // petición. Quien marca no elige a qué clase fue —ni el alumno con su
+          // QR ni el auxiliar que lo apunta a mano—, y dejarlo viajar por el
+          // cuerpo convertía el dato en una sugerencia del kiosco.
+          groupId: m.groupId ?? null,
           ...(marcadoEn ? { checkedInAt: marcadoEn } : {}),
         })
         .returning();
@@ -282,7 +301,7 @@ export async function checkinRoutes(app: FastifyInstance) {
           checkedInAt: attendances.checkedInAt,
           checkinDate: attendances.checkinDate,
           method: attendances.method,
-          grupo: attendances.grupo,
+          groupId: attendances.groupId,
         })
         .from(attendances)
         .innerJoin(memberships, eq(attendances.membershipId, memberships.id))

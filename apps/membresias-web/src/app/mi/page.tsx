@@ -6,12 +6,13 @@ import Link from 'next/link';
 import { api, mensajeError } from '@/lib/api';
 import { claveRol, useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
-import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
+import { claseEstado, claveEstado, fmtFecha, fmtMoneda, hoyISO } from '@/lib/formato';
 import { activarPush } from '@/lib/push';
 import { LIM, TIPOS_SANGRE, enMayusculas, soloTelefono, telefonoValido } from '@/lib/campos';
 import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
 import { Avatar } from '@/components/Avatar';
 import { CampoContrasena } from '@/components/CampoContrasena';
+import { CampoFecha } from '@/components/CampoFecha';
 import { avisoError, avisoOk } from '@/lib/toast';
 import { LogoClub } from '@/components/LogoClub';
 import { CampoImagen } from '@/components/CampoImagen';
@@ -41,6 +42,8 @@ interface Clases {
   proxima: string | null;
   /** Días de la semana con clase, 0 = domingo. */
   dias: number[];
+  /** Los mismos días, con hora de inicio y fin cuando el maestro las puso. */
+  horario: { weekday: number; opensAt: string | null; closesAt: string | null }[];
   /** Por qué está cerrado hoy, si es una excepción del calendario. */
   motivo: string | null;
   /**
@@ -62,6 +65,14 @@ interface MiEstado {
   checkinPin?: string | null;
   plan: { id: string; name: string; type: string; price: string } | null;
   clases: Clases;
+  /**
+   * MI clase, y solo la mía. `null` = el club no divide sus clases, o el
+   * maestro todavía no me repartió. Del resto de clases no llega nada: el
+   * filtro lo hace la API (ver `claseDelAlumno` en `routes/memberships.ts`).
+   */
+  clase: { id: string; name: string; descripcion: string | null } | null;
+  /** Qué se trabaja esta semana en mi clase. */
+  notaSemana: string | null;
   /** Cuándo entró al club (fecha ISO completa). */
   desde: string | null;
   asistencia: { total: number; esteMes: number; ultima: string | null };
@@ -118,6 +129,17 @@ function diasCortos(idioma: string): string[] {
   });
 }
 
+/** Los mismos días, con el nombre entero: el horario se lee, no se ojea. */
+function diasLargos(idioma: string): string[] {
+  const fmt = new Intl.DateTimeFormat(idioma === 'en' ? 'en-GB' : 'es-CO', {
+    weekday: 'long',
+  });
+  return Array.from({ length: 7 }, (_, i) => {
+    const nombre = fmt.format(new Date(2024, 0, 7 + i));
+    return nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  });
+}
+
 /**
  * Panel personal: MI club, MI estado, cuándo hay clase, cómo vengo viniendo,
  * MIS pagos y MI carnet. Aquí no aparece jamás un dato de otro miembro.
@@ -144,10 +166,20 @@ export default function MiPanel() {
   const [verAsistencias, setVerAsistencias] = useState(PASO_HISTORIAL);
   const [perfil, setPerfil] = useState({
     phone: '',
+    birthDate: '',
     bloodType: '',
     emergencyName: '',
     emergencyPhone: '',
   });
+  /**
+   * ¿La fecha de nacimiento ya está puesta?
+   *
+   * De esto depende que el campo se dibuje editable o de solo lectura, y sale
+   * de la SESIÓN, no del formulario: lo que hay guardado es lo que manda, y en
+   * cuanto se guarda una vez, corregirla pasa a ser cosa del maestro. El
+   * maestro sí edita la suya —por encima de él solo está el superadmin—.
+   */
+  const nacimientoFijado = Boolean(user?.birthDate) && !esMaestro;
 
   const cargar = useCallback(async () => {
     try {
@@ -188,6 +220,7 @@ export default function MiPanel() {
     }
     setPerfil({
       phone: user.phone ?? '',
+      birthDate: user.birthDate ?? '',
       bloodType: user.bloodType ?? '',
       emergencyName: user.emergencyName ?? '',
       emergencyPhone: user.emergencyPhone ?? '',
@@ -214,6 +247,9 @@ export default function MiPanel() {
       // que no tener ninguno.
       await api.patch('/auth/me', {
         phone: perfil.phone || null,
+        // Solo viaja si de verdad se puede cambiar: mandarla ya fijada devuelve
+        // un 403 que echaría abajo el guardado del resto del formulario.
+        ...(nacimientoFijado ? {} : { birthDate: perfil.birthDate || null }),
         bloodType: perfil.bloodType || null,
         emergencyName: perfil.emergencyName || null,
         emergencyPhone: perfil.emergencyPhone || null,
@@ -280,6 +316,12 @@ export default function MiPanel() {
    */
   const urgente = avisos.find((a) => !a.readAt && a.type !== 'maestro') ?? null;
   const tiempo = mi.desde ? antiguedad(mi.desde) : null;
+  /**
+   * Los días que además traen hora. Los que no la tienen ya salen marcados en
+   * la semana de arriba, y repetirlos aquí sin nada al lado sería una lista de
+   * días sueltos debajo de otra lista de días.
+   */
+  const horarioConHora = (mi.clases.horario ?? []).filter((h) => h.opensAt);
 
   return (
     <main style={{ maxWidth: 780, margin: '0 auto', padding: '1.5rem' }}>
@@ -481,8 +523,15 @@ export default function MiPanel() {
         style={{ padding: '1.25rem', marginBottom: '1rem' }}
       >
         <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
-          {t('clases.titulo')}
+          {mi.clase ? mi.clase.name : t('clases.titulo')}
         </h2>
+        {/* La descripción de SU clase. Del resto de clases del club no llega
+            nada hasta aquí: la API manda solo la suya (ver `GET /mi`). */}
+        {mi.clase?.descripcion && (
+          <p className="muted" style={{ fontSize: '0.8rem', marginBottom: '0.6rem' }}>
+            {mi.clase.descripcion}
+          </p>
+        )}
         {/* Tres respuestas, no dos. «Todavía no lo sabemos» es distinto de «hoy
             no hay»: el club sin horario publicado no puede afirmar ninguna de
             las dos, y decir que sí era mandar al alumno al salón por nada. */}
@@ -524,6 +573,45 @@ export default function MiPanel() {
                 {nombre}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* El horario con horas. «Los martes» no le sirve a nadie para llegar
+            a tiempo; «los martes de 18:00 a 19:30», sí. Solo se dibuja lo que
+            tiene hora: un día suelto ya sale marcado en la semana de arriba. */}
+        {horarioConHora.length > 0 && (
+          <div style={{ marginTop: '0.7rem' }}>
+            <span className="muted" style={{ fontSize: '0.72rem' }}>
+              {t('clases.horario')}
+            </span>
+            <ul style={{ fontSize: '0.85rem', marginTop: '0.2rem' }}>
+              {horarioConHora.map((h, i) => (
+                <li key={i}>
+                  {diasLargos(idioma)[h.weekday]}{' '}
+                  <strong className="mono">
+                    {h.opensAt}
+                    {h.closesAt ? `–${h.closesAt}` : ''}
+                  </strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Qué se trabaja esta semana. Es la razón por la que un alumno vuelve
+            a abrir esta pantalla el miércoles habiéndola visto el lunes. */}
+        {mi.notaSemana && (
+          <div
+            style={{
+              marginTop: '0.8rem',
+              paddingTop: '0.7rem',
+              borderTop: '1px solid var(--border)',
+            }}
+          >
+            <span className="muted" style={{ fontSize: '0.72rem' }}>
+              {t('clases.estaSemana')}
+            </span>
+            <p style={{ fontSize: '0.88rem', marginTop: '0.2rem' }}>{mi.notaSemana}</p>
           </div>
         )}
       </div>
@@ -806,6 +894,41 @@ export default function MiPanel() {
           >
             {t('comun.telefonoCorto')}
           </p>
+
+          {/* ── La fecha de nacimiento: se pone una vez ──
+              El único campo de esta pantalla con esa regla, y es a propósito:
+              quien mejor sabe cuándo nació es uno mismo, así que se puede
+              rellenar sin molestar a nadie. Pero de ella cuelga qué día lo
+              felicita el club, así que reescribirla ya no es mantener tus
+              datos. Una vez guardada se enseña, no se edita. */}
+          <label className="muted" style={{ fontSize: '0.75rem' }}>
+            {t('ficha.nacimiento')}
+          </label>
+          {nacimientoFijado ? (
+            <>
+              <p style={{ margin: '0.25rem 0 0.2rem' }}>
+                <strong className="mono">{fmtFecha(perfil.birthDate, idioma)}</strong>
+              </p>
+              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                {t('ficha.nacimientoFijada')}
+              </p>
+            </>
+          ) : (
+            <>
+              <div style={{ margin: '0.25rem 0 0.2rem' }}>
+                <CampoFecha
+                  valor={perfil.birthDate}
+                  onChange={(v) => setPerfil({ ...perfil, birthDate: v })}
+                  min="1900-01-01"
+                  max={hoyISO()}
+                  ariaLabel={t('ficha.nacimiento')}
+                />
+              </div>
+              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                {t('ficha.nacimientoMia')}
+              </p>
+            </>
+          )}
 
           {/* ── Lo que hay que saber si algo pasa ──
               Esto SÍ lo mantiene cada quien, al revés que el nombre: el

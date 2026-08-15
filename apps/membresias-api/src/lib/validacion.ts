@@ -15,6 +15,8 @@
  * no es el único que llama a esta API.
  */
 
+import { todayStr } from './billing';
+
 /** Máximos que impone el esquema (ver `packages/membresias-db/src/schema`). */
 export const LIMITES = {
   orgNombre: 120,
@@ -33,7 +35,15 @@ export const LIMITES = {
    */
   notaCalendario: 500,
   notaPago: 500,
-  grupo: 80,
+  /** Nombre de una clase del club: «Infantil», «Adultos noche». */
+  claseNombre: 80,
+  /**
+   * Quién entrena en esa clase y qué se hace en ella, y qué toca esta semana.
+   * Largos como el motivo del calendario por lo mismo: no son un dato, son una
+   * explicación que va a leer un alumno.
+   */
+  claseDescripcion: 500,
+  notaClase: 500,
   checkinPin: 12,
   /** bcrypt ignora todo lo que pase de 72 bytes: aceptar más engaña al usuario. */
   password: 72,
@@ -302,6 +312,30 @@ export function fecha(
   if (texto < min) return mal(`${campo} no puede ser anterior a ${min}.`);
   if (texto > max) return mal(`${campo} no puede ser posterior a ${max}.`);
   return bien(texto);
+}
+
+/**
+ * La fecha de nacimiento.
+ *
+ * Es `fecha()` con los dos topes que este campo necesita y que los de serie no
+ * dan:
+ *
+ * - **Por abajo, 1900.** El mínimo por defecto es el año 2000, que en un campo
+ *   de nacimiento deja fuera a cualquiera que pase de los veintiséis: al
+ *   maestro, a media clase de adultos y a los papás que figuran como acudientes.
+ * - **Por arriba, hoy.** Nadie nació mañana. Y va con `todayStr()` y no con
+ *   `toISOString()` porque aquello da el día en UTC: en Colombia (UTC−5), desde
+ *   las siete de la tarde el día de hoy ya sería «mañana» y la fecha de un
+ *   recién nacido se rechazaría sin motivo.
+ *
+ * Vive aquí y no en cada ruta porque lo validan tres: el alta, la edición de la
+ * ficha y el perfil propio.
+ */
+export function fechaNacimiento(valor: unknown): Campo<string | null> {
+  return fecha(valor, 'La fecha de nacimiento', {
+    min: '1900-01-01',
+    max: todayStr(),
+  });
 }
 
 /** Un entero de 0 a `max`. `null`, `undefined` y '' pasan como `null`. */

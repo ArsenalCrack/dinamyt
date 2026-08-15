@@ -11,6 +11,7 @@ import { LIM } from '@/lib/campos';
 import { avisoError, avisoInfo, avisoOk } from '@/lib/toast';
 import { Avatar } from '@/components/Avatar';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface RosterItem {
   userId: string;
@@ -27,6 +28,11 @@ interface Asistencia {
   checkedInAt: string;
   method: string;
 }
+/** Una clase del club, para pasar lista de una sola. */
+interface Clase {
+  id: string;
+  name: string;
+}
 
 /**
  * Pasar lista. El maestro marca a cada alumno presente, o deja que entren con
@@ -42,6 +48,15 @@ export default function AsistenciaPage() {
   const [totalRoster, setTotalRoster] = useState(0);
   const [offset, setOffset] = useState(0);
   const [asistencias, setAsistencias] = useState<Asistencia[]>([]);
+  const [clases, setClases] = useState<Clase[]>([]);
+  /**
+   * Qué clase se está pasando. '' = todas.
+   *
+   * Es el filtro que hace usable esta pantalla en un club dividido: a las seis
+   * de la tarde el maestro tiene delante a los adultos, y una lista con los
+   * niños intercalados le obliga a buscar cada nombre entre el doble de filas.
+   */
+  const [clase, setClase] = useState('');
   const [busqueda, setBusqueda] = useState('');
   /** Lo que de verdad viajó a la API: el filtro es suyo, no del navegador. */
   const [buscado, setBuscado] = useState('');
@@ -54,7 +69,12 @@ export default function AsistenciaPage() {
     try {
       const [r, a] = await Promise.all([
         api.get<{ items: RosterItem[]; total: number }>('/memberships', {
-          params: { limit: POR_PAGINA, offset, ...(buscado ? { q: buscado } : {}) },
+          params: {
+            limit: POR_PAGINA,
+            offset,
+            ...(buscado ? { q: buscado } : {}),
+            ...(clase ? { groupId: clase } : {}),
+          },
         }),
         // Las de HOY, sin paginar: son las que ya entraron, y en un día de
         // clase eso es una fracción del club. Se necesitan enteras para pintar
@@ -69,11 +89,11 @@ export default function AsistenciaPage() {
     } finally {
       setCargando(false);
     }
-  }, [offset, buscado, t]);
+  }, [offset, buscado, clase, t]);
 
   useEffect(() => {
     setOffset(0);
-  }, [buscado]);
+  }, [buscado, clase]);
 
   useEffect(() => {
     const id = setTimeout(() => setBuscado(busqueda.trim()), 300);
@@ -92,6 +112,12 @@ export default function AsistenciaPage() {
     }
     void cargar();
     const id = setInterval(() => void cargar(), 10000);
+    // Las clases van fuera del temporizador: no cambian cada diez segundos, y
+    // recargarlas con la lista sería un viaje de más cada vez.
+    void api
+      .get<{ grupos: Clase[] }>('/schedule')
+      .then((r) => setClases(r.data.grupos ?? []))
+      .catch(() => setClases([]));
     return () => clearInterval(id);
   }, [cargandoSesion, user, esStaff, router, cargar]);
 
@@ -159,14 +185,39 @@ export default function AsistenciaPage() {
           de cada marcaje va por la nube flotante (ver lib/toast.ts). */}
       {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
 
-      <input
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        maxLength={LIM.busqueda}
-        placeholder={t('pag.buscarAlumno')}
-        aria-label={t('pag.buscarAlumno')}
-        style={{ marginBottom: '0.9rem', width: '100%' }}
-      />
+      {/* El filtro por clase solo se dibuja si hay clases: en un club sin
+          dividir sería un desplegable con una sola opción. */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.5rem',
+          marginBottom: '0.9rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          maxLength={LIM.busqueda}
+          placeholder={t('pag.buscarAlumno')}
+          aria-label={t('pag.buscarAlumno')}
+          style={{ flex: '1 1 12rem', margin: 0 }}
+        />
+        {clases.length > 0 && (
+          <div style={{ flex: '0 1 12rem', minWidth: '10rem' }}>
+            <SelectMenu
+              valor={clase}
+              onChange={setClase}
+              etiquetaAria={t('grupos.filtrar')}
+              opciones={[
+                { valor: '', etiqueta: t('grupos.todas') },
+                ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
+                { valor: 'ninguna', etiqueta: t('grupos.sinAsignar') },
+              ]}
+            />
+          </div>
+        )}
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {visibles.length === 0 && (

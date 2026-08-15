@@ -26,6 +26,11 @@ export const LIM = {
   planNombre: 120,
   /** El motivo de una excepción del calendario: es una frase, no un dato. */
   notaCalendario: 500,
+  /** Nombre de una clase del club: «Infantil», «Adultos noche». */
+  claseNombre: 80,
+  /** Quién entrena en la clase, y qué toca esta semana. Frases, no datos. */
+  claseDescripcion: 500,
+  notaClase: 500,
   /**
    * PIN de check-in. La columna acepta doce dígitos, pero la app genera de
    * cuatro y el maestro los teclea a mano solo para corregirlos: dejar escribir

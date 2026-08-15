@@ -119,6 +119,12 @@ const es = {
   'ficha.entrenaDesde': 'Entrena desde',
   'ficha.entrenaDesdeAyuda':
     'Cuándo empezó a entrenar de verdad, aunque su cuenta sea de ayer. Si la dejas vacía se cuenta desde el día que lo inscribiste.',
+  'ficha.nacimiento': 'Fecha de nacimiento',
+  'ficha.nacimientoAyuda':
+    'Opcional. Con ella el club sabe qué día felicitarlo. El alumno puede ponerla él mismo una vez; corregirla ya es cosa tuya.',
+  'ficha.nacimientoMia':
+    'Ponla una sola vez. Después solo tu maestro puede corregirla, así que revísala antes de guardar.',
+  'ficha.nacimientoFijada': 'Ya está registrada. Si está mal, pídele a tu maestro que la corrija.',
   'ficha.sangre': 'Tipo de sangre',
   'ficha.sinSangre': 'Sin registrar',
   'ficha.emergencia': 'Contacto de emergencia',
@@ -199,6 +205,12 @@ const es = {
   'panel.cobrar': 'Cobrar',
   'panel.enCaja': 'entró en caja',
   'panel.deEsperado': 'de lo esperado este mes',
+  // Cumpleaños. La tarjeta solo sale el día que hay alguno: una tarjeta que
+  // dice «hoy nadie cumple años» 360 días al año es ruido, no información.
+  'panel.cumpleHoy': 'Hoy cumple años',
+  'panel.cumpleHoyVarios': 'Hoy cumplen años',
+  'panel.cumpleAnos': 'años',
+  'panel.cumpleTitulo': 'Cumple años hoy',
 
   // Alumnos (CRUD del maestro)
   'alumnos.titulo': 'Alumnos del club',
@@ -277,6 +289,45 @@ const es = {
   // saberlo mandaba al alumno al salón por nada.
   'clases.sinHorario': 'Tu club todavía no publicó sus días de clase',
   'clases.sinHorarioAyuda': 'Pregúntale a tu maestro cuándo hay entrenamiento.',
+  'clases.miClase': 'Mi clase',
+  'clases.horario': 'Horario',
+  'clases.estaSemana': 'Esta semana',
+  'clases.sinNota': 'Tu maestro no escribió nada para esta semana.',
+  'clases.sinClaseAsignada': 'Tu maestro todavía no te asignó una clase.',
+
+  // Las clases del club, vistas por el maestro
+  'grupos.titulo': 'Clases del club',
+  'grupos.ayuda':
+    'Si divides a tus alumnos en varias clases —los niños a una hora y los adultos a otra—, créalas aquí. Cada una lleva su propio horario, su descripción y su nota de la semana, y el alumno solo ve la suya.',
+  'grupos.sinClases': 'Un solo horario para todo el club',
+  'grupos.sinClasesAyuda':
+    'Así funciona ahora: todos tus alumnos comparten los mismos días. Crea una clase solo si necesitas separarlos.',
+  'grupos.nueva': 'Nueva clase',
+  'grupos.nombre': 'Nombre de la clase',
+  'grupos.nombreEjemplo': 'Infantil · Adultos · Competición',
+  'grupos.descripcion': 'Descripción',
+  'grupos.descripcionEjemplo': 'Quién entrena aquí y qué se trabaja.',
+  'grupos.creada': 'Clase creada.',
+  'grupos.eliminar': 'Eliminar clase',
+  'grupos.eliminarConfirma':
+    '¿Eliminar esta clase? Sus alumnos quedan sin clase asignada y su horario se borra. Las asistencias ya registradas se conservan.',
+  'grupos.eliminada': 'Clase eliminada.',
+  'grupos.asignar': 'Clase',
+  'grupos.sinAsignar': 'Sin clase',
+  'grupos.todas': 'Todas las clases',
+  'grupos.filtrar': 'Filtrar por clase',
+  'grupos.delClub': 'Todo el club',
+  'grupos.horarioAyuda':
+    'Marca los días y, si quieres, la hora. Un día sin hora sigue contando como día de clase.',
+  'grupos.abre': 'Empieza',
+  'grupos.cierra': 'Termina',
+  'grupos.nota': 'Qué se trabaja esta semana',
+  'grupos.notaEjemplo': 'Kata y examen de cinturón el viernes.',
+  'grupos.notaGuardada': 'Nota de la semana guardada.',
+  'grupos.semanaAnterior': 'Semana anterior',
+  'grupos.semanaSiguiente': 'Semana siguiente',
+  'grupos.semanaActual': 'Esta semana',
+  'grupos.semanaDel': 'Semana del',
 
   // Carnet QR
   'qr.titulo': 'Carnet del alumno',
@@ -414,7 +465,7 @@ const es = {
     'La inscripción, que se paga UNA vez al entrar al club. No da tiempo ni clases y no vence: solo deja al alumno marcado como matriculado. Si tu club cobra inscripción cada año, vuelve a registrarla ese año.',
 
   // Calendario
-  'calendario.titulo': 'Días de clase',
+  'calendario.titulo': 'Clases y calendario',
   'calendario.diasSemana': 'Días de la semana',
   'calendario.excepciones': 'Excepciones (festivos y cierres)',
   'calendario.agregarExcepcion': 'Agregar excepción',
@@ -679,6 +730,12 @@ const en: Record<ClaveTexto, string> = {
   'ficha.entrenaDesde': 'Training since',
   'ficha.entrenaDesdeAyuda':
     'When they actually started training, even if their account is from yesterday. Leave it empty and it counts from the day you enrolled them.',
+  'ficha.nacimiento': 'Date of birth',
+  'ficha.nacimientoAyuda':
+    'Optional. It tells the club what day to wish them a happy birthday. Students may fill it in once themselves; correcting it is up to you.',
+  'ficha.nacimientoMia':
+    'You can set this once. After that only your master can correct it, so check it before saving.',
+  'ficha.nacimientoFijada': 'Already on file. If it is wrong, ask your master to correct it.',
   'ficha.sangre': 'Blood type',
   'ficha.sinSangre': 'Not recorded',
   'ficha.emergencia': 'Emergency contact',
@@ -749,6 +806,10 @@ const en: Record<ClaveTexto, string> = {
   'panel.cobrar': 'Charge',
   'panel.enCaja': 'came in',
   'panel.deEsperado': 'of what this month expects',
+  'panel.cumpleHoy': 'Birthday today',
+  'panel.cumpleHoyVarios': 'Birthdays today',
+  'panel.cumpleAnos': 'years old',
+  'panel.cumpleTitulo': 'Birthday today',
 
   'alumnos.titulo': 'Club students',
   'alumnos.nuevo': 'New student',
@@ -810,6 +871,44 @@ const en: Record<ClaveTexto, string> = {
   'clases.proxima': 'Next class',
   'clases.sinHorario': 'Your club has not published its class days yet',
   'clases.sinHorarioAyuda': 'Ask your master when training takes place.',
+  'clases.miClase': 'My class',
+  'clases.horario': 'Schedule',
+  'clases.estaSemana': 'This week',
+  'clases.sinNota': 'Your master has not written anything for this week.',
+  'clases.sinClaseAsignada': 'Your master has not assigned you to a class yet.',
+
+  'grupos.titulo': 'Club classes',
+  'grupos.ayuda':
+    'If you split your students into several classes — kids at one time, adults at another — create them here. Each one keeps its own schedule, description and weekly note, and students only see their own.',
+  'grupos.sinClases': 'One schedule for the whole club',
+  'grupos.sinClasesAyuda':
+    'That is how it works right now: all your students share the same days. Create a class only if you need to separate them.',
+  'grupos.nueva': 'New class',
+  'grupos.nombre': 'Class name',
+  'grupos.nombreEjemplo': 'Kids · Adults · Competition',
+  'grupos.descripcion': 'Description',
+  'grupos.descripcionEjemplo': 'Who trains here and what they work on.',
+  'grupos.creada': 'Class created.',
+  'grupos.eliminar': 'Delete class',
+  'grupos.eliminarConfirma':
+    'Delete this class? Its students are left with no class and its schedule is removed. Attendance already recorded is kept.',
+  'grupos.eliminada': 'Class deleted.',
+  'grupos.asignar': 'Class',
+  'grupos.sinAsignar': 'No class',
+  'grupos.todas': 'All classes',
+  'grupos.filtrar': 'Filter by class',
+  'grupos.delClub': 'Whole club',
+  'grupos.horarioAyuda':
+    'Tick the days and, if you like, the time. A day without a time still counts as a class day.',
+  'grupos.abre': 'Starts',
+  'grupos.cierra': 'Ends',
+  'grupos.nota': 'What this week works on',
+  'grupos.notaEjemplo': 'Kata, and belt grading on Friday.',
+  'grupos.notaGuardada': 'Weekly note saved.',
+  'grupos.semanaAnterior': 'Previous week',
+  'grupos.semanaSiguiente': 'Next week',
+  'grupos.semanaActual': 'This week',
+  'grupos.semanaDel': 'Week of',
 
   'qr.titulo': 'Student card',
   'qr.descripcion':
@@ -919,7 +1018,7 @@ const en: Record<ClaveTexto, string> = {
   'planes.ayuda.matricula':
     'The joining fee, paid ONCE on entering the club. It grants no time and no classes and never expires: it only marks the student as enrolled. If your club charges it every year, record it again that year.',
 
-  'calendario.titulo': 'Class days',
+  'calendario.titulo': 'Classes and calendar',
   'calendario.diasSemana': 'Days of the week',
   'calendario.excepciones': 'Exceptions (holidays and closures)',
   'calendario.agregarExcepcion': 'Add exception',

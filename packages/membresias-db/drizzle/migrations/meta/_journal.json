@@ -92,6 +92,20 @@
       "when": 1785998000000,
       "tag": "0012_modo_mantenimiento",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785999000000,
+      "tag": "0013_fecha_de_nacimiento",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786000000000,
+      "tag": "0014_clases_del_club",
+      "breakpoints": true
     }
   ]
 }

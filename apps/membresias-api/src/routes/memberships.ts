@@ -1,18 +1,35 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, desc, gte, ilike, inArray, lte, ne, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  desc,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import {
   memberships,
   plans,
   payments,
   attendances,
   users,
+  classNotes,
+  clubGroups,
   clubSchedule,
   scheduleExceptions,
   type Db,
 } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireClub, requireRole } from '../plugins/auth';
 import { ensureMembership } from '../lib/memberships';
-import { esDiaClase } from '../lib/schedule';
+import { diasDeClase, esDiaClase, lunesDe } from '../lib/schedule';
 import { leerPagina, patron } from '../lib/paginacion';
 import { columnaImagenLigera, direccionFoto } from '../lib/imagenes';
 import {
@@ -90,10 +107,20 @@ function masDias(fecha: string, dias: number): string {
  *    pregunta con `'cerrado'` y viaja `configurado` para que la pantalla diga
  *    lo que pasa de verdad: que el club todavía no publicó sus días.
  */
-async function calendarioDelAlumno(db: Db, orgId: string, today: string) {
+async function calendarioDelAlumno(
+  db: Db,
+  orgId: string,
+  today: string,
+  groupId: string | null,
+) {
   const [dias, excepciones] = await Promise.all([
     db
-      .select({ weekday: clubSchedule.weekday })
+      .select({
+        weekday: clubSchedule.weekday,
+        groupId: clubSchedule.groupId,
+        opensAt: clubSchedule.opensAt,
+        closesAt: clubSchedule.closesAt,
+      })
       .from(clubSchedule)
       .where(and(eq(clubSchedule.orgId, orgId), eq(clubSchedule.isActive, true))),
     db
@@ -112,9 +139,20 @@ async function calendarioDelAlumno(db: Db, orgId: string, today: string) {
       ),
   ]);
 
-  const weekdays = dias.map((d) => d.weekday);
+  // Los días de SU clase, no los del club: en un club dividido, contestarle al
+  // de la clase de la tarde que «hoy hay clase» porque entrena la otra sería
+  // mandarlo al salón un día que no le toca. Sin clase asignada —o en un club
+  // sin dividir— cuentan todos, que es como funcionaba antes de todo esto.
+  const weekdays = diasDeClase(dias, groupId);
   const hayClase = (dia: string) => esDiaClase(weekdays, excepciones, dia, 'cerrado');
   const hoy = hayClase(today);
+
+  // El horario de su clase, con horas. Es lo que convierte «los martes» en «los
+  // martes de 6:00 a 7:30», que es lo que el alumno abre la app para mirar.
+  const horario = dias
+    .filter((d) => (groupId ? d.groupId === groupId : true))
+    .map((d) => ({ weekday: d.weekday, opensAt: d.opensAt, closesAt: d.closesAt }))
+    .sort((a, b) => a.weekday - b.weekday);
 
   let proxima: string | null = null;
   for (let i = 1; i <= HORIZONTE_CLASES && !proxima; i++) {
@@ -129,11 +167,80 @@ async function calendarioDelAlumno(db: Db, orgId: string, today: string) {
   return {
     hoy,
     proxima,
-    dias: weekdays.sort((a, b) => a - b),
+    dias: weekdays,
+    horario,
     motivo: excepcionHoy?.note ?? null,
     /** ¿El maestro llegó a marcar sus días? Sin esto no hay respuesta que dar. */
     configurado: weekdays.length > 0,
   };
+}
+
+/**
+ * La clase del alumno: cuál es, qué se hace en ella y qué toca esta semana.
+ *
+ * **Esto es el muro.** Un club dividido tiene dos clases con horarios,
+ * descripciones y notas distintas, y el alumno de una no tiene por qué leer las
+ * de la otra —ni saber cuántas hay—. El filtro va aquí, en la consulta: mandarle
+ * las dos y esconder una en el navegador no es un muro, es una cortina.
+ *
+ * Devuelve `null` cuando no hay clase que contar: el club sin dividir, o el
+ * alumno al que el maestro todavía no repartió. En los dos casos el panel
+ * enseña lo de siempre —los días del club— y no una tarjeta vacía.
+ */
+async function claseDelAlumno(
+  db: Db,
+  orgId: string,
+  groupId: string | null,
+  today: string,
+) {
+  const semana = lunesDe(today);
+
+  // Sin clase asignada solo queda la nota del club entero (`group_id` nulo),
+  // que es la que escribe el maestro que no divide a sus alumnos.
+  if (!groupId) {
+    const [suelta] = await db
+      .select({ nota: classNotes.nota })
+      .from(classNotes)
+      .where(
+        and(
+          eq(classNotes.orgId, orgId),
+          eq(classNotes.semana, semana),
+          isNull(classNotes.groupId),
+        ),
+      )
+      .limit(1);
+    return { clase: null, notaSemana: suelta?.nota ?? null };
+  }
+
+  const [g] = await db
+    .select({
+      id: clubGroups.id,
+      name: clubGroups.name,
+      descripcion: clubGroups.descripcion,
+    })
+    .from(clubGroups)
+    .where(
+      and(
+        eq(clubGroups.id, groupId),
+        eq(clubGroups.orgId, orgId),
+        eq(clubGroups.isActive, true),
+      ),
+    )
+    .limit(1);
+
+  const [nota] = await db
+    .select({ nota: classNotes.nota })
+    .from(classNotes)
+    .where(
+      and(
+        eq(classNotes.orgId, orgId),
+        eq(classNotes.semana, semana),
+        eq(classNotes.groupId, groupId),
+      ),
+    )
+    .limit(1);
+
+  return { clase: g ?? null, notaSemana: nota?.nota ?? null };
 }
 
 export async function membershipsRoutes(app: FastifyInstance) {
@@ -163,7 +270,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
 
       const db = req.db;
       const { limit, offset, q } = leerPagina(req.query);
-      const { userId } = req.query as { userId?: string };
+      const { userId, groupId } = req.query as { userId?: string; groupId?: string };
 
       const conds = [
         eq(users.orgId, orgId),
@@ -174,6 +281,37 @@ export async function membershipsRoutes(app: FastifyInstance) {
       if (q) {
         const p = patron(q);
         conds.push(or(ilike(users.fullName, p), ilike(users.email, p))!);
+      }
+
+      /**
+       * Filtrar por clase.
+       *
+       * Va como subconsulta y no como JOIN porque la página se cuenta sobre
+       * `users`: con un JOIN, el alumno sin membresía desaparecería del listado
+       * en cuanto se filtrara por clase, y el `total` dejaría de cuadrar con lo
+       * que se enseña —que es el error que ya costó una página de 25 que
+       * enseñaba 23—.
+       *
+       * `ninguna` es un filtro de verdad y no un descuido: es como el maestro
+       * encuentra a quién le falta repartir después de crear sus clases.
+       */
+      if (groupId) {
+        const enGrupo = req.db
+          .select({ userId: memberships.userId })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.orgId, orgId),
+              groupId === 'ninguna'
+                ? isNotNull(memberships.groupId)
+                : eq(memberships.groupId, groupId),
+            ),
+          );
+        conds.push(
+          groupId === 'ninguna'
+            ? notInArray(users.id, enGrupo)
+            : inArray(users.id, enGrupo),
+        );
       }
       const donde = and(...conds);
 
@@ -213,6 +351,15 @@ export async function membershipsRoutes(app: FastifyInstance) {
       const byUser = new Map(local.map((m) => [m.userId, m]));
       const today = todayStr();
 
+      // El NOMBRE de la clase, no solo su id: la lista lo enseña en cada fila, y
+      // sin esto la pantalla tendría que pedir las clases por su cuenta para
+      // traducir un uuid. Son dos o tres filas por club.
+      const clases = await req.db
+        .select({ id: clubGroups.id, name: clubGroups.name })
+        .from(clubGroups)
+        .where(eq(clubGroups.orgId, orgId));
+      const nombreClase = new Map(clases.map((g) => [g.id, g.name]));
+
       const items = personas.map((p) => {
         const m = byUser.get(p.id);
         return {
@@ -228,6 +375,9 @@ export async function membershipsRoutes(app: FastifyInstance) {
           status: m?.status ?? null,
           /** Plan de referencia del alumno: lo que la ficha muestra elegido. */
           currentPlanId: m?.currentPlanId ?? null,
+          /** En qué clase entrena. `null` = sin repartir, o club sin dividir. */
+          groupId: m?.groupId ?? null,
+          groupName: m?.groupId ? (nombreClase.get(m.groupId) ?? null) : null,
           matriculado: m?.matriculado ?? false,
           venceEl: m?.venceEl ?? null,
           clasesRestantes: m?.clasesRestantes ?? null,
@@ -271,7 +421,13 @@ export async function membershipsRoutes(app: FastifyInstance) {
       // tampoco tiene por qué saber de excepciones ni de días de la semana.
       // Lo que necesita es la respuesta: ¿hay clase hoy?, ¿cuándo es la
       // próxima?
-      const clases = await calendarioDelAlumno(db, orgId, today);
+      const clases = await calendarioDelAlumno(db, orgId, today, m?.groupId ?? null);
+      const { clase, notaSemana } = await claseDelAlumno(
+        db,
+        orgId,
+        m?.groupId ?? null,
+        today,
+      );
 
       // Desde cuándo entrena. Lo que manda es la fecha que puso el maestro: un
       // club que estrena la app trae gente con años encima, y contarles la
@@ -294,6 +450,8 @@ export async function membershipsRoutes(app: FastifyInstance) {
           diasFaltantes: null,
           plan: null,
           clases,
+          clase,
+          notaSemana,
           desde,
           asistencia: { total: 0, esteMes: 0, ultima: null },
           pagos: [],
@@ -364,6 +522,9 @@ export async function membershipsRoutes(app: FastifyInstance) {
         estado: estado(m, today),
         plan: plan ? { id: plan.id, name: plan.name, type: plan.type, price: plan.price } : null,
         clases,
+        /** SU clase y nada más. Ver `claseDelAlumno`: aquí está el muro. */
+        clase,
+        notaSemana,
         desde,
         asistencia: {
           total: conteo?.total ?? 0,
@@ -395,9 +556,35 @@ export async function membershipsRoutes(app: FastifyInstance) {
         checkinPin?: string | null;
         venceEl?: string | null;
         clasesRestantes?: number | string | null;
+        groupId?: string | null;
       };
       const db = req.db;
       const m = await ensureMembership(db, orgId, userId);
+
+      // En qué clase entrena. Se comprueba que la clase sea de ESTE club y esté
+      // activa: sin eso, un id copiado de otra pestaña metería a un alumno en la
+      // clase de otro club, y RLS no lo atraparía porque la escritura es sobre
+      // una membresía que sí es del club.
+      let grupo: string | null | undefined;
+      if (body.groupId !== undefined) {
+        if (!body.groupId) {
+          grupo = null; // sacarlo de su clase es una acción legítima
+        } else {
+          const [g] = await db
+            .select({ id: clubGroups.id })
+            .from(clubGroups)
+            .where(
+              and(
+                eq(clubGroups.id, body.groupId),
+                eq(clubGroups.orgId, orgId),
+                eq(clubGroups.isActive, true),
+              ),
+            )
+            .limit(1);
+          if (!g) return reply.code(422).send({ error: 'Esa clase no es de tu club.' });
+          grupo = g.id;
+        }
+      }
 
       const status =
         body.status && (ESTADOS_MEM as readonly string[]).includes(body.status)
@@ -482,6 +669,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
           ...(pin !== undefined && { checkinPin: pin }),
           ...(venceEl !== undefined && { venceEl, anchorDay }),
           ...(clases !== undefined && { clasesRestantes: clases }),
+          ...(grupo !== undefined && { groupId: grupo }),
           updatedAt: new Date(),
         })
         .where(eq(memberships.id, m.id))

@@ -12,6 +12,7 @@ import { CampoImagen } from '@/components/CampoImagen';
 import { Cinturon } from '@/components/Cinturon';
 import { LogoClub } from '@/components/LogoClub';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
+import { SelectMenu } from '@/components/SelectMenu';
 import { avisoError, avisoInfo, avisoOk } from '@/lib/toast';
 
 interface RosterItem {
@@ -27,6 +28,21 @@ interface RosterItem {
   clasesRestantes: number | null;
   diasFaltantes: number | null;
   estado: string;
+  /** En qué clase entrena. `null` = sin repartir, o club sin dividir. */
+  groupId: string | null;
+  groupName: string | null;
+}
+/** Una clase del club, para el filtro de arriba del roster. */
+interface Clase {
+  id: string;
+  name: string;
+}
+/** Quien cumple años HOY. Ver `GET /reports/birthdays`. */
+interface Cumple {
+  userId: string;
+  fullName: string;
+  avatarUrl: string | null;
+  cumple: number | null;
 }
 interface Revenue {
   /** Lo que ENTRÓ este mes, sin importar qué meses cubra. */
@@ -63,35 +79,46 @@ export default function Panel() {
   const [revenue, setRevenue] = useState<Revenue | null>(null);
   const [overdue, setOverdue] = useState<Overdue[]>([]);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
+  const [cumples, setCumples] = useState<Cumple[]>([]);
+  const [clases, setClases] = useState<Clase[]>([]);
+  /** Qué clase se está mirando. '' = todas. */
+  const [clase, setClase] = useState('');
   /** Solo para fallos al CARGAR el panel; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(true);
 
   const cargar = useCallback(async () => {
     try {
-      const [r, rev, ov, at] = await Promise.all([
+      const [r, rev, ov, at, cum] = await Promise.all([
         api.get<{ items: RosterItem[]; total: number }>('/memberships', {
-          params: { limit: POR_PAGINA, offset, ...(buscado ? { q: buscado } : {}) },
+          params: {
+            limit: POR_PAGINA,
+            offset,
+            ...(buscado ? { q: buscado } : {}),
+            ...(clase ? { groupId: clase } : {}),
+          },
         }),
         api.get<Revenue>('/reports/revenue'),
         api.get<Overdue[]>('/reports/overdue'),
         api.get<Attendance>('/reports/attendance'),
+        api.get<Cumple[]>('/reports/birthdays'),
       ]);
       setRoster(r.data.items);
       setTotalRoster(r.data.total);
       setRevenue(rev.data);
       setOverdue(ov.data);
       setAttendance(at.data);
+      setCumples(cum.data);
     } catch (e) {
       setError(mensajeError(e, t('comun.ninguno')));
     } finally {
       setCargando(false);
     }
-  }, [offset, buscado, t]);
+  }, [offset, buscado, clase, t]);
 
   useEffect(() => {
-    setOffset(0); // buscar siempre empieza por el principio
-  }, [buscado]);
+    setOffset(0); // buscar o cambiar de clase empieza por el principio
+  }, [buscado, clase]);
 
   useEffect(() => {
     const id = setTimeout(() => setBuscado(busqueda.trim()), 300);
@@ -110,6 +137,12 @@ export default function Panel() {
       return;
     }
     void cargar();
+    // Las clases del club van aparte: no cambian entre búsquedas ni entre
+    // páginas, así que no tienen por qué viajar con cada recarga del roster.
+    void api
+      .get<{ grupos: Clase[] }>('/schedule')
+      .then((r) => setClases(r.data.grupos ?? []))
+      .catch(() => setClases([]));
   }, [cargandoSesion, user, esStaff, router, cargar]);
 
   /**
@@ -162,6 +195,9 @@ export default function Panel() {
       </main>
     );
   }
+
+  /** Para marcar la fila con el 🎂 sin recorrer la lista en cada alumno. */
+  const cumpleHoy = new Set(cumples.map((c) => c.userId));
 
   return (
     <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}>
@@ -235,6 +271,48 @@ export default function Panel() {
         </p>
       )}
 
+      {/* ── Quién cumple años hoy ──
+          Aparece SOLO el día que hay alguno. Una tarjeta que dijera «hoy nadie
+          cumple años» estaría en pantalla trescientos sesenta días al año para
+          no decir nada, y acabaría siendo un trozo de panel que nadie mira —que
+          es justo lo que le pasaría al aviso el día que sí importa—. */}
+      {cumples.length > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: '0.9rem 1rem',
+            marginBottom: '1.25rem',
+            borderColor: 'var(--gold)',
+          }}
+        >
+          <div
+            className="eyebrow"
+            style={{ marginBottom: '0.6rem', color: 'var(--gold)' }}
+          >
+            🎂 {cumples.length === 1 ? t('panel.cumpleHoy') : t('panel.cumpleHoyVarios')}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+            {cumples.map((c) => (
+              <Link
+                key={c.userId}
+                href={`/alumnos/${c.userId}`}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}
+              >
+                <Avatar src={c.avatarUrl} nombre={c.fullName} size={36} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--gold)' }}>{c.fullName}</div>
+                  {c.cumple != null && (
+                    <div className="muted" style={{ fontSize: '0.72rem' }}>
+                      {c.cumple} {t('panel.cumpleAnos')}
+                    </div>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           display: 'grid',
@@ -291,14 +369,39 @@ export default function Panel() {
       {/* El roster va por páginas, así que necesita buscador SÍ o SÍ: sin él,
           el alumno de la página tres no aparece por ningún lado. Filtra la
           API, no el navegador. */}
-      <input
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        maxLength={80}
-        placeholder={t('pag.buscarAlumno')}
-        aria-label={t('pag.buscarAlumno')}
-        style={{ marginBottom: '0.75rem' }}
-      />
+      {/* El filtro por clase solo se dibuja si hay clases: en un club sin
+          dividir sería un desplegable con una sola opción. */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.5rem',
+          marginBottom: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          maxLength={80}
+          placeholder={t('pag.buscarAlumno')}
+          aria-label={t('pag.buscarAlumno')}
+          style={{ flex: '1 1 12rem', margin: 0 }}
+        />
+        {clases.length > 0 && (
+          <div style={{ flex: '0 1 12rem', minWidth: '10rem' }}>
+            <SelectMenu
+              valor={clase}
+              onChange={setClase}
+              etiquetaAria={t('grupos.filtrar')}
+              opciones={[
+                { valor: '', etiqueta: t('grupos.todas') },
+                ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
+                { valor: 'ninguna', etiqueta: t('grupos.sinAsignar') },
+              ]}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <table>
@@ -332,9 +435,16 @@ export default function Panel() {
                         style={{ fontWeight: 600, color: 'var(--gold)' }}
                       >
                         {a.fullName}
+                        {/* El mismo dato que la tarjeta de arriba, pegado a la
+                            fila: el maestro que está cobrando ve ahí mismo que
+                            hoy es el cumpleaños de quien tiene delante. */}
+                        {cumpleHoy.has(a.userId) && (
+                          <span title={t('panel.cumpleTitulo')}> 🎂</span>
+                        )}
                       </Link>
                       <div className="muted" style={{ fontSize: '0.72rem' }}>
                         {a.email}
+                        {a.groupName ? ` · ${a.groupName}` : ''}
                       </div>
                     </div>
                   </div>

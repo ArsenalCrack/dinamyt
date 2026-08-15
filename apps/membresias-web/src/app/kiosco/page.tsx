@@ -9,6 +9,7 @@ import { fmtFecha, hoyISO } from '@/lib/formato';
 import { LIM, soloDigitos } from '@/lib/campos';
 import { avisar } from '@/lib/sonido';
 import { EscanerQR } from '@/components/EscanerQR';
+import { SelectMenu } from '@/components/SelectMenu';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -16,6 +17,14 @@ interface RosterItem {
   userId: string;
   fullName: string;
   estado: string;
+  /** En qué clase entrena. `null` = sin repartir, o club sin dividir. */
+  groupId: string | null;
+  groupName: string | null;
+}
+/** Una clase del club, para acotar la parrilla a la que está entrando. */
+interface Clase {
+  id: string;
+  name: string;
 }
 interface Resultado {
   ok: boolean;
@@ -82,6 +91,9 @@ export default function Kiosco() {
   const { user, cargando: cargandoSesion, esStaff } = useAuth();
 
   const [roster, setRoster] = useState<RosterItem[]>([]);
+  const [clases, setClases] = useState<Clase[]>([]);
+  /** Qué clase está entrando ahora mismo. '' = todas. */
+  const [clase, setClase] = useState('');
   const [filtro, setFiltro] = useState('');
   const [pin, setPin] = useState('');
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -164,6 +176,12 @@ export default function Kiosco() {
     } catch {
       /* el kiosco puede operar sin roster (solo QR/PIN) */
     }
+    try {
+      const g = await api.get<{ grupos: Clase[] }>('/schedule');
+      setClases(g.data.grupos ?? []);
+    } catch {
+      setClases([]); // sin clases el kiosco funciona igual: una sola parrilla
+    }
   }, []);
 
   useEffect(() => {
@@ -221,9 +239,17 @@ export default function Kiosco() {
   }
 
   const q = filtro.trim().toLowerCase();
+  /**
+   * El filtro por clase se aplica AQUÍ y no pidiéndoselo a la API, al revés que
+   * en las otras pantallas. El motivo es el mismo por el que el roster del
+   * kiosco viene entero: en la puerta del salón se sigue marcando gente cuando
+   * se cae la conexión, y un filtro que necesitara una petición dejaría la
+   * parrilla vacía justo cuando hace más falta.
+   */
+  const delaClase = clase ? roster.filter((a) => a.groupId === clase) : roster;
   const coincidencias = q
-    ? roster.filter((a) => a.fullName.toLowerCase().includes(q))
-    : roster;
+    ? delaClase.filter((a) => a.fullName.toLowerCase().includes(q))
+    : delaClase;
   const enPantalla = coincidencias.slice(0, TOPE_BOTONES);
 
   const color = resultado?.bloqueado
@@ -403,6 +429,22 @@ export default function Kiosco() {
               mientras alguien espera en la puerta. El buscador filtra lo que
               ya está descargado —el roster viene entero, ver `cargar`—, así
               que sigue funcionando sin conexión. */}
+          {/* La clase que está entrando: a las seis de la tarde en la puerta
+              están los adultos, y la parrilla con los niños intercalados obliga
+              a buscar cada nombre entre el doble de botones. */}
+          {clases.length > 0 && (
+            <div style={{ marginBottom: '0.6rem' }}>
+              <SelectMenu
+                valor={clase}
+                onChange={setClase}
+                etiquetaAria={t('grupos.filtrar')}
+                opciones={[
+                  { valor: '', etiqueta: t('grupos.todas') },
+                  ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
+                ]}
+              />
+            </div>
+          )}
           {roster.length > TOPE_BOTONES && (
             <input
               value={filtro}

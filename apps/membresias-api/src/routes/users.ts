@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { and, asc, eq, ilike, ne, or, sql } from 'drizzle-orm';
-import { users, type Db } from '@dinamyt/membresias-db';
+import { clubGroups, memberships, users, type Db } from '@dinamyt/membresias-db';
 import { esStaff, orgDelRequest, requireAuth, requireRole } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
 import {
   LIMITES,
   correo as validarCorreo,
   fecha,
+  fechaNacimiento,
   nombreCompleto,
   telefono,
   textoOpcional,
@@ -56,6 +57,7 @@ interface FilaVista {
   avatarUrl: string | null;
   belt: string | null;
   trainsSince?: string | null;
+  birthDate?: string | null;
   carnetEmitidoEl?: string | null;
   bloodType?: string | null;
   emergencyName?: string | null;
@@ -76,6 +78,8 @@ function vista(u: FilaVista) {
     avatarUrl: direccionFoto(u),
     belt: u.belt,
     trainsSince: u.trainsSince ?? null,
+    /** Cuándo nació. La pone quien sea una vez; la corrige solo el maestro. */
+    birthDate: u.birthDate ?? null,
     /** Cuándo se expidió su carnet. Ver `POST /users/:id/carnet`. */
     carnetEmitidoEl: u.carnetEmitidoEl ?? null,
     bloodType: u.bloodType ?? null,
@@ -97,6 +101,7 @@ const COLUMNAS_VISTA = {
   avatarUrl: columnaImagenLigera(users.avatarUrl),
   belt: users.belt,
   trainsSince: users.trainsSince,
+  birthDate: users.birthDate,
   carnetEmitidoEl: users.carnetEmitidoEl,
   bloodType: users.bloodType,
   emergencyName: users.emergencyName,
@@ -245,6 +250,8 @@ export async function usersRoutes(app: FastifyInstance) {
       avatarUrl?: string;
       belt?: string;
       trainsSince?: string | null;
+      birthDate?: string | null;
+      groupId?: string | null;
       bloodType?: string | null;
       emergencyName?: string | null;
       emergencyPhone?: string | null;
@@ -263,6 +270,10 @@ export async function usersRoutes(app: FastifyInstance) {
     if (!retrato.ok) return reply.code(422).send({ error: retrato.error });
     const ficha = fichaDeSeguridad(body);
     if (!ficha.ok) return reply.code(422).send({ error: ficha.error });
+    // Opcional a propósito: quien está de pie delante del maestro no se puede
+    // quedar sin inscribir porque nadie se acuerde del año.
+    const nacimiento = fechaNacimiento(body.birthDate);
+    if (!nacimiento.ok) return reply.code(422).send({ error: nacimiento.error });
 
     const rol = (body.role ?? 'student') as MembresiasRole;
     if (!ROLES_ASIGNABLES.includes(rol)) {
@@ -287,6 +298,7 @@ export async function usersRoutes(app: FastifyInstance) {
         avatarUrl: retrato.valor,
         belt: grado.valor,
         ...ficha.valor,
+        birthDate: nacimiento.valor,
         role: rol,
         orgId,
         // Su carnet se expide hoy. Va explícito y no por el DEFAULT de la
@@ -304,7 +316,30 @@ export async function usersRoutes(app: FastifyInstance) {
     // panel y no tenía ni carnet con PIN ni forma de marcar sin el QR.
     if (rol === 'student') {
       try {
-        await ensureMembership(db, orgId, creado.id);
+        const membresia = await ensureMembership(db, orgId, creado.id);
+        // Su clase, si el maestro la eligió al inscribirlo. Se hace aquí y no
+        // en un segundo viaje desde la web porque repartir al alumno es parte
+        // del mismo gesto: darlo de alta y no decir a qué clase va lo deja
+        // fuera del horario que verá al abrir su panel.
+        if (body.groupId) {
+          const [g] = await db
+            .select({ id: clubGroups.id })
+            .from(clubGroups)
+            .where(
+              and(
+                eq(clubGroups.id, body.groupId),
+                eq(clubGroups.orgId, orgId),
+                eq(clubGroups.isActive, true),
+              ),
+            )
+            .limit(1);
+          if (g) {
+            await db
+              .update(memberships)
+              .set({ groupId: g.id, updatedAt: new Date() })
+              .where(eq(memberships.id, membresia.id));
+          }
+        }
       } catch {
         // Que falle no invalida el alta: la membresía se crea igual la primera
         // vez que se le ponga plan o se le marque asistencia.
@@ -354,6 +389,7 @@ export async function usersRoutes(app: FastifyInstance) {
         phone?: string | null;
         avatarUrl?: string | null;
         belt?: string | null;
+        birthDate?: string | null;
         role?: string;
         isActive?: boolean;
       } & CuerpoFicha;
@@ -393,6 +429,24 @@ export async function usersRoutes(app: FastifyInstance) {
         const grado = cinturon(body.belt);
         if (!grado.ok) return reply.code(422).send({ error: grado.error });
         cambios.belt = grado.valor;
+      }
+
+      // La fecha de nacimiento la corrige el MAESTRO, no el auxiliar.
+      //
+      // Es el mismo criterio que el rol, y por eso lleva la misma reja: el
+      // auxiliar lleva el día a día —cobra, pasa lista—, pero esta fecha ya la
+      // escribió alguien (el maestro al inscribir, o el propio alumno una vez)
+      // y de ella cuelga qué día lo felicita el club. Rehacerla no es día a
+      // día, es corregir un documento.
+      if (body.birthDate !== undefined) {
+        if (req.user!.role_membresias === 'staff' && !req.user!.is_super_admin) {
+          return reply
+            .code(403)
+            .send({ error: 'Solo el maestro cambia la fecha de nacimiento.' });
+        }
+        const nacimiento = fechaNacimiento(body.birthDate);
+        if (!nacimiento.ok) return reply.code(422).send({ error: nacimiento.error });
+        cambios.birthDate = nacimiento.valor;
       }
 
       // El rol solo lo mueve el maestro, y nunca hacia `owner`: el dueño del

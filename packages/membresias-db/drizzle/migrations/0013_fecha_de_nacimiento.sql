@@ -1,0 +1,11 @@
+-- La fecha de nacimiento del alumno.
+--
+-- La ficha sabía desde cuándo entrena (`trains_since`) pero no cuándo nació, y
+-- son dos cosas distintas: la primera es antigüedad en el club, la segunda es
+-- la edad. Sin ella el maestro no puede felicitar a nadie el día que toca —que
+-- es lo que motivó la columna— ni agrupar por edades el día que haga falta.
+--
+-- Nula a propósito, y nula para todos los que ya existen: exigirla al dar de
+-- alta convertiría un dato que muchas veces no se sabe en el momento en un
+-- obstáculo para inscribir a alguien que está de pie delante del maestro.
+ALTER TABLE "membresias"."users" ADD COLUMN "birth_date" date;

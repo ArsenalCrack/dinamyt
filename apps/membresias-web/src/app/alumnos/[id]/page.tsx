@@ -42,6 +42,7 @@ interface Persona {
   avatarUrl: string | null;
   belt: string | null;
   trainsSince: string | null;
+  birthDate: string | null;
   /** Cuándo se le expidió el carnet. Ver `POST /users/:id/carnet`. */
   carnetEmitidoEl: string | null;
   bloodType: string | null;
@@ -60,6 +61,14 @@ interface Membership {
   clasesRestantes: number | null;
   diasFaltantes: number | null;
   checkinPin: string | null;
+  /** En qué clase del club entrena. `null` = sin repartir. */
+  groupId: string | null;
+  groupName: string | null;
+}
+/** Una clase del club, para el desplegable de asignación. */
+interface Clase {
+  id: string;
+  name: string;
 }
 interface Plan {
   id: string;
@@ -135,6 +144,7 @@ export default function Ficha() {
     phone: '',
     belt: '',
     trainsSince: '',
+    birthDate: '',
     bloodType: '',
     emergencyName: '',
     emergencyPhone: '',
@@ -154,7 +164,10 @@ export default function Ficha() {
     checkinPin: '',
     venceEl: '',
     clasesRestantes: '',
+    /** Su clase. Vive con el plan porque, como él, es de la MEMBRESÍA. */
+    groupId: '',
   });
+  const [clases, setClases] = useState<Clase[]>([]);
   const [cobro, setCobro] = useState({
     planId: '',
     amount: '',
@@ -204,6 +217,7 @@ export default function Ficha() {
         phone: pe.data.phone ?? '',
         belt: pe.data.belt ?? '',
         trainsSince: pe.data.trainsSince ?? '',
+        birthDate: pe.data.birthDate ?? '',
         bloodType: pe.data.bloodType ?? '',
         emergencyName: pe.data.emergencyName ?? '',
         emergencyPhone: pe.data.emergencyPhone ?? '',
@@ -214,6 +228,7 @@ export default function Ficha() {
         checkinPin: m?.checkinPin ?? '',
         venceEl: m?.venceEl ?? '',
         clasesRestantes: m?.clasesRestantes != null ? String(m.clasesRestantes) : '',
+        groupId: m?.groupId ?? '',
       });
     } catch (e) {
       setError(mensajeError(e, t('comun.ninguno')));
@@ -231,6 +246,12 @@ export default function Ficha() {
       return;
     }
     if (id) void cargar();
+    // Las clases del club, para el desplegable de asignación. Aparte de la
+    // ficha porque no cambian al guardar nada de esta pantalla.
+    void api
+      .get<{ grupos: Clase[] }>('/schedule')
+      .then((r) => setClases(r.data.grupos ?? []))
+      .catch(() => setClases([]));
   }, [cargandoSesion, user, esStaff, id, router, cargar]);
 
   /**
@@ -284,6 +305,10 @@ export default function Ficha() {
         phone: datos.phone || null,
         belt: datos.belt || null,
         trainsSince: datos.trainsSince || null,
+        // Solo la manda el maestro: la API rechaza con un 403 al auxiliar que
+        // lo intente, así que enviarla desde su pantalla sería un error seguro
+        // en un guardado que por lo demás es suyo.
+        ...(esMaestro ? { birthDate: datos.birthDate || null } : {}),
         bloodType: datos.bloodType || null,
         emergencyName: datos.emergencyName || null,
         emergencyPhone: datos.emergencyPhone || null,
@@ -348,6 +373,10 @@ export default function Ficha() {
         checkinPin: plan.checkinPin || null,
         venceEl: plan.venceEl || null,
         clasesRestantes: plan.clasesRestantes === '' ? null : Number(plan.clasesRestantes),
+        // Viaja aunque esté vacía: sacar a alguien de su clase es una decisión
+        // tan legítima como meterlo, y con `undefined` no habría forma de
+        // distinguirla de «no la toques».
+        groupId: plan.groupId || null,
       });
       await cargar();
       avisoOk(t('ficha.guardado'));
@@ -778,6 +807,36 @@ export default function Ficha() {
               {t('ficha.entrenaDesdeAyuda')}
             </p>
 
+            {/* La fecha de nacimiento la corrige el MAESTRO. Al auxiliar se le
+                enseña, porque es parte de la ficha que él consulta, pero sin
+                editar: la API le responde 403, y un campo que rebota al guardar
+                es peor que uno que se ve y no se toca. */}
+            <Etiqueta>{t('ficha.nacimiento')}</Etiqueta>
+            {esMaestro ? (
+              <>
+                <div style={{ margin: '0.25rem 0 0.2rem' }}>
+                  <CampoFecha
+                    valor={datos.birthDate}
+                    onChange={(v) => setDatos({ ...datos, birthDate: v })}
+                    min="1900-01-01"
+                    max={hoyISO()}
+                    ariaLabel={t('ficha.nacimiento')}
+                  />
+                </div>
+                <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                  {t('ficha.nacimientoAyuda')}
+                </p>
+              </>
+            ) : (
+              <p style={{ margin: '0.25rem 0 0.9rem' }}>
+                {datos.birthDate ? (
+                  <strong className="mono">{fmtFecha(datos.birthDate, idioma)}</strong>
+                ) : (
+                  <span className="muted">{t('ficha.sinSangre')}</span>
+                )}
+              </p>
+            )}
+
             <Etiqueta>{t('ficha.sangre')}</Etiqueta>
             <div style={{ margin: '0.25rem 0 0.9rem' }}>
               <SelectMenu
@@ -849,6 +908,29 @@ export default function Ficha() {
                   disabled={planes.length === 0}
                 />
               </div>
+              {/* Su clase. Vive aquí y no arriba, con los datos personales,
+                  porque no es de la persona: es de su membresía EN ESTE club,
+                  igual que el plan y el estado, y se guarda en el mismo gesto.
+                  Solo se dibuja si el club tiene clases. */}
+              {clases.length > 0 && (
+                <>
+                  <label className="muted" style={{ fontSize: '0.75rem' }}>
+                    {t('grupos.asignar')}
+                  </label>
+                  <div style={{ margin: '0.25rem 0 0.7rem' }}>
+                    <SelectMenu
+                      valor={plan.groupId}
+                      onChange={(v) => setPlan({ ...plan, groupId: v })}
+                      etiquetaAria={t('grupos.asignar')}
+                      placeholder={t('grupos.sinAsignar')}
+                      opciones={[
+                        { valor: '', etiqueta: t('grupos.sinAsignar') },
+                        ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
+                      ]}
+                    />
+                  </div>
+                </>
+              )}
               <label className="muted" style={{ fontSize: '0.75rem' }}>
                 {t('comun.estado')}
               </label>
