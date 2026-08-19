@@ -13,4 +13,8 @@ export default defineConfig({
     url: process.env.ACADEMY_DATABASE_URL!,
   },
   schemaFilter: ['academy'],
+  // El diario de migraciones va DENTRO del esquema de la app, no en el
+  // `drizzle` global: Academy comparte base con el ecosistema y las dos
+  // escribian en la MISMA tabla. Ver scripts/diario-migraciones.mjs.
+  migrations: { schema: 'academy' },
 });
