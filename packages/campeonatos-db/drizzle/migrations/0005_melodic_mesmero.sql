@@ -1,1 +1,0 @@
-ALTER TABLE "campeonatos"."competidores" ADD COLUMN "foto_url" text;

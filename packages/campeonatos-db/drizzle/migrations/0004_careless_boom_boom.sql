@@ -1,1 +1,0 @@
-ALTER TABLE "campeonatos"."invitaciones" ADD COLUMN "invitado_por_rol" varchar(20);

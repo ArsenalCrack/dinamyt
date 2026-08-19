@@ -1,1 +1,0 @@
-ALTER TABLE "campeonatos"."inscripciones" ADD COLUMN "motivo_rechazo" text;
