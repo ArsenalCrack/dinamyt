@@ -86,8 +86,8 @@ export default function PrivacidadPage() {
               Mi perfil
             </Link>
             ; para supresión de la cuenta o reclamos escribe a{' '}
-            <a href="mailto:admin@dinamyt.com" style={{ color: 'var(--gold)' }}>
-              admin@dinamyt.com
+            <a href="mailto:admin@dinamyt.org" style={{ color: 'var(--gold)' }}>
+              admin@dinamyt.org
             </a>
             . Los menores de edad se registran y gestionan con autorización de su
             acudiente.

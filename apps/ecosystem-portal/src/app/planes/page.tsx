@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { listPlanesAPI, type Plan } from '@/lib/api';
 
 const CONTACTO_ADMIN =
-  process.env.NEXT_PUBLIC_ADMIN_CONTACT_EMAIL || 'admin@dinamyt.com';
+  process.env.NEXT_PUBLIC_ADMIN_CONTACT_EMAIL || 'admin@dinamyt.org';
 
 const NOMBRE_APP: Record<string, string> = {
   academy: 'Academy',
