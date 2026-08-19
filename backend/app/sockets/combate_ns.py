@@ -396,6 +396,27 @@ def roles_ocupados_para_tatami(tatami_id):
         return set(ts.get("roles_activos", {}).keys())
 
 
+def _pareja_llave_coincide(ts):
+    """
+    El marcador sigue mostrando a los DOS competidores del partido de llave
+    enganchado. Si no, ese marcador ya no representa ese partido y su
+    resultado no puede avanzar en el cuadro.
+    Sin llave enganchada responde True (nada que verificar).
+    """
+    info = ts.get("combate_llave")
+    if not info:
+        return True
+    estado = ts.get("estado") or {}
+
+    def _n(valor):
+        return str(valor or "").strip().casefold()
+
+    return (
+        _n(estado.get("nombreHong")) == _n((info.get("comp1") or {}).get("nombre"))
+        and _n(estado.get("nombreChung")) == _n((info.get("comp2") or {}).get("nombre"))
+    )
+
+
 def _competidores_con_nombre(estado):
     hong = (estado.get("nombreHong") or "").strip()
     chung = (estado.get("nombreChung") or "").strip()
@@ -768,16 +789,13 @@ class CombateNamespace(Namespace):
                 return
 
             if accion == "soltar_combate_llave":
-                if ts.get("combate_llave"):
-                    ts.pop("combate_llave", None)
+                if self._cerrar_combate_llave(ts):
                     _agregar_log(
                         ts["estado"],
-                        "[LLAVE] Combate de eliminación liberado — marcador suelto",
+                        "[LLAVE] Combate de eliminación liberado — marcador suelto, "
+                        "la llave vuelve a pendiente",
                         "arb",
                     )
-                ts["mostrar_arbol"] = False
-                ts.pop("llave_arbol", None)
-                ts.pop("proximos_llave", None)
                 if ev_id:
                     emit("ack", {"evId": ev_id})
                 self._broadcast_estado(room, ts)
@@ -810,6 +828,21 @@ class CombateNamespace(Namespace):
             if accion == "nuevo_combate":
                 categoria = ts.get("categoria_activa", "combate")
                 llave_info = ts.get("combate_llave") if categoria == "combate" else None
+
+                # Última defensa: si el marcador ya no muestra a los dos
+                # competidores del partido enganchado, guardar aquí haría
+                # avanzar en el cuadro a alguien que nunca disputó ese combate.
+                # Se guarda como combate suelto y la llave se libera.
+                if llave_info and not _pareja_llave_coincide(ts):
+                    self._cerrar_combate_llave(ts)
+                    _agregar_log(
+                        ts["estado"],
+                        "[LLAVE] El marcador ya no corresponde a "
+                        f"{llave_info['comp1']['nombre']} vs {llave_info['comp2']['nombre']}: "
+                        "se guarda como combate suelto y la llave vuelve a pendiente",
+                        "arb",
+                    )
+                    llave_info = None
 
                 # Combate de eliminación: debe haber un ganador definido
                 ganador_color = None
@@ -902,6 +935,9 @@ class CombateNamespace(Namespace):
             if accion == "cambiar_categoria":
                 # Abandona el grupo de figuras en curso (vuelve a 'pendiente').
                 self._cerrar_grupo_figuras(ts, terminada=False)
+                # Y también el combate de eliminación: el marcador se reinicia
+                # aquí, así que el partido enganchado deja de tener respaldo.
+                self._cerrar_combate_llave(ts)
                 nueva_cat = ev.get("categoria", "combate")
                 ts["categoria_activa"] = nueva_cat
                 if nueva_cat == "figuras":
@@ -1033,6 +1069,26 @@ class CombateNamespace(Namespace):
                     self._cerrar_grupo_figuras(ts, terminada=False)
             else:
                 aplicar_evento(ts["estado"], ev, ganador_cb, alerta_superioridad_cb, derrota_cb)
+                # El reset devuelve el marcador a cero y borra los nombres: el
+                # partido de la llave queda sin respaldo y debe desengancharse,
+                # o el SIGUIENTE combate que se guarde avanzaría ese partido.
+                if accion == "reset":
+                    if self._cerrar_combate_llave(ts):
+                        _agregar_log(
+                            ts["estado"],
+                            "[LLAVE] Combate de eliminación liberado por el reset — "
+                            "la llave vuelve a pendiente",
+                            "arb",
+                        )
+                # Cambiar los nombres a mano rompe el vínculo con el cuadro.
+                elif accion == "nombres" and not _pareja_llave_coincide(ts):
+                    if self._cerrar_combate_llave(ts):
+                        _agregar_log(
+                            ts["estado"],
+                            "[LLAVE] El marcador cambió de competidores — llave "
+                            "liberada, vuelve a pendiente",
+                            "arb",
+                        )
 
             # ── Manejar cronómetro ─────────────────────────────────────────
             if accion == "crono_start":
@@ -1283,6 +1339,32 @@ class CombateNamespace(Namespace):
             print(f"  [ERR] Error registrando resultado en la llave: {e}")
         finally:
             ts.pop("combate_llave", None)
+
+    def _cerrar_combate_llave(self, ts):
+        """
+        Desengancha el combate de eliminación en curso SIN registrar resultado:
+        limpia el árbol de la pantalla pública y devuelve la llave a
+        'pendiente' para que no quede bloqueada como 'activa' (no se podría
+        editar, combinar ni re-sortear). Espejo de `_cerrar_grupo_figuras`.
+        Retorna True si había un combate enganchado.
+        """
+        from ..models.llave import Llave
+
+        info = ts.pop("combate_llave", None)
+        ts["mostrar_arbol"] = False
+        ts.pop("llave_arbol", None)
+        ts.pop("proximos_llave", None)
+        if not info:
+            return False
+        try:
+            llave = Llave.query.get(info["llave_id"])
+            if llave and llave.tipo_norm == "combate" and llave.estado_norm == "activa":
+                llave.estado = "pendiente"
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"  [ERR] Error liberando la llave de combate: {e}")
+        return True
 
     def _activar_grupo_figuras(self, tatami_id, ts, ev):
         """

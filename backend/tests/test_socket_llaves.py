@@ -193,6 +193,91 @@ class TestCombateEliminacionSocket:
             from app.models.llave import Llave
             llave = Llave.query.get(llave_id)
             assert llave.estructura.get("campeon") is None, "el combate sigue pendiente"
+            # Soltar devuelve la llave a la cola: si quedara 'activa' ya no se
+            # podría editar, combinar ni re-sortear nunca más.
+            assert llave.estado == "pendiente"
+
+        cliente.disconnect(namespace="/combate")
+
+    def test_reset_libera_la_llave(self, entorno):
+        """
+        Regresión: activar una llave, NO disputarla y resetear dejaba el
+        tatami enganchado al partido. El siguiente combate que se guardara
+        —aunque fuera de otros competidores— marcaba ganador en el cuadro.
+        """
+        app, tatami_id, llave_id = entorno
+        cliente = socketio.test_client(
+            app, namespace="/combate",
+            query_string=f"tatami_id={tatami_id}&rol=arbitro",
+        )
+        _emitir(cliente, "activar_tatami")
+        _emitir(cliente, "activar_combate_llave", llave_id=llave_id)
+        _emitir(cliente, "reset")
+        estado = _ultimo_estado(cliente)
+        assert estado["_combate_llave"] is None, "el reset desengancha la llave"
+
+        # Combate suelto de OTROS competidores, guardado después
+        _emitir(cliente, "nombres", nombreHong="Pedro", nombreChung="Juan")
+        _emitir(cliente, "punto_juez", juez="j1", color="hong", pts=2, nombre="x")
+        _emitir(cliente, "nuevo_combate")
+
+        with app.app_context():
+            from app.models.llave import Llave
+            llave = Llave.query.get(llave_id)
+            assert llave.estructura.get("campeon") is None, (
+                "un combate ajeno no puede coronar campeón en la llave"
+            )
+            assert all(
+                p.get("ganador") is None
+                for ronda in llave.estructura["rondas"] for p in ronda
+            ), "ningún partido debe quedar marcado"
+            assert llave.estado == "pendiente"
+
+        cliente.disconnect(namespace="/combate")
+
+    def test_cambiar_nombres_libera_la_llave(self, entorno):
+        """Renombrar a los competidores rompe el vínculo con el cuadro."""
+        app, tatami_id, llave_id = entorno
+        cliente = socketio.test_client(
+            app, namespace="/combate",
+            query_string=f"tatami_id={tatami_id}&rol=arbitro",
+        )
+        _emitir(cliente, "activar_tatami")
+        _emitir(cliente, "activar_combate_llave", llave_id=llave_id)
+        _emitir(cliente, "nombres", nombreHong="Otro", nombreChung="Distinto")
+        estado = _ultimo_estado(cliente)
+        assert estado["_combate_llave"] is None
+
+        _emitir(cliente, "punto_juez", juez="j1", color="hong", pts=2, nombre="x")
+        _emitir(cliente, "nuevo_combate")
+        with app.app_context():
+            from app.models.llave import Llave
+            llave = Llave.query.get(llave_id)
+            assert llave.estructura.get("campeon") is None
+            assert llave.estado == "pendiente"
+
+        cliente.disconnect(namespace="/combate")
+
+    def test_cambiar_categoria_libera_la_llave(self, entorno):
+        """Irse a Figuras y volver no puede dejar el partido enganchado."""
+        app, tatami_id, llave_id = entorno
+        cliente = socketio.test_client(
+            app, namespace="/combate",
+            query_string=f"tatami_id={tatami_id}&rol=arbitro",
+        )
+        _emitir(cliente, "activar_tatami")
+        _emitir(cliente, "activar_combate_llave", llave_id=llave_id)
+        _emitir(cliente, "cambiar_categoria", categoria="figuras")
+        _emitir(cliente, "cambiar_categoria", categoria="combate")
+        _emitir(cliente, "nombres", nombreHong="Pedro", nombreChung="Juan")
+        _emitir(cliente, "punto_juez", juez="j1", color="hong", pts=2, nombre="x")
+        _emitir(cliente, "nuevo_combate")
+
+        with app.app_context():
+            from app.models.llave import Llave
+            llave = Llave.query.get(llave_id)
+            assert llave.estructura.get("campeon") is None
+            assert llave.estado == "pendiente"
 
         cliente.disconnect(namespace="/combate")
 
