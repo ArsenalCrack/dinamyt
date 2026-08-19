@@ -9,10 +9,20 @@ import { config } from '../config';
 const VENTANA_AVATAR_MS = 30 * 60 * 1000;
 const ultimoRefresco = new Map<string, number>();
 
+/** Purga entradas expiradas para que el mapa no crezca sin límite. */
+function podarVentana(mapa: Map<string, number>, ventanaMs: number, tope = 1000) {
+  if (mapa.size <= tope) return;
+  const limite = Date.now() - ventanaMs;
+  for (const [clave, marca] of mapa) {
+    if (marca < limite) mapa.delete(clave);
+  }
+}
+
 export async function refrescarPerfilEcosystem(db: Db, sub: string, token: string) {
   const ahora = Date.now();
   const previo = ultimoRefresco.get(sub);
   if (previo && ahora - previo < VENTANA_AVATAR_MS) return;
+  podarVentana(ultimoRefresco, VENTANA_AVATAR_MS);
   ultimoRefresco.set(sub, ahora);
   try {
     const res = await fetch(`${config.ecosystemApiUrl}/users/${sub}/profile`, {
@@ -88,7 +98,10 @@ export async function sincronizarUsuarioLocal(
  * `role_academy` el rol de la MEMBRESÍA de la org (maestro/owner/student…),
  * así que aquí se normaliza al catálogo local (admin/teacher/student).
  */
-export function rolEfectivo(payload: JwtPayload, usuario: UsuarioLocal): AcademyRole {
+export function rolEfectivo(
+  payload: JwtPayload,
+  usuario: Pick<UsuarioLocal, 'localRole'>,
+): AcademyRole {
   if (payload.is_super_admin) return 'admin';
   if (usuario.localRole) return usuario.localRole;
   const delToken = (payload.role_academy ?? '').toLowerCase();

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   martialArts,
   grades,
@@ -120,7 +120,8 @@ export async function martialArtsRoutes(app: FastifyInstance) {
       const [arte] = await db
         .update(martialArts)
         .set({
-          ...(body.name !== undefined && { name: body.name.trim() }),
+          ...(typeof body.name === 'string' &&
+            body.name.trim() && { name: body.name.trim() }),
           ...(body.description !== undefined && { description: body.description }),
           ...(body.federation !== undefined && { federation: body.federation }),
           ...(body.isActive !== undefined && { isActive: body.isActive }),
@@ -176,7 +177,7 @@ export async function martialArtsRoutes(app: FastifyInstance) {
         const [u] = await db
           .select()
           .from(academyUsers)
-          .where(eq(academyUsers.email, body.email.trim().toLowerCase()))
+          .where(sql`lower(${academyUsers.email}) = ${body.email.trim().toLowerCase()}`)
           .limit(1);
         if (!u) {
           return reply.code(404).send({

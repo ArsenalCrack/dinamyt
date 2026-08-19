@@ -42,6 +42,13 @@ export async function registrarIngreso(db: Db, userId: string) {
   const ahora = Date.now();
   const previo = ultimoIngreso.get(userId);
   if (previo && ahora - previo < VENTANA_INGRESO_MS) return;
+  // Acotar el mapa: purgar entradas ya expiradas cuando crece demasiado.
+  if (ultimoIngreso.size > 1000) {
+    const limite = ahora - VENTANA_INGRESO_MS;
+    for (const [clave, marca] of ultimoIngreso) {
+      if (marca < limite) ultimoIngreso.delete(clave);
+    }
+  }
   ultimoIngreso.set(userId, ahora);
   await registrarActividad(db, {
     userId,

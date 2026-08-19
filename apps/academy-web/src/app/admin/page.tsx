@@ -226,7 +226,8 @@ function TabUsuarios() {
 
   const cargar = useCallback(async () => {
     try {
-      setUsuarios(await getUsuariosAdminAPI());
+      // Incluye los soft-deleted para poder restaurarlos.
+      setUsuarios(await getUsuariosAdminAPI(true));
     } catch (err) {
       setError(extraerError(err));
     }
@@ -287,7 +288,9 @@ function TabUsuarios() {
                   </select>
                 </td>
                 <td>
-                  {u.suspended ? (
+                  {u.deletedAt ? (
+                    <span className="badge badge-danger">Eliminado</span>
+                  ) : u.suspended ? (
                     <span className="badge badge-danger">Suspendido</span>
                   ) : (
                     <span className="badge badge-ok">Activo</span>
@@ -295,21 +298,32 @@ function TabUsuarios() {
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button
-                      className={u.suspended ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
-                      onClick={() => void cambiar(u, { suspended: !u.suspended })}
-                    >
-                      {u.suspended ? 'Reactivar' : 'Suspender'}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => {
-                        if (confirm('¿Eliminar (soft delete) este usuario de Academy?'))
-                          void cambiar(u, { eliminar: true });
-                      }}
-                    >
-                      Eliminar
-                    </button>
+                    {u.deletedAt ? (
+                      <button
+                        className="btn btn-gold btn-sm"
+                        onClick={() => void cambiar(u, { restaurar: true })}
+                      >
+                        Restaurar
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className={u.suspended ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
+                          onClick={() => void cambiar(u, { suspended: !u.suspended })}
+                        >
+                          {u.suspended ? 'Reactivar' : 'Suspender'}
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => {
+                            if (confirm('¿Eliminar (soft delete) este usuario de Academy?'))
+                              void cambiar(u, { eliminar: true });
+                          }}
+                        >
+                          Eliminar
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

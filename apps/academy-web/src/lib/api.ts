@@ -171,6 +171,7 @@ export interface UsuarioLocal {
   localRole: 'admin' | 'teacher' | 'student' | null;
   avatarUrl?: string | null;
   suspended: boolean;
+  deletedAt?: string | null;
   matriculas?: string[];
 }
 export interface MatriculaMe {
@@ -343,8 +344,12 @@ export const getEstudiantesAPI = async (martialArtId: string, gradeId?: string) 
     await api.get('/progress/students', { params: { martialArtId, gradeId } })
   ).data as EstudiantePanel[];
 
-export const getUsuariosAdminAPI = async () =>
-  (await api.get('/admin/users')).data as UsuarioLocal[];
+export const getUsuariosAdminAPI = async (incluirEliminados = false) =>
+  (
+    await api.get('/admin/users', {
+      params: incluirEliminados ? { incluirEliminados: '1' } : undefined,
+    })
+  ).data as UsuarioLocal[];
 export const patchUsuarioAdminAPI = async (id: string, body: Record<string, unknown>) =>
   (await api.patch(`/admin/users/${id}`, body)).data as UsuarioLocal;
 export const solicitarMaestroAPI = async (body: {

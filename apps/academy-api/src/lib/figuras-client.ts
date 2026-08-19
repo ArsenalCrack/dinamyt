@@ -44,6 +44,9 @@ export interface FigurasClient {
     referenceVideoPath: string;
     referenceAnglesPath: string;
     outDir: string;
+    /** Raíz del almacén: el servicio devuelve las rutas de salida RELATIVAS a
+     *  ella (sin esto vuelven absolutas y /files no puede servirlas). */
+    baseDir: string;
   }): Promise<ResultadoFigura>;
 }
 
@@ -69,6 +72,7 @@ export function createHttpFigurasClient(baseUrl: string): FigurasClient {
         reference_video_path: args.referenceVideoPath,
         reference_angles_path: args.referenceAnglesPath,
         out_dir: args.outDir,
+        base_dir: args.baseDir,
       }),
   };
 }

@@ -6,7 +6,12 @@ import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
 import { notificar, estudiantesDe } from '../lib/notify';
 import { registrarActividad } from '../lib/activity';
-import { guardarArchivoSeguro, ErrorSubida, type ClaseArchivo } from '../lib/uploads';
+import {
+  guardarArchivoSeguro,
+  borrarArchivoSubido,
+  ErrorSubida,
+  type ClaseArchivo,
+} from '../lib/uploads';
 
 const TIPOS = ['documento', 'video', 'imagen', 'texto'] as const;
 type TipoContenido = (typeof TIPOS)[number];
@@ -202,12 +207,19 @@ export async function contentsRoutes(app: FastifyInstance) {
         throw err;
       }
 
+      // Si una validación falla DESPUÉS de guardar el archivo, se borra para
+      // no dejar huérfanos en disco.
+      const rechazar = async (codigo: number, error: string) => {
+        if (archivo) await borrarArchivoSubido(archivo.rel);
+        return reply.code(codigo).send({ error });
+      };
+
       const { martialArtId, gradeId, title, description, orderIndex } = campos;
       if (!esUuid(martialArtId) || !esUuid(gradeId)) {
-        return reply.code(422).send({ error: 'martialArtId y gradeId son obligatorios.' });
+        return rechazar(422, 'martialArtId y gradeId son obligatorios.');
       }
       if (!title?.trim()) {
-        return reply.code(422).send({ error: 'La unidad necesita un título.' });
+        return rechazar(422, 'La unidad necesita un título.');
       }
       if (!archivo) {
         return reply.code(422).send({ error: 'Adjunta el archivo (video, imagen o PDF).' });
@@ -215,9 +227,7 @@ export async function contentsRoutes(app: FastifyInstance) {
 
       const db = req.server.db;
       if (!(await esMaestroDe(db, req.academy!.rol, req.user!.sub, martialArtId))) {
-        return reply
-          .code(403)
-          .send({ error: 'Solo puedes publicar en las artes marciales asignadas.' });
+        return rechazar(403, 'Solo puedes publicar en las artes marciales asignadas.');
       }
       const [grado] = await db
         .select({ id: grades.id, martialArtId: grades.martialArtId })
@@ -225,7 +235,7 @@ export async function contentsRoutes(app: FastifyInstance) {
         .where(eq(grades.id, gradeId))
         .limit(1);
       if (!grado || grado.martialArtId !== martialArtId) {
-        return reply.code(422).send({ error: 'El grado no pertenece a esa arte marcial.' });
+        return rechazar(422, 'El grado no pertenece a esa arte marcial.');
       }
 
       const [unidad] = await db
@@ -275,10 +285,23 @@ export async function contentsRoutes(app: FastifyInstance) {
           .send({ error: 'Solo puedes editar contenido de tus artes marciales.' });
       }
 
+      // Si se cambia de grado, debe ser un grado de la MISMA arte marcial.
+      if (body.gradeId !== undefined && esUuid(body.gradeId)) {
+        const [grado] = await db
+          .select({ id: grades.id, martialArtId: grades.martialArtId })
+          .from(grades)
+          .where(eq(grades.id, body.gradeId))
+          .limit(1);
+        if (!grado || grado.martialArtId !== existente.martialArtId) {
+          return reply.code(422).send({ error: 'El grado no pertenece a esa arte marcial.' });
+        }
+      }
+
       const [unidad] = await db
         .update(contents)
         .set({
-          ...(body.title !== undefined && { title: body.title.trim() }),
+          ...(typeof body.title === 'string' &&
+            body.title.trim() && { title: body.title.trim() }),
           ...(body.description !== undefined && { description: body.description }),
           ...(body.url !== undefined && { url: body.url }),
           ...(body.body !== undefined && { body: body.body }),

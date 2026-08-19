@@ -33,7 +33,9 @@ export interface BuildAppDeps {
 }
 
 export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
-  const app = Fastify({ logger: false });
+  // En producción los errores (p. ej. del análisis de figuras en segundo
+  // plano) deben quedar en los logs de la plataforma; en tests, silencio.
+  const app = Fastify({ logger: process.env.NODE_ENV === 'production' });
 
   app.decorate(
     'verifyToken',

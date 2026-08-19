@@ -1053,14 +1053,18 @@ function TabEstudiantes({ arte }: { arte: Arte }) {
                           className="btn btn-outline btn-sm"
                           disabled={subiendoCert}
                           onClick={() => {
-                            // Usar el último avance del estudiante.
-                            // Se necesita obtener el ID del avance; lo pasamos vía la API.
-                            api.get(`/progress/students`, { params: { martialArtId: arte.id } })
-                              .then(async (res) => {
-                                // Buscar los avances del estudiante vía el historial.
-                                const histRes = await api.get(`/historial`, { params: { martialArtId: arte.id, studentUserId: f.studentUserId } });
-                                const eventos = histRes.data as { refId?: string; type: string }[];
-                                const ultimo = eventos.find((ev) => ev.type === 'avance_grado' && ev.refId);
+                            // El certificado se adjunta al ÚLTIMO avance del
+                            // estudiante: se busca su id en la bitácora.
+                            api.get(`/historial`, {
+                              params: {
+                                martialArtId: arte.id,
+                                studentUserId: f.studentUserId,
+                                type: 'avance_grado',
+                              },
+                            })
+                              .then((res) => {
+                                const eventos = res.data as { refId?: string }[];
+                                const ultimo = eventos.find((ev) => ev.refId);
                                 if (ultimo?.refId) {
                                   iniciarSubidaCert(ultimo.refId);
                                 } else {

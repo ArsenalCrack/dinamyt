@@ -17,6 +17,11 @@ import { notificar, estudiantesDe, maestrosDe } from '../lib/notify';
 import { registrarActividad } from '../lib/activity';
 
 const KINDS = ['cuestionario', 'tarea', 'actividad'] as const;
+
+/** Gracia sobre la fecha límite: si al estudiante se le cayó la conexión justo
+ *  al enviar, un reintento pocos minutos después del vencimiento aún entra.
+ *  La UI sigue mostrando «vencida» desde `dueAt` exacto. */
+const GRACIA_ENTREGA_MS = 5 * 60 * 1000;
 const ETIQUETA_KIND: Record<string, string> = {
   cuestionario: 'Cuestionario',
   tarea: 'Tarea',
@@ -224,23 +229,68 @@ export async function evaluationsRoutes(app: FastifyInstance) {
           .send({ error: 'Solo puedes crear evaluaciones en tus artes marciales.' });
       }
 
-      const [evaluacion] = await db
-        .insert(evaluations)
-        .values({
-          martialArtId: body.martialArtId,
-          gradeId: body.gradeId,
-          title: body.title.trim(),
-          description: body.description ?? null,
-          kind,
-          maxAttempts: body.maxAttempts ?? 1,
-          availableFrom: body.availableFrom ? new Date(body.availableFrom) : null,
-          dueAt: body.dueAt ? new Date(body.dueAt) : null,
-          mcWeight,
-          createdByUserId: req.user!.sub,
-        })
-        .returning();
+      // Todo o nada: si falla una pregunta, no queda una evaluación a medias.
+      const evaluacion = await db.transaction(async (tx) => {
+        const [cabecera] = await tx
+          .insert(evaluations)
+          .values({
+            martialArtId: body.martialArtId,
+            gradeId: body.gradeId,
+            title: body.title.trim(),
+            description: body.description ?? null,
+            kind,
+            maxAttempts: body.maxAttempts ?? 1,
+            availableFrom: body.availableFrom ? new Date(body.availableFrom) : null,
+            dueAt: body.dueAt ? new Date(body.dueAt) : null,
+            mcWeight,
+            createdByUserId: req.user!.sub,
+          })
+          .returning();
 
-      // Aviso a los estudiantes del grado: nueva tarea/cuestionario/actividad.
+        for (let i = 0; i < body.preguntas.length; i++) {
+          const p = body.preguntas[i];
+          const [pregunta] = await tx
+            .insert(questions)
+            .values({
+              evaluationId: cabecera.id,
+              type: p.type,
+              prompt: p.prompt.trim(),
+              points: p.points ?? 1,
+              orderIndex: i,
+            })
+            .returning();
+          if (p.type === 'opcion_multiple' && p.opciones) {
+            await tx.insert(questionOptions).values(
+              p.opciones.map((o, j) => ({
+                questionId: pregunta.id,
+                text: o.text,
+                isCorrect: !!o.isCorrect,
+                orderIndex: j,
+              })),
+            );
+          }
+          // Rúbrica de la evidencia: los puntos de la pregunta = suma de criterios.
+          if (p.type === 'evidencia' && p.criterios?.length) {
+            await tx.insert(questionCriteria).values(
+              p.criterios.map((c, j) => ({
+                questionId: pregunta.id,
+                label: c.label.trim(),
+                maxPoints: Math.max(1, c.maxPoints ?? 1),
+                orderIndex: j,
+              })),
+            );
+            const suma = p.criterios.reduce((s, c) => s + Math.max(1, c.maxPoints ?? 1), 0);
+            await tx
+              .update(questions)
+              .set({ points: suma })
+              .where(eq(questions.id, pregunta.id));
+          }
+        }
+        return cabecera;
+      });
+
+      // Aviso a los estudiantes del grado DESPUÉS de crear las preguntas: si
+      // algo falla arriba, nadie recibe un enlace a una evaluación a medias.
       await notificar(db, await estudiantesDe(db, body.martialArtId, body.gradeId), {
         type: 'tarea_nueva',
         title: `📝 ${ETIQUETA_KIND[kind]} nueva: ${evaluacion.title}`,
@@ -249,46 +299,6 @@ export async function evaluationsRoutes(app: FastifyInstance) {
           : null,
         link: `/evaluaciones/${evaluacion.id}`,
       });
-
-      for (let i = 0; i < body.preguntas.length; i++) {
-        const p = body.preguntas[i];
-        const [pregunta] = await db
-          .insert(questions)
-          .values({
-            evaluationId: evaluacion.id,
-            type: p.type,
-            prompt: p.prompt.trim(),
-            points: p.points ?? 1,
-            orderIndex: i,
-          })
-          .returning();
-        if (p.type === 'opcion_multiple' && p.opciones) {
-          await db.insert(questionOptions).values(
-            p.opciones.map((o, j) => ({
-              questionId: pregunta.id,
-              text: o.text,
-              isCorrect: !!o.isCorrect,
-              orderIndex: j,
-            })),
-          );
-        }
-        // Rúbrica de la evidencia: los puntos de la pregunta = suma de criterios.
-        if (p.type === 'evidencia' && p.criterios?.length) {
-          await db.insert(questionCriteria).values(
-            p.criterios.map((c, j) => ({
-              questionId: pregunta.id,
-              label: c.label.trim(),
-              maxPoints: Math.max(1, c.maxPoints ?? 1),
-              orderIndex: j,
-            })),
-          );
-          const suma = p.criterios.reduce((s, c) => s + Math.max(1, c.maxPoints ?? 1), 0);
-          await db
-            .update(questions)
-            .set({ points: suma })
-            .where(eq(questions.id, pregunta.id));
-        }
-      }
 
       const preguntas = await cargarPreguntas(db, evaluacion.id, false);
       return reply.code(201).send({ ...evaluacion, preguntas });
@@ -359,11 +369,15 @@ export async function evaluationsRoutes(app: FastifyInstance) {
       const [evaluacion] = await db
         .update(evaluations)
         .set({
-          ...(body.title !== undefined && { title: body.title.trim() }),
+          ...(typeof body.title === 'string' &&
+            body.title.trim() && { title: body.title.trim() }),
           ...(body.description !== undefined && { description: body.description }),
           ...(body.maxAttempts !== undefined && { maxAttempts: body.maxAttempts }),
           ...(body.availableFrom !== undefined && {
             availableFrom: body.availableFrom ? new Date(body.availableFrom) : null,
+          }),
+          ...(body.dueAt !== undefined && {
+            dueAt: body.dueAt ? new Date(body.dueAt) : null,
           }),
           ...(body.mcWeight !== undefined && { mcWeight: body.mcWeight }),
           updatedAt: new Date(),
@@ -425,7 +439,10 @@ export async function evaluationsRoutes(app: FastifyInstance) {
       if (evaluacion.availableFrom && new Date(evaluacion.availableFrom) > new Date()) {
         return reply.code(403).send({ error: 'La evaluación aún no está disponible.' });
       }
-      if (evaluacion.dueAt && new Date(evaluacion.dueAt) < new Date()) {
+      if (
+        evaluacion.dueAt &&
+        new Date(evaluacion.dueAt).getTime() + GRACIA_ENTREGA_MS < Date.now()
+      ) {
         return reply.code(403).send({ error: 'La fecha límite de entrega ya pasó.' });
       }
 
@@ -467,11 +484,17 @@ export async function evaluationsRoutes(app: FastifyInstance) {
         .reduce((s, p) => s + p.points, 0);
 
       const filasRespuesta: (typeof answers.$inferInsert)[] = [];
+      const respondidas = new Set<string>();
       for (const r of respuestas) {
         const p = porId.get(r.questionId);
         if (!p) {
           return reply.code(422).send({ error: 'Respuesta a una pregunta inexistente.' });
         }
+        // La restricción única (intento, pregunta) volvería esto un 500.
+        if (respondidas.has(p.id)) {
+          return reply.code(422).send({ error: 'Hay dos respuestas para la misma pregunta.' });
+        }
+        respondidas.add(p.id);
         if (p.type === 'opcion_multiple') {
           const opcion = p.opciones.find((o) => o.id === r.selectedOptionId);
           if (!opcion) {
@@ -504,25 +527,41 @@ export async function evaluationsRoutes(app: FastifyInstance) {
       // Sin evidencias, el intento queda calificado de inmediato.
       const final = hayEvidencias ? null : notaFinal(evaluacion.mcWeight, mcScore, null);
 
-      const [intento] = await db
-        .insert(attempts)
-        .values({
-          evaluationId: id,
-          studentUserId: req.user!.sub,
-          attemptNumber: previos.length + 1,
-          status: hayEvidencias ? 'ENVIADO' : 'CALIFICADO',
-          mcScore: mcScore === null ? null : mcScore.toFixed(2),
-          finalScore: final === null ? null : final.toFixed(2),
-          gradeNameSnapshot: mat.gradoActual.name,
-          submittedAt: new Date(),
-          gradedAt: hayEvidencias ? null : new Date(),
-        })
-        .returning();
-
-      if (filasRespuesta.length) {
-        await db
-          .insert(answers)
-          .values(filasRespuesta.map((f) => ({ ...f, attemptId: intento.id })));
+      // Intento + respuestas en una transacción: nunca queda un intento sin
+      // sus respuestas. El índice único (evaluación, estudiante, nº) frena dos
+      // envíos simultáneos; se responde amable en vez de un 500.
+      let intento: typeof attempts.$inferSelect;
+      try {
+        intento = await db.transaction(async (tx) => {
+          const [fila] = await tx
+            .insert(attempts)
+            .values({
+              evaluationId: id,
+              studentUserId: req.user!.sub,
+              attemptNumber: previos.length + 1,
+              status: hayEvidencias ? 'ENVIADO' : 'CALIFICADO',
+              mcScore: mcScore === null ? null : mcScore.toFixed(2),
+              finalScore: final === null ? null : final.toFixed(2),
+              gradeNameSnapshot: mat.gradoActual.name,
+              submittedAt: new Date(),
+              gradedAt: hayEvidencias ? null : new Date(),
+            })
+            .returning();
+          if (filasRespuesta.length) {
+            await tx
+              .insert(answers)
+              .values(filasRespuesta.map((f) => ({ ...f, attemptId: fila.id })));
+          }
+          return fila;
+        });
+      } catch (err) {
+        const e = err as { code?: string; message?: string };
+        if (e.code === '23505' || /duplicate key|unique/i.test(e.message ?? '')) {
+          return reply.code(409).send({
+            error: 'Esta entrega ya se estaba registrando. Revisa tus intentos antes de reenviar.',
+          });
+        }
+        throw err;
       }
 
       // Bitácora: entrega registrada con número de intento.

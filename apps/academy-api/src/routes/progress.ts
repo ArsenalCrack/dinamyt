@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import {
   martialArts,
   grades,
@@ -12,7 +12,7 @@ import {
   academyUsers,
 } from '@dinamyt/academy-db';
 import { requireAcademy, requireAuth } from '../plugins/auth';
-import { esMaestroDe } from '../lib/users';
+import { esMaestroDe, rolEfectivo } from '../lib/users';
 import { esUuid } from '../lib/enrollments';
 import { notificar } from '../lib/notify';
 import { registrarActividad } from '../lib/activity';
@@ -188,7 +188,7 @@ export async function progressRoutes(app: FastifyInstance) {
         const [u] = await db
           .select()
           .from(academyUsers)
-          .where(eq(academyUsers.email, body.email.trim().toLowerCase()))
+          .where(sql`lower(${academyUsers.email}) = ${body.email.trim().toLowerCase()}`)
           .limit(1);
         if (!u) {
           return reply.code(404).send({
@@ -203,8 +203,19 @@ export async function progressRoutes(app: FastifyInstance) {
       }
 
       let gradeId = body.gradeId ?? null;
-      if (gradeId && !esUuid(gradeId)) {
-        return reply.code(422).send({ error: 'gradeId inválido.' });
+      if (gradeId) {
+        if (!esUuid(gradeId)) {
+          return reply.code(422).send({ error: 'gradeId inválido.' });
+        }
+        // El grado inicial debe pertenecer a la misma arte marcial.
+        const [g] = await db
+          .select({ id: grades.id, martialArtId: grades.martialArtId })
+          .from(grades)
+          .where(eq(grades.id, gradeId))
+          .limit(1);
+        if (!g || g.martialArtId !== body.martialArtId) {
+          return reply.code(422).send({ error: 'El grado no pertenece a esa arte marcial.' });
+        }
       }
       if (!gradeId) {
         const [primero] = await db
@@ -306,25 +317,29 @@ export async function progressRoutes(app: FastifyInstance) {
         siguiente = g;
       }
 
-      // Historial inmutable: nombres snapshot al momento del avance.
-      const [avance] = await db
-        .insert(gradeAdvancements)
-        .values({
-          enrollmentId: matricula.id,
-          fromGradeId: gradoActual.id,
-          toGradeId: siguiente.id,
-          fromGradeName: gradoActual.name,
-          toGradeName: siguiente.name,
-          approvedByUserId: req.user!.sub,
-          approvedByName: req.user!.fullName ?? null,
-          notes: body.notes ?? null,
-        })
-        .returning();
-      const [actualizada] = await db
-        .update(enrollments)
-        .set({ currentGradeId: siguiente.id, updatedAt: new Date() })
-        .where(eq(enrollments.id, matricula.id))
-        .returning();
+      // Historial inmutable: nombres snapshot al momento del avance. El insert
+      // del historial y el cambio de grado van juntos o no van.
+      const { avance, actualizada } = await db.transaction(async (tx) => {
+        const [av] = await tx
+          .insert(gradeAdvancements)
+          .values({
+            enrollmentId: matricula.id,
+            fromGradeId: gradoActual.id,
+            toGradeId: siguiente.id,
+            fromGradeName: gradoActual.name,
+            toGradeName: siguiente.name,
+            approvedByUserId: req.user!.sub,
+            approvedByName: req.user!.fullName ?? null,
+            notes: body.notes ?? null,
+          })
+          .returning();
+        const [mat] = await tx
+          .update(enrollments)
+          .set({ currentGradeId: siguiente.id, updatedAt: new Date() })
+          .where(eq(enrollments.id, matricula.id))
+          .returning();
+        return { avance: av, actualizada: mat };
+      });
 
       // Bitácora del ascenso (queda en el historial del maestro).
       await registrarActividad(db, {
@@ -386,6 +401,30 @@ export async function progressRoutes(app: FastifyInstance) {
         .where(and(...condiciones))
         .orderBy(asc(grades.orderIndex));
 
+      // Las evaluaciones del arte y los intentos calificados son los mismos
+      // para todos: una sola consulta en vez de una por estudiante.
+      const evalsArte = await db
+        .select({ id: evaluations.id })
+        .from(evaluations)
+        .where(eq(evaluations.martialArtId, martialArtId));
+      const calificados =
+        evalsArte.length && mats.length
+          ? await db
+              .select({ studentUserId: attempts.studentUserId })
+              .from(attempts)
+              .where(
+                and(
+                  eq(attempts.status, 'CALIFICADO'),
+                  inArray(attempts.evaluationId, evalsArte.map((e) => e.id)),
+                  inArray(attempts.studentUserId, mats.map((m) => m.studentUserId)),
+                ),
+              )
+          : [];
+      const completadasPor = new Map<string, number>();
+      for (const c of calificados) {
+        completadasPor.set(c.studentUserId, (completadasPor.get(c.studentUserId) ?? 0) + 1);
+      }
+
       const filas = [];
       for (const m of mats) {
         const progreso = await progresoContenido(
@@ -394,22 +433,6 @@ export async function progressRoutes(app: FastifyInstance) {
           martialArtId,
           m.currentGradeId,
         );
-        const evalsArte = await db
-          .select({ id: evaluations.id })
-          .from(evaluations)
-          .where(eq(evaluations.martialArtId, martialArtId));
-        const completadas = evalsArte.length
-          ? await db
-              .select({ id: attempts.id })
-              .from(attempts)
-              .where(
-                and(
-                  eq(attempts.studentUserId, m.studentUserId),
-                  eq(attempts.status, 'CALIFICADO'),
-                  inArray(attempts.evaluationId, evalsArte.map((e) => e.id)),
-                ),
-              )
-          : [];
         const [ultimoAvance] = await db
           .select()
           .from(gradeAdvancements)
@@ -419,7 +442,7 @@ export async function progressRoutes(app: FastifyInstance) {
         filas.push({
           ...m,
           progresoContenido: progreso,
-          evaluacionesCompletadas: completadas.length,
+          evaluacionesCompletadas: completadasPor.get(m.studentUserId) ?? 0,
           ultimoAvance: ultimoAvance?.advancedAt ?? null,
         });
       }
@@ -465,12 +488,20 @@ export async function progressRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     if (!esUuid(id)) return reply.code(400).send({ error: 'Id inválido.' });
     const u = req.user!;
-    const esRolStaff = u.role_academy === 'teacher' || u.role_academy === 'admin';
-    if (!u.is_super_admin && u.sub !== id && !esRolStaff) {
-      return reply.code(403).send({ error: 'No puedes ver el resumen de otra persona.' });
-    }
-
     const db = req.server.db;
+    if (!u.is_super_admin && u.sub !== id) {
+      // Rol EFECTIVO (el rol local asignado por el admin prevalece sobre el
+      // token): un maestro promovido solo localmente también puede consultar.
+      const [local] = await db
+        .select({ localRole: academyUsers.localRole })
+        .from(academyUsers)
+        .where(eq(academyUsers.ecosystemUserId, u.sub))
+        .limit(1);
+      const rol = rolEfectivo(u, local ?? { localRole: null });
+      if (rol !== 'teacher' && rol !== 'admin') {
+        return reply.code(403).send({ error: 'No puedes ver el resumen de otra persona.' });
+      }
+    }
     const mats = await db
       .select()
       .from(enrollments)

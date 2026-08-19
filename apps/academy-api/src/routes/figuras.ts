@@ -12,7 +12,7 @@ import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
 import { notificar } from '../lib/notify';
 import { registrarActividad } from '../lib/activity';
-import { guardarArchivoSeguro, ErrorSubida } from '../lib/uploads';
+import { guardarArchivoSeguro, borrarArchivoSubido, ErrorSubida } from '../lib/uploads';
 import { config } from '../config';
 
 /** Lee un multipart: campos de texto + UN video validado por la capa de
@@ -49,19 +49,25 @@ export async function figurasRoutes(app: FastifyInstance) {
         if (err instanceof ErrorSubida) return reply.code(422).send({ error: err.message });
         throw err;
       }
+      // Si algo falla después de guardar el video, se borra (sin huérfanos).
+      const rechazar = async (codigo: number, error: string) => {
+        if (videoRel) await borrarArchivoSubido(videoRel);
+        return reply.code(codigo).send({ error });
+      };
+
       const { martialArtId, gradeId, name, description } = campos;
       if (!esUuid(martialArtId) || !esUuid(gradeId)) {
-        return reply.code(422).send({ error: 'martialArtId y gradeId son obligatorios.' });
+        return rechazar(422, 'martialArtId y gradeId son obligatorios.');
       }
       if (!name?.trim()) {
-        return reply.code(422).send({ error: 'La figura necesita un nombre.' });
+        return rechazar(422, 'La figura necesita un nombre.');
       }
       if (!videoRel) {
         return reply.code(422).send({ error: 'Adjunta el video de la figura (mp4/webm).' });
       }
       const db = req.server.db;
       if (!(await esMaestroDe(db, req.academy!.rol, req.user!.sub, martialArtId))) {
-        return reply.code(403).send({ error: 'No tienes asignada esta arte marcial.' });
+        return rechazar(403, 'No tienes asignada esta arte marcial.');
       }
       const [grado] = await db
         .select()
@@ -69,7 +75,7 @@ export async function figurasRoutes(app: FastifyInstance) {
         .where(eq(grades.id, gradeId))
         .limit(1);
       if (!grado || grado.martialArtId !== martialArtId) {
-        return reply.code(422).send({ error: 'El grado no pertenece a esa arte marcial.' });
+        return rechazar(422, 'El grado no pertenece a esa arte marcial.');
       }
 
       // Extraer pose/ángulos de la referencia (una sola vez, se reutilizan).
@@ -83,10 +89,11 @@ export async function figurasRoutes(app: FastifyInstance) {
         detectionRate = r.detectionRate;
       } catch (err) {
         req.log?.error?.(err);
-        return reply.code(502).send({
-          error:
-            'El servicio de figuras no pudo procesar el video de referencia. ¿Está corriendo academy-figuras (:3009)?',
-        });
+        await borrarArchivoSubido(anglesRel);
+        return rechazar(
+          502,
+          'El servicio de figuras no pudo procesar el video de referencia. ¿Está corriendo academy-figuras (:3009)?',
+        );
       }
 
       const [figura] = await db
@@ -233,6 +240,7 @@ export async function figurasRoutes(app: FastifyInstance) {
             referenceVideoPath: join(config.uploadsDir, fig.videoPath),
             referenceAnglesPath: join(config.uploadsDir, fig.anglesPath ?? ''),
             outDir: join(config.uploadsDir, outDir),
+            baseDir: config.uploadsDir,
           });
           await db
             .update(figureAttempts)

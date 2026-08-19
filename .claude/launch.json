@@ -2,6 +2,27 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "//": "Producto INDEPENDIENTE en D:/Repositorios/dinamyt-membresias. Nada que ver con apps/membresias-* de este monorepo: --dir hace que pnpm resuelva el workspace del otro repositorio.",
+      "name": "standalone-membresias-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "D:/Repositorios/dinamyt-membresias/apps/membresias-api",
+        "dev"
+      ],
+      "port": 3004
+    },
+    {
+      "name": "standalone-membresias-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "D:/Repositorios/dinamyt-membresias/apps/membresias-web",
+        "dev"
+      ],
+      "port": 3006
+    },
+    {
       "name": "ecosystem-api",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dinamyt/ecosystem-api", "start:dev"],
@@ -17,6 +38,12 @@
       "name": "campeonatos-web",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dinamyt/campeonatos-web", "dev"],
+      "port": 3003
+    },
+    {
+      "name": "campeonatos-web-local",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@dinamyt/campeonatos-web-local", "dev"],
       "port": 3003
     },
     {

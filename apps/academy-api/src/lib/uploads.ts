@@ -136,3 +136,10 @@ export async function guardarArchivoSeguro(
 
   return { rel, clase, ext };
 }
+
+/** Borra (best-effort) un archivo ya guardado en el almacén. Se usa cuando una
+ *  validación POSTERIOR a la subida falla: sin esto el archivo queda huérfano
+ *  en disco para siempre. */
+export async function borrarArchivoSubido(rel: string): Promise<void> {
+  await unlink(join(config.uploadsDir, rel)).catch(() => undefined);
+}

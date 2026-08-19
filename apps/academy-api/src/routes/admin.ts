@@ -20,15 +20,17 @@ const ROLES = ['admin', 'teacher', 'student'] as const;
 /** Administración de Academy (RF-ACA-26..28). */
 export async function adminRoutes(app: FastifyInstance) {
   // ── GET /admin/users — usuarios locales (RF-ACA-26) ───────────────────────
+  // Con ?incluirEliminados=1 también lista los soft-deleted (para restaurar).
   app.get(
     '/admin/users',
     { preHandler: requireAcademy(['admin']) },
     async (req) => {
+      const { incluirEliminados } = req.query as { incluirEliminados?: string };
       const db = req.server.db;
       const usuarios = await db
         .select()
         .from(academyUsers)
-        .where(isNull(academyUsers.deletedAt))
+        .where(incluirEliminados === '1' ? undefined : isNull(academyUsers.deletedAt))
         .orderBy(asc(academyUsers.createdAt));
       const mats = await db
         .select({
@@ -57,6 +59,7 @@ export async function adminRoutes(app: FastifyInstance) {
         localRole?: (typeof ROLES)[number] | null;
         suspended?: boolean;
         eliminar?: boolean;
+        restaurar?: boolean;
       };
       if (
         body.localRole !== undefined &&
@@ -66,17 +69,35 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.code(422).send({ error: 'Rol local inválido.' });
       }
       const db = req.server.db;
+
+      const [objetivo] = await db
+        .select({ ecosystemUserId: academyUsers.ecosystemUserId })
+        .from(academyUsers)
+        .where(eq(academyUsers.id, id))
+        .limit(1);
+      if (!objetivo) return reply.code(404).send({ error: 'Usuario no encontrado.' });
+      // Un admin no puede dejarse a sí mismo fuera de Academy.
+      if (
+        objetivo.ecosystemUserId === req.user!.sub &&
+        (body.suspended === true || body.eliminar)
+      ) {
+        return reply
+          .code(422)
+          .send({ error: 'No puedes suspenderte ni eliminarte a ti mismo.' });
+      }
+
       const [usuario] = await db
         .update(academyUsers)
         .set({
           ...(body.localRole !== undefined && { localRole: body.localRole }),
           ...(body.suspended !== undefined && { suspended: body.suspended }),
           ...(body.eliminar && { deletedAt: new Date() }),
+          // Restaurar revierte el soft delete (y la suspensión).
+          ...(body.restaurar && { deletedAt: null, suspended: false }),
           updatedAt: new Date(),
         })
         .where(eq(academyUsers.id, id))
         .returning();
-      if (!usuario) return reply.code(404).send({ error: 'Usuario no encontrado.' });
       return usuario;
     },
   );
