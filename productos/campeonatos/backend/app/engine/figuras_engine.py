@@ -1,0 +1,573 @@
+"""
+Motor de Figuras v2 — Sistema de puntuacion multi-competidor.
+
+Cambios v2:
+- Cada juez puntua UN SOLO criterio (J1=criterio[0], J2=criterio[1], etc.)
+- Nota unica de 0.00 a 9.99 con 2 decimales
+- El total del competidor es la SUMA de las notas de todos los jueces
+- El Juez Central activa/desactiva la puntuacion por competidor
+- Puntuaciones confirmadas son inmutables
+- Nombre de categoria personalizable
+"""
+import copy
+import re
+import time
+
+
+CRITERIOS_DEFAULT = [
+    {"id": "tecnica", "nombre": "Técnica", "max_pts": 9.99},
+    {"id": "fuerza", "nombre": "Fuerza / Potencia", "max_pts": 9.99},
+    {"id": "equilibrio", "nombre": "Equilibrio", "max_pts": 9.99},
+    {"id": "presentacion", "nombre": "Presentación", "max_pts": 9.99},
+]
+
+# Mapeo fijo juez → índice de criterio (máximo 4 jueces de esquina)
+JUEZ_CRITERIO_MAP = {
+    "j1": 0,
+    "j2": 1,
+    "j3": 2,
+    "j4": 3,
+}
+
+CATEGORIA_NOMBRE_MAX = 40
+CATEGORIA_NOMBRE_RE = re.compile(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+$")
+
+
+def _normalizar_nombre_categoria(nombre):
+    raw = str(nombre or "")
+    limpio = re.sub(r"[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]", "", raw)
+    # Colapsar espacios y unificar en MAYÚSCULAS para que "Defensa" y
+    # "defensa" no aparezcan como categorías distintas en el registro.
+    limpio = re.sub(r"\s+", " ", limpio).strip().upper()
+    return limpio[:CATEGORIA_NOMBRE_MAX]
+
+
+def nombre_categoria_valido(nombre):
+    valor = str(nombre or "").strip()
+    return bool(valor and CATEGORIA_NOMBRE_RE.fullmatch(valor))
+
+
+def criterio_para_juez(estado, juez_id):
+    """Retorna el criterio asignado a un juez según su posición."""
+    idx = JUEZ_CRITERIO_MAP.get(juez_id)
+    if idx is None:
+        return None
+    criterios = estado.get("criterios", CRITERIOS_DEFAULT)
+    if idx < len(criterios):
+        return criterios[idx]
+    return None
+
+
+def estado_inicial_figuras(config=None):
+    """Retorna el estado inicial de una sesion de Figuras v2."""
+    criterios = list(CRITERIOS_DEFAULT)
+    if config and config.get("criterios"):
+        criterios = config["criterios"]
+
+    return {
+        "tipo": "figuras",
+        # Configuración
+        "criterios": criterios,
+        "num_jueces": 4,
+        # Nombre personalizable de la categoría
+        "nombre_categoria": "Figuras",
+        # Descripción pública (ej: "Intermedios 15-17 años"). Solo informativa.
+        "descripcion": "",
+        "nombres_jueces": {"j1": "", "j2": "", "j3": "", "j4": ""},
+        # Competidores
+        "competidores": [],       # [{id, nombre, club}]
+        # Puntuaciones: { comp_id: { juez_id: valor_float } }
+        "puntuaciones": {},
+        # Confirmaciones: { comp_id: { juez_id: True } }
+        "puntuaciones_confirmadas": {},
+        # Control de turno (Juez Central)
+        "competidor_activo_id": None,   # ID del competidor en turno
+        "puntuacion_abierta": False,    # True = jueces pueden puntuar
+        # Estado final
+        "finalizado": False,
+        # Constancia de reevaluaciones por empate (para reportes)
+        "desempates": [],
+        # IDs en presentación de desempate: solo ellos se pueden activar
+        "en_desempate": [],
+        "log": [],
+}
+
+
+def _agregar_log_f(estado, txt, color="info"):
+    estado["log"].insert(0, {"txt": txt, "color": color, "ts": int(time.time() * 1000)})
+    # Registro completo de la categoría (se limpia al guardar / resetear);
+    # el tope alto es solo un seguro de memoria/payload.
+    if len(estado["log"]) > 300:
+        estado["log"] = estado["log"][:300]
+
+
+def _jueces_activos_figuras(estado):
+    jueces = []
+    for i in range(1, int(estado.get("num_jueces", 4)) + 1):
+        juez_id = f"j{i}"
+        if criterio_para_juez(estado, juez_id):
+            jueces.append(juez_id)
+    return jueces
+
+
+def _competidor_completo(estado, comp_id):
+    """True si todos los jueces activos ya confirmaron su nota."""
+    jueces = _jueces_activos_figuras(estado)
+    if not jueces:
+        return False
+    confirmadas = estado.get("puntuaciones_confirmadas", {}).get(str(comp_id), {})
+    return all(confirmadas.get(j) for j in jueces)
+
+
+def puntuaciones_completas(estado):
+    if not estado.get("competidores"):
+        return False
+    return all(
+        _competidor_completo(estado, comp["id"])
+        for comp in estado["competidores"]
+    )
+
+
+def _juez_meta_evento(ev, juez_fallback):
+    return {
+        "nombre": ev.get("juez_nombre") or juez_fallback,
+        "email": ev.get("juez_email") or "",
+        "asignacion": ev.get("juez_asignacion") or juez_fallback,
+        "rol": ev.get("juez_rol") or juez_fallback,
+        "acceso": ev.get("juez_acceso") or "",
+    }
+
+
+def _juez_log_label(ev, juez_fallback):
+    meta = _juez_meta_evento(ev, juez_fallback)
+    base = f"{meta['asignacion']}: {meta['nombre']}"
+    return f"{base} <{meta['email']}>" if meta["email"] else base
+
+
+def calcular_total_competidor(estado, competidor_id):
+    """
+    Total = suma de las notas de los JUECES ACTIVOS para ese competidor.
+    Cada juez activo aporta un solo número. Las notas de un juez fuera de la
+    configuración (ej: j3 con la categoría a 2 jueces) NO cuentan en el total,
+    aunque hayan quedado registradas antes de bajar el número de jueces.
+    """
+    puntajes = estado["puntuaciones"].get(str(competidor_id), {})
+    if not puntajes:
+        return 0.0
+    activos = _jueces_activos_figuras(estado)
+    return round(sum(puntajes.get(j, 0) for j in activos), 2)
+
+
+def _ordenar_con_puestos(estado, comps, todos_primer_puesto=False):
+    """
+    Ordena por total. Un empate de totales es un empate REAL: comparten
+    puesto (1, 2, 2, 4) y quedan marcados con empate=True. La resolución
+    es una presentación de desempate (acción reevaluar_empate), no un
+    criterio automático.
+
+    Con todos_primer_puesto=True (categoría especial), TODOS reciben el
+    puesto 1 sin importar su puntuación y nunca quedan en empate.
+    """
+    items = []
+    for comp in comps:
+        cid = str(comp["id"])
+        total = calcular_total_competidor(estado, cid)
+        items.append({**comp, "total": total})
+
+    items.sort(key=lambda x: x["total"], reverse=True)
+
+    if todos_primer_puesto:
+        for item in items:
+            item["puesto"] = 1
+            item["empate"] = False
+        return items
+
+    # Puestos con ranking estándar de competencia: los empatados comparten
+    # puesto y el siguiente se salta (dos terceros puestos → no hay cuarto).
+    prev_total = None
+    puesto = 0
+    for idx, item in enumerate(items):
+        if prev_total is None or item["total"] != prev_total:
+            puesto = idx + 1
+        item["puesto"] = puesto
+        prev_total = item["total"]
+
+    # Un empate solo cuenta cuando TODOS los del grupo ya tienen sus
+    # puntuaciones completas: dos competidores sin calificar (0.00) o a
+    # medias no están "empatados", simplemente les falta puntuar.
+    grupos = {}
+    for item in items:
+        grupos.setdefault(item["puesto"], []).append(item)
+    for grupo in grupos.values():
+        es_empate = len(grupo) > 1 and all(
+            _competidor_completo(estado, g["id"]) for g in grupo
+        )
+        for g in grupo:
+            g["empate"] = es_empate
+    return items
+
+
+def calcular_ranking(estado):
+    """
+    Ranking completo:
+    - TODOS los competidores de categoría especial reciben el puesto 1 sin
+      importar su puntuación, sin desplazar el podio normal: comparten el
+      primer puesto con el 1° normal.
+    - El resto compite en el podio normal; los empates reales se resuelven
+      con presentación de desempate.
+    """
+    especiales = [c for c in estado["competidores"] if c.get("especial")]
+    normales = [c for c in estado["competidores"] if not c.get("especial")]
+    ranking_especial = _ordenar_con_puestos(estado, especiales, todos_primer_puesto=True)
+    for item in ranking_especial:
+        item["especial"] = True
+    return ranking_especial + _ordenar_con_puestos(estado, normales)
+
+
+def empates_en_ranking(ranking):
+    """Agrupa los empates reales por puesto (para logs y avisos)."""
+    grupos = {}
+    for item in ranking:
+        if item.get("empate"):
+            clave = ("especial" if item.get("especial") else "normal", item["puesto"])
+            grupos.setdefault(clave, []).append(item["nombre"])
+    return grupos
+
+
+def _parse_puntuacion(valor):
+    """
+    Valida puntuaciones con dos decimales obligatorios: 0.00 a 9.99.
+    El valor puede llegar como string desde el cliente o como numero legacy.
+    """
+    raw = str(valor).strip().replace(",", ".")
+    if not re.fullmatch(r"\d\.\d{2}", raw):
+        return None
+    numero = float(raw)
+    if numero < 0 or numero > 9.99:
+        return None
+    return round(numero, 2)
+
+
+def aplicar_evento_figuras(estado, ev):
+    """Aplica un evento al estado de Figuras v2."""
+    accion = ev.get("accion")
+
+    # ── Nombre de categoría ──────────────────────────────────────────────────
+    if accion == "cambiar_nombre_categoria":
+        estado["nombre_categoria"] = _normalizar_nombre_categoria(ev.get("nombre", ""))
+
+    # ── Descripción pública (admite números: "Intermedios 15-17 años") ───────
+    elif accion == "cambiar_descripcion":
+        estado["descripcion"] = str(ev.get("descripcion", "")).strip()[:120]
+
+    # ── Número de jueces (máximo 4 de esquina) ──────────────────────────────
+    elif accion == "set_num_jueces":
+        # Coerción defensiva: un payload no numérico no debe tumbar el handler
+        try:
+            n = int(ev.get("num_jueces", 4))
+        except (TypeError, ValueError):
+            n = estado.get("num_jueces", 4)
+        estado["num_jueces"] = max(2, min(4, n))
+
+    # ── Competidores ─────────────────────────────────────────────────────────
+    elif accion == "agregar_competidor":
+        nombre = str(ev.get("nombre", "Competidor")).strip()[:60]
+        club = str(ev.get("club", "")).strip()[:60]
+        especial = bool(ev.get("especial"))
+        if not nombre:
+            return estado
+        if len(estado["competidores"]) >= 50:
+            return estado
+        max_id = max((c["id"] for c in estado["competidores"]), default=0)
+        nuevo_id = max_id + 1
+        estado["competidores"].append({
+            "id": nuevo_id,
+            "nombre": nombre,
+            "club": club,
+            "especial": especial,
+        })
+        estado["puntuaciones"][str(nuevo_id)] = {}
+        estado["puntuaciones_confirmadas"][str(nuevo_id)] = {}
+        # Un competidor nuevo aún no tiene notas: si la categoría ya estaba
+        # finalizada, el podio deja de ser válido hasta calificarlo.
+        estado["finalizado"] = False
+        etiqueta = " (Categoría Especial)" if especial else ""
+        _agregar_log_f(estado, f"[+] {nombre}{etiqueta}", "info")
+
+    elif accion == "eliminar_competidor":
+        cid = ev.get("competidor_id")
+        estado["competidores"] = [
+            c for c in estado["competidores"] if str(c["id"]) != str(cid)
+        ]
+        estado["puntuaciones"].pop(str(cid), None)
+        estado["puntuaciones_confirmadas"].pop(str(cid), None)
+        if str(estado.get("competidor_activo_id")) == str(cid):
+            estado["competidor_activo_id"] = None
+            estado["puntuacion_abierta"] = False
+        # Si estaba en un desempate, sale de la lista: sin esta limpieza el
+        # turno quedaba bloqueado para siempre ("solo los empatados pueden
+        # presentarse") apuntando a un competidor que ya no existe.
+        estado["en_desempate"] = [
+            i for i in (estado.get("en_desempate") or []) if str(i) != str(cid)
+        ]
+        _agregar_log_f(estado, "[-] Competidor eliminado", "info")
+        # Al quitarlo puede que los restantes ya estén todos calificados:
+        # se habilita el podio igual que al confirmar la última nota.
+        if not estado.get("finalizado") and puntuaciones_completas(estado):
+            estado["finalizado"] = True
+            estado["puntuacion_abierta"] = False
+            estado["en_desempate"] = []
+            _agregar_log_f(estado, "[PODIO] Puntuaciones completas — Podio habilitado", "arb")
+
+    # ── Control de turno (Juez Central) ─────────────────────────────────────
+    elif accion == "activar_competidor":
+        comp_id = ev.get("competidor_id")
+        # Verificar que existe
+        comp = next(
+            (c for c in estado["competidores"] if str(c["id"]) == str(comp_id)),
+            None
+        )
+        if comp:
+            # Durante una presentación de desempate solo se pueden activar
+            # los competidores empatados.
+            en_desempate = estado.get("en_desempate") or []
+            if en_desempate and comp["id"] not in en_desempate:
+                _agregar_log_f(
+                    estado,
+                    "[TURNO] Bloqueado: desempate en curso — solo los empatados pueden presentarse",
+                    "arb",
+                )
+                return estado
+            # Un competidor ya calificado por completo no se vuelve a activar
+            # (sus notas son inmutables; para repetir está el desempate).
+            if _competidor_completo(estado, comp["id"]):
+                _agregar_log_f(
+                    estado,
+                    f"[TURNO] Bloqueado: {comp['nombre']} ya fue calificado por completo",
+                    "arb",
+                )
+                return estado
+            # No se puede pasar a otro competidor si al activo le falta
+            # alguna puntuación por confirmar.
+            activo_id = estado.get("competidor_activo_id")
+            if activo_id is not None and str(activo_id) != str(comp["id"]):
+                jueces = _jueces_activos_figuras(estado)
+                confirmadas = estado.get("puntuaciones_confirmadas", {}).get(
+                    str(activo_id), {}
+                )
+                if jueces and not all(confirmadas.get(j) for j in jueces):
+                    _agregar_log_f(
+                        estado,
+                        "[TURNO] Bloqueado: el competidor en turno tiene puntuaciones pendientes",
+                        "arb",
+                    )
+                    return estado
+            estado["competidor_activo_id"] = comp["id"]
+            estado["puntuacion_abierta"] = True
+            _agregar_log_f(estado, f"[TURNO] {comp['nombre']}", "arb")
+
+    elif accion == "cerrar_puntuacion":
+        estado["puntuacion_abierta"] = False
+        _agregar_log_f(estado, "[CERRADO] Puntuación cerrada", "arb")
+
+    # ── Puntuación (un solo valor por juez por competidor) ───────────────────
+    elif accion == "puntuar":
+        juez_id = ev.get("juez_id")
+        comp_id = str(ev.get("competidor_id", ""))
+        valor = ev.get("valor", "")
+
+        # Validar apertura
+        if not estado.get("puntuacion_abierta"):
+            return estado
+
+        # Solo el competidor activo
+        if str(estado.get("competidor_activo_id", "")) != comp_id:
+            return estado
+
+        # No si ya fue confirmada
+        confirmadas = estado.get("puntuaciones_confirmadas", {})
+        if confirmadas.get(comp_id, {}).get(juez_id):
+            return estado
+
+        # Solo puntúan los jueces activos según num_jueces: un juez de más
+        # asignado al tatami (ej: j3 con la categoría a 2 jueces) no puntúa,
+        # para que su nota no se sume al total del competidor.
+        if juez_id not in _jueces_activos_figuras(estado):
+            return estado
+
+        # Validar y formatear valor (0.00 - 9.99, 2 decimales obligatorios)
+        valor = _parse_puntuacion(valor)
+        if valor is None:
+            return estado
+
+        if comp_id not in estado["puntuaciones"]:
+            estado["puntuaciones"][comp_id] = {}
+        estado["puntuaciones"][comp_id][juez_id] = valor
+
+        # Log
+        comp_nombre = next(
+            (c["nombre"] for c in estado["competidores"] if str(c["id"]) == comp_id),
+            comp_id
+        )
+        criterio = criterio_para_juez(estado, juez_id)
+        crit_nombre = criterio["nombre"] if criterio else juez_id
+        _agregar_log_f(
+            estado,
+            f"[{juez_id}] {comp_nombre}: {valor:.2f} ({crit_nombre}) · {_juez_log_label(ev, juez_id)}",
+            "info",
+        )
+
+    # ── Confirmar puntuación (inmutable después de esto) ─────────────────────
+    elif accion == "confirmar_puntuacion":
+        juez_id = ev.get("juez_id")
+        comp_id = str(ev.get("competidor_id", ""))
+
+        # Solo confirman los jueces activos según num_jueces (mismo criterio
+        # que puntuar): un juez de más no debe cerrar ninguna nota.
+        if juez_id not in _jueces_activos_figuras(estado):
+            return estado
+
+        # Solo se confirma durante la ventana abierta para el competidor activo.
+        if not estado.get("puntuacion_abierta"):
+            return estado
+        if str(estado.get("competidor_activo_id", "")) != comp_id:
+            return estado
+
+        # Solo si tiene puntuación registrada
+        if estado["puntuaciones"].get(comp_id, {}).get(juez_id) is None:
+            return estado
+
+        if comp_id not in estado["puntuaciones_confirmadas"]:
+            estado["puntuaciones_confirmadas"][comp_id] = {}
+        estado["puntuaciones_confirmadas"][comp_id][juez_id] = True
+
+        valor = estado["puntuaciones"][comp_id][juez_id]
+        comp_nombre = next(
+            (c["nombre"] for c in estado["competidores"] if str(c["id"]) == comp_id),
+            comp_id
+        )
+        _agregar_log_f(
+            estado,
+            f"[✓] {comp_nombre} = {valor:.2f} CONFIRMADO · {_juez_log_label(ev, juez_id)}",
+            "info",
+        )
+        # Podio automático: al confirmar la última puntuación pendiente
+        # se finaliza la categoría y el podio aparece en pantalla.
+        if puntuaciones_completas(estado):
+            estado["finalizado"] = True
+            estado["puntuacion_abierta"] = False
+            estado["en_desempate"] = []  # el desempate terminó
+            _agregar_log_f(estado, "[PODIO] Puntuaciones completas — Podio habilitado", "arb")
+            for (ambito, puesto), nombres in empates_en_ranking(calcular_ranking(estado)).items():
+                etiqueta = " (Especial)" if ambito == "especial" else ""
+                _agregar_log_f(
+                    estado,
+                    f"[PODIO] Empate real en el puesto {puesto}{etiqueta}: {' y '.join(nombres)} — comparten el puesto",
+                    "arb",
+                )
+
+    # ── Nombre de juez ───────────────────────────────────────────────────────
+    elif accion == "set_nombre_juez":
+        juez_id = ev.get("juez_id")
+        nombre = ev.get("nombre", "")
+        if juez_id and "nombres_jueces" in estado:
+            estado["nombres_jueces"][juez_id] = nombre
+
+    # ── Finalizar sesión ─────────────────────────────────────────────────────
+    elif accion == "finalizar":
+        # El podio solo se muestra cuando todos los competidores pasaron y
+        # fueron calificados en todos sus criterios.
+        if not puntuaciones_completas(estado):
+            _agregar_log_f(
+                estado,
+                "[PODIO] Bloqueado: faltan competidores o criterios por calificar",
+                "arb",
+            )
+            return estado
+        estado["finalizado"] = True
+        estado["puntuacion_abierta"] = False
+        ranking = calcular_ranking(estado)
+        for item in ranking:
+            if item.get("especial") and item["puesto"] == 1:
+                _agregar_log_f(
+                    estado,
+                    f"[1° Especial] {item['nombre']} — {item['total']} pts",
+                    "info",
+                )
+        ganador = next((r for r in ranking if not r.get("especial")), None)
+        if ganador:
+            _agregar_log_f(
+                estado,
+                f"[1°] {ganador['nombre']} — {ganador['total']} pts",
+                "info"
+            )
+
+    # ── Desempate: reevaluación de los empatados (solo podio normal) ────────
+    elif accion == "reevaluar_empate":
+        # Solo cuando ya terminaron de puntuar y hay un empate real
+        if not (estado.get("finalizado") or puntuaciones_completas(estado)):
+            return estado
+        ranking = calcular_ranking(estado)
+        empatados = [r for r in ranking if r.get("empate") and not r.get("especial")]
+        if not empatados:
+            return estado
+        nombres = [r["nombre"] for r in empatados]
+        # Limpiar SOLO las notas de los empatados: los jueces de esquina
+        # los vuelven a evaluar; la categoría especial no se toca.
+        for r in empatados:
+            cid = str(r["id"])
+            estado["puntuaciones"][cid] = {}
+            estado["puntuaciones_confirmadas"][cid] = {}
+        # El podio se oculta mientras dura el desempate (deja de estar completo)
+        estado["finalizado"] = False
+        estado["puntuacion_abierta"] = False
+        estado["competidor_activo_id"] = None
+        # Solo los empatados se pueden activar hasta resolver el desempate
+        estado["en_desempate"] = [r["id"] for r in empatados]
+        estado.setdefault("desempates", []).append({
+            "nombres": nombres,
+            "ts": int(time.time() * 1000),
+        })
+        _agregar_log_f(
+            estado,
+            f"[DESEMPATE] Reevaluación de: {', '.join(nombres)} — notas limpiadas, el podio vuelve al completar",
+            "arb",
+        )
+
+    # ── Reset ────────────────────────────────────────────────────────────────
+    elif accion in ("reset_figuras", "reset"):
+        config = ev.get("config") if accion == "reset_figuras" else None
+        nombre_cat = estado.get("nombre_categoria", "Figuras")
+        num_j = estado.get("num_jueces", 4)
+        criterios = estado.get("criterios", CRITERIOS_DEFAULT)
+        nuevo = estado_inicial_figuras(config)
+        nuevo["nombre_categoria"] = nombre_cat
+        nuevo["num_jueces"] = num_j
+        if not config:
+            nuevo["criterios"] = criterios
+        estado.update(nuevo)
+        estado.pop("podio_modo", None)
+
+    return estado
+
+
+def guardar_figuras_snapshot(estado):
+    """Snapshot para persistir en DB."""
+    ranking = calcular_ranking(estado)
+    return {
+        "tipo": "figuras",
+        "nombre_categoria": estado.get("nombre_categoria", "Figuras"),
+        "descripcion": estado.get("descripcion", ""),
+        "competidores": copy.deepcopy(estado["competidores"]),
+        "criterios": copy.deepcopy(estado["criterios"]),
+        "puntuaciones": copy.deepcopy(estado["puntuaciones"]),
+        "puntuaciones_confirmadas": copy.deepcopy(
+            estado.get("puntuaciones_confirmadas", {})
+        ),
+        "ranking": ranking,
+        "num_jueces": estado["num_jueces"],
+        "desempates": copy.deepcopy(estado.get("desempates", [])),
+        "puntuaciones_completas": puntuaciones_completas(estado),
+        "finalizado": estado["finalizado"],
+        "log": copy.deepcopy(estado.get("log", [])),
+    }

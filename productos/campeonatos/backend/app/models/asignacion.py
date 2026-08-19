@@ -1,0 +1,108 @@
+"""
+Modelos: AsignacionJuez y AccesoTatami
+
+AsignacionJuez — Admin asigna un juez a un tatami con un rol específico.
+AccesoTatami — Auditoría: quién entró, cuándo, con qué IP, a qué tatami.
+"""
+
+from datetime import datetime, timezone
+from ..extensions import db
+from ..timeutil import iso_utc
+from ..uid import nuevo_uid
+
+
+class AsignacionJuez(db.Model):
+    __tablename__ = "asignaciones_juez"
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Identidad estable entre instancias (local ↔ online). Ver app/uid.py.
+    uid = db.Column(db.String(32), nullable=True, index=True, default=nuevo_uid)
+    usuario_id = db.Column(
+        db.Integer, db.ForeignKey("usuarios.id"), nullable=False, index=True
+    )
+    tatami_id = db.Column(
+        db.Integer, db.ForeignKey("tatamis.id"), nullable=False, index=True
+    )
+    rol_tatami = db.Column(
+        db.Enum("arbitro", "j1", "j2", "j3", "j4", "j5", "j6", "j7", name="rol_tatami"),
+        nullable=False,
+    )
+    nombre_display = db.Column(db.String(150), nullable=True)
+    asignado_por_id = db.Column(
+        db.Integer, db.ForeignKey("usuarios.id"), nullable=True, index=True
+    )
+    asignado_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    # Constraint: un usuario solo puede tener un rol por tatami
+    __table_args__ = (
+        db.UniqueConstraint(
+            "usuario_id", "tatami_id", name="uq_asignacion_usuario_tatami"
+        ),
+    )
+
+    def to_dict(self, include_usuario=True):
+        return {
+            "id": self.id,
+            "usuario_id": self.usuario_id,
+            "tatami_id": self.tatami_id,
+            "rol_tatami": self.rol_tatami,
+            "nombre_display": self.nombre_display,
+            "asignado_por_id": self.asignado_por_id,
+            "asignado_at": iso_utc(self.asignado_at),
+            "usuario": (
+                self.usuario.to_dict() if include_usuario and self.usuario else None
+            ),
+            "asignado_por": (
+                {
+                    "id": self.asignado_por.id,
+                    "nombre": self.asignado_por.nombre,
+                    "email": self.asignado_por.email,
+                }
+                if self.asignado_por else None
+            ),
+        }
+
+    def __repr__(self):
+        return f"<AsignacionJuez User:{self.usuario_id} Tatami:{self.tatami_id} Rol:{self.rol_tatami}>"
+
+
+class AccesoTatami(db.Model):
+    __tablename__ = "accesos_tatami"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tatami_id = db.Column(
+        db.Integer, db.ForeignKey("tatamis.id"), nullable=False, index=True
+    )
+    usuario_id = db.Column(
+        db.Integer, db.ForeignKey("usuarios.id"), nullable=True
+    )
+    nombre_visitante = db.Column(db.String(150), nullable=True)
+    rol_seleccionado = db.Column(db.String(50), nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    acceso_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tatami_id": self.tatami_id,
+            "usuario_id": self.usuario_id,
+            "usuario": (
+                {
+                    "id": self.usuario.id,
+                    "nombre": self.usuario.nombre,
+                    "email": self.usuario.email,
+                }
+                if self.usuario else None
+            ),
+            "nombre_visitante": self.nombre_visitante,
+            "rol_seleccionado": self.rol_seleccionado,
+            "ip_address": self.ip_address,
+            "acceso_at": iso_utc(self.acceso_at),
+        }
+
+    def __repr__(self):
+        return f"<AccesoTatami Tatami:{self.tatami_id} IP:{self.ip_address}>"

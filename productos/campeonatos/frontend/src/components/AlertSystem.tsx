@@ -1,0 +1,875 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Logo from "@/components/Logo";
+import { useI18n } from "@/lib/i18n";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+export interface FlashData {
+  ico: string;
+  txt: string;
+}
+
+export interface FaltaFlashData {
+  ico: string;
+  titulo: string;
+  sub: string;
+  tipo: "adv" | "falta" | "especial";
+}
+
+export interface GanadorData {
+  nombre: string;
+  color: "hong" | "chung";
+  motivo?: string;
+}
+
+export interface Alerta12Data {
+  hong: string;
+  chung: string;
+  lider: string;
+  diferencia?: string;
+  motivo?: string;
+  /** Nombre del competidor que lidera (para el botón de ganador del JC) */
+  liderNombre?: string;
+}
+
+export interface DerrotaData {
+  perdedor: string;
+  razon: string;
+}
+
+export interface ConfirmData {
+  titulo: string;
+  mensaje: string;
+  onConfirm: () => void;
+  onCancel?: () => void;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  solo_ok?: boolean; // Solo botón "Entendido"
+  tipo?: "peligro" | "advertencia" | "info";
+}
+
+// ─── Hook para AlertSystem ───────────────────────────────────────────────────
+interface AlertState {
+  flash?: FlashData;
+  faltaFlash?: FaltaFlashData;
+  ganador?: GanadorData;
+  alerta12?: Alerta12Data;
+  derrota?: DerrotaData;
+  confirm?: ConfirmData;
+}
+
+export function useAlertSystem() {
+  const [alerts, setAlerts] = useState<AlertState>({});
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const faltaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showFlash(ico: string, txt: string, duracion = 1100) {
+    setAlerts((p) => ({ ...p, flash: { ico, txt } }));
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => {
+      setAlerts((p) => ({ ...p, flash: undefined }));
+    }, duracion);
+  }
+
+  function showFaltaFlash(data: FaltaFlashData, duracion = 3000) {
+    setAlerts((p) => ({ ...p, faltaFlash: data }));
+    if (faltaTimer.current) clearTimeout(faltaTimer.current);
+    faltaTimer.current = setTimeout(() => {
+      setAlerts((p) => ({ ...p, faltaFlash: undefined }));
+    }, duracion);
+  }
+
+  function showGanador(data: GanadorData) {
+    setAlerts((p) => ({ ...p, ganador: data }));
+  }
+
+  function clearGanador() {
+    setAlerts((p) => ({ ...p, ganador: undefined }));
+  }
+
+  function showAlerta12(data: Alerta12Data) {
+    setAlerts((p) => ({ ...p, alerta12: data }));
+  }
+
+  function clearAlerta12() {
+    setAlerts((p) => ({ ...p, alerta12: undefined }));
+  }
+
+  function showDerrota(data: DerrotaData) {
+    setAlerts((p) => ({ ...p, derrota: data }));
+  }
+
+  function clearDerrota() {
+    setAlerts((p) => ({ ...p, derrota: undefined }));
+  }
+
+  function showConfirm(data: ConfirmData) {
+    setAlerts((p) => ({ ...p, confirm: data }));
+  }
+
+  function clearConfirm() {
+    setAlerts((p) => ({ ...p, confirm: undefined }));
+  }
+
+  return {
+    alerts,
+    showFlash,
+    showFaltaFlash,
+    showGanador,
+    clearGanador,
+    showAlerta12,
+    clearAlerta12,
+    showDerrota,
+    clearDerrota,
+    showConfirm,
+    clearConfirm,
+  };
+}
+
+// ─── AlertSystem Component ───────────────────────────────────────────────────
+interface AlertSystemProps {
+  alerts: AlertState;
+  onClearGanador: () => void;
+  onClearDerrota: () => void;
+  onClearConfirm: () => void;
+  isPantalla?: boolean;
+  canCloseGanador?: boolean;
+  /** Solo el Juez Central decide sobre la alerta de superioridad */
+  canCloseAlerta12?: boolean;
+  onAlerta12Reanudar?: () => void;
+  onAlerta12Ganador?: () => void;
+}
+
+export default function AlertSystem({
+  alerts,
+  onClearGanador,
+  onClearDerrota,
+  onClearConfirm,
+  isPantalla = false,
+  canCloseGanador = true,
+  canCloseAlerta12 = true,
+  onAlerta12Reanudar,
+  onAlerta12Ganador,
+}: AlertSystemProps) {
+  // Con un modal bloqueante abierto, la página de fondo no debe hacer scroll
+  const hayModalBloqueante = Boolean(
+    alerts.ganador || alerts.alerta12 || alerts.derrota || alerts.confirm
+  );
+  useEffect(() => {
+    if (!hayModalBloqueante) return;
+    const previo = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previo; };
+  }, [hayModalBloqueante]);
+
+  return (
+    <>
+      {/* ── FLASH NOTIF rápida (centro) ── */}
+      <FlashNotif data={alerts.flash} />
+
+      {/* ── FALTA FLASH grande (overlay) ── */}
+      <FaltaFlashOverlay data={alerts.faltaFlash} />
+
+      {/* ── GANADOR fullscreen ── */}
+      {alerts.ganador && (
+        <GanadorOverlay
+          data={alerts.ganador}
+          onClose={onClearGanador}
+          isPantalla={isPantalla}
+          canClose={canCloseGanador}
+        />
+      )}
+
+      {/* ── ALERTA 12 puntos ── */}
+      {alerts.alerta12 && (
+        <Alerta12Modal
+          data={alerts.alerta12}
+          canClose={canCloseAlerta12}
+          onReanudar={onAlerta12Reanudar}
+          onGanador={onAlerta12Ganador}
+        />
+      )}
+
+      {/* ── DERROTA modal ── */}
+      {alerts.derrota && (
+        <DerrotaModal data={alerts.derrota} onClose={onClearDerrota} />
+      )}
+
+      {/* ── CONFIRM modal (reemplaza confirm() nativo) ── */}
+      {alerts.confirm && (
+        <ConfirmModal data={alerts.confirm} onClose={onClearConfirm} />
+      )}
+    </>
+  );
+}
+
+// ─── Flash Notif ─────────────────────────────────────────────────────────────
+function FlashNotif({ data }: { data?: FlashData }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: data
+          ? "translate(-50%, -50%) scale(1)"
+          : "translate(-50%, -50%) scale(0)",
+        background: "rgba(15, 15, 22, 0.97)",
+        border: "1.5px solid var(--gold)",
+        borderRadius: "var(--radius-lg)",
+        padding: "18px 32px",
+        textAlign: "center",
+        zIndex: 5000,
+        pointerEvents: "none",
+        transition: "transform 0.18s cubic-bezier(.4,0,.2,1), opacity 0.18s",
+        opacity: data ? 1 : 0,
+        backdropFilter: "blur(14px)",
+        minWidth: 180,
+      }}
+    >
+      <div style={{ fontSize: "2.2rem", lineHeight: 1 }}>{data?.ico}</div>
+      <div
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "1.7rem",
+          letterSpacing: "0.06em",
+          marginTop: 4,
+          color: "var(--text)",
+        }}
+      >
+        {data?.txt}
+      </div>
+    </div>
+  );
+}
+
+// ─── Falta Flash Overlay ──────────────────────────────────────────────────────
+function FaltaFlashOverlay({ data }: { data?: FaltaFlashData }) {
+  const colores = {
+    adv: {
+      bg: "rgba(255, 114, 0, 0.16)",
+      border: "#FF8C00",
+      tituloColor: "#FF8C00",
+    },
+    falta: {
+      bg: "rgba(232, 0, 42, 0.18)",
+      border: "var(--hong)",
+      tituloColor: "var(--hong-light)",
+    },
+    especial: {
+      bg: "rgba(240, 184, 0, 0.18)",
+      border: "var(--gold)",
+      tituloColor: "var(--gold)",
+    },
+  };
+  const c = data ? colores[data.tipo] : colores.adv;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 8000,
+        pointerEvents: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: data ? 1 : 0,
+        transition: "opacity 0.2s",
+      }}
+    >
+      <div
+        style={{
+          background: c.bg,
+          border: `3px solid ${c.border}`,
+          borderRadius: "var(--radius-xl)",
+          padding: "28px 52px",
+          textAlign: "center",
+          backdropFilter: "blur(8px)",
+          boxShadow: `0 0 60px ${c.border}55`,
+          animation: data ? "pff-in 0.25s ease-out" : undefined,
+        }}
+      >
+        <div style={{ fontSize: "3.5rem", lineHeight: 1 }}>{data?.ico}</div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "3rem",
+            letterSpacing: "0.06em",
+            color: c.tituloColor,
+            lineHeight: 1,
+            marginTop: 4,
+          }}
+        >
+          {data?.titulo}
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "1.4rem",
+            // var(--text) y no blanco fijo: este overlay es un tinte translúcido
+            // sobre la página, que en tema claro es clara
+            color: "var(--text)",
+            opacity: 0.8,
+            letterSpacing: "0.1em",
+            marginTop: 4,
+          }}
+        >
+          {data?.sub}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Ganador Overlay ─────────────────────────────────────────────────────────
+function GanadorOverlay({
+  data,
+  onClose,
+  isPantalla,
+  canClose,
+}: {
+  data: GanadorData;
+  onClose: () => void;
+  isPantalla: boolean;
+  canClose: boolean;
+}) {
+  const { t } = useI18n();
+  const colorMap = {
+    hong: "var(--hong-vivid)",
+    chung: "var(--chung-vivid)",
+  };
+  const glowMap = {
+    hong: "rgba(232, 0, 42, 0.5)",
+    chung: "rgba(0, 85, 255, 0.5)",
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9500,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.9)",
+        backdropFilter: "blur(12px)",
+        padding: 16,
+        overflowY: "auto",
+      }}
+    >
+      <div
+        style={{
+          textAlign: "center",
+          animation: "ganador-entrada 0.5s cubic-bezier(.17,.67,.35,1.4)",
+        }}
+      >
+        <div style={{ marginBottom: 10 }}>
+          <Logo fontSize={isPantalla ? "1.6rem" : "1.1rem"} style={{ opacity: 0.85 }} />
+        </div>
+        <div style={{ fontSize: isPantalla ? "10rem" : "5rem", lineHeight: 1 }}>
+          🏆
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: isPantalla ? "clamp(3rem,7vw,6rem)" : "2.5rem",
+            letterSpacing: "0.4em",
+            color: "var(--gold)",
+            textShadow: "0 0 40px rgba(240,184,0,0.6)",
+            margin: "8px 0",
+          }}
+        >
+          SUNG
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: isPantalla ? "clamp(5rem,18vw,16rem)" : "clamp(3.5rem,10vw,8rem)",
+            lineHeight: 0.9,
+            color: colorMap[data.color],
+            textShadow: `0 0 80px ${glowMap[data.color]}`,
+          }}
+        >
+          {data.nombre.toUpperCase()}
+        </div>
+        {data.motivo && (
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: isPantalla ? "2rem" : "1.2rem",
+              letterSpacing: "0.25em",
+              color: "rgba(255,255,255,0.4)",
+              marginTop: 12,
+            }}
+          >
+            {data.motivo}
+          </div>
+        )}
+        {canClose ? (
+          <button
+            onClick={onClose}
+            style={{
+              marginTop: 24,
+              background: "rgba(255,255,255,0.1)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: "var(--radius)",
+              padding: "10px 32px",
+              fontFamily: "var(--font-display)",
+              fontSize: "1rem",
+              letterSpacing: "0.1em",
+              color: "rgba(255,255,255,0.6)",
+              cursor: "pointer",
+            }}
+          >
+            {t("alert.cerrar")}
+          </button>
+        ) : (
+          <div
+            style={{
+              marginTop: 24,
+              fontFamily: "var(--font-display)",
+              fontSize: isPantalla ? "1.4rem" : "0.95rem",
+              letterSpacing: "0.12em",
+              color: "rgba(255,255,255,0.45)",
+            }}
+          >
+            {t("alert.esperandoCierre")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Alerta 12 puntos ────────────────────────────────────────────────────────
+function Alerta12Modal({
+  data,
+  canClose,
+  onReanudar,
+  onGanador,
+}: {
+  data: Alerta12Data;
+  canClose: boolean;
+  onReanudar?: () => void;
+  onGanador?: () => void;
+}) {
+  const { t } = useI18n();
+  // Confirmación inline antes de terminar el combate por superioridad
+  const [confirmandoGanador, setConfirmandoGanador] = useState(false);
+  const liderNombre = (data.liderNombre || data.lider || "").toUpperCase();
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.87)",
+        backdropFilter: "blur(8px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--bg-card)",
+          border: "2px solid var(--gold)",
+          borderRadius: "var(--radius-xl)",
+          padding: "clamp(16px, 4vw, 32px) clamp(16px, 5vw, 44px)",
+          textAlign: "center",
+          maxWidth: 400,
+          width: "100%",
+          maxHeight: "90dvh",
+          overflowY: "auto",
+          animation: "shake 0.4s ease-out",
+          boxShadow: "var(--shadow-gold)",
+        }}
+      >
+        <div style={{ fontSize: "clamp(2rem, 6vw, 2.8rem)", lineHeight: 1 }}>⚠️</div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "clamp(1.4rem, 5.5vw, 2rem)",
+            letterSpacing: "0.08em",
+            color: "var(--gold)",
+            marginTop: 6,
+          }}
+        >
+          {(data.motivo || t("alert.superioridad")).toUpperCase()}
+        </div>
+        <div
+          style={{
+            fontSize: "clamp(0.875rem, 3vw, 0.9rem)",
+            color: "var(--text-muted)",
+            margin: "8px 0 16px",
+          }}
+        >
+          {t("alert.lidera", { lider: data.lider, dif: data.diferencia || "12.0" })}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "clamp(10px, 4vw, 20px)",
+            marginBottom: 18,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "clamp(2.2rem, 9vw, 3.5rem)",
+              color: "var(--hong-vivid)",
+            }}
+          >
+            {data.hong}
+          </div>
+          <div style={{ color: "var(--text-dim)", fontSize: "clamp(1rem, 4vw, 1.5rem)" }}>vs</div>
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "clamp(2.2rem, 9vw, 3.5rem)",
+              color: "var(--chung-vivid)",
+            }}
+          >
+            {data.chung}
+          </div>
+        </div>
+        {canClose ? (
+          confirmandoGanador ? (
+            <>
+              <div
+                style={{
+                  fontSize: "clamp(0.88rem, 3vw, 0.92rem)",
+                  color: "var(--text-muted)",
+                  marginBottom: 14,
+                }}
+              >
+                {t("alert.terminara1")} <strong style={{ color: "var(--gold)" }}>{liderNombre}</strong>{" "}
+                {t("alert.terminara2")}
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                <button
+                  onClick={() => setConfirmandoGanador(false)}
+                  style={{
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: "var(--radius)",
+                    padding: "12px 24px",
+                    fontFamily: "var(--font-body)",
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("alert.volver")}
+                </button>
+                <button
+                  onClick={onGanador}
+                  style={{
+                    background: "linear-gradient(135deg,var(--gold),var(--gold-dark))",
+                    border: "none",
+                    borderRadius: "var(--radius)",
+                    padding: "12px 24px",
+                    fontFamily: "var(--font-display)",
+                    fontSize: "1.05rem",
+                    letterSpacing: "0.06em",
+                    color: "var(--text-on-gold)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("alert.confirmarGanador")}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={onReanudar}
+                style={{
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-light)",
+                  borderRadius: "var(--radius)",
+                  padding: "12px 24px",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "1.05rem",
+                  letterSpacing: "0.06em",
+                  color: "var(--text)",
+                  cursor: "pointer",
+                }}
+              >
+                {t("alert.reanudar")}
+              </button>
+              <button
+                onClick={() => setConfirmandoGanador(true)}
+                style={{
+                  background: "linear-gradient(135deg,var(--gold),var(--gold-dark))",
+                  border: "none",
+                  borderRadius: "var(--radius)",
+                  padding: "12px 24px",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "1.05rem",
+                  letterSpacing: "0.06em",
+                  color: "var(--text-on-gold)",
+                  cursor: "pointer",
+                }}
+              >
+                {t("alert.ganadorBtn", { nombre: liderNombre })}
+              </button>
+            </div>
+          )
+        ) : (
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "clamp(0.9rem, 3vw, 1rem)",
+              letterSpacing: "0.12em",
+              // Sobre var(--bg-card): blanco fijo sería invisible en tema claro
+              color: "var(--text-muted)",
+            }}
+          >
+            {t("alert.esperandoJC")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Derrota Modal ───────────────────────────────────────────────────────────
+function DerrotaModal({
+  data,
+  onClose,
+}: {
+  data: DerrotaData;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 10000,
+        background: "rgba(0,0,0,0.93)",
+        backdropFilter: "blur(14px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--bg-card)",
+          border: "3px solid var(--hong)",
+          borderRadius: "var(--radius-xl)",
+          padding: "clamp(18px, 4vw, 36px) clamp(18px, 5vw, 48px)",
+          textAlign: "center",
+          maxWidth: 440,
+          width: "100%",
+          maxHeight: "90dvh",
+          overflowY: "auto",
+          animation: "shake 0.5s ease-out",
+          boxShadow: "var(--shadow-hong)",
+        }}
+      >
+        <div style={{ fontSize: "clamp(2.6rem, 8vw, 4rem)", lineHeight: 1 }}>🚫</div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "clamp(1.7rem, 6.5vw, 2.6rem)",
+            letterSpacing: "0.06em",
+            color: "var(--hong-light)",
+            marginTop: 8,
+          }}
+        >
+          {t("alert.descalificado")}
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "clamp(2rem, 8vw, 3.2rem)",
+            lineHeight: 1.1,
+            margin: "8px 0",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {data.perdedor.toUpperCase()}
+        </div>
+        <div
+          style={{
+            fontSize: "0.9rem",
+            color: "var(--text-muted)",
+            marginBottom: 24,
+          }}
+        >
+          {data.razon}
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: "var(--hong)",
+            border: "none",
+            borderRadius: "var(--radius)",
+            padding: "13px 32px",
+            fontFamily: "var(--font-display)",
+            fontSize: "1.1rem",
+            letterSpacing: "0.08em",
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          {t("alert.cerrar")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Confirm Modal (reemplaza confirm() nativo) ────────────────────────────
+function ConfirmModal({
+  data,
+  onClose,
+}: {
+  data: ConfirmData;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const tipoBorder = {
+    peligro: "var(--hong)",
+    advertencia: "var(--gold)",
+    info: "var(--border-light)",
+  };
+  const tipoIco = {
+    peligro: "🚫",
+    advertencia: "⚠️",
+    info: "ℹ️",
+  };
+
+  const tipo = data.tipo || "advertencia";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9800,
+        background: "rgba(0,0,0,0.88)",
+        backdropFilter: "blur(10px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+      }}
+    >
+      <div
+        style={{
+          background: "var(--bg-card)",
+          border: `2px solid ${tipoBorder[tipo]}`,
+          borderRadius: "var(--radius-xl)",
+          padding: "clamp(18px, 4vw, 32px) clamp(16px, 5vw, 40px)",
+          textAlign: "center",
+          maxWidth: 460,
+          width: "100%",
+          maxHeight: "90dvh",
+          overflowY: "auto",
+          animation: "shake 0.35s ease-out",
+          boxShadow: "var(--shadow-lg)",
+        }}
+      >
+        <div style={{ fontSize: "2.5rem", lineHeight: 1 }}>
+          {tipoIco[tipo]}
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "1.8rem",
+            letterSpacing: "0.06em",
+            color:
+              tipo === "peligro"
+                ? "var(--hong-light)"
+                : tipo === "advertencia"
+                ? "var(--gold)"
+                : "var(--text)",
+            marginTop: 10,
+            marginBottom: 12,
+          }}
+        >
+          {data.titulo}
+        </div>
+        <p
+          style={{
+            color: "var(--text-muted)",
+            fontSize: "0.95rem",
+            lineHeight: 1.6,
+            marginBottom: 28,
+          }}
+        >
+          {data.mensaje}
+        </p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+          {!data.solo_ok && (
+            <button
+              onClick={() => {
+                data.onCancel?.();
+                onClose();
+              }}
+              style={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-light)",
+                borderRadius: "var(--radius)",
+                padding: "12px 28px",
+                fontFamily: "var(--font-body)",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                color: "var(--text-muted)",
+                cursor: "pointer",
+              }}
+            >
+              {data.cancelLabel || t("comun.cancelar")}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              data.onConfirm();
+              onClose();
+            }}
+            style={{
+              background:
+                tipo === "peligro"
+                  ? "var(--hong)"
+                  : tipo === "advertencia"
+                  ? "linear-gradient(135deg,var(--gold),var(--gold-dark))"
+                  : "var(--bg-elevated)",
+              border: "none",
+              borderRadius: "var(--radius)",
+              padding: "12px 32px",
+              fontFamily: "var(--font-display)",
+              fontSize: "1rem",
+              letterSpacing: "0.06em",
+              // #fff solo sobre el rojo de "peligro"; el fondo neutro
+              // (bg-elevated) es claro en tema claro y necesita var(--text)
+              color:
+                tipo === "peligro"
+                  ? "#fff"
+                  : tipo === "advertencia"
+                  ? "var(--text-on-gold)"
+                  : "var(--text)",
+              cursor: "pointer",
+            }}
+          >
+            {data.solo_ok
+              ? t("alert.entendido")
+              : data.confirmLabel || t("alert.confirmar")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
