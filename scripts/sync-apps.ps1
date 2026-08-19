@@ -73,10 +73,18 @@ $espejos = @(
 
 if ($Producto) { $espejos = $espejos | Where-Object { $_.Nombre -eq $Producto } }
 
-# Un subtree pull sobre un arbol sucio deja un conflicto a medias que hay que
-# deshacer a mano. Mejor negarse antes de empezar.
-if (git status --porcelain) {
-    throw "Hay cambios sin commitear en este repositorio. Guardalos antes de sincronizar."
+# Un subtree pull sobre cambios sin commitear deja un conflicto a medias que hay
+# que deshacer a mano. Mejor negarse antes de empezar.
+#
+# --untracked-files=no a proposito: lo que estorba son las modificaciones de
+# archivos RASTREADOS, que el merge intentaria conservar. Un archivo suelto que
+# git no conoce no le importa a nadie, y este repo tiene varios documentos asi
+# de forma permanente — con la comprobacion a secas, el guion no corria nunca.
+$sucio = git status --porcelain --untracked-files=no
+if ($sucio) {
+    Write-Host "Cambios sin commitear:" -ForegroundColor Red
+    $sucio | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+    throw "Guardalos antes de sincronizar."
 }
 
 foreach ($e in $espejos) {
