@@ -1,3 +1,16 @@
+# Qué es un paquete de ESTE workspace.
+#
+# `productos/` NO está aquí a propósito. Ahí viven los espejos de
+# `dinamyt-combat` y `dinamyt-membresias`, que son repositorios propios con su
+# propio `pnpm-lock.yaml` y sus propias versiones. Meterlos en este workspace
+# obligaría a resolver sus dependencias contra las de aquí, y una discrepancia
+# de versiones dejaría sin construir a los tres productos a la vez.
+#
+# Se construyen desde su propia carpeta, con su propio lockfile:
+#   cd productos/membresias  && pnpm install --frozen-lockfile && pnpm build
+#   cd productos/campeonatos && ...  (ver su README)
+#
+# Ver README.md → «Cómo está organizado esto».
 packages:
   - "apps/*"
   - "packages/*"

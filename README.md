@@ -4,37 +4,66 @@ Monorepo (pnpm + Turborepo, TypeScript full-stack) del ecosistema DINAMYT:
 identidad única + apps federadas por suscripción (JWT RS256 verificado contra
 `/auth/jwks`; ninguna app tiene login propio).
 
-| App | Puerto dev | Qué es |
+| Pieza | Puerto dev | Qué es |
 | --- | --- | --- |
-| `apps/ecosystem-api` | 3001 | Identidad y suscripciones (NestJS) |
-| `apps/ecosystem-portal` | 3000 | Portal: login/registro, dashboard, planes, admin (Next) |
-| `apps/campeonatos-api` / `-web` / `-combat` | 3002 / 3003 / 3005 | Torneos con puntuación en vivo (Fastify / Next / WebSocket) |
-| `apps/membresias-api` / `-web` / `-agent` | 3004 / 3006 / 7070 | Mensualidades, asistencia y kiosco del club |
+| `apps/ecosystem-api` | 3001 | Identidad y suscripciones (NestJS). **El único que emite tokens.** |
+| `apps/ecosystem-portal` | 3000 | Portal: login/registro, verificación de correo, dashboard, planes, admin (Next) |
 | `apps/academy-api` / `-web` | 3007 / 3008 | Enseñanza por cinturón: contenidos, tareas, notas, historial (PWA) |
 | `apps/academy-figuras` | 3009 | IA de figuras: MediaPipe + DTW, correcciones con timestamps (Python) |
-| `packages/shared` · `*-db` · `campeonatos-core` | — | Contrato JWT, esquemas Drizzle y dominio puro |
+| `packages/shared` | — | Contrato del JWT. **Fuente de verdad única** para las tres apps |
+| `packages/academy-db` | — | Esquemas Drizzle de academy |
+| `productos/campeonatos` | 3003 / 5000 | **Espejo** de `dinamyt-combat`: Flask + Next + Socket.IO |
+| `productos/membresias` | 3006 / 3004 | **Espejo** de `dinamyt-membresias`: Fastify + Next PWA |
+
+## Cómo está organizado esto
 
 ```
 dinamyt/
-├── apps/
-│   ├── ecosystem-api/          Servicio central de identidad y suscripciones (NestJS)
-│   ├── ecosystem-portal/       Portal del ecosystem (login SSO, perfil global)
-│   ├── campeonatos-api/        Backend de campeonatos
-│   ├── campeonatos-web/        Frontend de gestión de campeonatos (inscripciones, roles, cuadros)
-│   ├── campeonatos-combat/     Pantalla en vivo del tatami / juez central (COMBAT)
-│   ├── membresias-api/         Backend de mensualidades y asistencia
-│   ├── membresias-agent/       Agente/worker de membresías (notificaciones, vencimientos)
-│   ├── membresias-web/         Frontend de mensualidades, asistencia y perfil del alumno
-│   ├── academy-api/            Backend de academia (Hapkido, evaluaciones)
-│   ├── academy-web/            Frontend de academia (estudiantes y maestros)
+├── apps/            ← vive AQUÍ. Se edita aquí.
+│   ├── ecosystem-api/          Identidad y suscripciones (NestJS)
+│   ├── ecosystem-portal/       Portal del ecosystem (registro, SSO, perfil)
+│   ├── academy-api/            Backend de academia
+│   ├── academy-web/            Frontend de academia (PWA)
 │   └── academy-figuras/        Servicio IA de figuras con MediaPipe (Python)
-└── packages/
-    ├── shared/                 @dinamyt/shared — contrato compartido (tipos del JWT, enums)
-    ├── campeonatos-core/       Lógica compartida de campeonatos
-    ├── campeonatos-db/         Acceso a datos de campeonatos
-    ├── membresias-db/          Acceso a datos de membresías
-    └── academy-db/             Acceso a datos de academy
+├── packages/        ← vive AQUÍ.
+│   ├── shared/                 @dinamyt/shared — contrato del JWT
+│   └── academy-db/             Acceso a datos de academy
+├── productos/       ← ESPEJOS. NO se editan aquí (ver abajo).
+│   ├── campeonatos/            <- ArsenalCrack/dinamyt-combat
+│   └── membresias/             <- ArsenalCrack/dinamyt-membresias
+└── scripts/
+    ├── sync-apps.ps1           Pone al día los espejos
+    ├── respaldar-produccion.ps1
+    ├── verificar-respaldo.ps1
+    └── diario-migraciones.mjs
 ```
+
+### La regla de `productos/`
+
+Campeonatos y Membresías **tienen su propio repositorio y ahí es donde se
+trabaja**. Lo que hay en `productos/` es un espejo traído con `git subtree`, que
+conserva su historial completo.
+
+> **Nunca se edita nada dentro de `productos/`.** Un cambio hecho ahí se pierde
+> en la siguiente sincronización, y se pierde en silencio: `git subtree pull` no
+> avisa de lo que aplasta. Si hay que tocar Campeonatos o Membresías, se abre SU
+> repositorio.
+
+Para ponerlos al día:
+
+```powershell
+.\scripts\sync-apps.ps1                       # los dos
+.\scripts\sync-apps.ps1 -Producto membresias  # solo uno
+.\scripts\sync-apps.ps1 -Local                # desde el disco, sin pasar por GitHub
+```
+
+**No están en el workspace de pnpm** (`pnpm-workspace.yaml` solo mira `apps/*` y
+`packages/*`). Cada uno se construye desde su carpeta con su propio lockfile: si
+compartieran resolución de dependencias, una discrepancia de versiones dejaría
+sin construir a los tres productos a la vez.
+
+**El despliegue clona los tres repositorios**, no este espejo — así un despliegue
+nunca depende de que alguien se acordara de sincronizar.
 
 > Las apps **delegan la autenticación** en `ecosystem-api`: este firma un JWT
 > RS256 y publica la clave en `/auth/jwks`; las demás solo lo verifican y exigen
