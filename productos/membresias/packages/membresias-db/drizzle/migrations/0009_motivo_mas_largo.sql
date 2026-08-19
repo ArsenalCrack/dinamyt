@@ -1,0 +1,1 @@
+ALTER TABLE "membresias"."schedule_exceptions" ALTER COLUMN "note" SET DATA TYPE varchar(500);

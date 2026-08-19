@@ -1,0 +1,112 @@
+# Despliegue de la API de DINAMYT Membresías en Render.
+#
+# En el panel de Render: New → Blueprint → apuntar a este repositorio.
+#
+# Sobre pnpm: NO se usa `corepack enable` ni `npm i -g pnpm`. El sistema de
+# archivos de Render es de solo lectura en esas rutas y ambos fallan con EROFS.
+# `npx --yes pnpm@<versión>` lo descarga en la carpeta del build y funciona.
+#
+# Las migraciones NO van aquí: la API las aplica sola al arrancar
+# (ver apps/membresias-api/src/main.ts), así el esquema nunca queda desfasado.
+
+services:
+  - type: web
+    name: dinamyt-membresias-api
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: >-
+      npx --yes pnpm@11.5.0 install --frozen-lockfile &&
+      npx --yes pnpm@11.5.0 --filter @dinamyt/membresias-db build &&
+      npx --yes pnpm@11.5.0 --filter @dinamyt/membresias-api build
+    startCommand: node apps/membresias-api/dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PORT
+        value: "3004"
+
+      # Zona horaria del club. NO es cosmético: el día del check-in, el
+      # vencimiento de las mensualidades y la fecha del carnet se calculan con
+      # la hora LOCAL del servidor (`todayStr` en lib/billing.ts).
+      #
+      # Render arranca en UTC, y Colombia es UTC−5: sin esto, a partir de las
+      # siete de la tarde el servidor ya cree que es mañana. Un club que
+      # entrena martes y jueves a las ocho de la noche veía su clase validada
+      # contra el miércoles y el kiosco rechazaba a la fila entera con «hoy el
+      # club no tiene clase programada» — y las que sí entraban quedaban
+      # fechadas al día siguiente, que además rompe el candado de la doble
+      # marca (es por alumno y día).
+      #
+      # Para un club fuera de Colombia, cambiar por su zona IANA.
+      - key: TZ
+        value: America/Bogota
+
+      # Saltos de proxy hasta el cliente. Son DOS porque la web no llama a esta
+      # API directamente: el navegador pide a Vercel y Vercel reenvía aquí (ver
+      # el rewrite de apps/membresias-web/next.config.ts). La cadena queda
+      # "cliente, vercel" y Render añade su propio salto.
+      # Contrapartida: quien llame a esta API saltándose Vercel puede escribir
+      # un X-Forwarded-For a mano y falsear su IP, con lo que esquiva el tope
+      # por IP. El tope por CORREO del login (5 cada 5 min), que es el que
+      # protege las cuentas, no depende de la IP y sigue en pie.
+      - key: TRUST_PROXY_HOPS
+        value: "2"
+
+      # Base de datos. En Supabase: la cadena del "Transaction pooler"
+      # (puerto 6543), NO la conexión directa — esa solo responde por IPv6 y
+      # Render no hace salidas por IPv6.
+      - key: MEMBRESIAS_DATABASE_URL
+        sync: false
+
+      # Identidad. Render genera el secreto solo: nadie tiene que verlo.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: "86400"
+      - key: BCRYPT_ROUNDS
+        value: "10"
+
+      # Cuenta inicial del superadmin. Se siembra UNA vez, en el primer
+      # arranque; cambiarla aquí después no reescribe la contraseña real.
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: SUPERADMIN_NOMBRE
+        value: Super administrador
+
+      # Dominio de la web en Vercel. Sin esto el navegador bloquea las
+      # peticiones por CORS y la app se ve vacía sin dar ningún error claro.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: MEMBRESIAS_WEB_URL
+        sync: false
+
+      # Cookie de sesión. "lax" y NO "none" a propósito: la web consume la API
+      # bajo su propio dominio (rewrite de Next), así que la cookie es de
+      # primera parte. Ponerla en "none" la convertiría en cookie de terceros y
+      # Safari volvería a bloquearla, que es justo lo que rompía la sesión al
+      # recargar.
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: COOKIE_SECURE
+        value: "true"
+
+      # Avisos push (opcional). Generar con:
+      #   pnpm --filter @dinamyt/membresias-api gen:vapid
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+
+      # Secreto del disparo diario de avisos. NO se genera aquí: tiene que ser
+      # el MISMO valor que en Vercel, que es quien lleva el reloj (el plan
+      # gratuito de Render no tiene tareas programadas). Sin él, la ruta
+      # /notifications/cron responde 404 y los avisos se quedan a mano.
+      - key: CRON_SECRET
+        sync: false

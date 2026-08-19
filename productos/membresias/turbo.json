@@ -1,0 +1,39 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "concurrency": "20",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      // Turbo 2 corre las tareas en un entorno LIMPIO: lo que no se declare
+      // aquí no llega al build, aunque esté puesto en el panel de Vercel. Es
+      // lo que dejaba `MEMBRESIAS_API_ORIGIN` vacía y hacía que el rewrite de
+      // /api apuntara a 127.0.0.1, con Vercel respondiendo 404
+      // (DNS_HOSTNAME_RESOLVED_PRIVATE) a toda la API.
+      //
+      // Declararlas además mete su valor en la clave de caché, que es lo que
+      // hay que querer: cambiar la URL de la API invalida el build en vez de
+      // reutilizar uno construido contra la anterior.
+      //
+      // Las `NEXT_PUBLIC_*` se inlinean en el bundle al construir, así que
+      // también se leen aquí, no al arrancar.
+      "env": [
+        "MEMBRESIAS_API_ORIGIN",
+        "NEXT_PUBLIC_API_MODE",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL",
+        "NEXT_PUBLIC_LOCALE_MONEDA",
+        "NEXT_PUBLIC_MONEDA",
+        "NEXT_PUBLIC_VAPID_PUBLIC_KEY"
+      ],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {},
+    "test": {
+      "dependsOn": ["^build"]
+    }
+  }
+}

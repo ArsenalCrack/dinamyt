@@ -1,0 +1,31 @@
+{
+  "name": "Mi Club · DINAMYT",
+  "short_name": "Mi Club",
+  "description": "Tu carnet, tus asistencias y tu estado en el club.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0e0e15",
+  "theme_color": "#0e0e15",
+  "categories": ["sports", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Kiosco de check-in",
+      "short_name": "Kiosco",
+      "description": "Escanear carnets QR al entrar a clase",
+      "url": "/kiosco"
+    },
+    {
+      "name": "Mi estado",
+      "short_name": "Mi carnet",
+      "description": "Mi estado y mi carnet QR",
+      "url": "/mi"
+    }
+  ]
+}

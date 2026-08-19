@@ -1,0 +1,17 @@
+{
+  "name": "dinamyt-membresias",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.5.0",
+  "description": "DINAMYT Membresías — control de mensualidades, pagos y asistencia de un club de artes marciales. Producto independiente: identidad, base de datos y despliegue propios.",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.7.3"
+  }
+}

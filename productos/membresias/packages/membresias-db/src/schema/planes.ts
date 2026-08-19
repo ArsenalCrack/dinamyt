@@ -1,0 +1,119 @@
+import {
+  uuid,
+  varchar,
+  text,
+  boolean,
+  integer,
+  decimal,
+  timestamp,
+  date,
+  index,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
+import {
+  mem,
+  tipoPlanEnum,
+  metodoPagoEnum,
+  estadoPagoEnum,
+  estadoMembresiaEnum,
+} from './_schema';
+
+// ── Planes / tarifas del club ────────────────────────────────────────────────
+export const plans = mem.table('plans', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orgId: uuid('org_id').notNull(),
+  name: varchar('name', { length: 120 }).notNull(),
+  type: tipoPlanEnum('type').notNull(),
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  /** Solo para semanal (=7); mensual usa mes calendario, no días. */
+  durationDays: integer('duration_days'),
+  /** Solo para paquete/clase. */
+  nClasses: integer('n_classes'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// ── Membresía: estado del alumno EN ESTE club ────────────────────────────────
+// El perfil de la persona vive en `users`; aquí solo su estado en el club
+// (plan vigente, vencimiento, clases restantes, mora).
+export const memberships = mem.table(
+  'memberships',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull(),
+    /**
+     * Alumno (→ `users.id`). Sin FK declarada a propósito: la columna se llamaba
+     * `ecosystem_user_id` y podía traer UUIDs del ecosistema, así que una base
+     * ya existente puede migrar sin que la restricción la rechace.
+     */
+    userId: uuid('user_id').notNull(),
+    /** Acudiente que paga en este club (opcional). */
+    payerUserId: uuid('payer_user_id'),
+    /**
+     * En qué clase del club entrena (→ `club_groups.id`). Una sola, y de ahí
+     * sale el muro: «el alumno de una clase no ve la otra» no se sostiene si se
+     * puede estar en las dos. `null` = sin clase asignada, que es lo que son
+     * todos hasta que el maestro los reparte —y lo único que hay en un club que
+     * no divide sus clases—.
+     *
+     * La FK existe en la base (ver `0014_clases_del_club.sql`) pero no se
+     * declara aquí: `club_groups` vive en `schema/asistencia.ts`, que ya
+     * importa este archivo, y declararla cerraría el círculo entre los dos
+     * módulos.
+     */
+    groupId: uuid('group_id'),
+    status: estadoMembresiaEnum('status').notNull().default('activo'),
+    statusReason: text('status_reason'),
+    matriculado: boolean('matriculado').default(false),
+    currentPlanId: uuid('current_plan_id').references(() => plans.id),
+    /** Planes por tiempo: fecha de vencimiento vigente. */
+    venceEl: date('vence_el'),
+    /** Día ancla del mes para el ciclo mensual (§3.3 impl). */
+    anchorDay: integer('anchor_day'),
+    /** Planes por paquete/clase: clases disponibles. */
+    clasesRestantes: integer('clases_restantes'),
+    /** Código para el check-in por PIN (opcional, único por club). */
+    checkinPin: varchar('checkin_pin', { length: 12 }),
+    /** Check-ins hechos en mora desde el último pago (1=avisado; ≥2 se bloquea). */
+    moraCheckins: integer('mora_checkins').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uq_membership_org_user').on(t.orgId, t.userId),
+    uniqueIndex('uq_membership_pin').on(t.orgId, t.checkinPin),
+    index('ix_memberships_grupo').on(t.orgId, t.groupId),
+  ],
+);
+
+// ── Pagos (el cobro es externo; aquí solo se registran) ──────────────────────
+export const payments = mem.table('payments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  membershipId: uuid('membership_id')
+    .notNull()
+    .references(() => memberships.id),
+  planId: uuid('plan_id')
+    .notNull()
+    .references(() => plans.id),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  method: metodoPagoEnum('method').notNull(),
+  status: estadoPagoEnum('status').notNull().default('PAGADO'),
+  paidAt: timestamp('paid_at').defaultNow(),
+  /**
+   * Qué periodo compró este pago. Son las tres columnas que permiten decir
+   * cuánto dinero le CORRESPONDE a cada mes, y no solo cuánto entró en caja:
+   * un alumno que paga dos meses en julio metía 160 000 en julio y cero en
+   * agosto, y el panel del club leía el doble de lo esperado.
+   *
+   * `periodos` es cuántas mensualidades (o semanas) cubre el pago. Nulos en
+   * clase, paquete y matrícula: esos no compran tiempo.
+   */
+  periodos: integer('periodos').notNull().default(1),
+  periodoDesde: date('periodo_desde'),
+  periodoHasta: date('periodo_hasta'),
+  /** user_id del ecosistema que registró el pago (maestro o auxiliar). */
+  registeredByUserId: uuid('registered_by_user_id').notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+});

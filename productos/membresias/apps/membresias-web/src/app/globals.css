@@ -1,0 +1,1357 @@
+@import "tailwindcss";
+
+/* ════════════════════════════════════════════════════════════════════════
+   DINAMYT Membresías — sistema visual del ecosistema (espejo del portal).
+   Tinta profunda + oro de marca; el mono de marcador manda en PIN y datos.
+   Las clases de componentes viven en @layer components para que las
+   utilidades de Tailwind (hidden, w-full, px-*) puedan sobreescribirlas.
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  color-scheme: dark;
+  --bg: #0e0e15;
+  --bg-card: #15151f;
+  --bg-elevated: #1d1d2a;
+  --bg-input: #0a0a11;
+  --border: #262635;
+  --border-strong: #3a3a4e;
+  --text: #f3f1e8;
+  --text-muted: #a19db8;
+  --gold: #f0b800;
+  /* Accion primaria del dia a dia: jade profundo, legible y sin neon.
+     El oro queda como color de MARCA (acentos, badges y CTA del login). */
+  --accion: #1f8f63;
+  --accion-texto: #eafff4;
+  --gold-dim: #c99a00;
+  --gold-soft: rgba(240, 184, 0, 0.12);
+  --danger: #ff5577;
+  --ok: #3ecf8e;
+  --info: #4d9fff;
+  --hong: #e8002a;
+  --chung: #2266ff;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* La barra es sticky y tapa los primeros 57 px: sin esto, saltar a un ancla
+   —«Cobrar →» lleva a #cobrar— dejaba el título del formulario debajo de la
+   barra y parecía que el salto se había pasado de largo. */
+html { scroll-padding-top: 4.5rem; }
+a { color: inherit; text-decoration: none; }
+::selection { background: var(--gold); color: #14141e; }
+
+/* ── Formularios (base por elemento) ────────────────────────────────────── */
+input, select, textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  color: var(--text);
+  width: 100%;
+  transition: border-color 0.15s ease;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--gold); }
+
+/* ── Contraseñas: un solo ojo, el nuestro ──
+   Edge dibuja el suyo (`::-ms-reveal`) y ningún otro navegador lo hace, así que
+   el «ver contraseña» lo pone <CampoContrasena> para todos. Sin esta regla,
+   Edge —y solo Edge— enseñaría los dos, uno encima del otro. `::-ms-clear` es
+   la «x» de borrar del mismo navegador, que además tapa el ojo. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+@layer components {
+  /* ── Tipografía de rol ──────────────────────────────────────────────── */
+  .display {
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-weight: 800;
+    font-stretch: 118%;
+    text-transform: uppercase;
+    letter-spacing: -0.015em;
+    line-height: 0.98;
+  }
+  .eyebrow {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--gold);
+  }
+  .mono {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Franja de cinturones (firma del ecosistema) ────────────────────── */
+  .cinturon {
+    height: 4px;
+    border: 0;
+    background: linear-gradient(
+      90deg,
+      #f3f1e8 0 16.66%,
+      #f0b800 16.66% 33.33%,
+      #3ecf8e 33.33% 50%,
+      #2266ff 50% 66.66%,
+      #e8002a 66.66% 83.33%,
+      #454545 83.33% 100%
+    );
+  }
+
+  /* ── Botones ────────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: filter 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn:hover:not(:disabled) { filter: brightness(1.12); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  /* Accion primaria (antes oro neon): jade profundo legible. La clase
+     conserva su nombre historico para no tocar cada pagina. */
+  .btn-gold {
+    background: var(--accion);
+    color: var(--accion-texto);
+    border-color: rgba(234, 255, 244, 0.12);
+  }
+  /* CTA de marca (login "Ingresar" y portadas): el oro original. */
+  .btn-cta {
+    background: var(--gold);
+    color: #14141e;
+    box-shadow: 0 2px 14px rgba(240, 184, 0, 0.25);
+  }
+  .btn-outline { background: transparent; border-color: var(--border-strong); color: var(--text); }
+  .btn-outline:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  /* Acción destructiva (cerrar sesión, eliminar): SIEMPRE distinta del resto */
+  .btn-danger {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: rgba(255, 85, 119, 0.12);
+    filter: none;
+  }
+  .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.75rem; }
+
+  /* ── Tarjetas ───────────────────────────────────────────────────────── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  a.card:hover, button.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    border-color: var(--gold-dim);
+  }
+
+  /* ── Badges ─────────────────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .badge-ok { background: rgba(62, 207, 142, 0.1); border-color: var(--ok); color: var(--ok); }
+  .badge-gold { background: var(--gold-soft); border-color: var(--gold-dim); color: var(--gold); }
+  .badge-danger { background: rgba(255, 85, 119, 0.12); border-color: var(--danger); color: var(--danger); }
+
+  .msg-error { color: var(--danger); }
+  .msg-ok { color: var(--ok); }
+  .muted { color: var(--text-muted); }
+}
+
+/* En móvil, las tablas del panel se deslizan horizontalmente dentro de su
+   tarjeta en lugar de romper el layout. (Fuera de @layer: Tailwind no emite
+   dentro de la capa las clases que no reconoce en el contenido escaneado.) */
+.tabla-scroll { overflow-x: auto; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   AVISOS FLOTANTES (toast / snackbar) — ver components/Toaster.tsx
+   ════════════════════════════════════════════════════════════════════════
+   Abajo, como el snackbar de Android: cerca del pulgar y sin tapar el
+   formulario que se acaba de rellenar. Centrado y a todo lo ancho en el
+   teléfono; en la esquina inferior derecha en escritorio, como las
+   notificaciones del sistema. */
+.toaster {
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  right: 0;
+  /* Sobre la barra de gestos de Android y la zona segura de iOS. */
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  padding: 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  /* El contenedor ocupa el ancho de la ventana: sin esto se quedaría
+     interceptando clics en una franja invisible de la pantalla. */
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 30rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 0.6rem 0.75rem 0.85rem;
+  border-radius: 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  /* SIN `both` a propósito: con relleno hacia atrás, el estado en reposo del
+     aviso sería el primer fotograma —opacidad 0—, y basta con que la animación
+     no llegue a correr (pestaña en segundo plano, animaciones desactivadas)
+     para que el aviso quede invisible sin que nada lo delate. Así el estado
+     normal es «visible» y la animación solo lo adorna al entrar. */
+  animation: toast-entra 200ms ease-out;
+}
+/* Aquí sí hace falta el relleno: el aviso tiene que QUEDARSE transparente
+   hasta que lo quiten del DOM. */
+.toast[data-saliendo='true'] { animation: toast-sale 200ms ease-in both; }
+.toast[data-tipo='ok'] { border-color: var(--ok); }
+.toast[data-tipo='error'] { border-color: var(--danger); }
+.toast[data-tipo='info'] { border-color: var(--gold-dim); }
+
+.toast-ico {
+  flex: 0 0 auto;
+  width: 1.35rem;
+  height: 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.toast[data-tipo='ok'] .toast-ico { background: rgba(62, 207, 142, 0.14); color: var(--ok); }
+.toast[data-tipo='error'] .toast-ico { background: rgba(255, 85, 119, 0.14); color: var(--danger); }
+.toast[data-tipo='info'] .toast-ico { background: var(--gold-soft); color: var(--gold); }
+
+.toast-txt { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+
+.toast-cerrar {
+  flex: 0 0 auto;
+  /* 2.25rem: el mínimo cómodo para un dedo sin que el aviso engorde. */
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.toast-cerrar:hover,
+.toast-cerrar:focus-visible { background: var(--bg-elevated); color: var(--text); outline: none; }
+
+/* Escritorio: esquina inferior derecha, como las notificaciones del sistema.
+   El `min-width` es para que un «Guardado.» no salga como una pastilla
+   diminuta perdida en la esquina: los avisos cortos y los largos ocupan un
+   bloque reconocible (mismo criterio que el snackbar de Material). */
+@media (min-width: 640px) {
+  .toaster {
+    left: auto;
+    right: 0;
+    align-items: flex-end;
+    padding: 0 1.25rem;
+    max-width: 32rem;
+  }
+  .toast { min-width: 20rem; }
+}
+
+@keyframes toast-entra {
+  from { opacity: 0; transform: translateY(1rem) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-sale {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
+}
+
+/* Quien pidió menos movimiento en su sistema recibe solo el fundido. Con
+   nombres DISTINTOS y no redefiniendo los de arriba: dos `@keyframes` con el
+   mismo nombre compiten por él, y cuál gana no es algo en lo que convenga
+   confiar. */
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: toast-fundido 150ms ease-out; }
+  .toast[data-saliendo='true'] { animation: toast-fundido-sale 150ms ease-in both; }
+}
+@keyframes toast-fundido {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes toast-fundido-sale {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ── Pie legal ──
+   Discreto y al final de todo. `margin-top: auto` no sirve aquí (el body no es
+   flex), así que se separa con margen y una línea. */
+.pie-legal {
+  max-width: 1180px;
+  margin: 3rem auto 0;
+  padding: 1.25rem 1.5rem 2rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.pie-legal strong { color: var(--text); font-weight: 700; }
+.pie-legal-nota { margin-top: 0.2rem; opacity: 0.75; }
+
+/* ── Excepciones del calendario ──
+   Fecha y tipo comparten renglón; el motivo va debajo, a lo ancho, porque es
+   una frase y no un dato. En móvil todo se apila solo. */
+.excepcion-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.excepcion-fila {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 0.5rem;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   BARRA Y MENÚ DE HAMBURGUESA
+   (fuera de @layer, misma razón que .tabla-scroll)
+
+   Arriba solo van los enlaces del día a día; el resto vive en el panel, que
+   es el mapa completo (ver el reparto `principal` en NavBar.tsx). Y la
+   identidad —foto, nombre, rol y club— tiene su propio sitio: el botón del
+   menú. Antes competía por el hueco que dejaban los enlaces y, en cuanto el
+   nombre o el club eran largos, se veía apretada contra ellos.
+   ════════════════════════════════════════════════════════════════════════ */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  /* La sombra dice que la barra está ENCIMA y que lo demás pasa por debajo.
+     Sin ella, al bajar por un formulario largo el borde de una tarjeta llegaba
+     a ras de la barra y parecía que la estaba tocando o empujando. */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+.navbar-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1rem;
+}
+.navbar-marca {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.navbar-marca span { font-size: 1rem; white-space: nowrap; }
+/* `min-width: 0` es lo que permite que los enlaces cedan ancho antes que
+   empujar el chip de identidad fuera de la pantalla. */
+.navbar-links { display: none; flex: 1 1 auto; min-width: 0; align-items: center; gap: 0.15rem; }
+.navbar-link {
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+.navbar-link:hover { color: var(--text); }
+.navbar-link[data-activo='true'] { background: var(--bg-elevated); color: var(--gold); }
+.navbar-derecha {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── Botón del menú: foto + nombre de pila + las tres rayas ──
+   Las rayas se vuelven una X al abrir. El nombre se recorta con puntos
+   suspensivos: un nombre de pila largo estrecha el chip, nunca la barra. */
+.navbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 38px;
+  max-width: 12rem;
+  padding: 0 0.55rem;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.navbar-toggle-nombre {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.navbar-toggle:hover,
+.navbar-toggle[aria-expanded='true'] { border-color: var(--gold); color: var(--gold); }
+.navbar-rayas { position: relative; width: 18px; height: 12px; flex-shrink: 0; }
+.navbar-rayas span {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform 0.2s ease, opacity 0.2s ease, top 0.2s ease;
+}
+.navbar-rayas span:nth-child(1) { top: 0; }
+.navbar-rayas span:nth-child(2) { top: 5px; }
+.navbar-rayas span:nth-child(3) { top: 10px; }
+.navbar-rayas[data-abierto='true'] span:nth-child(1) { top: 5px; transform: rotate(45deg); }
+.navbar-rayas[data-abierto='true'] span:nth-child(2) { opacity: 0; }
+.navbar-rayas[data-abierto='true'] span:nth-child(3) { top: 5px; transform: rotate(-45deg); }
+
+/* ── El panel ── */
+.navbar-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0.75rem;
+  z-index: 40;
+  width: 250px;
+  max-width: calc(100vw - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.7rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: aparecer 0.15s ease;
+}
+/* La identidad completa. Aquí SÍ hay sitio: el nombre parte de línea y el
+   club se lee entero, por largo que sea. */
+.navbar-panel-quien {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.55rem 0.7rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+.navbar-panel-datos { min-width: 0; }
+.navbar-panel-quien b {
+  display: block;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.navbar-panel-datos > span {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  overflow-wrap: anywhere;
+}
+.navbar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.55rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0.45rem;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.navbar-item:hover,
+.navbar-item:focus-visible { background: var(--bg-elevated); outline: none; }
+.navbar-item[data-activo='true'] { color: var(--gold); }
+.navbar-sep { height: 1px; margin: 0.35rem 0; background: var(--border); }
+.navbar-panel-links { display: flex; flex-direction: column; gap: 0.15rem; }
+
+/* ── Idiomas ── */
+.navbar-idiomas { display: flex; gap: 0.35rem; padding: 0.15rem 0.55rem 0.35rem; }
+.navbar-idioma {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.navbar-idioma:hover { color: var(--text); background: var(--bg-elevated); }
+.navbar-idioma[data-activo='true'] {
+  background: var(--gold-soft);
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  font-weight: 800;
+}
+.navbar-etiqueta {
+  padding: 0.35rem 0.55rem 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+
+/* ── Vista previa del carnet ──
+   El iframe trae el documento a tamaño de tarjeta y se escala desde el
+   componente cuando la columna es más estrecha (ver Carnet.tsx). El marco solo
+   recorta lo que sobra y le pone fondo, para que la tarjeta blanca se lea
+   igual en modo claro que en oscuro. */
+.carnet-marco {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border);
+  background: #e9e9ee;
+}
+.carnet-marco iframe { display: block; }
+
+/* ── Semana de clases del club, en el panel del alumno ──
+   Siete casillas: las del club encendidas. Se lee de un vistazo «martes y
+   jueves» sin tener que interpretar una lista escrita. */
+.clases-semana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+  margin-top: 1rem;
+}
+.clases-dia {
+  padding: 0.4rem 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clases-dia[data-activo='true'] {
+  background: var(--gold-soft);
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* ── Escalera de cinturones del panel del alumno ──
+   Once puntos, el suyo con un anillo. No es una barra de progreso: subir de
+   grado lo decide el maestro, no el tiempo. */
+.grados {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+.grado {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+}
+.grado[data-activo='true'] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-soft);
+}
+.grado-punto {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+}
+.grado[data-activo='true'] .grado-punto { width: 1rem; height: 1rem; }
+
+/* ── PIN de respaldo, en el panel del alumno ── */
+.pin-respaldo {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 0.9rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 0.6rem;
+}
+.pin-respaldo strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+}
+.pin-respaldo .muted { font-size: 0.72rem; flex-basis: 100%; }
+
+/* ── Hasta cuándo vale el carnet, junto a la vista previa ──
+   Es lo que se mira ANTES de imprimir. Vencido se pone en rojo y el botón de
+   al lado deja de ser un extra: sin reexpedirlo, lo que sale de la impresora
+   es un documento caducado. */
+.carnet-vigencia {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+}
+.carnet-vigencia[data-vencido] {
+  border-color: var(--danger);
+}
+.carnet-vigencia[data-vencido] .mono { color: var(--danger); }
+
+.carnet-formatos { display: flex; gap: 0.35rem; }
+.carnet-formato {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.carnet-formato:hover { color: var(--text); background: var(--bg-elevated); }
+.carnet-formato[data-activo='true'] {
+  background: var(--gold-soft);
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* De aquí para arriba caben los enlaces principales en línea. Por debajo, la
+   barra se queda en marca + campana + chip, y TODO lo demás está a un toque
+   dentro del menú. */
+@media (min-width: 860px) {
+  .navbar-links { display: flex; }
+  .navbar-toggle-nombre { display: block; }
+  /* Lo que ya se ve arriba no se repite dentro. Y si al alumno o al superadmin
+     no les queda nada que repetir, se va también el rótulo: un «Ir a» sobre
+     una lista vacía es peor que no ponerlo. */
+  .navbar-panel-links .navbar-item[data-principal='true'] { display: none; }
+  .navbar-panel-nav[data-solo-principales='true'] { display: none; }
+  .navbar-panel { right: calc((100vw - 1180px) / 2 + 1rem); }
+}
+/* Por debajo de 1180 + márgenes, el contenedor ya no está centrado: el panel
+   vuelve a colgar del borde de la ventana. */
+@media (min-width: 860px) and (max-width: 1212px) {
+  .navbar-panel { right: 1rem; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════
+   CAMPANA DE AVISOS
+   En PC cuelga del botón. En MÓVIL se centra en la pantalla con un velo
+   detrás: anclada a la derecha se salía del borde y el texto del aviso
+   quedaba cortado justo donde dice qué pasa.
+   ════════════════════════════════════════════════════════════════════════ */
+.avisos { position: relative; }
+.avisos-badge {
+  min-width: 1.1rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+}
+.avisos-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.5);
+}
+.avisos-panel {
+  position: fixed;
+  z-index: 51;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - 2rem));
+  max-height: min(70vh, 30rem);
+  overflow-y: auto;
+  padding: 0.9rem;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.8rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+.avisos-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.avisos-item:last-child { border-bottom: 0; }
+.avisos-item[data-nuevo='true'] { border-left: 3px solid var(--gold); padding-left: 0.5rem; }
+.avisos-titulo { font-size: 0.85rem; font-weight: 700; }
+.avisos-texto { font-size: 0.8rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.avisos-fecha {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+@media (min-width: 768px) {
+  .avisos-velo { display: none; }
+  .avisos-panel {
+    position: absolute;
+    left: auto;
+    right: 0;
+    top: calc(100% + 6px);
+    transform: none;
+    width: 340px;
+    max-width: 90vw;
+  }
+}
+
+/* ── Paso de páginas y «ver más» ────────────────────────────────────────── */
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+}
+.paginacion-cuenta {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.ver-mas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0 0.4rem;
+  font-size: 0.72rem;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   EDITOR DE ENCUADRE (<AjustarImagen>)
+   El visor es el cuadrado que se guarda; la imagen se arrastra por debajo.
+   El tablero de ajedrez del fondo solo aparece en el escudo: es lo que hace
+   ver que el fondo es transparente y no blanco.
+   ════════════════════════════════════════════════════════════════════════ */
+.encuadre {
+  padding: 0.9rem;
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.7rem;
+  background: var(--bg-elevated);
+}
+.encuadre-quien {
+  margin-bottom: 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+/* Mide el ancho disponible; el componente le da al visor el lado que quepa
+   (ver `useLayoutEffect` en AjustarImagen). Antes el visor traía un lado fijo
+   con `max-width: 100%`: en un celular angosto el CSS lo encogía sin que el
+   componente se enterara, y el encuadre se calculaba sobre un cuadrado que no
+   era el que estaba en pantalla. */
+.encuadre-caja { width: 100%; }
+.encuadre-visor {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-strong);
+  background: #14141e;
+  cursor: grab;
+  touch-action: none; /* el arrastre es nuestro, no del scroll de la página */
+  user-select: none;
+}
+.encuadre-visor:active { cursor: grabbing; }
+/* ── El arreglo del zoom que aplastaba la foto ──
+   El preflight de Tailwind le pone `max-width: 100%` a todo `<img>`. Aquí la
+   imagen mide a propósito MÁS que su contenedor —eso es acercarla—, así que esa
+   regla le recortaba el ancho al del visor mientras el alto seguía creciendo:
+   la cara salía estirada y corrida hacia la izquierda, y lo que se guardaba no
+   era lo que se veía. */
+.encuadre-visor img {
+  pointer-events: none;
+  max-width: none;
+  max-height: none;
+}
+.encuadre-visor[data-logo='true'] {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, #d8d8e2 25%, transparent 25%),
+    linear-gradient(-45deg, #d8d8e2 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d8d8e2 75%),
+    linear-gradient(-45deg, transparent 75%, #d8d8e2 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* El hueco del carnet (22 × 29 mm) sobre el encuadre: más alto que ancho, así
+   que de un cuadrado se come los lados. Verlo aquí evita descubrirlo al
+   imprimir cincuenta carnets. */
+.encuadre-carnet {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px dashed rgba(240, 184, 0, 0.85);
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+.encuadre-carnet span {
+  position: absolute;
+  bottom: 0.3rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #f0b800;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   KIOSCO · PARRILLA DE MARCADO MANUAL
+   El plan B del carnet QR: una cuadrícula de botones con el nombre de cada
+   alumno, para el que llegó sin carnet y sin acordarse del PIN.
+   ════════════════════════════════════════════════════════════════════════ */
+.kiosco-parrilla {
+  display: grid;
+  /* Un poco más anchas que antes (140 px): con nombres completos en mayúsculas
+     —«MARÍA FERNANDA RESTREPO»— la columna estrecha obligaba a partir cada
+     nombre en cuatro líneas. */
+  grid-template-columns: repeat(auto-fill, minmax(min(165px, 100%), 1fr));
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+}
+/* ── El arreglo del nombre que se salía del botón ──
+   `.btn` lleva `white-space: nowrap`, que es lo que quiere un botón de
+   «Guardar» y lo contrario de lo que necesita uno cuyo texto es el nombre de
+   una persona: los largos se desbordaban del rectángulo y se montaban encima
+   del de al lado. Aquí el nombre se parte en líneas, los botones se estiran
+   todos a la altura del más alto (`align-items: stretch` es el defecto de la
+   cuadrícula) y el dedo sigue teniendo dónde caer. */
+.kiosco-alumno {
+  white-space: normal;
+  /* Para el apellido larguísimo que ni siquiera cabe suelto en la columna. */
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  min-height: 3rem;
+  padding: 0.55rem 0.6rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   VISOR DE IMAGEN (<VisorImagen>)
+   La foto en grande sobre negro, como en WhatsApp. Por encima de todo: la
+   barra pegajosa está en 30 y el editor de encuadre en 50.
+   ════════════════════════════════════════════════════════════════════════ */
+.visor-imagen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.93);
+  touch-action: none; /* el pellizco es del visor, no del navegador */
+  overscroll-behavior: contain;
+}
+.visor-imagen img {
+  max-width: min(92vw, 720px);
+  max-height: 82vh;
+  border-radius: 0.5rem;
+  /* Sin transición: acercar con la rueda o con los dedos tiene que ir pegado
+     al gesto, y una animación de por medio se siente como retraso. */
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.visor-cerrar {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: rgba(20, 20, 30, 0.75);
+  color: #f3f1e8;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.visor-cerrar:hover { border-color: var(--gold); color: var(--gold); }
+.visor-pie {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90vw;
+  color: #f3f1e8;
+  font-size: 0.8rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* La miniatura que se puede abrir en grande. El aro de foco es el mismo que el
+   del resto de la app: esto es un botón, aunque parezca solo una foto. */
+.miniatura-ampliable {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  line-height: 0;
+  border-radius: 50%;
+}
+.miniatura-ampliable[data-logo='true'] { border-radius: 0.6rem; }
+
+.encuadre-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+  font-size: 0.75rem;
+}
+.encuadre-zoom input[type='range'] { flex: 1; accent-color: var(--gold); }
+.encuadre-ayuda { margin-top: 0.4rem; font-size: 0.7rem; }
+.encuadre-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+/* ── Campo de dinero: el símbolo dentro, pegado al borde izquierdo ─────── */
+.campo-dinero { position: relative; width: 100%; }
+.campo-dinero-simbolo {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.campo-dinero input {
+  /* Sitio para el símbolo. `ch` y no `rem`: un `S/` ocupa más que un `$`. */
+  padding-left: calc(1rem + 1.6ch);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   DESPLEGABLES PROPIOS (<SelectMenu>)
+   El `<select>` nativo se pinta con los colores del sistema operativo y
+   rompe la pantalla; este es el mismo menú dorado de DINAMYT-LOCAL.
+   ════════════════════════════════════════════════════════════════════════ */
+.selectmenu { position: relative; width: 100%; }
+.selectmenu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.selectmenu-btn:hover:not(:disabled) { border-color: var(--border-strong); }
+.selectmenu-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.selectmenu-btn[aria-expanded='true'] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.selectmenu-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selectmenu-label[data-vacio='true'] { color: var(--text-muted); }
+.selectmenu-flecha {
+  flex-shrink: 0;
+  color: var(--gold);
+  font-size: 0.8rem;
+  transition: rotate 0.18s ease-out;
+}
+.selectmenu-flecha[data-abierto='true'] { rotate: 180deg; }
+.selectmenu-punto {
+  flex-shrink: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+}
+/* `fixed` y no `absolute`: el panel se monta en el <body> con las coordenadas
+   del botón (ver SelectMenu.tsx). Dentro de la tarjeta del roster hay un
+   `overflow-x: auto` que lo recortaba. */
+.selectmenu-panel {
+  position: fixed;
+  z-index: 55;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  max-height: 17rem;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.6rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.selectmenu-opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.selectmenu-opcion[data-activa='true'] { background: var(--bg-elevated); }
+.selectmenu-opcion[aria-selected='true'] {
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   CALENDARIO PROPIO (<CampoFecha>)
+   El `type="date"` de Android solo se mueve mes a mes: llegar a 2016 son
+   cien toques. Aquí el título abre la rejilla de años. Ver CampoFecha.tsx.
+   ════════════════════════════════════════════════════════════════════════ */
+.campofecha { position: relative; width: 100%; }
+.fecha-panel {
+  position: fixed;
+  z-index: 56;
+  padding: 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.7rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.fecha-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+.fecha-flecha {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  color: var(--gold);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.fecha-flecha:hover:not(:disabled) { border-color: var(--gold); }
+.fecha-flecha:disabled { opacity: 0.3; cursor: not-allowed; }
+.fecha-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  flex: 1;
+  padding: 0.4rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.fecha-titulo:hover { background: var(--bg-elevated); }
+.fecha-titulo-flecha { color: var(--gold); font-size: 0.7rem; }
+.fecha-semana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 0.2rem;
+}
+.fecha-semana span {
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.fecha-rejilla {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.fecha-rejilla-meses { grid-template-columns: repeat(3, 1fr); gap: 0.3rem; }
+.fecha-rejilla-anos { grid-template-columns: repeat(4, 1fr); gap: 0.3rem; }
+.fecha-dia,
+.fecha-celda {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  /* Cuadrado y con la altura del dedo: en el celular estos botones se pulsan
+     con el pulgar, no con un ratón. */
+  min-height: 2.1rem;
+}
+.fecha-celda { min-height: 2.4rem; font-weight: 600; }
+.fecha-dia:hover:not(:disabled),
+.fecha-celda:hover:not(:disabled) { background: var(--bg-elevated); }
+.fecha-dia:disabled,
+.fecha-celda:disabled { opacity: 0.25; cursor: not-allowed; }
+.fecha-dia[data-hoy] { border-color: var(--gold-dim); }
+.fecha-dia[data-elegido],
+.fecha-celda[data-elegido] {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 800;
+}
+.fecha-pie {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+.fecha-pie .btn { flex: 1; }
+
+/* Un botón que se lee como un enlace: la sugerencia de «¿quisiste decir
+   …@gmail.com?» es una acción, no un destino, así que por dentro es un
+   <button> aunque por fuera parezca un enlace. */
+.enlace {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--gold);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+main { animation: aparecer 0.25s ease; }
+@keyframes aparecer {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Tablas del panel (roster, pagos, asistencias) ──────────────────────── */
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+th {
+  color: var(--text-muted);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-weight: 500;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+td.mono, .tabular { font-variant-numeric: tabular-nums; }
+
+/* ── Movimiento (con respeto por reduced-motion) ────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   MODO CLARO
+   Se activa con data-theme="light" en <html> (ver lib/theme.ts y el script
+   anti-flash de layout.tsx). Solo redefine las variables de color: todo lo
+   demás — tipografía, espaciado, componentes — se mantiene igual.
+
+   El oro de marca se oscurece a --gold: #a37400 sobre fondo claro. El
+   #f0b800 del modo oscuro contra blanco da 1.9:1 de contraste, ilegible.
+   ════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f4f8;
+  --bg-card: #ffffff;
+  --bg-elevated: #ececf3;
+  --bg-input: #ffffff;
+  --border: #dcdce6;
+  --border-strong: #b9b9c9;
+  --text: #16161f;
+  --text-muted: #5d5d72;
+  --gold: #a37400;
+  --gold-dim: #8a6200;
+  --gold-soft: rgba(163, 116, 0, 0.1);
+  --accion: #17784f;
+  --accion-texto: #ffffff;
+  --danger: #c4213f;
+  --ok: #167a4d;
+  --info: #1b5fbf;
+}
+
+html[data-theme="light"] ::selection {
+  background: var(--gold);
+  color: #ffffff;
+}
+
+/* En claro las tarjetas se separan del fondo con sombra, no con borde
+   luminoso: el truco del modo oscuro aquí se ve sucio. */
+html[data-theme="light"] .card {
+  box-shadow: 0 1px 3px rgba(22, 22, 31, 0.06), 0 1px 2px rgba(22, 22, 31, 0.04);
+}
+
+/* Las sombras del modo oscuro son negro al 45 %: sobre fondo claro se ven
+   sucias. Los paneles flotantes usan una mucho más suave. */
+html[data-theme="light"] .navbar-panel,
+html[data-theme="light"] .avisos-panel,
+html[data-theme="light"] .selectmenu-panel,
+html[data-theme="light"] .fecha-panel,
+html[data-theme="light"] .apar-panel {
+  box-shadow: 0 8px 24px rgba(22, 22, 31, 0.14);
+}
+
+html[data-theme="light"] .btn-danger {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+}
+
+html[data-theme="light"] .badge-ok {
+  background: rgba(22, 122, 77, 0.1);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+html[data-theme="light"] .badge-danger {
+  background: rgba(196, 33, 63, 0.1);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ── Impresión ───────────────────────────────────────────────────────────
+   El carnet YA NO se imprime desde aquí: tiene su propio documento, a tamaño
+   de tarjeta, dentro de un iframe (ver `lib/carnet.ts`). Lo que queda es lo
+   que pasa cuando alguien pulsa Ctrl+P en cualquier pantalla: tinta negra
+   sobre blanco, sin la barra ni los botones, y sin partir una tarjeta en dos
+   hojas. */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .navbar,
+  .carnet-formatos,
+  button {
+    display: none !important;
+  }
+  .card {
+    border-color: #cccccc !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  .muted { color: #444444 !important; }
+}
