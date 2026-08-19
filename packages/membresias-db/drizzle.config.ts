@@ -13,4 +13,8 @@ export default defineConfig({
     url: process.env.MEMBRESIAS_DATABASE_URL!,
   },
   schemaFilter: ['membresias'],
+  // El diario de migraciones va DENTRO del esquema de la app, no en el
+  // `drizzle` global: en el VPS la base es una sola y hay un esquema por app,
+  // así que un diario global lo compartirían todas. Ver `src/diario.ts`.
+  migrations: { schema: 'membresias' },
 });
