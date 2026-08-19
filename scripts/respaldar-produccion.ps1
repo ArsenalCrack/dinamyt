@@ -42,7 +42,12 @@ param(
     # volcado hecho con la 18 NO se restaura en el PostgreSQL 17 del VPS.
     # Aqui se fija la 17, que es la que va a correr alli: madura, y la misma
     # rama que sirve Supabase.
-    [string]$PgVersion = '17'
+    [string]$PgVersion = '17',
+    # Repetir solo una de las tres, cuando una falla y las otras ya salieron.
+    # Volver a volcar lo que ya esta bien no es gratis: son minutos y trafico
+    # contra una base de produccion.
+    [ValidateSet('eco_acad', 'membresias', 'campeonatos')]
+    [string]$Solo
 )
 
 $ErrorActionPreference = 'Stop'
@@ -85,6 +90,11 @@ $trabajos = @(
        Esquemas = @('public')
        Nota = 'proyecto zceny... — Flask, sus tablas viven en public' }
 )
+
+if ($Solo) {
+    $trabajos = $trabajos | Where-Object { $_.Nombre -eq $Solo }
+    Write-Host "Solo: $Solo" -ForegroundColor DarkGray
+}
 
 New-Item -ItemType Directory -Force -Path $Destino | Out-Null
 $sello = Get-Date -Format 'yyyy-MM-dd_HHmm'
