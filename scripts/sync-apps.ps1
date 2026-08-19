@@ -46,6 +46,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Situarse en la raiz del repositorio, sea cual sea el directorio desde el que
+# se llame. `git subtree` trabaja siempre sobre el repo del directorio actual, y
+# sin esto el guion falla con "not a git repository" en cuanto se ejecuta desde
+# fuera — que es justo como se ejecuta un guion al que se llama por su ruta.
+$raiz = Split-Path -Parent $PSScriptRoot
+Push-Location $raiz
+try {
+    if (-not (Test-Path (Join-Path $raiz '.git'))) {
+        throw "No parece un repositorio git: $raiz"
+    }
+
 $espejos = @(
     @{ Nombre = 'campeonatos'
        Prefijo = 'productos/campeonatos'
@@ -98,3 +109,6 @@ foreach ($e in $espejos) {
 
 Write-Host ""
 Write-Host "Listo. Recuerda: lo de productos/ NO se edita aqui." -ForegroundColor Yellow
+
+}
+finally { Pop-Location }
