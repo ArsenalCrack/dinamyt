@@ -34,34 +34,104 @@ export class UsersService {
     return result[0] ?? null;
   }
 
+  /** Costo de bcrypt del ecosistema. Las apps importadas usan 10. */
+  static readonly BCRYPT_ROUNDS = 12;
+
   // Crear usuario nuevo
   async createUser(data: {
     email: string;
     password: string;
     fullName: string;
-    documentId: string;
+    /** Opcional: las cuentas importadas (§2.4) no traen documento. */
+    documentId?: string | null;
     phone?: string;
     birthDate?: Date;
+    origen?: string;
   }) {
-    const passwordHash = await bcrypt.hash(data.password, 12);
+    const passwordHash = await bcrypt.hash(
+      data.password,
+      UsersService.BCRYPT_ROUNDS,
+    );
 
     const result = await db
       .insert(users)
       .values({
         email: data.email,
         passwordHash: passwordHash,
+        passwordOrigen: 'propio',
         fullName: data.fullName,
-        documentId: data.documentId,
+        documentId: data.documentId ?? null,
         phone: data.phone ?? null,
         birthDate: data.birthDate ?? null,
+        origen: data.origen ?? 'registro',
       })
       .returning();
 
     return result[0];
   }
 
-  // Verificar contraseña
-  async verifyPassword(plainPassword: string, hash: string): Promise<boolean> {
+  /**
+   * Cuenta creada por el maestro (camino B, §2.1): existe, pertenece a la
+   * persona y **no tiene contraseña todavía**. Sin `password_hash` no se puede
+   * iniciar sesión, así que la cuenta no es utilizable por nadie hasta que su
+   * dueño abra el enlace de invitación y ponga una.
+   *
+   * Tampoco se da el correo por verificado: eso lo hace `ponerContrasena`, y
+   * lo hace con razón — abrir el enlace ES la prueba de que la dirección existe.
+   */
+  async crearInvitado(data: {
+    email: string;
+    fullName: string;
+    phone?: string | null;
+  }) {
+    const [fila] = await db
+      .insert(users)
+      .values({
+        email: data.email,
+        fullName: data.fullName,
+        phone: data.phone ?? null,
+        passwordHash: null,
+        origen: 'invitacion',
+      })
+      .returning();
+    return fila;
+  }
+
+  /**
+   * Canje del enlace de invitación: pone la contraseña y da el correo por
+   * verificado **en el mismo acto**, porque el enlace llegó a esa dirección y
+   * alguien lo abrió. Pedir después un código por correo sería preguntar dos
+   * veces lo mismo.
+   */
+  async ponerContrasena(userId: string, password: string) {
+    const passwordHash = await bcrypt.hash(
+      password,
+      UsersService.BCRYPT_ROUNDS,
+    );
+    await db
+      .update(users)
+      .set({
+        passwordHash,
+        passwordOrigen: 'propio',
+        isEmailVerified: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  /**
+   * Verificar contraseña.
+   *
+   * El hash puede ser NULL (cuenta invitada que todavía no puso contraseña) y
+   * puede venir de otra app: Membresías y Campeonatos hashean con bcrypt al
+   * mismo costo, así que `compare` los acepta sin conversión. Quien decide qué
+   * decirle a la persona cuando no hay hash es `AuthService.login`.
+   */
+  async verifyPassword(
+    plainPassword: string,
+    hash: string | null,
+  ): Promise<boolean> {
+    if (!hash) return false;
     return bcrypt.compare(plainPassword, hash);
   }
 
@@ -123,10 +193,20 @@ export class UsersService {
       .where(eq(users.id, userId));
   }
 
-  // Actualizar contraseña
+  /**
+   * Actualizar contraseña. Sirve también para volver a hashear al costo del
+   * ecosistema la contraseña heredada de otra app tras un login correcto: en
+   * los dos casos, a partir de aquí la contraseña es `propio`.
+   */
   async updatePassword(userId: string, newPassword: string) {
-    const passwordHash = await bcrypt.hash(newPassword, 12);
-    await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+    const passwordHash = await bcrypt.hash(
+      newPassword,
+      UsersService.BCRYPT_ROUNDS,
+    );
+    await db
+      .update(users)
+      .set({ passwordHash, passwordOrigen: 'propio' })
+      .where(eq(users.id, userId));
   }
 
   // ── Bloqueo por intentos fallidos (anti fuerza-bruta) ──────────────────────

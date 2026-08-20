@@ -24,6 +24,18 @@ import {
 
 type User = InferSelectModel<typeof users>;
 
+// Catálogos de roles por app. Los tipos viven en `@dinamyt/shared`, pero son
+// tipos: no existen en tiempo de ejecución y aquí hay que comprobar valores.
+const ROLES_MEMBRESIAS = ['owner', 'staff', 'guardian', 'student'] as const;
+const ROLES_CAMPEONATOS = [
+  'admin',
+  'maestro',
+  'coach',
+  'competitor',
+  'judge',
+] as const;
+const ROLES_ACADEMY = ['admin', 'teacher', 'student'] as const;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -58,7 +70,9 @@ export class AuthService {
 
     const existing = await this.usersService.findByEmail(data.email);
     if (existing) {
-      throw new BadRequestException('Ya existe una cuenta con ese correo.');
+      throw new BadRequestException(
+        AuthService.mensajeCuentaExistente(existing),
+      );
     }
 
     const user = await this.usersService.createUser(data);
@@ -69,6 +83,35 @@ export class AuthService {
       message: 'Usuario registrado. Revisa tu correo para verificar tu cuenta.',
       userId: user.id,
     };
+  }
+
+  /**
+   * Qué se le dice a quien intenta registrarse con un correo que ya está.
+   *
+   * Importa el matiz: para casi todo el club la cuenta NO la crearon ellos —la
+   * trajo la reconciliación (§2.4) desde Membresías o Campeonatos—, así que
+   * «ya existe una cuenta con ese correo» se lee como un error ajeno. Lo que
+   * necesitan saber es que la cuenta es suya y que ya tiene contraseña.
+   *
+   * **Lo que NO se dice: de qué app viene.** Decir «entra con la contraseña que
+   * usas en Membresías» le entrega a cualquiera que pruebe correos ajenos dos
+   * datos por el precio de uno: que esa persona existe y en qué aplicación
+   * buscarla. Para el dueño de la cuenta no aporta nada —su contraseña es la
+   * misma en las dos— y para quien va de pesca es un mapa. Desde fuera, DINAMYT
+   * es un solo sitio; el origen de la cuenta es asunto interno y se queda en
+   * `users.origen`.
+   */
+  static mensajeCuentaExistente(user: Pick<User, 'origen'>): string {
+    switch (user.origen) {
+      case 'importado-membresias':
+      case 'importado-campeonatos':
+      case 'importado-ambas':
+        return 'Ya tienes una cuenta de DINAMYT con ese correo. Inicia sesión con tu contraseña de siempre; si no la recuerdas, usa «¿Olvidaste tu contraseña?».';
+      case 'invitacion':
+        return 'Ya hay una cuenta con ese correo, todavía sin contraseña. Abre el enlace que te enviamos para ponerla.';
+      default:
+        return 'Ya existe una cuenta con ese correo.';
+    }
   }
 
   // ── Verificar OTP de email ────────────────────────────────────────────────
@@ -112,6 +155,15 @@ export class AuthService {
       );
     }
 
+    // Cuenta invitada que todavía no tiene contraseña (camino B, §2.1). Se
+    // dice tal cual: fingir «contraseña incorrecta» manda a la persona a
+    // probar veinte veces una contraseña que no existe.
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        'Tu cuenta existe pero todavía no tiene contraseña. Abre el enlace que te enviamos por correo para ponerla.',
+      );
+    }
+
     const validPassword = await this.usersService.verifyPassword(
       password,
       user.passwordHash,
@@ -148,6 +200,14 @@ export class AuthService {
     // Login correcto: limpia el contador de intentos y cualquier bloqueo vencido.
     if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
       await this.usersService.desbloquearCuenta(user.id);
+    }
+
+    // Contraseña heredada de otra app (§2.4): se acaba de comprobar que es la
+    // correcta, así que aquí —y solo aquí— se puede volver a hashear al costo
+    // del ecosistema. Del segundo login en adelante la cuenta ya no depende
+    // del hash que trajo la importación. La persona no nota nada.
+    if (user.passwordOrigen && user.passwordOrigen !== 'propio') {
+      await this.usersService.updatePassword(user.id, password);
     }
 
     const token = await this.buildToken(user);
@@ -220,6 +280,47 @@ export class AuthService {
     return { message: 'Contraseña actualizada correctamente.' };
   }
 
+  // ── Poner la contraseña desde el enlace de invitación ─────────────────────
+  //
+  // Solo funciona mientras la cuenta NO tenga contraseña. Eso es lo que hace
+  // que el enlace sea de un solo uso sin llevar una lista de enlaces gastados:
+  // en cuanto alguien la pone, el mismo enlace deja de abrir nada. Y si el
+  // enlace se filtró después, tampoco sirve para robar la cuenta — para eso
+  // está «olvidé mi contraseña», que exige entrar al correo.
+  async setPassword(token: string, newPassword: string) {
+    if (!token) throw new BadRequestException('Falta el enlace de invitación.');
+    if (!newPassword || newPassword.length < 8) {
+      throw new BadRequestException(
+        'La contraseña debe tener al menos 8 caracteres.',
+      );
+    }
+
+    let userId: string;
+    try {
+      userId = await this.jwtService.verificarInvitacion(token);
+    } catch {
+      throw new BadRequestException(
+        'Este enlace ya no es válido. Pídele a tu club que te invite otra vez.',
+      );
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user || !user.isActive) {
+      throw new BadRequestException('Esta cuenta ya no está disponible.');
+    }
+    if (user.passwordHash) {
+      throw new BadRequestException(
+        'Esta cuenta ya tiene contraseña. Inicia sesión, o usa «¿Olvidaste tu contraseña?».',
+      );
+    }
+
+    await this.usersService.ponerContrasena(userId, newPassword);
+    return {
+      message: 'Contraseña guardada. Ya puedes iniciar sesión.',
+      email: user.email,
+    };
+  }
+
   // ── Verificar token (lo consumen las otras apps) ──────────────────────────
   async verifyToken(token: string) {
     try {
@@ -230,17 +331,33 @@ export class AuthService {
     }
   }
 
-  // ── Construir el payload del token con scopes reales ──────────────────────
+  // ── Construir el payload del token ────────────────────────────────────────
   //
-  // Consulta las suscripciones activas del usuario (organizacionales y
-  // personales), extrae los apps_included de cada plan, y construye el
-  // payload JWT con:
-  //   - app_scopes: array deduplicado de apps a las que tiene acceso
-  //   - org_id: ID de la primera organización a la que pertenece
-  //   - role_academy / role_campeonatos / role_membresias: rol del usuario en la org
+  // Son dos preguntas distintas, y antes se contestaban con una sola consulta:
   //
+  //   QUIÉN ERES  → `org_members`: a qué club perteneces y con qué rol en cada
+  //                 app. Es identidad, y no se apaga porque nadie haya pagado.
+  //   QUÉ ABRES   → `subscriptions`: qué apps habilita el plan del club (o el
+  //                 personal). Eso sí es comercial.
+  //
+  // Mezclarlas dejaba `org_id` y los roles en `null` para todo club sin
+  // suscripción activa — es decir, para TODOS los clubes recién reconciliados
+  // (§2.4): la gente entraría al portal sin club y las apps no sabrían quién
+  // es. Ahora la pertenencia manda; la suscripción solo llena `app_scopes`.
   private async buildToken(user: User): Promise<string> {
     const now = new Date();
+
+    // ── 0. Pertenencias del usuario (identidad) ──────────────────────────
+    const pertenencias = await db
+      .select({
+        orgId: orgMembers.orgId,
+        role: orgMembers.role,
+        roleMembresias: orgMembers.roleMembresias,
+        roleCampeonatos: orgMembers.roleCampeonatos,
+        roleAcademy: orgMembers.roleAcademy,
+      })
+      .from(orgMembers)
+      .where(eq(orgMembers.userId, user.id));
 
     // ── 1. Suscripciones organizacionales activas del usuario ────────────
     // Join: org_members → subscriptions → subscription_plans
@@ -302,19 +419,38 @@ export class AuthService {
     const uniqueScopes = [...new Set(allScopes)];
 
     // ── 4. Determinar org_id y roles ────────────────────────────────────
-    // Toma la primera organización con suscripción activa
-    const firstOrg = orgSubs[0] ?? null;
-    const orgId = firstOrg?.orgId ?? null;
-    const orgRole = firstOrg?.role ?? null;
+    // El club es el de la pertenencia; entre varios gana el que tenga
+    // suscripción activa, que es el que la persona va a poder abrir.
+    const conSuscripcion = new Set(orgSubs.map((s) => s.orgId));
+    const principal =
+      pertenencias.find((p) => conSuscripcion.has(p.orgId)) ??
+      pertenencias[0] ??
+      null;
 
-    // Mapear el rol de la org a los campos del JWT
-    // Si el scope incluye la app, se asigna el rol de la org
-    const roleAcademy =
-      uniqueScopes.includes('academy') && orgRole ? orgRole : null;
-    const roleCampeonatos =
-      uniqueScopes.includes('campeonatos') && orgRole ? orgRole : null;
-    const roleMembresias =
-      uniqueScopes.includes('membresias') && orgRole ? orgRole : null;
+    const orgId = principal?.orgId ?? null;
+
+    // El rol por app sale de su columna. Si está vacía se cae al rol general,
+    // pero solo cuando ese valor pertenece al catálogo de esa app: las filas
+    // viejas traen 'member' o 'admin', y colar 'member' como rol de Membresías
+    // sería inventarse un permiso que la app no sabe interpretar.
+    const rolDeApp = (
+      propio: string | null | undefined,
+      catalogo: readonly string[],
+    ): string | null => {
+      if (propio) return propio;
+      const general = principal?.role ?? null;
+      return general && catalogo.includes(general) ? general : null;
+    };
+
+    const roleAcademy = rolDeApp(principal?.roleAcademy, ROLES_ACADEMY);
+    const roleCampeonatos = rolDeApp(
+      principal?.roleCampeonatos,
+      ROLES_CAMPEONATOS,
+    );
+    const roleMembresias = rolDeApp(
+      principal?.roleMembresias,
+      ROLES_MEMBRESIAS,
+    );
 
     // ── 5. Construir y firmar el payload ────────────────────────────────
     const payload: JwtPayload = {
