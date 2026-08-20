@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { registerAPI, guardarUsuarioPendiente, extraerError } from '@/lib/api';
 import { soloLetras, soloDigitos } from '@/lib/validacion';
+import { CampoContrasena } from '@/components/CampoContrasena';
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -95,15 +96,16 @@ export default function RegistroPage() {
         </label>
         <label className="mb-3 block text-sm">
           Contraseña (mín. 8 caracteres)
-          <input
-            type="password"
-            value={form.password}
-            onChange={set('password')}
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className="mt-1"
-          />
+          {/* El mismo ojo que Membresías y Campeonatos (ver UNA-SOLA-APP.md §2). */}
+          <span className="mt-1 block">
+            <CampoContrasena
+              value={form.password}
+              onChange={set('password')}
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </span>
         </label>
         <label className="mb-4 flex items-start gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
           <input

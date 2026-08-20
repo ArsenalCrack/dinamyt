@@ -57,6 +57,15 @@ input:focus, select:focus, textarea:focus {
 }
 input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--gold); }
 
+/* ── Contraseñas: un solo ojo, el nuestro ──
+   Edge dibuja el suyo (`::-ms-reveal`) y ningún otro navegador lo hace, así que
+   el «ver contraseña» lo pone <CampoContrasena> para todos. Sin esta regla,
+   Edge —y solo Edge— enseñaría los dos, uno encima del otro. `::-ms-clear` es
+   la «x» de borrar del mismo navegador, que además tapa el ojo.
+   La misma regla está en el portal, en Membresías y en Campeonatos. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }
+
 :focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;

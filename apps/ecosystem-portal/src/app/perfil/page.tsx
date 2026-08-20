@@ -15,6 +15,7 @@ import {
   PARENTESCOS,
   comprimirAvatar,
 } from '@/lib/validacion';
+import { CampoContrasena } from '@/components/CampoContrasena';
 
 interface Disciplina {
   id: string;
@@ -194,17 +195,33 @@ export default function PerfilPage() {
     valor: string,
     onChange: (v: string) => void,
     props: Record<string, unknown> = {},
-  ) => (
-    <label className="block text-sm">
-      <span style={{ color: 'var(--text-muted)' }}>{etiqueta}</span>
-      <input
-        className="mt-1"
-        value={valor}
-        onChange={(e) => onChange(e.target.value)}
-        {...props}
-      />
-    </label>
-  );
+  ) => {
+    // Las contraseñas llevan el ojo del ecosistema, el mismo que el login,
+    // Membresías y Campeonatos (ver UNA-SOLA-APP.md §2). `type` sobra ahí: el
+    // componente lo maneja él.
+    const { type, ...resto } = props;
+    return (
+      <label className="block text-sm">
+        <span style={{ color: 'var(--text-muted)' }}>{etiqueta}</span>
+        {type === 'password' ? (
+          <span className="mt-1 block">
+            <CampoContrasena
+              value={valor}
+              onChange={(e) => onChange(e.target.value)}
+              {...resto}
+            />
+          </span>
+        ) : (
+          <input
+            className="mt-1"
+            value={valor}
+            onChange={(e) => onChange(e.target.value)}
+            {...props}
+          />
+        )}
+      </label>
+    );
+  };
 
   if (!perfil) {
     return (

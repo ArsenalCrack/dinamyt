@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ponerContrasenaAPI, extraerError } from '@/lib/api';
+import { CampoContrasena } from '@/components/CampoContrasena';
 
 /**
  * Donde aterriza el enlace de invitación del maestro (camino B, §2.1).
@@ -18,7 +19,6 @@ function PonerContrasena() {
 
   const [clave, setClave] = useState('');
   const [repetida, setRepetida] = useState('');
-  const [verClave, setVerClave] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -89,40 +89,34 @@ function PonerContrasena() {
               todo DINAMYT.
             </p>
 
+            {/* El mismo ojo que el login, Membresías y Campeonatos, en vez de
+                la casilla «ver lo que escribo» que solo existía aquí (ver
+                UNA-SOLA-APP.md §2). Cada campo lleva el suyo: quien se
+                equivoca al repetirla necesita mirar ESA, no las dos. */}
             <label className="mb-3 block text-sm">
               Contraseña
-              <input
-                type={verClave ? 'text' : 'password'}
-                value={clave}
-                onChange={(e) => setClave(e.target.value)}
-                minLength={8}
-                required
-                autoComplete="new-password"
-                className="mt-1"
-              />
+              <span className="mt-1 block">
+                <CampoContrasena
+                  value={clave}
+                  onChange={(e) => setClave(e.target.value)}
+                  minLength={8}
+                  required
+                  autoComplete="new-password"
+                />
+              </span>
             </label>
 
-            <label className="mb-3 block text-sm">
+            <label className="mb-4 block text-sm">
               Repítela
-              <input
-                type={verClave ? 'text' : 'password'}
-                value={repetida}
-                onChange={(e) => setRepetida(e.target.value)}
-                minLength={8}
-                required
-                autoComplete="new-password"
-                className="mt-1"
-              />
-            </label>
-
-            <label className="mb-4 flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={verClave}
-                onChange={(e) => setVerClave(e.target.checked)}
-                className="h-4 w-4"
-              />
-              Ver lo que escribo
+              <span className="mt-1 block">
+                <CampoContrasena
+                  value={repetida}
+                  onChange={(e) => setRepetida(e.target.value)}
+                  minLength={8}
+                  required
+                  autoComplete="new-password"
+                />
+              </span>
             </label>
 
             {error && (
