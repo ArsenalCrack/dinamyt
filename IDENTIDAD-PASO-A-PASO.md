@@ -65,11 +65,17 @@ del hash importado.
 No es opcional. Esto escribe en los tres esquemas a la vez.
 
 ```bash
-sudo -u postgres pg_dump -Fc dinamyt > /var/backups/dinamyt-antes-de-identidad.dump
-ls -lh /var/backups/dinamyt-antes-de-identidad.dump
+sudo -u postgres pg_dump -Fc dinamyt | sudo tee /var/backups/dinamyt-antes-de-identidad.dump > /dev/null
+sudo ls -lh /var/backups/dinamyt-antes-de-identidad.dump
 ```
 
 ✅ El archivo pesa algo. Si pesa cero, no sigas.
+
+> **Por qué `| sudo tee` y no `> /var/backups/...`.** El `>` lo ejecuta TU
+> shell, no `sudo`: con la flecha, quien intenta escribir en `/var/backups`
+> eres tú, y esa carpeta es de root — `Permission denied`. Con `tee` detrás de
+> `sudo`, quien escribe es root, que sí puede. Es el mismo motivo por el que
+> el respaldo diario del cron sí funciona: lo corre root.
 
 ---
 
