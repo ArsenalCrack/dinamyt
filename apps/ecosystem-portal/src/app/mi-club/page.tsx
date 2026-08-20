@@ -14,6 +14,7 @@ import {
   type Pais,
 } from '@/lib/api';
 import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
+import { nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 
 const TIPO: Record<string, string> = {
@@ -21,17 +22,6 @@ const TIPO: Record<string, string> = {
   LEAGUE: 'Liga',
   CLUB: 'Club',
   ACADEMY: 'Academia',
-};
-
-const ROL: Record<string, string> = {
-  maestro: 'Maestro',
-  owner: 'Dueño',
-  admin: 'Administrador',
-  coach: 'Coach',
-  judge: 'Juez',
-  competitor: 'Alumno',
-  student: 'Alumno',
-  member: 'Miembro',
 };
 
 /** Nombre del país en español a partir del iso2 (el catálogo viene en inglés). */
@@ -373,7 +363,7 @@ export default function MiClubPage() {
                 </p>
               )}
             </div>
-            <span className="badge badge-gold">{ROL[club.myRole] ?? club.myRole}</span>
+            <span className="badge badge-gold">{nombreRol(club.myRole)}</span>
           </div>
 
           <div className="p-5">
@@ -426,14 +416,25 @@ export default function MiClubPage() {
                 </h3>
                 <ul className="flex flex-col gap-1.5 text-sm">
                   {club.gestores.map((g, i) => (
-                    <li key={i} className="flex flex-wrap items-center gap-2">
+                    /* Nombre, correo y teléfono en columna y recortados: en
+                       una sola línea, un correo normal se sale de la tarjeta
+                       en cualquier celular. El `title` deja leerlo entero. */
+                    <li key={i} className="flex items-center gap-2">
                       <Avatar src={g.avatarUrl} nombre={g.fullName} size={32} />
-                      <span className="badge">{ROL[g.role] ?? g.role}</span>
-                      <strong>{g.fullName}</strong>
-                      <span style={{ color: 'var(--text-muted)' }}>
-                        {g.email}
-                        {g.phone ? ` · ${g.phone}` : ''}
-                      </span>
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-1.5">
+                          <span className="badge">{nombreRol(g.role)}</span>
+                          <strong className="truncate">{g.fullName}</strong>
+                        </p>
+                        <p
+                          className="truncate text-xs"
+                          style={{ color: 'var(--text-muted)' }}
+                          title={`${g.email}${g.phone ? ` · ${g.phone}` : ''}`}
+                        >
+                          {g.email}
+                          {g.phone ? ` · ${g.phone}` : ''}
+                        </p>
+                      </div>
                     </li>
                   ))}
                 </ul>

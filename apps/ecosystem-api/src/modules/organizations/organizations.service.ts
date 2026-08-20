@@ -856,6 +856,13 @@ export class OrganizationsService {
 
   // ── Listar miembros de una organización ───────────────────────────────────
   // Join org_members → users para obtener datos del usuario
+  //
+  // Devuelve el rol GENERAL y también los de cada app. No es un adorno: son
+  // campos distintos con dueños distintos —el general lo pone el portal, los de
+  // app los pone cada producto— y hasta que se enseñaron, quien miraba el panel
+  // veía un solo rol y daba por hecho que era «el» rol. De ahí la sensación de
+  // que los datos se contradecían: no se contradecían, se estaban escondiendo
+  // tres cuartas partes.
   async getMembers(orgId: string) {
     // Verificar que la organización existe
     await this.findById(orgId);
@@ -864,6 +871,9 @@ export class OrganizationsService {
       .select({
         memberId: orgMembers.id,
         role: orgMembers.role,
+        roleMembresias: orgMembers.roleMembresias,
+        roleCampeonatos: orgMembers.roleCampeonatos,
+        roleAcademy: orgMembers.roleAcademy,
         joinedAt: orgMembers.joinedAt,
         userId: users.id,
         email: users.email,

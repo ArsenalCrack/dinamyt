@@ -31,10 +31,8 @@ import {
   type SuscripcionPersonal,
   type CuentaBloqueada,
 } from '@/lib/api';
-
-/** Roles de membresía que viajan al JWT (role_campeonatos / role_academy). */
-/** admin gestiona · maestro inscribe · coach es un título · judge puntúa. */
-const ROLES = ['admin', 'maestro', 'coach', 'judge', 'competitor', 'member'] as const;
+import { ROLES_SUPERADMIN, nombreRol } from '@/lib/roles';
+import { FilaMiembro } from '@/components/FilaMiembro';
 const TIPOS_ORG = ['FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY'] as const;
 
 /**
@@ -261,36 +259,19 @@ export default function AdminEcosistemaPage() {
             <>
               <ul className="mb-4 flex flex-col gap-2">
                 {miembros.map((m) => (
-                  <li
+                  <FilaMiembro
                     key={m.memberId}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <strong>{m.fullName}</strong>
-                      <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
-                        · {m.email}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <select
-                        value={m.role}
-                        onChange={(e) =>
-                          accion(
-                            () => cambiarRolMiembroAPI(orgSel.id, m.userId, e.target.value),
-                            'Rol actualizado.',
-                            'No se pudo cambiar el rol.',
-                          )
-                        }
-                        disabled={ocupado}
-                        style={selectStyle}
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
+                    miembro={m}
+                    asignables={ROLES_SUPERADMIN}
+                    ocupado={ocupado}
+                    onCambiarRol={(rol) =>
+                      accion(
+                        () => cambiarRolMiembroAPI(orgSel.id, m.userId, rol),
+                        'Rol actualizado.',
+                        'No se pudo cambiar el rol.',
+                      )
+                    }
+                    acciones={
                       <button
                         onClick={() =>
                           accion(
@@ -302,11 +283,12 @@ export default function AdminEcosistemaPage() {
                         disabled={ocupado}
                         className="btn btn-outline"
                         style={{ color: 'var(--danger)' }}
+                        title={`Quitar a ${m.fullName} de la organización`}
                       >
                         ✕
                       </button>
-                    </span>
-                  </li>
+                    }
+                  />
                 ))}
                 {miembros.length === 0 && (
                   <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -327,9 +309,9 @@ export default function AdminEcosistemaPage() {
                   onChange={(e) => setInvitacion({ ...invitacion, role: e.target.value })}
                   style={selectStyle}
                 >
-                  {ROLES.map((r) => (
+                  {ROLES_SUPERADMIN.map((r) => (
                     <option key={r} value={r}>
-                      {r}
+                      {nombreRol(r)}
                     </option>
                   ))}
                 </select>
@@ -726,7 +708,7 @@ function AccesosRapidos({
             <span style={{ color: 'var(--text-muted)' }}>· {sel.email}</span>
             {sel.membresias.map((m, i) => (
               <span key={i} className="badge ml-1">
-                {m.org}: {m.role}
+                {m.org}: {nombreRol(m.role)}
               </span>
             ))}
           </p>
@@ -736,9 +718,9 @@ function AccesosRapidos({
               <option value="academy">Academy</option>
             </select>
             <select value={rol} onChange={(e) => setRol(e.target.value)} style={selectStyle}>
-              {ROLES.map((r) => (
+              {ROLES_SUPERADMIN.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {nombreRol(r)}
                 </option>
               ))}
             </select>

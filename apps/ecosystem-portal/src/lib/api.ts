@@ -186,7 +186,17 @@ export interface Organizacion {
 }
 export interface Miembro {
   memberId: string;
+  /** Rol GENERAL en la organización: el del portal, quién gestiona el club. */
   role: string;
+  /**
+   * Rol dentro de cada app, o `null` si no participa en ella. Es la verdad de
+   * cada producto y NO tiene por qué coincidir con el general: la misma
+   * persona es alumno de su club y juez en un campeonato. Se enseñan en
+   * pantalla para que nadie tenga que adivinar cuál está mirando.
+   */
+  roleMembresias?: string | null;
+  roleCampeonatos?: string | null;
+  roleAcademy?: string | null;
   userId: string;
   email: string;
   fullName: string;

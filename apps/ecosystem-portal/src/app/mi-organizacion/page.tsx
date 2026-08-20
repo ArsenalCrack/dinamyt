@@ -26,26 +26,9 @@ import {
   type InvitacionClub,
 } from '@/lib/api';
 import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
+import { ROLES_CLUB, ROLES_ORG, nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
-
-// Reparto de roles (decisión de producto): la organización (federación/liga)
-// agrega administradores y jueces; el club agrega maestros, coaches y
-// competidores. El backend valida lo mismo.
-const ROLES_ORG = ['admin', 'judge'] as const;
-// El club agrega a su gente: maestro, coach y ALUMNOS (el alumno ES el
-// competidor — una sola etiqueta para no confundir). Jueces: solo la org.
-const ROLES_CLUB = ['maestro', 'coach', 'competitor'] as const;
-
-const NOMBRE_ROL: Record<string, string> = {
-  admin: 'Administrador',
-  judge: 'Juez',
-  maestro: 'Maestro',
-  owner: 'Dueño',
-  coach: 'Coach',
-  competitor: 'Alumno',
-  student: 'Alumno',
-  member: 'Miembro',
-};
+import { FilaMiembro } from '@/components/FilaMiembro';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -306,11 +289,13 @@ export default function MiOrganizacionPage() {
                   className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm"
                   style={{ borderColor: sel === o.id ? 'var(--gold)' : 'var(--border)' }}
                 >
-                  <span>
-                    <strong>{o.name}</strong>
-                    <span className="badge ml-2">{TIPO[o.type] ?? o.type}</span>
-                    <span className="badge ml-1">{NOMBRE_ROL[o.myRole] ?? o.myRole}</span>
-                    {o.isActive === false && <span className="badge ml-1">Desactivada</span>}
+                  {/* Envuelve en vez de empujar: un nombre de club largo
+                      sacaba las insignias fuera del botón. */}
+                  <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <strong className="min-w-0 truncate">{o.name}</strong>
+                    <span className="badge">{TIPO[o.type] ?? o.type}</span>
+                    <span className="badge">{nombreRol(o.myRole)}</span>
+                    {o.isActive === false && <span className="badge">Desactivada</span>}
                   </span>
                 </button>
                 {/* Clubes hijos */}
@@ -489,73 +474,48 @@ export default function MiOrganizacionPage() {
           )}
           <ul className="mb-4 flex flex-col gap-2">
             {miembros.map((m) => (
-              <li
+              <FilaMiembro
                 key={m.memberId}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <Avatar src={m.avatarUrl} nombre={m.fullName} size={32} />
-                  <span className="min-w-0">
-                    <strong>{m.fullName}</strong>
-                    <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
-                      · {m.email}
-                    </span>
-                  </span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  {/* El gestor edita el perfil del miembro (nombre, nacimiento,
-                      cinturón, tipo de sangre…) */}
-                  <Link
-                    href={`/mi-organizacion/miembro/${m.userId}`}
-                    className="btn btn-outline btn-sm"
-                    title="Editar el perfil de esta persona"
-                  >
-                    ✎ Perfil
-                  </Link>
-                  <select
-                    value={m.role}
-                    onChange={(e) =>
-                      accion(
-                        () => cambiarRolMiembroAPI(sel!, m.userId, e.target.value),
-                        'Rol actualizado.',
-                        'No se pudo cambiar el rol.',
-                      )
-                    }
-                    disabled={ocupado}
-                  >
-                    {/* El rol actual siempre aparece aunque no sea asignable aquí.
-                        student y competitor son la misma etiqueta (Alumno):
-                        no se ofrecen los dos a la vez. */}
-                    {[
-                      ...new Set([
-                        m.role,
-                        ...rolesPermitidos.filter(
-                          (r) => !(r === 'competitor' && m.role === 'student'),
-                        ),
-                      ]),
-                    ].map((r) => (
-                      <option key={r} value={r}>
-                        {NOMBRE_ROL[r] ?? r}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() =>
-                      accion(
-                        () => quitarMiembroAPI(sel!, m.userId),
-                        'Miembro quitado.',
-                        'No se pudo quitar.',
-                      )
-                    }
-                    disabled={ocupado}
-                    className="btn btn-outline"
-                    style={{ color: 'var(--danger)' }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              </li>
+                miembro={m}
+                asignables={rolesPermitidos}
+                ocupado={ocupado}
+                onCambiarRol={(rol) =>
+                  accion(
+                    () => cambiarRolMiembroAPI(sel!, m.userId, rol),
+                    'Rol actualizado.',
+                    'No se pudo cambiar el rol.',
+                  )
+                }
+                acciones={
+                  <>
+                    {/* El gestor edita el perfil del miembro (nombre,
+                        nacimiento, cinturón, tipo de sangre…) */}
+                    <Link
+                      href={`/mi-organizacion/miembro/${m.userId}`}
+                      className="btn btn-outline"
+                      style={{ padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
+                      title={`Editar el perfil de ${m.fullName}`}
+                    >
+                      ✎ Perfil
+                    </Link>
+                    <button
+                      onClick={() =>
+                        accion(
+                          () => quitarMiembroAPI(sel!, m.userId),
+                          'Miembro quitado.',
+                          'No se pudo quitar.',
+                        )
+                      }
+                      disabled={ocupado}
+                      className="btn btn-outline"
+                      style={{ color: 'var(--danger)' }}
+                      title={`Quitar a ${m.fullName} del club`}
+                    >
+                      ✕
+                    </button>
+                  </>
+                }
+              />
             ))}
             {miembros.length === 0 && (
               <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -579,7 +539,7 @@ export default function MiOrganizacionPage() {
             >
               {rolesPermitidos.map((r) => (
                 <option key={r} value={r}>
-                  {NOMBRE_ROL[r] ?? r}
+                  {nombreRol(r)}
                 </option>
               ))}
             </select>

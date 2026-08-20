@@ -232,7 +232,35 @@ Se calcula **al pulsar**, no al pintar: un `<button>` con `onClick` que arma la
 dirección y navega. En Membresías no se notaba porque su botón vive dentro de
 un `{sso && …}` que solo aparece después de hidratar.
 
-## 3.7 Cloudflare cambia las reglas del juego
+## 3.7 Un `<select>` cuyo valor no está entre sus opciones MIENTE
+
+No se queda vacío ni avisa: el navegador enseña **la primera opción**. El panel
+del super-admin ofrecía `admin, maestro, coach, judge, competitor, member`, y la
+reconciliación escribe `student`, `staff` y `guardian`. Resultado: todos los
+alumnos importados aparecían como **«admin»** sin serlo. Y lo caro no es la
+mentira, es lo que provoca — quien la ve intenta corregirla, y al hacerlo
+sobrescribe el rol de verdad con uno inventado.
+
+La regla, para cualquier desplegable de datos existentes:
+
+> **El valor actual va SIEMPRE entre las opciones**, aunque esa pantalla no lo
+> pueda asignar. Una línea: `[...new Set([actual, ...asignables])]`.
+
+Vive en `apps/ecosystem-portal/src/lib/roles.ts` (`opcionesDeRol`), junto al
+catálogo único de nombres de rol. Antes cada pantalla tenía el suyo y la misma
+persona se llamaba «student» en un panel y «Alumno» en otro.
+
+## 3.8 Un rol no es «el» rol: hay cuatro, y por buenas razones
+
+`org_members` guarda el GENERAL (`role`, el del portal: quién gestiona el club)
+y uno por app (`role_membresias`, `role_campeonatos`, `role_academy`, la verdad
+de cada producto). No sobran —la misma persona es alumno en su club y juez en un
+campeonato—, pero la API solo devolvía el general, así que desde fuera parecía
+que los datos se contradecían. `GET /organizations/:id/members` devuelve los
+cuatro y el portal los enseña. **Si añades una pantalla que toque roles, enseña
+de cuál estás hablando.**
+
+## 3.9 Cloudflare cambia las reglas del juego
 
 Con la nube naranja: `TRUST_PROXY_HOPS=2`, SSL/TLS en **Full (strict)**, puerto
 80 abierto (renovación del certificado), y **ningún registro DNS gris apuntando
