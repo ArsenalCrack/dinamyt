@@ -1538,11 +1538,16 @@ petición no cierra—, ese `ALTER` se queda en cola **y bloquea a todo el que
 llegue detrás, aunque solo quiera leer**. Pasó el 20 de agosto: tumbó el
 respaldo previo a la reconciliación sin un solo error en ningún registro.
 
+> **No es teórico: se bloquea contra sí mismo.** Una de sus sesiones deja la
+> transacción abierta y otra pide el candado del arranque; matar la sesión no
+> sirve porque la app la regenera. Lo que lo suelta es `systemctl stop
+> campeonatos-api`.
+>
 > Dos costuras que lo cierran: un `SET lock_timeout = '5s'` antes del DDL de
 > arranque (mejor que la app se queje a que cuelgue la base), y cerrar la
 > sesión en el `teardown_appcontext` de Flask. Mientras tanto, el parche del
 > lado de la base ya está puesto:
-> `ALTER DATABASE dinamyt SET idle_in_transaction_session_timeout = '60s'`.
+> `ALTER DATABASE dinamyt SET idle_in_transaction_session_timeout = '5min'`.
 
 ---
 

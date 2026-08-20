@@ -94,22 +94,41 @@ La cadena típica —y ya pasó el 20 de agosto— es esta:
 llegue detrás, aunque solo quiera leer. Así que una transacción olvidada que no
 hace nada acaba parando la base entera, sin un solo error en ningún registro.
 
-Se suelta matando la sesión olvidada (la que está `idle in transaction`):
+Si la sesión olvidada es una sola, se mata y ya está:
 
 ```bash
 sudo -u postgres psql -d dinamyt -c "select pg_terminate_backend(EL_PID);"
 ```
 
-Y se evita de raíz diciéndole a PostgreSQL que las corte solo:
+**Pero si al matarla aparece otra con el mismo PID+algo, no la mates una por
+una: es la app regenerándola.** Campeonatos se bloquea contra sí mismo —una de
+sus sesiones deja la transacción abierta y otra pide el candado exclusivo del
+arranque—, así que lo que hay que hacer es pararlo un minuto:
 
 ```bash
-sudo -u postgres psql -d dinamyt -c "alter database dinamyt set idle_in_transaction_session_timeout = '60s';"
+sudo systemctl stop campeonatos-api
 ```
+
+Con la base libre, el volcado tarda segundos. Después se levanta otra vez
+(`sudo systemctl start campeonatos-api`) y se comprueba que responde.
+
+Y se evita de raíz diciéndole a PostgreSQL que corte las transacciones
+abandonadas:
+
+```bash
+sudo -u postgres psql -d dinamyt -c "alter database dinamyt set idle_in_transaction_session_timeout = '5min';"
+```
+
+**Cinco minutos y no uno**, a propósito: Campeonatos mantiene sesiones abiertas
+entre peticiones, y un tope de 60 s se las cortaría en marcha —la siguiente
+petición se llevaría el error—. Cinco minutos evitan igual el bloqueo eterno y
+no molestan a nadie. El día que Campeonatos cierre bien su sesión (ver el
+pendiente en `VPS-PASO-A-PASO.md`, Anexo C), se puede bajar a 60 s.
 
 Solo alcanza a las transacciones **abandonadas**, no a las que están
 trabajando: la reconciliación corre entera en una transacción activa y este
-tope no la toca. Se aplica a las conexiones nuevas, así que después conviene
-reiniciar las apps.
+tope no la toca. Se aplica a las conexiones nuevas, así que se pone **antes**
+de volver a arrancar las apps.
 
 > **Por qué en tres pasos y no en uno.** El `>` lo ejecuta TU shell, no
 > `sudo`: escribir directamente en `/var/backups` da `Permission denied`,
