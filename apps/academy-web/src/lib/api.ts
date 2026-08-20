@@ -9,11 +9,51 @@ const ECOSYSTEM_API_URL =
 
 const TOKEN_KEY = 'dinamyt_token';
 
+/**
+ * Margen contra el reloj del navegador. Un reloj adelantado unos segundos
+ * respecto al servidor daría por viva una sesión que la API ya rechaza; es
+ * preferible darla por muerta un poco antes de tiempo.
+ */
+const MARGEN_EXPIRACION_SEG = 30;
+
 export function guardarToken(token: string) {
   if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
 }
+
+/**
+ * ¿Este token todavía vale como sesión? Solo mira la fecha de caducidad: la
+ * firma la comprueba la API, y aquí no hay llave con la que hacerlo.
+ */
+function vigente(token: string): boolean {
+  try {
+    const parte = token.split('.')[1];
+    const p = JSON.parse(atob(parte.replace(/-/g, '+').replace(/_/g, '/')));
+    // Sin `exp` no es un token nuestro: todos los que firma el ecosystem lo
+    // llevan (ver `jwt.service.ts`).
+    if (typeof p.exp !== 'number') return false;
+    return p.exp * 1000 > Date.now() + MARGEN_EXPIRACION_SEG * 1000;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * El token de la sesión, o `null` si no hay o si ya caducó.
+ *
+ * **Que haya una cadena guardada no significa que haya sesión.** Con un token
+ * de ayer, cada pantalla se daba por autorizada, pedía datos, recibía 401 y
+ * rebotaba al login, que volvía a encontrar el mismo token. Borrarlo aquí hace
+ * que ese rebote pase una vez y no vuelva.
+ */
 export function obtenerToken(): string | null {
-  return typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+  if (typeof window === 'undefined') return null;
+  const t = localStorage.getItem(TOKEN_KEY);
+  if (!t) return null;
+  if (!vigente(t)) {
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return t;
 }
 export function cerrarSesion() {
   if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);
@@ -56,13 +96,30 @@ export async function login(email: string, password: string): Promise<string> {
   return token;
 }
 
-/** Mensaje de error legible desde una respuesta axios. */
+/**
+ * El mensaje que se le enseña a la persona cuando la API dice que no.
+ *
+ * **El orden importa, y estaba al revés.** NestJS responde así:
+ *
+ *     { "message": "Contraseña incorrecta. Te quedan 4 intentos…",
+ *       "error": "Unauthorized", "statusCode": 401 }
+ *
+ * `error` es el nombre del código HTTP, no una explicación. Mirándolo primero,
+ * todo fallo se veía como «Unauthorized» y se tiraba a la basura lo único que
+ * sirve: si el correo no existe, si la contraseña falló o cuántos intentos
+ * quedan. Primero `message`; `error` solo como último recurso, para las APIs
+ * que sí lo usan como texto (Membresías y Campeonatos). Ver REGLAS §3.3.
+ */
 export function extraerError(err: unknown, porDefecto = 'Algo salió mal.'): string {
   const e = err as { response?: { data?: { error?: string; message?: string | string[] } } };
-  const m = e.response?.data?.message;
-  return (
-    e.response?.data?.error ?? (Array.isArray(m) ? m.join(' ') : m) ?? porDefecto
-  );
+  const data = e.response?.data;
+  if (typeof data?.message === 'string' && data.message) return data.message;
+  if (Array.isArray(data?.message) && data.message.length) return data.message.join(' ');
+  const generico = ['Unauthorized', 'Bad Request', 'Forbidden', 'Not Found'];
+  if (typeof data?.error === 'string' && !generico.includes(data.error)) {
+    return data.error;
+  }
+  return porDefecto;
 }
 
 // ── Tipos del dominio (espejo de academy-api) ────────────────────────────────

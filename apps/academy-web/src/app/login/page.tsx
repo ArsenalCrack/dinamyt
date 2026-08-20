@@ -2,8 +2,9 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { login, guardarToken, extraerError } from '@/lib/api';
+import { login, guardarToken, obtenerToken, extraerError } from '@/lib/api';
 import { getRolEfectivo, limpiarRolCache, rutaInicio } from '@/lib/session';
+import { CampoContrasena } from '@/components/CampoContrasena';
 
 const PORTAL_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
@@ -15,6 +16,22 @@ export default function Login() {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
+  /**
+   * Saltar al portal a iniciar sesión y volver aquí con la sesión hecha.
+   *
+   * **Es un botón y no un enlace, y esa es la corrección.** El `href` se
+   * construía en el render con `window.location.origin`, que en el servidor no
+   * existe: el HTML salía con `?redirect=` **vacío**, y React —lo dice en la
+   * consola— «no corrige atributos que difieren al hidratar». Así que el
+   * enlace se quedaba roto: entrabas por el portal y el portal te dejaba en SU
+   * panel, sin devolverte nunca a Academy. Calculando la dirección al pulsar,
+   * el servidor no tiene que adivinar nada.
+   */
+  function entrarPorElPortal() {
+    const vuelta = encodeURIComponent(`${window.location.origin}/login`);
+    window.location.href = `${PORTAL_URL}/login?redirect=${vuelta}`;
+  }
+
   async function entrar() {
     limpiarRolCache();
     const rol = await getRolEfectivo();
@@ -23,16 +40,23 @@ export default function Login() {
 
   // SSO desde el portal del ecosystem: si llega #token=<jwt> en el fragmento,
   // se guarda y se entra directo (el fragmento nunca viaja al servidor).
+  //
+  // El token se comprueba ANTES de navegar: si el portal entregó uno caducado,
+  // `obtenerToken` lo descarta y aquí se dice por qué, en vez de mandar a la
+  // persona a una pantalla que la va a devolver al login sin explicación —que
+  // es como se construye un bucle.
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash.startsWith('#token=')) {
-      const token = decodeURIComponent(hash.slice(7));
-      if (token) {
-        guardarToken(token);
-        window.history.replaceState(null, '', window.location.pathname);
-        void entrar();
-      }
+    if (!hash.startsWith('#token=')) return;
+    const token = decodeURIComponent(hash.slice(7));
+    if (!token) return;
+    guardarToken(token);
+    window.history.replaceState(null, '', window.location.pathname);
+    if (!obtenerToken()) {
+      setError('La sesión del portal ya había caducado. Vuelve a entrar aquí.');
+      return;
     }
+    void entrar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -73,11 +97,21 @@ export default function Login() {
           Ingresa con tu cuenta del ecosistema.
         </p>
 
-        <label className="muted" style={{ fontSize: '0.8rem' }}>Correo</label>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ margin: '0.3rem 0 0.9rem' }} />
+        <label className="muted" style={{ fontSize: '0.8rem' }} htmlFor="email">Correo</label>
+        <input id="email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ margin: '0.3rem 0 0.9rem' }} />
 
-        <label className="muted" style={{ fontSize: '0.8rem' }}>Contraseña</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ margin: '0.3rem 0 1.1rem' }} />
+        <label className="muted" style={{ fontSize: '0.8rem' }} htmlFor="password">Contraseña</label>
+        {/* El ojo: el MISMO componente y el mismo dibujo que el portal,
+            Membresías y Campeonatos (ver UNA-SOLA-APP.md §2). */}
+        <div style={{ margin: '0.3rem 0 1.1rem' }}>
+          <CampoContrasena
+            id="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </div>
 
         {error && <p className="msg-error" style={{ marginBottom: '0.8rem', fontSize: '0.85rem' }}>{error}</p>}
 
@@ -100,15 +134,14 @@ export default function Login() {
           o
           <span style={{ height: 1, flex: 1, background: 'var(--border)' }} />
         </div>
-        <a
+        <button
+          type="button"
           className="btn btn-outline"
           style={{ width: '100%' }}
-          href={`${PORTAL_URL}/login?redirect=${encodeURIComponent(
-            typeof window !== 'undefined' ? `${window.location.origin}/login` : '',
-          )}`}
+          onClick={entrarPorElPortal}
         >
           Entrar con el portal DINAMYT
-        </a>
+        </button>
 
         <p className="muted" style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.85rem' }}>
           ¿No tienes cuenta?{' '}

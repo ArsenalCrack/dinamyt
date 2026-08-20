@@ -40,11 +40,57 @@ api.interceptors.response.use(
 const TOKEN_KEY = 'dinamyt_token';
 const PENDING_USER_KEY = 'dinamyt_pending_user';
 
+/**
+ * Margen contra el reloj del navegador. Un reloj adelantado unos segundos
+ * respecto al servidor daría por viva una sesión que la API ya rechaza; es
+ * preferible darla por muerta un poco antes de tiempo.
+ */
+const MARGEN_EXPIRACION_SEG = 30;
+
 export function guardarToken(token: string) {
   if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
 }
+
+/**
+ * ¿Este token todavía vale como sesión?
+ *
+ * Solo mira la fecha de caducidad: la firma la comprueba la API, y aquí no hay
+ * llave con la que hacerlo. Es suficiente para lo que se usa — no dejar pasar
+ * como sesión algo que ya está muerto.
+ */
+export function tokenVigente(token: string): boolean {
+  const p = decodificarToken(token);
+  // Sin `exp` no es un token nuestro: todos los que firma el ecosystem lo
+  // llevan (ver `jwt.service.ts`).
+  if (!p || typeof p.exp !== 'number') return false;
+  return p.exp * 1000 > Date.now() + MARGEN_EXPIRACION_SEG * 1000;
+}
+
+/**
+ * El token de la sesión, o `null` si no hay o si ya caducó.
+ *
+ * **Que haya una cadena guardada no significa que haya sesión**, y confundir
+ * las dos cosas es lo que provocaba el bucle: con un token de ayer en
+ * `localStorage`, todas las pantallas se daban por autorizadas, pedían datos a
+ * la API, recibían 401 y rebotaban al login… que volvía a encontrar el mismo
+ * token y volvía a entregarlo. Un token caducado se borra aquí mismo, así que
+ * el rebote pasa una vez y no vuelve.
+ */
 export function obtenerToken(): string | null {
-  return typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+  if (typeof window === 'undefined') return null;
+  const t = localStorage.getItem(TOKEN_KEY);
+  if (!t) return null;
+  if (!tokenVigente(t)) {
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return t;
+}
+
+/** El payload de la sesión viva, o `null`. Para pintar quién está dentro. */
+export function sesionActual(): TokenPayload | null {
+  const t = obtenerToken();
+  return t ? decodificarToken(t) : null;
 }
 export function cerrarSesion() {
   if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);

@@ -107,10 +107,15 @@ export default function DashboardPage() {
           {(payload.is_super_admin ||
             payload.app_scopes.includes('campeonatos')) && (
             // SSO por redirección: el token viaja en el fragmento (#) — nunca
-            // llega al servidor — y campeonatos-web lo guarda al aterrizar.
-            // Así NO hay que iniciar sesión dos veces.
+            // llega al servidor — y la app lo guarda al aterrizar.
+            //
+            // ⚠️ La ruta es `/login`, no `/admin/login`: esa segunda NO EXISTE
+            // en el frontend de Campeonatos y este enlace daba un 404. Lo que
+            // todavía falta —y vive en `dinamyt-combat`, no aquí— es que su
+            // `/login` LEA el `#token=`; mientras tanto se aterriza en su
+            // formulario en vez de en una página que no existe.
             <a
-              href={`${CAMPEONATOS_URL}/admin/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
+              href={`${CAMPEONATOS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
               className="rounded-lg px-4 py-3 font-semibold"
               style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
