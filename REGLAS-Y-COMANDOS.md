@@ -178,7 +178,61 @@ comprobarlo: sin eso, un enlace de siete días que viaja por WhatsApp abría
 `/auth/me` como sesión iniciada. Si añades otro tipo de token firmado, dale su
 propio emisor **y** su `purpose`.
 
-## 3.5 Cloudflare cambia las reglas del juego
+> **Y hay que comprobarlo en cada app que verifique tokens del ecosistema, no
+> solo en el ecosistema.** El `verificadorEcosystem` de Membresías aceptaba
+> cualquier firma RS256 válida sin mirar el emisor: el mismo enlace de
+> invitación entraba ahí como sesión. Corregido el 20 de agosto — exige emisor
+> `dinamyt-ecosystem` y rechaza cualquier token con `purpose`. **Campeonatos
+> tiene que revisar lo mismo cuando escriba su verificador (bloque C1).**
+
+## 3.5 El bucle entre el login y la pantalla de dentro
+
+Salir de Membresías, pulsar «entrar con DINAMYT» y quedar rebotando entre el
+formulario de entrada y el panel del club, sin un solo error en pantalla.
+**Eran tres fallos encadenados, y cada uno solo se ve cuando se arreglan los
+otros dos:**
+
+1. **El portal daba por sesión cualquier cadena guardada.** No miraba el `exp`,
+   así que un token de ayer pasaba todos los guards del navegador: la pantalla
+   se pintaba, pedía datos, recibía 401 y rebotaba al login… que volvía a
+   encontrar el mismo token. Ahora `obtenerToken()` borra el que ya caducó.
+2. **El portal entregaba esa sesión sola.** Con `?redirect=` de una app, la
+   devolvía sin preguntar — aunque fuera **de otra persona**. Ahora enseña de
+   quién es y ofrece «continuar como…» o «entrar con otra cuenta».
+3. **La sesión de Membresías por SSO no era una sesión.** El token del portal
+   se quedaba en una variable del navegador y nunca se convertía en cookie:
+   funcionaba hasta la primera recarga. Ahora se canjea en `POST /auth/sso`,
+   que devuelve la MISMA cookie httpOnly que el login por contraseña.
+
+> **La regla general, para lo que venga:** una sesión es lo que el servidor
+> reconoce, no lo que el navegador guardó. Y quien redirige tiene que cambiar
+> algo en cada vuelta —borrar el token muerto, pedir una decisión—, o construye
+> un bucle sin darse cuenta.
+
+⚠️ Una ruta que abre su propia transacción (`sinFiltroDeClub`) va en la lista
+`SIN_CONTEXTO` de `plugins/rls.ts`. Si se olvida, **no da error: se cuelga**,
+porque el envoltorio de RLS ya abrió una y PGlite es de una sola conexión.
+`/auth/login`, `/auth/acceso-qr` y `/auth/sso` están ahí por eso.
+
+## 3.6 `window.location` en el render de una página que se pre-renderiza
+
+En el servidor `window` no existe, así que esto:
+
+```tsx
+href={`${PORTAL}/login?redirect=${encodeURIComponent(
+  typeof window !== 'undefined' ? window.location.origin : '')}`}
+```
+
+sale al HTML con `?redirect=` **vacío**, y React **no corrige los atributos que
+no cuadran al hidratar** — lo dice en la consola: «this won't be patched up».
+El enlace se queda roto para siempre: entras por el portal y el portal no sabe
+a dónde devolverte. Le pasaba a Academy.
+
+Se calcula **al pulsar**, no al pintar: un `<button>` con `onClick` que arma la
+dirección y navega. En Membresías no se notaba porque su botón vive dentro de
+un `{sso && …}` que solo aparece después de hidratar.
+
+## 3.7 Cloudflare cambia las reglas del juego
 
 Con la nube naranja: `TRUST_PROXY_HOPS=2`, SSL/TLS en **Full (strict)**, puerto
 80 abierto (renovación del certificado), y **ningún registro DNS gris apuntando

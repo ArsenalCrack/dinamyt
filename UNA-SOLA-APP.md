@@ -13,6 +13,11 @@ Este es el bloque **B5**, y va **después de que la identidad esté en reposo**.
 No antes: mover CSS mientras se mueve el login es cómo se rompen las dos cosas
 a la vez.
 
+> **Estado — 20 de agosto de 2026.** Hecha la pantalla de entrada (§2) en
+> portal, Membresías y Academy, y el camino de vuelta del logo. De paso se
+> cerró el bucle de sesión que las tres compartían: ver `REGLAS-Y-COMANDOS.md`
+> §3.5. Falta Campeonatos (vive en `dinamyt-combat`) y el resto de §4.
+
 ---
 
 ## 1. La regla que hace que esto no se deshaga
@@ -55,10 +60,20 @@ Es la primera que se ve y la que más delata que son tres productos.
 | «¿Olvidaste tu contraseña?» | Lleva **al portal**. Necesita el bloque B2 (correo) |
 | Mensajes de error | Mismo estilo, y **el mensaje del servidor**, no el nombre del código HTTP |
 
-`[ ]` Membresías: ya tiene «entrar con DINAMYT»; falta el ojo, el logo clicable
-      y que «Regístrate» apunte al portal.
-`[ ]` Campeonatos: le falta todo lo de esta tabla.
-`[ ]` Portal: ojo ✅ (20 ago). Falta la página de «olvidé mi contraseña».
+`[x]` **Portal** (20 ago): el ojo ya no es un emoji — es el **mismo SVG** que
+      Membresías y Campeonatos, en `components/CampoContrasena.tsx`, y se usa
+      también en registro, «poner contraseña» y el cambio de contraseña del
+      perfil. Falta la página de «olvidé mi contraseña» (necesita B2).
+`[x]` **Membresías** (20 ago): ojo ✅ (ya lo tenía), logo clicable al portal ✅,
+      «¿No tienes cuenta? Regístrate en DINAMYT» → al portal ✅.
+`[x]` **Academy** (20 ago): tenía el campo de contraseña **sin ojo ninguno**.
+      Ahora lleva el mismo componente, y su enlace al portal ya conserva la
+      vuelta (antes viajaba con `?redirect=` vacío: ver la trampa en
+      `REGLAS-Y-COMANDOS.md` §3.6).
+`[ ]` **Campeonatos**: le falta todo lo de esta tabla salvo el ojo, que ya
+      tiene. Y algo más urgente que el aspecto: **su `/login` no lee el
+      `#token=`**, así que el salto desde el portal no inicia sesión. Se edita
+      en `dinamyt-combat`, que todavía no está clonado.
 
 ---
 
@@ -66,14 +81,22 @@ Es la primera que se ve y la que más delata que son tres productos.
 
 Una app del ecosistema **nunca es un callejón sin salida**.
 
-`[ ]` **El logo, en cualquier pantalla, lleva al portal.** Es la convención que
-      la gente ya conoce de otros sitios y no hay que explicarla.
+`[~]` **El logo, en cualquier pantalla, lleva al portal.** Es la convención que
+      la gente ya conoce de otros sitios y no hay que explicarla. Hecho en la
+      pantalla de entrada de Membresías y Academy (20 ago); falta el resto de
+      pantallas y Campeonatos.
 `[ ]` **«Volver a mi ecosistema»** en el menú de usuario de las tres apps.
 `[ ]` **El selector de apps** del portal (Membresías · Campeonatos · Academy)
       también dentro de cada app, para saltar sin pasar por el portal.
 `[ ]` Al cerrar sesión en una app, se cierra **en el ecosistema** y se vuelve al
       portal. Hoy cada una cierra la suya y la otra sigue abierta, que es la
       forma más rápida de que alguien crea que se salió y no lo hizo.
+
+> **Mientras eso no exista, el portal al menos lo dice en voz alta.** Si una
+> app pide sesión y aquí hay una abierta, ya no se entrega sola: se enseña de
+> quién es y se ofrece «continuar como…» o «entrar con otra cuenta». Era la
+> otra mitad del problema — salir de Membresías con tu cuenta y volver a
+> entrar, sin avisar, con la del último que usó el portal.
 
 ---
 
