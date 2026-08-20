@@ -11,6 +11,7 @@ import api, {
   miClubAPI,
   type TokenPayload,
 } from '@/lib/api';
+import { nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 
 const CAMPEONATOS_URL =
@@ -120,7 +121,7 @@ export default function DashboardPage() {
               style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               Entrar a Campeonatos
-              {payload.role_campeonatos ? ` (${payload.role_campeonatos})` : ''}
+              {payload.role_campeonatos ? ` (${nombreRol(payload.role_campeonatos)})` : ''}
             </a>
           )}
           {(payload.is_super_admin ||
@@ -133,7 +134,7 @@ export default function DashboardPage() {
               style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               Entrar a Membresías
-              {payload.role_membresias ? ` (${payload.role_membresias})` : ''}
+              {payload.role_membresias ? ` (${nombreRol(payload.role_membresias)})` : ''}
             </a>
           )}
           {(payload.is_super_admin || payload.app_scopes.includes('academy')) && (
@@ -145,16 +146,54 @@ export default function DashboardPage() {
               style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
               Entrar a Academy
-              {payload.role_academy ? ` (${payload.role_academy})` : ''}
+              {payload.role_academy ? ` (${nombreRol(payload.role_academy)})` : ''}
             </a>
           )}
           {!payload.is_super_admin && payload.app_scopes.length === 0 && (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              No tienes aplicaciones habilitadas todavía.{' '}
-              <Link href="/planes" style={{ color: 'var(--gold)' }}>
-                Ver planes disponibles
-              </Link>
-            </p>
+            /**
+             * Sin suscripción activa no hay atajo a ninguna app: `app_scopes`
+             * sale de las suscripciones, no de los roles (ver `buildToken`).
+             *
+             * Pero decirle «no tienes aplicaciones» a alguien que lleva meses
+             * usando Membresías es sencillamente falso, y es lo que pasaba con
+             * todo el que llegó por la reconciliación: su ficha, su club y sus
+             * alumnos estaban ahí, y el portal le contestaba que no tenía
+             * nada. Si la persona TIENE rol en una app, se le dice lo que de
+             * verdad ocurre —falta la suscripción del club— y que su app sigue
+             * funcionando por su dirección de siempre.
+             */
+            <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              {payload.role_membresias ||
+              payload.role_campeonatos ||
+              payload.role_academy ? (
+                <>
+                  <p>
+                    Tu cuenta está en{' '}
+                    {[
+                      payload.role_membresias && 'Membresías',
+                      payload.role_campeonatos && 'Campeonatos',
+                      payload.role_academy && 'Academy',
+                    ]
+                      .filter(Boolean)
+                      .join(' y ')}
+                    , pero tu club todavía no tiene una suscripción activa aquí,
+                    así que el portal aún no puede llevarte de un salto.
+                  </p>
+                  <p className="mt-2">
+                    Mientras tanto entras como siempre, por la dirección de tu
+                    app. Pídele a un administrador de DINAMYT que active la
+                    suscripción de tu club.
+                  </p>
+                </>
+              ) : (
+                <p>
+                  No tienes aplicaciones habilitadas todavía.{' '}
+                  <Link href="/planes" style={{ color: 'var(--gold)' }}>
+                    Ver planes disponibles
+                  </Link>
+                </p>
+              )}
+            </div>
           )}
         </div>
       </section>

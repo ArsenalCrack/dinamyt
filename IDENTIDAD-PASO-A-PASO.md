@@ -403,6 +403,57 @@ sudo journalctl -u membresias-api -n 30 --no-pager
 
 ---
 
+# Después de aplicarla: dos cosas que sorprenden y no son fallos
+
+## La app no aparece en el portal aunque la persona lleve meses usándola
+
+La reconciliación crea cuentas y pertenencias. **No crea suscripciones**, y el
+atajo «Entrar a Membresías» del panel sale de `app_scopes`, que se calcula
+**solo** desde las suscripciones activas (ver `buildToken`). Así que un maestro
+importado ve su club y sus alumnos en el portal, pero no el botón para saltar a
+su propia app.
+
+No es un error de datos: es el modelo comercial, que no sabía nada de la gente
+que ya existía. Se resuelve una vez por club, desde `/admin` → **Suscripciones**:
+elige el club, un plan que incluya `membresias`, las fechas, créala y **actívala**.
+En el siguiente inicio de sesión el atajo aparece.
+
+> **No lo hagas desde «Accesos».** Ese panel crea la suscripción, sí, pero de
+> paso **sobrescribe el rol general** de la persona con el que elijas en el
+> desplegable. Para dar acceso a un club entero, la suscripción; «Accesos» es
+> para una persona suelta a la que además le estás fijando el rol.
+
+Mientras tanto la persona entra como siempre, por la dirección de su app: no se
+queda fuera de nada.
+
+## Los alumnos importados aparecen con un rol raro
+
+`org_members.role` es el rol GENERAL del portal, y la reconciliación lo escribe
+con los valores de Membresías (`maestro`, `staff`, `guardian`, `student`). Si un
+panel te enseña otro —«admin», por ejemplo— **no lo corrijas a mano sin mirar
+primero**: hasta el 20 de agosto el desplegable del super-admin no incluía esos
+valores y pintaba la primera opción de su lista, que era `admin`. Ver
+`REGLAS-Y-COMANDOS.md` §3.7.
+
+Para ver lo que hay de verdad:
+
+```sql
+SELECT u.email, om.role, om.role_membresias, om.role_campeonatos
+  FROM ecosystem.org_members om
+  JOIN ecosystem.users u ON u.id = om.user_id
+ ORDER BY om.role;
+```
+
+Y si alguien ya «corrigió» alumnos a `competitor`, esto los devuelve a su sitio
+sin tocar a nadie más (`role_membresias` conserva la verdad):
+
+```sql
+UPDATE ecosystem.org_members SET role = 'student'
+ WHERE role = 'competitor' AND role_membresias = 'student';
+```
+
+---
+
 # Marcha atrás
 
 **Lo primero: nada se borró.** Las fichas, los pagos, las asistencias y los
