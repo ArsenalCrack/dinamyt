@@ -378,12 +378,21 @@ pnpm install --frozen-lockfile
 pnpm --filter @dinamyt/membresias-db  build
 pnpm --filter @dinamyt/membresias-api build
 pnpm --filter @dinamyt/membresias-web build
-cd apps/membresias-api && pnpm db:migrate
 sudo systemctl restart membresias-api membresias-web
 ```
 
-✅ La migración `0015_espejo_ecosystem` aplica sin ruido aunque el guion ya
-hubiera añadido las columnas: están escritas con `IF NOT EXISTS` justo por eso.
+> **En Membresías no hay un paso de migración.** La API las aplica ella sola al
+> arrancar, antes de aceptar tráfico (`main.ts`), y si fallan **no arranca** —
+> es preferible a responder errores raros a mitad de una clase. Reiniciar el
+> servicio ES aplicar la migración.
+
+✅ La migración `0015_espejo_ecosystem` aplica sin ruido aunque el guion de
+reconciliación ya hubiera añadido las columnas: están escritas con
+`IF NOT EXISTS` justo por eso. Compruébalo:
+
+```bash
+sudo -u postgres psql -d dinamyt -c "select column_name from information_schema.columns where table_schema='membresias' and column_name in ('eco_sub','eco_org_id');"
+```
 
 ```bash
 sudo journalctl -u membresias-api -n 30 --no-pager
