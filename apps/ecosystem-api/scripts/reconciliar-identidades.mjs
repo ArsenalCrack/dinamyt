@@ -71,7 +71,32 @@ if (!opciones.url) {
 /** Marca para deshacer la transacción del ensayo sin que parezca un fallo. */
 class Ensayo extends Error {}
 
-const sql = postgres(opciones.url, { onnotice: () => {}, max: 1 });
+/**
+ * `postgresql:///dinamyt` significa «por el socket Unix» para `psql`, pero para
+ * este driver significa TCP a localhost — y por TCP, PostgreSQL pide contraseña
+ * aunque seas el usuario `postgres` (el socket usa autenticación `peer`, el
+ * puerto no). El síntoma es un `password authentication failed for user
+ * "postgres"` que no tiene nada que ver con permisos.
+ *
+ * Si la cadena no trae host, se habla por el socket: es como entra
+ * `sudo -u postgres psql`, y no hay ninguna contraseña que inventar.
+ */
+export function socketSiNoHayHost(cadena) {
+  // Se saca el host igual que lo saca el driver (src/index.js:541-543): lo que
+  // hay entre `://` y la primera `/` o `?`, quitándole el usuario. Hacerlo con
+  // `new URL` parecía más limpio, pero `postgres://postgres@/dinamyt` —que
+  // `psql` acepta— no sobrevive a ese análisis y volvía a caer en TCP.
+  const autoridad = /^[a-z+]+:\/\/([^/?]*)/i.exec(cadena)?.[1] ?? '';
+  const host = autoridad.slice(autoridad.indexOf('@') + 1);
+  return host ? null : (process.env.PGHOST ?? '/var/run/postgresql');
+}
+
+const socket = socketSiNoHayHost(opciones.url);
+const sql = postgres(opciones.url, {
+  onnotice: () => {},
+  max: 1,
+  ...(socket ? { host: socket } : {}),
+});
 const t0 = Date.now();
 
 let informe = null;

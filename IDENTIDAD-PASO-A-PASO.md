@@ -220,13 +220,22 @@ imprime es lo que va a pasar, no una estimación.
 ```bash
 cd /srv/dinamyt/apps/ecosystem-api
 sudo -u postgres RECONCILIACION_DATABASE_URL=postgresql:///dinamyt \
-  node scripts/reconciliar-identidades.mjs --informe /root/ensayo-identidad.json
+  node scripts/reconciliar-identidades.mjs --informe /tmp/ensayo-identidad.json
 ```
 
 > **Se conecta como `postgres` y no con el usuario de una app.** Membresías y
 > Campeonatos tienen RLS en modo FORCE: un rol normal vería solo una parte de
 > las filas y el guion daría por reconciliado lo que nunca vio. El guion lo
 > comprueba y se planta si no es superusuario.
+
+> **El informe va a `/tmp` y no a `/root`**: quien escribe el archivo es el
+> usuario `postgres`, que no entra en la carpeta de root.
+>
+> Y si aparece `password authentication failed for user "postgres"`, no es un
+> problema de permisos: es que el driver interpretó la cadena sin host como TCP
+> a localhost, donde PostgreSQL sí pide contraseña. Con el guion actualizado ya
+> no pasa; con uno viejo, se fuerza el socket delante del comando:
+> `PGHOST=/var/run/postgresql`.
 
 Vas a ver algo así:
 
@@ -305,7 +314,7 @@ UPDATE ecosystem.users SET is_super_admin = true WHERE email = 'tucorreo@dinamyt
 cd /srv/dinamyt/apps/ecosystem-api
 sudo -u postgres RECONCILIACION_DATABASE_URL=postgresql:///dinamyt \
   node scripts/reconciliar-identidades.mjs --aplicar \
-  --informe /root/reconciliacion-$(date +%F).json
+  --informe /tmp/reconciliacion-$(date +%F).json
 ```
 
 Añade `--crear-clubes-campeonatos` **solo si** ya revisaste la lista del paso
