@@ -236,7 +236,17 @@ export class OrganizationsController {
   @UseGuards(EcosystemJwtGuard)
   async inviteMember(
     @Param('id') orgId: string,
-    @Body() body: { email: string; role?: string },
+    @Body()
+    body: {
+      email: string;
+      role?: string;
+      /** Obligatorio si esa persona todavía no tiene cuenta. */
+      fullName?: string;
+      phone?: string;
+      roleMembresias?: string;
+      roleCampeonatos?: string;
+      roleAcademy?: string;
+    },
     @CurrentUser() user: JwtPayload,
   ) {
     await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
@@ -245,6 +255,13 @@ export class OrganizationsController {
       body.email,
       body.role ?? 'member',
       user.sub,
+      {
+        fullName: body.fullName,
+        phone: body.phone,
+        roleMembresias: body.roleMembresias,
+        roleCampeonatos: body.roleCampeonatos,
+        roleAcademy: body.roleAcademy,
+      },
     );
   }
 

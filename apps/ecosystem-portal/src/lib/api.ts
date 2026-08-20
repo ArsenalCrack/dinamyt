@@ -100,6 +100,16 @@ export async function registerAPI(data: {
   return res.data as { message: string; userId: string };
 }
 
+/**
+ * Canjea el enlace de invitación del maestro (camino B): pone la contraseña y
+ * da el correo por verificado en el mismo acto. No necesita sesión —quien lo
+ * usa todavía no puede iniciar sesión—: lo que autoriza es el token del enlace.
+ */
+export async function ponerContrasenaAPI(token: string, password: string) {
+  const res = await api.post('/auth/set-password', { token, password });
+  return res.data as { message: string; email: string };
+}
+
 export async function verifyEmailAPI(userId: string, code: string) {
   const res = await api.post('/auth/verify-email', { userId, code });
   return res.data as { message: string };

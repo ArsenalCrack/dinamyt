@@ -9,6 +9,8 @@ import { UsersModule } from '../users/users.module';
   imports: [UsersModule],
   controllers: [AuthController],
   providers: [AuthService, JwtTokenService, MailerService],
-  exports: [JwtTokenService],
+  // MailerService se exporta para `organizations`: la invitación del maestro
+  // (camino B) sale desde ahí, que es donde vive el permiso de gestor.
+  exports: [JwtTokenService, MailerService],
 })
 export class AuthModule {}

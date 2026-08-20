@@ -93,6 +93,16 @@ export class AuthController {
     );
   }
 
+  // ── POST /auth/set-password — canjear el enlace de invitación ─────────────
+  // Pública a propósito: quien la usa todavía no puede iniciar sesión. Lo que
+  // la protege es el enlace firmado, y el límite por IP evita que alguien pruebe
+  // enlaces a ciegas.
+  @Throttle({ global: { limit: 6, ttl: 60_000 } })
+  @Post('set-password')
+  setPassword(@Body() body: { token: string; password: string }) {
+    return this.authService.setPassword(body?.token, body?.password);
+  }
+
   @Post('verify-token')
   verifyToken(@Body() body: { token: string }) {
     return this.authService.verifyToken(body.token);

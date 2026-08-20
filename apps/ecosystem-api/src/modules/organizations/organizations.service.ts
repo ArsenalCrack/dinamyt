@@ -14,6 +14,9 @@ import {
   orgClubInvitations,
 } from '../../db/schema';
 import { and, eq, gt, ilike, inArray, isNull } from 'drizzle-orm';
+import { UsersService } from '../users/users.service';
+import { JwtTokenService } from '../auth/jwt.service';
+import { MailerService } from '../auth/mailer.service';
 
 // Quién puede GESTIONAR una organización (editar su ficha, invitar gente,
 // responder invitaciones): el admin, el dueño o el maestro del club.
@@ -33,6 +36,12 @@ const ROLES_POR_TIPO: Record<string, string[]> = {
 
 @Injectable()
 export class OrganizationsService {
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtTokenService,
+    private readonly mailer: MailerService,
+  ) {}
+
   // ── Crear organización ────────────────────────────────────────────────────
   async create(data: {
     name: string;
@@ -81,11 +90,35 @@ export class OrganizationsService {
 
   // ── Invitar usuario a una organización por email ──────────────────────────
   // Busca el usuario por email y lo agrega a org_members
+  /**
+   * Mete a alguien en la organización. Es el **camino B** del plan (§2.1): el
+   * maestro no crea contraseñas, crea la cuenta y manda un enlace para que su
+   * dueño ponga la suya.
+   *
+   * Tres situaciones, y las tres acaban en una fila de `org_members`:
+   *
+   *   · **Ya tiene cuenta**  → se enlaza y ya está. No se le manda nada: su
+   *     contraseña es suya y no ha cambiado.
+   *   · **No tiene cuenta**  → se crea SIN contraseña y se manda la invitación.
+   *   · **Fue invitada y no la usó** → se le manda un enlace nuevo.
+   *
+   * Cuando no hay proveedor de correo (bloque B2 todavía pendiente) el enlace
+   * se DEVUELVE, para que el maestro lo mande por WhatsApp. En cuanto el correo
+   * funcione, deja de devolverse: el enlace es una llave, y quien la reparte
+   * no debería ser quien invita.
+   */
   async inviteMember(
     orgId: string,
     email: string,
     role: string,
     invitedByUserId: string,
+    extra: {
+      fullName?: string;
+      phone?: string;
+      roleMembresias?: string;
+      roleCampeonatos?: string;
+      roleAcademy?: string;
+    } = {},
   ) {
     // Verificar que la organización existe
     const org = await this.findById(orgId);
@@ -102,45 +135,102 @@ export class OrganizationsService {
       );
     }
 
-    // Buscar el usuario por email
-    const userResult = await db
+    // El correo, siempre en minúsculas y sin espacios: es la clave con la que
+    // se cruza a una persona en todo el ecosistema.
+    const correo = (email ?? '').trim().toLowerCase();
+    if (!correo) throw new BadRequestException('Falta el correo.');
+
+    const [existente] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, correo))
       .limit(1);
 
-    if (!userResult[0]) {
-      throw new NotFoundException('No se encontró un usuario con ese correo.');
+    let usuario = existente;
+    let cuentaNueva = false;
+
+    if (!usuario) {
+      const nombre = (extra.fullName ?? '').trim();
+      if (!nombre) {
+        throw new BadRequestException(
+          'Esa persona todavía no tiene cuenta: hace falta su nombre completo para crearla.',
+        );
+      }
+      usuario = await this.usersService.crearInvitado({
+        email: correo,
+        fullName: nombre.toLocaleUpperCase('es'),
+        phone: extra.phone ?? null,
+      });
+      cuentaNueva = true;
     }
 
-    const userId = userResult[0].id;
+    const userId = usuario.id;
 
     // Verificar que no sea ya miembro
-    const existing = await db
-      .select()
+    const [yaMiembro] = await db
+      .select({ id: orgMembers.id })
       .from(orgMembers)
-      .where(eq(orgMembers.orgId, orgId))
-      .limit(100);
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+      .limit(1);
 
-    const alreadyMember = existing.find((m) => m.userId === userId);
-    if (alreadyMember) {
+    // Ya es miembro Y su cuenta funciona: no hay nada que hacer. Si es miembro
+    // pero sigue sin contraseña, es una invitación que nadie abrió — y volver a
+    // mandarla es justo lo que el maestro está pidiendo.
+    if (yaMiembro && usuario.passwordHash) {
       throw new BadRequestException(
         'El usuario ya es miembro de esta organización.',
       );
     }
 
-    // Insertar miembro
-    const result = await db
-      .insert(orgMembers)
-      .values({
-        orgId,
-        userId,
-        role,
-        invitedByUserId,
-      })
-      .returning();
+    let miembro;
+    if (yaMiembro) {
+      miembro = yaMiembro;
+    } else {
+      [miembro] = await db
+        .insert(orgMembers)
+        .values({
+          orgId,
+          userId,
+          role,
+          roleMembresias: extra.roleMembresias ?? null,
+          roleCampeonatos: extra.roleCampeonatos ?? null,
+          roleAcademy: extra.roleAcademy ?? null,
+          invitedByUserId,
+        })
+        .returning();
+    }
 
-    return result[0];
+    // ── La invitación ──────────────────────────────────────────────────────
+    // Solo para quien no tiene contraseña. A quien ya tiene cuenta no se le
+    // manda nada: no hay nada que poner y un correo de más es un correo menos
+    // del cupo del día.
+    if (usuario.passwordHash) {
+      return { miembro, cuenta: 'existente' as const, invitacion: null };
+    }
+
+    const token = await this.jwtService.firmarInvitacion(userId);
+    const portal = process.env.PORTAL_URL ?? 'https://dinamyt.org';
+    const enlace = `${portal}/poner-contrasena?token=${token}`;
+
+    const enviada = await this.mailer.enviarInvitacion(
+      correo,
+      enlace,
+      org.name,
+      JwtTokenService.DIAS_INVITACION,
+    );
+
+    return {
+      miembro,
+      cuenta: cuentaNueva ? ('nueva' as const) : ('invitada' as const),
+      invitacion: {
+        enviadaPorCorreo: enviada,
+        // El enlace solo se devuelve si el correo NO salió. Es la muleta
+        // mientras no hay proveedor (bloque B2): el maestro lo manda por
+        // WhatsApp. Con el correo funcionando, quien invita no ve la llave.
+        enlace: enviada ? undefined : enlace,
+        venceEnDias: JwtTokenService.DIAS_INVITACION,
+      },
+    };
   }
 
   // ── ¿El usuario administra esta organización? ──────────────────────────────
