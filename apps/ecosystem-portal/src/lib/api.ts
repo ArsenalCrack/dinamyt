@@ -357,14 +357,36 @@ export const desbloquearUsuarioAPI = async (userId: string) =>
   (await api.post(`/users/${userId}/desbloquear`)).data;
 
 /** Extrae el mensaje de error del backend ({error} propio o {message} de Nest). */
+/**
+ * El mensaje que se le enseña a la persona cuando la API dice que no.
+ *
+ * **El orden importa, y estaba al revés.** NestJS responde así:
+ *
+ *     { "message": "Contraseña incorrecta. Te quedan 4 intentos…",
+ *       "error": "Unauthorized", "statusCode": 401 }
+ *
+ * `error` es el nombre del código HTTP, no una explicación. Mirándolo primero,
+ * TODOS los fallos del portal se veían como «Unauthorized» o «Bad Request», y
+ * la explicación de verdad —la que dice si el correo no existe, si la
+ * contraseña falló, si la cuenta está suspendida o cuántos intentos quedan— se
+ * tiraba a la basura. Primero `message`; `error` solo como último recurso,
+ * para las APIs que sí lo usan como texto (Membresías y Campeonatos).
+ */
 export function extraerError(e: unknown, fallback: string): string {
   if (axios.isAxiosError(e)) {
     const data = e.response?.data as
       | { error?: string; message?: string | string[] }
       | undefined;
-    if (typeof data?.error === 'string') return data.error;
-    if (Array.isArray(data?.message)) return data.message.join(' ');
-    if (typeof data?.message === 'string') return data.message;
+    if (typeof data?.message === 'string' && data.message) return data.message;
+    if (Array.isArray(data?.message) && data.message.length) {
+      return data.message.join(' ');
+    }
+    // Solo si no hay mensaje: y nunca el nombre del código HTTP a secas, que no
+    // le dice nada a nadie.
+    const generico = ['Unauthorized', 'Bad Request', 'Forbidden', 'Not Found'];
+    if (typeof data?.error === 'string' && !generico.includes(data.error)) {
+      return data.error;
+    }
   }
   return fallback;
 }

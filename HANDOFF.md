@@ -1,5 +1,15 @@
 # DINAMYT — Estado del proyecto y Handoff
 
+> ⛔ **CONGELADO EL 10 DE JULIO DE 2026. Esto es historia, no el estado actual.**
+>
+> Todo lo que dice de despliegue (Vercel, Render, Supabase) **ya no es cierto**:
+> desde el 20 de agosto DINAMYT corre en un VPS propio con una sola base. Para
+> el estado de hoy: [REGLAS-Y-COMANDOS.md](REGLAS-Y-COMANDOS.md) y
+> [VPS-PASO-A-PASO.md](VPS-PASO-A-PASO.md).
+>
+> Se conserva porque explica **por qué** están hechas así muchas piezas de
+> Academy y del portal, y eso no caduca.
+
 > Documento vivo. Última actualización: 2026-07-10.
 >
 > **2026-07-10 — Academy ampliada (académico completo + FIGURAS con IA):**

@@ -986,6 +986,7 @@ SUPERADMIN_PASSWORD=UNA_CLAVE_FUERTE
 SUPERADMIN_NOMBRE=Super administrador
 CORS_ORIGINS=https://club.dinamyt.org
 MEMBRESIAS_WEB_URL=https://club.dinamyt.org
+ECOSYSTEM_JWKS_URL=https://id.dinamyt.org/auth/jwks
 TRUST_PROXY_HOPS=1
 COOKIE_SAMESITE=lax
 COOKIE_SECURE=true
@@ -998,10 +999,24 @@ nano /srv/membresias/apps/membresias-web/.env.production
 
 ```bash
 MEMBRESIAS_API_ORIGIN=http://127.0.0.1:3004
+NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL=https://dinamyt.org
 CRON_SECRET=EL_MISMO_DE_LA_API
 ```
 
-⚠️ `MEMBRESIAS_API_ORIGIN` también se lee **al compilar**, no al arrancar.
+⚠️ `MEMBRESIAS_API_ORIGIN` y `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` se leen **al
+compilar**, no al arrancar: si las cambias, hay que volver a compilar la web.
+
+> **Estas dos variables son el SSO entero, y sin ellas parece que no funciona.**
+>
+> `ECOSYSTEM_JWKS_URL` (en la API) es la que le dice a Membresías que existe un
+> emisor de identidad al que creerle. **Sin ella, Membresías es autónoma a
+> propósito**: rechaza el token del ecosistema y enseña su propio formulario —
+> exactamente lo que hay que ver el día del campeonato, sin internet, y
+> exactamente lo que NO se quiere el resto del año. El síntoma es que saltas
+> desde el portal y te vuelve a pedir la contraseña.
+>
+> `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` (en la web) es la que dibuja el botón
+> «entrar con DINAMYT» y el camino de vuelta al portal.
 
 ## 6.7 Compilar Membresías
 

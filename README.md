@@ -77,17 +77,23 @@ nunca depende de que alguien se acordara de sincronizar.
 
 ## Uso y Documentación
 
-- **Correr en local**: ver [RUN_LOCAL.md](RUN_LOCAL.md) (PGlite embebido, sin Docker).
-- **Montar el servidor**: ver [VPS-PASO-A-PASO.md](VPS-PASO-A-PASO.md) — es lo que corre hoy en `dinamyt.org`.
-- **Dar cuenta a quien ya existe**: ver [IDENTIDAD-PASO-A-PASO.md](IDENTIDAD-PASO-A-PASO.md)
-  (bloque B3: reconciliar Membresías y Campeonatos contra `ecosystem.users`).
-- **Que el campeonato salga aunque se caiga todo**: ver
-  [CONTINGENCIA-CAMPEONATO.md](CONTINGENCIA-CAMPEONATO.md) (el evento corre en
-  un PC del polideportivo, sin internet; el VPS solo inscribe y publica).
-- **Desplegar gratis en la web**: ver [DESPLIEGUE_WEB.md](DESPLIEGUE_WEB.md).
-- **Estado del proyecto / handoff**: ver [HANDOFF.md](HANDOFF.md).
-- **El plan maestro** (el tablero de bloques B0…B4) vive, por ahora, dentro del
-  espejo: `productos/campeonatos/PLAN-ECOSYSTEM-VPS.md`. **Se edita en el repo
-  `dinamyt-combat`**, nunca aquí.
+> **Empieza por [REGLAS-Y-COMANDOS.md](REGLAS-Y-COMANDOS.md)**: dónde se edita
+> cada cosa, el orden al desplegar, las variables que parecen opcionales y no lo
+> son, y las trampas que ya costaron una tarde. Casi todo lo que hay ahí está
+> escrito porque se rompió una vez.
+
+| Documento | Para qué |
+|---|---|
+| [REGLAS-Y-COMANDOS.md](REGLAS-Y-COMANDOS.md) | Las reglas y los comandos de siempre |
+| [RUN_LOCAL.md](RUN_LOCAL.md) | Correr todo en tu PC (PGlite embebido, sin Docker) |
+| [VPS-PASO-A-PASO.md](VPS-PASO-A-PASO.md) | El servidor, de cero. Es lo que corre hoy en `dinamyt.org`. Anexos: pendientes (C), Cloudflare (D), correo (E) |
+| [IDENTIDAD-PASO-A-PASO.md](IDENTIDAD-PASO-A-PASO.md) | Dar cuenta del ecosistema a quien ya existía en Membresías y Campeonatos |
+| [CONTINGENCIA-CAMPEONATO.md](CONTINGENCIA-CAMPEONATO.md) | Si se cae el VPS, el internet o la luz en pleno campeonato |
+| [UNA-SOLA-APP.md](UNA-SOLA-APP.md) | Que las tres apps se sientan una sola (bloque B5) |
+| [HANDOFF.md](HANDOFF.md) | Estado del proyecto **congelado en julio de 2026**. Histórico |
+
+**El plan maestro** (el tablero de bloques B0…B5) vive, por ahora, dentro del
+espejo: `productos/campeonatos/PLAN-ECOSYSTEM-VPS.md`. **Se edita en el repo
+`dinamyt-combat`**, nunca aquí.
 
 Verificación rápida: `pnpm install`, `pnpm build` y `pnpm test` (Turbo, 15/15).

@@ -46,6 +46,7 @@ function LoginForm() {
   const search = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [verClave, setVerClave] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -105,15 +106,29 @@ function LoginForm() {
             className="mt-1"
           />
         </label>
-        <label className="mb-4 block text-sm">
+        <label className="mb-1 block text-sm">
           Contraseña
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="mt-1"
-          />
+          {/* El ojo no es un adorno: la mitad de los «no puedo entrar» son una
+              letra mal tecleada en un teclado de celular. */}
+          <span className="relative mt-1 block">
+            <input
+              type={verClave ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              className="w-full pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setVerClave(!verClave)}
+              aria-label={verClave ? 'Ocultar contraseña' : 'Ver contraseña'}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {verClave ? '🙈' : '👁'}
+            </button>
+          </span>
         </label>
         {error && (
           <p className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>

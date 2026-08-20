@@ -1,0 +1,200 @@
+# DINAMYT — Reglas que no se negocian, y comandos que vas a repetir
+
+> Léelo antes de tocar código o el servidor. Casi todo lo que hay aquí está
+> escrito porque **ya se rompió una vez**.
+
+---
+
+# PARTE 1 · Las reglas
+
+## 1.1 Dónde se edita cada cosa
+
+| Si vas a tocar… | Se edita en… | ⚠️ |
+|---|---|---|
+| Portal, identidad, Academy | `dinamyt` (este repo), en `apps/` | |
+| **Membresías** | `D:\Repositorios\dinamyt-membresias` | **NUNCA** en `productos/membresias` |
+| **Campeonatos** | `dinamyt-combat` (sin clonar todavía) | **NUNCA** en `productos/campeonatos` |
+
+`productos/` son **espejos** traídos con `git subtree`. Un cambio hecho ahí se
+pierde en la siguiente sincronización, **y se pierde en silencio**. Para ponerlos
+al día:
+
+```powershell
+.\scripts\sync-apps.ps1
+```
+
+## 1.2 El orden al desplegar (romperlo tira el login)
+
+1. `git push` desde tu PC — **el VPS clona de GitHub, no de tu disco**.
+2. En el servidor: `git pull` → `pnpm install` → **compilar**.
+3. **Migrar la base ANTES de reiniciar.** El código nuevo lee columnas que crea
+   la migración; al revés, todos los inicios de sesión fallan. Mientras no
+   reinicies, el servicio sigue con el código viejo y la base migrada no le
+   molesta.
+4. Reiniciar el servicio.
+
+> **Membresías es la excepción**: aplica sus migraciones **ella sola al
+> arrancar**, y si fallan no arranca. Ahí reiniciar ES migrar.
+
+## 1.3 Qué obliga a volver a compilar
+
+- Cualquier variable **`NEXT_PUBLIC_*`** y `MEMBRESIAS_API_ORIGIN`: viven dentro
+  del build. Cambiarlas y solo reiniciar **no hace nada**.
+- Cambios en `packages/shared` o `membresias-db`: compilar el paquete **antes**
+  que quien lo consume.
+
+## 1.4 Las variables que parecen opcionales y no lo son
+
+| Variable | Dónde | Si falta… |
+|---|---|---|
+| `TRUST_PROXY_HOPS` | las tres APIs | Todo el mundo cae en el mismo cubo del limitador: 10 inicios de sesión por minuto **para la plataforma entera**. `1` = solo Caddy · `2` = con Cloudflare |
+| `ECOSYSTEM_JWKS_URL` | membresias-api | El SSO no existe: saltas desde el portal y te vuelve a pedir la contraseña. **Vacía a propósito solo en el modo local del campeonato** |
+| `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` | membresias-web | No aparece «entrar con DINAMYT» ni el camino de vuelta |
+| `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe |
+| `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: la invitación devuelve el enlace para mandarlo por WhatsApp |
+
+## 1.5 Lo que nunca se hace
+
+- **Tocar nada entre el 1 y el 13 de octubre.** Campeonato el 9, 10 y 11.
+- **Desplegar sin respaldo** si la migración toca datos.
+- **Exigir correo para que alguien entre.** Quien no tiene correo usable entra
+  con carnet QR o PIN, y su ficha vive sin cuenta.
+- **Propagar `is_super_admin` automáticamente.** Se concede a mano, mirando.
+- **Romper el modo local de Campeonatos.** Sin internet, sin ecosistema, tiene
+  que arrancar igual: es la marcha atrás del día del evento.
+
+---
+
+# PARTE 2 · Comandos
+
+## 2.1 En tu PC, antes de empujar
+
+```bash
+pnpm --filter @dinamyt/ecosystem-api exec tsc -p tsconfig.build.json --noEmit
+```
+
+```bash
+pnpm --filter @dinamyt/ecosystem-api exec jest
+```
+
+```bash
+pnpm --filter @dinamyt/ecosystem-api reconciliar:ensayo
+```
+
+El último levanta un PostgreSQL de verdad (en WebAssembly), le aplica las
+migraciones reales y corre la reconciliación dos veces. Si tocas algo de
+identidad, esto tiene que seguir en verde.
+
+## 2.2 En el servidor, todos los días
+
+| Para qué | Comando |
+|---|---|
+| Entrar | `ssh dinamyt@80.190.78.70` |
+| ¿Está viva? | `sudo systemctl status dinamyt-id` |
+| ¿Por qué falló? | `sudo journalctl -u dinamyt-id -n 50 --no-pager` |
+| Reiniciar | `sudo systemctl restart dinamyt-id` |
+| Entrar a la base | `sudo -u postgres psql -d dinamyt` |
+| Memoria y disco | `free -h` · `df -h /` |
+
+Los servicios son: `dinamyt-id`, `dinamyt-portal`, `membresias-api`,
+`membresias-web`, `campeonatos-api`, `campeonatos-web`.
+
+## 2.3 Desplegar
+
+```bash
+cd /srv/dinamyt && git pull && pnpm install --frozen-lockfile && pnpm --filter @dinamyt/shared build && pnpm --filter @dinamyt/ecosystem-api build && pnpm --filter @dinamyt/ecosystem-portal build
+```
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && pnpm db:migrate && sudo systemctl restart dinamyt-id dinamyt-portal
+```
+
+```bash
+cd /srv/membresias && git pull && pnpm install --frozen-lockfile && pnpm --filter @dinamyt/membresias-db build && pnpm --filter @dinamyt/membresias-api build && pnpm --filter @dinamyt/membresias-web build && sudo systemctl restart membresias-api membresias-web
+```
+
+## 2.4 Respaldar antes de tocar
+
+```bash
+sudo -v && sudo -u postgres pg_dump -Fc dinamyt > ~/respaldo-$(date +%F).dump && sudo mv ~/respaldo-$(date +%F).dump /var/backups/
+```
+
+> El `>` lo ejecuta **tu** shell, no `sudo`: escribir directo en `/var/backups`
+> da `Permission denied`. Y **nunca** `sudo … | sudo tee …`: los dos `sudo`
+> piden contraseña al mismo teclado y se cuelga sin decir por qué.
+
+## 2.5 La reconciliación de identidades
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && sudo -u postgres RECONCILIACION_DATABASE_URL=postgresql:///dinamyt node scripts/reconciliar-identidades.mjs --informe /tmp/ensayo.json
+```
+
+Sin `--aplicar` es un ensayo: hace **todo** el trabajo y deshace la transacción.
+El informe va a `/tmp` porque quien escribe es el usuario `postgres`, que no
+entra en `/root`.
+
+---
+
+# PARTE 3 · Las trampas que ya nos costaron una tarde
+
+## 3.1 Una transacción olvidada secuestra la base entera
+
+Campeonatos lanza `ALTER TABLE … ENABLE ROW LEVEL SECURITY` **en cada arranque**.
+Si hay una sesión `idle in transaction`, ese `ALTER` se queda en cola — **y un
+candado exclusivo en cola bloquea a todo el que llega detrás, aunque solo quiera
+leer**. Síntoma: `pg_dump` «lento» que en realidad nunca arrancó. Sin un solo
+error en ningún registro.
+
+```bash
+sudo -u postgres psql -d dinamyt -c "select pid, state, wait_event_type, pg_blocking_pids(pid) as bloqueado_por, left(query,60) from pg_stat_activity where datname='dinamyt';"
+```
+
+Si al matar la sesión aparece otra igual, **es la app regenerándola**: párala
+(`sudo systemctl stop campeonatos-api`), haz lo tuyo, y levántala.
+
+El parche permanente ya está puesto:
+`ALTER DATABASE dinamyt SET idle_in_transaction_session_timeout = '5min'`.
+
+## 3.2 `postgresql:///base` no significa lo mismo para todos
+
+Para `psql` es «por el socket Unix». Para el driver de Node es **TCP a
+localhost**, donde PostgreSQL sí pide contraseña — de ahí un
+`password authentication failed for user "postgres"` que no tiene nada que ver
+con permisos. El guion ya lo resuelve solo; si te pasa con otro, delante:
+`PGHOST=/var/run/postgresql`.
+
+## 3.3 El mensaje de error que se comía a sí mismo
+
+NestJS responde `{ "message": "la explicación", "error": "Unauthorized" }`.
+`error` es el **nombre del código HTTP**, no una explicación. El portal lo leía
+primero, así que todo fallo se veía como «Unauthorized». Si escribes código de
+frontend nuevo: **primero `message`**.
+
+## 3.4 Un enlace firmado no es una sesión
+
+Todo lo que firma el ecosistema usa la misma llave RS256. Lo único que
+distingue una sesión de un enlace de invitación es el **emisor**, y hay que
+comprobarlo: sin eso, un enlace de siete días que viaja por WhatsApp abría
+`/auth/me` como sesión iniciada. Si añades otro tipo de token firmado, dale su
+propio emisor **y** su `purpose`.
+
+## 3.5 Cloudflare cambia las reglas del juego
+
+Con la nube naranja: `TRUST_PROXY_HOPS=2`, SSL/TLS en **Full (strict)**, puerto
+80 abierto (renovación del certificado), y **ningún registro DNS gris apuntando
+a tu IP** — uno solo tira a la basura todo el beneficio. Un subdominio proxiado
+sin nada detrás da **525**.
+
+---
+
+# PARTE 4 · Dónde está cada documento
+
+| Documento | Para qué |
+|---|---|
+| [README.md](README.md) | Qué es cada pieza y cómo está organizado el repo |
+| [RUN_LOCAL.md](RUN_LOCAL.md) | Correr todo en tu PC, sin Docker |
+| [VPS-PASO-A-PASO.md](VPS-PASO-A-PASO.md) | El servidor, de cero. Anexos: pendientes (C), Cloudflare (D), correo (E) |
+| [IDENTIDAD-PASO-A-PASO.md](IDENTIDAD-PASO-A-PASO.md) | Dar cuenta del ecosistema a quien ya existía |
+| [CONTINGENCIA-CAMPEONATO.md](CONTINGENCIA-CAMPEONATO.md) | Si se cae todo el día del campeonato |
+| [UNA-SOLA-APP.md](UNA-SOLA-APP.md) | Que las tres apps se sientan una sola (bloque B5) |
+| `productos/campeonatos/PLAN-ECOSYSTEM-VPS.md` | El plan maestro y su tablero. **Se edita en `dinamyt-combat`** |
