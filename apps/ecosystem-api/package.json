@@ -23,7 +23,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "pnpm build && node dist/db/seed.js",
-    "db:local:setup": "node scripts/pglite-setup.mjs"
+    "db:local:setup": "node scripts/pglite-setup.mjs",
+    "reconciliar": "node scripts/reconciliar-identidades.mjs",
+    "reconciliar:ensayo": "node scripts/probar-reconciliacion.mjs"
   },
   "dependencies": {
     "@dinamyt/shared": "workspace:*",
