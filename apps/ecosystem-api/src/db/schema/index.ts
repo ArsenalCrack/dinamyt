@@ -39,6 +39,17 @@ export const paymentStatusEnum = eco.enum('payment_status', [
 export const organizations = eco.table('organizations', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 200 }).notNull(),
+  /**
+   * Nombre corto y estable del club, único en todo el ecosistema.
+   *
+   * Existe por la reconciliación (§2.4 del plan): `membresias.orgs` ya tiene
+   * su propio `slug`, y cruzar por él es lo que hace que correr el guion dos
+   * veces no cree dos clubes. Los clubes que solo conocía Campeonatos —donde
+   * el club es texto libre dentro de `usuarios.clubes`— reciben uno derivado
+   * de su nombre normalizado. Nullable: las organizaciones creadas desde el
+   * portal antes de esto no tienen ninguno.
+   */
+  slug: varchar('slug', { length: 60 }).unique(),
   type: orgTypeEnum('type').notNull(),
   parentId: uuid('parent_id'),
   email: varchar('email', { length: 200 }),
@@ -63,15 +74,51 @@ export const organizations = eco.table('organizations', {
 export const users = eco.table('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 200 }).notNull().unique(),
-  documentId: varchar('document_id', { length: 30 }).notNull().unique(),
+  /**
+   * Documento de identidad. **Opcional**, y no por comodidad: ni Membresías ni
+   * Campeonatos lo guardan, así que exigirlo dejaría fuera de la reconciliación
+   * a todo el mundo que ya existe. El auto-registro del portal lo sigue
+   * pidiendo; a las cuentas importadas se les pide la primera vez que abran su
+   * perfil. `unique` sigue valiendo: PostgreSQL admite varios NULL.
+   */
+  documentId: varchar('document_id', { length: 30 }).unique(),
   fullName: varchar('full_name', { length: 200 }).notNull(),
   phone: varchar('phone', { length: 30 }),
   birthDate: timestamp('birth_date'),
   avatarUrl: text('avatar_url'),
-  passwordHash: text('password_hash').notNull(),
+  /**
+   * bcrypt. **Puede ser NULL**: una cuenta creada por invitación del maestro
+   * (camino B, §2.1) existe antes de tener contraseña. Sin hash no se puede
+   * iniciar sesión, y `login` lo dice con esas palabras en vez de fingir que
+   * la contraseña es incorrecta.
+   */
+  passwordHash: text('password_hash'),
   isEmailVerified: boolean('is_email_verified').default(false),
   isActive: boolean('is_active').default(true),
   isSuperAdmin: boolean('is_super_admin').default(false),
+  /**
+   * De dónde salió la cuenta: `registro` (la persona se registró en el
+   * portal), `invitacion` (la creó su maestro) o `importado-membresias` /
+   * `importado-campeonatos` / `importado-ambas` (la trajo la reconciliación
+   * de §2.4 desde una app que ya existía).
+   *
+   * No es estadística. De esto depende qué se le dice a quien intenta
+   * registrarse con un correo que ya está («tu cuenta ya existe, entra con la
+   * contraseña de Membresías») y a quién hay que pedirle una verificación de
+   * correo de verdad cuando el correo funcione (bloque B2).
+   */
+  origen: varchar('origen', { length: 30 }).notNull().default('registro'),
+  /**
+   * De dónde salió el HASH de la contraseña: `propio`, `membresias` o
+   * `campeonatos`.
+   *
+   * Las tres apps hashean con bcrypt al mismo costo (10 rondas), así que el
+   * hash importado se verifica tal cual y la gente entra con la contraseña que
+   * ya usa —sin depender del correo, que es el bloque B2—. Se anota el origen
+   * para rehashearlo al costo del ecosistema en el primer login correcto y
+   * para saber quién no ha puesto todavía una contraseña propia.
+   */
+  passwordOrigen: varchar('password_origen', { length: 30 }),
   dataConsentAt: timestamp('data_consent_at'),
   // ── Anti fuerza-bruta: contador de intentos fallidos y bloqueo temporal ────
   // (el super-admin puede desbloquear desde el panel /admin del portal)
@@ -113,7 +160,21 @@ export const orgMembers = eco.table('org_members', {
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id),
+  /** Rol general en la organización (el que se ve en el portal). */
   role: varchar('role', { length: 50 }).notNull().default('member'),
+  /**
+   * Rol por aplicación. Existen porque la misma persona no es lo mismo en cada
+   * una: un alumno del club (`student` en Membresías) suele ser `judge` o
+   * `competitor` en Campeonatos. Con un solo `role` había que elegir cuál de
+   * las dos mentir, y el token lleva un claim por app.
+   *
+   * NULL = no participa en esa app, y el claim va en `null`. Los valores
+   * válidos son los catálogos de `@dinamyt/shared` (`MembresiasRole`,
+   * `CampeonatosRole`, `AcademyRole`).
+   */
+  roleMembresias: varchar('role_membresias', { length: 50 }),
+  roleCampeonatos: varchar('role_campeonatos', { length: 50 }),
+  roleAcademy: varchar('role_academy', { length: 50 }),
   joinedAt: timestamp('joined_at').defaultNow(),
   invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
 });
