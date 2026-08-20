@@ -1526,9 +1526,23 @@ las cuatro apps en systemd.
 | **B3** | Identidad única. **La mitad está hecha** (20 ago): migración `0004`, guion de reconciliación con su ensayo, roles por app en el token y espejo en Membresías → ver **`IDENTIDAD-PASO-A-PASO.md`**. Falta correrlo en el VPS y falta Campeonatos (bloques C1–C7). | 19 sep |
 | 🔒 | **Del 1 al 13 de octubre no se toca nada.** Snapshot el día 8. | — |
 
-**Un arreglo de código pendiente**, en el repo `dinamyt-combat`:
-`backend/app/config.py:64` trae `admin@dinamyt.com` como valor por defecto, y ese
-dominio es de otra persona. Cámbialo a `admin@dinamyt.org`.
+**Dos arreglos de código pendientes**, los dos en el repo `dinamyt-combat`:
+
+`[ ]` `backend/app/config.py:64` trae `admin@dinamyt.com` como valor por
+defecto, y ese dominio es de otra persona. Cámbialo a `admin@dinamyt.org`.
+
+`[ ]` **Campeonatos ejecuta DDL al arrancar** (`ALTER TABLE … ENABLE ROW LEVEL
+SECURITY`, en `app/rls.py`) y eso necesita un candado exclusivo. Si hay una
+transacción olvidada —y las hay: SQLAlchemy deja la sesión abierta cuando una
+petición no cierra—, ese `ALTER` se queda en cola **y bloquea a todo el que
+llegue detrás, aunque solo quiera leer**. Pasó el 20 de agosto: tumbó el
+respaldo previo a la reconciliación sin un solo error en ningún registro.
+
+> Dos costuras que lo cierran: un `SET lock_timeout = '5s'` antes del DDL de
+> arranque (mejor que la app se queje a que cuelgue la base), y cerrar la
+> sesión en el `teardown_appcontext` de Flask. Mientras tanto, el parche del
+> lado de la base ya está puesto:
+> `ALTER DATABASE dinamyt SET idle_in_transaction_session_timeout = '60s'`.
 
 ---
 

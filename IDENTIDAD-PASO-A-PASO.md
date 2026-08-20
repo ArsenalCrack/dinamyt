@@ -73,6 +73,44 @@ sudo ls -lh /var/backups/dinamyt-antes-de-identidad.dump
 
 ✅ El archivo pesa algo. Si pesa cero, no sigas.
 
+### Si se queda colgado y no pasa nada
+
+No es que sea lento: casi siempre está **haciendo fila detrás de un candado**.
+Mira quién lo tiene, desde otra terminal:
+
+```bash
+sudo -u postgres psql -d dinamyt -c "select pid, state, wait_event_type, pg_blocking_pids(pid) as bloqueado_por, left(query,60) as consulta from pg_stat_activity where datname='dinamyt';"
+```
+
+La cadena típica —y ya pasó el 20 de agosto— es esta:
+
+```
+32193  idle in transaction   SELECT ... FROM usuarios     ← una sesión olvidada
+   └─ bloquea a  ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY   ← Campeonatos al arrancar
+         └─ bloquea a  LOCK TABLE ...                     ← tu pg_dump
+```
+
+**Lo que hay que entender:** un candado EXCLUSIVO en cola bloquea a todo el que
+llegue detrás, aunque solo quiera leer. Así que una transacción olvidada que no
+hace nada acaba parando la base entera, sin un solo error en ningún registro.
+
+Se suelta matando la sesión olvidada (la que está `idle in transaction`):
+
+```bash
+sudo -u postgres psql -d dinamyt -c "select pg_terminate_backend(EL_PID);"
+```
+
+Y se evita de raíz diciéndole a PostgreSQL que las corte solo:
+
+```bash
+sudo -u postgres psql -d dinamyt -c "alter database dinamyt set idle_in_transaction_session_timeout = '60s';"
+```
+
+Solo alcanza a las transacciones **abandonadas**, no a las que están
+trabajando: la reconciliación corre entera en una transacción activa y este
+tope no la toca. Se aplica a las conexiones nuevas, así que después conviene
+reiniciar las apps.
+
 > **Por qué en tres pasos y no en uno.** El `>` lo ejecuta TU shell, no
 > `sudo`: escribir directamente en `/var/backups` da `Permission denied`,
 > porque esa carpeta es de root (por eso el respaldo diario del cron sí
