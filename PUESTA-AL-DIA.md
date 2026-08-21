@@ -21,9 +21,15 @@
 
 **Se salta de una máquina a otra, y ese es el error fácil de cometer.** El PASO
 1 empuja el código a GitHub, así que tiene que salir de donde ESTÁ el código —
-tu PC—; los demás tocan el servidor. Si corres el PASO 1 dentro del SSH, la
-respuesta es `cd: /d/Repositorios/…: No such file or directory` (no pasa nada:
-el `cd` falla y el `&&` corta la cadena, así que no se ejecuta nada más).
+tu PC—; los demás tocan el servidor.
+
+Los dos tropiezos habituales, y ninguno rompe nada porque el `cd` falla antes
+de tocar nada:
+
+| Lo que sale | Qué pasó |
+|---|---|
+| `-bash: cd: /d/Repositorios/…: No such file or directory` | Corriste el PASO 1 **dentro del SSH**. Ahí no está tu disco |
+| `Cannot find path 'C:\d\Repositorios\…'` | Usaste la ruta de **Git Bash en PowerShell**. En PowerShell va `D:\Repositorios\…` |
 
 | Paso | Dónde | Qué hace |
 |---|---|---|
@@ -77,33 +83,53 @@ sudo -v && sudo -u postgres pg_dump -Fc dinamyt > ~/respaldo-$(date +%F).dump &&
 **El VPS clona de GitHub, no de tu disco.** Son dos repositorios y el orden no
 importa, pero los dos tienen que estar arriba antes de tocar el servidor.
 
-> Las rutas de abajo son de **Git Bash** (`/d/Repositorios/…`). En PowerShell se
-> escriben `D:\Repositorios\…` y los comandos se encadenan igual con `&&`.
+> ⚠️ **Los comandos de este paso son de PowerShell**, que es la terminal que se
+> abre por defecto en Windows. La ruta va con la letra de la unidad
+> (`D:\Repositorios\…`) y los comandos se separan con `;`.
+>
+> **`/d/Repositorios/…` es de Git Bash y en PowerShell NO funciona**: lo lee
+> como una carpeta `d` dentro de la unidad en la que estés, y responde
+> `Cannot find path 'C:\d\Repositorios\…'`. No rompe nada — simplemente no
+> hace nada.
+>
+> Si prefieres Git Bash, la misma línea con `/d/Repositorios/…` y `&&`.
 
 ### 1.1 Membresías
 
-```bash
-cd /d/Repositorios/dinamyt-membresias && git add -A && git status --short
+Primero mirar qué se va a subir. **Nunca `commit` sin ver antes esta lista**:
+
+```powershell
+cd D:\Repositorios\dinamyt-membresias; git add -A; git status --short
 ```
 
-```bash
-cd /d/Repositorios/dinamyt-membresias && git commit -m "feat(altas): la ficha que nace del ecosistema, y listas que se pueden recorrer" && git push
+Deben salir 9 archivos: `aprovisionar.ts` y la migración `0016` como nuevos
+(`A`), y siete modificados (`M`). Si cuadra:
+
+```powershell
+cd D:\Repositorios\dinamyt-membresias; git commit -m "feat(altas): la ficha que nace del ecosistema, y listas que se pueden recorrer"; git push
 ```
+
+> El aviso `LF will be replaced by CRLF` es normal en Windows y no rompe nada:
+> Git guarda los saltos de línea en su formato y los devuelve en el de tu PC.
 
 ### 1.2 El monorepo
 
-```bash
-cd /d/Repositorios/dinamyt && git add -A && git status --short
+```powershell
+cd D:\Repositorios\dinamyt; git add -A; git status --short
 ```
 
-```bash
-cd /d/Repositorios/dinamyt && git commit -m "feat(altas): codigo de club, solicitudes, genero y suscripciones que se pueden cancelar" && git push
+Aquí son ~34: las dos migraciones nuevas con sus snapshots, cinco componentes
+del portal, dos ficheros de pruebas, este documento, y el resto modificados.
+
+```powershell
+cd D:\Repositorios\dinamyt; git commit -m "feat(altas): codigo de club, solicitudes, genero y suscripciones que se pueden cancelar"; git push
 ```
 
 ### 1.3 Poner al día el espejo (opcional, pero hazlo)
 
 `productos/membresias` es un **espejo**. Si no se sincroniza, el monorepo
-guarda una versión de Membresías anterior a estos cambios.
+guarda una versión de Membresías anterior a estos cambios. Va **después** de
+que Membresías esté subida: el guion lee de GitHub, no de tu disco.
 
 ```powershell
 cd D:\Repositorios\dinamyt; .\scripts\sync-apps.ps1 -Producto membresias
