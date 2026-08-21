@@ -36,6 +36,15 @@ let tokenEnMemoria: string | null = null;
 
 /** Solo el perfil, para pintar rápido. Sin él, nada: el token no se guarda. */
 const USER_KEY = 'membresias_user';
+/**
+ * Si esta sesion nacio del portal DINAMYT.
+ *
+ * Lo necesita el boton de Salir: cerrar solo la sesion de aqui deja la del
+ * portal viva, y al pulsar «entrar con DINAMYT» el portal devuelve otro token
+ * al instante, sin preguntar nada. Por fuera eso se ve como si salir no
+ * funcionara — se sale y se vuelve a estar dentro.
+ */
+const ORIGEN_SSO_KEY = 'membresias_origen_sso';
 const COOKIE_CSRF = 'membresias_csrf';
 
 export type Rol = 'owner' | 'staff' | 'guardian' | 'student';
@@ -139,6 +148,18 @@ export function cerrarSesion() {
   // Restos de la versión anterior, cuando el token vivía aquí. Se borra para
   // no dejar sesiones viejas al alcance de cualquier script.
   localStorage.removeItem('membresias_token');
+  localStorage.removeItem(ORIGEN_SSO_KEY);
+}
+
+/** Deja constancia de que esta sesión vino del portal. */
+export function marcarOrigenSso() {
+  if (typeof window !== 'undefined') localStorage.setItem(ORIGEN_SSO_KEY, '1');
+}
+
+/** ¿Esta sesión vino del portal? Lo pregunta el botón de Salir. */
+export function vinoDelPortal(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(ORIGEN_SSO_KEY) === '1';
 }
 
 // `withCredentials` es lo que hace que la cookie de sesión viaje (y que el
@@ -171,6 +192,23 @@ export const EVENTO_MANTENIMIENTO = 'membresias:mantenimiento';
 /**
  * Sesión expirada, cuenta desactivada o club suspendido: se limpia y se vuelve
  * al login. Nunca desde el propio /auth/login ni si ya estamos en /login.
+ *
+ * ── Y NUNCA desde `/auth/me` ──
+ *
+ * `/auth/me` es el sondeo con el que el guardián de sesión se presenta al
+ * arrancar, y ese sondeo compite con el canje del token del portal: React
+ * ejecuta los efectos de los hijos antes que los del padre, así que la pantalla
+ * de login lanza `POST /auth/sso` y el guardián lanza su `GET /auth/me` sin
+ * esperarlo. El `me` sale SIN cookie —todavía no existe— y vuelve 401.
+ *
+ * Cuando ese 401 llegaba tarde, aquí se hacía `window.location.href` estando ya
+ * dentro de la app: una recarga entera, disparada por una petición que ya no
+ * significaba nada. Quien lo sufría entraba por el portal, veía la pantalla
+ * parpadear y se quedaba con la sesión del servidor viva y la de la app
+ * borrada — dos versiones distintas de si había alguien dentro.
+ *
+ * Su 401 lo interpreta el guardián, que sabe si sigue siendo la respuesta que
+ * estaba esperando (ver `AuthProvider`).
  */
 api.interceptors.response.use(
   (r) => r,
@@ -179,6 +217,7 @@ api.interceptors.response.use(
       axios.isAxiosError(error) &&
       error.response?.status === 401 &&
       !error.config?.url?.includes('/auth/login') &&
+      !error.config?.url?.includes('/auth/me') &&
       typeof window !== 'undefined' &&
       window.location.pathname !== '/login'
     ) {
@@ -293,6 +332,7 @@ export async function entrarConSso(token: string): Promise<RespuestaLogin> {
   const { data } = await api.post<RespuestaLogin>('/auth/sso', { token });
   guardarToken(data.token);
   guardarUsuario(data.user);
+  marcarOrigenSso();
   return data;
 }
 

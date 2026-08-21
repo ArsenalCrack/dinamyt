@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   cerrarSesion as limpiar,
   entrarConCodigo as codigoApi,
@@ -49,17 +56,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [club, setClub] = useState<Club | null>(null);
   const [cargando, setCargando] = useState(true);
 
+  /**
+   * Cuántas veces ha cambiado quién está dentro desde que arrancó la app.
+   *
+   * ── Para qué hace falta contar ──
+   *
+   * El sondeo de abajo (`/auth/me`) sale a la vez que el canje del token del
+   * portal (`/auth/sso`), porque React ejecuta los efectos de los hijos —la
+   * pantalla de login— antes que los del padre —este guardián—. El sondeo sale
+   * SIN cookie, porque todavía no hay ninguna, y vuelve 401.
+   *
+   * Cuál de los dos contesta primero es una carrera, y depende de la latencia:
+   * en local ganaba siempre el sondeo y no se notaba nada; contra el servidor
+   * de verdad gana a veces el canje, y entonces ese 401 llegaba DESPUÉS de que
+   * la sesión ya estuviera hecha y ejecutaba su `catch`, que borraba al usuario
+   * recién entrado. La app se quedaba diciendo «aquí no hay nadie» con la
+   * cookie viva en el servidor, y a partir de ahí ni salir funcionaba: se
+   * pedía cerrar una sesión que la app creía inexistente.
+   *
+   * Con el contador, una respuesta que se refiere a un estado ya superado se
+   * descarta en vez de aplicarse. Sirve en los dos sentidos: un 401 tardío no
+   * borra a quien acaba de entrar, y un 200 tardío no resucita a quien acaba
+   * de salir.
+   */
+  const generacion = useRef(0);
+
   useEffect(() => {
     let cancelado = false;
+    const mia = generacion.current;
+    const vigente = () => !cancelado && generacion.current === mia;
+
     setUser(obtenerUsuario());
     obtenerMe()
       .then(({ user: u, club: c }) => {
-        if (cancelado) return;
+        if (!vigente()) return;
         setUser(u);
         setClub(c);
       })
       .catch(() => {
-        if (cancelado) return;
+        if (!vigente()) return;
         limpiar();
         setUser(null);
         setClub(null);
@@ -74,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await loginApi(email, password);
+    generacion.current += 1;
     setUser(data.user);
     setClub(data.club);
     return data.user;
@@ -81,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginConCodigo = useCallback(async (token: string) => {
     const data = await codigoApi(token);
+    generacion.current += 1;
     setUser(data.user);
     setClub(data.club);
     return data.user;
@@ -98,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const loginConSso = useCallback(async (token: string) => {
     const data = await ssoApi(token);
+    generacion.current += 1;
     setUser(data.user);
     setClub(data.club);
     return data.user;
@@ -108,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // viva en la API.
   const logout = useCallback(async () => {
     await logoutApi();
+    generacion.current += 1;
     limpiar();
     setUser(null);
     setClub(null);
