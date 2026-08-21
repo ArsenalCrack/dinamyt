@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, type SQL } from 'drizzle-orm';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import type { JwtPayload, MembresiasRole } from '../types/auth';
@@ -43,28 +43,35 @@ interface UsuarioVigente {
   orgActiva: boolean;
 }
 
+/** Un `sub` con forma de UUID; cualquier otra cosa no se le pasa a Postgres. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Relee al usuario del token. Devuelve `null` si ya no existe o está inactivo.
  *
- * Se busca por CORREO, no por id: un token del ecosistema trae un `sub` que no
- * pertenece a esta base. Nunca se da de alta a nadie en silencio — si el correo
- * no existe aquí, no entra.
+ * Se busca primero por `eco_sub` —la cuenta del ecosistema con la que la
+ * reconciliación (§2.4) enlazó esta ficha— y solo después por CORREO, que es
+ * como se hacía cuando el enlace no existía. El orden importa: el correo se
+ * puede cambiar desde el portal, y el enlace no.
+ *
+ * Nunca se da de alta a nadie en silencio: si no hay ficha, no entra.
  */
 async function usuarioVigente(
   db: Db,
   payload: JwtPayload,
 ): Promise<UsuarioVigente | null> {
   const correo = (payload.email ?? '').toLowerCase();
-  if (!correo) return null;
+  const sub = typeof payload.sub === 'string' && UUID.test(payload.sub) ? payload.sub : null;
+  if (!correo && !sub) return null;
 
   // Cruza clubes por necesidad: este paso ES el que averigua a cuál pertenece
   // quien llama, así que todavía no hay contexto con el que filtrar.
   const { fila, orgActiva } = await sinFiltroDeClub(db, async (tx) => {
-    const [fila] = await tx
-      .select()
-      .from(users)
-      .where(eq(users.email, correo))
-      .limit(1);
+    const buscar = (condicion: SQL | undefined) =>
+      tx.select().from(users).where(condicion).limit(1);
+
+    let [fila] = sub ? await buscar(eq(users.ecoSub, sub)) : [];
+    if (!fila && correo) [fila] = await buscar(eq(users.email, correo));
 
     if (!fila || !fila.isActive) return { fila: null, orgActiva: true };
 

@@ -34,6 +34,10 @@ const SIN_CONTEXTO = new Set([
   // Canjea el QR del maestro por una sesión: como el login, se resuelve antes
   // de saber a qué club pertenece quien entra y abre su propio contexto.
   '/auth/acceso-qr',
+  // Canjea el token del portal DINAMYT por una sesión: mismo caso que las dos
+  // anteriores. Olvidarla aquí no da un error claro —la ruta se queda colgada,
+  // porque su `sinFiltroDeClub` abriría una transacción dentro de esta.
+  '/auth/sso',
   // El cron diario recorre TODOS los clubes: abre su propia transacción sin
   // filtro (ver `routes/notifications.ts`), así que envolverla en el contexto
   // de un club —que no tiene— solo abriría una transacción de más.

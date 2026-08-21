@@ -7,6 +7,7 @@ import {
   date,
   timestamp,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { mem, rolUsuarioEnum } from './_schema';
 
@@ -36,6 +37,16 @@ export const orgs = mem.table('orgs', {
    */
   logoUrl: text('logo_url'),
   isActive: boolean('is_active').notNull().default(true),
+  /**
+   * El mismo club, visto desde el ecosistema DINAMYT.
+   *
+   * Es un ESPEJO, no una clave: `id` no se toca porque lo referencian ocho
+   * tablas y todas las políticas de RLS. Lo llena la reconciliación (§2.4 del
+   * plan maestro) y sirve para que el club exista una sola vez —el maestro lo
+   * registra en el portal y aparece en Membresías y en Campeonatos con su
+   * gente ya asociada—. Vacío mientras Membresías corra sola.
+   */
+  ecoOrgId: uuid('eco_org_id'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -53,8 +64,23 @@ export const users = mem.table(
     id: uuid('id').primaryKey().defaultRandom(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     fullName: varchar('full_name', { length: 150 }).notNull(),
-    /** bcrypt. Nunca sale de la API. */
-    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    /**
+     * bcrypt. Nunca sale de la API. **Puede estar vacío.**
+     *
+     * Vacío significa «esta persona entra por DINAMYT»: su ficha la creó el
+     * canje del SSO (`POST /auth/sso`) a partir de su cuenta del ecosistema, y
+     * su contraseña vive allí, una sola vez. Antes era obligatorio, y eso era
+     * justo lo que rompía el puente: el alumno que su maestro había dado de
+     * alta en el portal llegaba aquí y se le decía que le pidiera a su maestro
+     * que lo agregara.
+     *
+     * El login no necesita saberlo: `verificarPassword` con un hash vacío
+     * devuelve `false` sin lanzar, así que estas fichas no entran por el
+     * formulario y lo hacen con el mismo mensaje genérico que un correo que no
+     * existe. Decir «esta entra por DINAMYT» delataría qué correos hay dados de
+     * alta.
+     */
+    passwordHash: varchar('password_hash', { length: 255 }),
     phone: varchar('phone', { length: 40 }),
     /** Foto de perfil: data-URL o http. La ve el maestro en el roster. */
     avatarUrl: text('avatar_url'),
@@ -113,8 +139,26 @@ export const users = mem.table(
     isActive: boolean('is_active').notNull().default(true),
     /** Quién lo dio de alta (trazabilidad de la jerarquía). */
     createdById: uuid('created_by_id'),
+    /**
+     * La cuenta de esta persona en el ecosistema DINAMYT (el `sub` de su
+     * token). Una persona, una cuenta, para siempre; esta fila es su FICHA en
+     * este club, que es otra cosa (§2 del plan maestro).
+     *
+     * Es lo que hace que el enlace no dependa del correo: si alguien cambia el
+     * suyo en el portal, la ficha lo sigue reconociendo. Vacío en las fichas
+     * que todavía no tienen cuenta —el alumno sin correo que entra por carnet
+     * QR o PIN—, que siguen funcionando igual que siempre.
+     */
+    ecoSub: uuid('eco_sub'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
   },
-  (t) => [index('ix_users_org').on(t.orgId)],
+  (t) => [
+    index('ix_users_org').on(t.orgId),
+    // Parcial: dos fichas sin cuenta no chocan entre sí, pero una cuenta del
+    // ecosistema no puede acabar enlazada a dos fichas del mismo club.
+    uniqueIndex('ux_membresias_users_eco_sub')
+      .on(t.ecoSub)
+      .where(sql`${t.ecoSub} is not null`),
+  ],
 );

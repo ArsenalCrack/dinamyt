@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import {
   cerrarSesion as limpiar,
   entrarConCodigo as codigoApi,
+  entrarConSso as ssoApi,
   login as loginApi,
   logout as logoutApi,
   obtenerMe,
@@ -32,6 +33,8 @@ interface AuthCtx {
   login: (email: string, password: string) => Promise<Usuario>;
   /** Entrar con el código del QR que genera el maestro (sin teclear nada). */
   loginConCodigo: (token: string) => Promise<Usuario>;
+  /** Entrar con el token que devuelve el portal DINAMYT (SSO por redirección). */
+  loginConSso: (token: string) => Promise<Usuario>;
   logout: () => Promise<void>;
   /** Refresca el usuario tras editar el propio perfil. */
   refrescar: () => Promise<void>;
@@ -83,6 +86,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data.user;
   }, []);
 
+  /**
+   * SSO: el portal devuelve su token y aquí se canjea por una sesión propia.
+   *
+   * Pasa por el contexto —y no por la API a secas— a propósito: antes la
+   * pantalla de login guardaba el token por su cuenta y llamaba a `/auth/me`,
+   * así que la sesión quedaba puesta en el servidor pero `user` seguía en
+   * `null` aquí dentro. La primera pantalla protegida a la que se llegaba veía
+   * «no hay usuario» y devolvía al login. Entrando por aquí, entrar por el
+   * portal deja exactamente el mismo estado que entrar con contraseña.
+   */
+  const loginConSso = useCallback(async (token: string) => {
+    const data = await ssoApi(token);
+    setUser(data.user);
+    setClub(data.club);
+    return data.user;
+  }, []);
+
   // La cookie de sesión es httpOnly: solo el servidor puede borrarla, así que
   // cerrar sesión pasa por pedírselo. Limpiar aquí a secas dejaría la sesión
   // viva en la API.
@@ -107,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cargando,
         login,
         loginConCodigo,
+        loginConSso,
         logout,
         refrescar,
         esStaff: esStaff(user),

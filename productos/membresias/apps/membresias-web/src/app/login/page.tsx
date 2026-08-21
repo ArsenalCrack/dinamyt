@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { guardarToken, mensajeError, obtenerConfig, obtenerMe } from '@/lib/api';
+import { mensajeError, obtenerConfig } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { LIM } from '@/lib/campos';
@@ -14,7 +14,7 @@ const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 export default function Login() {
   const router = useRouter();
   const { t } = useI18n();
-  const { login, loginConCodigo, user, cargando } = useAuth();
+  const { login, loginConCodigo, loginConSso, user, cargando } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,6 +51,12 @@ export default function Login() {
       });
   }, [loginConCodigo, router, t]);
 
+  /** Saltar al portal a iniciar sesión y volver aquí con la sesión hecha. */
+  function entrarPorElPortal() {
+    const vuelta = encodeURIComponent(`${window.location.origin}/login`);
+    window.location.href = `${PORTAL_URL}/login?redirect=${vuelta}`;
+  }
+
   // El botón de SSO solo se dibuja si esta instalación lo tiene configurado.
   useEffect(() => {
     obtenerConfig()
@@ -58,19 +64,37 @@ export default function Login() {
       .catch(() => setSso(false));
   }, []);
 
-  // SSO por redirección: el portal vuelve con #token=<jwt> en el fragmento,
-  // que nunca viaja al servidor.
+  /**
+   * SSO por redirección: el portal vuelve con #token=<jwt> en el fragmento,
+   * que nunca viaja al servidor.
+   *
+   * Ese token se CANJEA por una sesión de Membresías (`/auth/sso`) en vez de
+   * guardarse en memoria y preguntar por `/auth/me`. Antes pasaban dos cosas, y
+   * las dos acababan devolviendo a la persona al login: la sesión no
+   * sobrevivía a una recarga —vivía en una variable, no en la cookie— y el
+   * contexto de sesión nunca se enteraba de que había alguien dentro.
+   *
+   * `conCodigo` se marca mientras dura el canje por lo mismo que en el QR: sin
+   * eso, el efecto de «ya tienes sesión» de arriba compite con este por
+   * decidir a dónde se va.
+   */
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash.startsWith('#token=')) return;
     const token = decodeURIComponent(hash.slice(7));
     if (!token) return;
-    guardarToken(token);
+
+    setConCodigo(true);
+    // El token fuera de la barra de direcciones en cuanto se lee: si no, se
+    // queda en el historial y en cualquier captura de pantalla.
     window.history.replaceState(null, '', window.location.pathname);
-    obtenerMe()
-      .then(({ user: u }) => router.replace(rutaInicio(u)))
-      .catch(() => setError(t('login.error')));
-  }, [router, t]);
+    loginConSso(token)
+      .then((u) => router.replace(rutaInicio(u)))
+      .catch((err) => {
+        setError(mensajeError(err, t('login.error')));
+        setConCodigo(false);
+      });
+  }, [loginConSso, router, t]);
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
@@ -101,14 +125,30 @@ export default function Login() {
         className="card"
         style={{ padding: '1.75rem', width: '100%', maxWidth: 380 }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logo.png"
-          alt="DINAMYT"
-          width={56}
-          height={56}
-          style={{ marginBottom: '0.75rem' }}
-        />
+        {/* El logo lleva al portal, la convención del ecosistema: ninguna app
+            es un callejón sin salida (ver UNA-SOLA-APP.md §3). Solo cuando hay
+            portal al que ir: en el modo autónomo se queda como estaba. */}
+        {sso ? (
+          <a href={PORTAL_URL} title={t('login.volverAlPortal')}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="DINAMYT"
+              width={56}
+              height={56}
+              style={{ marginBottom: '0.75rem' }}
+            />
+          </a>
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src="/logo.png"
+            alt="DINAMYT"
+            width={56}
+            height={56}
+            style={{ marginBottom: '0.75rem' }}
+          />
+        )}
         <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>
           {t('login.eyebrow')}
         </p>
@@ -181,15 +221,29 @@ export default function Login() {
               {t('login.o')}
               <span style={{ height: 1, flex: 1, background: 'var(--border)' }} />
             </div>
-            <a
+            {/* Botón y no enlace: la dirección de vuelta necesita
+                `window.location.origin`, que en el servidor no existe. Como
+                atributo salía vacío y React no corrige atributos al hidratar,
+                así que el portal se quedaba sin saber a dónde devolver. */}
+            <button
+              type="button"
               className="btn btn-outline"
               style={{ width: '100%' }}
-              href={`${PORTAL_URL}/login?redirect=${encodeURIComponent(
-                typeof window !== 'undefined' ? `${window.location.origin}/login` : '',
-              )}`}
+              onClick={entrarPorElPortal}
             >
               {t('login.sso')}
-            </a>
+            </button>
+
+            {/* Las cuentas nacen en el ecosistema: aquí no hay registro. */}
+            <p
+              className="muted"
+              style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.85rem' }}
+            >
+              {t('login.sinCuenta')}{' '}
+              <a href={`${PORTAL_URL}/registro`} style={{ color: 'var(--gold)' }}>
+                {t('login.registrate')}
+              </a>
+            </p>
           </>
         )}
       </form>

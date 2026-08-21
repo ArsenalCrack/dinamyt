@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, ne, or, sql } from 'drizzle-orm';
 import { orgs, users } from '@dinamyt/membresias-db';
 import {
   orgDelRequest,
@@ -18,6 +18,7 @@ import {
 } from '../lib/validacion';
 import { decodificarImagen, direccionLogo, imagenGuardada } from '../lib/imagenes';
 import { todayStr } from '../lib/billing';
+import { leerPagina, patron } from '../lib/paginacion';
 
 /**
  * Panel del SUPERADMIN: qué clubes existen y qué maestros tienen acceso.
@@ -199,14 +200,41 @@ export async function orgsRoutes(app: FastifyInstance) {
   });
 
   // ── GET /orgs/:id/users — la gente de un club ─────────────────────────────
+  /**
+   * La gente de un club, para el superadmin.
+   *
+   * Paginado y con búsqueda del servidor, como el resto de listados (ver
+   * `lib/paginacion.ts`). Devolvía el club ENTERO en una sola respuesta y sin
+   * buscador: con cien alumnos, abrir «ver gente» era descargar cien filas
+   * para después recorrerlas a mano hacia abajo. La regla de la casa vale
+   * también aquí — si se pagina, se busca en el servidor, o quien esté en la
+   * página tres deja de existir para el buscador.
+   *
+   * Responde `{ items, total }` como los demás. Sin `limit` sigue devolviendo
+   * todo, así que nada de lo que ya llamaba a esta ruta se rompe.
+   */
   app.get('/orgs/:id/users', { preHandler: requireSuperAdmin() }, async (req) => {
     const { id } = req.params as { id: string };
-    const filas = await req.db
-      .select()
-      .from(users)
-      .where(eq(users.orgId, id))
-      .orderBy(asc(users.fullName));
-    return filas.map(vistaUsuario);
+    const { limit, offset, q } = leerPagina(req.query);
+
+    const conds = [eq(users.orgId, id)];
+    if (q) {
+      const p = patron(q);
+      conds.push(or(ilike(users.fullName, p), ilike(users.email, p))!);
+    }
+    const donde = and(...conds);
+
+    const [filas, [cuenta]] = await Promise.all([
+      req.db
+        .select()
+        .from(users)
+        .where(donde)
+        .orderBy(asc(users.fullName))
+        .limit(limit)
+        .offset(offset),
+      req.db.select({ n: sql<number>`count(*)::int` }).from(users).where(donde),
+    ]);
+    return { items: filas.map(vistaUsuario), total: cuenta?.n ?? 0 };
   });
 
   // ── POST /orgs/:id/maestros — nombrar al maestro de un club ───────────────

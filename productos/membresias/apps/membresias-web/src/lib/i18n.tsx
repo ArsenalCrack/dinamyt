@@ -72,6 +72,11 @@ const es = {
   'login.o': 'o',
   'login.conQr': 'Entrando con tu código…',
   'login.qrCaducado': 'Ese código ya caducó. Pídele otro a tu maestro.',
+  // Las cuentas nacen en el ecosistema, nunca aquí: por eso «regístrate» lleva
+  // al portal y no a un formulario propio (ver UNA-SOLA-APP.md §2).
+  'login.sinCuenta': '¿No tienes cuenta?',
+  'login.registrate': 'Regístrate en DINAMYT',
+  'login.volverAlPortal': 'Ir al portal DINAMYT',
 
   // Comunes
   'comun.cargando': 'Cargando…',
@@ -686,6 +691,9 @@ const en: Record<ClaveTexto, string> = {
   'login.o': 'or',
   'login.conQr': 'Signing you in with your code…',
   'login.qrCaducado': 'That code has expired. Ask your master for another one.',
+  'login.sinCuenta': 'No account yet?',
+  'login.registrate': 'Sign up at DINAMYT',
+  'login.volverAlPortal': 'Go to the DINAMYT portal',
 
   'comun.cargando': 'Loading…',
   'comun.guardar': 'Save',

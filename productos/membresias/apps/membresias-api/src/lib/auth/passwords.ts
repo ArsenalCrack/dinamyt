@@ -25,10 +25,20 @@ export async function hashPassword(plano: string): Promise<string> {
   return bcrypt.hash(plano, RONDAS);
 }
 
+/**
+ * Comprueba una contraseña contra el hash guardado.
+ *
+ * El hash puede estar VACÍO, y no es un caso raro: una ficha creada desde el
+ * ecosistema no tiene contraseña propia (ver la migración 0016). Entonces esto
+ * devuelve `false` sin más, que es lo correcto — por el formulario no se entra
+ * — y sin distinguirse de una contraseña equivocada, que es lo que impide que
+ * el login delate qué correos están dados de alta.
+ */
 export async function verificarPassword(
   plano: string,
-  hash: string,
+  hash: string | null | undefined,
 ): Promise<boolean> {
+  if (!hash) return false;
   try {
     return await bcrypt.compare(plano, hash);
   } catch {
@@ -40,7 +50,10 @@ export async function verificarPassword(
  * `true` si el hash guardado usa MÁS rondas que las configuradas. Permite bajar
  * el costo de forma transparente: tras un login correcto se vuelve a hashear.
  */
-export function necesitaRehash(hash: string): boolean {
+export function necesitaRehash(hash: string | null | undefined): boolean {
+  // Sin hash no hay nada que rehashear. Devolver `true` aquí haría que el login
+  // por SSO intentara guardar el hash de una contraseña que nadie escribió.
+  if (!hash) return false;
   try {
     return parseInt(hash.split('$')[2], 10) > RONDAS;
   } catch {
