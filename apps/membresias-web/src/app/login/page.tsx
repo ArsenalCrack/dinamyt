@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { mensajeError, obtenerConfig } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
@@ -12,32 +12,40 @@ import { ControlesApariencia } from '@/components/ControlesApariencia';
 const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 
 /**
- * Quita el token de la barra de direcciones — **sin romper el router**.
+ * Aquí ya NO se toca el historial a mano. Cuesta explicarlo, así que va entero.
  *
- * Los dos tokens que llegan por aquí (el `?acceso=` del QR y el `#token=` del
- * portal) no pueden quedarse escritos: se guardan en el historial del
- * navegador y salen en cualquier captura de pantalla. Hasta aquí, todo bien.
+ * Los dos tokens que entran por esta pantalla —el `?acceso=` del QR y el
+ * `#token=` del portal— no pueden quedarse escritos en la barra. La forma
+ * evidente de quitarlos era `history.replaceState(...)`, y de ahí salieron DOS
+ * fallos seguidos, los dos con el mismo síntoma: pulsabas «Salir» en otra
+ * pantalla, minutos después, y no pasaba nada.
  *
- * ── La trampa está en el PRIMER argumento ──
+ * 1. Con `replaceState(null, …)`, ese `null` borraba el estado del router que
+ *    Next guarda dentro de la entrada del historial. El router perdía el hilo
+ *    y `router.replace()` dejaba de navegar — sin lanzar, sin avisar.
  *
- * Esto se hacía con `replaceState(null, …)`, y ese `null` es el fallo: Next
- * guarda el estado de su router DENTRO de la entrada del historial, y pasar
- * `null` lo borra. A partir de ese momento el router pierde el hilo y
- * **`router.replace()` deja de navegar**: no lanza, no avisa, simplemente no
- * hace nada.
+ * 2. Conservando `window.history.state` se arreglaba eso… pero ese estado
+ *    lleva grabada dentro la URL, y la URL grabada seguía teniendo el
+ *    `?acceso=`. La barra decía una cosa y Next creía otra. Con el token del
+ *    portal no se notaba —`#token=` es un fragmento y Next ni lo mira—, pero
+ *    con el del QR la query SÍ es parte de la ruta que Next gestiona, y el
+ *    router volvía a quedarse mudo.
  *
- * El síntoma era desconcertante porque aparecía lejos de aquí: entrabas por el
- * portal, y al pulsar «Salir» —en otra pantalla, minutos después— no pasaba
- * nada. Con F5 funcionaba, porque una recarga entera reconstruye el router.
- * Entrando con contraseña no fallaba nunca: por ese camino nadie toca el
- * historial.
+ * ── Lo que se hace ahora ──
  *
- * Pasando `window.history.state` se conserva lo que Next tenía puesto y solo
- * cambia la dirección, que es lo único que se quería cambiar.
+ * Nada. El token se va solo: `router.replace()` REEMPLAZA la entrada actual del
+ * historial, así que al saltar a la pantalla de destino la dirección con el
+ * token desaparece de la barra Y del historial, sin que nadie tenga que
+ * borrarla. Si el canje falla y hay que quedarse aquí, se hace lo mismo hacia
+ * `/login` a secas.
+ *
+ * Queda a la vista los ~200 ms que dura el canje. Es un precio que se paga a
+ * gusto: lo que se compra es que el historial y Next digan siempre lo mismo.
+ *
+ * `canjeado` es el pestillo que antes ponía, de rebote, el limpiado de la
+ * barra: sin la URL vieja delante, un efecto que se repitiera volvería a
+ * canjear el mismo token. Ahora el pestillo es explícito.
  */
-function limpiarLaBarraDeDirecciones() {
-  window.history.replaceState(window.history.state, '', window.location.pathname);
-}
 
 export default function Login() {
   const router = useRouter();
@@ -50,6 +58,8 @@ export default function Login() {
   const [enviando, setEnviando] = useState(false);
   const [sso, setSso] = useState(false);
   const [conCodigo, setConCodigo] = useState(false);
+  /** Un token se canjea UNA vez. Ver el comentario largo de arriba. */
+  const canjeado = useRef(false);
 
   // Quien ya tiene sesión no debería quedarse mirando el formulario.
   useEffect(() => {
@@ -61,19 +71,25 @@ export default function Login() {
    * lo escanea con la cámara de su celular, que abre esta página con
    * `?acceso=<token>`.
    *
-   * El token se borra de la barra de direcciones en cuanto se lee: si no, se
-   * queda en el historial del navegador y en cualquier captura de pantalla.
+   * El token desaparece de la barra al saltar a la pantalla de destino, porque
+   * `router.replace()` reemplaza la entrada del historial en vez de añadir una
+   * (ver el comentario largo del principio del fichero).
    */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const codigo = params.get('acceso');
     if (!codigo) return;
 
+    if (canjeado.current) return;
+    canjeado.current = true;
+
     setConCodigo(true);
-    limpiarLaBarraDeDirecciones();
     loginConCodigo(codigo)
       .then((u) => router.replace(rutaInicio(u)))
       .catch((err) => {
+        // Nos quedamos aquí, así que el token sí hay que quitarlo de la barra
+        // — y se quita navegando, que es lo único que Next entiende.
+        router.replace('/login');
         setError(mensajeError(err, t('login.qrCaducado')));
         setConCodigo(false);
       });
@@ -112,11 +128,14 @@ export default function Login() {
     const token = decodeURIComponent(hash.slice(7));
     if (!token) return;
 
+    if (canjeado.current) return;
+    canjeado.current = true;
+
     setConCodigo(true);
-    limpiarLaBarraDeDirecciones();
     loginConSso(token)
       .then((u) => router.replace(rutaInicio(u)))
       .catch((err) => {
+        router.replace('/login');
         setError(mensajeError(err, t('login.error')));
         setConCodigo(false);
       });

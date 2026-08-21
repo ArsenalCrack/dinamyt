@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { claveRol, useAuth } from '@/lib/auth';
 import { vinoDelPortal } from '@/lib/api';
@@ -69,7 +69,6 @@ interface Enlace {
 }
 
 export function NavBar() {
-  const router = useRouter();
   const pathname = usePathname();
   const { t, idioma, setIdioma } = useI18n();
   const { user, club, logout, esStaff, esSuper } = useAuth();
@@ -182,6 +181,17 @@ export function NavBar() {
    * A quien entró con su contraseña no se le manda al portal: no tiene ninguna
    * sesión allí que cerrar, y el viaje solo le enseñaría un dominio que no
    * pidió.
+   *
+   * ── Por qué se sale con `location` y no con el router ──
+   *
+   * Salir es el único momento en que una recarga entera es exactamente lo que
+   * se quiere: no queda ni un dato del anterior en memoria, ni una pantalla a
+   * medio pintar, ni un estado de React con su nombre. Y de paso no depende de
+   * que el router esté sano — que es justo lo que falló tres veces seguidas
+   * aquí, siempre con el mismo disfraz: «pulso Salir y no pasa nada».
+   *
+   * Cuesta unos milisegundos más. Un botón de salir que a veces no sale cuesta
+   * bastante más que eso.
    */
   async function salir() {
     const porElPortal = vinoDelPortal() && Boolean(PORTAL_URL);
@@ -192,7 +202,7 @@ export function NavBar() {
       window.location.href = `${PORTAL_URL}/salir?redirect=${vuelta}`;
       return;
     }
-    router.replace('/login');
+    window.location.href = '/login';
   }
 
   return (
