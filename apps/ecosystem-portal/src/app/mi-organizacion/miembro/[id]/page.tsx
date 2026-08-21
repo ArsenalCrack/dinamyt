@@ -11,8 +11,10 @@ import {
   PARENTESCOS,
   TIPOS_SANGRE,
   CINTURONES_GRADO,
+  GENEROS,
 } from '@/lib/validacion';
 import { Avatar } from '@/components/Avatar';
+import { CampoFecha } from '@/components/CampoFecha';
 
 interface PerfilMiembro {
   id: string;
@@ -21,6 +23,7 @@ interface PerfilMiembro {
   documentId: string;
   phone: string | null;
   birthDate: string | null;
+  gender: string | null;
   avatarUrl: string | null;
   bloodType: string | null;
   emergencyContactName: string | null;
@@ -50,6 +53,7 @@ export default function EditarMiembroPage() {
   const [form, setForm] = useState({
     fullName: '',
     birthDate: '',
+    gender: '',
     phone: '',
     bloodType: '',
     emergencyContactName: '',
@@ -73,6 +77,7 @@ export default function EditarMiembroPage() {
       setForm({
         fullName: p.fullName ?? '',
         birthDate: p.birthDate ? p.birthDate.slice(0, 10) : '',
+        gender: p.gender ?? '',
         phone: p.phone ?? '',
         bloodType: p.bloodType ?? '',
         emergencyContactName: p.emergencyContactName ?? '',
@@ -102,6 +107,7 @@ export default function EditarMiembroPage() {
       await api.patch(`/users/${perfil.id}/profile`, {
         fullName: form.fullName.trim().toLocaleUpperCase('es'),
         birthDate: form.birthDate || null,
+        gender: form.gender || null,
         phone: form.phone || null,
         bloodType: form.bloodType || null,
         emergencyContactName: form.emergencyContactName || null,
@@ -176,16 +182,34 @@ export default function EditarMiembroPage() {
               required
             />
           </label>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Fecha de nacimiento</span>
-            <input
-              className="mt-1"
-              type="date"
-              value={form.birthDate}
-              min={fechas.min}
-              max={fechas.max}
-              onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
-            />
+            <div className="mt-1">
+              <CampoFecha
+                valor={form.birthDate}
+                onChange={(v) => setForm({ ...form, birthDate: v })}
+                min={fechas.min}
+                max={fechas.max}
+                etiquetaAria="Fecha de nacimiento"
+              />
+            </div>
+          </div>
+          <label className="block text-sm">
+            <span style={{ color: 'var(--text-muted)' }}>Género</span>
+            {/* Aquí SÍ se puede corregir: es el maestro. En el perfil de la
+                persona el campo se cierra una vez puesto. */}
+            <select
+              className="mt-1 w-full"
+              value={form.gender}
+              onChange={(e) => setForm({ ...form, gender: e.target.value })}
+            >
+              <option value="">— Sin registrar —</option>
+              {GENEROS.map((g) => (
+                <option key={g.valor} value={g.valor}>
+                  {g.etiqueta}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Tipo de sangre</span>

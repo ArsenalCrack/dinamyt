@@ -33,10 +33,21 @@ export class AuthController {
       fullName: string;
       documentId: string;
       phone?: string;
+      /** ISO 'YYYY-MM-DD'. Campeonatos categoriza por edad; el club felicita. */
+      birthDate?: string;
+      /** `MASCULINO` | `FEMENINO`. Campeonatos categoriza por género. */
+      gender?: string;
       dataConsent: boolean;
     },
   ) {
-    return this.authService.register(body);
+    // La fecha llega como texto y el servicio la valida como `Date`. Se
+    // convierte aquí, en la frontera, y no dentro: un `new Date('')` da
+    // `Invalid Date`, que pasa el `if (data.birthDate)` y revienta más
+    // adentro con un mensaje que no explica nada.
+    return this.authService.register({
+      ...body,
+      birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
+    });
   }
 
   @Throttle({ global: { limit: 6, ttl: 60_000 } })

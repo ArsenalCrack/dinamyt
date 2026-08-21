@@ -46,6 +46,8 @@ export class UsersService {
     documentId?: string | null;
     phone?: string;
     birthDate?: Date;
+    /** `MASCULINO` | `FEMENINO`. Lo pide el registro; Campeonatos lo consume. */
+    gender?: string;
     origen?: string;
   }) {
     const passwordHash = await bcrypt.hash(
@@ -63,6 +65,7 @@ export class UsersService {
         documentId: data.documentId ?? null,
         phone: data.phone ?? null,
         birthDate: data.birthDate ?? null,
+        gender: data.gender ?? null,
         origen: data.origen ?? 'registro',
       })
       .returning();
@@ -281,6 +284,7 @@ export class UsersService {
       fullName?: string;
       phone?: string | null;
       birthDate?: Date | null;
+      gender?: string | null;
       avatarUrl?: string | null;
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
@@ -295,6 +299,7 @@ export class UsersService {
         ...(data.fullName !== undefined && { fullName: data.fullName }),
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.birthDate !== undefined && { birthDate: data.birthDate }),
+        ...(data.gender !== undefined && { gender: data.gender }),
         ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
         ...(data.emergencyContactName !== undefined && {
           emergencyContactName: data.emergencyContactName,

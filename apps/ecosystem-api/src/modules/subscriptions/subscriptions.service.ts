@@ -219,4 +219,136 @@ export class SubscriptionsService {
 
     return result[0];
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  CORREGIR, CANCELAR Y BORRAR
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Hasta aquí una suscripción solo se podía CREAR y activar. Todo lo demás
+  // —una fecha mal tecleada, un club que se va, una creada por error— se
+  // quedaba en la base para siempre, y el panel enseñaba suscripciones que no
+  // correspondían a nada.
+
+  /**
+   * Corrige los datos de una suscripción: plan, fechas, monto y notas.
+   *
+   * El estado NO se toca desde aquí: tiene su propia ruta porque activar o
+   * suspender es una decisión, no una corrección, y mezclarlas hace que un
+   * dedazo en una fecha reactive un club suspendido sin que nadie lo pida.
+   */
+  async update(
+    id: string,
+    data: {
+      planId?: string;
+      startsAt?: string;
+      endsAt?: string;
+      totalAmount?: string | null;
+      notes?: string | null;
+    },
+  ) {
+    const [actual] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, id))
+      .limit(1);
+    if (!actual) throw new NotFoundException('Suscripción no encontrada.');
+
+    const startsAt = data.startsAt ? new Date(data.startsAt) : actual.startsAt;
+    const endsAt = data.endsAt ? new Date(data.endsAt) : actual.endsAt;
+    if (
+      Number.isNaN(startsAt.getTime()) ||
+      Number.isNaN(endsAt.getTime())
+    ) {
+      throw new BadRequestException('Alguna de las fechas no es válida.');
+    }
+    // Una suscripción que termina antes de empezar nunca da acceso a nada, y
+    // el síntoma es «pagué y no me abre», que se busca en el sitio equivocado.
+    if (endsAt <= startsAt) {
+      throw new BadRequestException(
+        'La fecha de fin tiene que ser posterior a la de inicio.',
+      );
+    }
+
+    if (data.planId) {
+      const [plan] = await db
+        .select({ id: subscriptionPlans.id })
+        .from(subscriptionPlans)
+        .where(eq(subscriptionPlans.id, data.planId))
+        .limit(1);
+      if (!plan) throw new NotFoundException('Ese plan no existe.');
+    }
+
+    const [fila] = await db
+      .update(subscriptions)
+      .set({
+        ...(data.planId !== undefined && { planId: data.planId }),
+        startsAt,
+        endsAt,
+        ...(data.totalAmount !== undefined && { totalAmount: data.totalAmount }),
+        ...(data.notes !== undefined && { notes: data.notes }),
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, id))
+      .returning();
+    return fila;
+  }
+
+  /**
+   * Borra una suscripción — de verdad, la fila desaparece.
+   *
+   * **Solo si no se le ha abonado nada.** Con un pago registrado encima, borrar
+   * la fila borra el único registro de que ese dinero entró: no hay tabla de
+   * pagos aparte, el abono vive en `paid_amount`. Para esos casos está
+   * suspender, que corta el acceso y conserva la historia. La diferencia entre
+   * las dos acciones tiene que estar aquí, en el servidor, y no en si alguien
+   * se acordó de pulsar el botón correcto.
+   */
+  async remove(id: string) {
+    const [actual] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, id))
+      .limit(1);
+    if (!actual) throw new NotFoundException('Suscripción no encontrada.');
+
+    if (parseFloat(actual.paidAmount ?? '0') > 0) {
+      throw new BadRequestException(
+        'Esta suscripción tiene pagos registrados y borrarla los borraría con ella. Suspéndela: corta el acceso y conserva la historia.',
+      );
+    }
+
+    await db.delete(subscriptions).where(eq(subscriptions.id, id));
+    return { ok: true, id };
+  }
+
+  // ── Las personales, con las mismas tres acciones ──────────────────────────
+  // No tenían ninguna: se creaban y ahí se quedaban.
+
+  async updateStatusPersonal(
+    id: string,
+    status: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'PENDING_REVIEW',
+  ) {
+    const [fila] = await db
+      .update(userSubscriptions)
+      .set({ status })
+      .where(eq(userSubscriptions.id, id))
+      .returning();
+    if (!fila) throw new NotFoundException('Suscripción personal no encontrada.');
+    return fila;
+  }
+
+  async removePersonal(id: string) {
+    const [actual] = await db
+      .select({ id: userSubscriptions.id })
+      .from(userSubscriptions)
+      .where(eq(userSubscriptions.id, id))
+      .limit(1);
+    if (!actual) {
+      throw new NotFoundException('Suscripción personal no encontrada.');
+    }
+    // Las personales no llevan pagos (`user_subscriptions` no tiene monto), así
+    // que aquí no hay historia que perder y borrar es seguro.
+    await db.delete(userSubscriptions).where(eq(userSubscriptions.id, id));
+    return { ok: true, id };
+  }
 }

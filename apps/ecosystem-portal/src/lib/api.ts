@@ -140,6 +140,10 @@ export async function registerAPI(data: {
   fullName: string;
   documentId: string;
   phone?: string;
+  /** ISO 'YYYY-MM-DD'. Campeonatos categoriza por edad; el club felicita. */
+  birthDate?: string;
+  /** `MASCULINO` | `FEMENINO`. Campeonatos separa las llaves con esto. */
+  gender?: string;
   dataConsent: boolean;
 }) {
   const res = await api.post('/auth/register', data);
@@ -210,8 +214,12 @@ export interface SuscripcionOrg {
   totalAmount: string | null;
   paidAmount: string | null;
   paymentStatus: string;
+  /** Nota del super-admin (a qué corresponde el cobro, cómo se pagó…). */
+  notes: string | null;
   orgId: string;
   orgName: string;
+  /** El plan por id, para poder cambiarlo desde el editor. */
+  planId: string;
   planName: string;
   appsIncluded: string[];
 }
@@ -243,6 +251,11 @@ export interface MiOrganizacion extends Organizacion {
   email: string | null;
   logoUrl: string | null;
   socialLinks: string[] | null;
+  /** La delegación a la que responde el club, y el país de ESA delegación. */
+  delegation: string | null;
+  delegationCountry: string | null;
+  /** Si el club sale en el directorio público de dinamyt.org. */
+  isPublic: boolean | null;
   hijas: (Organizacion & { isActive: boolean | null })[];
 }
 
@@ -270,9 +283,40 @@ export const crearOrganizacionAPI = async (data: {
   type: Organizacion['type'];
   city?: string;
   country?: string;
+  address?: string;
+  delegation?: string;
+  delegationCountry?: string;
+  email?: string;
+  phone?: string;
 }): Promise<Organizacion> => (await api.post('/organizations', data)).data;
-export const listMiembrosAPI = async (orgId: string): Promise<Miembro[]> =>
-  (await api.get(`/organizations/${orgId}/members`)).data;
+/** Una página de miembros, con el total para poder decir «21–40 de 137». */
+export interface PaginaMiembros {
+  items: Miembro[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/**
+ * Miembros de una organización, de veinte en veinte.
+ *
+ * La búsqueda la hace el SERVIDOR y no el navegador: filtrar en el cliente
+ * solo encuentra a quien ya se descargó, así que en un club de cien alumnos
+ * buscar estando en la página 1 no encontraría a nadie de la 4.
+ */
+export const listMiembrosAPI = async (
+  orgId: string,
+  opciones: { search?: string; limit?: number; offset?: number } = {},
+): Promise<PaginaMiembros> =>
+  (
+    await api.get(`/organizations/${orgId}/members`, {
+      params: {
+        ...(opciones.search ? { search: opciones.search } : {}),
+        limit: opciones.limit ?? 20,
+        offset: opciones.offset ?? 0,
+      },
+    })
+  ).data;
 export const invitarMiembroAPI = async (
   orgId: string,
   email: string,
@@ -294,8 +338,48 @@ export const crearSuscripcionOrgAPI = async (data: {
   endsAt: string;
   totalAmount?: string;
 }) => (await api.post('/subscriptions', data)).data;
-export const activarSuscripcionAPI = async (id: string) =>
-  (await api.patch(`/subscriptions/${id}/status`, { status: 'ACTIVE' })).data;
+/** Estados que puede tener una suscripción, con su nombre en español. */
+export const ESTADOS_SUSCRIPCION = [
+  { valor: 'ACTIVE', etiqueta: 'Activa' },
+  { valor: 'PENDING_REVIEW', etiqueta: 'Por revisar' },
+  { valor: 'SUSPENDED', etiqueta: 'Suspendida' },
+  { valor: 'EXPIRED', etiqueta: 'Vencida' },
+] as const;
+
+export const cambiarEstadoSuscripcionAPI = async (id: string, status: string) =>
+  (await api.patch(`/subscriptions/${id}/status`, { status })).data;
+
+/** Corrige plan, fechas, monto y notas. El ESTADO va por su propia ruta. */
+export const editarSuscripcionAPI = async (
+  id: string,
+  data: {
+    planId?: string;
+    startsAt?: string;
+    endsAt?: string;
+    totalAmount?: string | null;
+    notes?: string | null;
+  },
+) => (await api.patch(`/subscriptions/${id}`, data)).data;
+
+export const abonarSuscripcionAPI = async (
+  id: string,
+  data: { paidAmount: string; notes?: string },
+) => (await api.patch(`/subscriptions/${id}/payment`, data)).data;
+
+/**
+ * Borra la suscripción. El servidor la rechaza si tiene pagos registrados:
+ * borrarla borraría el único registro de que ese dinero entró.
+ */
+export const eliminarSuscripcionAPI = async (id: string) =>
+  (await api.delete(`/subscriptions/${id}`)).data;
+
+export const cambiarEstadoSuscripcionPersonalAPI = async (
+  id: string,
+  status: string,
+) => (await api.patch(`/subscriptions/user/${id}/status`, { status })).data;
+
+export const eliminarSuscripcionPersonalAPI = async (id: string) =>
+  (await api.delete(`/subscriptions/user/${id}`)).data;
 export const listSuscripcionesPersonalesAPI = async (): Promise<
   SuscripcionPersonal[]
 > => (await api.get('/subscriptions/user')).data;
@@ -322,11 +406,91 @@ export interface MiClub extends Organizacion {
   phone: string | null;
   logoUrl: string | null;
   socialLinks: string[] | null;
+  /** La delegación a la que responde el club, y el país de ESA delegación. */
+  delegation: string | null;
+  delegationCountry: string | null;
+  /** Si el club sale en el directorio público de dinamyt.org. */
+  isPublic: boolean | null;
   isActive: boolean | null;
   myRole: string;
   gestores: GestorClub[];
   organizacionPadre: string | null;
 }
+/** Una persona pidiendo entrar al club con su código. */
+export interface SolicitudDeEntrada {
+  id: string;
+  status: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | string;
+  note: string | null;
+  createdAt: string;
+  respondedAt: string | null;
+  userId: string;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  avatarUrl: string | null;
+  birthDate: string | null;
+}
+
+/** Lo que YO he pedido, para saber qué contarme en el dashboard. */
+export interface MiSolicitud {
+  id: string;
+  status: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | string;
+  createdAt: string;
+  respondedAt: string | null;
+  orgId: string;
+  orgName: string;
+  orgType: string;
+}
+
+/** Lo que responde `POST /organizations/join`. Tres finales, no uno. */
+export type ResultadoEntrada =
+  | { estado: 'EN_ESPERA'; org: { id: string; name: string } }
+  | { estado: 'YA_SOLICITADO'; org: { id: string; name: string } }
+  | { estado: 'YA_ERES_MIEMBRO'; org: { id: string; name: string } };
+
+export const entrarAClubAPI = async (
+  code: string,
+  note?: string,
+): Promise<ResultadoEntrada> =>
+  (await api.post('/organizations/join', { code, note })).data;
+
+export const misSolicitudesAPI = async (): Promise<MiSolicitud[]> =>
+  (await api.get('/organizations/solicitudes/mias')).data;
+
+export const solicitudesDelClubAPI = async (
+  orgId: string,
+  todas = false,
+): Promise<SolicitudDeEntrada[]> =>
+  (await api.get(`/organizations/${orgId}/solicitudes`, {
+    params: todas ? { todas: '1' } : undefined,
+  })).data;
+
+export const responderSolicitudAPI = async (
+  id: string,
+  datos: {
+    aceptar: boolean;
+    role?: string;
+    roleMembresias?: string;
+    roleCampeonatos?: string;
+    roleAcademy?: string;
+  },
+) => (await api.post(`/organizations/solicitudes/${id}/responder`, datos)).data;
+
+export const verCodigoClubAPI = async (
+  orgId: string,
+): Promise<{ joinCode: string | null }> =>
+  (await api.get(`/organizations/${orgId}/codigo`)).data;
+
+export const rotarCodigoClubAPI = async (
+  orgId: string,
+): Promise<{ joinCode: string | null }> =>
+  (await api.post(`/organizations/${orgId}/codigo`)).data;
+
+export const quitarCodigoClubAPI = async (
+  orgId: string,
+): Promise<{ joinCode: string | null }> =>
+  (await api.delete(`/organizations/${orgId}/codigo`)).data;
+
 export interface ClubBusqueda {
   id: string;
   name: string;
@@ -384,6 +548,9 @@ export const actualizarOrgInfoAPI = async (
     email?: string | null;
     city?: string | null;
     country?: string | null;
+    delegation?: string | null;
+    delegationCountry?: string | null;
+    isPublic?: boolean;
     logoUrl?: string | null;
     socialLinks?: string[] | null;
   },

@@ -13,6 +13,7 @@ import api, {
 } from '@/lib/api';
 import { nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
+import { EntrarAClub } from '@/components/EntrarAClub';
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
@@ -97,6 +98,22 @@ export default function DashboardPage() {
           </button>
         </div>
       </header>
+
+      {/* ── Sin club ───────────────────────────────────────────────────
+          Se dibuja solo para quien no pertenece a ninguno, y va ARRIBA de las
+          aplicaciones a propósito: sin club, casi todas le van a decir que no.
+          Antes esto no existía y quien se registraba por su cuenta se quedaba
+          con una cuenta que no servía para nada, sin ninguna pista de qué
+          hacer a continuación.
+
+          `gestiona === false` (y no `!gestiona`) porque `null` significa «aún
+          no se sabe»: enseñarlo mientras carga lo haría parpadear en la
+          pantalla de todo el mundo. */}
+      {gestiona === false && nombreClub === null && (
+        <div className="mb-5">
+          <EntrarAClub onEntrado={() => router.refresh()} />
+        </div>
+      )}
 
       <section
         className="rounded-xl border p-5"

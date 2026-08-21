@@ -1,0 +1,1 @@
+ALTER TABLE "ecosystem"."users" ADD COLUMN "gender" varchar(20);

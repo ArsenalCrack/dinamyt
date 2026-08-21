@@ -17,9 +17,11 @@ import {
   listPlanesAPI,
   listSuscripcionesAPI,
   crearSuscripcionOrgAPI,
-  activarSuscripcionAPI,
   listSuscripcionesPersonalesAPI,
   crearSuscripcionPersonalAPI,
+  ESTADOS_SUSCRIPCION,
+  cambiarEstadoSuscripcionPersonalAPI,
+  eliminarSuscripcionPersonalAPI,
   listarBloqueadosAPI,
   desbloquearUsuarioAPI,
   extraerError,
@@ -31,6 +33,9 @@ import {
   type SuscripcionPersonal,
   type CuentaBloqueada,
 } from '@/lib/api';
+import { CampoFecha } from '@/components/CampoFecha';
+import { FilaSuscripcion } from '@/components/FilaSuscripcion';
+import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 import { ROLES_SUPERADMIN, nombreRol } from '@/lib/roles';
 import { FilaMiembro } from '@/components/FilaMiembro';
 const TIPOS_ORG = ['FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY'] as const;
@@ -51,6 +56,13 @@ export default function AdminEcosistemaPage() {
   const [subsPersonales, setSubsPersonales] = useState<SuscripcionPersonal[]>([]);
   const [orgSel, setOrgSel] = useState<Organizacion | null>(null);
   const [miembros, setMiembros] = useState<Miembro[]>([]);
+  // Búsqueda y página de la lista de gente. El filtro lo hace el SERVIDOR:
+  // buscar solo en lo ya descargado no encontraría a nadie de la página 4.
+  const [totalMiembros, setTotalMiembros] = useState(0);
+  const [busquedaGente, setBusquedaGente] = useState('');
+  const [offsetGente, setOffsetGente] = useState(0);
+  /** Sube tras cada acción sobre un miembro y hace que la lista se recargue. */
+  const [recargaGente, setRecargaGente] = useState(0);
 
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -91,15 +103,37 @@ export default function AdminEcosistemaPage() {
     );
   }, [router, cargar]);
 
+  /**
+   * La lista de gente, con un respiro antes de consultar.
+   *
+   * Sin la espera, escribir «Rodríguez» dispara nueve consultas, y como cada
+   * una tarda lo suyo pueden volver desordenadas: la de «Rodrí» llegando
+   * después que la de «Rodríguez» y pisando el resultado bueno.
+   */
   useEffect(() => {
     if (!orgSel) {
       setMiembros([]);
+      setTotalMiembros(0);
       return;
     }
-    listMiembrosAPI(orgSel.id)
-      .then(setMiembros)
-      .catch(() => setMiembros([]));
-  }, [orgSel]);
+    const id = orgSel.id;
+    const t = setTimeout(() => {
+      listMiembrosAPI(id, {
+        search: busquedaGente,
+        limit: POR_PAGINA,
+        offset: offsetGente,
+      })
+        .then((p) => {
+          setMiembros(p.items);
+          setTotalMiembros(p.total);
+        })
+        .catch(() => {
+          setMiembros([]);
+          setTotalMiembros(0);
+        });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [orgSel, busquedaGente, offsetGente, recargaGente]);
 
   /** Ejecuta una acción, refresca y reporta el resultado. */
   async function accion(fn: () => Promise<unknown>, ok: string, fallback: string) {
@@ -108,7 +142,7 @@ export default function AdminEcosistemaPage() {
     try {
       await fn();
       await cargar();
-      if (orgSel) setMiembros(await listMiembrosAPI(orgSel.id));
+      if (orgSel) setRecargaGente((n) => n + 1);
       setMsg({ tipo: 'ok', texto: ok });
     } catch (e) {
       setMsg({ tipo: 'error', texto: extraerError(e, fallback) });
@@ -257,6 +291,18 @@ export default function AdminEcosistemaPage() {
           )}
           {orgSel && (
             <>
+              {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría
+                  «sin miembros» con los resultados esperando en la 1. */}
+              <input
+                value={busquedaGente}
+                onChange={(e) => {
+                  setBusquedaGente(e.target.value);
+                  setOffsetGente(0);
+                }}
+                placeholder="Buscar por nombre o correo…"
+                aria-label="Buscar entre los miembros de la organización"
+                className="mb-3"
+              />
               <ul className="mb-4 flex flex-col gap-2">
                 {miembros.map((m) => (
                   <FilaMiembro
@@ -292,12 +338,21 @@ export default function AdminEcosistemaPage() {
                 ))}
                 {miembros.length === 0 && (
                   <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                    Sin miembros todavía.
+                    {busquedaGente
+                      ? `Nadie coincide con «${busquedaGente}».`
+                      : 'Sin miembros todavía.'}
                   </li>
                 )}
               </ul>
 
-              <div className="mb-5 flex flex-wrap gap-2">
+              <Paginacion
+                offset={offsetGente}
+                limit={POR_PAGINA}
+                total={totalMiembros}
+                onIr={setOffsetGente}
+              />
+
+              <div className="mb-5 mt-3 flex flex-wrap gap-2">
                 <input
                   placeholder="email@usuario.com"
                   value={invitacion.email}
@@ -335,34 +390,13 @@ export default function AdminEcosistemaPage() {
               </h3>
               <ul className="mb-3 flex flex-col gap-2">
                 {subsDeOrg.map((s) => (
-                  <li
+                  <FilaSuscripcion
                     key={s.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <span>
-                      <strong>{s.planName}</strong>
-                      <span className="ml-2 badge">{s.status}</span>
-                      <span className="ml-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                        hasta {new Date(s.endsAt).toLocaleDateString('es')}
-                      </span>
-                    </span>
-                    {s.status !== 'ACTIVE' && (
-                      <button
-                        onClick={() =>
-                          accion(
-                            () => activarSuscripcionAPI(s.id),
-                            'Suscripción activada.',
-                            'No se pudo activar.',
-                          )
-                        }
-                        disabled={ocupado}
-                        className="btn btn-gold"
-                      >
-                        Activar
-                      </button>
-                    )}
-                  </li>
+                    sub={s}
+                    planes={planes}
+                    ocupado={ocupado}
+                    onAccion={accion}
+                  />
                 ))}
                 {subsDeOrg.length === 0 && (
                   <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -388,15 +422,17 @@ export default function AdminEcosistemaPage() {
                   value={nuevaSub.totalAmount}
                   onChange={(e) => setNuevaSub({ ...nuevaSub, totalAmount: e.target.value })}
                 />
-                <input
-                  type="date"
-                  value={nuevaSub.startsAt}
-                  onChange={(e) => setNuevaSub({ ...nuevaSub, startsAt: e.target.value })}
+                <CampoFecha
+                  valor={nuevaSub.startsAt}
+                  onChange={(v) => setNuevaSub({ ...nuevaSub, startsAt: v })}
+                  etiquetaAria="Inicio de la suscripción"
+                  placeholder="Desde"
                 />
-                <input
-                  type="date"
-                  value={nuevaSub.endsAt}
-                  onChange={(e) => setNuevaSub({ ...nuevaSub, endsAt: e.target.value })}
+                <CampoFecha
+                  valor={nuevaSub.endsAt}
+                  onChange={(v) => setNuevaSub({ ...nuevaSub, endsAt: v })}
+                  etiquetaAria="Fin de la suscripción"
+                  placeholder="Hasta"
                 />
               </div>
               <button
@@ -435,20 +471,79 @@ export default function AdminEcosistemaPage() {
           {subsPersonales.map((s) => (
             <li
               key={s.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+              className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
               style={{ borderColor: 'var(--border)' }}
             >
-              <span>
-                <strong>{s.userFullName}</strong>
-                <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
-                  · {s.userEmail}
-                </span>
-                <span className="ml-2 badge badge-gold">{s.planName}</span>
-                <span className="ml-2 badge">{s.status}</span>
-              </span>
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                hasta {new Date(s.endsAt).toLocaleDateString('es')}
-              </span>
+              <div className="min-w-0">
+                <p className="truncate font-semibold" title={s.userFullName}>
+                  {s.userFullName}
+                </p>
+                <p
+                  className="truncate text-xs"
+                  style={{ color: 'var(--text-muted)' }}
+                  title={s.userEmail}
+                >
+                  {s.userEmail}
+                </p>
+                <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="badge badge-gold">{s.planName}</span>
+                  <span
+                    style={{
+                      color:
+                        new Date(s.endsAt) < new Date()
+                          ? 'var(--danger)'
+                          : 'var(--text-muted)',
+                    }}
+                  >
+                    {new Date(s.endsAt) < new Date() ? 'venció' : 'hasta'} el{' '}
+                    {new Date(s.endsAt).toLocaleDateString('es-CO')}
+                  </span>
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                <label className="sr-only" htmlFor={`estado-personal-${s.id}`}>
+                  Estado de la suscripción de {s.userFullName}
+                </label>
+                <select
+                  id={`estado-personal-${s.id}`}
+                  value={s.status}
+                  disabled={ocupado}
+                  onChange={(e) =>
+                    accion(
+                      () => cambiarEstadoSuscripcionPersonalAPI(s.id, e.target.value),
+                      'Estado actualizado.',
+                      'No se pudo cambiar el estado.',
+                    )
+                  }
+                  style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
+                >
+                  {ESTADOS_SUSCRIPCION.map((e) => (
+                    <option key={e.valor} value={e.valor}>
+                      {e.etiqueta}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `¿Quitarle a ${s.userFullName} el plan «${s.planName}»? No se puede deshacer.`,
+                      )
+                    ) {
+                      return;
+                    }
+                    void accion(
+                      () => eliminarSuscripcionPersonalAPI(s.id),
+                      'Suscripción personal borrada.',
+                      'No se pudo borrar.',
+                    );
+                  }}
+                  disabled={ocupado}
+                  className="btn btn-danger btn-sm"
+                >
+                  Borrar
+                </button>
+              </div>
             </li>
           ))}
           {subsPersonales.length === 0 && (
@@ -479,19 +574,17 @@ export default function AdminEcosistemaPage() {
               </option>
             ))}
           </select>
-          <input
-            type="date"
-            value={nuevaSubPersonal.startsAt}
-            onChange={(e) =>
-              setNuevaSubPersonal({ ...nuevaSubPersonal, startsAt: e.target.value })
-            }
+          <CampoFecha
+            valor={nuevaSubPersonal.startsAt}
+            onChange={(v) => setNuevaSubPersonal({ ...nuevaSubPersonal, startsAt: v })}
+            etiquetaAria="Inicio de la suscripción personal"
+            placeholder="Desde"
           />
-          <input
-            type="date"
-            value={nuevaSubPersonal.endsAt}
-            onChange={(e) =>
-              setNuevaSubPersonal({ ...nuevaSubPersonal, endsAt: e.target.value })
-            }
+          <CampoFecha
+            valor={nuevaSubPersonal.endsAt}
+            onChange={(v) => setNuevaSubPersonal({ ...nuevaSubPersonal, endsAt: v })}
+            etiquetaAria="Fin de la suscripción personal"
+            placeholder="Hasta"
           />
         </div>
         <button

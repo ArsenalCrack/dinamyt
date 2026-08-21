@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import {
   pgSchema,
+  uniqueIndex,
   uuid,
   varchar,
   text,
@@ -65,6 +67,39 @@ export const organizations = eco.table('organizations', {
   logoUrl: text('logo_url'),
   /** Enlaces de redes sociales (array de URLs). */
   socialLinks: jsonb('social_links'),
+  /**
+   * Delegación a la que responde el club, y el país de esa delegación.
+   *
+   * No es lo mismo que `city`/`country`: Campeonatos lleva años pidiéndolos por
+   * separado al dar de alta un maestro (`{nombre, delegacion, pais_delegacion}`
+   * en `usuarios.clubes`) porque un dojang de Bogotá puede responder a una
+   * delegación de otro departamento —o de otro país—, y el admin que revisa una
+   * inscripción necesita ver la delegación DE ESE club para agrupar los
+   * reportes. Sin estas dos columnas, unir Campeonatos al ecosistema obligaría
+   * a volver a teclearlas, que es como se parten en dos las agrupaciones.
+   */
+  delegation: varchar('delegation', { length: 120 }),
+  delegationCountry: varchar('delegation_country', { length: 100 }),
+  /**
+   * Si el club sale en el directorio público de `dinamyt.org`.
+   *
+   * Apagado por defecto, y a propósito: la ficha lleva teléfono y dirección, y
+   * publicarlos tiene que ser un acto deliberado de su maestro, no el efecto
+   * secundario de haber rellenado el formulario. Lo que se publica es la ficha
+   * de contacto del club — nunca su gente.
+   */
+  isPublic: boolean('is_public').default(false),
+  /**
+   * Código de entrada al club: lo reparte el maestro y quien lo teclea en el
+   * portal queda como SOLICITUD, nunca como miembro directo.
+   *
+   * Es el camino C de §2.1 del plan, y existe porque los otros dos no cubren a
+   * quien ya tiene cuenta: hasta ahora, alguien que se registraba en el portal
+   * se quedaba sin club para siempre a menos que su maestro adivinara su correo
+   * y lo invitara a mano. Rotable (`POST /organizations/:id/codigo`): un código
+   * que se filtró se cambia y los que ya entraron no se enteran.
+   */
+  joinCode: varchar('join_code', { length: 12 }).unique(),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -85,6 +120,20 @@ export const users = eco.table('users', {
   fullName: varchar('full_name', { length: 200 }).notNull(),
   phone: varchar('phone', { length: 30 }),
   birthDate: timestamp('birth_date'),
+  /**
+   * `MASCULINO` | `FEMENINO`. Opcional, y de la persona — no de una app.
+   *
+   * Existe porque Campeonatos lo necesita para categorizar
+   * (`competidores.genero`) y hasta ahora el ecosistema no lo tenía: cada
+   * inscripción lo volvía a preguntar, y lo que se pregunta dos veces acaba
+   * contestado de dos formas. Se pide en el registro junto al documento y la
+   * fecha de nacimiento, que son los otros dos que Campeonatos autorrellena.
+   *
+   * Nullable: todas las cuentas importadas (§2.4) llegan sin él, y ninguna se
+   * queda fuera por eso — se le pide a su dueño la primera vez que abra su
+   * perfil, igual que el documento.
+   */
+  gender: varchar('gender', { length: 20 }),
   avatarUrl: text('avatar_url'),
   /**
    * bcrypt. **Puede ser NULL**: una cuenta creada por invitación del maestro
@@ -275,6 +324,42 @@ export const orgClubInvitations = eco.table('org_club_invitations', {
   respondedAt: timestamp('responded_at'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// ── Tabla: org_join_requests (persona → club, por código) ───────────────────
+//
+// El camino C de §2.1: alguien que YA tiene cuenta teclea el código de su club
+// y queda a la espera. Es una solicitud y no un alta porque el código se
+// comparte en un grupo de WhatsApp y acaba donde no debe; el maestro es quien
+// decide, y de paso es el único que sabe qué rol le toca a cada quien.
+//
+// Al aceptar nace la fila de `org_members` con sus roles por app, y desde ahí
+// Membresías le crea la ficha sola la primera vez que entre (auto-
+// aprovisionamiento, M1 de §4.3): pertenecer al club y tener ficha en la app
+// dejan de ser dos altas que nadie conectaba.
+export const orgJoinRequests = eco.table('org_join_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orgId: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  /** `PENDIENTE` · `ACEPTADA` · `RECHAZADA`. */
+  status: varchar('status', { length: 20 }).notNull().default('PENDIENTE'),
+  /** Lo que escribe quien pide entrar («soy el papá de Ana», «entreno los martes»). */
+  note: varchar('note', { length: 300 }),
+  respondedAt: timestamp('responded_at'),
+  respondedByUserId: uuid('responded_by_user_id').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (t) => [
+  // Parcial: una sola solicitud EN ESPERA por persona y club. Sin esto, pulsar
+  // dos veces «pedir entrar» —o volver a intentarlo porque no pasaba nada—
+  // llena la bandeja del maestro de la misma persona repetida. Las ya
+  // respondidas no estorban: quien fue rechazado puede volver a pedirlo.
+  uniqueIndex('ux_org_join_requests_pendiente')
+    .on(t.orgId, t.userId)
+    .where(sql`${t.status} = 'PENDIENTE'`),
+]);
 
 // ── Tabla: audit_auth ──────────────────────────────────────────────────────
 export const auditAuth = eco.table('audit_auth', {

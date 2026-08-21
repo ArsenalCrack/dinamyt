@@ -20,6 +20,7 @@ import {
   validarDocumento,
   validarTelefono,
   validarFechaNacimiento,
+  validarGenero,
 } from '../../common/validacion';
 
 type User = InferSelectModel<typeof users>;
@@ -52,6 +53,7 @@ export class AuthService {
     documentId: string;
     phone?: string;
     birthDate?: Date;
+    gender?: string;
     dataConsent: boolean;
   }) {
     if (!data.dataConsent) {
@@ -67,6 +69,7 @@ export class AuthService {
     data.documentId = validarDocumento(data.documentId);
     if (data.phone) data.phone = validarTelefono(data.phone);
     if (data.birthDate) validarFechaNacimiento(data.birthDate);
+    if (data.gender) data.gender = validarGenero(data.gender);
 
     const existing = await this.usersService.findByEmail(data.email);
     if (existing) {

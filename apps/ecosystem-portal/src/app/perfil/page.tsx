@@ -13,9 +13,11 @@ import {
   soloTelefono,
   limitesFechaNacimiento,
   PARENTESCOS,
+  GENEROS,
   comprimirAvatar,
 } from '@/lib/validacion';
 import { CampoContrasena } from '@/components/CampoContrasena';
+import { CampoFecha } from '@/components/CampoFecha';
 
 interface Disciplina {
   id: string;
@@ -35,6 +37,7 @@ interface Perfil {
   documentId: string;
   phone: string | null;
   birthDate: string | null;
+  gender: string | null;
   avatarUrl: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
@@ -83,6 +86,7 @@ export default function PerfilPage() {
     fullName: '',
     phone: '',
     birthDate: '',
+    gender: '',
     avatarUrl: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
@@ -120,6 +124,7 @@ export default function PerfilPage() {
         fullName: p.fullName ?? '',
         phone: p.phone ?? '',
         birthDate: p.birthDate ? p.birthDate.slice(0, 10) : '',
+        gender: p.gender ?? '',
         avatarUrl: p.avatarUrl ?? '',
         emergencyContactName: p.emergencyContactName ?? '',
         emergencyContactPhone: p.emergencyContactPhone ?? '',
@@ -158,6 +163,9 @@ export default function PerfilPage() {
       // que solo corrige el maestro del club o un administrador.
       await api.patch(`/users/${perfil.id}/profile`, {
         ...(perfil.birthDate ? {} : { birthDate: form.birthDate || null }),
+        // El género se manda solo si todavía no estaba: rellenar un hueco sí,
+        // cambiarlo no. Las cuentas importadas llegan sin él.
+        ...(perfil.gender ? {} : { gender: form.gender || null }),
         phone: form.phone || null,
         avatarUrl: form.avatarUrl || null,
         emergencyContactName: form.emergencyContactName || null,
@@ -402,22 +410,51 @@ export default function PerfilPage() {
             (v) => setForm({ ...form, phone: soloTelefono(v) }),
             { type: 'tel', inputMode: 'tel', placeholder: '300 123 4567' },
           )}
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Fecha de nacimiento</span>
-            <input
-              className="mt-1"
-              type="date"
-              value={form.birthDate}
-              min={fechas.min}
-              max={fechas.max}
-              readOnly={!!perfil.birthDate}
-              onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
-              style={perfil.birthDate ? { opacity: 0.7 } : undefined}
-            />
+            {/* El calendario propio, el mismo de Membresías y Campeonatos: el
+                nativo de Android solo avanza mes a mes y un año de nacimiento
+                son trescientos toques. */}
+            <div className="mt-1">
+              <CampoFecha
+                valor={form.birthDate}
+                onChange={(v) => setForm({ ...form, birthDate: v })}
+                min={fechas.min}
+                max={fechas.max}
+                disabled={!!perfil.birthDate}
+                borrable={false}
+                etiquetaAria="Fecha de nacimiento"
+              />
+            </div>
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
               {perfil.birthDate
                 ? 'Ya registrada: solo tu maestro o un administrador puede corregirla.'
                 : 'Regístrala con cuidado: después solo la corrige tu maestro.'}
+            </span>
+          </div>
+          <label className="block text-sm">
+            <span style={{ color: 'var(--text-muted)' }}>Género</span>
+            {/* Se puede rellenar si falta —las cuentas importadas llegan sin
+                él— pero no cambiar: Campeonatos ya armó categorías con este
+                dato, y moverlo a mitad de temporada mueve la llave. */}
+            <select
+              className="mt-1 w-full"
+              value={form.gender}
+              disabled={!!perfil.gender}
+              onChange={(e) => setForm({ ...form, gender: e.target.value })}
+              style={perfil.gender ? { opacity: 0.7 } : undefined}
+            >
+              <option value="">— Selecciona —</option>
+              {GENEROS.map((g) => (
+                <option key={g.valor} value={g.valor}>
+                  {g.etiqueta}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+              {perfil.gender
+                ? 'Ya registrado: lo corrige tu maestro o un administrador.'
+                : 'Con esto Campeonatos te ubica en tu categoría.'}
             </span>
           </label>
           <label className="block text-sm">

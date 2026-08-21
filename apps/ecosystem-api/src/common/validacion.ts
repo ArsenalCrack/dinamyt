@@ -64,6 +64,27 @@ export function validarFechaNacimiento(fecha: Date) {
   return fecha;
 }
 
+/**
+ * Géneros que reconoce el ecosistema.
+ *
+ * Dos valores y en mayúsculas porque así los guarda Campeonatos
+ * (`competidores.genero`), que es quien los usa para armar las categorías. Un
+ * tercer valor aquí no lo entendería el sorteo de llaves, así que mientras eso
+ * sea así, esta lista es la que manda. Quien no se reconozca en ninguno deja el
+ * campo vacío: es opcional.
+ */
+export const GENEROS = ['MASCULINO', 'FEMENINO'] as const;
+
+export function validarGenero(genero: string) {
+  const limpio = (genero ?? '').trim().toUpperCase();
+  if (!GENEROS.includes(limpio as (typeof GENEROS)[number])) {
+    throw new BadRequestException(
+      `Género inválido. Usa: ${GENEROS.join(' o ')}.`,
+    );
+  }
+  return limpio;
+}
+
 // Tipos de sangre válidos (desplegable en la UI).
 export const TIPOS_SANGRE = [
   'A+',

@@ -60,6 +60,19 @@ export const ROL_GENERAL_MEMBRESIAS = {
 
 export const ROL_CAMPEONATOS = { admin: 'admin', maestro: 'maestro', juez: 'judge' };
 
+// ── Disciplina ──────────────────────────────────────────────────────────────
+//
+// Membresías guarda el cinturón como un nombre suelto (`users.belt`) y no dice
+// de qué arte es: sus clubes son de uno solo, así que la pregunta nunca se hizo.
+// El ecosistema sí lo separa por disciplina, porque Academy y Campeonatos ya
+// manejan varias. Al importar hay que elegir una, y es Hapkido: es el arte de
+// los once cinturones que comparten las tres apps.
+//
+// En minúsculas porque así se compara aquí y así lo escribe el editor de
+// perfiles del portal. El día que un club sea de otro arte, esto se convierte
+// en un dato del club (`organizations`) y deja de ser una constante.
+export const DISCIPLINA_POR_DEFECTO = 'hapkido';
+
 // Un juez no gestiona el club al que pertenece: entra como miembro a secas.
 export const ROL_GENERAL_CAMPEONATOS = {
   admin: 'admin',
@@ -79,6 +92,7 @@ export function nuevoInforme(aplicar) {
       enlazadas: [],
       sinCorreo: [],
       sinContrasena: [],
+      cinturonesImportados: [],
       superadminsDetectados: [],
       rolesEnConflicto: [],
     },
@@ -263,7 +277,7 @@ export async function reconciliar(tx, opts = {}) {
 
   // ── 4. Los tres censos de personas ────────────────────────────────────────
   const usuariosEco = await tx`
-    SELECT id, email, full_name, phone, birth_date, blood_type, origen,
+    SELECT id, email, full_name, phone, birth_date, blood_type, origen, avatar_url,
            emergency_contact_name, emergency_contact_phone
       FROM ecosystem.users`;
 
@@ -273,6 +287,39 @@ export async function reconciliar(tx, opts = {}) {
                       org_id, eco_sub
                  FROM membresias.users ORDER BY created_at NULLS LAST, email`
     : [];
+
+  // ── La foto y el cinturón, aparte ─────────────────────────────────────────
+  //
+  // Van en su propia consulta y no en la de arriba porque son columnas de
+  // Membresías que una instalación vieja puede no tener, y un SELECT que
+  // nombra una columna inexistente no devuelve NULL: falla entero, y con él
+  // toda la reconciliación. Aquí se pregunta primero y se pide después.
+  //
+  // No se crean con `ADD COLUMN IF NOT EXISTS` como `eco_sub`: aquella es del
+  // enlace y la pone el ecosistema; estas son de Membresías, y este guion no
+  // le inventa columnas a otra aplicación.
+  if (hayMembresias) {
+    const tieneFoto = await existeColumna(tx, 'membresias', 'users', 'avatar_url');
+    const tieneCinturon = await existeColumna(tx, 'membresias', 'users', 'belt');
+    if (tieneFoto || tieneCinturon) {
+      const extras = tieneFoto && tieneCinturon
+        ? await tx`SELECT id, avatar_url, belt FROM membresias.users`
+        : tieneFoto
+          ? await tx`SELECT id, avatar_url FROM membresias.users`
+          : await tx`SELECT id, belt FROM membresias.users`;
+      const porId = new Map(extras.map((f) => [f.id, f]));
+      for (const u of usuariosMembresias) {
+        const extra = porId.get(u.id);
+        if (!extra) continue;
+        u.avatar_url = extra.avatar_url ?? null;
+        u.belt = extra.belt ?? null;
+      }
+    } else {
+      informe.avisos.push(
+        'Membresías no tiene `avatar_url` ni `belt`: no se importan fotos ni cinturones.',
+      );
+    }
+  }
 
   const usuariosCampeonatos = hayCampeonatos
     ? await tx`SELECT id, email, nombre, password_hash, rol, es_superadmin, activo,
@@ -403,6 +450,13 @@ export async function reconciliar(tx, opts = {}) {
         huecos.emergency_contact_name = p.memb.emergency_name;
       if (!p.eco.emergency_contact_phone && p.memb?.emergency_phone)
         huecos.emergency_contact_phone = p.memb.emergency_phone;
+      // La FOTO. Faltaba, y se notaba: la misma persona salía con su cara en
+      // Membresías y con sus iniciales en el portal, así que parecían dos
+      // fichas distintas de dos personas distintas. Es un hueco como los demás
+      // —solo se rellena si el ecosistema no tiene ya una—, porque la que la
+      // persona subió al portal es más reciente que la que le tomó su maestro.
+      if (!p.eco.avatar_url && p.memb?.avatar_url)
+        huecos.avatar_url = p.memb.avatar_url;
 
       if (Object.keys(huecos).length) {
         await tx`UPDATE ecosystem.users SET ${tx(huecos)} WHERE id = ${p.eco.id}`;
@@ -432,12 +486,12 @@ export async function reconciliar(tx, opts = {}) {
       const [creado] = await tx`
         INSERT INTO ecosystem.users
           (email, full_name, phone, birth_date, password_hash, password_origen, origen,
-           is_email_verified, is_active, blood_type,
+           is_email_verified, is_active, blood_type, avatar_url,
            emergency_contact_name, emergency_contact_phone)
         VALUES
           (${correo}, ${nombre}, ${p.memb?.phone ?? null}, ${p.memb?.birth_date ?? null},
            ${hash}, ${passwordOrigen}, ${origen},
-           true, ${activo}, ${p.memb?.blood_type ?? null},
+           true, ${activo}, ${p.memb?.blood_type ?? null}, ${p.memb?.avatar_url ?? null},
            ${p.memb?.emergency_name ?? null}, ${p.memb?.emergency_phone ?? null})
         RETURNING id`;
 
@@ -453,6 +507,43 @@ export async function reconciliar(tx, opts = {}) {
     }
 
     const sub = subDe.get(correo);
+
+    // ── El CINTURÓN ────────────────────────────────────────────────────────
+    //
+    // No es una columna de la persona: es una fila de `user_disciplines`, que
+    // es donde el ecosistema guarda el grado por disciplina (Campeonatos lo lee
+    // para categorizar). Membresías lo guarda como un nombre suelto en
+    // `users.belt` y con el MISMO catálogo —los once cinturones—, así que se
+    // copia tal cual, sin traducir.
+    //
+    // Solo si no hay grado ya: una promoción hecha en el portal es más nueva
+    // que la ficha del club, y esto no puede degradar a nadie. Y solo si hay
+    // cinturón: el alumno recién inscrito no tiene, y crear una fila con el
+    // grado en blanco es inventarse una disciplina que nadie ha empezado.
+    if (p.memb?.belt) {
+      const [yaTiene] = await tx`
+        SELECT id, current_grade FROM ecosystem.user_disciplines
+         WHERE user_id = ${sub} AND lower(discipline) = ${DISCIPLINA_POR_DEFECTO}
+         LIMIT 1`;
+      if (!yaTiene) {
+        await tx`
+          INSERT INTO ecosystem.user_disciplines (user_id, discipline, current_grade)
+          VALUES (${sub}, ${DISCIPLINA_POR_DEFECTO}, ${p.memb.belt})`;
+        informe.personas.cinturonesImportados.push({
+          correo,
+          cinturon: p.memb.belt,
+        });
+      } else if (!yaTiene.current_grade) {
+        await tx`
+          UPDATE ecosystem.user_disciplines
+             SET current_grade = ${p.memb.belt}, updated_at = now()
+           WHERE id = ${yaTiene.id}`;
+        informe.personas.cinturonesImportados.push({
+          correo,
+          cinturon: p.memb.belt,
+        });
+      }
+    }
 
     // El enlace, a los dos lados.
     if (p.memb && p.memb.eco_sub !== sub) {

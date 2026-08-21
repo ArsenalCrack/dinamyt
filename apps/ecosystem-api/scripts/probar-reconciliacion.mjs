@@ -124,6 +124,7 @@ await pg.query(`
     password_hash varchar(255) NOT NULL,
     phone varchar(40), birth_date date, blood_type varchar(8),
     emergency_name varchar(150), emergency_phone varchar(40),
+    avatar_url text, belt varchar(40),
     role varchar(20) NOT NULL DEFAULT 'student',
     is_super_admin boolean NOT NULL DEFAULT false,
     is_active boolean NOT NULL DEFAULT true,
@@ -147,6 +148,13 @@ await pg.query(
   [HASH_MEMB, clubSur.id],
 );
 await pg.query(`UPDATE membresias.users SET is_super_admin = true WHERE email = 'admin@dinamyt.org'`);
+// La foto y el cinturón de la alumna: es lo que antes se quedaba en Membresías
+// y hacía que la misma persona saliera con su cara en una app y con sus
+// iniciales en la otra.
+await pg.query(
+  `UPDATE membresias.users SET avatar_url = 'data:image/jpeg;base64,QUJD', belt = 'Verde'
+    WHERE email = 'alumno@dinamyt.org'`,
+);
 
 await pg.query(`CREATE SCHEMA campeonatos`);
 await pg.query(`
@@ -270,6 +278,40 @@ comprobar(
   'el enlace queda guardado a los dos lados y apunta al mismo sitio',
   enlaces[0]?.memb && enlaces[0]?.memb === enlaces[0]?.camp && enlaces[0].memb === maestro[0].id,
   enlaces[0],
+);
+
+// ── La foto y el cinturón ───────────────────────────────────────────────────
+//
+// Se quedaban en Membresías, y era el fallo más visible de todos: la misma
+// persona salía con su cara en una app y con sus iniciales en la otra, así que
+// no parecía la misma persona.
+const { rows: alumna } = await pg.query(
+  `SELECT id, avatar_url FROM ecosystem.users WHERE email = 'alumno@dinamyt.org'`,
+);
+comprobar(
+  'la foto del alumno viaja a su cuenta del ecosistema',
+  alumna[0]?.avatar_url === 'data:image/jpeg;base64,QUJD',
+  alumna[0]?.avatar_url,
+);
+
+const { rows: grado } = await pg.query(
+  `SELECT discipline, current_grade FROM ecosystem.user_disciplines WHERE user_id = $1`,
+  [alumna[0]?.id],
+);
+comprobar(
+  'y su cinturón se convierte en el grado de su disciplina',
+  grado[0]?.current_grade === 'Verde' && grado[0]?.discipline === 'hapkido',
+  grado[0],
+);
+
+const { rows: sinGrado } = await pg.query(
+  `SELECT count(*)::int AS n FROM ecosystem.user_disciplines
+    WHERE user_id = (SELECT id FROM ecosystem.users WHERE email = 'maestro@dinamyt.org')`,
+);
+comprobar(
+  'a quien no tiene cinturón no se le inventa una disciplina en blanco',
+  sinGrado[0]?.n === 0,
+  sinGrado[0],
 );
 
 const { rows: espejoClub } = await pg.query(`SELECT eco_org_id FROM membresias.orgs`);

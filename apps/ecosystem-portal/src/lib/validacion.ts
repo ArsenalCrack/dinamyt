@@ -32,6 +32,16 @@ export function limitesFechaNacimiento(): { min: string; max: string } {
   };
 }
 
+/**
+ * Géneros del ecosistema, con la etiqueta que ve la persona y el valor que se
+ * guarda. El valor va en MAYÚSCULAS porque así lo guarda Campeonatos
+ * (`competidores.genero`), que es quien arma las categorías con él.
+ */
+export const GENEROS = [
+  { valor: 'MASCULINO', etiqueta: 'Masculino' },
+  { valor: 'FEMENINO', etiqueta: 'Femenino' },
+] as const;
+
 // Tipos de sangre (desplegable; lo registra el maestro/admin del club).
 export const TIPOS_SANGRE = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
 

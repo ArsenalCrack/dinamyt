@@ -32,6 +32,12 @@ export class OrganizationsController {
       phone?: string;
       city?: string;
       country?: string;
+      address?: string;
+      /** La delegación a la que responde el club, y el país de ESA delegación. */
+      delegation?: string;
+      delegationCountry?: string;
+      description?: string;
+      logoUrl?: string;
     },
   ) {
     return this.orgsService.create(body);
@@ -107,11 +113,99 @@ export class OrganizationsController {
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ENTRAR AL CLUB POR CÓDIGO
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // ⚠️ Las rutas ESTÁTICAS van antes que `:id/…`, y aquí no es cosmética:
+  // `GET /organizations/solicitudes/mias` y `GET /organizations/:id/solicitudes`
+  // tienen los mismos dos segmentos, así que la que se declare primero gana. Al
+  // revés, «mis solicitudes» acabaría preguntando por el club llamado
+  // `solicitudes`.
+
+  // ── POST /organizations/join — pedir entrar con el código del club ────────
+  @Post('join')
+  @UseGuards(EcosystemJwtGuard)
+  solicitarEntrada(
+    @Body() body: { code: string; note?: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orgsService.solicitarEntrada(user.sub, body.code, body.note);
+  }
+
+  // ── GET /organizations/solicitudes/mias — qué he pedido yo ────────────────
+  @Get('solicitudes/mias')
+  @UseGuards(EcosystemJwtGuard)
+  misSolicitudes(@CurrentUser() user: JwtPayload) {
+    return this.orgsService.misSolicitudes(user.sub);
+  }
+
+  // ── POST /organizations/solicitudes/:id/responder — el maestro decide ─────
+  @Post('solicitudes/:id/responder')
+  @UseGuards(EcosystemJwtGuard)
+  responderSolicitud(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      aceptar: boolean;
+      role?: string;
+      roleMembresias?: string;
+      roleCampeonatos?: string;
+      roleAcademy?: string;
+    },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orgsService.responderSolicitud(
+      id,
+      user.sub,
+      user.is_super_admin,
+      { ...body, aceptar: body.aceptar === true },
+    );
+  }
+
   // ── GET /organizations/usuarios — buscador para el panel de Accesos ───────
   @Get('usuarios')
   @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
   buscarUsuarios(@Query('search') search?: string) {
     return this.orgsService.buscarUsuarios(search);
+  }
+
+  // ── GET /organizations/:id/codigo — el código del club (su gestor) ────────
+  // Lo crea la primera vez que se pide: un club que nunca lo mira nunca lo
+  // tiene, que es la postura segura por defecto.
+  @Get(':id/codigo')
+  @UseGuards(EcosystemJwtGuard)
+  async verCodigo(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    await this.orgsService.exigirGestorDe(user.sub, id, user.is_super_admin);
+    return this.orgsService.obtenerCodigo(id);
+  }
+
+  // ── POST /organizations/:id/codigo — generar uno nuevo ────────────────────
+  @Post(':id/codigo')
+  @UseGuards(EcosystemJwtGuard)
+  async rotarCodigo(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    await this.orgsService.exigirGestorDe(user.sub, id, user.is_super_admin);
+    return this.orgsService.rotarCodigo(id);
+  }
+
+  // ── DELETE /organizations/:id/codigo — cerrar la entrada por código ───────
+  @Delete(':id/codigo')
+  @UseGuards(EcosystemJwtGuard)
+  async quitarCodigo(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    await this.orgsService.exigirGestorDe(user.sub, id, user.is_super_admin);
+    return this.orgsService.quitarCodigo(id);
+  }
+
+  // ── GET /organizations/:id/solicitudes — la bandeja del maestro ───────────
+  @Get(':id/solicitudes')
+  @UseGuards(EcosystemJwtGuard)
+  async listarSolicitudes(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Query('todas') todas?: string,
+  ) {
+    await this.orgsService.exigirGestorDe(user.sub, id, user.is_super_admin);
+    return this.orgsService.listarSolicitudes(id, todas === '1');
   }
 
   // ── GET /organizations/:id/hijas — clubes de una federación ───────────────
@@ -159,6 +253,9 @@ export class OrganizationsController {
       country?: string | null;
       logoUrl?: string | null;
       socialLinks?: string[] | null;
+      delegation?: string | null;
+      delegationCountry?: string | null;
+      isPublic?: boolean;
     },
     @CurrentUser() user: JwtPayload,
   ) {
@@ -295,8 +392,24 @@ export class OrganizationsController {
   // (o de la federación padre) o el super admin.
   @Get(':id/members')
   @UseGuards(EcosystemJwtGuard)
-  async getMembers(@Param('id') orgId: string, @CurrentUser() user: JwtPayload) {
+  async getMembers(
+    @Param('id') orgId: string,
+    @CurrentUser() user: JwtPayload,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
     await this.orgsService.exigirRelacionCon(user.sub, orgId, user.is_super_admin);
-    return this.orgsService.getMembers(orgId);
+    // `Number('')` da 0 y `Number('abc')` da NaN: los dos acabarían pidiendo
+    // cero filas o reventando la consulta. Se filtran aquí.
+    const aNumero = (v?: string) => {
+      const n = Number(v);
+      return v && Number.isFinite(n) ? n : undefined;
+    };
+    return this.orgsService.getMembers(orgId, {
+      search,
+      limit: aNumero(limit),
+      offset: aNumero(offset),
+    });
   }
 }

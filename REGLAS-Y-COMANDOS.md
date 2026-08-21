@@ -260,7 +260,42 @@ que los datos se contradecían. `GET /organizations/:id/members` devuelve los
 cuatro y el portal los enseña. **Si añades una pantalla que toque roles, enseña
 de cuál estás hablando.**
 
-## 3.9 Cloudflare cambia las reglas del juego
+## 3.9 Si se pagina, se busca en el SERVIDOR
+
+Paginar y dejar el buscador filtrando en el navegador es **peor que no paginar**:
+el buscador solo encuentra a quien ya se descargó, así que el alumno de la
+página tres deja de existir. Y no da error — devuelve «no hay nadie», que se lee
+como un dato y no como un fallo.
+
+Los tres listados de gente ya lo hacen bien (`?q=` / `?search=` viajan junto a
+`limit` y `offset` y se aplican en la consulta): `/users` y `/orgs/:id/users` de
+Membresías, y `GET /organizations/:id/members` del ecosistema. **Si añades otro
+listado con páginas, la búsqueda va en el `WHERE`.**
+
+Dos detalles que se olvidan siempre:
+
+- **Al escribir hay que volver a la página 1.** Buscar desde la cuarta muestra
+  «ninguno» con los resultados esperando en la primera.
+- **Espera antes de consultar.** Sin ella, teclear «Rodríguez» dispara nueve
+  peticiones y pueden volver desordenadas: la de «Rodrí» llegando después que la
+  de «Rodríguez» y pisando el resultado bueno. 250 ms bastan.
+
+## 3.10 Un `<label>` que envuelve un botón lo dispara
+
+El selector de fecha propio (`CampoFecha`) no es un `<input>`: es un `<button>`
+que abre un panel. Metido dentro de un `<label>`, pulsar el TEXTO de la etiqueta
+abre el calendario — el navegador reenvía el clic al control que envuelve. Se ve
+como un panel que se abre solo.
+
+Por eso esos campos usan `<div className="block text-sm">` con un `<span>`
+dentro, y no `<label>`. La misma regla vale para cualquier control propio que no
+sea un control nativo.
+
+Y como no es un `<input required>`, **el navegador no detecta que está vacío**:
+si el campo es obligatorio hay que comprobarlo a mano antes de enviar, o el
+error llega del servidor, tarde y en otro sitio de la pantalla.
+
+## 3.11 Cloudflare cambia las reglas del juego
 
 Con la nube naranja: `TRUST_PROXY_HOPS=2`, SSL/TLS en **Full (strict)**, puerto
 80 abierto (renovación del certificado), y **ningún registro DNS gris apuntando
@@ -277,6 +312,7 @@ sin nada detrás da **525**.
 | [RUN_LOCAL.md](RUN_LOCAL.md) | Correr todo en tu PC, sin Docker |
 | [VPS-PASO-A-PASO.md](VPS-PASO-A-PASO.md) | El servidor, de cero. Anexos: pendientes (C), Cloudflare (D), correo (E) |
 | [IDENTIDAD-PASO-A-PASO.md](IDENTIDAD-PASO-A-PASO.md) | Dar cuenta del ecosistema a quien ya existía |
+| [PUESTA-AL-DIA.md](PUESTA-AL-DIA.md) | **Desplegar el puente de altas**: código de club, ficha que nace sola, foto y cinturón. Con su marcha atrás |
 | [CONTINGENCIA-CAMPEONATO.md](CONTINGENCIA-CAMPEONATO.md) | Si se cae todo el día del campeonato |
 | [UNA-SOLA-APP.md](UNA-SOLA-APP.md) | Que las tres apps se sientan una sola (bloque B5) |
 | `productos/campeonatos/PLAN-ECOSYSTEM-VPS.md` | El plan maestro y su tablero. **Se edita en `dinamyt-combat`** |

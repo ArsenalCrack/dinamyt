@@ -21,6 +21,7 @@ import {
   validarFechaNacimiento,
   validarAvatar,
   validarTipoSangre,
+  validarGenero,
 } from '../../common/validacion';
 
 /**
@@ -53,6 +54,7 @@ export class UsersController {
       fullName?: string;
       phone?: string | null;
       birthDate?: string | null;
+      gender?: string | null;
       avatarUrl?: string | null;
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
@@ -111,6 +113,7 @@ export class UsersController {
         .toLocaleUpperCase('es');
     }
     if (body.bloodType) body.bloodType = validarTipoSangre(body.bloodType);
+    if (body.gender) body.gender = validarGenero(body.gender);
     if (body.phone) body.phone = validarTelefono(body.phone);
     if (body.emergencyContactName) {
       body.emergencyContactName = validarNombre(

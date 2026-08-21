@@ -29,6 +29,8 @@ import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
 import { ROLES_CLUB, ROLES_ORG, nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { FilaMiembro } from '@/components/FilaMiembro';
+import { CodigoYSolicitudes } from '@/components/CodigoYSolicitudes';
+import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -53,6 +55,13 @@ export default function MiOrganizacionPage() {
   const [orgs, setOrgs] = useState<MiOrganizacion[]>([]);
   const [sel, setSel] = useState<string | null>(null);
   const [miembros, setMiembros] = useState<Miembro[]>([]);
+  // Búsqueda y página de la lista de gente. El filtro lo hace el SERVIDOR:
+  // buscar solo en lo ya descargado no encontraría a nadie de la página 4.
+  const [totalMiembros, setTotalMiembros] = useState(0);
+  const [busquedaGente, setBusquedaGente] = useState('');
+  const [offsetGente, setOffsetGente] = useState(0);
+  /** Sube tras cada acción sobre un miembro y hace que la lista se recargue. */
+  const [recargaGente, setRecargaGente] = useState(0);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -68,9 +77,15 @@ export default function MiOrganizacionPage() {
     phone: '',
     email: '',
     city: '',
+    country: '',
+    /** La delegación a la que responde el club, y el país de ESA delegación. */
+    delegation: '',
+    delegationCountry: '',
     logoUrl: '',
     red1: '',
     red2: '',
+    /** Si el club sale en el directorio público de dinamyt.org. */
+    isPublic: false,
   });
 
   // Invitaciones organización ↔ club.
@@ -114,9 +129,6 @@ export default function MiOrganizacionPage() {
 
   useEffect(() => {
     if (!sel) return;
-    listMiembrosAPI(sel)
-      .then(setMiembros)
-      .catch(() => setMiembros([]));
     const o = todas.find((x) => x.id === sel);
     setFicha({
       description: o?.description ?? '',
@@ -126,8 +138,12 @@ export default function MiOrganizacionPage() {
       email: o?.email ?? '',
       city: o?.city ?? '',
       logoUrl: o?.logoUrl ?? '',
+      country: o?.country ?? '',
+      delegation: o?.delegation ?? '',
+      delegationCountry: o?.delegationCountry ?? '',
       red1: o?.socialLinks?.[0] ?? '',
       red2: o?.socialLinks?.[1] ?? '',
+      isPublic: o?.isPublic ?? false,
     });
     setInvitacion((inv) => ({
       ...inv,
@@ -143,13 +159,47 @@ export default function MiOrganizacionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel, orgs]);
 
+  /**
+   * La lista de gente, en su propio efecto y con un respiro antes de
+   * consultar.
+   *
+   * Lo de la espera no es cosmético: sin ella, escribir «Rodríguez» dispara
+   * NUEVE consultas, y como cada una tarda lo suyo pueden volver desordenadas
+   * — la de «Rodrí» llegando después que la de «Rodríguez» y pisando el
+   * resultado bueno. Con 250 ms sale una sola cuando la persona deja de
+   * teclear.
+   */
+  useEffect(() => {
+    if (!sel) {
+      setMiembros([]);
+      setTotalMiembros(0);
+      return;
+    }
+    const t = setTimeout(() => {
+      listMiembrosAPI(sel, {
+        search: busquedaGente,
+        limit: POR_PAGINA,
+        offset: offsetGente,
+      })
+        .then((p) => {
+          setMiembros(p.items);
+          setTotalMiembros(p.total);
+        })
+        .catch(() => {
+          setMiembros([]);
+          setTotalMiembros(0);
+        });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [sel, busquedaGente, offsetGente, recargaGente]);
+
   async function accion(fn: () => Promise<unknown>, ok: string, fallback: string) {
     setMsg(null);
     setOcupado(true);
     try {
       await fn();
       await cargar();
-      if (sel) setMiembros(await listMiembrosAPI(sel));
+      if (sel) setRecargaGente((n) => n + 1);
       setMsg({ tipo: 'ok', texto: ok });
     } catch (e) {
       setMsg({ tipo: 'error', texto: extraerError(e, fallback) });
@@ -460,6 +510,12 @@ export default function MiOrganizacionPage() {
           )}
         </section>
 
+        {/* ── Entrada por código + bandeja de solicitudes ────────────────
+            Va ANTES de la lista de gente y no al final: quien está esperando
+            entrar es lo primero que hay que atender, y una bandeja escondida
+            debajo de doscientos alumnos es una bandeja que nadie abre. */}
+        {orgSel && <CodigoYSolicitudes key={orgSel.id} orgId={orgSel.id} />}
+
         {/* ── Miembros de la org seleccionada ───────────────────────────── */}
         <section className="card p-5">
           <h2 className="mb-1 text-lg font-semibold">
@@ -472,6 +528,18 @@ export default function MiOrganizacionPage() {
                 : 'Como club agregas maestros, coaches y competidores. Los jueces los agrega la organización.'}
             </p>
           )}
+          {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría «sin
+              miembros» con los resultados esperando en la 1. */}
+          <input
+            value={busquedaGente}
+            onChange={(e) => {
+              setBusquedaGente(e.target.value);
+              setOffsetGente(0);
+            }}
+            placeholder="Buscar por nombre o correo…"
+            aria-label="Buscar entre la gente del club"
+            className="mb-3"
+          />
           <ul className="mb-4 flex flex-col gap-2">
             {miembros.map((m) => (
               <FilaMiembro
@@ -519,10 +587,19 @@ export default function MiOrganizacionPage() {
             ))}
             {miembros.length === 0 && (
               <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Sin miembros todavía.
+                {busquedaGente
+                  ? `Nadie coincide con «${busquedaGente}».`
+                  : 'Sin miembros todavía.'}
               </li>
             )}
           </ul>
+
+          <Paginacion
+            offset={offsetGente}
+            limit={POR_PAGINA}
+            total={totalMiembros}
+            onIr={setOffsetGente}
+          />
 
           <div className="flex flex-wrap gap-2">
             <input
@@ -650,6 +727,44 @@ export default function MiOrganizacionPage() {
                     onChange={(e) => setFicha({ ...ficha, email: e.target.value })}
                   />
                 </label>
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>País</span>
+                  <input
+                    className="mt-1"
+                    maxLength={100}
+                    value={ficha.country}
+                    onChange={(e) => setFicha({ ...ficha, country: e.target.value })}
+                  />
+                </label>
+                {/* ── Delegación ──
+                    No es lo mismo que la ciudad, y por eso son dos campos: un
+                    dojang de Cali puede responder a una delegación de otro
+                    departamento —o de otro país—. Campeonatos lo pide desde
+                    siempre al dar de alta un maestro, y de ahí salen las
+                    agrupaciones de sus reportes. Si se rellenara luego, no se
+                    rellenaría nunca: habría que buscarla club por club. */}
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Delegación</span>
+                  <input
+                    className="mt-1"
+                    maxLength={120}
+                    placeholder="A qué delegación responde el club"
+                    value={ficha.delegation}
+                    onChange={(e) => setFicha({ ...ficha, delegation: e.target.value })}
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>País de la delegación</span>
+                  <input
+                    className="mt-1"
+                    maxLength={100}
+                    placeholder="Si es distinto al del club"
+                    value={ficha.delegationCountry}
+                    onChange={(e) =>
+                      setFicha({ ...ficha, delegationCountry: e.target.value })
+                    }
+                  />
+                </label>
               </div>
               <label className="mt-3 block text-sm">
                 <span style={{ color: 'var(--text-muted)' }}>Horarios de clase</span>
@@ -692,6 +807,29 @@ export default function MiOrganizacionPage() {
                   />
                 </label>
               </div>
+              {/* ── Directorio público ──
+                  Apagado por defecto y con la advertencia delante: la ficha
+                  lleva teléfono y dirección, y publicarlos tiene que ser un
+                  acto deliberado del maestro, no el efecto secundario de haber
+                  rellenado un formulario. Lo que se publica es la ficha de
+                  contacto del club — nunca su gente. */}
+              <label className="mt-3 flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  style={{ width: 'auto' }}
+                  checked={ficha.isPublic}
+                  onChange={(e) => setFicha({ ...ficha, isPublic: e.target.checked })}
+                />
+                <span>
+                  Mostrar este club en el directorio público de DINAMYT
+                  <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Se publican el nombre, la ciudad, el contacto y el logo. Tus
+                    alumnos no aparecen nunca.
+                  </span>
+                </span>
+              </label>
+
               <button
                 onClick={() =>
                   accion(
@@ -703,6 +841,10 @@ export default function MiOrganizacionPage() {
                         phone: ficha.phone || null,
                         email: ficha.email || null,
                         city: ficha.city || null,
+                        country: ficha.country || null,
+                        delegation: ficha.delegation || null,
+                        delegationCountry: ficha.delegationCountry || null,
+                        isPublic: ficha.isPublic,
                         logoUrl: ficha.logoUrl || null,
                         socialLinks: [ficha.red1.trim(), ficha.red2.trim()].filter(Boolean),
                       }),

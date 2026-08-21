@@ -12,8 +12,9 @@ import {
   subscriptions,
   subscriptionPlans,
   orgClubInvitations,
+  orgJoinRequests,
 } from '../../db/schema';
-import { and, eq, gt, ilike, inArray, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, or } from 'drizzle-orm';
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
 import { MailerService } from '../auth/mailer.service';
@@ -51,6 +52,11 @@ export class OrganizationsService {
     phone?: string;
     city?: string;
     country?: string;
+    address?: string;
+    delegation?: string;
+    delegationCountry?: string;
+    description?: string;
+    logoUrl?: string;
   }) {
     const result = await db
       .insert(organizations)
@@ -62,6 +68,14 @@ export class OrganizationsService {
         phone: data.phone ?? null,
         city: data.city ?? null,
         country: data.country ?? 'Colombia',
+        address: data.address ?? null,
+        // La delegación se pide DESDE EL ALTA y no después, porque después es
+        // cuando no se pone: Campeonatos la necesita para agrupar reportes y
+        // rellenarla a posteriori significa buscarla club por club.
+        delegation: data.delegation ?? null,
+        delegationCountry: data.delegationCountry ?? data.country ?? null,
+        description: data.description ?? null,
+        logoUrl: data.logoUrl ?? null,
       })
       .returning();
 
@@ -306,6 +320,9 @@ export class OrganizationsService {
         email: organizations.email,
         logoUrl: organizations.logoUrl,
         socialLinks: organizations.socialLinks,
+        delegation: organizations.delegation,
+        delegationCountry: organizations.delegationCountry,
+        isPublic: organizations.isPublic,
         myRole: orgMembers.role,
       })
       .from(orgMembers)
@@ -576,6 +593,9 @@ export class OrganizationsService {
       country?: string | null;
       logoUrl?: string | null;
       socialLinks?: string[] | null;
+      delegation?: string | null;
+      delegationCountry?: string | null;
+      isPublic?: boolean;
     },
   ) {
     const result = await db
@@ -591,6 +611,11 @@ export class OrganizationsService {
         ...(data.country !== undefined && { country: data.country }),
         ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
         ...(data.socialLinks !== undefined && { socialLinks: data.socialLinks }),
+        ...(data.delegation !== undefined && { delegation: data.delegation }),
+        ...(data.delegationCountry !== undefined && {
+          delegationCountry: data.delegationCountry,
+        }),
+        ...(data.isPublic !== undefined && { isPublic: data.isPublic }),
         updatedAt: new Date(),
       })
       .where(eq(organizations.id, orgId))
@@ -617,6 +642,9 @@ export class OrganizationsService {
         email: organizations.email,
         logoUrl: organizations.logoUrl,
         socialLinks: organizations.socialLinks,
+        delegation: organizations.delegation,
+        delegationCountry: organizations.delegationCountry,
+        isPublic: organizations.isPublic,
         isActive: organizations.isActive,
         myRole: orgMembers.role,
       })
@@ -863,11 +891,57 @@ export class OrganizationsService {
   // veía un solo rol y daba por hecho que era «el» rol. De ahí la sensación de
   // que los datos se contradecían: no se contradecían, se estaban escondiendo
   // tres cuartas partes.
-  async getMembers(orgId: string) {
+  /**
+   * ── Por qué esto se pagina, y por qué no basta con cortar en el navegador ──
+   *
+   * Un club de cien alumnos devolvía cien filas, y con la FOTO de cada uno
+   * metida dentro del JSON (`users.avatar_url` guarda el data-URL). Son varios
+   * megas en cada carga de pantalla, en el celular del maestro, con datos
+   * móviles — y encima una lista que solo se puede recorrer hacia abajo, que es
+   * como se busca a un alumno cuando no hay buscador: leyendo cien nombres.
+   *
+   * Filtrar y cortar aquí arregla las dos cosas a la vez: la búsqueda la hace
+   * PostgreSQL sobre todo el club (no solo sobre lo que ya se descargó) y por
+   * la red viajan veinte fotos en vez de cien.
+   *
+   * ⚠️ Lo que NO se ha hecho todavía, y por qué: Membresías no manda nunca la
+   * foto en sus listados — devuelve la dirección de una ruta que la sirve en
+   * binario con ETag (`lib/imagenes.ts`). Aquí eso todavía no vale: el portal
+   * autentica con Bearer en la cabecera, y un `<img src="…">` no manda
+   * cabeceras, así que esa ruta respondería 401. Primero hay que darle al
+   * portal una cookie de sesión como la de Membresías; hasta entonces,
+   * paginar es lo que evita el problema.
+   */
+  async getMembers(
+    orgId: string,
+    opciones: { search?: string; limit?: number; offset?: number } = {},
+  ) {
     // Verificar que la organización existe
     await this.findById(orgId);
 
-    const result = await db
+    const termino = (opciones.search ?? '').trim();
+    // Tope duro además del que pida quien llama: un `?limit=100000` no puede
+    // devolver el club entero por la puerta de atrás.
+    const limit = Math.min(Math.max(opciones.limit ?? 20, 1), 100);
+    const offset = Math.max(opciones.offset ?? 0, 0);
+
+    const filtro = termino
+      ? and(
+          eq(orgMembers.orgId, orgId),
+          or(
+            ilike(users.fullName, `%${termino}%`),
+            ilike(users.email, `%${termino}%`),
+          ),
+        )
+      : eq(orgMembers.orgId, orgId);
+
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(orgMembers)
+      .innerJoin(users, eq(orgMembers.userId, users.id))
+      .where(filtro);
+
+    const items = await db
       .select({
         memberId: orgMembers.id,
         role: orgMembers.role,
@@ -883,8 +957,315 @@ export class OrganizationsService {
       })
       .from(orgMembers)
       .innerJoin(users, eq(orgMembers.userId, users.id))
-      .where(eq(orgMembers.orgId, orgId));
+      .where(filtro)
+      // Por nombre y no por fecha de ingreso: quien busca a alguien lo busca
+      // por su nombre, y un orden que cambia solo (el de la base) hace que la
+      // misma persona salte de página entre dos cargas.
+      .orderBy(asc(users.fullName))
+      .limit(limit)
+      .offset(offset);
 
-    return result;
+    return { items, total, limit, offset };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  EL CÓDIGO DE ENTRADA AL CLUB  (camino C de §2.1)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Hasta aquí, quien se registraba solo en el portal se quedaba sin club para
+  // siempre: los dos caminos que existían salían del maestro —invitar por
+  // correo, o importar de una app vieja—, así que si el maestro no adivinaba tu
+  // correo, no había forma de llegar. Y sin club no hay ficha en Membresías, ni
+  // roles en el token, ni nada: la cuenta existía y no servía.
+
+  /**
+   * Alfabeto del código, sin `I`, `O`, `0` ni `1`.
+   *
+   * El código se dicta en voz alta en clase y se copia de un cartel: un cero y
+   * una O son el mismo garabato, y quien lo teclea mal no ve un error suyo, ve
+   * que la aplicación no funciona.
+   */
+  private static readonly ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  /** Normaliza lo que teclea la gente: minúsculas, espacios y guiones fuera. */
+  private static normalizarCodigo(valor: string): string {
+    return (valor ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  private generarCodigo(): string {
+    const a = OrganizationsService.ALFABETO_CODIGO;
+    let out = '';
+    for (let i = 0; i < 8; i++) {
+      out += a[Math.floor(Math.random() * a.length)];
+    }
+    return out;
+  }
+
+  /**
+   * El código del club, creándolo la primera vez que se pide.
+   *
+   * Perezoso a propósito: los clubes que ya existen no necesitan una migración
+   * que les invente uno, y el que nunca lo pida nunca lo tiene — que es la
+   * postura segura para un club que no quiere entradas por su cuenta.
+   */
+  async obtenerCodigo(orgId: string) {
+    const org = await this.findById(orgId);
+    if (org.joinCode) return { joinCode: org.joinCode };
+    return this.rotarCodigo(orgId);
+  }
+
+  /** Genera uno nuevo. El anterior deja de servir en el acto. */
+  async rotarCodigo(orgId: string) {
+    await this.findById(orgId);
+    // El código es único en todo el ecosistema, así que un choque es posible
+    // aunque improbable (32^8). Se reintenta en vez de reventar con un 500.
+    for (let intento = 0; intento < 5; intento++) {
+      const joinCode = this.generarCodigo();
+      const [ya] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(eq(organizations.joinCode, joinCode))
+        .limit(1);
+      if (ya) continue;
+      await db
+        .update(organizations)
+        .set({ joinCode, updatedAt: new Date() })
+        .where(eq(organizations.id, orgId));
+      return { joinCode };
+    }
+    throw new BadRequestException(
+      'No se pudo generar un código libre. Vuelve a intentarlo.',
+    );
+  }
+
+  /** Apaga la entrada por código sin tocar a quien ya entró. */
+  async quitarCodigo(orgId: string) {
+    await this.findById(orgId);
+    await db
+      .update(organizations)
+      .set({ joinCode: null, updatedAt: new Date() })
+      .where(eq(organizations.id, orgId));
+    return { joinCode: null };
+  }
+
+  /**
+   * Alguien con cuenta pide entrar a un club tecleando su código.
+   *
+   * Queda en ESPERA, nunca dentro: el código viaja por WhatsApp y acaba donde
+   * no debe, y además el maestro es el único que sabe qué rol le toca a cada
+   * quien. Lo que sí se resuelve solo es el caso aburrido —ya eres miembro—,
+   * que responde que sí en vez de abrir una solicitud que nadie quiere leer.
+   */
+  async solicitarEntrada(userId: string, codigo: string, note?: string) {
+    const limpio = OrganizationsService.normalizarCodigo(codigo);
+    if (!limpio) throw new BadRequestException('Falta el código del club.');
+
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.joinCode, limpio))
+      .limit(1);
+
+    // Mismo mensaje para «no existe» y «está suspendido»: un código válido que
+    // responde distinto que uno inventado es un código que se puede adivinar a
+    // fuerza de probar.
+    if (!org || !org.isActive) {
+      throw new NotFoundException(
+        'Ese código no corresponde a ningún club. Pídeselo otra vez a tu maestro.',
+      );
+    }
+
+    const [yaMiembro] = await db
+      .select({ id: orgMembers.id })
+      .from(orgMembers)
+      .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, userId)))
+      .limit(1);
+    if (yaMiembro) {
+      return {
+        estado: 'YA_ERES_MIEMBRO' as const,
+        org: { id: org.id, name: org.name },
+      };
+    }
+
+    const [pendiente] = await db
+      .select({ id: orgJoinRequests.id })
+      .from(orgJoinRequests)
+      .where(
+        and(
+          eq(orgJoinRequests.orgId, org.id),
+          eq(orgJoinRequests.userId, userId),
+          eq(orgJoinRequests.status, 'PENDIENTE'),
+        ),
+      )
+      .limit(1);
+    if (pendiente) {
+      return {
+        estado: 'YA_SOLICITADO' as const,
+        org: { id: org.id, name: org.name },
+      };
+    }
+
+    const [solicitud] = await db
+      .insert(orgJoinRequests)
+      .values({
+        orgId: org.id,
+        userId,
+        note: (note ?? '').trim().slice(0, 300) || null,
+      })
+      .returning();
+
+    return {
+      estado: 'EN_ESPERA' as const,
+      org: { id: org.id, name: org.name },
+      solicitud,
+    };
+  }
+
+  /** La bandeja del maestro: quién está pidiendo entrar a su club. */
+  async listarSolicitudes(orgId: string, incluirRespondidas = false) {
+    await this.findById(orgId);
+    const filtro = incluirRespondidas
+      ? eq(orgJoinRequests.orgId, orgId)
+      : and(
+          eq(orgJoinRequests.orgId, orgId),
+          eq(orgJoinRequests.status, 'PENDIENTE'),
+        );
+
+    return db
+      .select({
+        id: orgJoinRequests.id,
+        status: orgJoinRequests.status,
+        note: orgJoinRequests.note,
+        createdAt: orgJoinRequests.createdAt,
+        respondedAt: orgJoinRequests.respondedAt,
+        userId: users.id,
+        email: users.email,
+        fullName: users.fullName,
+        phone: users.phone,
+        avatarUrl: users.avatarUrl,
+        birthDate: users.birthDate,
+      })
+      .from(orgJoinRequests)
+      .innerJoin(users, eq(orgJoinRequests.userId, users.id))
+      .where(filtro)
+      .orderBy(desc(orgJoinRequests.createdAt));
+  }
+
+  /** Lo que YO he pedido: para que el portal sepa qué contarme. */
+  async misSolicitudes(userId: string) {
+    return db
+      .select({
+        id: orgJoinRequests.id,
+        status: orgJoinRequests.status,
+        createdAt: orgJoinRequests.createdAt,
+        respondedAt: orgJoinRequests.respondedAt,
+        orgId: organizations.id,
+        orgName: organizations.name,
+        orgType: organizations.type,
+      })
+      .from(orgJoinRequests)
+      .innerJoin(organizations, eq(orgJoinRequests.orgId, organizations.id))
+      .where(eq(orgJoinRequests.userId, userId))
+      .orderBy(desc(orgJoinRequests.createdAt));
+  }
+
+  /**
+   * El maestro responde. Aceptar ES el alta: nace la fila de `org_members` con
+   * sus roles por app, y con ella el token que la persona va a llevar a
+   * Membresías —donde su ficha se crea sola la primera vez que entre—.
+   *
+   * Los roles llegan del maestro y no de un valor fijo porque el mismo trámite
+   * sirve para un alumno, para un acudiente y para el auxiliar que echa una
+   * mano en recepción. Si no dice nada, entra como alumno, que es el 95 %.
+   */
+  async responderSolicitud(
+    solicitudId: string,
+    gestorUserId: string,
+    esSuper: boolean,
+    datos: {
+      aceptar: boolean;
+      role?: string;
+      roleMembresias?: string;
+      roleCampeonatos?: string;
+      roleAcademy?: string;
+    },
+  ) {
+    const [solicitud] = await db
+      .select()
+      .from(orgJoinRequests)
+      .where(eq(orgJoinRequests.id, solicitudId))
+      .limit(1);
+    if (!solicitud) throw new NotFoundException('Solicitud no encontrada.');
+
+    await this.exigirGestorDe(gestorUserId, solicitud.orgId, esSuper);
+
+    if (solicitud.status !== 'PENDIENTE') {
+      throw new BadRequestException('Esa solicitud ya fue respondida.');
+    }
+
+    if (!datos.aceptar) {
+      const [fila] = await db
+        .update(orgJoinRequests)
+        .set({
+          status: 'RECHAZADA',
+          respondedAt: new Date(),
+          respondedByUserId: gestorUserId,
+        })
+        .where(eq(orgJoinRequests.id, solicitudId))
+        .returning();
+      return { solicitud: fila, miembro: null };
+    }
+
+    const org = await this.findById(solicitud.orgId);
+    const role = datos.role ?? 'student';
+    const permitidos = ROLES_POR_TIPO[org.type] ?? [];
+    if (permitidos.length > 0 && !permitidos.includes(role)) {
+      throw new BadRequestException(
+        `Una organización de tipo ${org.type} no asigna el rol '${role}'.`,
+      );
+    }
+
+    // Puede haber entrado por otra puerta mientras la solicitud esperaba (una
+    // invitación del maestro, la reconciliación). Aceptar tiene que seguir
+    // funcionando: se marca respondida y no se duplica la pertenencia.
+    const [yaMiembro] = await db
+      .select()
+      .from(orgMembers)
+      .where(
+        and(
+          eq(orgMembers.orgId, solicitud.orgId),
+          eq(orgMembers.userId, solicitud.userId),
+        ),
+      )
+      .limit(1);
+
+    const miembro =
+      yaMiembro ??
+      (
+        await db
+          .insert(orgMembers)
+          .values({
+            orgId: solicitud.orgId,
+            userId: solicitud.userId,
+            role,
+            roleMembresias: datos.roleMembresias ?? 'student',
+            roleCampeonatos: datos.roleCampeonatos ?? null,
+            roleAcademy: datos.roleAcademy ?? null,
+            invitedByUserId: gestorUserId,
+          })
+          .returning()
+      )[0];
+
+    const [fila] = await db
+      .update(orgJoinRequests)
+      .set({
+        status: 'ACEPTADA',
+        respondedAt: new Date(),
+        respondedByUserId: gestorUserId,
+      })
+      .where(eq(orgJoinRequests.id, solicitudId))
+      .returning();
+
+    return { solicitud: fila, miembro };
   }
 }
