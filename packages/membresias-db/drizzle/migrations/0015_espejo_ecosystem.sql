@@ -1,0 +1,43 @@
+-- El espejo del ecosistema DINAMYT: `orgs.eco_org_id` y `users.eco_sub`.
+--
+-- ── Qué problema resuelve ──
+--
+-- Hoy una misma persona es dos personas: la ficha del club aquí y la cuenta que
+-- va a tener en el portal. Y un mismo club es dos clubes: la fila de `orgs` y
+-- la organización del ecosistema. Mientras Membresías corría sola eso no
+-- molestaba a nadie. Con las tres apps compartiendo identidad (§2 del plan
+-- maestro) hay que poder decir «esta ficha y esa cuenta son la misma persona»,
+-- y decirlo de una forma que sobreviva a que alguien cambie su correo.
+--
+-- ── Por qué una columna nueva y no cambiar la clave ──
+--
+-- La tentación es hacer que `users.id` sea el `sub` del ecosistema. Sería
+-- reescribir media base: ocho tablas referencian estos ids y TODAS las
+-- políticas de RLS se apoyan en ellos. El espejo cuesta dos columnas y ningún
+-- riesgo: los ids de aquí siguen siendo los de aquí.
+--
+-- ── Las dos columnas ──
+--
+-- `orgs.eco_org_id`  — el club, visto desde el ecosistema. Lo llena la
+--                      reconciliación; con él, el maestro registra su club UNA
+--                      vez y aparece en Campeonatos con sus alumnos asociados.
+-- `users.eco_sub`    — la cuenta de la persona. El guard lo mira ANTES que el
+--                      correo (ver `plugins/auth.ts`), porque el correo se
+--                      puede cambiar desde el portal y el enlace no.
+--
+-- Las dos son NULL para todo el mundo hasta que corra la reconciliación, y se
+-- quedan en NULL para siempre en las fichas sin cuenta —el alumno sin correo
+-- que entra por carnet QR o PIN—, que siguen funcionando igual que siempre.
+--
+-- ── El `IF NOT EXISTS` no es decoración ──
+--
+-- El guion de reconciliación (`ecosystem-api/scripts/reconciliar-identidades.mjs`)
+-- añade estas mismas columnas si no las encuentra, porque tiene que poder correr
+-- ANTES de que se despliegue esta migración. Sin `IF NOT EXISTS`, el orden de
+-- los dos pasos decidiría si la app arranca.
+ALTER TABLE "membresias"."orgs"  ADD COLUMN IF NOT EXISTS "eco_org_id" uuid;--> statement-breakpoint
+ALTER TABLE "membresias"."users" ADD COLUMN IF NOT EXISTS "eco_sub"    uuid;--> statement-breakpoint
+-- Parcial: dos fichas sin cuenta no chocan entre sí (NULL no es igual a NULL),
+-- pero una cuenta del ecosistema no puede acabar enlazada a dos fichas.
+CREATE UNIQUE INDEX IF NOT EXISTS "ux_membresias_users_eco_sub"
+  ON "membresias"."users" ("eco_sub") WHERE "eco_sub" IS NOT NULL;

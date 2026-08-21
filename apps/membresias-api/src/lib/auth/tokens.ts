@@ -89,16 +89,41 @@ export async function verificarTokenPropio(token: string): Promise<JwtPayload> {
 }
 
 /**
+ * Emisor de las SESIONES del ecosistema DINAMYT.
+ *
+ * No es un detalle: el ecosistema firma con la MISMA llave RS256 las sesiones
+ * y los enlaces de invitación del maestro, que duran siete días y viajan por
+ * WhatsApp. Lo único que los distingue es el emisor (`dinamyt-ecosystem` vs.
+ * `dinamyt-ecosystem-invitacion`) y un `purpose` en los de un solo uso.
+ * Ver REGLAS-Y-COMANDOS §3.4, «un enlace firmado no es una sesión».
+ */
+export const EMISOR_ECOSYSTEM = 'dinamyt-ecosystem';
+
+/**
  * Verificador de tokens del ecosistema DINAMYT (RS256 contra su JWKS).
  * Solo se construye si `ECOSYSTEM_JWKS_URL` está configurada — sin ella,
  * Membresías es totalmente autónoma.
+ *
+ * ── Los dos cierres, y por qué el segundo no sobra ──
+ *
+ * Se exige el emisor **y** se rechaza cualquier token con `purpose`. Sin el
+ * primero, un enlace de invitación de siete días abría sesión aquí como si
+ * fuera una; el segundo está para el día en que alguien añada otro token
+ * firmado con esa misma llave y se olvide de darle su propio emisor. Es la
+ * misma pareja de cierres que ya tiene el ecosistema en `jwt.service.ts`.
  */
 export function verificadorEcosystem(
   jwksUrl: string,
 ): (token: string) => Promise<JwtPayload> {
   const jwks = createRemoteJWKSet(new URL(jwksUrl));
   return async (token: string) => {
-    const { payload } = await jwtVerify(token, jwks, { algorithms: ['RS256'] });
+    const { payload } = await jwtVerify(token, jwks, {
+      algorithms: ['RS256'],
+      issuer: EMISOR_ECOSYSTEM,
+    });
+    if (payload.purpose) {
+      throw new Error('Ese token no es una sesión.');
+    }
     return payload as unknown as JwtPayload;
   };
 }

@@ -279,6 +279,23 @@ export async function entrarConCodigo(token: string): Promise<RespuestaLogin> {
   return data;
 }
 
+/**
+ * Canjea el token que devuelve el portal DINAMYT por una sesión DE AQUÍ.
+ *
+ * **Es lo que faltaba para que «entrar con DINAMYT» aguantara una recarga.**
+ * Antes, ese token se guardaba en memoria y ya: la sesión existía mientras no
+ * se recargara la página, y al primer refresco desaparecía y la app devolvía a
+ * la persona al login —desde donde volvía al portal, que entregaba el mismo
+ * token, sin fin—. Canjeándolo, termina en el MISMO sitio que el login normal
+ * y que el QR: cookie httpOnly puesta por la API y perfil cacheado.
+ */
+export async function entrarConSso(token: string): Promise<RespuestaLogin> {
+  const { data } = await api.post<RespuestaLogin>('/auth/sso', { token });
+  guardarToken(data.token);
+  guardarUsuario(data.user);
+  return data;
+}
+
 /** Qué ofrece esta instalación. Se consulta ANTES del login (ruta pública). */
 export async function obtenerConfig(): Promise<{ sso: boolean }> {
   const { data } = await api.get<{ sso: boolean }>('/auth/config');

@@ -1,0 +1,29 @@
+-- Una ficha puede existir SIN contraseña propia.
+--
+-- ── Qué problema resuelve ──
+--
+-- Hasta aquí, entrar a Membresías y pertenecer a un club eran dos altas que
+-- nadie conectaba. El maestro daba de alta al alumno en el portal DINAMYT, el
+-- alumno pulsaba «entrar a Membresías»… y se encontraba con «tu cuenta todavía
+-- no está en ningún club: pídele a tu maestro que te agregue». Se lo pedía al
+-- mismo maestro que ya lo había agregado.
+--
+-- La causa era esta columna. `POST /auth/sso` no podía crear la ficha que
+-- faltaba porque `password_hash` era obligatorio, y una persona que entra por
+-- el ecosistema no tiene —ni debe tener— una contraseña propia aquí: su
+-- contraseña vive en el portal, una sola vez, y ese es justamente el punto de
+-- la identidad única (§2 del plan maestro).
+--
+-- ── Qué NO cambia ──
+--
+-- Nada de lo que ya funciona. El maestro sigue creando alumnos con contraseña
+-- (`POST /users`), y esos siguen entrando por el formulario de siempre. El
+-- login tampoco cambia: `verificarPassword` con un hash vacío devuelve `false`
+-- —no lanza—, así que una ficha sin contraseña simplemente no entra por ahí, y
+-- lo hace con el MISMO mensaje genérico que un correo inexistente. Eso también
+-- es a propósito: decir «esta cuenta entra por DINAMYT» delataría qué correos
+-- están dados de alta, y este login nunca lo ha hecho.
+--
+-- Y el modo autónomo sigue intacto: sin `ECOSYSTEM_JWKS_URL` la ruta `/auth/sso`
+-- responde 404 y aquí no se crea ninguna ficha sin contraseña jamás.
+ALTER TABLE "membresias"."users" ALTER COLUMN "password_hash" DROP NOT NULL;

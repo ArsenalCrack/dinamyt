@@ -19,6 +19,7 @@ import { LIM, enMayusculas, soloTelefono, telefonoValido } from '@/lib/campos';
 import { avisoError, avisoOk } from '@/lib/toast';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { SelectMenu } from '@/components/SelectMenu';
+import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
 interface Club {
   id: string;
@@ -63,6 +64,9 @@ export default function Admin() {
   const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: '' });
   const [expandido, setExpandido] = useState<string | null>(null);
   const [gente, setGente] = useState<Record<string, Persona[]>>({});
+  const [totalGente, setTotalGente] = useState<Record<string, number>>({});
+  const [busqueda, setBusqueda] = useState<Record<string, string>>({});
+  const [offset, setOffset] = useState<Record<string, number>>({});
   const [nuevoMaestro, setNuevoMaestro] = useState({
     email: '',
     fullName: '',
@@ -192,19 +196,57 @@ export default function Admin() {
     }
   }
 
+  /**
+   * Trae una página de la gente de un club.
+   *
+   * La búsqueda va al SERVIDOR (`?q=`) y no se filtra aquí: filtrar en el
+   * navegador solo encuentra a quien ya se descargó, así que en un club de cien
+   * alumnos buscar desde la primera página no encontraría a nadie de la cuarta.
+   */
+  const cargarGente = useCallback(
+    async (clubId: string) => {
+      try {
+        const { data } = await api.get<{ items: Persona[]; total: number }>(
+          `/orgs/${clubId}/users`,
+          {
+            params: {
+              limit: POR_PAGINA,
+              offset: offset[clubId] ?? 0,
+              ...(busqueda[clubId] ? { q: busqueda[clubId] } : {}),
+            },
+          },
+        );
+        setGente((g) => ({ ...g, [clubId]: data.items }));
+        setTotalGente((n) => ({ ...n, [clubId]: data.total }));
+      } catch (err) {
+        avisoError(mensajeError(err, t('admin.verGente')));
+      }
+    },
+    [busqueda, offset, t],
+  );
+
   async function verGente(clubId: string) {
     if (expandido === clubId) {
       setExpandido(null);
       return;
     }
     setExpandido(clubId);
-    try {
-      const { data } = await api.get<Persona[]>(`/orgs/${clubId}/users`);
-      setGente((g) => ({ ...g, [clubId]: data }));
-    } catch (err) {
-      avisoError(mensajeError(err, t('admin.verGente')));
-    }
+    await cargarGente(clubId);
   }
+
+  /**
+   * Al escribir o cambiar de página se vuelve a pedir, con un respiro.
+   *
+   * Sin la espera, teclear «Rodríguez» dispara nueve consultas y pueden volver
+   * desordenadas — la de «Rodrí» llegando después que la de «Rodríguez» y
+   * pisando el resultado bueno.
+   */
+  useEffect(() => {
+    if (!expandido) return;
+    const id = setTimeout(() => void cargarGente(expandido), 250);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandido, busqueda[expandido ?? ''], offset[expandido ?? '']]);
 
   async function crearMaestro(e: FormEvent, clubId: string) {
     e.preventDefault();
@@ -215,8 +257,7 @@ export default function Admin() {
     try {
       await api.post(`/orgs/${clubId}/maestros`, nuevoMaestro);
       setNuevoMaestro({ email: '', fullName: '', password: '', phone: '' });
-      const { data } = await api.get<Persona[]>(`/orgs/${clubId}/users`);
-      setGente((g) => ({ ...g, [clubId]: data }));
+      await cargarGente(clubId);
       await cargar();
       avisoOk(t('admin.maestroCreado'));
     } catch (err) {
@@ -227,8 +268,7 @@ export default function Admin() {
   async function alternarPersona(clubId: string, p: Persona) {
     try {
       await api.patch(`/orgs/usuarios/${p.id}`, { isActive: !p.isActive });
-      const { data } = await api.get<Persona[]>(`/orgs/${clubId}/users`);
-      setGente((g) => ({ ...g, [clubId]: data }));
+      await cargarGente(clubId);
     } catch (err) {
       avisoError(mensajeError(err, t('comun.editar')));
     }
@@ -466,6 +506,20 @@ export default function Admin() {
 
             {expandido === c.id && (
               <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                {/* Buscador del servidor. Al escribir se vuelve a la primera
+                    página: si no, buscar desde la tercera diría «ninguno» con
+                    los resultados esperando en la primera. */}
+                <input
+                  value={busqueda[c.id] ?? ''}
+                  onChange={(e) => {
+                    const texto = e.target.value;
+                    setBusqueda((b) => ({ ...b, [c.id]: texto }));
+                    setOffset((o) => ({ ...o, [c.id]: 0 }));
+                  }}
+                  placeholder={t('pag.buscarAlumno')}
+                  aria-label={t('pag.buscarAlumno')}
+                  style={{ marginBottom: '0.75rem' }}
+                />
                 <div className="tabla-scroll">
                   <table>
                     <thead>
@@ -521,6 +575,13 @@ export default function Admin() {
                     </tbody>
                   </table>
                 </div>
+
+                <Paginacion
+                  offset={offset[c.id] ?? 0}
+                  limit={POR_PAGINA}
+                  total={totalGente[c.id] ?? 0}
+                  onIr={(n) => setOffset((o) => ({ ...o, [c.id]: n }))}
+                />
 
                 <form
                   onSubmit={(e) => crearMaestro(e, c.id)}

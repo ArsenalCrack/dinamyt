@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { and, asc, eq } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { requireAuth } from '../plugins/auth';
+import type { JwtPayload } from '../types/auth';
 import { firmarToken, verificarTokenAcceso } from '../lib/auth/tokens';
 import {
   hashPassword,
@@ -27,12 +28,16 @@ import {
 } from '../lib/validacion';
 import { direccionFoto, direccionLogo, imagenGuardada } from '../lib/imagenes';
 import { sinFiltroDeClub } from '../lib/db-contexto';
+import { aprovisionarFicha } from '../lib/aprovisionar';
 import { ssoHabilitado } from '../config';
 
 // Tope de intentos de login: 5 por correo y 20 por IP cada 5 minutos.
 const MAX_POR_EMAIL = 5;
 const MAX_POR_IP = 20;
 const VENTANA_SEG = 300;
+
+/** Un `sub` con forma de UUID; cualquier otra cosa no se le pasa a Postgres. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Vista pública de un usuario. El hash de la contraseña nunca sale de aquí. */
 function vistaUsuario(u: typeof users.$inferSelect) {
@@ -238,6 +243,85 @@ export async function authRoutes(app: FastifyInstance) {
     },
   );
 
+  // ── POST /auth/sso — canjear el token del portal por una sesión de aquí ──
+  //
+  // **Esto es lo que hacía que «entrar con DINAMYT» no aguantara una recarga.**
+  // Antes, el token que devolvía el portal se quedaba en una variable de la web
+  // (`tokenEnMemoria`) y nunca se convertía en cookie. Funcionaba mientras no
+  // se recargara la página; a la primera F5 —o al primer 401 que fuerza una
+  // navegación completa— la sesión desaparecía, la app te devolvía al login, y
+  // desde ahí se volvía al portal, que entregaba el mismo token otra vez. Ese
+  // viaje de ida y vuelta no cambiaba nada, así que se repetía sin fin.
+  //
+  // Canjeándolo aquí, el navegador se queda con la MISMA cookie httpOnly que
+  // da el login por contraseña, y la sesión vive lo que vive cualquier otra.
+  //
+  // Ruta pública por necesidad —quien la usa todavía no tiene sesión—, pero lo
+  // que autoriza es un token del ecosistema con su emisor comprobado (ver
+  // `verificadorEcosystem`). El tope por IP está por lo mismo que en el QR: es
+  // de las pocas que entregan sesión sin contraseña.
+  app.post(
+    '/auth/sso',
+    { preHandler: limitarPorIp('sso', 20, 300) },
+    async (req, reply) => {
+      if (!ssoHabilitado()) {
+        return reply
+          .code(404)
+          .send({ error: 'Esta instalación no tiene SSO con DINAMYT.' });
+      }
+
+      const { token } = (req.body ?? {}) as { token?: string };
+      if (!token) return reply.code(400).send({ error: 'Falta el token del portal.' });
+
+      let payload: JwtPayload;
+      try {
+        payload = await req.server.verifyToken(token);
+      } catch {
+        return reply.code(401).send({
+          error: 'La sesión del portal ya había caducado. Vuelve a entrar desde DINAMYT.',
+        });
+      }
+
+      const correo = (payload.email ?? '').toLowerCase();
+      const sub =
+        typeof payload.sub === 'string' && UUID.test(payload.sub) ? payload.sub : null;
+      if (!correo && !sub) {
+        return reply.code(401).send({ error: 'Ese token no identifica a nadie.' });
+      }
+
+      // Mismo orden que el guard (`usuarioVigente`): primero el enlace con la
+      // cuenta del ecosistema, que no cambia; el correo después, porque se
+      // puede editar desde el portal. Nunca se da de alta a nadie en silencio.
+      return sinFiltroDeClub(req.server.db, async (db) => {
+        let [u] = sub
+          ? await db.select().from(users).where(eq(users.ecoSub, sub)).limit(1)
+          : [];
+        if (!u && correo) {
+          [u] = await db.select().from(users).where(eq(users.email, correo)).limit(1);
+        }
+        // Sin ficha: puede que no falte nada, solo que nadie la haya creado
+        // todavía. Si el token dice que esta persona pertenece a un club que
+        // aquí tiene espejo, la ficha nace ahora (ver `lib/aprovisionar.ts`,
+        // que explica por qué eso no es dar de alta a cualquiera en silencio).
+        if (!u) {
+          const nueva = await aprovisionarFicha(db, payload);
+          if (!nueva) {
+            return reply.code(403).send({
+              error:
+                'Tu cuenta de DINAMYT todavía no está en ningún club de Membresías. Pídele a tu maestro que te agregue.',
+            });
+          }
+          req.log.info(
+            { usuario: nueva.ficha.id, club: nueva.club.id, rol: nueva.ficha.role },
+            'ficha creada desde el ecosistema',
+          );
+          u = nueva.ficha;
+        }
+        return abrirSesion(db, reply, u);
+      });
+    },
+  );
+
   // ── POST /auth/logout — cierra la sesión del navegador ────────────────────
   // Sin guard: si la cookie ya no vale, borrarla debe funcionar igual. Lo
   // contrario deja al usuario con una sesión rota que no puede ni cerrar.
@@ -394,6 +478,18 @@ export async function authRoutes(app: FastifyInstance) {
         .where(eq(users.id, req.user!.sub))
         .limit(1);
       if (!u) return reply.code(404).send({ error: 'Usuario no encontrado.' });
+
+      // Quien entró por DINAMYT no tiene contraseña aquí, y su ficha lo dice
+      // (`password_hash` vacío). Sin esta comprobación se le respondería «la
+      // contraseña actual no es correcta», que es cierto y no ayuda: la manda a
+      // buscar una contraseña que no existe en vez de al sitio donde sí está.
+      // Aquí no hay nada que delatar: la sesión ya dice quién es.
+      if (!u.passwordHash) {
+        return reply.code(400).send({
+          error:
+            'Tu contraseña vive en DINAMYT, no aquí: cámbiala en tu perfil del portal y sirve para todo el ecosistema.',
+        });
+      }
 
       if (!(await verificarPassword(body.actual ?? '', u.passwordHash))) {
         return reply.code(401).send({ error: 'La contraseña actual no es correcta.' });
