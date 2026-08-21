@@ -102,15 +102,31 @@ function LoginForm() {
     setAbierta(sesionActual());
   }, []);
 
-  function entregarSesion(token: string) {
-    if (destino) {
+  /**
+   * Dónde acaba quien inicia sesión.
+   *
+   * Con `?redirect=` se devuelve a la app que lo pidió; sin él, al portal.
+   * `soloAlPortal` es la escapatoria: **ignora el redirect a propósito**.
+   *
+   * ── Por qué hace falta una escapatoria ──
+   *
+   * Sin ella, caer en `/login?redirect=…` era un CALLEJÓN: continuar con la
+   * sesión abierta, entrar con otra cuenta o escribir la contraseña acababan
+   * los tres aquí, y los tres se iban a la app. No existía forma de llegar al
+   * portal — ni siquiera para el que solo quería mirar su perfil—, y el
+   * síntoma que se veía era «no me deja entrar a DINAMYT, me manda a
+   * Membresías». El enlace queda pegado en el historial y en el botón «entrar
+   * con DINAMYT» de la app, así que no es un caso raro: es el normal.
+   */
+  function entregarSesion(token: string, soloAlPortal = false) {
+    if (destino && !soloAlPortal) {
       window.location.href = `${destino.url}#token=${encodeURIComponent(token)}`;
       return;
     }
     router.push('/dashboard');
   }
 
-  function continuarConLaSesionAbierta() {
+  function continuarConLaSesionAbierta(soloAlPortal = false) {
     const t = obtenerToken();
     // Pudo caducar entre que se pintó la tarjeta y se pulsó el botón.
     if (!t) {
@@ -118,7 +134,7 @@ function LoginForm() {
       setError('Tu sesión caducó. Vuelve a escribir tu contraseña.');
       return;
     }
-    entregarSesion(t);
+    entregarSesion(t, soloAlPortal);
   }
 
   function entrarConOtraCuenta() {
@@ -127,19 +143,31 @@ function LoginForm() {
     setError(null);
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  /**
+   * `soloAlPortal` viaja desde el botón que se pulsó, y NO desde un estado.
+   *
+   * Con un `useState` el valor lo leería el `onSubmit` de la vuelta siguiente
+   * del render —React agrupa las actualizaciones—, así que el primer clic se
+   * iría a la app igual. Aquí el formulario tiene dos botones de envío y cada
+   * uno dice a dónde va.
+   */
+  async function entrar(soloAlPortal: boolean) {
     setError(null);
     setCargando(true);
     try {
       const { access_token } = await loginAPI(email, password);
       guardarToken(access_token);
-      entregarSesion(access_token);
+      entregarSesion(access_token, soloAlPortal);
     } catch (err) {
       setError(extraerError(err, 'No se pudo iniciar sesión.'));
     } finally {
       setCargando(false);
     }
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await entrar(false);
   }
 
   return (
@@ -177,13 +205,25 @@ function LoginForm() {
           )}
           <button
             type="button"
-            onClick={continuarConLaSesionAbierta}
+            onClick={() => continuarConLaSesionAbierta()}
             className="btn btn-cta w-full"
           >
             {destino
               ? `Continuar a ${destino.nombre} como ${primerNombre(abierta.fullName)}`
               : `Continuar como ${primerNombre(abierta.fullName)}`}
           </button>
+          {/* La salida del embudo. Solo aparece cuando una app está pidiendo la
+              sesión: sin `?redirect=` el botón de arriba YA lleva al portal y
+              este sería el mismo botón dos veces. */}
+          {destino && (
+            <button
+              type="button"
+              onClick={() => continuarConLaSesionAbierta(true)}
+              className="btn btn-outline mt-3 w-full"
+            >
+              Ir a mi cuenta DINAMYT
+            </button>
+          )}
           <button
             type="button"
             onClick={entrarConOtraCuenta}
@@ -235,8 +275,18 @@ function LoginForm() {
             disabled={cargando}
             className="btn btn-cta mt-4 w-full"
           >
-            {cargando ? 'Entrando…' : 'Entrar'}
+            {cargando ? 'Entrando…' : destino ? `Entrar y volver a ${destino.nombre}` : 'Entrar'}
           </button>
+          {destino && (
+            <button
+              type="button"
+              disabled={cargando}
+              onClick={() => void entrar(true)}
+              className="btn btn-outline mt-3 w-full"
+            >
+              Entrar solo a DINAMYT
+            </button>
+          )}
           <p
             className="mt-4 text-center text-sm"
             style={{ color: 'var(--text-muted)' }}
