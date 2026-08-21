@@ -8,6 +8,7 @@ import {
   soloLetras,
   soloTelefono,
   limitesFechaNacimiento,
+  comprimirAvatar,
   PARENTESCOS,
   TIPOS_SANGRE,
   CINTURONES_GRADO,
@@ -49,6 +50,8 @@ export default function EditarMiembroPage() {
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const [guardando, setGuardando] = useState(false);
+  /** La foto tiene su propio «guardando»: se manda sola, sin el formulario. */
+  const [foto, setFoto] = useState(false);
 
   const [form, setForm] = useState({
     fullName: '',
@@ -96,6 +99,48 @@ export default function EditarMiembroPage() {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  /**
+   * La foto del alumno, puesta por su maestro.
+   *
+   * ── Por qué la pone el maestro y no solo el alumno ──
+   *
+   * La foto va impresa en el carnet, y el carnet lo expide el club. El alumno
+   * de ocho años no tiene ni cuenta de correo propia, y el de cuarenta sube la
+   * que le gusta, no la que sirve para reconocerlo en la puerta. Aquí se sube
+   * en el mismo sitio donde ya se le corrige el nombre y se le promueve el
+   * cinturón.
+   *
+   * Se guarda al elegirla, sin esperar al botón del formulario: nadie espera
+   * tener que confirmar una foto que ya se está viendo puesta. `null` la
+   * quita, que es lo que hace falta cuando la que hay está mal recortada o es
+   * de otra persona.
+   */
+  async function guardarFoto(avatarUrl: string | null) {
+    if (!perfil) return;
+    setFoto(true);
+    setError('');
+    setOk('');
+    try {
+      await api.patch(`/users/${perfil.id}/profile`, { avatarUrl });
+      await cargar();
+      setOk(avatarUrl ? 'Foto guardada.' : 'Foto quitada.');
+    } catch (e) {
+      setError(extraerError(e, 'No se pudo guardar la foto.'));
+    } finally {
+      setFoto(false);
+    }
+  }
+
+  /** Del archivo del dispositivo a un cuadrado pequeño listo para guardar. */
+  async function elegirFoto(file: File | undefined) {
+    if (!file) return;
+    try {
+      await guardarFoto(await comprimirAvatar(file));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo procesar la imagen.');
+    }
+  }
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -151,7 +196,7 @@ export default function EditarMiembroPage() {
       </Link>
 
       <header className="card mt-3 mb-4 flex flex-wrap items-center gap-4 p-5">
-        <Avatar src={perfil.avatarUrl} nombre={perfil.fullName} size={64} />
+        <Avatar src={perfil.avatarUrl} nombre={perfil.fullName} size={72} />
         <div className="min-w-0 flex-1">
           <p className="eyebrow mb-1">Edición del staff</p>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--gold)' }}>
@@ -160,6 +205,40 @@ export default function EditarMiembroPage() {
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             {perfil.email} · Documento {perfil.documentId}
           </p>
+          {/* La foto, aquí y no dentro del formulario: se guarda sola al
+              elegirla, así que un botón «Guardar cambios» al lado solo
+              confundiría sobre qué falta por guardar. */}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label
+              className="btn btn-outline btn-sm cursor-pointer"
+              style={foto ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+            >
+              {foto ? 'Guardando…' : perfil.avatarUrl ? 'Cambiar foto' : 'Subir foto'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={foto}
+                onChange={(e) => {
+                  void elegirFoto(e.target.files?.[0]);
+                  // Se vacía para que elegir DOS veces el mismo archivo
+                  // vuelva a disparar el `change` (si no, el segundo intento
+                  // tras un fallo no hace nada).
+                  e.target.value = '';
+                }}
+              />
+            </label>
+            {perfil.avatarUrl && (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={foto}
+                onClick={() => void guardarFoto(null)}
+              >
+                Quitar foto
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

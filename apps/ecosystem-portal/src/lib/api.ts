@@ -272,7 +272,7 @@ export const grantAccessAPI = async (
   (await api.post(`/organizations/${orgId}/grant-access`, data)).data;
 export const crearClubHijoAPI = async (
   parentId: string,
-  data: { name: string; type: Organizacion['type']; city?: string },
+  data: { name: string; type: Organizacion['type']; city?: string; country?: string },
 ) => (await api.post(`/organizations/${parentId}/hijas`, data)).data;
 export const setOrgActivaAPI = async (orgId: string, isActive: boolean) =>
   (await api.patch(`/organizations/${orgId}`, { isActive })).data;
@@ -523,18 +523,12 @@ export const crearMiClubAPI = async (data: {
   socialLinks?: string[];
 }) => (await api.post('/organizations/mi-club', data)).data;
 
-// ── Catálogo geográfico (lo sirve campeonatos-api; endpoint público) ────────
-const CAMPEONATOS_API_URL =
-  process.env.NEXT_PUBLIC_CAMPEONATOS_API_URL || 'http://localhost:3002';
-export interface Pais {
-  iso2: string;
-  nombre: string;
-}
-export const listPaisesAPI = async (): Promise<Pais[]> =>
-  (await axios.get(`${CAMPEONATOS_API_URL}/geo/paises`)).data;
-export const listCiudadesAPI = async (iso2: string): Promise<string[]> =>
-  (await axios.get(`${CAMPEONATOS_API_URL}/geo/ciudades`, { params: { pais: iso2 } }))
-    .data;
+// ── Catálogo geográfico ─────────────────────────────────────────────────────
+// Ya no se pide por HTTP. Estaba puesto contra `campeonatos-api` (`GET
+// /geo/paises`, `/geo/ciudades`), rutas que ese backend nunca ha tenido: la
+// llamada fallaba siempre y el `catch` de quien la usaba dejaba los
+// desplegables vacíos. El catálogo vive ahora en `lib/geo.ts` y lo consume el
+// componente `PaisCiudad`.
 export const listarClubesAPI = async (search?: string): Promise<ClubBusqueda[]> =>
   (await api.get('/organizations/clubes', { params: { search } })).data;
 export const actualizarOrgInfoAPI = async (

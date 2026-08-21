@@ -18,6 +18,7 @@ import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, or } from 'drizz
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
 import { MailerService } from '../auth/mailer.service';
+import { espejarClub } from '../../common/espejo-membresias';
 
 // Quién puede GESTIONAR una organización (editar su ficha, invitar gente,
 // responder invitaciones): el admin, el dueño o el maestro del club.
@@ -621,6 +622,17 @@ export class OrganizationsService {
       .where(eq(organizations.id, orgId))
       .returning();
     if (!result[0]) throw new NotFoundException('Organización no encontrada.');
+
+    // La copia de Membresías. Solo lo que allí existe: el escudo —que es el
+    // motivo por el que aquella app dejó de tener su propio botón—, el nombre y
+    // la ciudad. La sede, los horarios y las redes son de la ficha del portal y
+    // allí no tienen dónde ir. Ver `common/espejo-membresias.ts`.
+    espejarClub(orgId, {
+      name: data.name,
+      city: data.city,
+      logoUrl: data.logoUrl,
+    });
+
     return result[0];
   }
 

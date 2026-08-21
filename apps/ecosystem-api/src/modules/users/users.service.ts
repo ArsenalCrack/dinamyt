@@ -9,6 +9,7 @@ import {
 } from '../../db/schema';
 import { eq, and, gt, isNull } from 'drizzle-orm';
 import { encryptField, decryptField } from '../../common/crypto';
+import { espejarPersona } from '../../common/espejo-membresias';
 import * as bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
 
@@ -318,6 +319,20 @@ export class UsersService {
       })
       .where(eq(users.id, id))
       .returning();
+
+    // La copia de Membresías, que es quien imprime el carnet. No se espera y no
+    // puede fallar hacia aquí: ver `common/espejo-membresias.ts`. Las notas
+    // médicas y el género no viajan — allí no existen.
+    espejarPersona(id, {
+      fullName: data.fullName,
+      phone: data.phone,
+      avatarUrl: data.avatarUrl,
+      birthDate: data.birthDate,
+      bloodType: data.bloodType,
+      emergencyName: data.emergencyContactName,
+      emergencyPhone: data.emergencyContactPhone,
+    });
+
     return this.strip(row);
   }
 
@@ -348,6 +363,7 @@ export class UsersService {
         })
         .where(eq(userDisciplines.id, existing[0].id))
         .returning();
+      espejarPersona(userId, { belt: row.currentGrade });
       return row;
     }
 
@@ -360,6 +376,9 @@ export class UsersService {
         since: data.since ?? null,
       })
       .returning();
+    // El grado va al carnet que imprime Membresías: promoverlo aquí y que allí
+    // siguiera el anterior era justo lo que hacía dudar de cuál era el bueno.
+    espejarPersona(userId, { belt: row.currentGrade });
     return row;
   }
 

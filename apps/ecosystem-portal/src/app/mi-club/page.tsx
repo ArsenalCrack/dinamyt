@@ -7,30 +7,19 @@ import {
   obtenerToken,
   miClubAPI,
   crearMiClubAPI,
-  listPaisesAPI,
-  listCiudadesAPI,
   extraerError,
   type MiClub,
-  type Pais,
 } from '@/lib/api';
 import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
 import { nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
+import { PaisCiudad } from '@/components/PaisCiudad';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
   LEAGUE: 'Liga',
   CLUB: 'Club',
   ACADEMY: 'Academia',
-};
-
-/** Nombre del país en español a partir del iso2 (el catálogo viene en inglés). */
-const nombrePais = (iso2: string, fallback: string) => {
-  try {
-    return new Intl.DisplayNames(['es'], { type: 'region' }).of(iso2) ?? fallback;
-  } catch {
-    return fallback;
-  }
 };
 
 /** Etiqueta corta de un enlace de red social (instagram.com/club → Instagram). */
@@ -64,15 +53,13 @@ export default function MiClubPage() {
   const [nuevo, setNuevo] = useState({
     name: '',
     city: '',
-    paisIso: 'CO',
+    country: 'Colombia',
     description: '',
     phone: '',
     logoUrl: '',
     red1: '',
     red2: '',
   });
-  const [paises, setPaises] = useState<Pais[]>([]);
-  const [ciudades, setCiudades] = useState<string[]>([]);
   const [creando, setCreando] = useState(false);
   const inputLogo = useRef<HTMLInputElement>(null);
 
@@ -91,19 +78,7 @@ export default function MiClubPage() {
 
   useEffect(() => {
     void cargar();
-    // Catálogo geográfico (mismo desplegable que al crear un campeonato).
-    listPaisesAPI().then(setPaises).catch(() => setPaises([]));
   }, [cargar]);
-
-  useEffect(() => {
-    if (!nuevo.paisIso) {
-      setCiudades([]);
-      return;
-    }
-    listCiudadesAPI(nuevo.paisIso)
-      .then(setCiudades)
-      .catch(() => setCiudades([]));
-  }, [nuevo.paisIso]);
 
   async function elegirLogo(file: File | undefined) {
     if (!file) return;
@@ -120,11 +95,10 @@ export default function MiClubPage() {
     setCreando(true);
     setMsg('');
     try {
-      const pais = paises.find((p) => p.iso2 === nuevo.paisIso);
       await crearMiClubAPI({
         name: nuevo.name.trim(),
         city: nuevo.city.trim() || undefined,
-        country: pais ? nombrePais(pais.iso2, pais.nombre) : undefined,
+        country: nuevo.country || undefined,
         description: nuevo.description.trim() || undefined,
         phone: nuevo.phone.trim() || undefined,
         logoUrl: nuevo.logoUrl || undefined,
@@ -132,7 +106,7 @@ export default function MiClubPage() {
       });
       setMsg('Club creado: ya eres su maestro. Complétalo en «Mi organización».');
       setNuevo({
-        name: '', city: '', paisIso: 'CO', description: '',
+        name: '', city: '', country: 'Colombia', description: '',
         phone: '', logoUrl: '', red1: '', red2: '',
       });
       await cargar();
@@ -252,36 +226,15 @@ export default function MiClubPage() {
                   placeholder="300 123 4567"
                 />
               </label>
-              <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>País</span>
-                <select
-                  className="mt-1 w-full"
-                  value={nuevo.paisIso}
-                  onChange={(e) => setNuevo({ ...nuevo, paisIso: e.target.value, city: '' })}
-                >
-                  {paises.length === 0 && <option value="CO">Colombia</option>}
-                  {paises.map((p) => (
-                    <option key={p.iso2} value={p.iso2}>
-                      {nombrePais(p.iso2, p.nombre)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>Ciudad</span>
-                <select
-                  className="mt-1 w-full"
-                  value={nuevo.city}
-                  onChange={(e) => setNuevo({ ...nuevo, city: e.target.value })}
-                >
-                  <option value="">— Elige la ciudad —</option>
-                  {ciudades.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* Del catálogo local (ver `lib/geo.ts`). Antes estos dos
+                  desplegables se llenaban con una llamada a campeonatos-api
+                  que no existe: fallaba siempre, y quedaban «Colombia» como
+                  único país y ninguna ciudad. */}
+              <PaisCiudad
+                pais={nuevo.country}
+                ciudad={nuevo.city}
+                onChange={(country, city) => setNuevo({ ...nuevo, country, city })}
+              />
               <label className="block text-sm">
                 <span style={{ color: 'var(--text-muted)' }}>Red social (enlace)</span>
                 <input

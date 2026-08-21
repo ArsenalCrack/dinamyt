@@ -303,7 +303,9 @@ export default function AdminEcosistemaPage() {
                 aria-label="Buscar entre los miembros de la organización"
                 className="mb-3"
               />
-              <ul className="mb-4 flex flex-col gap-2">
+              {/* Dos columnas en pantalla ancha, como en «Mi organización»:
+                  una tira de veinte filas dejaba media pantalla en blanco. */}
+              <ul className="mb-4 grid gap-2 lg:grid-cols-2">
                 {miembros.map((m) => (
                   <FilaMiembro
                     key={m.memberId}

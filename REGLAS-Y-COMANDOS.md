@@ -52,6 +52,8 @@ al día:
 | `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` | membresias-web | No aparece «entrar con DINAMYT» ni el camino de vuelta |
 | `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe |
 | `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: la invitación devuelve el enlace para mandarlo por WhatsApp |
+| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api **y** membresias-api | **El mismo valor en las dos.** Sin él, la foto, el escudo y el cinturón que se guardan en el portal no llegan a Membresías: el carnet se sigue imprimiendo con lo que hubiera. En Membresías `POST /sync/persona` responde 404 |
+| `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
 
 ## 1.5 Lo que nunca se hace
 

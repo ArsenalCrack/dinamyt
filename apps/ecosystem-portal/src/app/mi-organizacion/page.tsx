@@ -30,6 +30,7 @@ import { ROLES_CLUB, ROLES_ORG, nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { FilaMiembro } from '@/components/FilaMiembro';
 import { CodigoYSolicitudes } from '@/components/CodigoYSolicitudes';
+import { PaisCiudad } from '@/components/PaisCiudad';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
 const TIPO: Record<string, string> = {
@@ -67,7 +68,7 @@ export default function MiOrganizacionPage() {
   const [cargando, setCargando] = useState(true);
 
   const [invitacion, setInvitacion] = useState({ email: '', role: '' });
-  const [nuevoClub, setNuevoClub] = useState({ name: '', city: '' });
+  const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: '' });
 
   // Ficha del club/organización seleccionada.
   const [ficha, setFicha] = useState({
@@ -78,9 +79,6 @@ export default function MiOrganizacionPage() {
     email: '',
     city: '',
     country: '',
-    /** La delegación a la que responde el club, y el país de ESA delegación. */
-    delegation: '',
-    delegationCountry: '',
     logoUrl: '',
     red1: '',
     red2: '',
@@ -139,8 +137,6 @@ export default function MiOrganizacionPage() {
       city: o?.city ?? '',
       logoUrl: o?.logoUrl ?? '',
       country: o?.country ?? '',
-      delegation: o?.delegation ?? '',
-      delegationCountry: o?.delegationCountry ?? '',
       red1: o?.socialLinks?.[0] ?? '',
       red2: o?.socialLinks?.[1] ?? '',
       isPublic: o?.isPublic ?? false,
@@ -253,7 +249,7 @@ export default function MiOrganizacionPage() {
   const soloClubes = orgs.every((o) => !esOrgGrande(o.type));
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6">
       <Link href="/dashboard" className="text-sm" style={{ color: 'var(--text-muted)' }}>
         ← Dashboard
       </Link>
@@ -407,17 +403,22 @@ export default function MiOrganizacionPage() {
                 Nuevo club de {federaciones[0].name}
               </h3>
               <div className="grid gap-2 sm:grid-cols-2">
-                <input
-                  placeholder="Nombre del club *"
-                  maxLength={200}
-                  value={nuevoClub.name}
-                  onChange={(e) => setNuevoClub({ ...nuevoClub, name: e.target.value })}
-                />
-                <input
-                  placeholder="Ciudad"
-                  maxLength={100}
-                  value={nuevoClub.city}
-                  onChange={(e) => setNuevoClub({ ...nuevoClub, city: e.target.value })}
+                <label className="block text-sm sm:col-span-2">
+                  <span style={{ color: 'var(--text-muted)' }}>Nombre del club *</span>
+                  <input
+                    className="mt-1"
+                    maxLength={200}
+                    value={nuevoClub.name}
+                    onChange={(e) => setNuevoClub({ ...nuevoClub, name: e.target.value })}
+                  />
+                </label>
+                {/* Del catálogo, igual que en la ficha: el club nace con su
+                    país y su ciudad bien escritos y no hay que volver a
+                    pasar por aquí a corregirlos. */}
+                <PaisCiudad
+                  pais={nuevoClub.country}
+                  ciudad={nuevoClub.city}
+                  onChange={(country, city) => setNuevoClub({ ...nuevoClub, country, city })}
                 />
               </div>
               <button
@@ -428,6 +429,7 @@ export default function MiOrganizacionPage() {
                         name: nuevoClub.name.trim(),
                         type: 'CLUB',
                         city: nuevoClub.city.trim() || undefined,
+                        country: nuevoClub.country || undefined,
                       }),
                     'Club creado.',
                     'No se pudo crear el club.',
@@ -515,352 +517,325 @@ export default function MiOrganizacionPage() {
             entrar es lo primero que hay que atender, y una bandeja escondida
             debajo de doscientos alumnos es una bandeja que nadie abre. */}
         {orgSel && <CodigoYSolicitudes key={orgSel.id} orgId={orgSel.id} />}
+      </div>
 
-        {/* ── Miembros de la org seleccionada ───────────────────────────── */}
-        <section className="card p-5">
-          <h2 className="mb-1 text-lg font-semibold">
-            {orgSel ? `Gente de ${orgSel.name}` : 'Miembros'}
-          </h2>
-          {orgSel && (
-            <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-              {esOrgGrande(orgSel.type)
-                ? 'Como organización agregas administradores y jueces. Los competidores los agrega cada club.'
-                : 'Como club agregas maestros, coaches y competidores. Los jueces los agrega la organización.'}
-            </p>
-          )}
-          {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría «sin
-              miembros» con los resultados esperando en la 1. */}
-          <input
-            value={busquedaGente}
-            onChange={(e) => {
-              setBusquedaGente(e.target.value);
-              setOffsetGente(0);
-            }}
-            placeholder="Buscar por nombre o correo…"
-            aria-label="Buscar entre la gente del club"
-            className="mb-3"
-          />
-          <ul className="mb-4 flex flex-col gap-2">
-            {miembros.map((m) => (
-              <FilaMiembro
-                key={m.memberId}
-                miembro={m}
-                asignables={rolesPermitidos}
-                ocupado={ocupado}
-                onCambiarRol={(rol) =>
-                  accion(
-                    () => cambiarRolMiembroAPI(sel!, m.userId, rol),
-                    'Rol actualizado.',
-                    'No se pudo cambiar el rol.',
-                  )
-                }
-                acciones={
-                  <>
-                    {/* El gestor edita el perfil del miembro (nombre,
-                        nacimiento, cinturón, tipo de sangre…) */}
-                    <Link
-                      href={`/mi-organizacion/miembro/${m.userId}`}
-                      className="btn btn-outline"
-                      style={{ padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
-                      title={`Editar el perfil de ${m.fullName}`}
-                    >
-                      ✎ Perfil
-                    </Link>
-                    <button
-                      onClick={() =>
-                        accion(
-                          () => quitarMiembroAPI(sel!, m.userId),
-                          'Miembro quitado.',
-                          'No se pudo quitar.',
-                        )
-                      }
-                      disabled={ocupado}
-                      className="btn btn-outline"
-                      style={{ color: 'var(--danger)' }}
-                      title={`Quitar a ${m.fullName} del club`}
-                    >
-                      ✕
-                    </button>
-                  </>
-                }
-              />
-            ))}
-            {miembros.length === 0 && (
-              <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                {busquedaGente
-                  ? `Nadie coincide con «${busquedaGente}».`
-                  : 'Sin miembros todavía.'}
-              </li>
-            )}
-          </ul>
-
-          <Paginacion
-            offset={offsetGente}
-            limit={POR_PAGINA}
-            total={totalMiembros}
-            onIr={setOffsetGente}
-          />
-
-          <div className="flex flex-wrap gap-2">
-            <input
-              placeholder="correo@persona.com"
-              type="email"
-              maxLength={200}
-              value={invitacion.email}
-              onChange={(e) => setInvitacion({ ...invitacion, email: e.target.value })}
-              className="min-w-0 flex-1"
-            />
-            <select
-              value={invitacion.role}
-              onChange={(e) => setInvitacion({ ...invitacion, role: e.target.value })}
-            >
-              {rolesPermitidos.map((r) => (
-                <option key={r} value={r}>
-                  {nombreRol(r)}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() =>
+      {/* ── Miembros de la org seleccionada ───────────────────────────── */}
+      <section className="card mt-5 p-5">
+        <h2 className="mb-1 text-lg font-semibold">
+          {orgSel ? `Gente de ${orgSel.name}` : 'Miembros'}
+        </h2>
+        {orgSel && (
+          <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+            {esOrgGrande(orgSel.type)
+              ? 'Como organización agregas administradores y jueces. Los competidores los agrega cada club.'
+              : 'Como club agregas maestros, coaches y competidores. Los jueces los agrega la organización.'}
+          </p>
+        )}
+        {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría «sin
+            miembros» con los resultados esperando en la 1. */}
+        <input
+          value={busquedaGente}
+          onChange={(e) => {
+            setBusquedaGente(e.target.value);
+            setOffsetGente(0);
+          }}
+          placeholder="Buscar por nombre o correo…"
+          aria-label="Buscar entre la gente del club"
+          className="mb-3"
+        />
+        {/* Dos columnas en pantalla ancha. Con veinte alumnos por página, una
+          sola columna era una tira de dos pantallas de alto con la mitad
+          derecha del monitor vacía; en el celular sigue siendo una. */}
+      <ul className="mb-4 grid gap-2 lg:grid-cols-2">
+          {miembros.map((m) => (
+            <FilaMiembro
+              key={m.memberId}
+              miembro={m}
+              asignables={rolesPermitidos}
+              ocupado={ocupado}
+              onCambiarRol={(rol) =>
                 accion(
-                  () => invitarMiembroAPI(sel!, invitacion.email.trim(), invitacion.role),
-                  'Miembro añadido.',
-                  'No se pudo añadir (¿existe la cuenta?).',
+                  () => cambiarRolMiembroAPI(sel!, m.userId, rol),
+                  'Rol actualizado.',
+                  'No se pudo cambiar el rol.',
                 )
               }
-              disabled={ocupado || !sel || !invitacion.email.trim()}
-              className="btn btn-gold"
-            >
-              + Añadir
-            </button>
+              acciones={
+                <>
+                  {/* El gestor edita el perfil del miembro (nombre,
+                      nacimiento, cinturón, tipo de sangre…) */}
+                  <Link
+                    href={`/mi-organizacion/miembro/${m.userId}`}
+                    className="btn btn-outline"
+                    style={{ padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
+                    title={`Editar el perfil de ${m.fullName}`}
+                  >
+                    ✎ Perfil
+                  </Link>
+                  <button
+                    onClick={() =>
+                      accion(
+                        () => quitarMiembroAPI(sel!, m.userId),
+                        'Miembro quitado.',
+                        'No se pudo quitar.',
+                      )
+                    }
+                    disabled={ocupado}
+                    className="btn btn-outline"
+                    style={{ color: 'var(--danger)' }}
+                    title={`Quitar a ${m.fullName} del club`}
+                  >
+                    ✕
+                  </button>
+                </>
+              }
+            />
+          ))}
+          {miembros.length === 0 && (
+            <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              {busquedaGente
+                ? `Nadie coincide con «${busquedaGente}».`
+                : 'Sin miembros todavía.'}
+            </li>
+          )}
+        </ul>
+
+        <Paginacion
+          offset={offsetGente}
+          limit={POR_PAGINA}
+          total={totalMiembros}
+          onIr={setOffsetGente}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <input
+            placeholder="correo@persona.com"
+            type="email"
+            maxLength={200}
+            value={invitacion.email}
+            onChange={(e) => setInvitacion({ ...invitacion, email: e.target.value })}
+            className="min-w-0 flex-1"
+          />
+          <select
+            value={invitacion.role}
+            onChange={(e) => setInvitacion({ ...invitacion, role: e.target.value })}
+          >
+            {rolesPermitidos.map((r) => (
+              <option key={r} value={r}>
+                {nombreRol(r)}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() =>
+              accion(
+                () => invitarMiembroAPI(sel!, invitacion.email.trim(), invitacion.role),
+                'Miembro añadido.',
+                'No se pudo añadir (¿existe la cuenta?).',
+              )
+            }
+            disabled={ocupado || !sel || !invitacion.email.trim()}
+            className="btn btn-gold"
+          >
+            + Añadir
+          </button>
+        </div>
+      </section>
+
+      {/* ── Ficha del club (la ven los miembros en «Mi club») ──────────────
+          Sección propia y a lo ancho, no un apéndice colgado del final de la
+          lista de gente. Son once campos: metidos en media pantalla salían uno
+          debajo de otro en una columna de cuatro dedos de ancho, con la mitad
+          derecha del monitor en blanco. */}
+      {orgSel && (
+        <section className="card mt-5 p-5">
+          <h2 className="mb-1 text-lg font-semibold">Ficha de {orgSel.name}</h2>
+          <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Esta información la ven todos los miembros en «Mi club»: escudo,
+            sede, horarios, contacto y redes.
+          </p>
+
+          {/* ── El escudo del club ──
+              Se pone AQUÍ y en ningún otro sitio. Membresías tenía su propio
+              botón para cambiarlo y ya no: dos sitios donde poner la misma
+              imagen son dos escudos distintos para el mismo club, según por
+              qué puerta se entre. */}
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            {ficha.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={ficha.logoUrl}
+                alt="Escudo del club"
+                className="h-16 w-16 rounded-xl object-cover"
+                style={{ border: '2px solid var(--gold-dim)' }}
+              />
+            ) : (
+              <div
+                className="flex h-16 w-16 items-center justify-center rounded-xl text-2xl"
+                style={{ background: 'var(--bg-elevated)', border: '2px dashed var(--border)' }}
+              >
+                🛡
+              </div>
+            )}
+            <label className="btn btn-outline btn-sm cursor-pointer">
+              {ficha.logoUrl ? 'Cambiar escudo' : 'Subir escudo'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  void comprimirAvatar(f, 256).then((data) =>
+                    setFicha((cur) => ({ ...cur, logoUrl: data })),
+                  );
+                }}
+              />
+            </label>
+            {ficha.logoUrl && (
+              <button
+                type="button"
+                onClick={() => setFicha((cur) => ({ ...cur, logoUrl: '' }))}
+                className="btn btn-outline btn-sm"
+              >
+                Quitar escudo
+              </button>
+            )}
           </div>
 
-          {/* ── Ficha del club (la ven los miembros en «Mi club») ─────────── */}
-          {orgSel && (
-            <div className="mt-6 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-              <h3 className="mb-1 text-sm font-semibold">Ficha de {orgSel.name}</h3>
-              <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Esta información la ven todos los miembros en «Mi club»: logo,
-                sede, horarios, contacto y redes.
-              </p>
+          <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Dirección / sede</span>
+              <input
+                className="mt-1"
+                value={ficha.address}
+                maxLength={200}
+                onChange={(e) => setFicha({ ...ficha, address: e.target.value })}
+              />
+            </label>
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Teléfono (solo números)</span>
+              <input
+                className="mt-1"
+                type="tel"
+                inputMode="tel"
+                value={ficha.phone}
+                onChange={(e) => setFicha({ ...ficha, phone: soloTelefono(e.target.value) })}
+              />
+            </label>
+            {/* País y ciudad, los dos del catálogo. Ver `components/PaisCiudad`:
+                escritos a mano acababan en cuatro grafías de la misma ciudad, y
+                Campeonatos agrupa comparando ese texto por valor exacto. */}
+            <PaisCiudad
+              pais={ficha.country}
+              ciudad={ficha.city}
+              onChange={(country, city) => setFicha({ ...ficha, country, city })}
+            />
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Correo de contacto</span>
+              <input
+                className="mt-1"
+                type="email"
+                maxLength={200}
+                value={ficha.email}
+                onChange={(e) => setFicha({ ...ficha, email: e.target.value })}
+              />
+            </label>
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Red social (enlace)</span>
+              <input
+                className="mt-1"
+                type="url"
+                value={ficha.red1}
+                onChange={(e) => setFicha({ ...ficha, red1: e.target.value })}
+                placeholder="https://instagram.com/tuclub"
+              />
+            </label>
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Otra red social (enlace)</span>
+              <input
+                className="mt-1"
+                type="url"
+                value={ficha.red2}
+                onChange={(e) => setFicha({ ...ficha, red2: e.target.value })}
+                placeholder="https://facebook.com/tuclub"
+              />
+            </label>
+          </div>
 
-              {/* Logo del club */}
-              <div className="mb-3 flex flex-wrap items-center gap-3">
-                {ficha.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={ficha.logoUrl}
-                    alt="Logo"
-                    className="h-14 w-14 rounded-xl object-cover"
-                    style={{ border: '2px solid var(--gold-dim)' }}
-                  />
-                ) : (
-                  <div
-                    className="flex h-14 w-14 items-center justify-center rounded-xl text-xl"
-                    style={{ background: 'var(--bg-elevated)', border: '2px dashed var(--border)' }}
-                  >
-                    🛡
-                  </div>
-                )}
-                <label className="btn btn-outline btn-sm cursor-pointer">
-                  {ficha.logoUrl ? 'Cambiar logo' : 'Subir logo'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      void comprimirAvatar(f, 256).then((data) =>
-                        setFicha((cur) => ({ ...cur, logoUrl: data })),
-                      );
-                    }}
-                  />
-                </label>
-                {ficha.logoUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setFicha((cur) => ({ ...cur, logoUrl: '' }))}
-                    className="btn btn-outline btn-sm"
-                  >
-                    Quitar
-                  </button>
-                )}
-              </div>
+          <div className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Horarios de clase</span>
+              <textarea
+                className="mt-1"
+                rows={3}
+                value={ficha.schedule}
+                onChange={(e) => setFicha({ ...ficha, schedule: e.target.value })}
+                placeholder={'Lun-Mié-Vie 6-8pm (infantil)\nMar-Jue 8-10pm (adultos)'}
+              />
+            </label>
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Descripción</span>
+              <textarea
+                className="mt-1"
+                rows={3}
+                value={ficha.description}
+                onChange={(e) => setFicha({ ...ficha, description: e.target.value })}
+                placeholder="Qué se entrena, para quién, desde cuándo…"
+              />
+            </label>
+          </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Dirección / sede</span>
-                  <input
-                    className="mt-1"
-                    value={ficha.address}
-                    maxLength={200}
-                    onChange={(e) => setFicha({ ...ficha, address: e.target.value })}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Ciudad</span>
-                  <input
-                    className="mt-1"
-                    value={ficha.city}
-                    maxLength={100}
-                    onChange={(e) => setFicha({ ...ficha, city: e.target.value })}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Teléfono (solo números)</span>
-                  <input
-                    className="mt-1"
-                    type="tel"
-                    inputMode="tel"
-                    value={ficha.phone}
-                    onChange={(e) => setFicha({ ...ficha, phone: soloTelefono(e.target.value) })}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Correo de contacto</span>
-                  <input
-                    className="mt-1"
-                    type="email"
-                    maxLength={200}
-                    value={ficha.email}
-                    onChange={(e) => setFicha({ ...ficha, email: e.target.value })}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>País</span>
-                  <input
-                    className="mt-1"
-                    maxLength={100}
-                    value={ficha.country}
-                    onChange={(e) => setFicha({ ...ficha, country: e.target.value })}
-                  />
-                </label>
-                {/* ── Delegación ──
-                    No es lo mismo que la ciudad, y por eso son dos campos: un
-                    dojang de Cali puede responder a una delegación de otro
-                    departamento —o de otro país—. Campeonatos lo pide desde
-                    siempre al dar de alta un maestro, y de ahí salen las
-                    agrupaciones de sus reportes. Si se rellenara luego, no se
-                    rellenaría nunca: habría que buscarla club por club. */}
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Delegación</span>
-                  <input
-                    className="mt-1"
-                    maxLength={120}
-                    placeholder="A qué delegación responde el club"
-                    value={ficha.delegation}
-                    onChange={(e) => setFicha({ ...ficha, delegation: e.target.value })}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>País de la delegación</span>
-                  <input
-                    className="mt-1"
-                    maxLength={100}
-                    placeholder="Si es distinto al del club"
-                    value={ficha.delegationCountry}
-                    onChange={(e) =>
-                      setFicha({ ...ficha, delegationCountry: e.target.value })
-                    }
-                  />
-                </label>
-              </div>
-              <label className="mt-3 block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>Horarios de clase</span>
-                <textarea
-                  className="mt-1"
-                  rows={2}
-                  value={ficha.schedule}
-                  onChange={(e) => setFicha({ ...ficha, schedule: e.target.value })}
-                  placeholder={'Lun-Mié-Vie 6-8pm (infantil)\nMar-Jue 8-10pm (adultos)'}
-                />
-              </label>
-              <label className="mt-3 block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>Descripción</span>
-                <textarea
-                  className="mt-1"
-                  rows={2}
-                  value={ficha.description}
-                  onChange={(e) => setFicha({ ...ficha, description: e.target.value })}
-                />
-              </label>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Red social (enlace)</span>
-                  <input
-                    className="mt-1"
-                    type="url"
-                    value={ficha.red1}
-                    onChange={(e) => setFicha({ ...ficha, red1: e.target.value })}
-                    placeholder="https://instagram.com/tuclub"
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Otra red social (enlace)</span>
-                  <input
-                    className="mt-1"
-                    type="url"
-                    value={ficha.red2}
-                    onChange={(e) => setFicha({ ...ficha, red2: e.target.value })}
-                    placeholder="https://facebook.com/tuclub"
-                  />
-                </label>
-              </div>
-              {/* ── Directorio público ──
-                  Apagado por defecto y con la advertencia delante: la ficha
-                  lleva teléfono y dirección, y publicarlos tiene que ser un
-                  acto deliberado del maestro, no el efecto secundario de haber
-                  rellenado un formulario. Lo que se publica es la ficha de
-                  contacto del club — nunca su gente. */}
-              <label className="mt-3 flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  style={{ width: 'auto' }}
-                  checked={ficha.isPublic}
-                  onChange={(e) => setFicha({ ...ficha, isPublic: e.target.checked })}
-                />
-                <span>
-                  Mostrar este club en el directorio público de DINAMYT
-                  <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Se publican el nombre, la ciudad, el contacto y el logo. Tus
-                    alumnos no aparecen nunca.
-                  </span>
-                </span>
-              </label>
+          {/* ── Directorio público ──
+              Apagado por defecto y con la advertencia delante: la ficha lleva
+              teléfono y dirección, y publicarlos tiene que ser un acto
+              deliberado del maestro, no el efecto secundario de haber
+              rellenado un formulario. Lo que se publica es la ficha de
+              contacto del club — nunca su gente. */}
+          <label className="mt-4 flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              style={{ width: 'auto' }}
+              checked={ficha.isPublic}
+              onChange={(e) => setFicha({ ...ficha, isPublic: e.target.checked })}
+            />
+            <span>
+              Mostrar este club en el directorio público de DINAMYT
+              <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
+                Se publican el nombre, la ciudad, el contacto y el escudo. Tus
+                alumnos no aparecen nunca.
+              </span>
+            </span>
+          </label>
 
-              <button
-                onClick={() =>
-                  accion(
-                    () =>
-                      actualizarOrgInfoAPI(sel!, {
-                        description: ficha.description || null,
-                        address: ficha.address || null,
-                        schedule: ficha.schedule || null,
-                        phone: ficha.phone || null,
-                        email: ficha.email || null,
-                        city: ficha.city || null,
-                        country: ficha.country || null,
-                        delegation: ficha.delegation || null,
-                        delegationCountry: ficha.delegationCountry || null,
-                        isPublic: ficha.isPublic,
-                        logoUrl: ficha.logoUrl || null,
-                        socialLinks: [ficha.red1.trim(), ficha.red2.trim()].filter(Boolean),
-                      }),
-                    'Ficha guardada: tus miembros ya la ven en «Mi club».',
-                    'No se pudo guardar la ficha.',
-                  )
-                }
-                disabled={ocupado}
-                className="btn btn-gold mt-3"
-              >
-                Guardar ficha
-              </button>
-            </div>
-          )}
+          <button
+            onClick={() =>
+              accion(
+                () =>
+                  actualizarOrgInfoAPI(sel!, {
+                    description: ficha.description || null,
+                    address: ficha.address || null,
+                    schedule: ficha.schedule || null,
+                    phone: ficha.phone || null,
+                    email: ficha.email || null,
+                    city: ficha.city || null,
+                    country: ficha.country || null,
+                    isPublic: ficha.isPublic,
+                    logoUrl: ficha.logoUrl || null,
+                    socialLinks: [ficha.red1.trim(), ficha.red2.trim()].filter(Boolean),
+                  }),
+                'Ficha guardada: tus miembros ya la ven en «Mi club».',
+                'No se pudo guardar la ficha.',
+              )
+            }
+            disabled={ocupado}
+            className="btn btn-gold mt-4"
+          >
+            Guardar ficha
+          </button>
         </section>
-      </div>
+      )}
     </main>
   );
 }
