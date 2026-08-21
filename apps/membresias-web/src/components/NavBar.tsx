@@ -4,10 +4,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { claveRol, useAuth } from '@/lib/auth';
+import { vinoDelPortal } from '@/lib/api';
 import { IDIOMAS, useI18n, type ClaveTexto } from '@/lib/i18n';
 import { aplicarTema, getTema, type Tema } from '@/lib/theme';
 import { Avatar } from './Avatar';
 import { Avisos } from './Avisos';
+
+const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 
 /**
  * Barra de navegación.
@@ -157,12 +160,38 @@ export function NavBar() {
     setTema(nuevo);
   }
 
-  // Se espera al logout antes de navegar: la cookie de sesión la borra el
-  // servidor, y si se cambia de página antes el navegador puede cancelar la
-  // petición y dejar la sesión viva en la API.
+  /**
+   * Salir de verdad — y eso incluye al portal si fue él quien te dejó entrar.
+   *
+   * Se espera al logout antes de navegar: la cookie de sesión la borra el
+   * servidor, y si se cambia de página antes el navegador puede cancelar la
+   * petición y dejar la sesión viva en la API.
+   *
+   * ── Por qué hay que ir hasta el portal ──
+   *
+   * La sesión del portal vive en SU dominio, y ningún navegador deja que esta
+   * app la toque. Cerrando solo la de aquí, el portal seguía reconociéndote:
+   * pulsabas «entrar con DINAMYT» y te devolvía un token nuevo al instante, sin
+   * preguntar nada ni enseñar una sola pantalla. Salir y volver a estar dentro,
+   * una y otra vez — que es exactamente como se ve un botón de salir roto,
+   * aunque el de aquí hiciera su trabajo.
+   *
+   * `vinoDelPortal()` se lee ANTES del logout: `cerrarSesion()` borra esa marca
+   * junto con lo demás, y después ya no hay a quién preguntarle.
+   *
+   * A quien entró con su contraseña no se le manda al portal: no tiene ninguna
+   * sesión allí que cerrar, y el viaje solo le enseñaría un dominio que no
+   * pidió.
+   */
   async function salir() {
+    const porElPortal = vinoDelPortal() && Boolean(PORTAL_URL);
     await logout();
     setAbierto(false);
+    if (porElPortal) {
+      const vuelta = encodeURIComponent(`${window.location.origin}/login`);
+      window.location.href = `${PORTAL_URL}/salir?redirect=${vuelta}`;
+      return;
+    }
     router.replace('/login');
   }
 

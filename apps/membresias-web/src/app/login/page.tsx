@@ -11,6 +11,34 @@ import { ControlesApariencia } from '@/components/ControlesApariencia';
 
 const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 
+/**
+ * Quita el token de la barra de direcciones — **sin romper el router**.
+ *
+ * Los dos tokens que llegan por aquí (el `?acceso=` del QR y el `#token=` del
+ * portal) no pueden quedarse escritos: se guardan en el historial del
+ * navegador y salen en cualquier captura de pantalla. Hasta aquí, todo bien.
+ *
+ * ── La trampa está en el PRIMER argumento ──
+ *
+ * Esto se hacía con `replaceState(null, …)`, y ese `null` es el fallo: Next
+ * guarda el estado de su router DENTRO de la entrada del historial, y pasar
+ * `null` lo borra. A partir de ese momento el router pierde el hilo y
+ * **`router.replace()` deja de navegar**: no lanza, no avisa, simplemente no
+ * hace nada.
+ *
+ * El síntoma era desconcertante porque aparecía lejos de aquí: entrabas por el
+ * portal, y al pulsar «Salir» —en otra pantalla, minutos después— no pasaba
+ * nada. Con F5 funcionaba, porque una recarga entera reconstruye el router.
+ * Entrando con contraseña no fallaba nunca: por ese camino nadie toca el
+ * historial.
+ *
+ * Pasando `window.history.state` se conserva lo que Next tenía puesto y solo
+ * cambia la dirección, que es lo único que se quería cambiar.
+ */
+function limpiarLaBarraDeDirecciones() {
+  window.history.replaceState(window.history.state, '', window.location.pathname);
+}
+
 export default function Login() {
   const router = useRouter();
   const { t } = useI18n();
@@ -42,7 +70,7 @@ export default function Login() {
     if (!codigo) return;
 
     setConCodigo(true);
-    window.history.replaceState(null, '', window.location.pathname);
+    limpiarLaBarraDeDirecciones();
     loginConCodigo(codigo)
       .then((u) => router.replace(rutaInicio(u)))
       .catch((err) => {
@@ -85,9 +113,7 @@ export default function Login() {
     if (!token) return;
 
     setConCodigo(true);
-    // El token fuera de la barra de direcciones en cuanto se lee: si no, se
-    // queda en el historial y en cualquier captura de pantalla.
-    window.history.replaceState(null, '', window.location.pathname);
+    limpiarLaBarraDeDirecciones();
     loginConSso(token)
       .then((u) => router.replace(rutaInicio(u)))
       .catch((err) => {
