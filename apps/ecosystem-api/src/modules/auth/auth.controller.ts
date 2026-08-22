@@ -3,7 +3,7 @@ import {
   Post,
   Body,
   Get,
-  Headers,
+  Query,
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
@@ -50,10 +50,33 @@ export class AuthController {
     });
   }
 
+  // El código se canjea por CORREO. `userId` se sigue aceptando para las
+  // cuentas creadas antes del registro en dos actos (ver AuthService).
   @Throttle({ global: { limit: 6, ttl: 60_000 } })
   @Post('verify-email')
-  verifyEmail(@Body() body: { userId: string; code: string }) {
-    return this.authService.verifyEmail(body.userId, body.code);
+  verifyEmail(@Body() body: { email?: string; userId?: string; code: string }) {
+    return this.authService.verifyEmail(body);
+  }
+
+  // Reenviar el código del registro. El freno de verdad —la espera entre
+  // envíos y el tope— está en el servicio; esto es el techo por IP.
+  @Throttle({ global: { limit: 5, ttl: 60_000 } })
+  @Post('resend-code')
+  resendCode(@Body() body: { email: string }) {
+    return this.authService.reenviarCodigo(body?.email);
+  }
+
+  // ¿Está libre este correo / este documento? Lo pregunta el formulario del
+  // portal MIENTRAS se escribe, para no descubrir el choque al pulsar «crear
+  // cuenta» con todo el formulario ya lleno. Límite generoso porque se llama
+  // una vez por campo terminado, pero límite al fin: no es una lista.
+  @Throttle({ global: { limit: 30, ttl: 60_000 } })
+  @Get('disponibilidad')
+  disponibilidad(
+    @Query('email') email?: string,
+    @Query('documentId') documentId?: string,
+  ) {
+    return this.authService.disponibilidad({ email, documentId });
   }
 
   @Throttle({ global: { limit: 10, ttl: 60_000 } })
@@ -95,13 +118,10 @@ export class AuthController {
   @Throttle({ global: { limit: 6, ttl: 60_000 } })
   @Post('reset-password')
   resetPassword(
-    @Body() body: { userId: string; code: string; newPassword: string },
+    @Body()
+    body: { email?: string; userId?: string; code: string; newPassword: string },
   ) {
-    return this.authService.resetPassword(
-      body.userId,
-      body.code,
-      body.newPassword,
-    );
+    return this.authService.resetPassword(body);
   }
 
   // ── POST /auth/set-password — canjear el enlace de invitación ─────────────

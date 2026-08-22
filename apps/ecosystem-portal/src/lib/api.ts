@@ -38,7 +38,17 @@ api.interceptors.response.use(
 );
 
 const TOKEN_KEY = 'dinamyt_token';
-const PENDING_USER_KEY = 'dinamyt_pending_user';
+/**
+ * El registro que espera su código. **Es el CORREO, no un id de usuario.**
+ *
+ * Antes se guardaba aquí el `userId` que devolvía el registro, y la pantalla de
+ * verificación lo enseñaba en un campo etiquetado «ID de usuario» — un dato
+ * interno, que no significa nada para quien lo lee y que nadie sabía de dónde
+ * sacar si se perdía. Ahora ni existe: la cuenta no se crea hasta que el código
+ * se teclea, así que lo único que hay que recordar entre las dos pantallas es a
+ * qué correo salió y cuándo caduca.
+ */
+const PENDING_KEY = 'dinamyt_registro_pendiente';
 
 /**
  * Margen contra el reloj del navegador. Un reloj adelantado unos segundos
@@ -95,14 +105,53 @@ export function sesionActual(): TokenPayload | null {
 export function cerrarSesion() {
   if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);
 }
-export function guardarUsuarioPendiente(userId: string) {
-  if (typeof window !== 'undefined')
-    localStorage.setItem(PENDING_USER_KEY, userId);
+export interface RegistroEnEspera {
+  email: string;
+  /** ISO. Pasada esta hora el registro ya no existe en el servidor. */
+  expiresAt: string;
+  /**
+   * `false` = la API no tiene proveedor de correo configurado y el código NO
+   * salió a ningún sitio (ver `MailerService`: sin `SMTP_HOST` la función de
+   * correo no existe, y es un estado válido). Se guarda para poder DECIRLO en
+   * la pantalla del código, en vez de dejar a alguien esperando un correo que
+   * nadie mandó.
+   */
+  enviado?: boolean;
 }
-export function obtenerUsuarioPendiente(): string | null {
-  return typeof window !== 'undefined'
-    ? localStorage.getItem(PENDING_USER_KEY)
-    : null;
+
+export function guardarRegistroPendiente(datos: RegistroEnEspera) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(datos));
+  }
+}
+
+/**
+ * El registro a la espera, o `null` si no hay o si ya caducó.
+ *
+ * Caducado se descarta aquí mismo, igual que con el token: enseñar la pantalla
+ * de «escribe tu código» para un registro que el servidor ya borró es mandar a
+ * alguien a teclear seis dígitos que no van a servir.
+ */
+export function obtenerRegistroPendiente(): RegistroEnEspera | null {
+  if (typeof window === 'undefined') return null;
+  const crudo = localStorage.getItem(PENDING_KEY);
+  if (!crudo) return null;
+  try {
+    const datos = JSON.parse(crudo) as RegistroEnEspera;
+    if (!datos?.email) return null;
+    if (datos.expiresAt && new Date(datos.expiresAt).getTime() < Date.now()) {
+      localStorage.removeItem(PENDING_KEY);
+      return null;
+    }
+    return datos;
+  } catch {
+    localStorage.removeItem(PENDING_KEY);
+    return null;
+  }
+}
+
+export function olvidarRegistroPendiente() {
+  if (typeof window !== 'undefined') localStorage.removeItem(PENDING_KEY);
 }
 
 export interface TokenPayload {
@@ -134,6 +183,13 @@ export async function loginAPI(email: string, password: string) {
   return res.data as { access_token: string };
 }
 
+/**
+ * Crear cuenta. **No crea la cuenta**: crea un registro a la espera del código.
+ *
+ * La API ya no devuelve un `userId` —no hay usuario todavía— sino el correo al
+ * que salió el código y cuándo caduca. Es justo lo que la pantalla siguiente
+ * necesita enseñar.
+ */
 export async function registerAPI(data: {
   email: string;
   password: string;
@@ -147,7 +203,36 @@ export async function registerAPI(data: {
   dataConsent: boolean;
 }) {
   const res = await api.post('/auth/register', data);
-  return res.data as { message: string; userId: string };
+  return res.data as RegistroPendiente;
+}
+
+export interface RegistroPendiente {
+  message: string;
+  email: string;
+  /** ISO. Cuando pase, el registro se borra y hay que empezar de nuevo. */
+  expiresAt: string;
+  codigoDigitos: number;
+  /** `false` = el servidor no tiene proveedor de correo configurado. */
+  enviado: boolean;
+}
+
+/**
+ * ¿Está libre este correo / este documento?
+ *
+ * Se pregunta mientras se llena el formulario para no descubrir el choque al
+ * pulsar «crear cuenta», que era lo que pasaba. Un fallo aquí NO es un error de
+ * la pantalla: si la red falla, el formulario sigue funcionando y quien decide
+ * es el servidor al enviar.
+ */
+export async function disponibilidadAPI(params: {
+  email?: string;
+  documentId?: string;
+}): Promise<{
+  email?: { libre: boolean; motivo?: string };
+  documentId?: { libre: boolean; motivo?: string };
+}> {
+  const res = await api.get('/auth/disponibilidad', { params });
+  return res.data;
 }
 
 /**
@@ -160,9 +245,39 @@ export async function ponerContrasenaAPI(token: string, password: string) {
   return res.data as { message: string; email: string };
 }
 
-export async function verifyEmailAPI(userId: string, code: string) {
-  const res = await api.post('/auth/verify-email', { userId, code });
-  return res.data as { message: string };
+/**
+ * El código del correo. **Aquí es donde nace la cuenta**, así que la respuesta
+ * trae ya la sesión: el código llegó a ese buzón y alguien lo tecleó, que es
+ * toda la prueba que existe de que la dirección es suya. Pedirle además la
+ * contraseña que acaba de elegir sería preguntar dos veces.
+ */
+export async function verifyEmailAPI(email: string, code: string) {
+  const res = await api.post('/auth/verify-email', { email, code });
+  return res.data as { message: string; email: string; access_token?: string };
+}
+
+export async function reenviarCodigoAPI(email: string) {
+  const res = await api.post('/auth/resend-code', { email });
+  return res.data as RegistroPendiente;
+}
+
+/** Manda el código de recuperación. Responde igual exista o no el correo. */
+export async function olvideContrasenaAPI(email: string) {
+  const res = await api.post('/auth/forgot-password', { email });
+  return res.data as { message: string; codigoDigitos: number };
+}
+
+export async function resetearContrasenaAPI(
+  email: string,
+  code: string,
+  newPassword: string,
+) {
+  const res = await api.post('/auth/reset-password', {
+    email,
+    code,
+    newPassword,
+  });
+  return res.data as { message: string; email: string };
 }
 
 export interface Plan {

@@ -16,11 +16,13 @@ import {
 } from '../../db/schema';
 import { eq, and, gt, InferSelectModel } from 'drizzle-orm';
 import {
-  validarNombre,
+  validarNombreCompleto,
   validarDocumento,
   validarTelefono,
   validarFechaNacimiento,
   validarGenero,
+  validarCorreo,
+  validarContrasena,
 } from '../../common/validacion';
 
 type User = InferSelectModel<typeof users>;
@@ -45,7 +47,21 @@ export class AuthService {
     private readonly mailer: MailerService,
   ) {}
 
-  // ── Registro ─────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+  // REGISTRO — en dos actos, porque la cuenta la crea el CÓDIGO
+  //
+  // Antes esto insertaba la fila en `users` y la dejaba sin verificar. La
+  // cuenta existía sin que nadie hubiera demostrado que el correo era suyo, y
+  // con ella quedaban ocupados para siempre el correo Y el documento: quien
+  // tecleó mal su correo —el caso normal— no podía volver a registrarse con el
+  // bueno, porque su documento ya estaba cogido por la cuenta fantasma. La
+  // única salida era el super-admin.
+  //
+  // Ahora `register` guarda un REGISTRO PENDIENTE con fecha de caducidad
+  // (`pending_registrations`, ver el esquema) y `verifyEmail` es quien crea la
+  // cuenta. Si el código no se usa a tiempo, la fila se borra sola y el correo
+  // y el documento vuelven a estar libres.
+  // ════════════════════════════════════════════════════════════════════════
   async register(data: {
     email: string;
     password: string;
@@ -62,30 +78,91 @@ export class AuthService {
       );
     }
 
-    // Validación + normalización: el nombre se guarda SIEMPRE en mayúsculas
-    // (así aparece igual en carnets, llaves y planillas de todas las apps).
-    data.fullName = validarNombre(data.fullName, 'nombre completo')
-      .toLocaleUpperCase('es');
-    data.documentId = validarDocumento(data.documentId);
-    if (data.phone) data.phone = validarTelefono(data.phone);
+    // Validación + normalización. El correo se comprueba entero —dominio
+    // incluido—, el nombre tiene que ir completo y la contraseña tiene que ser
+    // una contraseña; el portal aplica LAS MISMAS reglas mientras se teclea,
+    // así que llegar aquí con algo inválido es cosa de quien llama a la API sin
+    // pasar por la web. El nombre se guarda SIEMPRE en mayúsculas (así aparece
+    // igual en carnets, llaves y planillas de las tres apps).
+    const email = validarCorreo(data.email);
+    const fullName = validarNombreCompleto(data.fullName).toLocaleUpperCase(
+      'es',
+    );
+    const documentId = validarDocumento(data.documentId);
+    const phone = data.phone ? validarTelefono(data.phone) : null;
     if (data.birthDate) validarFechaNacimiento(data.birthDate);
-    if (data.gender) data.gender = validarGenero(data.gender);
+    const gender = data.gender ? validarGenero(data.gender) : null;
+    // El contexto es lo que acaba de teclear: su contraseña no puede ser su
+    // propio nombre ni su documento, que es justo lo que la gente elige.
+    validarContrasena(data.password, [email, fullName, documentId]);
 
-    const existing = await this.usersService.findByEmail(data.email);
-    if (existing) {
+    // Lo primero, tirar lo caducado: así el correo y el documento de un
+    // registro abandonado quedan libres en el mismo momento en que alguien los
+    // pide, sin depender de ningún temporizador.
+    await this.usersService.purgarRegistrosPendientes();
+
+    await this.comprobarQueEstanLibres(email, documentId);
+
+    const passwordHash = await this.usersService.hashearContrasena(
+      data.password,
+    );
+    const { fila, code } = await this.usersService.crearRegistroPendiente({
+      email,
+      passwordHash,
+      fullName,
+      documentId,
+      phone,
+      birthDate: data.birthDate ?? null,
+      gender,
+    });
+
+    const enviado = await this.mailer.sendOtp(email, code, 'EMAIL_VERIFY');
+
+    return {
+      message: `Te enviamos un código de ${AuthService.CODIGO_DIGITOS} dígitos a ${email}.`,
+      // El correo, y NO un id de usuario: no hay usuario todavía, y la pantalla
+      // siguiente lo que necesita enseñar es a dónde va a llegar el código.
+      email,
+      expiresAt: fila.expiresAt,
+      codigoDigitos: AuthService.CODIGO_DIGITOS,
+      /** `false` = no hay proveedor de correo configurado (ver MailerService). */
+      enviado,
+    };
+  }
+
+  /** Los dígitos del código. Uno solo aquí y el portal lo pinta con esto. */
+  static readonly CODIGO_DIGITOS = 6;
+
+  /**
+   * ¿Están libres el correo y el documento? Los dos, y en este orden.
+   *
+   * El documento no se comprobaba: `users.document_id` es `unique` desde la
+   * primera migración, así que la segunda persona con el mismo documento
+   * chocaba contra PostgreSQL y recibía un 500 sin explicación.
+   */
+  private async comprobarQueEstanLibres(email: string, documentId: string) {
+    const cuenta = await this.usersService.findByEmail(email);
+    if (cuenta) {
+      throw new BadRequestException(AuthService.mensajeCuentaExistente(cuenta));
+    }
+
+    const conDocumento = await this.usersService.findByDocument(documentId);
+    if (conDocumento) {
       throw new BadRequestException(
-        AuthService.mensajeCuentaExistente(existing),
+        'Ya hay una cuenta de DINAMYT con ese documento. Si es tuya, inicia sesión con su correo o usa «¿Olvidaste tu contraseña?»; si crees que es un error, escríbele a tu club.',
       );
     }
 
-    const user = await this.usersService.createUser(data);
-    const code = await this.usersService.generateOtp(user.id, 'EMAIL_VERIFY');
-    await this.mailer.sendOtp(user.email, code, 'EMAIL_VERIFY');
-
-    return {
-      message: 'Usuario registrado. Revisa tu correo para verificar tu cuenta.',
-      userId: user.id,
-    };
+    // Un pendiente de OTRO correo con el mismo documento: alguien se está
+    // registrando con ese documento y aún no ha confirmado. No se le quita el
+    // sitio, pero tampoco se bloquea para siempre — caduca solo.
+    const pendiente =
+      await this.usersService.registroPendientePorDocumento(documentId);
+    if (pendiente && pendiente.email !== email) {
+      throw new BadRequestException(
+        'Hay un registro sin confirmar con ese documento. Si eres tú, termina de confirmarlo con el código que te llegó; si no, vuelve a intentarlo en unos minutos.',
+      );
+    }
   }
 
   /**
@@ -113,22 +190,216 @@ export class AuthService {
       case 'invitacion':
         return 'Ya hay una cuenta con ese correo, todavía sin contraseña. Abre el enlace que te enviamos para ponerla.';
       default:
-        return 'Ya existe una cuenta con ese correo.';
+        return 'Ya existe una cuenta con ese correo. Inicia sesión, o usa «¿Olvidaste tu contraseña?» si no la recuerdas.';
     }
   }
 
-  // ── Verificar OTP de email ────────────────────────────────────────────────
-  async verifyEmail(userId: string, code: string) {
-    const valid = await this.usersService.verifyOtp(
-      userId,
-      code,
-      'EMAIL_VERIFY',
-    );
-    if (!valid) {
-      throw new BadRequestException('Código inválido o expirado.');
+  /**
+   * ¿Está libre este correo / este documento? Lo pregunta el formulario del
+   * portal mientras se escribe, para no descubrir el choque al pulsar «crear
+   * cuenta» —que era lo que pasaba, con todo el formulario ya lleno—.
+   *
+   * **No revela nada que el login no diga ya**: `login` responde «no existe una
+   * cuenta con ese correo» desde siempre, y es una decisión de producto
+   * consciente. Aun así va con su propio límite por IP en el controlador, para
+   * que no se pueda usar como lista.
+   */
+  async disponibilidad(datos: { email?: string; documentId?: string }) {
+    await this.usersService.purgarRegistrosPendientes();
+    const salida: {
+      email?: { libre: boolean; motivo?: string };
+      documentId?: { libre: boolean; motivo?: string };
+    } = {};
+
+    // El correo tal y como lo tecleó quien pregunta. Sirve para dos cosas: para
+    // buscarlo, y para reconocer sus propios datos más abajo.
+    const correoPedido = datos.email ? datos.email.trim().toLowerCase() : null;
+
+    if (correoPedido) {
+      let email: string;
+      try {
+        email = validarCorreo(correoPedido);
+      } catch {
+        // Un correo a medio escribir no es «ocupado»: es que todavía no se
+        // puede preguntar. La forma la valida el propio formulario.
+        return salida;
+      }
+      const cuenta = await this.usersService.findByEmail(email);
+      salida.email = cuenta
+        ? { libre: false, motivo: AuthService.mensajeCuentaExistente(cuenta) }
+        : { libre: true };
     }
-    await this.usersService.markEmailVerified(userId);
-    return { message: 'Correo verificado correctamente.' };
+
+    if (datos.documentId) {
+      const doc = datos.documentId.trim();
+      if (!/^[0-9]{4,20}$/.test(doc)) return salida;
+
+      const cuenta = await this.usersService.findByDocument(doc);
+      const pendiente =
+        await this.usersService.registroPendientePorDocumento(doc);
+
+      // Un pendiente CON EL MISMO CORREO es el de quien está preguntando: se
+      // registró, no le llegó el código y está volviendo a intentarlo con sus
+      // mismos datos. Decirle que su documento está ocupado —por él— dejaría el
+      // formulario bloqueado sin salida, y `register` sí lo deja pasar.
+      const esSuyo = Boolean(pendiente && pendiente.email === correoPedido);
+
+      salida.documentId = cuenta
+        ? {
+            libre: false,
+            motivo:
+              'Ya hay una cuenta de DINAMYT con ese documento. Si es tuya, inicia sesión.',
+          }
+        : pendiente && !esSuyo
+          ? {
+              libre: false,
+              motivo:
+                'Hay un registro sin confirmar con ese documento. Si eres tú, confírmalo con el código que te llegó.',
+            }
+          : { libre: true };
+    }
+
+    return salida;
+  }
+
+  // ── Verificar el correo: AQUÍ nace la cuenta ──────────────────────────────
+  //
+  // Se identifica por CORREO y no por id de usuario. El id era lo que había
+  // —la pantalla llegaba a pedirlo, escrito, a la persona— y además ya no
+  // existe: mientras no se verifique el correo no hay usuario al que apuntar.
+  //
+  // `userId` se sigue aceptando por el camino heredado: las cuentas creadas
+  // antes de este cambio están en `users` sin verificar y tienen que poder
+  // terminar de confirmarse.
+  async verifyEmail(datos: { email?: string; userId?: string; code: string }) {
+    const code = (datos.code ?? '').replace(/\D/g, '');
+    if (code.length !== AuthService.CODIGO_DIGITOS) {
+      throw new BadRequestException(
+        `El código son ${AuthService.CODIGO_DIGITOS} dígitos.`,
+      );
+    }
+
+    await this.usersService.purgarRegistrosPendientes();
+
+    const email = datos.email ? datos.email.trim().toLowerCase() : null;
+    const pendiente = email
+      ? await this.usersService.registroPendientePorCorreo(email)
+      : null;
+
+    if (pendiente) {
+      if (pendiente.code !== code) {
+        const intentos = pendiente.attempts + 1;
+        if (intentos >= UsersService.REGISTRO_MAX_INTENTOS) {
+          // Se tira el registro entero: quien prueba seis códigos no es quien
+          // recibió el correo. El correo y el documento quedan libres.
+          await this.usersService.borrarRegistroPendiente(pendiente.id);
+          throw new BadRequestException(
+            'Demasiados códigos incorrectos. El registro se canceló: vuelve a empezar cuando quieras.',
+          );
+        }
+        await this.usersService.fallarCodigoPendiente(pendiente.id, intentos);
+        const quedan = UsersService.REGISTRO_MAX_INTENTOS - intentos;
+        throw new BadRequestException(
+          `Ese código no es. Te queda${quedan === 1 ? '' : 'n'} ${quedan} intento${quedan === 1 ? '' : 's'}.`,
+        );
+      }
+
+      const usuario = await this.usersService.confirmarRegistroPendiente(
+        pendiente,
+      );
+      // Se entra directo. El código llegó a ese correo y alguien lo tecleó:
+      // esa es toda la prueba que existe de que la dirección es suya, y pedirle
+      // ahora la contraseña que acaba de elegir es preguntar dos veces.
+      return {
+        message: 'Cuenta creada y correo verificado.',
+        email: usuario.email,
+        access_token: await this.buildToken(usuario),
+      };
+    }
+
+    // ── Camino heredado: cuenta ya creada, sin verificar ────────────────────
+    const usuario = email
+      ? await this.usersService.findByEmail(email)
+      : datos.userId
+        ? await this.usersService.findById(datos.userId)
+        : null;
+
+    if (usuario?.isEmailVerified) {
+      throw new BadRequestException(
+        'Ese correo ya está verificado. Inicia sesión.',
+      );
+    }
+    if (usuario) {
+      const valido = await this.usersService.verifyOtp(
+        usuario.id,
+        code,
+        'EMAIL_VERIFY',
+      );
+      if (!valido) throw new BadRequestException('Código inválido o expirado.');
+      await this.usersService.markEmailVerified(usuario.id);
+      return {
+        message: 'Correo verificado correctamente.',
+        email: usuario.email,
+        access_token: await this.buildToken({
+          ...usuario,
+          isEmailVerified: true,
+        }),
+      };
+    }
+
+    throw new BadRequestException(
+      'No hay ningún registro esperando confirmación para ese correo. Puede que haya caducado: vuelve a registrarte.',
+    );
+  }
+
+  /**
+   * Otro código para el mismo registro.
+   *
+   * Con dos frenos, y los dos hacen falta: una espera entre envíos (sin ella el
+   * botón «reenviar» es un grifo abierto contra la cuota diaria de correo) y un
+   * tope de envíos (sin él, el grifo solo va más despacio).
+   */
+  async reenviarCodigo(correo: string) {
+    await this.usersService.purgarRegistrosPendientes();
+    const email = (correo ?? '').trim().toLowerCase();
+    const pendiente = email
+      ? await this.usersService.registroPendientePorCorreo(email)
+      : null;
+
+    if (!pendiente) {
+      throw new BadRequestException(
+        'No hay ningún registro esperando confirmación para ese correo. Puede que haya caducado: vuelve a registrarte.',
+      );
+    }
+    if (pendiente.sends >= UsersService.REGISTRO_MAX_ENVIOS) {
+      throw new BadRequestException(
+        'Ya te enviamos el código varias veces. Revisa la carpeta de correo no deseado, o vuelve a registrarte más tarde.',
+      );
+    }
+
+    const desde = pendiente.lastSentAt?.getTime() ?? 0;
+    const espera = Math.ceil(
+      (desde + UsersService.REGISTRO_ESPERA_REENVIO_SEG * 1000 - Date.now()) /
+        1000,
+    );
+    if (espera > 0) {
+      throw new BadRequestException(
+        `Espera ${espera} segundo${espera === 1 ? '' : 's'} antes de pedir otro código.`,
+      );
+    }
+
+    const { fila, code } = await this.usersService.renovarCodigoPendiente(
+      pendiente.id,
+    );
+    const enviado = await this.mailer.sendOtp(email, code, 'EMAIL_VERIFY');
+
+    return {
+      message: `Te enviamos un código nuevo a ${email}.`,
+      email,
+      expiresAt: fila.expiresAt,
+      codigoDigitos: AuthService.CODIGO_DIGITOS,
+      enviado,
+    };
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -210,7 +481,13 @@ export class AuthService {
     // del ecosistema. Del segundo login en adelante la cuenta ya no depende
     // del hash que trajo la importación. La persona no nota nada.
     if (user.passwordOrigen && user.passwordOrigen !== 'propio') {
-      await this.usersService.updatePassword(user.id, password);
+      // Sin espejo: la contraseña NO cambió, solo el costo con que se guarda.
+      // La copia de Membresías sigue siendo un hash válido de esta misma
+      // contraseña, así que copiarla sería una llamada HTTP por login para
+      // dejar todo igual.
+      await this.usersService.updatePassword(user.id, password, {
+        espejar: false,
+      });
     }
 
     const token = await this.buildToken(user);
@@ -245,42 +522,98 @@ export class AuthService {
       currentPassword,
       user.passwordHash,
     );
-    if (!ok) throw new UnauthorizedException('La contraseña actual no es correcta.');
-    if (!newPassword || newPassword.length < 8) {
-      throw new BadRequestException('La nueva contraseña debe tener al menos 8 caracteres.');
+    if (!ok)
+      throw new UnauthorizedException('La contraseña actual no es correcta.');
+    validarContrasena(newPassword, [
+      user.email,
+      user.fullName,
+      user.documentId,
+    ]);
+    if (newPassword === currentPassword) {
+      throw new BadRequestException(
+        'La contraseña nueva tiene que ser distinta de la actual.',
+      );
     }
     await this.usersService.updatePassword(userId, newPassword);
     return { message: 'Contraseña actualizada.' };
   }
 
   // ── Recuperar contraseña ──────────────────────────────────────────────────
-  async forgotPassword(email: string) {
+  //
+  // La respuesta es SIEMPRE la misma, exista o no el correo. Antes lo decía y
+  // luego se desdecía: cuando el correo existía, la respuesta traía además el
+  // `userId`. Con eso, probar correos ajenos contra este endpoint contestaba a
+  // la pregunta que el mensaje decía no contestar — y encima entregaba el
+  // identificador interno de esa persona.
+  //
+  // El código se canjea por CORREO (ver `resetPassword`), así que no hace falta
+  // devolver nada más que el mensaje.
+  async forgotPassword(correo: string) {
+    const respuesta = {
+      message:
+        'Si ese correo tiene una cuenta de DINAMYT, te acabamos de enviar un código.',
+      codigoDigitos: AuthService.CODIGO_DIGITOS,
+    };
+
+    const email = (correo ?? '').trim().toLowerCase();
+    if (!email) return respuesta;
+
     const user = await this.usersService.findByEmail(email);
-    // Siempre responde igual para no revelar si el correo existe
-    if (!user) {
-      return { message: 'Si ese correo existe, recibirás un código.' };
-    }
+    if (!user) return respuesta;
 
     const code = await this.usersService.generateOtp(user.id, 'PASSWORD_RESET');
     await this.mailer.sendOtp(user.email, code, 'PASSWORD_RESET');
-    return {
-      message: 'Si ese correo existe, recibirás un código.',
-      userId: user.id,
-    };
+    return respuesta;
   }
 
   // ── Resetear contraseña ───────────────────────────────────────────────────
-  async resetPassword(userId: string, code: string, newPassword: string) {
+  //
+  // Por correo, igual que la verificación: quien llega aquí viene de teclear un
+  // código que le llegó a su buzón, no de una pantalla que le pidiera su id.
+  // `userId` se sigue aceptando por si alguna app vieja lo manda.
+  async resetPassword(datos: {
+    email?: string;
+    userId?: string;
+    code: string;
+    newPassword: string;
+  }) {
+    const email = datos.email ? datos.email.trim().toLowerCase() : null;
+    const user = email
+      ? await this.usersService.findByEmail(email)
+      : datos.userId
+        ? await this.usersService.findById(datos.userId)
+        : null;
+
+    // Mismo mensaje que un código malo: si dijera «ese correo no existe», este
+    // endpoint sería la lista de correos que `forgot-password` se niega a dar.
+    if (!user) throw new BadRequestException('Código inválido o expirado.');
+
+    validarContrasena(datos.newPassword, [
+      user.email,
+      user.fullName,
+      user.documentId,
+    ]);
+
     const valid = await this.usersService.verifyOtp(
-      userId,
-      code,
+      user.id,
+      (datos.code ?? '').replace(/\D/g, ''),
       'PASSWORD_RESET',
     );
-    if (!valid) {
-      throw new BadRequestException('Código inválido o expirado.');
+    if (!valid) throw new BadRequestException('Código inválido o expirado.');
+
+    await this.usersService.updatePassword(user.id, datos.newPassword);
+    // Quien recupera su contraseña ha demostrado que el correo es suyo: si la
+    // cuenta estaba bloqueada por intentos fallidos —el motivo más común para
+    // acabar aquí—, dejarla bloqueada la manda a esperar quince minutos por
+    // nada. Y el correo queda verificado por la misma razón.
+    await this.usersService.desbloquearCuenta(user.id);
+    if (!user.isEmailVerified) {
+      await this.usersService.markEmailVerified(user.id);
     }
-    await this.usersService.updatePassword(userId, newPassword);
-    return { message: 'Contraseña actualizada correctamente.' };
+    return {
+      message: 'Contraseña actualizada. Ya puedes iniciar sesión.',
+      email: user.email,
+    };
   }
 
   // ── Poner la contraseña desde el enlace de invitación ─────────────────────
@@ -292,11 +625,6 @@ export class AuthService {
   // está «olvidé mi contraseña», que exige entrar al correo.
   async setPassword(token: string, newPassword: string) {
     if (!token) throw new BadRequestException('Falta el enlace de invitación.');
-    if (!newPassword || newPassword.length < 8) {
-      throw new BadRequestException(
-        'La contraseña debe tener al menos 8 caracteres.',
-      );
-    }
 
     let userId: string;
     try {
@@ -316,6 +644,10 @@ export class AuthService {
         'Esta cuenta ya tiene contraseña. Inicia sesión, o usa «¿Olvidaste tu contraseña?».',
       );
     }
+
+    // Después de comprobar el enlace y no antes: quien llega con un enlace
+    // caducado tiene que enterarse de eso, no de que su contraseña es corta.
+    validarContrasena(newPassword, [user.email, user.fullName, user.documentId]);
 
     await this.usersService.ponerContrasena(userId, newPassword);
     return {

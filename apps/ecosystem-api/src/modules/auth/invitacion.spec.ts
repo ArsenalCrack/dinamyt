@@ -43,9 +43,9 @@ describe('Invitación · poner la contraseña desde el enlace', () => {
   it('pone la contraseña de una cuenta invitada', async () => {
     const { service, ponerContrasena } = armar(invitado);
 
-    const res = await service.setPassword(ENLACE_BUENO, 'unaClaveLarga');
+    const res = await service.setPassword(ENLACE_BUENO, 'UnaClaveLarga7');
 
-    expect(ponerContrasena).toHaveBeenCalledWith(USUARIO, 'unaClaveLarga');
+    expect(ponerContrasena).toHaveBeenCalledWith(USUARIO, 'UnaClaveLarga7');
     expect(res.email).toBe('alumna@dinamyt.org');
   });
 
@@ -64,7 +64,7 @@ describe('Invitación · poner la contraseña desde el enlace', () => {
   it('un enlace inventado o caducado no abre nada', async () => {
     const { service, ponerContrasena } = armar(invitado);
 
-    await expect(service.setPassword('cualquier-cosa', 'unaClaveLarga')).rejects.toThrow(
+    await expect(service.setPassword('cualquier-cosa', 'UnaClaveLarga7')).rejects.toThrow(
       /ya no es válido/i,
     );
     expect(ponerContrasena).not.toHaveBeenCalled();
@@ -73,7 +73,7 @@ describe('Invitación · poner la contraseña desde el enlace', () => {
   it('una cuenta suspendida no se reactiva por el enlace', async () => {
     const { service, ponerContrasena } = armar({ ...invitado, isActive: false });
 
-    await expect(service.setPassword(ENLACE_BUENO, 'unaClaveLarga')).rejects.toThrow(
+    await expect(service.setPassword(ENLACE_BUENO, 'UnaClaveLarga7')).rejects.toThrow(
       /ya no está disponible/i,
     );
     expect(ponerContrasena).not.toHaveBeenCalled();

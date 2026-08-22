@@ -81,11 +81,13 @@ Campeonatos y Membresías (por eso el maestro registra al alumno **una sola vez*
 
 | Método | Ruta                          | Protección            | Descripción                          |
 | ------ | ----------------------------- | --------------------- | ------------------------------------ |
-| POST   | `/auth/register`              | pública               | Registro + envío de OTP              |
-| POST   | `/auth/verify-email`          | pública               | Verifica el OTP de correo            |
+| POST   | `/auth/register`              | pública               | **No crea la cuenta**: deja un registro pendiente (caduca a los 20 min) y manda el código |
+| POST   | `/auth/verify-email`          | pública               | `{ email, code }` → **aquí nace la cuenta**, y devuelve `access_token` |
+| POST   | `/auth/resend-code`           | pública               | Otro código para el mismo registro (espera de 60 s, máx. 5 envíos) |
+| GET    | `/auth/disponibilidad`        | pública               | `?email=&documentId=` → si están libres (lo consulta el formulario) |
 | POST   | `/auth/login`                 | pública               | Devuelve `{ access_token }`          |
-| POST   | `/auth/forgot-password`       | pública               | Envía OTP de recuperación            |
-| POST   | `/auth/reset-password`        | pública               | Establece nueva contraseña           |
+| POST   | `/auth/forgot-password`       | pública               | Envía OTP de recuperación (responde igual exista o no el correo) |
+| POST   | `/auth/reset-password`        | pública               | `{ email, code, newPassword }` → nueva contraseña |
 | POST   | `/auth/verify-token`          | pública (apps)        | Valida un token y devuelve el payload |
 | GET    | `/auth/jwks`                  | pública (apps)        | Clave pública en formato JWKS        |
 | POST   | `/organizations`              | super admin           | Crear organización                   |

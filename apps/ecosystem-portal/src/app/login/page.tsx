@@ -13,6 +13,8 @@ import {
   type TokenPayload,
 } from '@/lib/api';
 import { CampoContrasena } from '@/components/CampoContrasena';
+import { Campo } from '@/components/Campo';
+import { validarCorreo } from '@/lib/validacion';
 import { destinoSeguro } from '@/lib/apps';
 
 export default function LoginPage() {
@@ -26,10 +28,24 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(search.get('email') ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [tocado, setTocado] = useState(false);
   const [cargando, setCargando] = useState(false);
+
+  const correo = validarCorreo(email);
+  /**
+   * ¿El fallo es «tu correo no está verificado»?
+   *
+   * Solo les pasa a las cuentas creadas antes del registro en dos actos, que
+   * quedaron en la base sin confirmar. Su código de verificación caducó hace
+   * mucho y no hay forma de reenviárselo —el reenvío es para registros
+   * pendientes, y esa cuenta ya existe—, así que el camino bueno es recuperar
+   * la contraseña: eso demuestra que el correo es suyo y lo deja verificado de
+   * paso. Sin este aviso, esa cuenta es un callejón sin salida.
+   */
+  const faltaVerificar = Boolean(error && /verificar tu correo/i.test(error));
 
   /**
    * La sesión que ya estaba abierta al llegar, si es que hay alguna VIVA.
@@ -126,6 +142,15 @@ function LoginForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setTocado(true);
+    // Un correo mal escrito se dice aquí y no después de un viaje al servidor
+    // que iba a contestar «no existe una cuenta con ese correo» — que es la
+    // misma frase para «lo escribiste mal» y para «no tienes cuenta», y son
+    // dos cosas muy distintas.
+    if (!correo.ok) {
+      setError(null);
+      return;
+    }
     await entrar(false);
   }
 
@@ -199,17 +224,21 @@ function LoginForm() {
               ? `Una cuenta para todo el ecosistema. Al entrar, vuelves a ${destino.nombre}.`
               : 'Una cuenta para todo el ecosistema.'}
           </p>
-          <label className="mb-3 block text-sm">
-            Correo
+          <Campo
+            etiqueta="Correo"
+            htmlFor="login-correo"
+            error={tocado && !correo.ok ? correo.error : null}
+          >
             <input
+              id="login-correo"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              onBlur={() => setTocado(true)}
               autoComplete="username"
-              className="mt-1"
+              placeholder="tucorreo@gmail.com"
             />
-          </label>
+          </Campo>
           <label className="mb-1 block text-sm">
             Contraseña
             {/* El ojo no es un adorno: la mitad de los «no puedo entrar» son una
@@ -224,9 +253,33 @@ function LoginForm() {
               />
             </span>
           </label>
+          {/* El enlace que no existía en ninguna de las cuatro apps, aunque los
+              mensajes de error del servidor lo mencionaran por su nombre. Va
+              debajo del campo de contraseña, que es donde se busca. El correo
+              ya escrito viaja con él: nadie quiere teclearlo dos veces. */}
+          <p className="mt-2 text-right text-sm">
+            <Link
+              href={`/recuperar${email ? `?email=${encodeURIComponent(email)}` : ''}`}
+              style={{ color: 'var(--gold)' }}
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </p>
           {error && (
-            <p className="mb-3 mt-3 text-sm" style={{ color: 'var(--danger)' }}>
+            <p className="mb-1 mt-3 text-sm" style={{ color: 'var(--danger)' }}>
               {error}
+            </p>
+          )}
+          {faltaVerificar && (
+            <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+              Puedes desbloquearla ahora mismo:{' '}
+              <Link
+                href={`/recuperar${email ? `?email=${encodeURIComponent(email)}` : ''}`}
+                style={{ color: 'var(--gold)' }}
+              >
+                cambia tu contraseña con un código
+              </Link>
+              . Con eso tu correo queda confirmado.
             </p>
           )}
           <button

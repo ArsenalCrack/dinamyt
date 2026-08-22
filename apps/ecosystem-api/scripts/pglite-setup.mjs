@@ -15,7 +15,22 @@ if (!dir) {
 
 const pg = new PGlite(dir);
 const db = drizzle(pg);
-await migrate(db, { migrationsFolder: join(process.cwd(), 'drizzle', 'migrations') });
+// `migrationsSchema` NO es opcional aquí, aunque lo parezca.
+//
+// Sin él, el migrador escribe el diario en un esquema llamado `drizzle` —su
+// valor por defecto—, mientras que `drizzle.config.ts` lo declara DENTRO de
+// `ecosystem`. Los dos caminos quedan así mirando diarios distintos: esta
+// siembra aplica y anota en `drizzle`, y el día que alguien corre
+// `pnpm db:migrate` (drizzle-kit) este mira en `ecosystem`, no encuentra nada,
+// da la base por vacía y reintenta la 0000 contra tablas que ya existen. El
+// error que sale —«ya existe»— no menciona ni diarios ni esquemas.
+//
+// Si tu base local ya venía de antes con el diario en el sitio de al lado:
+//   pnpm db:migrar --mover-diario
+await migrate(db, {
+  migrationsFolder: join(process.cwd(), 'drizzle', 'migrations'),
+  migrationsSchema: 'ecosystem',
+});
 console.log('[ecosystem] migraciones aplicadas en', dir);
 
 // ── Super administrador ──

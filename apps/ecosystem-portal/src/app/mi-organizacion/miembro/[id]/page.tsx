@@ -9,6 +9,7 @@ import {
   soloTelefono,
   limitesFechaNacimiento,
   comprimirAvatar,
+  hoyISO,
   PARENTESCOS,
   TIPOS_SANGRE,
   CINTURONES_GRADO,
@@ -31,7 +32,13 @@ interface PerfilMiembro {
   emergencyContactPhone: string | null;
   emergencyContactRelationship: string | null;
   medicalNotes: string | null;
-  disciplines: { id: string; discipline: string; currentGrade: string | null }[];
+  disciplines: {
+    id: string;
+    discipline: string;
+    currentGrade: string | null;
+    /** Desde cuándo entrena. Va impresa en su carnet de Membresías. */
+    since: string | null;
+  }[];
 }
 
 /**
@@ -65,6 +72,16 @@ export default function EditarMiembroPage() {
     medicalNotes: '',
   });
   const [cinturon, setCinturon] = useState('');
+  /**
+   * Desde cuándo entrena.
+   *
+   * Vive con el cinturón porque es la misma fila (`user_disciplines`) y el
+   * mismo gesto: los dos los pone el maestro y los dos van impresos en el
+   * carnet. Antes se editaba en Membresías, que es donde se imprime, y por eso
+   * el maestro tenía que acordarse de que ESE dato —y solo ese— se corregía en
+   * la otra app.
+   */
+  const [desde, setDesde] = useState('');
 
   const fechas = limitesFechaNacimiento();
 
@@ -89,6 +106,7 @@ export default function EditarMiembroPage() {
         medicalNotes: p.medicalNotes ?? '',
       });
       setCinturon(p.disciplines?.[0]?.currentGrade ?? '');
+      setDesde(p.disciplines?.[0]?.since?.slice(0, 10) ?? '');
     } catch (e) {
       setError(
         extraerError(e, 'No se pudo cargar el perfil (¿gestionas a esta persona?).'),
@@ -160,11 +178,19 @@ export default function EditarMiembroPage() {
         emergencyContactRelationship: form.emergencyContactRelationship || null,
         medicalNotes: form.medicalNotes || null,
       });
-      // Promoción de cinturón (disciplina Hapkido) si cambió.
-      if (cinturon && cinturon !== (perfil.disciplines?.[0]?.currentGrade ?? '')) {
+      // Cinturón y antigüedad viven en la misma fila (`user_disciplines`), así
+      // que viajan juntos y en un solo viaje. Se manda si cambió cualquiera de
+      // los dos: `null` borra la fecha, que es lo que hace falta cuando se
+      // puso mal.
+      const disciplinaActual = perfil.disciplines?.[0];
+      if (
+        cinturon !== (disciplinaActual?.currentGrade ?? '') ||
+        desde !== (disciplinaActual?.since?.slice(0, 10) ?? '')
+      ) {
         await api.put(`/users/${perfil.id}/disciplines`, {
-          discipline: perfil.disciplines?.[0]?.discipline ?? 'hapkido',
-          currentGrade: cinturon,
+          discipline: disciplinaActual?.discipline ?? 'hapkido',
+          currentGrade: cinturon || null,
+          since: desde || null,
         });
       }
       setOk('Perfil guardado.');
@@ -333,6 +359,24 @@ export default function EditarMiembroPage() {
               onChange={(e) => setForm({ ...form, phone: soloTelefono(e.target.value) })}
             />
           </label>
+          {/* ── Entrena desde ──
+              Va pegada al cinturón porque es su misma fila y su mismo gesto. Y
+              va aquí, y no en Membresías, porque es un dato de la persona: un
+              club que estrena la app trae alumnos con años encima y su cuenta
+              es de esta semana. Membresías la imprime en el carnet; la recibe
+              del portal como la foto y el grado. */}
+          <div className="block text-sm">
+            <span style={{ color: 'var(--text-muted)' }}>Entrena desde</span>
+            <div className="mt-1">
+              <CampoFecha
+                valor={desde}
+                onChange={setDesde}
+                min="1950-01-01"
+                max={hoyISO()}
+                etiquetaAria="Entrena desde"
+              />
+            </div>
+          </div>
         </div>
 
         <h2 className="mt-2 text-lg font-semibold">Contacto de emergencia</h2>

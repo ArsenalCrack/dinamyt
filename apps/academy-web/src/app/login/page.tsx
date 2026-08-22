@@ -113,6 +113,19 @@ export default function Login() {
           />
         </div>
 
+        {/* La contraseña es UNA para todo el ecosistema, así que recuperarla
+            también se hace en un solo sitio: el portal. Este enlace no existía
+            en ninguna de las cuatro apps, aunque los mensajes de error del
+            propio servidor lo mencionaran por su nombre. */}
+        <p style={{ marginTop: '-0.6rem', marginBottom: '0.9rem', textAlign: 'right', fontSize: '0.8rem' }}>
+          <a
+            href={`${PORTAL_URL}/recuperar${email ? `?email=${encodeURIComponent(email)}` : ''}`}
+            style={{ color: 'var(--gold)' }}
+          >
+            ¿Olvidaste tu contraseña?
+          </a>
+        </p>
+
         {error && <p className="msg-error" style={{ marginBottom: '0.8rem', fontSize: '0.85rem' }}>{error}</p>}
 
         <button className="btn btn-cta" type="submit" disabled={cargando} style={{ width: '100%' }}>

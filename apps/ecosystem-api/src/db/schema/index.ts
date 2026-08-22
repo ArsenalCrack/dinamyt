@@ -371,3 +371,46 @@ export const auditAuth = eco.table('audit_auth', {
   metadata: text('metadata'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// ── Tabla: pending_registrations ───────────────────────────────────────────
+//
+// **La cuenta no existe hasta que el correo está verificado.**
+//
+// Antes, `POST /auth/register` insertaba la fila en `users` y la dejaba con
+// `is_email_verified = false`. Eso tenía dos consecuencias que se notaban:
+//
+//   · El correo y el documento quedaban OCUPADOS para siempre. Quien se
+//     equivocó al teclear su correo —el caso normal— no podía volver a
+//     registrarse con el bueno usando su mismo documento, y nadie más podía
+//     usar el correo que se tecleó mal. La única salida era el super-admin.
+//   · La lista de usuarios se llenaba de cuentas que no eran de nadie.
+//
+// Aquí vive el registro mientras espera su código: con todo lo que hará falta
+// para crear la cuenta —incluida la contraseña YA hasheada, nunca en claro— y
+// con fecha de caducidad. Si el código no se usa a tiempo, la fila se borra y
+// el correo y el documento vuelven a quedar libres, sin que nadie tenga que
+// hacer nada.
+//
+// Las dos claves son únicas por lo mismo que en `users`: dos personas no pueden
+// estar esperando el código para el mismo correo, ni para el mismo documento.
+export const pendingRegistrations = eco.table('pending_registrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 200 }).notNull().unique(),
+  documentId: varchar('document_id', { length: 30 }).unique(),
+  fullName: varchar('full_name', { length: 200 }).notNull(),
+  phone: varchar('phone', { length: 30 }),
+  birthDate: timestamp('birth_date'),
+  gender: varchar('gender', { length: 20 }),
+  /** bcrypt, con el costo del ecosistema. **Nunca la contraseña en claro.** */
+  passwordHash: text('password_hash').notNull(),
+  /** Seis dígitos. El mismo formato que el OTP de recuperar contraseña. */
+  code: varchar('code', { length: 6 }).notNull(),
+  /** Cuándo caduca el registro entero, no solo el código: son lo mismo. */
+  expiresAt: timestamp('expires_at').notNull(),
+  /** Códigos fallados. Al pasarse del tope, el registro se borra. */
+  attempts: integer('attempts').default(0).notNull(),
+  /** Veces que se ha mandado el código (el primero cuenta). Anti-abuso. */
+  sends: integer('sends').default(1).notNull(),
+  lastSentAt: timestamp('last_sent_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow(),
+});

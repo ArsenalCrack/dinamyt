@@ -6,10 +6,11 @@ import {
   userDisciplines,
   userGuardians,
   orgMembers,
+  pendingRegistrations,
 } from '../../db/schema';
-import { eq, and, gt, isNull } from 'drizzle-orm';
+import { eq, and, gt, lt, isNull, sql } from 'drizzle-orm';
 import { encryptField, decryptField } from '../../common/crypto';
-import { espejarPersona } from '../../common/espejo-membresias';
+import { espejarPersona, espejarContrasena } from '../../common/espejo-membresias';
 import * as bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
 
@@ -37,6 +38,17 @@ export class UsersService {
 
   /** Costo de bcrypt del ecosistema. Las apps importadas usan 10. */
   static readonly BCRYPT_ROUNDS = 12;
+
+  /**
+   * El hash, al costo del ecosistema.
+   *
+   * Existe suelto porque el registro pendiente guarda la contraseña YA hasheada
+   * (§ `pending_registrations`): un registro que puede no llegar nunca a cuenta
+   * no es motivo para tener una contraseña en claro en la base ni un minuto.
+   */
+  hashearContrasena(password: string): Promise<string> {
+    return bcrypt.hash(password, UsersService.BCRYPT_ROUNDS);
+  }
 
   // Crear usuario nuevo
   async createUser(data: {
@@ -121,6 +133,7 @@ export class UsersService {
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
+    espejarContrasena(userId, passwordHash);
   }
 
   /**
@@ -201,8 +214,23 @@ export class UsersService {
    * Actualizar contraseña. Sirve también para volver a hashear al costo del
    * ecosistema la contraseña heredada de otra app tras un login correcto: en
    * los dos casos, a partir de aquí la contraseña es `propio`.
+   *
+   * ── `espejar`, y por qué no siempre ──
+   *
+   * La contraseña es UNA para todo DINAMYT: al cambiarla aquí hay que copiarla a
+   * Membresías, o quien la cambia se queda fuera de `club.dinamyt.org` con la
+   * nueva y dentro con la vieja (ver `espejarContrasena`).
+   *
+   * La excepción es el rehash tras un login correcto: ahí la contraseña **no
+   * cambió**, solo se guardó con otro costo. La copia de Membresías sigue siendo
+   * un hash válido de esa misma contraseña, así que mandarla sería una llamada
+   * HTTP por login para no cambiar nada.
    */
-  async updatePassword(userId: string, newPassword: string) {
+  async updatePassword(
+    userId: string,
+    newPassword: string,
+    opciones: { espejar?: boolean } = {},
+  ) {
     const passwordHash = await bcrypt.hash(
       newPassword,
       UsersService.BCRYPT_ROUNDS,
@@ -211,6 +239,8 @@ export class UsersService {
       .update(users)
       .set({ passwordHash, passwordOrigen: 'propio' })
       .where(eq(users.id, userId));
+
+    if (opciones.espejar !== false) espejarContrasena(userId, passwordHash);
   }
 
   // ── Bloqueo por intentos fallidos (anti fuerza-bruta) ──────────────────────
@@ -354,16 +384,18 @@ export class UsersService {
       .limit(1);
 
     if (existing[0]) {
+      // `undefined` es «no lo toques» y `null` es «bórralo»: con `??` los dos
+      // significaban lo mismo y no había forma de quitar una fecha mal puesta.
       const [row] = await db
         .update(userDisciplines)
         .set({
-          currentGrade: data.currentGrade ?? existing[0].currentGrade,
-          since: data.since ?? existing[0].since,
+          ...(data.currentGrade !== undefined && { currentGrade: data.currentGrade }),
+          ...(data.since !== undefined && { since: data.since }),
           updatedAt: new Date(),
         })
         .where(eq(userDisciplines.id, existing[0].id))
         .returning();
-      espejarPersona(userId, { belt: row.currentGrade });
+      espejarPersona(userId, { belt: row.currentGrade, trainsSince: row.since });
       return row;
     }
 
@@ -376,9 +408,10 @@ export class UsersService {
         since: data.since ?? null,
       })
       .returning();
-    // El grado va al carnet que imprime Membresías: promoverlo aquí y que allí
-    // siguiera el anterior era justo lo que hacía dudar de cuál era el bueno.
-    espejarPersona(userId, { belt: row.currentGrade });
+    // El grado y la antigüedad van al carnet que imprime Membresías: cambiarlos
+    // aquí y que allí siguieran los anteriores era justo lo que hacía dudar de
+    // cuál de los dos era el bueno.
+    espejarPersona(userId, { belt: row.currentGrade, trainsSince: row.since });
     return row;
   }
 
@@ -428,5 +461,198 @@ export class UsersService {
       .from(orgMembers)
       .where(eq(orgMembers.userId, targetUserId));
     return targetMemberships.some((t) => managedOrgIds.includes(t.orgId));
+  }
+
+  // ── El documento, que es la SEGUNDA llave única de la persona ──────────────
+  //
+  // `users.document_id` es `unique` desde la primera migración, pero el registro
+  // no lo comprobaba: la segunda persona que se registraba con el mismo
+  // documento chocaba contra PostgreSQL y recibía un 500 sin explicación. Con
+  // esto se comprueba antes y se le dice qué pasó.
+  async findByDocument(documentId: string) {
+    const filas = await db
+      .select()
+      .from(users)
+      .where(eq(users.documentId, documentId))
+      .limit(1);
+    return filas[0] ?? null;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // REGISTRO PENDIENTE — la cuenta no existe hasta que el correo se verifica
+  // ════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Lo que vive un registro sin confirmar, y por qué veinte minutos.
+   *
+   * Es el mismo plazo para el código y para el registro entero, a propósito:
+   * dos relojes distintos («el código caducó pero tu registro sigue vivo») son
+   * dos cosas que explicar en una pantalla donde la persona solo quiere entrar.
+   * Veinte minutos alcanzan para abrir el correo en el celular —diez se quedan
+   * cortos si el correo tarda en llegar— y no tanto como para que el documento
+   * de alguien quede bloqueado media tarde por un dedazo.
+   */
+  static readonly REGISTRO_MINUTOS = 20;
+  /** Códigos fallados antes de tirar el registro y hacer empezar de nuevo. */
+  static readonly REGISTRO_MAX_INTENTOS = 6;
+  /** Veces que se puede pedir el código, contando el primero. */
+  static readonly REGISTRO_MAX_ENVIOS = 5;
+  /** Espera entre reenvíos: sin ella el botón «reenviar» es un grifo abierto. */
+  static readonly REGISTRO_ESPERA_REENVIO_SEG = 60;
+
+  /** Seis dígitos, con el generador criptográfico y no con `Math.random`. */
+  private static nuevoCodigo(): string {
+    return randomInt(100_000, 1_000_000).toString();
+  }
+
+  private static caducidadRegistro(): Date {
+    return new Date(Date.now() + UsersService.REGISTRO_MINUTOS * 60_000);
+  }
+
+  /**
+   * Tira los registros que ya caducaron.
+   *
+   * Se llama al principio de cada registro y de cada verificación, y no desde un
+   * cron: son dos consultas al día en el peor caso, y así el correo y el
+   * documento de un registro abandonado vuelven a estar libres en el mismo
+   * momento en que alguien los pide, sin depender de que un temporizador esté
+   * vivo. Un cron que se cae deja el sistema bloqueando correos para siempre.
+   */
+  async purgarRegistrosPendientes() {
+    await db
+      .delete(pendingRegistrations)
+      .where(lt(pendingRegistrations.expiresAt, new Date()));
+  }
+
+  async registroPendientePorCorreo(email: string) {
+    const filas = await db
+      .select()
+      .from(pendingRegistrations)
+      .where(eq(pendingRegistrations.email, email))
+      .limit(1);
+    return filas[0] ?? null;
+  }
+
+  async registroPendientePorDocumento(documentId: string) {
+    const filas = await db
+      .select()
+      .from(pendingRegistrations)
+      .where(eq(pendingRegistrations.documentId, documentId))
+      .limit(1);
+    return filas[0] ?? null;
+  }
+
+  /**
+   * Guarda el registro a la espera de su código.
+   *
+   * La contraseña entra ya hasheada: un registro que no llega a cuenta no es
+   * motivo para tener una contraseña en claro en la base de datos ni un minuto.
+   *
+   * Si ya había un pendiente para ese correo se REEMPLAZA. Es el caso normal:
+   * la persona no recibió el código, volvió atrás y lo intentó otra vez, quizá
+   * con otra contraseña. Guardar el segundo y dejar vivo el primero haría que
+   * el código que llegue no sirva para los datos que se acaban de escribir.
+   */
+  async crearRegistroPendiente(data: {
+    email: string;
+    passwordHash: string;
+    fullName: string;
+    documentId: string;
+    phone?: string | null;
+    birthDate?: Date | null;
+    gender?: string | null;
+  }) {
+    const code = UsersService.nuevoCodigo();
+    const values = {
+      email: data.email,
+      documentId: data.documentId,
+      fullName: data.fullName,
+      phone: data.phone ?? null,
+      birthDate: data.birthDate ?? null,
+      gender: data.gender ?? null,
+      passwordHash: data.passwordHash,
+      code,
+      expiresAt: UsersService.caducidadRegistro(),
+      attempts: 0,
+      sends: 1,
+      lastSentAt: new Date(),
+    };
+
+    const [fila] = await db
+      .insert(pendingRegistrations)
+      .values(values)
+      .onConflictDoUpdate({
+        target: pendingRegistrations.email,
+        set: { ...values, createdAt: new Date() },
+      })
+      .returning();
+
+    return { fila, code };
+  }
+
+  /** Otro código y otros veinte minutos, para el botón «reenviar». */
+  async renovarCodigoPendiente(id: string) {
+    const code = UsersService.nuevoCodigo();
+    const [fila] = await db
+      .update(pendingRegistrations)
+      .set({
+        code,
+        expiresAt: UsersService.caducidadRegistro(),
+        attempts: 0,
+        lastSentAt: new Date(),
+        sends: sql`${pendingRegistrations.sends} + 1`,
+      })
+      .where(eq(pendingRegistrations.id, id))
+      .returning();
+    return { fila, code };
+  }
+
+  /** Anota un código fallado y devuelve cuántos van. */
+  async fallarCodigoPendiente(id: string, intentos: number) {
+    await db
+      .update(pendingRegistrations)
+      .set({ attempts: intentos })
+      .where(eq(pendingRegistrations.id, id));
+  }
+
+  async borrarRegistroPendiente(id: string) {
+    await db.delete(pendingRegistrations).where(eq(pendingRegistrations.id, id));
+  }
+
+  /**
+   * El código era el bueno: **aquí, y solo aquí, nace la cuenta.**
+   *
+   * El correo se da por verificado en el mismo acto —el código llegó a esa
+   * dirección y alguien lo tecleó, que es toda la prueba que existe— y se sella
+   * el consentimiento de datos (Ley 1581), que hasta ahora no se guardaba en
+   * ningún sitio aunque el formulario lo exigiera.
+   *
+   * El pendiente se borra al final. Si la creación falla, la fila sigue ahí y
+   * la persona puede reintentar con el mismo código.
+   */
+  async confirmarRegistroPendiente(fila: typeof pendingRegistrations.$inferSelect) {
+    const [usuario] = await db
+      .insert(users)
+      .values({
+        email: fila.email,
+        passwordHash: fila.passwordHash,
+        passwordOrigen: 'propio',
+        fullName: fila.fullName,
+        documentId: fila.documentId,
+        phone: fila.phone,
+        birthDate: fila.birthDate,
+        gender: fila.gender,
+        origen: 'registro',
+        isEmailVerified: true,
+        dataConsentAt: new Date(),
+      })
+      .returning();
+
+    await this.borrarRegistroPendiente(fila.id);
+    // Por si su ficha de Membresías ya existía —un club que ya usaba la app y
+    // cuya persona se registra ahora en el portal—: así entra a las dos con la
+    // misma contraseña desde el primer día.
+    espejarContrasena(usuario.id, fila.passwordHash);
+    return usuario;
   }
 }

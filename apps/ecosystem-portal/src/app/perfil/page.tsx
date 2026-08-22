@@ -15,9 +15,12 @@ import {
   PARENTESCOS,
   GENEROS,
   comprimirAvatar,
+  validarContrasena,
 } from '@/lib/validacion';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
+import { SelectMenu } from '@/components/SelectMenu';
+import { MedidorContrasena } from '@/components/MedidorContrasena';
 
 interface Disciplina {
   id: string;
@@ -432,31 +435,30 @@ export default function PerfilPage() {
                 : 'Regístrala con cuidado: después solo la corrige tu maestro.'}
             </span>
           </div>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Género</span>
             {/* Se puede rellenar si falta —las cuentas importadas llegan sin
                 él— pero no cambiar: Campeonatos ya armó categorías con este
                 dato, y moverlo a mitad de temporada mueve la llave. */}
-            <select
-              className="mt-1 w-full"
-              value={form.gender}
-              disabled={!!perfil.gender}
-              onChange={(e) => setForm({ ...form, gender: e.target.value })}
-              style={perfil.gender ? { opacity: 0.7 } : undefined}
-            >
-              <option value="">— Selecciona —</option>
-              {GENEROS.map((g) => (
-                <option key={g.valor} value={g.valor}>
-                  {g.etiqueta}
-                </option>
-              ))}
-            </select>
+            <div className="mt-1">
+              <SelectMenu
+                valor={form.gender}
+                etiquetaAria="Género"
+                disabled={!!perfil.gender}
+                placeholder="— Selecciona —"
+                onChange={(v) => setForm({ ...form, gender: v })}
+                opciones={GENEROS.map((g) => ({
+                  valor: g.valor,
+                  etiqueta: g.etiqueta,
+                }))}
+              />
+            </div>
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
               {perfil.gender
                 ? 'Ya registrado: lo corrige tu maestro o un administrador.'
                 : 'Con esto Campeonatos te ubica en tu categoría.'}
             </span>
-          </label>
+          </div>
           <label className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Tipo de sangre</span>
             <input
@@ -484,23 +486,20 @@ export default function PerfilPage() {
             (v) => setForm({ ...form, emergencyContactPhone: soloTelefono(v) }),
             { type: 'tel', inputMode: 'tel' },
           )}
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Parentesco</span>
-            <select
-              className="mt-1 w-full"
-              value={form.emergencyContactRelationship}
-              onChange={(e) =>
-                setForm({ ...form, emergencyContactRelationship: e.target.value })
-              }
-            >
-              <option value="">— Selecciona —</option>
-              {PARENTESCOS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="mt-1">
+              <SelectMenu
+                valor={form.emergencyContactRelationship}
+                etiquetaAria="Parentesco"
+                placeholder="— Selecciona —"
+                onChange={(v) =>
+                  setForm({ ...form, emergencyContactRelationship: v })
+                }
+                opciones={PARENTESCOS.map((p) => ({ valor: p, etiqueta: p }))}
+              />
+            </div>
+          </div>
         </div>
 
         <label className="block text-sm">
@@ -561,12 +560,18 @@ export default function PerfilPage() {
             required: true,
             autoComplete: 'current-password',
           })}
-          {campo('Nueva contraseña (mín. 8)', passNueva, setPassNueva, {
-            type: 'password',
-            required: true,
-            minLength: 8,
-            autoComplete: 'new-password',
-          })}
+          <div>
+            {campo('Nueva contraseña', passNueva, setPassNueva, {
+              type: 'password',
+              required: true,
+              maxLength: 72,
+              autoComplete: 'new-password',
+            })}
+            {/* Los mismos mínimos que el registro, a la vista. «(mín. 8)» en la
+                etiqueta era todo lo que se decía, y era todo lo que se exigía:
+                `12345678` pasaba. */}
+            <MedidorContrasena clave={passNueva} />
+          </div>
         </div>
         {passMsg && (
           <p
@@ -576,7 +581,11 @@ export default function PerfilPage() {
             {passMsg}
           </p>
         )}
-        <button type="submit" className="btn btn-outline self-start">
+        <button
+          type="submit"
+          disabled={!passActual || !validarContrasena(passNueva).ok}
+          className="btn btn-outline self-start"
+        >
           Actualizar contraseña
         </button>
       </form>

@@ -17,6 +17,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt.service';
 import {
   validarNombre,
+  validarNombreCompleto,
   validarTelefono,
   validarFechaNacimiento,
   validarAvatar,
@@ -108,9 +109,12 @@ export class UsersController {
 
     // Validación de datos de la persona (el front también valida, pero la
     // última palabra la tiene el servidor).
+    // El nombre, COMPLETO: la misma regla que el registro. Sin ella, editar el
+    // perfil era la puerta de atrás para dejarlo en una letra.
     if (body.fullName !== undefined) {
-      body.fullName = validarNombre(body.fullName, 'nombre completo')
-        .toLocaleUpperCase('es');
+      body.fullName = validarNombreCompleto(body.fullName).toLocaleUpperCase(
+        'es',
+      );
     }
     if (body.bloodType) body.bloodType = validarTipoSangre(body.bloodType);
     if (body.gender) body.gender = validarGenero(body.gender);

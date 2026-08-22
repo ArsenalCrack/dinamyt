@@ -108,6 +108,8 @@ export function espejarPersona(
     phone?: string | null;
     avatarUrl?: string | null;
     belt?: string | null;
+    /** Desde cuándo entrena (`user_disciplines.since`). Va impresa en el carnet. */
+    trainsSince?: Date | string | null;
     birthDate?: Date | string | null;
     bloodType?: string | null;
     emergencyName?: string | null;
@@ -118,7 +120,9 @@ export function espejarPersona(
   for (const [k, v] of Object.entries(campos)) {
     if (v === undefined) continue;
     cuerpo[k] =
-      k === 'birthDate' && v instanceof Date ? v.toISOString().slice(0, 10) : v;
+      (k === 'birthDate' || k === 'trainsSince') && v instanceof Date
+        ? v.toISOString().slice(0, 10)
+        : v;
   }
   // Solo el `ecoSub`: no hay nada que copiar.
   if (Object.keys(cuerpo).length === 1) return;
@@ -138,4 +142,43 @@ export function espejarClub(
   if (Object.keys(cuerpo).length === 1) return;
 
   void avisar('/sync/club', cuerpo);
+}
+
+/**
+ * Copia la contraseña. **Es la misma para todo DINAMYT, y se fija aquí.**
+ *
+ * ── El problema que cierra ──
+ *
+ * La reconciliación (§2.4) trajo las cuentas de Membresías con su hash puesto,
+ * así que la misma contraseña abría las dos apps. Pero solo el primer día:
+ * quien la cambiaba en el portal —o la recuperaba con «¿olvidaste tu
+ * contraseña?»— se encontraba con que en `club.dinamyt.org` seguía valiendo la
+ * VIEJA. Dos contraseñas para una sola cuenta, y ninguna pantalla que lo
+ * dijera. Es el mismo problema que resolvió `espejarPersona` con la foto, con
+ * la diferencia de que este deja a alguien fuera en vez de imprimir un carnet
+ * viejo.
+ *
+ * ── Por qué viaja el HASH y no la contraseña ──
+ *
+ * Porque no hace falta: bcrypt guarda su propio costo dentro del hash, así que
+ * `compare` acepta igual el de 12 rondas de aquí y el de 10 de allí. Mandar la
+ * contraseña en claro pondría una copia legible en la memoria y en los registros
+ * de un segundo servidor a cambio de nada. Al otro lado se guarda tal cual: no
+ * se rehashea ni se toca.
+ *
+ * ── Lo que NO hace ──
+ *
+ * No busca por correo: busca por `eco_sub`, el id de esta cuenta allí. Una ficha
+ * sin cuenta del ecosistema —el alumno sin correo, que entra por carnet QR o
+ * PIN— no tiene `eco_sub` y este aviso no la toca jamás. Su contraseña sigue
+ * siendo asunto de su club, como debe ser.
+ *
+ * Y como todo el espejo: se dispara sin esperarlo y no puede romper el cambio
+ * de contraseña. Si Membresías está caída, la contraseña se cambia igual aquí y
+ * allí queda la vieja hasta el próximo cambio — que es exactamente lo que pasa
+ * hoy, siempre.
+ */
+export function espejarContrasena(userId: string, passwordHash: string): void {
+  if (!passwordHash) return;
+  void avisar('/sync/contrasena', { ecoSub: userId, passwordHash });
 }

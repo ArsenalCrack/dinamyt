@@ -23,12 +23,14 @@
 | Dónde | Qué | Por qué |
 |---|---|---|
 | Portal · «Mi organización» | El maestro sube, cambia y quita **la foto** de cada alumno | Antes solo la ponía Membresías, y la del portal se quedaba en iniciales |
+| Portal · «Mi organización» | **«Entrena desde»**, pegada al cinturón | Es su misma fila (`user_disciplines`) y su mismo gesto. Era el único dato de la persona que seguía editándose en Membresías |
 | Portal · ficha del club | País y ciudad son **desplegables**; se fueron «Delegación» y «País de la delegación»; dos columnas y sección propia | Escritos a mano salían cuatro grafías de la misma ciudad, y Campeonatos agrupa comparando ese texto por valor exacto |
 | Portal · listas de gente | **Dos columnas** en pantalla ancha | Veinte filas en una tira dejaban media pantalla en blanco |
-| Membresías · ficha del alumno | Los datos de la persona pasan a **lectura**, con enlace al portal. «Registrar un pago» se pone **al lado** de «Plan y estado en el club», y «Poner contraseña nueva» **junto al** «Acceso rápido con QR» | Se podía editar por los dos lados y ganaba el último que guardara |
+| Membresías · ficha del alumno | Los datos de la persona pasan a **lectura** —sin un solo botón de guardar—, con enlace al portal. «Registrar un pago» se pone **al lado** de «Plan y estado en el club», y «Poner contraseña nueva» **junto al** «Acceso rápido con QR» | Se podía editar por los dos lados y ganaba el último que guardara |
 | Membresías · panel del club | Se va el botón **«Cambiar escudo»** | El escudo se pone en la ficha del club del portal |
 | Membresías · API | `PATCH /users/:id` y `PATCH /auth/me` rechazan los campos de la persona (403) | La reja tiene que estar en el servidor, no solo en la pantalla |
 | Las dos APIs | El portal avisa a Membresías al guardar (`POST /sync/persona`, `/sync/club`) | Sin esto la foto nueva no llegaría nunca al carnet |
+| Las dos APIs | **La contraseña también se copia** (`POST /sync/contrasena`), y Membresías deja de dejar que se fije desde su lado | Se cambiaba en el portal y en el club seguía valiendo la vieja: dos contraseñas para una cuenta. Ver [CONTRASENA-UNICA.md](CONTRASENA-UNICA.md) |
 
 > **Membresías como producto independiente no cambia en nada.** Todo esto se
 > enciende solo cuando la ficha tiene `eco_sub` (o el club `eco_org_id`) **y**
@@ -48,8 +50,8 @@
 cd D:\Repositorios\dinamyt-membresias; git add -A; git status --short
 ```
 
-Deben salir tres archivos nuevos (`lib/ecosistema.ts`, `routes/sync.ts`,
-`ecosistema.spec.ts`) y siete modificados. Si cuadra:
+**Nunca `commit` sin mirar antes esa lista.** Solo deben salir archivos de
+`apps/membresias-api/src` y `apps/membresias-web/src`. Si cuadra:
 
 ```powershell
 cd D:\Repositorios\dinamyt-membresias; git commit -m "feat(identidad): la ficha se lee aqui y se escribe en el portal"; git push
@@ -166,15 +168,18 @@ Esto se mira en el navegador, con la cuenta de un maestro.
    la vista previa del carnet. *Si sigue con las iniciales, el aviso no llegó:*
    `sudo journalctl -u dinamyt-id -n 30 --no-pager | grep -i espejo`.
 3. En esa misma ficha, sus datos personales son una **tarjeta de lectura** con
-   un botón **«Editar en DINAMYT ↗»**, no un formulario. «Registrar un pago»
-   está **al lado** de «Plan y estado en el club», y «Poner contraseña nueva»
-   **debajo del** «Acceso rápido con QR».
+   un botón **«Editar en DINAMYT ↗»** y **ningún botón de guardar** —«Entrena
+   desde» incluida—. Más abajo, «Registrar un pago» está **al lado** de «Plan y
+   estado en el club», y «Poner contraseña nueva» **debajo del** «Acceso rápido
+   con QR».
 4. **Portal → Mi organización → ficha del club.** País y ciudad son
    desplegables, ya no están «Delegación» ni «País de la delegación», y el
    escudo se pone ahí.
 5. **Membresías → panel del club.** Ya no hay botón de escudo.
 6. **Entra como alumno a Membresías → «Mi perfil».** Ve sus datos y un enlace al
    portal; ya no los edita.
+7. **La vista previa del carnet queda centrada** en su tarjeta, tanto en el
+   escritorio como en el celular. Antes se pegaba a la izquierda.
 
 ---
 
@@ -206,4 +211,7 @@ tenga.
   desde «Alumnos» en vez de darla de alta en el portal. Esa cuenta nace sin
   `eco_sub`, así que se edita allí como siempre — es la escapatoria para quien
   no está en DINAMYT, pero si se usa por costumbre vuelven las dos fichas.
-- **Campeonatos.** Sigue con su login propio (bloques C1–C7 del plan maestro).
+- **Campeonatos.** Sigue con su login propio (bloques C1–C7 del plan maestro), y
+  con su propia contraseña: no entra en el espejo hasta después del campeonato
+  del 9–11 de octubre. Lo que hará falta está escrito en
+  [CONTRASENA-UNICA.md](CONTRASENA-UNICA.md), §Campeonatos.

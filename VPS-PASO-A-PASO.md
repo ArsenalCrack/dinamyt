@@ -1911,6 +1911,12 @@ llega de vuelta, esta mitad está hecha.
 
 ## E.2 · Enviar: Resend ⏱ 20 min + espera de DNS
 
+> **Antes de nada, la migración `0007_registro_pendiente`.** El registro cambió:
+> la cuenta ya no nace al pulsar «Crear cuenta», nace cuando la persona teclea
+> el código. Sin la tabla `ecosystem.pending_registrations`, `/auth/register` y
+> `/auth/verify-email` responden 500. Ver
+> [CORREO-PASO-A-PASO.md](CORREO-PASO-A-PASO.md), §0.
+
 1. Crea la cuenta en **resend.com** (el plan gratis basta: 3.000 al mes, **100
    al día**, un dominio).
 2. **Domains** → **Add Domain** → `dinamyt.org`. Elige la región más cercana.

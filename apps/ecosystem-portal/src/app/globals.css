@@ -379,3 +379,195 @@ main { animation: aparecer 0.3s ease; }
   padding-top: 0.5rem;
   border-top: 1px solid var(--border);
 }
+
+/* ── Desplegables propios (components/SelectMenu.tsx) ─────────────────────
+   FUERA de `@layer components`, por lo mismo que el calendario de arriba.
+
+   El `<select>` nativo se pinta con los colores del sistema operativo: gris en
+   escritorio, y en Android una hoja a pantalla completa. Era lo único que
+   quedaba del sistema en las pantallas del portal. Es el MISMO panel dorado de
+   Membresías y Campeonatos, con los tokens de aquí — que se llaman igual. */
+.selectmenu { position: relative; width: 100%; }
+.selectmenu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.selectmenu-btn:hover:not(:disabled) { border-color: var(--border-strong); }
+.selectmenu-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.selectmenu-btn[aria-expanded='true'] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.selectmenu-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selectmenu-label[data-vacio='true'] { color: var(--text-muted); }
+.selectmenu-flecha {
+  flex-shrink: 0;
+  color: var(--gold);
+  font-size: 0.8rem;
+  transition: rotate 0.18s ease-out;
+}
+.selectmenu-flecha[data-abierto='true'] { rotate: 180deg; }
+.selectmenu-punto {
+  flex-shrink: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+}
+/* `fixed` y no `absolute`: el panel se monta en el <body> con las coordenadas
+   del botón, para que no lo recorte ningún contenedor con `overflow`. */
+.selectmenu-panel {
+  position: fixed;
+  z-index: 55;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  max-height: 17rem;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.6rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.selectmenu-opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.selectmenu-opcion[data-activa='true'] { background: var(--bg-elevated); }
+.selectmenu-opcion[aria-selected='true'] {
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* ── Campos con estado (components/Campo.tsx) ─────────────────────────────
+   Un campo mal escrito tiene que VERSE mal escrito, no solo llevar un texto
+   rojo debajo: el borde es lo que se mira cuando el formulario tiene siete
+   campos y hay que encontrar el que falla. */
+.campo { display: block; margin-bottom: 0.9rem; }
+.campo-etiqueta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  margin-bottom: 0.3rem;
+}
+.campo-pista { font-size: 0.75rem; color: var(--text-muted); }
+.campo[data-estado='error'] input,
+.campo[data-estado='error'] .selectmenu-btn,
+.campo[data-estado='error'] .fecha-btn {
+  border-color: var(--danger);
+}
+.campo[data-estado='error'] input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 85, 119, 0.16);
+}
+.campo[data-estado='ok'] input,
+.campo[data-estado='ok'] .selectmenu-btn,
+.campo[data-estado='ok'] .fecha-btn {
+  border-color: var(--ok);
+}
+.campo-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.campo-aviso[data-tono='error'] { color: var(--danger); }
+.campo-aviso[data-tono='ok'] { color: var(--ok); }
+.campo-aviso[data-tono='info'] { color: var(--text-muted); }
+.campo-aviso button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--gold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── Medidor de contraseña (components/MedidorContrasena.tsx) ────────────── */
+.medidor { margin-top: 0.5rem; }
+.medidor-barra {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+  margin-bottom: 0.45rem;
+}
+.medidor-tramo {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 0.2s ease;
+}
+.medidor-tramo[data-lleno='true'][data-nivel='1'] { background: var(--danger); }
+.medidor-tramo[data-lleno='true'][data-nivel='2'] { background: var(--gold); }
+.medidor-tramo[data-lleno='true'][data-nivel='3'] { background: var(--ok); }
+.medidor-tramo[data-lleno='true'][data-nivel='4'] { background: var(--ok); }
+.medidor-requisitos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.medidor-requisitos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.medidor-requisitos li[data-cumple='true'] { color: var(--ok); }
+
+/* ── Código de verificación (components/CampoCodigo.tsx) ──────────────────
+   Seis casillas y no un campo de texto: así la pantalla DICE cuántos dígitos
+   son, sin tener que explicarlo con palabras que nadie lee. */
+.codigo {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+}
+.codigo input {
+  width: 2.9rem;
+  height: 3.4rem;
+  padding: 0;
+  text-align: center;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  caret-color: var(--gold);
+}
+.codigo input[data-lleno='true'] { border-color: var(--gold-dim); }
+.codigo[data-error='true'] input { border-color: var(--danger); }
+@media (max-width: 380px) {
+  .codigo { gap: 0.3rem; }
+  .codigo input { width: 2.4rem; height: 3rem; font-size: 1.25rem; }
+}

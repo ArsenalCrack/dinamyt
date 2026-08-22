@@ -51,7 +51,7 @@ al día:
 | `ECOSYSTEM_JWKS_URL` | membresias-api | El SSO no existe: saltas desde el portal y te vuelve a pedir la contraseña. **Vacía a propósito solo en el modo local del campeonato** |
 | `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` | membresias-web | No aparece «entrar con DINAMYT» ni el camino de vuelta |
 | `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe |
-| `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: la invitación devuelve el enlace para mandarlo por WhatsApp |
+| `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: la invitación devuelve el enlace para mandarlo por WhatsApp, y el código del registro sale por el registro del servidor (`[SIN CORREO] OTP …`). El auto-registro no es utilizable de verdad hasta configurarlo: ver [CORREO-PASO-A-PASO.md](CORREO-PASO-A-PASO.md) |
 | `ECOSYSTEM_SYNC_SECRET` | ecosystem-api **y** membresias-api | **El mismo valor en las dos.** Sin él, la foto, el escudo y el cinturón que se guardan en el portal no llegan a Membresías: el carnet se sigue imprimiendo con lo que hubiera. En Membresías `POST /sync/persona` responde 404 |
 | `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
 

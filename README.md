@@ -90,6 +90,8 @@ nunca depende de que alguien se acordara de sincronizar.
 | [IDENTIDAD-PASO-A-PASO.md](IDENTIDAD-PASO-A-PASO.md) | Dar cuenta del ecosistema a quien ya existía en Membresías y Campeonatos |
 | [PUESTA-AL-DIA.md](PUESTA-AL-DIA.md) | El puente de altas: la ficha de Membresías que nace sola desde el portal |
 | [FUENTE-DE-VERDAD-PASO-A-PASO.md](FUENTE-DE-VERDAD-PASO-A-PASO.md) | Los datos de la persona se escriben en el portal y Membresías los lee (y el espejo que los lleva hasta el carnet) |
+| [CORREO-PASO-A-PASO.md](CORREO-PASO-A-PASO.md) | Que al alumno le llegue el código: Resend, el DNS y la migración que va **antes** |
+| [CONTRASENA-UNICA.md](CONTRASENA-UNICA.md) | Una contraseña para todo DINAMYT: se fija en el portal y Membresías la copia (Campeonatos, después de octubre) |
 | [CONTINGENCIA-CAMPEONATO.md](CONTINGENCIA-CAMPEONATO.md) | Si se cae el VPS, el internet o la luz en pleno campeonato |
 | [UNA-SOLA-APP.md](UNA-SOLA-APP.md) | Que las tres apps se sientan una sola (bloque B5) |
 | [HANDOFF.md](HANDOFF.md) | Estado del proyecto **congelado en julio de 2026**. Histórico |

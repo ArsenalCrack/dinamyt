@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PAISES, ciudadesDe } from '@/lib/geo';
+import { SelectMenu } from '@/components/SelectMenu';
 
 /**
  * País y ciudad, los dos como desplegable.
@@ -40,31 +41,36 @@ export function PaisCiudad({
 
   return (
     <>
-      <label className="block text-sm">
+      {/* El desplegable propio del ecosistema, no el `<select>` gris del
+          sistema operativo: el mismo panel dorado de Membresías y Campeonatos
+          (ver `SelectMenu.tsx`). Con doscientos países importa además que el
+          panel se abra hacia arriba cuando no cabe abajo, que es lo que este
+          hace y el nativo de Android no. */}
+      <div className="block text-sm">
         <span style={{ color: 'var(--text-muted)' }}>País{requerido ? ' *' : ''}</span>
-        <select
-          className="mt-1 w-full"
-          value={pais}
-          // Cambiar de país vacía la ciudad: dejar «Medellín» debajo de
-          // «México» es peor que dejarlo en blanco.
-          onChange={(e) => {
-            setAMano(false);
-            onChange(e.target.value, '');
-          }}
-          required={requerido}
-        >
-          <option value="">— Elige el país —</option>
-          {/* Un país guardado que no esté en el catálogo no se pierde. */}
-          {pais && !PAISES.includes(pais) && <option value={pais}>{pais}</option>}
-          {PAISES.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </label>
+        <div className="mt-1">
+          <SelectMenu
+            valor={pais}
+            etiquetaAria="País"
+            placeholder="— Elige el país —"
+            // Cambiar de país vacía la ciudad: dejar «Medellín» debajo de
+            // «México» es peor que dejarlo en blanco.
+            onChange={(v) => {
+              setAMano(false);
+              onChange(v, '');
+            }}
+            opciones={[
+              // Un país guardado que no esté en el catálogo no se pierde.
+              ...(pais && !PAISES.includes(pais)
+                ? [{ valor: pais, etiqueta: pais }]
+                : []),
+              ...PAISES.map((p) => ({ valor: p, etiqueta: p })),
+            ]}
+          />
+        </div>
+      </div>
 
-      <label className="block text-sm">
+      <div className="block text-sm">
         <span style={{ color: 'var(--text-muted)' }}>Ciudad</span>
         {aMano ? (
           <div className="mt-1 flex gap-2">
@@ -89,29 +95,31 @@ export function PaisCiudad({
             </button>
           </div>
         ) : (
-          <select
-            className="mt-1 w-full"
-            value={ciudad}
-            disabled={!pais}
-            onChange={(e) => {
-              if (e.target.value === '__otra') {
-                setAMano(true);
-                onChange(pais, '');
-                return;
-              }
-              onChange(pais, e.target.value);
-            }}
-          >
-            <option value="">{pais ? '— Elige la ciudad —' : '— Elige antes el país —'}</option>
-            {ciudades.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-            {pais && <option value="__otra">Otra ciudad…</option>}
-          </select>
+          <div className="mt-1">
+            <SelectMenu
+              valor={ciudad}
+              etiquetaAria="Ciudad"
+              disabled={!pais}
+              placeholder={pais ? '— Elige la ciudad —' : '— Elige antes el país —'}
+              onChange={(v) => {
+                // La escapatoria: el catálogo no tiene todas las ciudades del
+                // mundo, y sin esto un club de un municipio pequeño no tendría
+                // forma de decir dónde está.
+                if (v === '__otra') {
+                  setAMano(true);
+                  onChange(pais, '');
+                  return;
+                }
+                onChange(pais, v);
+              }}
+              opciones={[
+                ...ciudades.map((c) => ({ valor: c, etiqueta: c })),
+                ...(pais ? [{ valor: '__otra', etiqueta: 'Otra ciudad…' }] : []),
+              ]}
+            />
+          </div>
         )}
-      </label>
+      </div>
     </>
   );
 }

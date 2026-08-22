@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ponerContrasenaAPI, extraerError } from '@/lib/api';
 import { CampoContrasena } from '@/components/CampoContrasena';
+import { Campo } from '@/components/Campo';
+import { MedidorContrasena } from '@/components/MedidorContrasena';
+import { validarContrasena } from '@/lib/validacion';
 
 /**
  * Donde aterriza el enlace de invitación del maestro (camino B, §2.1).
@@ -19,22 +22,23 @@ function PonerContrasena() {
 
   const [clave, setClave] = useState('');
   const [repetida, setRepetida] = useState('');
+  const [tocado, setTocado] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
   const [cargando, setCargando] = useState(false);
 
+  // Las MISMAS reglas que el registro y que el servidor, y enseñadas igual: con
+  // el medidor delante. Aquí se decía «mín. 8 caracteres» y se rechazaba
+  // después, que es la peor forma de pedir una contraseña.
+  const claveValida = validarContrasena(clave);
+  const coinciden = clave === repetida;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setTocado({ clave: true, repetida: true });
 
-    if (clave.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.');
-      return;
-    }
-    if (clave !== repetida) {
-      setError('Las dos contraseñas no coinciden.');
-      return;
-    }
+    if (!claveValida.ok || !coinciden) return;
 
     setCargando(true);
     try {
@@ -83,7 +87,7 @@ function PonerContrasena() {
             </Link>
           </div>
         ) : (
-          <form onSubmit={onSubmit}>
+          <form onSubmit={onSubmit} noValidate>
             <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
               Tu club ya creó tu cuenta. Elige una contraseña y con ella entras a
               todo DINAMYT.
@@ -93,31 +97,41 @@ function PonerContrasena() {
                 la casilla «ver lo que escribo» que solo existía aquí (ver
                 UNA-SOLA-APP.md §2). Cada campo lleva el suyo: quien se
                 equivoca al repetirla necesita mirar ESA, no las dos. */}
-            <label className="mb-3 block text-sm">
-              Contraseña
-              <span className="mt-1 block">
-                <CampoContrasena
-                  value={clave}
-                  onChange={(e) => setClave(e.target.value)}
-                  minLength={8}
-                  required
-                  autoComplete="new-password"
-                />
-              </span>
-            </label>
+            <Campo
+              etiqueta="Contraseña"
+              htmlFor="nueva-clave"
+              error={tocado.clave && !claveValida.ok ? claveValida.error : null}
+            >
+              <CampoContrasena
+                id="nueva-clave"
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                onBlur={() => setTocado((t) => ({ ...t, clave: true }))}
+                autoComplete="new-password"
+                maxLength={72}
+              />
+            </Campo>
+            <div className="-mt-2 mb-4">
+              <MedidorContrasena clave={clave} />
+            </div>
 
-            <label className="mb-4 block text-sm">
-              Repítela
-              <span className="mt-1 block">
-                <CampoContrasena
-                  value={repetida}
-                  onChange={(e) => setRepetida(e.target.value)}
-                  minLength={8}
-                  required
-                  autoComplete="new-password"
-                />
-              </span>
-            </label>
+            <Campo
+              etiqueta="Repítela"
+              error={
+                tocado.repetida && repetida && !coinciden
+                  ? 'Las dos contraseñas no coinciden.'
+                  : null
+              }
+              ok={repetida && coinciden && claveValida.ok ? 'Coinciden.' : null}
+            >
+              <CampoContrasena
+                value={repetida}
+                onChange={(e) => setRepetida(e.target.value)}
+                onBlur={() => setTocado((t) => ({ ...t, repetida: true }))}
+                autoComplete="new-password"
+                maxLength={72}
+              />
+            </Campo>
 
             {error && (
               <p className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>
