@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   pgSchema,
+  index,
   uniqueIndex,
   uuid,
   varchar,
@@ -289,6 +290,29 @@ export const subscriptions = eco.table('subscriptions', {
   paidAmount: decimal('paid_amount', { precision: 10, scale: 2 }).default('0'),
   paymentStatus: paymentStatusEnum('payment_status').default('PENDING'),
   notes: text('notes'),
+  // ── El ciclo: lo que convierte esto en algo que se RENUEVA ────────────────
+  //
+  // Hasta aquí una suscripción era una fila con dos fechas, y renovar era
+  // crear otra a mano cada mes. Con el club número quince eso son quince
+  // formularios al mes y una fila nueva por cada uno: el historial de un club
+  // quedaba repartido en doce filas que nadie relacionaba entre sí.
+  /** Cuántos meses compra cada renovación. Casi siempre 1. */
+  renewalMonths: integer('renewal_months').default(1),
+  /**
+   * Día del mes en el que vence, conservado entre renovaciones.
+   *
+   * Sin él, el club que paga el día 5 pero un mes se retrasa al 12 se queda
+   * venciendo el 12 para siempre — su ciclo se corre solo, un poco cada vez.
+   * Ver `common/ciclo.ts`.
+   */
+  anchorDay: integer('anchor_day'),
+  // ── El aviso de vencimiento ───────────────────────────────────────────────
+  // Las dos columnas existen para no repetirse: sin ellas, el disparo diario
+  // le manda al maestro el mismo correo cada mañana mientras siga vencido.
+  /** Cuándo se le avisó por última vez al maestro. */
+  lastReminderAt: timestamp('last_reminder_at'),
+  /** Qué se le avisó: `POR_VENCER` o `VENCIDA`. */
+  lastReminderKind: varchar('last_reminder_kind', { length: 20 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -305,8 +329,67 @@ export const userSubscriptions = eco.table('user_subscriptions', {
   status: subscriptionStatusEnum('status').default('ACTIVE'),
   startsAt: timestamp('starts_at').notNull(),
   endsAt: timestamp('ends_at').notNull(),
+  /** El mismo ciclo que las de organización. Ver `subscriptions`. */
+  renewalMonths: integer('renewal_months').default(1),
+  anchorDay: integer('anchor_day'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// ── Tabla: subscription_payments (el historial del dinero) ──────────────────
+//
+// ── Por qué no basta con `paid_amount` ──
+//
+// `subscriptions.paid_amount` es un contador: dice cuánto se ha pagado EN
+// TOTAL, y nada más. No dice cuándo, ni en efectivo o por transferencia, ni
+// qué meses compró ese dinero, ni quién lo registró. Con una suscripción que
+// se renueva doce veces al año, ese número solo se puede leer como «algo se
+// pagó»: si un club reclama que ya pagó agosto, no hay dónde mirar.
+//
+// ── Las tres columnas de periodo ──
+//
+// Son las que separan «cuándo entró la plata» de «a qué mes le toca». Un club
+// que paga tres meses de golpe en agosto no metió el triple en agosto: compró
+// agosto, septiembre y octubre. Es la misma decisión que ya tomó Membresías en
+// su tabla `payments`, y por el mismo motivo.
+//
+// ── Una tabla para los dos tipos de suscripción ──
+//
+// `subscription_id` para las de organización y `user_subscription_id` para las
+// personales; exactamente una de las dos. Dos tablas gemelas se separan al
+// primer cambio, y el historial se lee siempre igual venga de donde venga.
+export const subscriptionPayments = eco.table(
+  'subscription_payments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Suscripción de organización. Excluyente con la de abajo. */
+    subscriptionId: uuid('subscription_id').references(() => subscriptions.id),
+    /** Suscripción personal. Excluyente con la de arriba. */
+    userSubscriptionId: uuid('user_subscription_id').references(
+      () => userSubscriptions.id,
+    ),
+    amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+    /** `efectivo` · `transferencia` · `nequi` · `daviplata` · `otro`. */
+    method: varchar('method', { length: 20 }).notNull().default('efectivo'),
+    paidAt: timestamp('paid_at').defaultNow(),
+    /**
+     * Cuántos meses compró este pago. `0` = un abono suelto, que paga deuda
+     * pero no mueve la fecha de vencimiento.
+     */
+    periodos: integer('periodos').notNull().default(1),
+    periodoDesde: date('periodo_desde'),
+    periodoHasta: date('periodo_hasta'),
+    /** Quién lo registró (el super-admin). */
+    registeredByUserId: uuid('registered_by_user_id').references(() => users.id),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (t) => [
+    // Leer el historial de una suscripción es lo único que se hace con esta
+    // tabla, y siempre de lo más nuevo a lo más viejo.
+    index('ix_subscription_payments_sub').on(t.subscriptionId, t.paidAt),
+    index('ix_subscription_payments_user').on(t.userSubscriptionId, t.paidAt),
+  ],
+);
 
 // ── Tabla: org_club_invitations (federación/liga → club) ────────────────────
 // Una organización invita a un club existente a ser su hijo; el maestro/dueño

@@ -506,13 +506,114 @@ export const editarSuscripcionAPI = async (
 
 export const abonarSuscripcionAPI = async (
   id: string,
-  data: { paidAmount: string; notes?: string },
+  data: { paidAmount: string; notes?: string; method?: string },
 ) => (await api.patch(`/subscriptions/${id}/payment`, data)).data;
 
 /**
  * Borra la suscripción. El servidor la rechaza si tiene pagos registrados:
  * borrarla borraría el único registro de que ese dinero entró.
  */
+// ── Renovar, el historial y los vencimientos ────────────────────────────────
+
+/** Las formas de pago que se pueden registrar. Las mismas que Membresías. */
+export const METODOS_PAGO = [
+  { valor: 'efectivo', etiqueta: 'Efectivo' },
+  { valor: 'transferencia', etiqueta: 'Transferencia' },
+  { valor: 'nequi', etiqueta: 'Nequi' },
+  { valor: 'daviplata', etiqueta: 'Daviplata' },
+  { valor: 'otro', etiqueta: 'Otro' },
+] as const;
+
+export const nombreMetodo = (m: string) =>
+  METODOS_PAGO.find((x) => x.valor === m)?.etiqueta ?? m;
+
+/** Una línea del historial de pagos. */
+export interface PagoSuscripcion {
+  id: string;
+  amount: string;
+  method: string;
+  paidAt: string;
+  /** Meses que compró. `0` = un abono suelto, que no mueve la fecha. */
+  periodos: number;
+  periodoDesde: string | null;
+  periodoHasta: string | null;
+  notes: string | null;
+  registradoPor: string | null;
+}
+
+/** Una suscripción que vence pronto, o que ya venció. */
+export interface Vencimiento {
+  id: string;
+  status: string;
+  venceEl: string | null;
+  /** Días que faltan. Negativo si ya pasó. */
+  dias: number | null;
+  estado: 'al_dia' | 'por_vencer' | 'vencida' | 'sin_fecha';
+  totalAmount: string | null;
+  paidAmount: string | null;
+  paymentStatus: string;
+  renewalMonths: number | null;
+  lastReminderAt: string | null;
+  lastReminderKind: string | null;
+  orgId: string;
+  orgName: string;
+  orgType: string;
+  orgEmail: string | null;
+  orgPhone: string | null;
+  planId: string;
+  planName: string;
+  priceMonthly: string | null;
+}
+
+export interface DatosRenovacion {
+  meses?: number;
+  /** Lo que cuesta el periodo. Sin decir nada, el precio del plan. */
+  precio?: string;
+  /** Lo que entregó. Sin decir nada, el precio. */
+  amount?: string;
+  method?: string;
+  notes?: string;
+}
+
+export const renovarSuscripcionAPI = async (
+  id: string,
+  datos: DatosRenovacion,
+): Promise<{ venceEl: string }> =>
+  (await api.post(`/subscriptions/${id}/renovar`, datos)).data;
+
+export const historialSuscripcionAPI = async (
+  id: string,
+): Promise<PagoSuscripcion[]> =>
+  (await api.get(`/subscriptions/${id}/pagos`)).data;
+
+export const renovarSuscripcionPersonalAPI = async (
+  id: string,
+  datos: DatosRenovacion,
+): Promise<{ venceEl: string }> =>
+  (await api.post(`/subscriptions/user/${id}/renovar`, datos)).data;
+
+export const historialSuscripcionPersonalAPI = async (
+  id: string,
+): Promise<PagoSuscripcion[]> =>
+  (await api.get(`/subscriptions/user/${id}/pagos`)).data;
+
+export const vencimientosAPI = async (dias?: number): Promise<Vencimiento[]> =>
+  (
+    await api.get('/subscriptions/vencimientos', {
+      params: dias ? { dias } : undefined,
+    })
+  ).data;
+
+export const avisarVencimientosAPI = async (opciones?: {
+  soloId?: string;
+  forzar?: boolean;
+}): Promise<{
+  revisadas: number;
+  avisadas: number;
+  omitidas: number;
+  correoConfigurado: boolean;
+}> => (await api.post('/subscriptions/avisos', opciones ?? {})).data;
+
 export const eliminarSuscripcionAPI = async (id: string) =>
   (await api.delete(`/subscriptions/${id}`)).data;
 

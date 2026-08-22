@@ -699,4 +699,97 @@ export class MailerService {
         : `DINAMYT — Tu solicitud a ${club} no fue aceptada\n\nHabla con tu maestro: con un código nuevo puedes volver a pedirlo.\n${enlace}`,
     );
   }
+
+  /**
+   * La suscripción del club está por vencer, o ya venció.
+   *
+   * ── Por qué esto lo recibe el maestro y no el alumno ──
+   *
+   * Porque es el único que puede hacer algo. El alumno no paga la suscripción
+   * del club a DINAMYT —paga su mensualidad, que es otra cosa y vive en
+   * Membresías— y avisarle solo consigue que crea que le van a cortar a él.
+   *
+   * ── Por qué no lleva botón de pagar ──
+   *
+   * Porque no hay pasarela: el cobro es por fuera (transferencia, efectivo) y
+   * quien lo registra es el administrador del ecosistema. Un botón que
+   * pareciera de pago y llevara a una pantalla informativa es peor que no
+   * tenerlo. Lo que lleva es a quién escribirle.
+   */
+  async avisarVencimientoSuscripcion(datos: {
+    to: string;
+    nombre?: string | null;
+    club: string;
+    plan: string;
+    /** 'YYYY-MM-DD'. */
+    venceEl: string;
+    /** Días que faltan. Negativo si ya venció. */
+    dias: number;
+  }): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.warn(
+        `[SIN CORREO] Vencimiento de ${datos.club} (${datos.venceEl}) para ${datos.to}`,
+      );
+      return false;
+    }
+
+    const vencida = datos.dias < 0;
+    const club = MailerService.escapar(datos.club);
+    const plan = MailerService.escapar(datos.plan);
+    const saludo = (datos.nombre ?? '').trim().split(/\s+/)[0] || null;
+
+    // La fecha, escrita como se lee. '2026-09-22' obliga a contar meses con
+    // los dedos; «22 de septiembre de 2026» no.
+    const fecha = (() => {
+      const [a, m, d] = datos.venceEl.split('-').map(Number);
+      if (!a || !m || !d) return datos.venceEl;
+      return new Date(Date.UTC(a, m - 1, d)).toLocaleDateString('es-CO', {
+        dateStyle: 'long',
+        timeZone: 'UTC',
+      });
+    })();
+
+    const cuantos = Math.abs(datos.dias);
+    const plazo = vencida
+      ? `Venció hace ${cuantos} ${cuantos === 1 ? 'día' : 'días'}`
+      : cuantos === 0
+        ? 'Vence hoy'
+        : `Vence en ${cuantos} ${cuantos === 1 ? 'día' : 'días'}`;
+
+    const cuerpo = vencida
+      ? `<p style="margin:0;">La suscripción de <b>${club}</b> a DINAMYT
+           (<b>${plan}</b>) <b>venció el ${fecha}</b>.</p>
+         ${MailerService.aviso(
+           'Mientras esté vencida, tu club <b>no puede abrir las aplicaciones</b> desde DINAMYT. Tus datos y los de tus alumnos siguen todos ahí: no se borra nada.',
+         )}
+         <p style="margin:16px 0 0 0;">Para renovarla, escríbenos a
+           <a href="mailto:${MailerService.soporte()}" style="color:${MailerService.C.oro}; text-decoration:none;">${MailerService.soporte()}</a>
+           y la reactivamos en cuanto quede el pago.</p>`
+      : `<p style="margin:0;">La suscripción de <b>${club}</b> a DINAMYT
+           (<b>${plan}</b>) <b>vence el ${fecha}</b>.</p>
+         <p style="margin:16px 0 0 0;">Este es el aviso con tiempo, para que no
+           te coja el día. Escríbenos a
+           <a href="mailto:${MailerService.soporte()}" style="color:${MailerService.C.oro}; text-decoration:none;">${MailerService.soporte()}</a>
+           y la dejamos renovada.</p>
+         ${MailerService.lista([
+           'Si renuevas antes de la fecha, <b>no pierdes los días</b> que te quedan: se suman.',
+           'Tu club sigue funcionando con normalidad hasta ese día.',
+         ])}`;
+
+    return this.enviar(
+      datos.to,
+      vencida
+        ? `La suscripción de ${datos.club} venció`
+        : `La suscripción de ${datos.club} vence el ${fecha}`,
+      MailerService.plantilla({
+        etiqueta: vencida ? 'Suscripción vencida' : 'Aviso de vencimiento',
+        titulo: plazo,
+        avance: `${plazo}: ${datos.club} · ${datos.plan}.`,
+        saludo,
+        cuerpo,
+        pie: `Recibes esto porque administras ${club} en DINAMYT.`,
+      }),
+      `DINAMYT — ${plazo}\n\nLa suscripción de ${datos.club} (${datos.plan}) ${vencida ? 'venció' : 'vence'} el ${fecha}.\n\nEscríbenos a ${MailerService.soporte()} para renovarla.`,
+    );
+  }
 }

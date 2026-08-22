@@ -18,6 +18,9 @@ import {
   listSuscripcionesAPI,
   crearSuscripcionOrgAPI,
   listSuscripcionesPersonalesAPI,
+  vencimientosAPI,
+  avisarVencimientosAPI,
+  renovarSuscripcionAPI,
   crearSuscripcionPersonalAPI,
   ESTADOS_SUSCRIPCION,
   cambiarEstadoSuscripcionPersonalAPI,
@@ -32,6 +35,7 @@ import {
   type SuscripcionOrg,
   type SuscripcionPersonal,
   type CuentaBloqueada,
+  type Vencimiento,
 } from '@/lib/api';
 import { CampoFecha } from '@/components/CampoFecha';
 import { FilaSuscripcion } from '@/components/FilaSuscripcion';
@@ -182,6 +186,9 @@ export default function AdminEcosistemaPage() {
           {msg.texto}
         </p>
       )}
+
+      {/* ── VENCIMIENTOS: lo único de esta pantalla que caduca ──────────── */}
+      <Vencimientos ocupado={ocupado} onAccion={accion} />
 
       {/* ── ACCESOS RÁPIDOS: correo → app + rol → un clic ───────────────── */}
       <AccesosRapidos
@@ -833,6 +840,173 @@ function AccesosRapidos({
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+/**
+ * **El recordatorio para el super-admin**: qué vence esta semana y qué ya
+ * venció.
+ *
+ * ── Por qué está aquí arriba y no en una pestaña ──
+ *
+ * Porque es lo único de este panel que caduca. Las organizaciones y los planes
+ * están cuando se les busca; una suscripción vencida, en cambio, tiene al club
+ * entero sin poder abrir sus aplicaciones y nadie se entera hasta que el
+ * maestro escribe. Si hay que ir a buscarlo, se mira el día que ya es tarde.
+ *
+ * ── Por qué se dibuja solo cuando hay algo ──
+ *
+ * Una tarjeta permanente que casi siempre dice «todo al día» deja de leerse a
+ * la semana, y el día que diga otra cosa tampoco se leerá.
+ *
+ * ── El botón de avisar ──
+ *
+ * Manda el correo a los maestros de los clubes de la lista. El servidor no
+ * repite el mismo aviso antes de una semana, así que pulsarlo dos veces no
+ * llena el buzón de nadie: la segunda vez contesta «0 avisadas».
+ */
+function Vencimientos({
+  ocupado,
+  onAccion,
+}: {
+  ocupado?: boolean;
+  onAccion: (fn: () => Promise<unknown>, exito: string, fallo: string) => Promise<unknown>;
+}) {
+  const [filas, setFilas] = useState<Vencimiento[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [recarga, setRecarga] = useState(0);
+
+  useEffect(() => {
+    vencimientosAPI()
+      .then(setFilas)
+      .catch(() => setFilas([]))
+      .finally(() => setCargando(false));
+  }, [recarga]);
+
+  if (cargando || filas.length === 0) return null;
+
+  const vencidas = filas.filter((f) => f.estado === 'vencida');
+  const porVencer = filas.filter((f) => f.estado === 'por_vencer');
+
+  /** «Venció hace 3 días» se entiende; «-3» hay que traducirlo. */
+  const plazo = (dias: number | null) => {
+    if (dias === null) return 'sin fecha';
+    if (dias < 0) {
+      const n = Math.abs(dias);
+      return `venció hace ${n} ${n === 1 ? 'día' : 'días'}`;
+    }
+    if (dias === 0) return 'vence hoy';
+    return `vence en ${dias} ${dias === 1 ? 'día' : 'días'}`;
+  };
+
+  return (
+    <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">⏳ Vencimientos</h2>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            {vencidas.length > 0 && (
+              <span style={{ color: 'var(--danger)' }}>
+                {vencidas.length} vencida{vencidas.length === 1 ? '' : 's'}
+              </span>
+            )}
+            {vencidas.length > 0 && porVencer.length > 0 && ' · '}
+            {porVencer.length > 0 && `${porVencer.length} por vencer esta semana`}
+            . Una suscripción vencida apaga las aplicaciones del club entero.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            void onAccion(
+              () =>
+                avisarVencimientosAPI().then((r) => {
+                  setRecarga((n) => n + 1);
+                  return r;
+                }),
+              'Avisos enviados a los maestros.',
+              'No se pudieron enviar los avisos.',
+            )
+          }
+          disabled={ocupado}
+          className="btn btn-outline btn-sm"
+          title="Manda el correo de vencimiento a los maestros. No repite el mismo aviso antes de una semana."
+        >
+          ✉ Avisar a los maestros
+        </button>
+      </div>
+
+      <ul className="flex flex-col gap-2">
+        {filas.map((v) => (
+          <li
+            key={v.id}
+            className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+            style={{
+              borderColor: v.estado === 'vencida' ? 'var(--danger)' : 'var(--border)',
+            }}
+          >
+            <div className="min-w-0">
+              <p className="truncate font-semibold" title={v.orgName}>
+                {v.orgName}
+              </p>
+              <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                {v.planName} ·{' '}
+                <span
+                  style={{
+                    color: v.estado === 'vencida' ? 'var(--danger)' : 'var(--gold)',
+                  }}
+                >
+                  {plazo(v.dias)}
+                </span>
+                {v.venceEl ? ` (${v.venceEl})` : ''}
+              </p>
+              {/* Saber si ya se le escribió evita el correo de más y la llamada
+                  de menos. */}
+              {v.lastReminderAt && (
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Avisado el {new Date(v.lastReminderAt).toLocaleDateString('es-CO')}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  void onAccion(
+                    () =>
+                      renovarSuscripcionAPI(v.id, {
+                        meses: v.renewalMonths ?? 1,
+                      }).then((r) => {
+                        setRecarga((n) => n + 1);
+                        return r;
+                      }),
+                    `${v.orgName} renovada.`,
+                    'No se pudo renovar.',
+                  )
+                }
+                disabled={ocupado}
+                className="btn btn-gold btn-sm"
+                // Un mes al precio del plan, dado por pagado: es el 95 % de las
+                // veces. Para lo demás —tres meses, un abono parcial— está el
+                // formulario de la fila de abajo.
+                title={`Renueva ${v.renewalMonths ?? 1} mes al precio del plan y lo da por pagado`}
+              >
+                ↻ Renovar
+              </button>
+              {v.orgEmail && (
+                <a
+                  href={`mailto:${v.orgEmail}`}
+                  className="btn btn-outline btn-sm"
+                  title={v.orgEmail}
+                >
+                  ✉
+                </a>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

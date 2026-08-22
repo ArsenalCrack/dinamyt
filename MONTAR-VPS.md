@@ -1,13 +1,18 @@
 # DINAMYT — Montar el VPS, paso a paso
 
+> **Esto ya está hecho.** El servidor lleva en marcha desde el 20 de agosto de
+> 2026 y responde en `dinamyt.org`, `id.dinamyt.org`, `club.dinamyt.org` y
+> `campeonatos.dinamyt.org`, con HTTPS y las cuatro apps en systemd.
+>
+> Se conserva para **rehacerlo**: si el servidor se muere, se cambia de
+> proveedor o hay que levantar un segundo entorno, esto es la receta completa —
+> de un Ubuntu recién instalado a las apps sirviendo por HTTPS.
+>
+> **Para el día a día no es este documento**, es [OPERAR.md](OPERAR.md):
+> desplegar, migrar, respaldar, diagnosticar. Aquí solo se viene a construir.
+>
 > Guía para alguien que **nunca ha administrado un servidor**. Cada paso dice qué
 > escribir, qué tiene que salir en pantalla, y qué hacer si sale otra cosa.
->
-> Es la ejecución del bloque **B1** de
-> `productos/campeonatos/PLAN-ECOSYSTEM-VPS.md` (§3, §6, §7). Ese archivo es el
-> plan; este es el manual de manos.
->
-> **Fecha tope de B1: 29 de agosto.** El campeonato es el 9, 10 y 11 de octubre.
 
 ---
 
@@ -1054,6 +1059,9 @@ SMTP_PASS=
 MAIL_FROM=DINAMYT <no-reply@dinamyt.org>
 MAIL_REPLY_TO=soporte@dinamyt.org
 MAIL_DAILY_MAX=90
+CRON_SECRET=
+MEMBRESIAS_SYNC_URL=https://membresias-api.dinamyt.org
+ECOSYSTEM_SYNC_SECRET=
 ADMIN_EMAIL=admin@dinamyt.org
 ADMIN_PASSWORD=UNA_CLAVE_FUERTE
 ADMIN_NAME=Super Administrador DINAMYT
@@ -1076,8 +1084,28 @@ ADMIN_DOCUMENT=1000000000
 > alguien reclama. Contado aquí, el envío 91 no sale y queda escrito en el
 > registro.
 >
-> `PORTAL_URL` es la base del enlace de invitación. Si apunta al sitio
-> equivocado, el enlace lleva a una página que no existe.
+> `PORTAL_URL` es la base del enlace de invitación y del pie de todos los
+> correos. Si apunta al sitio equivocado, el enlace lleva a una página que no
+> existe.
+
+> **Las otras tres vacías, y qué apagan.**
+>
+> · `CRON_SECRET` — el aviso diario de suscripciones por vencer. Sin ella, la
+>   ruta `POST /subscriptions/avisos/cron` responde **404**, que es lo correcto:
+>   una ruta sin autenticar que manda correo a todos los clubes no puede quedar
+>   abierta «por si acaso». El botón «Avisar a los maestros» del panel sigue
+>   funcionando sin ella. Genérala con
+>   `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
+>   y engánchala a un `systemd timer` o a un `cron` diario.
+>
+> · `ECOSYSTEM_SYNC_SECRET` — **tiene que valer LO MISMO en `ecosystem-api` y en
+>   `membresias-api`.** Es lo que autentica el aviso que lleva la foto, el
+>   escudo, el cinturón y la contraseña del portal hasta Membresías. Sin ella,
+>   el maestro sube la foto y el carnet se sigue imprimiendo con las iniciales;
+>   y la contraseña cambiada en el portal no vale en el club.
+>
+> · `MEMBRESIAS_SYNC_URL` — a dónde va ese aviso. El origen de `membresias-api`,
+>   **sin barra final**.
 
 ```bash
 nano /srv/dinamyt/apps/ecosystem-portal/.env.production
@@ -1436,29 +1464,21 @@ marcha atrás si algo pasa durante el campeonato.
 ---
 ---
 
-# Anexo A · Comandos que vas a necesitar siempre
+# Anexo A · Los cuatro comandos de supervivencia
+
+Lo justo para saber si algo está vivo mientras montas. **Los de todos los días
+—desplegar, migrar, respaldar— viven en [OPERAR.md](OPERAR.md), parte 2**, y no
+se repiten aquí: dos copias de un comando de despliegue es cómo una se queda
+vieja sin que nadie lo note.
 
 | Para qué | Comando |
 |---|---|
 | Entrar al servidor | `ssh dinamyt@80.190.78.70` (en tu PC) |
 | Ver si una app está viva | `sudo systemctl status campeonatos-api` |
 | Ver por qué falló | `sudo journalctl -u campeonatos-api -n 50 --no-pager` |
-| Reiniciar una app | `sudo systemctl restart campeonatos-api` |
 | Ver el registro en vivo | `sudo journalctl -u campeonatos-api -f` (salir: `Ctrl+C`) |
-| Cuánta memoria queda | `free -h` |
-| Cuánto disco queda | `df -h /` |
+| Cuánta memoria y disco | `free -h` · `df -h /` |
 | Entrar a la base | `sudo -u postgres psql -d dinamyt` (salir: `\q`) |
-
-**Desplegar un cambio nuevo** (después de hacer `git push` desde tu PC):
-
-```bash
-cd /srv/campeonatos && git pull
-cd frontend && npm ci && npm run build
-sudo systemctl restart campeonatos-web campeonatos-api
-```
-
-⚠️ Si tocaste cualquier variable `NEXT_PUBLIC_*` o `MEMBRESIAS_API_ORIGIN`, hay
-que **volver a compilar**, no basta con reiniciar: viven dentro del build.
 
 ---
 
@@ -1527,219 +1547,6 @@ Compilar, migrar y crear los servicios `academy-api` (`:3007`) y `academy-web`
 > despliega en B1: la evaluación de figuras quedará sin funcionar hasta que se
 > monte.
 
----
-
-# Anexo C · Lo que queda pendiente después de esto
-
-✅ **B1 está hecho** (20 de agosto): el VPS responde en `dinamyt.org`,
-`id.dinamyt.org`, `club.dinamyt.org` y `campeonatos.dinamyt.org`, con HTTPS y
-las cuatro apps en systemd.
-
-| Bloque | Qué falta | Tope |
-|---|---|---|
-| **B2** | Correo con Resend: verificar dominio, plantillas, prueba con SPF y DKIM en verde. Hasta entonces no hay registro por correo ni recuperación de contraseña. **Ya no bloquea a B3**: los usuarios importados entran con su contraseña de siempre. | 5 sep |
-| **B3** | Identidad única. **La mitad está hecha** (20 ago): migración `0004`, guion de reconciliación con su ensayo, roles por app en el token y espejo en Membresías → ver **`IDENTIDAD-PASO-A-PASO.md`**. Falta correrlo en el VPS y falta Campeonatos (bloques C1–C7). | 19 sep |
-| 🔒 | **Del 1 al 13 de octubre no se toca nada.** Snapshot el día 8. | — |
-
-**Dos arreglos de código pendientes**, los dos en el repo `dinamyt-combat`:
-
-`[ ]` `backend/app/config.py:64` trae `admin@dinamyt.com` como valor por
-defecto, y ese dominio es de otra persona. Cámbialo a `admin@dinamyt.org`.
-
-`[ ]` **Campeonatos ejecuta DDL al arrancar** (`ALTER TABLE … ENABLE ROW LEVEL
-SECURITY`, en `app/rls.py`) y eso necesita un candado exclusivo. Si hay una
-transacción olvidada —y las hay: SQLAlchemy deja la sesión abierta cuando una
-petición no cierra—, ese `ALTER` se queda en cola **y bloquea a todo el que
-llegue detrás, aunque solo quiera leer**. Pasó el 20 de agosto: tumbó el
-respaldo previo a la reconciliación sin un solo error en ningún registro.
-
-> **No es teórico: se bloquea contra sí mismo.** Una de sus sesiones deja la
-> transacción abierta y otra pide el candado del arranque; matar la sesión no
-> sirve porque la app la regenera. Lo que lo suelta es `systemctl stop
-> campeonatos-api`.
->
-> Dos costuras que lo cierran: un `SET lock_timeout = '5s'` antes del DDL de
-> arranque (mejor que la app se queje a que cuelgue la base), y cerrar la
-> sesión en el `teardown_appcontext` de Flask. Mientras tanto, el parche del
-> lado de la base ya está puesto:
-> `ALTER DATABASE dinamyt SET idle_in_transaction_session_timeout = '5min'`.
-
----
-
-## Anexo C.1 · El portal, para después del campeonato
-
-Nada de esto es necesario para devolver el servicio ni para el campeonato del
-9 de octubre. Va aquí escrito para que no se pierda, y se hace **desde el 14 de
-octubre** (§10 del plan maestro, Fase 2).
-
-### C.1.1 El portal por dentro: más completo y con más información
-
-Hoy `ecosystem-portal` es poco más que la puerta de entrada: login, salto a las
-apps y el panel del super-admin. Le falta ser la **cara** de DINAMYT.
-
-`[ ]` **Portada pública** — qué es DINAMYT, qué hace cada una de las tres apps,
-      capturas, y a quién sirve (club, federación, competidor). Hoy quien llega
-      sin cuenta ve un formulario de login y nada más.
-`[ ]` **Planes y precios** — qué incluye cada plan y el botón de contacto. Es la
-      pieza que §10.1 y §10.2 del plan maestro dan por hecha.
-`[ ]` **«Mi cuenta» de verdad** — perfil completo, foto, disciplinas y grado,
-      acudientes y menores (§2.2), y **pedir el documento** a quien llegó por la
-      reconciliación y no lo tiene.
-`[ ]` **«Mi club»** — ficha del club con logo, horarios, dirección y redes, que
-      ya existe en `organizations` y nadie enseña.
-`[ ]` **Pie de página con el copyright** — `© 2026 DINAMYT. Todos los derechos
-      reservados.` más los enlaces a **términos de servicio**, **política de
-      privacidad** y **tratamiento de datos personales**. Esto último no es
-      cosmética: la app pide documento, fecha de nacimiento, teléfono, tipo de
-      sangre y contacto de emergencia de menores de edad. En Colombia eso es la
-      Ley 1581 de 2012, y `users.data_consent_at` ya guarda el consentimiento
-      sin que haya una página que explique a qué se consintió.
-`[ ]` **Contacto y soporte** — `soporte@dinamyt.org`, que sale del Email Routing
-      del bloque B2.
-
-### C.1.2 Que Google encuentre DINAMYT
-
-Hoy el portal es una app de Next.js sin una sola señal para un buscador: sin
-título propio por página, sin descripción, sin mapa del sitio y sin nada que le
-diga a Google qué es esto. Buscar «dinamyt» no lo encuentra.
-
-`[ ]` **`robots.txt`** — permitir la portada y las páginas públicas, y **negar**
-      `/admin`, `/perfil` y cualquier ruta con sesión. Que un panel de
-      administración salga en Google es un problema, no una victoria.
-`[ ]` **`sitemap.xml`** — generado por Next (`app/sitemap.ts`), con la portada,
-      planes, cada app y las páginas legales.
-`[ ]` **Metadatos por página** (`export const metadata`): título, descripción,
-      `canonical`, y `lang="es-CO"` en el `<html>`.
-`[ ]` **Open Graph y Twitter Card** — imagen, título y descripción, para que el
-      enlace se vea bien cuando alguien lo pegue en WhatsApp (que es por donde
-      va a viajar de verdad).
-`[ ]` **Datos estructurados** (JSON-LD `Organization` y `SoftwareApplication`)
-      con el nombre, el logo y la URL.
-`[ ]` **Google Search Console** — verificar el dominio por registro DNS TXT
-      (no por archivo: el DNS ya está en Cloudflare y no depende del despliegue)
-      y **enviar el sitemap a mano** el primer día. Sin eso, la indexación puede
-      tardar semanas.
-`[ ]` **Favicon, `apple-touch-icon` y `manifest.webmanifest`** con el logo.
-`[ ]` **Comprobar que la portada se sirve en HTML** y no solo tras ejecutar
-      JavaScript: si es un componente de cliente, Google ve una página vacía.
-
-> **Los subdominios de las apps no se indexan.** `club.`, `campeonatos.` e
-> `id.` son herramientas con sesión, no páginas para buscar: `robots.txt`
-> propio con `Disallow: /` en cada uno. Lo que tiene que salir en Google es
-> `dinamyt.org` y nada más.
-
----
-
-## Anexo C.2 · Las fotos, ahora que hay disco propio
-
-**Cómo están hoy.** La foto de cada persona y el escudo del club viajan DENTRO
-de la fila, como data-URL en `users.avatar_url` y `orgs.logo_url`, con un tope
-de 90 000 caracteres (~66 KB). La API nunca devuelve el data-URL en los
-listados: devuelve la dirección de una ruta que sirve la imagen en binario, con
-`ETag` y caché de un año.
-
-**Y estaba bien.** En Render el disco se borra en cada despliegue y en Vercel es
-de solo lectura: meter la imagen en la base era la única opción que no obligaba
-a contratar un bucket, y quien lo escribió dejó resueltos los dos problemas que
-eso trae (el tamaño y que no viaje en los listados).
-
-**Lo que cambió el 20 de agosto:** ahora hay un disco que no se borra, y un
-Caddy delante que sabe servir archivos sin despertar a Node.
-
-### Lo que cuesta dejarlo como está
-
-| | |
-|---|---|
-| **+33 % de peso** | Base64 es así. Una foto de 60 KB ocupa 80 KB en la fila |
-| **El respaldo carga con todo** | El volcado diario que sube a la nube lleva dentro todas las fotos de todos los clubes, todas las noches, hayan cambiado o no |
-| **Cada foto es una consulta** | Servirla despierta a Node y a PostgreSQL. Un archivo en disco lo sirve Caddy solo, y con Cloudflare delante (Anexo D) ni siquiera llega al servidor |
-| **El carnet se ve regular** | 66 KB obliga a recomprimir fuerte. Con archivos en disco, el tope lo pone el sentido común y no la fila |
-
-### Cómo se hace bien
-
-1. **El binario al disco, la clave a la base.** La columna deja de guardar la
-   imagen y guarda `/media/fotos/a3f9…c1.webp`.
-2. **El nombre es el hash del contenido.** Misma foto = mismo archivo; foto
-   nueva = nombre nuevo. Eso permite cachear «para siempre»
-   (`Cache-Control: public, max-age=31536000, immutable`) sin miedo a servir la
-   vieja, que es el problema clásico de las fotos de perfil.
-3. **Caddy la sirve** desde `/srv/media` con `file_server`. Node no se entera.
-4. **Dos tamaños**: la original y una miniatura para el roster y el carnet
-   (`sharp` en Node hace las dos al subirla).
-5. **El disco pasa a ser estado**: entra en el respaldo diario junto al volcado
-   (`rclone` ya sube a R2; se le añade la carpeta).
-6. **La migración no rompe nada**: la columna acepta las tres formas
-   (`data:`, `/media/…`, `https://`) y ya hay una función que las distingue
-   (`esImagenIncrustada`). Un guion recorre las filas, escribe el archivo y
-   reescribe la columna. Idempotente, y con la app en marcha.
-
-### Cuándo
-
-**Después del campeonato.** Toca las dos apps y no arregla nada que hoy duela:
-con un club y fotos de 25 KB, esto es higiene, no urgencia. Adelántalo solo si
-el volcado diario empieza a pesar de verdad (digamos, más de 200 MB) o si
-quieres fotos decentes en el carnet impreso.
-
----
-
-## Anexo C.3 · Una sola fuente de verdad para los datos de la persona
-
-**La regla, en una frase:**
-
-> **La persona se edita en el portal. La ficha se edita en su app.**
-
-Hoy el mismo dato se puede tocar en tres sitios y gana el último que escribió.
-Con la reconciliación hecha, eso deja de ser un detalle: si el nombre está en
-`ecosystem.users` y también en `membresias.users`, el carnet y la planilla del
-campeonato acaban diciendo cosas distintas de la misma persona.
-
-### El reparto
-
-| Dato | Dónde vive | Quién lo edita |
-|---|---|---|
-| Nombre, correo, documento, teléfono, nacimiento, foto | `ecosystem.users` | **La persona**, en el portal |
-| Tipo de sangre, contacto de emergencia | `ecosystem.users` | La persona |
-| Acudiente ↔ menor | `ecosystem.user_guardians` | La persona (el maestro lo propone) |
-| **Grado / cinturón** | `ecosystem.user_disciplines` | **El maestro.** Un grado es una certificación del club, no algo que uno se pone |
-| Plan, pagos, asistencias, carnet | `membresias` | El maestro |
-| Categoría, peso, inscripciones, resultados | `campeonatos` | El maestro y el admin |
-
-### Cómo se implementa
-
-`[ ]` En Membresías y Campeonatos, los datos de persona se ven **en solo
-      lectura**, con un botón **«Editar en dinamyt.org»** que lleva al portal y
-      vuelve a donde estabas.
-`[ ]` Sus endpoints de escritura **dejan de aceptar** esos campos. Que la
-      pantalla no los muestre no basta: la API es la puerta que hay que cerrar.
-`[ ]` El ecosystem expone `GET /users/:sub/perfil` y
-      `GET /organizations/:id/members` (§4.1 #8 del plan maestro).
-`[ ]` Cada app guarda un **espejo de solo lectura** (nombre y foto, lo que se
-      pinta en cada pantalla), refrescado en el login y con caducidad corta.
-      **El espejo no es opcional**: sin él, Campeonatos en modo local —el día
-      del evento, sin internet— no sabría ni cómo se llama la gente.
-
-### Las dos excepciones, que son de verdad
-
-1. **La ficha sin cuenta.** El alumno sin correo no tiene persona en el
-   ecosistema: ahí el maestro sigue editándolo todo en Membresías, como hoy. El
-   día que esa ficha se enlace a una cuenta, sus datos de persona pasan a solo
-   lectura y lo que había se sube al ecosistema **solo donde el hueco esté
-   vacío**.
-
-2. **Corregir a quien todavía no ha entrado.** El maestro escribe «Jhon» y era
-   «John». Si la persona nunca ha iniciado sesión en el portal, no hay a quién
-   pedirle que lo arregle. Para eso: `[ ]` añadir `users.last_login_at`, y
-   permitir al gestor del club editar los datos de persona de sus miembros
-   **mientras esa columna esté en NULL**. En cuanto la persona entra una vez,
-   sus datos son suyos.
-
-> **Por qué el grado es del ecosistema y no de Membresías.** Porque el
-> competidor que se inscribe a un campeonato lleva su cinturón, y hoy ese dato
-> se escribe a mano por segunda vez en Campeonatos. Con el grado en la persona,
-> la inscripción se rellena sola y deja de haber dos verdades sobre la misma
-> franja.
-
----
 ---
 
 # Anexo D · Encender el proxy de Cloudflare (la nube naranja)
@@ -1868,7 +1675,11 @@ el 13 de octubre.
 ---
 ---
 
-# Anexo E · El correo (bloque B2), paso a paso
+# Anexo E · El correo: Resend y el DNS, paso a paso
+
+> Esto es la parte que se hace **una vez**: la cuenta del proveedor y los
+> registros del dominio. Cómo funciona el correo por dentro, qué mensajes manda
+> y cómo comprobar que sale: [OPERAR.md](OPERAR.md), parte 3.
 
 **Por qué no ves ningún registro de correo: porque no existe todavía.** Un
 dominio recién comprado no recibe ni envía correo hasta que se lo montas, y son
@@ -1911,11 +1722,16 @@ llega de vuelta, esta mitad está hecha.
 
 ## E.2 · Enviar: Resend ⏱ 20 min + espera de DNS
 
-> **Antes de nada, la migración `0007_registro_pendiente`.** El registro cambió:
-> la cuenta ya no nace al pulsar «Crear cuenta», nace cuando la persona teclea
-> el código. Sin la tabla `ecosystem.pending_registrations`, `/auth/register` y
-> `/auth/verify-email` responden 500. Ver
-> [CORREO-PASO-A-PASO.md](CORREO-PASO-A-PASO.md), §0.
+> **Antes de nada, las migraciones al día.** El registro cambió: la cuenta ya no
+> nace al pulsar «Crear cuenta», nace cuando la persona teclea el código. Sin la
+> tabla `ecosystem.pending_registrations` (migración `0007`), `/auth/register` y
+> `/auth/verify-email` responden 500.
+>
+> ```bash
+> cd /srv/dinamyt/apps/ecosystem-api && pnpm db:diagnostico && pnpm db:migrar
+> ```
+>
+> Qué significa cada error del diagnóstico: [OPERAR.md](OPERAR.md), §2.6.
 
 1. Crea la cuenta en **resend.com** (el plan gratis basta: 3.000 al mes, **100
    al día**, un dominio).

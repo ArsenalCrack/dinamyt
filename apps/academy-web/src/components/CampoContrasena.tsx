@@ -10,7 +10,7 @@ import { useState } from 'react';
  * Academy no tenía ojo: se escribía a ciegas. Membresías y Campeonatos dibujan
  * este mismo SVG, y el portal ahora también. Tres apps del mismo ecosistema con
  * tres ojos distintos es justo lo que delata que son tres productos (ver
- * `UNA-SOLA-APP.md`, §2).
+ * `OPERAR.md`, §4.8).
  *
  * ── Por qué un botón propio y no el del navegador ──
  *

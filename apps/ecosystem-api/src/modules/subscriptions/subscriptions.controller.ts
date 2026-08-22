@@ -5,12 +5,18 @@ import {
   Patch,
   Delete,
   Param,
+  Query,
   Body,
+  Headers,
+  NotFoundException,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
 import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../auth/jwt.service';
 
 @Controller('subscriptions')
 export class SubscriptionsController {
@@ -61,6 +67,50 @@ export class SubscriptionsController {
     return this.subsService.findAll();
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  VENCIMIENTOS Y AVISOS
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // ⚠️ Estáticas y declaradas ANTES que las de `:id`. En Nest gana la primera
+  // que coincide, y `avisos` encajaría en `:id` si fuera al revés.
+
+  // ── GET /subscriptions/vencimientos — el recordatorio para el super-admin ─
+  @Get('vencimientos')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  vencimientos(@Query('dias') dias?: string) {
+    const n = Number(dias);
+    return this.subsService.vencimientos(Number.isFinite(n) && n > 0 ? n : 7);
+  }
+
+  // ── POST /subscriptions/avisos — mandar los correos AHORA ─────────────────
+  // El botón del panel. `forzar=1` reenvía aunque ya se haya avisado esta
+  // semana: sirve para probar que el correo sale.
+  @Post('avisos')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  avisar(@Body() body: { soloId?: string; forzar?: boolean }) {
+    return this.subsService.avisarVencimientos({
+      soloId: body?.soloId,
+      forzar: body?.forzar === true,
+    });
+  }
+
+  // ── POST /subscriptions/avisos/cron — el disparo diario ───────────────────
+  //
+  // Sin sesión: quien llama es una máquina y no tiene cuenta. La puerta es
+  // `CRON_SECRET`, y **si esa variable no está definida la ruta no existe** —
+  // una ruta sin autenticar que manda correo a todos los clubes no puede
+  // quedarse abierta «por si acaso». Es el mismo criterio que usa Membresías
+  // con su cron de avisos.
+  @Post('avisos/cron')
+  avisarPorCron(@Headers('x-cron-secret') secreto?: string) {
+    const esperado = process.env.CRON_SECRET;
+    if (!esperado) throw new NotFoundException('No encontrado.');
+    if (secreto !== esperado) {
+      throw new UnauthorizedException('Secreto de cron inválido.');
+    }
+    return this.subsService.avisarVencimientos();
+  }
+
   // ── GET /subscriptions/org/:orgId — suscripciones de una org (autenticado)─
   @Get('org/:orgId')
   @UseGuards(EcosystemJwtGuard)
@@ -73,9 +123,47 @@ export class SubscriptionsController {
   @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
   registerPayment(
     @Param('id') id: string,
-    @Body() body: { paidAmount: string; notes?: string },
+    @Body() body: { paidAmount: string; notes?: string; method?: string },
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.subsService.registerPayment(id, body);
+    return this.subsService.registerPayment(id, {
+      ...body,
+      registeredByUserId: user.sub,
+    });
+  }
+
+  // ── POST /subscriptions/:id/renovar — el mes siguiente, de un gesto ───────
+  //
+  // Esto es lo que sustituye a «crear otra suscripción cada mes». Extiende la
+  // fecha, deja el pago escrito en el historial y reactiva la que estuviera
+  // suspendida por no pagar — que es justo lo que acaba de dejar de ser cierto.
+  @Post(':id/renovar')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  renovar(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      meses?: number;
+      /** Lo que cuesta el periodo. Por defecto, el precio del plan. */
+      precio?: string;
+      /** Lo que entregó. Por defecto, el precio. */
+      amount?: string;
+      method?: string;
+      notes?: string;
+    },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.subsService.renovar(id, {
+      ...body,
+      registeredByUserId: user.sub,
+    });
+  }
+
+  // ── GET /subscriptions/:id/pagos — el historial ───────────────────────────
+  @Get(':id/pagos')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  historial(@Param('id') id: string) {
+    return this.subsService.historial(id);
   }
 
   // ── PATCH /subscriptions/:id/status — cambiar estado (solo super admin) ───
@@ -108,6 +196,28 @@ export class SubscriptionsController {
     body: { status: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'PENDING_REVIEW' },
   ) {
     return this.subsService.updateStatusPersonal(id, body.status);
+  }
+
+  // ── POST /subscriptions/user/:id/renovar — renovar una personal ──────────
+  @Post('user/:id/renovar')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  renovarPersonal(
+    @Param('id') id: string,
+    @Body()
+    body: { meses?: number; amount?: string; method?: string; notes?: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.subsService.renovarPersonal(id, {
+      ...body,
+      registeredByUserId: user.sub,
+    });
+  }
+
+  // ── GET /subscriptions/user/:id/pagos — historial de una personal ────────
+  @Get('user/:id/pagos')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  historialPersonal(@Param('id') id: string) {
+    return this.subsService.historial(id, true);
   }
 
   // ── DELETE /subscriptions/user/:id — borrar personal ──────────────────────

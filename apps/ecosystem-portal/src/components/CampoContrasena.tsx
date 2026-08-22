@@ -9,7 +9,7 @@ import { useState } from 'react';
  *
  * El portal dibujaba 👁 / 🙈. Membresías y Campeonatos dibujan este SVG. Tres
  * apps del mismo ecosistema con tres ojos distintos es justo lo que delata que
- * son tres productos (ver `UNA-SOLA-APP.md`, §2). El emoji además se pinta
+ * son tres productos (ver `OPERAR.md`, §4.8). El emoji además se pinta
  * distinto —o no se pinta— según el sistema, y en Android sale de color.
  *
  * ── Por qué un botón propio y no el del navegador ──

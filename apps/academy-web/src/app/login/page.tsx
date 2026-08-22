@@ -102,7 +102,7 @@ export default function Login() {
 
         <label className="muted" style={{ fontSize: '0.8rem' }} htmlFor="password">Contraseña</label>
         {/* El ojo: el MISMO componente y el mismo dibujo que el portal,
-            Membresías y Campeonatos (ver UNA-SOLA-APP.md §2). */}
+            Membresías y Campeonatos (ver OPERAR.md §4.8). */}
         <div style={{ margin: '0.3rem 0 1.1rem' }}>
           <CampoContrasena
             id="password"

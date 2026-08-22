@@ -3,12 +3,18 @@
 import { useState } from 'react';
 import {
   ESTADOS_SUSCRIPCION,
+  METODOS_PAGO,
   cambiarEstadoSuscripcionAPI,
   editarSuscripcionAPI,
   abonarSuscripcionAPI,
   eliminarSuscripcionAPI,
+  renovarSuscripcionAPI,
+  historialSuscripcionAPI,
+  nombreMetodo,
+  extraerError,
   type SuscripcionOrg,
   type Plan,
+  type PagoSuscripcion,
 } from '@/lib/api';
 import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
@@ -36,6 +42,17 @@ import { SelectMenu } from '@/components/SelectMenu';
  * Corregir fechas es raro; mirar el estado es constante. Con los campos
  * siempre abiertos, la lista de veinte suscripciones no cabe en una pantalla y
  * lo que se consulta a diario queda enterrado bajo formularios que nadie toca.
+ *
+ * ── Renovar es lo que se hace a diario, y por eso está fuera ──
+ *
+ * Antes cobrarle el mes siguiente a un club era crear OTRA suscripción: con
+ * quince clubes, quince formularios al mes y la historia de cada uno repartida
+ * en doce filas que nadie relacionaba. Ahora es un botón, y por eso está en la
+ * fila y no escondido detrás de «Editar»: es el gesto normal, no la excepción.
+ *
+ * Corregir una fecha a mano sigue existiendo —está donde estaba— pero ya no es
+ * el camino para renovar. Son cosas distintas: renovar deja un pago escrito y
+ * reactiva; editar arregla un dedazo.
  */
 
 /** Cómo se lee cada estado de pago. El valor crudo no lo entiende nadie. */
@@ -71,7 +88,43 @@ export function FilaSuscripcion({
   ) => Promise<unknown>;
 }) {
   const [editando, setEditando] = useState(false);
+  const [renovando, setRenovando] = useState(false);
   const [abono, setAbono] = useState('');
+  const [metodoAbono, setMetodoAbono] = useState('efectivo');
+
+  /** Lo que se va a cobrar. El precio sale del plan y casi nunca se toca. */
+  const precioMes = planes.find((p) => p.id === sub.planId)?.priceMonthly ?? null;
+  const [renovacion, setRenovacion] = useState({
+    meses: '1',
+    precio: '',
+    amount: '',
+    method: 'efectivo',
+    notes: '',
+  });
+
+  // ── El historial ──
+  // Se pide al abrirlo y no con la fila: son veinte suscripciones en pantalla y
+  // traer los pagos de todas para que se miren los de una es pedir veinte veces
+  // lo que no se va a leer.
+  const [pagos, setPagos] = useState<PagoSuscripcion[] | null>(null);
+  const [cargandoPagos, setCargandoPagos] = useState(false);
+  const [errorPagos, setErrorPagos] = useState('');
+
+  async function verHistorial() {
+    if (pagos) {
+      setPagos(null);
+      return;
+    }
+    setCargandoPagos(true);
+    setErrorPagos('');
+    try {
+      setPagos(await historialSuscripcionAPI(sub.id));
+    } catch (e) {
+      setErrorPagos(extraerError(e, 'No se pudo cargar el historial.'));
+    } finally {
+      setCargandoPagos(false);
+    }
+  }
   const [form, setForm] = useState({
     planId: sub.planId ?? '',
     startsAt: sub.startsAt ? sub.startsAt.slice(0, 10) : '',
@@ -111,7 +164,11 @@ export function FilaSuscripcion({
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        {/* Sin `shrink-0`: con cinco controles —estado, renovar, historial,
+            editar y borrar— este bloque ya no cabe en 375 px, y un hijo de un
+            flex que no puede encogerse tampoco llega a envolver: se sale de la
+            tarjeta y empuja la página entera hacia los lados. */}
+        <div className="flex flex-wrap items-center gap-1.5">
           <SelectMenu
             valor={sub.status}
             disabled={ocupado}
@@ -130,6 +187,25 @@ export function FilaSuscripcion({
             style={{ width: 'auto', minWidth: '9rem' }}
             botonStyle={{ padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
           />
+          {/* El primero de los botones, y en oro: es el que se pulsa cada mes.
+              «Editar» y «Borrar» son la excepción. */}
+          <button
+            type="button"
+            onClick={() => setRenovando(!renovando)}
+            disabled={ocupado}
+            className="btn btn-gold btn-sm"
+            title="Extiende la fecha y deja el pago escrito en el historial"
+          >
+            {renovando ? 'Cerrar' : '↻ Renovar'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void verHistorial()}
+            disabled={ocupado || cargandoPagos}
+            className="btn btn-outline btn-sm"
+          >
+            {cargandoPagos ? '…' : pagos ? 'Ocultar pagos' : 'Historial'}
+          </button>
           <button
             type="button"
             onClick={() => setEditando(!editando)}
@@ -165,6 +241,191 @@ export function FilaSuscripcion({
           </button>
         </div>
       </div>
+
+      {/* ── Renovar ─────────────────────────────────────────────────────
+          Los tres campos que de verdad cambian —cuántos meses, cuánto costó,
+          cuánto entregó— y nada más. El precio y el monto salen ya puestos con
+          el precio del plan: el caso normal es pulsar el botón sin tocar nada.
+
+          «Cuánto costó» y «cuánto entregó» son dos campos y no uno porque son
+          dos hechos distintos. Con uno solo, quien recibe la mitad tiene que
+          elegir entre mentir en el precio o mentir en lo pagado — y el estado
+          de pago deja de significar nada. */}
+      {renovando && (
+        <div
+          className="flex flex-col gap-2 border-t pt-2"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {vencida
+              ? 'Está vencida: el periodo nuevo empieza hoy.'
+              : `Le quedan días: el periodo nuevo empieza el ${new Date(sub.endsAt).toLocaleDateString('es-CO')} y no pierde ninguno.`}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <label className="block text-xs">
+              <span style={{ color: 'var(--text-muted)' }}>Meses</span>
+              <input
+                className="mt-1"
+                inputMode="numeric"
+                value={renovacion.meses}
+                onChange={(e) =>
+                  setRenovacion({
+                    ...renovacion,
+                    meses: e.target.value.replace(/[^0-9]/g, ''),
+                  })
+                }
+              />
+            </label>
+            <label className="block text-xs">
+              <span style={{ color: 'var(--text-muted)' }}>Cuánto costó</span>
+              <input
+                className="mt-1"
+                inputMode="numeric"
+                placeholder={
+                  precioMes
+                    ? String(Number(precioMes) * (Number(renovacion.meses) || 1))
+                    : 'Precio del plan'
+                }
+                value={renovacion.precio}
+                onChange={(e) =>
+                  setRenovacion({
+                    ...renovacion,
+                    precio: e.target.value.replace(/[^0-9.]/g, ''),
+                  })
+                }
+              />
+            </label>
+            <label className="block text-xs">
+              <span style={{ color: 'var(--text-muted)' }}>Cuánto entregó</span>
+              <input
+                className="mt-1"
+                inputMode="numeric"
+                placeholder="Todo"
+                value={renovacion.amount}
+                onChange={(e) =>
+                  setRenovacion({
+                    ...renovacion,
+                    amount: e.target.value.replace(/[^0-9.]/g, ''),
+                  })
+                }
+              />
+            </label>
+            <div className="block text-xs">
+              <span style={{ color: 'var(--text-muted)' }}>Cómo pagó</span>
+              <div className="mt-1">
+                <SelectMenu
+                  valor={renovacion.method}
+                  onChange={(v) => setRenovacion({ ...renovacion, method: v })}
+                  opciones={METODOS_PAGO.map((m) => ({
+                    valor: m.valor,
+                    etiqueta: m.etiqueta,
+                  }))}
+                  etiquetaAria="Forma de pago"
+                />
+              </div>
+            </div>
+          </div>
+          <label className="block text-xs">
+            <span style={{ color: 'var(--text-muted)' }}>Nota (opcional)</span>
+            <input
+              className="mt-1"
+              maxLength={300}
+              placeholder="«pagó agosto y septiembre juntos»"
+              value={renovacion.notes}
+              onChange={(e) => setRenovacion({ ...renovacion, notes: e.target.value })}
+            />
+          </label>
+          <div>
+            <button
+              type="button"
+              onClick={() =>
+                void onAccion(
+                  () =>
+                    renovarSuscripcionAPI(sub.id, {
+                      meses: Number(renovacion.meses) || 1,
+                      precio: renovacion.precio || undefined,
+                      amount: renovacion.amount || undefined,
+                      method: renovacion.method,
+                      notes: renovacion.notes || undefined,
+                    }),
+                  'Renovada: la fecha se extendió y el pago quedó registrado.',
+                  'No se pudo renovar.',
+                ).then(() => {
+                  setRenovando(false);
+                  setRenovacion({
+                    meses: '1',
+                    precio: '',
+                    amount: '',
+                    method: renovacion.method,
+                    notes: '',
+                  });
+                  setPagos(null);
+                })
+              }
+              disabled={ocupado}
+              className="btn btn-gold btn-sm"
+            >
+              Renovar y registrar el pago
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── El historial ────────────────────────────────────────────────
+          Lo que `paid_amount` nunca pudo contar: cuándo entró cada pago, cómo,
+          qué meses compró y quién lo recibió. Es lo que se mira cuando un club
+          dice que ya pagó. */}
+      {(pagos || errorPagos) && (
+        <div className="border-t pt-2" style={{ borderColor: 'var(--border)' }}>
+          {errorPagos && <p className="msg-error text-xs">{errorPagos}</p>}
+          {pagos && pagos.length === 0 && (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Todavía no hay ningún pago registrado.
+            </p>
+          )}
+          {pagos && pagos.length > 0 && (
+            // Se desliza sola en el celular: son seis columnas y no caben en
+            // 375 px sin partir las cifras.
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs" style={{ minWidth: '34rem' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)' }}>
+                    <th className="py-1 pr-3 text-left font-medium">Fecha</th>
+                    <th className="py-1 pr-3 text-right font-medium">Monto</th>
+                    <th className="py-1 pr-3 text-left font-medium">Cómo</th>
+                    <th className="py-1 pr-3 text-left font-medium">Periodo</th>
+                    <th className="py-1 text-left font-medium">Registró</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagos.map((pg) => (
+                    <tr key={pg.id} style={{ borderTop: '1px solid var(--border)' }}>
+                      <td className="py-1.5 pr-3 whitespace-nowrap">
+                        {new Date(pg.paidAt).toLocaleDateString('es-CO')}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right whitespace-nowrap font-semibold">
+                        {dinero(pg.amount)}
+                      </td>
+                      <td className="py-1.5 pr-3">{nombreMetodo(pg.method)}</td>
+                      <td className="py-1.5 pr-3 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                        {/* `periodos: 0` es un abono: paga deuda, no compra
+                            meses. Enseñarlo como un periodo vacío haría creer
+                            que ese dinero extendió la fecha. */}
+                        {pg.periodos > 0 && pg.periodoDesde && pg.periodoHasta
+                          ? `${pg.periodoDesde} → ${pg.periodoHasta}`
+                          : 'Abono'}
+                      </td>
+                      <td className="py-1.5" style={{ color: 'var(--text-muted)' }}>
+                        {pg.registradoPor ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {editando && (
         <div className="flex flex-col gap-2 border-t pt-2" style={{ borderColor: 'var(--border)' }}>
@@ -266,14 +527,36 @@ export function FilaSuscripcion({
                 style={{ width: 'auto' }}
               />
             </label>
+            <div className="block text-xs">
+              <span style={{ color: 'var(--text-muted)' }}>Cómo pagó</span>
+              <div className="mt-1">
+                <SelectMenu
+                  valor={metodoAbono}
+                  onChange={setMetodoAbono}
+                  opciones={METODOS_PAGO.map((m) => ({
+                    valor: m.valor,
+                    etiqueta: m.etiqueta,
+                  }))}
+                  etiquetaAria="Forma de pago del abono"
+                  style={{ width: 'auto', minWidth: '9rem' }}
+                />
+              </div>
+            </div>
             <button
               type="button"
               onClick={() =>
                 void onAccion(
-                  () => abonarSuscripcionAPI(sub.id, { paidAmount: abono }),
+                  () =>
+                    abonarSuscripcionAPI(sub.id, {
+                      paidAmount: abono,
+                      method: metodoAbono,
+                    }),
                   'Abono registrado.',
                   'No se pudo registrar el abono.',
-                ).then(() => setAbono(''))
+                ).then(() => {
+                  setAbono('');
+                  setPagos(null);
+                })
               }
               disabled={ocupado || !abono || Number(abono) <= 0}
               className="btn btn-outline btn-sm"

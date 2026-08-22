@@ -16,7 +16,7 @@ import { createPortal } from 'react-dom';
  * Selector de fecha propio, con año y mes a un toque.
  *
  * Es el MISMO componente que ya usan Membresías y Campeonatos, traído al portal
- * (bloque B5, `UNA-SOLA-APP.md` §4). Hasta aquí el portal era el único de los
+ * (`OPERAR.md`, §4.8). Hasta aquí el portal era el único de los
  * tres que seguía con `<input type="date">`.
  *
  * ── Por qué no `<input type="date">` ──

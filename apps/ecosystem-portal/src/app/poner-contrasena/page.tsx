@@ -95,7 +95,7 @@ function PonerContrasena() {
 
             {/* El mismo ojo que el login, Membresías y Campeonatos, en vez de
                 la casilla «ver lo que escribo» que solo existía aquí (ver
-                UNA-SOLA-APP.md §2). Cada campo lleva el suyo: quien se
+                OPERAR.md §4.8). Cada campo lleva el suyo: quien se
                 equivoca al repetirla necesita mirar ESA, no las dos. */}
             <Campo
               etiqueta="Contraseña"

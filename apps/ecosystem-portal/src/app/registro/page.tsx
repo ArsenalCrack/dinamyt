@@ -327,7 +327,7 @@ export default function RegistroPage() {
 
         <div data-campo="password">
           <Campo etiqueta="Contraseña" error={fallo('password')} htmlFor="reg-clave">
-            {/* El mismo ojo que Membresías y Campeonatos (ver UNA-SOLA-APP.md §2). */}
+            {/* El mismo ojo que Membresías y Campeonatos (ver OPERAR.md §4.8). */}
             <CampoContrasena
               id="reg-clave"
               value={form.password}

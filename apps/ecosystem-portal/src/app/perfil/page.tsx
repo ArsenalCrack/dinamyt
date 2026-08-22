@@ -208,7 +208,7 @@ export default function PerfilPage() {
     props: Record<string, unknown> = {},
   ) => {
     // Las contraseñas llevan el ojo del ecosistema, el mismo que el login,
-    // Membresías y Campeonatos (ver UNA-SOLA-APP.md §2). `type` sobra ahí: el
+    // Membresías y Campeonatos (ver OPERAR.md §4.8). `type` sobra ahí: el
     // componente lo maneja él.
     const { type, ...resto } = props;
     return (

@@ -1,0 +1,683 @@
+# DINAMYT — Operar el ecosistema
+
+> Léelo antes de tocar código o el servidor. Casi todo lo que hay aquí está
+> escrito porque **ya se rompió una vez**.
+>
+> Para montar el servidor desde cero: [MONTAR-VPS.md](MONTAR-VPS.md).
+> Para saber qué es cada pieza y correrlo en tu PC: [README.md](README.md).
+> Si se cae todo el día del campeonato: [CONTINGENCIA-CAMPEONATO.md](CONTINGENCIA-CAMPEONATO.md).
+
+**Estado: en producción desde el 20 de agosto de 2026**, en un VPS propio, con
+una sola base PostgreSQL y un esquema por app. Todo lo que hable de Vercel,
+Render o Supabase es historia: está en el registro de git, no aquí.
+
+---
+
+# PARTE 1 · Las reglas
+
+## 1.1 Dónde se edita cada cosa
+
+| Si vas a tocar… | Se edita en… | ⚠️ |
+|---|---|---|
+| Portal, identidad, Academy | `dinamyt` (este repo), en `apps/` | |
+| **Membresías** | `D:\Repositorios\dinamyt-membresias` | **NUNCA** en `productos/membresias` |
+| **Campeonatos** | `dinamyt-combat` (sin clonar todavía) | **NUNCA** en `productos/campeonatos` |
+
+`productos/` son **espejos** traídos con `git subtree`. Un cambio hecho ahí se
+pierde en la siguiente sincronización, **y se pierde en silencio**: `git subtree
+pull` no avisa de lo que aplasta. Para ponerlos al día:
+
+```powershell
+.\scripts\sync-apps.ps1
+```
+
+**El despliegue clona los tres repositorios**, no este espejo — así un despliegue
+nunca depende de que alguien se acordara de sincronizar.
+
+## 1.2 El orden al desplegar (romperlo tira el login)
+
+1. `git push` desde tu PC — **el VPS clona de GitHub, no de tu disco**.
+2. En el servidor: `git pull` → `pnpm install` → **compilar**.
+3. **Migrar la base ANTES de reiniciar.** El código nuevo lee columnas que crea
+   la migración; al revés, todos los inicios de sesión fallan. Mientras no
+   reinicies, el servicio sigue con el código viejo y la base migrada no le
+   molesta.
+4. Reiniciar el servicio.
+
+> **Membresías es la excepción**: aplica sus migraciones **ella sola al
+> arrancar**, y si fallan no arranca. Ahí reiniciar ES migrar.
+
+## 1.3 Qué obliga a volver a compilar
+
+- Cualquier variable **`NEXT_PUBLIC_*`** y `MEMBRESIAS_API_ORIGIN`: viven dentro
+  del build. Cambiarlas y solo reiniciar **no hace nada**.
+- Cambios en `packages/shared` o `membresias-db`: compilar el paquete **antes**
+  que quien lo consume.
+- **Archivos de `apps/ecosystem-api/src/assets/`** (hoy, el escudo de los
+  correos): los copia `nest build` gracias a `nest-cli.json`. Si el correo sale
+  sin logo, es que `dist/assets/` está vacío.
+
+## 1.4 Las variables que parecen opcionales y no lo son
+
+| Variable | Dónde | Si falta… |
+|---|---|---|
+| `TRUST_PROXY_HOPS` | las tres APIs | Todo el mundo cae en el mismo cubo del limitador: 10 inicios de sesión por minuto **para la plataforma entera**. `1` = solo Caddy · `2` = con Cloudflare |
+| `ECOSYSTEM_JWKS_URL` | membresias-api | El SSO no existe: saltas desde el portal y te vuelve a pedir la contraseña. **Vacía a propósito solo en el modo local del campeonato** |
+| `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` | membresias-web | No aparece «entrar con DINAMYT» ni el camino de vuelta |
+| `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe, y el pie de los correos apunta a ninguna parte |
+| `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: ver §3 |
+| `CRON_SECRET` | ecosystem-api | El aviso diario de suscripciones **no existe** (la ruta responde 404). El botón del panel sigue funcionando |
+| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api **y** membresias-api | **El mismo valor en las dos.** Sin él, la foto, el escudo, el cinturón y la contraseña que se guardan en el portal no llegan a Membresías: el carnet se sigue imprimiendo con lo que hubiera y la contraseña vieja sigue valiendo en el club |
+| `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
+
+## 1.5 Lo que nunca se hace
+
+- **Tocar nada entre el 1 y el 13 de octubre.** Campeonato el 9, 10 y 11.
+- **Desplegar sin respaldo** si la migración toca datos.
+- **Exigir correo para que alguien entre.** Quien no tiene correo usable entra
+  con carnet QR o PIN, y su ficha vive sin cuenta.
+- **Propagar `is_super_admin` automáticamente.** Se concede a mano, mirando.
+- **Romper el modo local de Campeonatos.** Sin internet, sin ecosistema, tiene
+  que arrancar igual: es la marcha atrás del día del evento.
+
+---
+
+# PARTE 2 · Comandos
+
+## 2.1 En tu PC, antes de empujar
+
+```bash
+pnpm turbo build test
+```
+
+```bash
+pnpm --filter @dinamyt/ecosystem-api reconciliar:ensayo
+```
+
+El segundo levanta un PostgreSQL de verdad (en WebAssembly), le aplica las
+migraciones reales y corre la reconciliación dos veces. Si tocas algo de
+identidad, esto tiene que seguir en verde.
+
+## 2.2 En el servidor, todos los días
+
+| Para qué | Comando |
+|---|---|
+| Entrar | `ssh dinamyt@80.190.78.70` |
+| ¿Está viva? | `sudo systemctl status dinamyt-id` |
+| ¿Por qué falló? | `sudo journalctl -u dinamyt-id -n 50 --no-pager` |
+| Reiniciar | `sudo systemctl restart dinamyt-id` |
+| Entrar a la base | `sudo -u postgres psql -d dinamyt` |
+| Memoria y disco | `free -h` · `df -h /` |
+
+Los servicios son: `dinamyt-id`, `dinamyt-portal`, `membresias-api`,
+`membresias-web`, `campeonatos-api`, `campeonatos-web`.
+
+> **Para leer un registro de arranque, `--since` y no `-n 20`.** Nest imprime
+> una línea por cada una de sus rutas al arrancar, así que la cola corta se
+> traga los mensajes que importan:
+> ```bash
+> sudo journalctl -u dinamyt-id --since "5 min ago" --no-pager | grep -iE "correo|smtp"
+> ```
+
+## 2.3 Desplegar el ecosystem
+
+```bash
+cd /srv/dinamyt && git pull && pnpm install --frozen-lockfile && pnpm --filter @dinamyt/shared build && pnpm --filter @dinamyt/ecosystem-api build && pnpm --filter @dinamyt/ecosystem-portal build
+```
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && pnpm db:migrar
+```
+
+```bash
+sudo systemctl restart dinamyt-id dinamyt-portal && sudo systemctl status dinamyt-id --no-pager
+```
+
+> **`db:migrar`, no `db:migrate`.** El segundo es `drizzle-kit`, que es una
+> **devDependency**: en un servidor instalado con `--prod` no está, y falla con
+> «drizzle-kit: not found», un error que no dice nada de bases de datos.
+> `db:migrar` usa el migrador de `drizzle-orm` —mismo diario, mismo orden,
+> mismos ficheros— y funciona con dependencias de producción.
+
+## 2.4 Desplegar Membresías
+
+```bash
+cd /srv/membresias && git pull && pnpm install --frozen-lockfile && pnpm --filter @dinamyt/membresias-db build && pnpm --filter @dinamyt/membresias-api build && pnpm --filter @dinamyt/membresias-web build && sudo systemctl restart membresias-api membresias-web
+```
+
+Aquí reiniciar ES migrar. Si la API **no arranca**, es que la migración falló:
+ese es el aviso, no un misterio.
+
+## 2.5 Respaldar antes de tocar
+
+```bash
+sudo -v && sudo -u postgres pg_dump -Fc dinamyt > ~/respaldo-$(date +%F).dump && sudo mv ~/respaldo-$(date +%F).dump /var/backups/ && sudo ls -lh /var/backups/
+```
+
+> El `>` lo ejecuta **tu** shell, no `sudo`: escribir directo en `/var/backups`
+> da `Permission denied`. Y **nunca** `sudo … | sudo tee …`: los dos `sudo`
+> piden contraseña al mismo teclado y se cuelga sin decir por qué.
+>
+> Si se queda colgado, **no es lento: está haciendo fila detrás de un candado**.
+> Ver §5.1 — casi siempre es Campeonatos, y se resuelve parándolo un minuto.
+
+## 2.6 Diagnóstico de la base
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && pnpm db:diagnostico
+```
+
+No escribe nada. Dice a qué base apunta de verdad, dónde está el diario de
+migraciones, qué tablas hay y cuáles faltan. **Empieza siempre por aquí** cuando
+algo de migraciones no cuadre: los tres fallos típicos dan errores casi
+idénticos y ninguno se explica solo.
+
+| Lo que dice | Qué es |
+|---|---|
+| `tenant or user not found` · `ENOTFOUND` · `ECONNREFUSED` | La base del `.env` no existe o no responde. No es un problema de migraciones |
+| `relation … already exists` | El diario está en el esquema `drizzle` y este proyecto lo lleva dentro de `ecosystem`. Se arregla una vez: `pnpm db:migrar --mover-diario` |
+| `permission denied` | Al usuario de la app le falta `CREATE`. Como `postgres`: `GRANT CREATE ON DATABASE dinamyt TO dinamyt_eco;` |
+
+## 2.7 La reconciliación de identidades
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && sudo -u postgres RECONCILIACION_DATABASE_URL=postgresql:///dinamyt node scripts/reconciliar-identidades.mjs --informe /tmp/ensayo.json
+```
+
+Sin `--aplicar` es un ensayo: hace **todo** el trabajo y deshace la transacción.
+El informe va a `/tmp` porque quien escribe es el usuario `postgres`, que no
+entra en `/root`.
+
+---
+
+# PARTE 3 · El correo
+
+## 3.1 Sin `SMTP_HOST`, la función de correo NO EXISTE
+
+No se rompe: no existe. Es el mismo criterio que el SSO y `CRON_SECRET`, y es lo
+que permitió que el ecosistema estuviera en producción sin proveedor contratado.
+Quien llama recibe un `false` y decide qué contar:
+
+- El **código del registro** sale por el registro del servidor
+  (`[SIN CORREO] OTP …`).
+- La **invitación del maestro** devuelve el enlace en pantalla, para mandarlo
+  por WhatsApp. En cuanto el correo funciona, deja de devolverse: el enlace es
+  una llave, y quien invita no debería ser quien la reparte.
+
+## 3.2 Las variables
+
+```
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=587
+SMTP_USER=resend
+SMTP_PASS=            la API key del proveedor
+MAIL_FROM=DINAMYT <no-reply@dinamyt.org>
+MAIL_REPLY_TO=soporte@dinamyt.org
+MAIL_DAILY_MAX=90     tope propio, por debajo del del proveedor
+PORTAL_URL=https://dinamyt.org
+```
+
+Es SMTP y no el SDK de nadie: Resend y Amazon SES hablan los dos SMTP, así que
+cambiar de proveedor son cuatro variables y ni una línea de código.
+
+**El tope se cuenta aquí, no en el proveedor.** Si Resend rechaza el correo 101
+el fallo es silencioso y nadie se entera hasta que alguien reclama. Con el tope
+propio, el envío 91 no sale y queda escrito en el registro con esas palabras.
+
+Montar Resend y el DNS (SPF, DKIM, DMARC): [MONTAR-VPS.md](MONTAR-VPS.md),
+Anexo E.
+
+## 3.3 Qué manda correo
+
+| Correo | Cuándo |
+|---|---|
+| Código de verificación | Al crear una cuenta. **La cuenta no existe hasta que se teclea el código** |
+| Código de recuperación | «¿Olvidaste tu contraseña?» |
+| Cuenta creada por el maestro | El maestro invita a alguien sin cuenta: enlace para poner contraseña |
+| Invitación a un club | El maestro invita a alguien que **sí** tiene cuenta: la acepta en su DINAMYT |
+| Solicitud aceptada o rechazada | El maestro responde a quien entró con el código del club |
+| Vencimiento de suscripción | Al maestro, cuando su club está por vencer o ya venció (§4.5) |
+
+Todos llevan el escudo **adjunto** (`cid:`) y no enlazado: Outlook y Thunderbird
+no bajan imágenes remotas hasta que la persona pulsa «descargar», y el correo
+con el código de verificación es el peor momento para que la marca aparezca como
+un cuadro roto.
+
+## 3.4 Comprobar que quedó
+
+```bash
+sudo journalctl -u dinamyt-id --since "5 min ago" --no-pager | grep -iE "correo|smtp"
+```
+
+✅ Tiene que decir `Correo por SMTP: smtp.resend.com:587`.
+
+Después, en el portal: **Crear cuenta** con un correo tuyo de verdad, mira la
+cabecera del mensaje (en Gmail: **⋮ → Mostrar original**) y comprueba
+**SPF: PASS**, **DKIM: PASS**, **DMARC: PASS**.
+
+---
+
+# PARTE 4 · Cómo funciona esto por dentro
+
+Las decisiones que ya son ley. Si vas a añadir una pantalla o una app, empieza
+por aquí.
+
+## 4.1 Una identidad, y una sola
+
+`ecosystem-api` es **el único que emite tokens**. Firma un JWT RS256 y publica
+la clave en `/auth/jwks`; las demás apps solo lo verifican y exigen su
+`app_scope` (`campeonatos`, `membresias`, `academy`). El contrato vive en
+`@dinamyt/shared` para que emisor y consumidores no se desincronicen.
+
+**El SSO es por fragmento**: el portal salta a `…/login#token=…`. Va detrás de
+la almohadilla a propósito — eso no llega al servidor ni queda en los registros
+de nadie. La app lo canjea por su propia cookie de sesión al aterrizar.
+
+## 4.2 Quién eres y qué abres son dos preguntas distintas
+
+| | Sale de | Es |
+|---|---|---|
+| **Quién eres** | `org_members`: a qué club perteneces y con qué rol en cada app | Identidad. No se apaga porque nadie haya pagado |
+| **Qué abres** | `subscriptions`: qué apps habilita el plan del club | Comercial |
+
+Mezclarlas dejaba `org_id` y los roles en `null` para todo club sin suscripción
+activa —es decir, para todos los recién reconciliados—: la gente entraba sin club
+y las apps no sabían quién era.
+
+**Hay cuatro roles por persona, y no sobran.** El GENERAL (`role`, del portal:
+quién gestiona el club) y uno por app (`role_membresias`, `role_campeonatos`,
+`role_academy`, la verdad de cada producto). La misma persona es alumno en su
+club y juez en un campeonato. Si añades una pantalla que toque roles, **enseña
+de cuál estás hablando**.
+
+## 4.3 El token se queda viejo, y hay que refrescarlo
+
+Dentro del token van el club, los roles y `app_scopes` — y todo eso lo cambia
+**otra persona**: el maestro que acepta una solicitud, el admin que activa la
+suscripción. Quien tuviera la sesión abierta seguía con el token de cuando
+entró, así que el alumno recién aceptado abría DINAMYT y no veía ni su club ni
+sus aplicaciones. Y Membresías tampoco le creaba la ficha, porque eso sale del
+`org_id` del token.
+
+`POST /auth/refresh` vuelve a firmarlo con lo que la base dice ahora. El
+dashboard del portal lo llama al abrir y después de aceptar una invitación.
+**Si añades una pantalla donde algo cambie la pertenencia, refresca ahí también.**
+
+## 4.4 Entrar a un club siempre lo deciden DOS
+
+Y solo cambia quién habla primero:
+
+| Camino | Quién empieza | Quién acepta |
+|---|---|---|
+| **El código del club** (`org_join_requests`) | La persona teclea el código | El maestro, en «Entrada al club» |
+| **La invitación** (`org_invitations`) | El maestro manda un correo | La persona, en su dashboard |
+| La reconciliación | — | Nadie: viene de datos que ya existían |
+
+**Ninguno de los dos mete a nadie sin su visto bueno.** La fila de `org_members`
+nace cuando alguien dice que sí, y con ella la ficha de Membresías —que se crea
+sola la primera vez que entre (`lib/aprovisionar.ts` allí)—.
+
+El super-admin sí puede colocar a alguien directo (`POST /organizations/:id/invite`):
+administra el ecosistema entero y a veces tiene que. El maestro no.
+
+## 4.5 Las suscripciones se renuevan, no se recrean
+
+Una suscripción de club es **una fila que se extiende**, no una fila nueva cada
+mes. Renovar (`POST /subscriptions/:id/renovar`) hace tres cosas de un gesto:
+extiende la fecha, deja el pago escrito en `subscription_payments` y reactiva la
+que estuviera suspendida por no pagar.
+
+El ciclo cuenta **meses, no días** (`common/ciclo.ts`), igual que Membresías con
+las mensualidades de los alumnos:
+
+- Quien renueva **antes** de vencer encadena desde su fecha: no pierde los días
+  que le quedaban.
+- Quien renueva **tarde** empieza hoy: no recibe gratis los meses que estuvo
+  vencido.
+- El **día ancla** se conserva. Quien paga el 5 sigue venciendo el 5 aunque un
+  mes se retrase al 12. Y quien empezó el 31 de enero vence el 28 de febrero y
+  el **31** de marzo — sumar días perdería ese día en cada mes corto.
+
+**El historial no es `paid_amount`.** Ese número solo dice cuánto se ha pagado en
+total; no dice cuándo, ni cómo, ni qué meses compró, ni quién lo recibió. Cuando
+un club reclama que ya pagó agosto, lo que se mira es la tabla.
+
+Los avisos:
+
+| Para quién | Dónde | Cuándo |
+|---|---|---|
+| **Para ti** | Tarjeta «⏳ Vencimientos» arriba de `/admin`. Solo aparece si hay algo | Siempre que abras el panel |
+| **Para el maestro** | Correo | Al entrar en «por vencer» (7 días antes), al vencer, y una vez por semana mientras siga sin pagar |
+
+El disparo diario es `POST /subscriptions/avisos/cron` con la cabecera
+`x-cron-secret`. Sin `CRON_SECRET` la ruta responde 404: una ruta sin autenticar
+que manda correo a todos los clubes no puede quedarse abierta «por si acaso».
+
+## 4.6 La persona se edita en el portal; la ficha, en su app
+
+| Dato | Dónde vive | Quién lo edita |
+|---|---|---|
+| Nombre, correo, documento, teléfono, nacimiento, foto, género | `ecosystem.users` | La persona, en el portal |
+| Cinturón, «entrena desde», tipo de sangre, contacto de emergencia | `ecosystem` | El maestro, en «Mi organización» |
+| Sede, horarios, contacto, escudo del club | `ecosystem.organizations` | Los gestores del club |
+| Plan, pagos, asistencia, kiosco | `membresias` | El club, en su app |
+
+Membresías dejó de tener formulario para los datos de la persona: los **lee**.
+Y como quien imprime el carnet es Membresías, el portal le **avisa** cada vez
+que se guarda (`POST /sync/persona`, `/sync/club`, `/sync/contrasena`, con
+`x-dinamyt-sync`). Sin ese aviso, el maestro sube la foto en el portal y el
+carnet sigue saliendo con las iniciales para siempre.
+
+**Es un aviso y no una escritura directa** porque Membresías se vende sola y
+puede estar en otra máquina; escribir en las tablas de otra app obliga a que las
+dos migren a la vez para siempre.
+
+## 4.7 Una contraseña para todo DINAMYT
+
+Se fija en el portal y las apps la **copian**. Nunca al revés, y nunca en dos
+sitios a la vez.
+
+**Viaja el hash de bcrypt, nunca la contraseña.** No hace falta: bcrypt guarda su
+propio costo dentro del hash, así que `compare` acepta igual el de 12 rondas del
+ecosistema y el de 10 de Membresías.
+
+Sale la copia desde `change-password`, `reset-password`, `set-password` y
+`verify-email`. **El único que NO copia** es el rehash tras un login correcto con
+una contraseña heredada: ahí la contraseña no cambió, solo se guardó con otro
+costo (`{ espejar: false }`).
+
+Una ficha **sin** `eco_sub` —el alumno sin correo, que entra por carnet QR o
+PIN— no tiene cuenta del ecosistema y este aviso no la toca jamás. Su contraseña
+sigue siendo asunto de su club.
+
+## 4.8 Que las tres apps se sientan una sola
+
+> Los colores, los tamaños y las formas se definen **una** vez y las tres apps
+> los leen. Ninguna app define un color propio.
+
+Hoy los tokens están espejados en el `globals.css` de cada web (tinta profunda +
+oro de marca, Archivo + Instrument Sans + IBM Plex Mono). El desplegable propio
+—`SelectMenu`— es el **mismo componente** en las tres: el `<select>` nativo se
+pinta con los colores del sistema operativo, y en Android abre su propia hoja a
+pantalla completa.
+
+**Una app del ecosistema nunca es un callejón sin salida**: el logo lleva al
+portal desde cualquier pantalla.
+
+Lo que **no** se unifica: el combate en vivo de Campeonatos (está hecho para
+gritar números a dos metros), el carnet de Membresías (está hecho para
+imprimirse) y el modo local de Campeonatos (arranca sin ecosistema, con su
+propio login).
+
+## 4.9 El mapa de la API del ecosistema
+
+El contrato que consumen las apps —lo único que no se puede cambiar sin avisar a
+las otras tres— es el payload del JWT. Vive en `@dinamyt/shared`:
+
+```ts
+interface JwtPayload {
+  sub: string;               // user_id (UUID del ecosistema)
+  email: string;
+  fullName: string;
+  org_id: string | null;     // el club de la pertenencia
+  app_scopes: string[];      // sale de las SUSCRIPCIONES, no de los roles
+  role_membresias: string | null;
+  role_campeonatos: string | null;
+  role_academy: string | null;
+  is_super_admin: boolean;
+}
+```
+
+Una app lo valida así, **sin llamar al ecosistema en cada petición**: se baja la
+clave pública de `GET /auth/jwks`, verifica la firma RS256, comprueba **el
+emisor** (§5.4) y que su scope esté en `app_scopes`.
+
+### `/auth`
+
+| Ruta | Quién | Qué |
+|---|---|---|
+| `POST /register` | pública | **No crea la cuenta**: deja un registro pendiente (caduca a los 20 min) y manda el código |
+| `POST /verify-email` | pública | **Aquí nace la cuenta**, y devuelve `access_token` |
+| `POST /resend-code` | pública | Otro código (espera de 60 s, máx. 5 envíos) |
+| `GET /disponibilidad` | pública | `?email=&documentId=` — lo consulta el formulario mientras se escribe |
+| `POST /login` · `/forgot-password` · `/reset-password` | pública | |
+| `POST /set-password` | pública | Canjea el enlace de invitación del maestro |
+| `POST /refresh` | sesión | Vuelve a firmar el token con lo de ahora (§4.3) |
+| `GET /me` · `POST /change-password` | sesión | |
+| `POST /verify-token` · `GET /jwks` | las apps | |
+
+### `/organizations`
+
+| Ruta | Quién | Qué |
+|---|---|---|
+| `POST /join` | sesión | Pedir entrar con el código del club |
+| `GET /solicitudes/mias` · `GET /invitaciones/mias` | sesión | Lo que pedí y lo que me ofrecen |
+| `POST /solicitudes/:id/responder` | gestor | El maestro acepta o rechaza |
+| `POST /invitaciones/:id/responder` | la persona invitada | Acepta o rechaza |
+| `GET` y `POST /:id/invitaciones` · `DELETE /invitaciones/:id` | gestor | Invitar, listar, retirar |
+| `GET`, `POST` y `DELETE /:id/codigo` · `GET /:id/solicitudes` | gestor | El código y su bandeja |
+| `GET /mi-club` · `POST /mi-club` | sesión | Ver mi club · fundar el mío |
+| `GET /mias` · `PATCH /:id` · `GET /:id/members` | gestor | Lo que administro |
+| `POST /:id/invite` | super-admin | Alta directa, sin preguntar (§4.4) |
+| `GET /clubes` · `POST /:id/invitar-club` · `GET /invitaciones-club/mias` | varios | Federación ↔ club |
+
+### `/subscriptions` y `/subscription-plans`
+
+Todo del super-admin, salvo `GET /subscriptions/org/:orgId` (autenticado) y
+`GET /subscription-plans` (pública, la usa `/planes`).
+
+| Ruta | Qué |
+|---|---|
+| `POST /subscriptions` · `POST /subscriptions/user` | Crear, de organización o personal |
+| `POST /subscriptions/:id/renovar` | **Extiende la fecha y deja el pago escrito** (§4.5) |
+| `GET /subscriptions/:id/pagos` | El historial |
+| `GET /subscriptions/vencimientos` | Lo que vence esta semana y lo que ya venció |
+| `POST /subscriptions/avisos` | Mandar los correos ahora |
+| `POST /subscriptions/avisos/cron` | El disparo diario (`x-cron-secret`) |
+| `PATCH /subscriptions/:id/payment` | Un abono suelto: paga deuda, no mueve la fecha |
+| `PATCH /subscriptions/:id` · `/:id/status` · `DELETE /:id` | Corregir, suspender, borrar |
+
+> **Borrar una suscripción con pagos está prohibido en el servidor.** No es una
+> comprobación de la pantalla: borrar la fila se llevaría por delante el
+> historial de ese dinero. Para eso está suspender, que corta el acceso y
+> conserva la historia.
+
+Hay ejemplos listos para usar en
+[`apps/ecosystem-api/requests/auth.http`](apps/ecosystem-api/requests/auth.http).
+
+---
+
+# PARTE 5 · Las trampas que ya costaron una tarde
+
+## 5.1 Una transacción olvidada secuestra la base entera
+
+Campeonatos lanza `ALTER TABLE … ENABLE ROW LEVEL SECURITY` **en cada arranque**.
+Si hay una sesión `idle in transaction`, ese `ALTER` se queda en cola — **y un
+candado exclusivo en cola bloquea a todo el que llega detrás, aunque solo quiera
+leer**. Síntoma: `pg_dump` «lento» que en realidad nunca arrancó. Sin un solo
+error en ningún registro.
+
+```bash
+sudo -u postgres psql -d dinamyt -c "select pid, state, wait_event_type, pg_blocking_pids(pid) as bloqueado_por, left(query,60) from pg_stat_activity where datname='dinamyt';"
+```
+
+Si al matar la sesión aparece otra igual, **es la app regenerándola**: párala
+(`sudo systemctl stop campeonatos-api`), haz lo tuyo, y levántala.
+
+El parche permanente ya está puesto:
+`ALTER DATABASE dinamyt SET idle_in_transaction_session_timeout = '5min'`.
+
+## 5.2 `postgresql:///base` no significa lo mismo para todos
+
+Para `psql` es «por el socket Unix». Para el driver de Node es **TCP a
+localhost**, donde PostgreSQL sí pide contraseña — de ahí un
+`password authentication failed for user "postgres"` que no tiene nada que ver
+con permisos. El guion ya lo resuelve solo; si te pasa con otro, delante:
+`PGHOST=/var/run/postgresql`.
+
+## 5.3 El mensaje de error que se comía a sí mismo
+
+NestJS responde `{ "message": "la explicación", "error": "Unauthorized" }`.
+`error` es el **nombre del código HTTP**, no una explicación. El portal lo leía
+primero, así que todo fallo se veía como «Unauthorized». Si escribes código de
+frontend nuevo: **primero `message`**.
+
+## 5.4 Un enlace firmado no es una sesión
+
+Todo lo que firma el ecosistema usa la misma llave RS256. Lo único que distingue
+una sesión de un enlace de invitación es el **emisor**, y hay que comprobarlo:
+sin eso, un enlace de siete días que viaja por WhatsApp abría `/auth/me` como
+sesión iniciada. Si añades otro tipo de token firmado, dale su propio emisor
+**y** su `purpose`.
+
+> **Y hay que comprobarlo en cada app que verifique tokens del ecosistema, no
+> solo en el ecosistema.** El `verificadorEcosystem` de Membresías aceptaba
+> cualquier firma RS256 válida sin mirar el emisor. Corregido el 20 de agosto.
+> **Campeonatos tiene que revisar lo mismo cuando escriba su verificador.**
+
+## 5.5 El bucle entre el login y la pantalla de dentro
+
+Salir de Membresías, pulsar «entrar con DINAMYT» y quedar rebotando entre el
+formulario y el panel del club, sin un solo error en pantalla. **Eran tres
+fallos encadenados, y cada uno solo se ve cuando se arreglan los otros dos:**
+
+1. **El portal daba por sesión cualquier cadena guardada.** No miraba el `exp`,
+   así que un token de ayer pasaba todos los guards del navegador. Ahora
+   `obtenerToken()` borra el que ya caducó.
+2. **El portal entregaba esa sesión sola.** Con `?redirect=` de una app, la
+   devolvía sin preguntar — aunque fuera **de otra persona**. Ahora enseña de
+   quién es y ofrece «continuar como…» o «entrar con otra cuenta».
+3. **La sesión de Membresías por SSO no era una sesión.** El token se quedaba en
+   una variable del navegador y nunca se convertía en cookie: funcionaba hasta
+   la primera recarga. Ahora se canjea en `POST /auth/sso`, que devuelve la
+   MISMA cookie httpOnly que el login por contraseña.
+
+> **La regla general:** una sesión es lo que el servidor reconoce, no lo que el
+> navegador guardó. Y quien redirige tiene que cambiar algo en cada vuelta
+> —borrar el token muerto, pedir una decisión—, o construye un bucle sin darse
+> cuenta.
+
+⚠️ Una ruta de Membresías que abre su propia transacción (`sinFiltroDeClub`) va
+en la lista `SIN_CONTEXTO` de `plugins/rls.ts`. Si se olvida, **no da error: se
+cuelga**, porque el envoltorio de RLS ya abrió una y PGlite es de una sola
+conexión. `/auth/login`, `/auth/acceso-qr` y `/auth/sso` están ahí por eso.
+
+## 5.6 `window.location` en el render de una página que se pre-renderiza
+
+En el servidor `window` no existe, así que esto:
+
+```tsx
+href={`${PORTAL}/login?redirect=${encodeURIComponent(
+  typeof window !== 'undefined' ? window.location.origin : '')}`}
+```
+
+sale al HTML con `?redirect=` **vacío**, y React **no corrige los atributos que
+no cuadran al hidratar** — lo dice en la consola: «this won't be patched up». El
+enlace se queda roto para siempre. Le pasaba a Academy.
+
+Se calcula **al pulsar**, no al pintar: un `<button>` con `onClick` que arma la
+dirección y navega.
+
+## 5.7 Un desplegable cuyo valor no está entre sus opciones MIENTE
+
+No se queda vacío ni avisa: enseña **la primera opción**. El panel del
+super-admin ofrecía `admin, maestro, coach, judge, competitor, member`, y la
+reconciliación escribe `student`, `staff` y `guardian`. Resultado: todos los
+alumnos importados aparecían como **«admin»** sin serlo. Y lo caro no es la
+mentira, es lo que provoca — quien la ve intenta corregirla, y al hacerlo
+sobrescribe el rol de verdad.
+
+> **El valor actual va SIEMPRE entre las opciones**, aunque esa pantalla no lo
+> pueda asignar. Una línea: `[...new Set([actual, ...asignables])]`.
+
+Vive en `apps/ecosystem-portal/src/lib/roles.ts` (`opcionesDeRol`), junto al
+catálogo único de nombres de rol.
+
+## 5.8 Si se pagina, se busca en el SERVIDOR
+
+Paginar y dejar el buscador filtrando en el navegador es **peor que no paginar**:
+solo encuentra a quien ya se descargó, así que el alumno de la página tres deja
+de existir. Y no da error — devuelve «no hay nadie», que se lee como un dato.
+
+Dos detalles que se olvidan siempre:
+
+- **Al escribir hay que volver a la página 1.** Buscar desde la cuarta muestra
+  «ninguno» con los resultados esperando en la primera.
+- **Espera antes de consultar.** Sin ella, teclear «Rodríguez» dispara nueve
+  peticiones y pueden volver desordenadas. 250 ms bastan.
+
+## 5.9 Un `<label>` que envuelve un botón lo dispara
+
+`CampoFecha` y `SelectMenu` no son `<input>`: son `<button>` que abren un panel.
+Metidos dentro de un `<label>`, pulsar el TEXTO de la etiqueta abre el panel — el
+navegador reenvía el clic al control que envuelve. Se ve como un panel que se
+abre solo.
+
+Por eso esos campos usan `<div className="block text-sm">` con un `<span>`
+dentro, y no `<label>`. Y como no son `<input required>`, **el navegador no
+detecta que están vacíos**: si el campo es obligatorio hay que comprobarlo a
+mano antes de enviar.
+
+## 5.10 Un hijo de un flex con `shrink-0` no envuelve: desborda
+
+Si un bloque de botones lleva `flex-wrap` **y** `shrink-0`, no puede encogerse,
+así que su `flex-wrap` nunca llega a aplicarse: se sale de la tarjeta y empuja
+la página entera hacia los lados en el celular. Pasó al añadir dos botones a la
+fila de suscripciones.
+
+> Después de tocar una fila con controles, comprueba a 375 px:
+> `document.documentElement.scrollWidth > clientWidth`.
+
+## 5.11 Cloudflare cambia las reglas del juego
+
+Con la nube naranja: `TRUST_PROXY_HOPS=2`, SSL/TLS en **Full (strict)**, puerto
+80 abierto (renovación del certificado), y **ningún registro DNS gris apuntando
+a tu IP** — uno solo tira a la basura todo el beneficio. Un subdominio proxiado
+sin nada detrás da **525**.
+
+---
+
+# PARTE 6 · Lo que queda pendiente
+
+## 6.1 Huecos conocidos
+
+`[ ]` **Un alumno desactivado en Membresías choca contra un 403 sin
+      explicación.** `isActive:false` corta el paso en `abrirSesion` —login y
+      SSO—, pero el portal no lo sabe (`org_members` no tiene estado) y le sigue
+      enseñando «Entrar a Membresías». Cerrarlo exige que el ecosistema lea el
+      estado de Membresías, o que el botón cuente lo que pasó cuando falle.
+
+`[ ]` **Campeonatos no lee el `#token=`.** Su `/login` existe, pero el salto
+      desde el portal aterriza en su formulario en vez de iniciar sesión. Se
+      edita en `dinamyt-combat`, que todavía no está clonado.
+
+`[ ]` **`backend/app/config.py:64` de Campeonatos** trae `admin@dinamyt.com`
+      por defecto, y ese dominio es de otra persona. Debe ser `.org`.
+
+`[ ]` **Campeonatos ejecuta DDL al arrancar** (§5.1). Dos costuras lo cierran:
+      un `SET lock_timeout = '5s'` antes del DDL, y cerrar la sesión en el
+      `teardown_appcontext` de Flask.
+
+## 6.2 Después del campeonato (desde el 14 de octubre)
+
+`[ ]` **Las fotos, al disco.** Hoy viajan como data-URL dentro de la fila
+      (`users.avatar_url`, tope ~66 KB). Estaba bien cuando el disco se borraba
+      en cada despliegue; ahora hay disco propio y un Caddy que sirve archivos
+      sin despertar a Node. Cuesta +33 % de peso (base64), mete todas las fotos
+      en el volcado diario y obliga a recomprimir fuerte para el carnet.
+      Se hace con el nombre = hash del contenido, para poder cachear «para
+      siempre» sin servir la vieja. La columna ya acepta las tres formas
+      (`data:`, `/media/…`, `https://`), así que la migración no rompe nada.
+
+`[ ]` **Tokens de estilo en un solo archivo** (`packages/shared/estilos.css`) en
+      vez de espejados en tres `globals.css`.
+
+`[ ]` **«Volver a mi ecosistema»** y el selector de apps dentro de cada app.
+
+`[ ]` **Cerrar sesión en una app cierra en el ecosistema.** Hoy cada una cierra
+      la suya y la otra sigue abierta — la forma más rápida de que alguien crea
+      que se salió y no lo hizo.
+
+> **El plan maestro** (el tablero de bloques B0…B5) vive dentro del espejo:
+> `productos/campeonatos/PLAN-ECOSYSTEM-VPS.md`. **Se edita en `dinamyt-combat`**,
+> nunca aquí.
