@@ -336,30 +336,90 @@ export const orgClubInvitations = eco.table('org_club_invitations', {
 // Membresías le crea la ficha sola la primera vez que entre (auto-
 // aprovisionamiento, M1 de §4.3): pertenecer al club y tener ficha en la app
 // dejan de ser dos altas que nadie conectaba.
-export const orgJoinRequests = eco.table('org_join_requests', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  orgId: uuid('org_id')
-    .notNull()
-    .references(() => organizations.id),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id),
-  /** `PENDIENTE` · `ACEPTADA` · `RECHAZADA`. */
-  status: varchar('status', { length: 20 }).notNull().default('PENDIENTE'),
-  /** Lo que escribe quien pide entrar («soy el papá de Ana», «entreno los martes»). */
-  note: varchar('note', { length: 300 }),
-  respondedAt: timestamp('responded_at'),
-  respondedByUserId: uuid('responded_by_user_id').references(() => users.id),
-  createdAt: timestamp('created_at').defaultNow(),
-}, (t) => [
-  // Parcial: una sola solicitud EN ESPERA por persona y club. Sin esto, pulsar
-  // dos veces «pedir entrar» —o volver a intentarlo porque no pasaba nada—
-  // llena la bandeja del maestro de la misma persona repetida. Las ya
-  // respondidas no estorban: quien fue rechazado puede volver a pedirlo.
-  uniqueIndex('ux_org_join_requests_pendiente')
-    .on(t.orgId, t.userId)
-    .where(sql`${t.status} = 'PENDIENTE'`),
-]);
+export const orgJoinRequests = eco.table(
+  'org_join_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** `PENDIENTE` · `ACEPTADA` · `RECHAZADA`. */
+    status: varchar('status', { length: 20 }).notNull().default('PENDIENTE'),
+    /** Lo que escribe quien pide entrar («soy el papá de Ana», «entreno los martes»). */
+    note: varchar('note', { length: 300 }),
+    respondedAt: timestamp('responded_at'),
+    respondedByUserId: uuid('responded_by_user_id').references(() => users.id),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (t) => [
+    // Parcial: una sola solicitud EN ESPERA por persona y club. Sin esto, pulsar
+    // dos veces «pedir entrar» —o volver a intentarlo porque no pasaba nada—
+    // llena la bandeja del maestro de la misma persona repetida. Las ya
+    // respondidas no estorban: quien fue rechazado puede volver a pedirlo.
+    uniqueIndex('ux_org_join_requests_pendiente')
+      .on(t.orgId, t.userId)
+      .where(sql`${t.status} = 'PENDIENTE'`),
+  ],
+);
+
+// ── Tabla: org_invitations (club → persona, por correo) ─────────────────────
+//
+// El camino B del plan, pero **preguntando**.
+//
+// Hasta aquí «invitar» era un nombre bonito para dar de alta: el maestro
+// tecleaba un correo, pulsaba «+ Añadir» y la fila de `org_members` nacía en el
+// acto. La persona se enteraba —si acaso— por un correo que ya no le
+// preguntaba nada. Es justo lo contrario de lo que hace el código del club
+// (`org_join_requests`), donde entrar siempre es una decisión de los DOS: uno
+// lo pide y el otro lo acepta. Aquí lo mismo, en el otro sentido: el club lo
+// ofrece y la persona lo acepta.
+//
+// ── Por qué la clave es el CORREO y no el usuario ──
+//
+// Porque el maestro invita a gente que a veces todavía no tiene cuenta. Cuando
+// la tiene, `user_id` se rellena y la invitación aparece en su panel de DINAMYT
+// al instante. Cuando no, se le crea la cuenta y se le manda el enlace para
+// poner contraseña (`inviteMember`), y esta invitación le está esperando dentro
+// cuando entre por primera vez. En los dos casos, `org_members` no se toca
+// hasta que alguien dice que sí.
+export const orgInvitations = eco.table(
+  'org_invitations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    /** A quién se invitó. Es la clave: puede no existir cuenta todavía. */
+    email: varchar('email', { length: 200 }).notNull(),
+    /** La cuenta, cuando la hay. Se rellena al crearla o al encontrarla. */
+    userId: uuid('user_id').references(() => users.id),
+    /** Rol general y por app con los que entraría. Los elige quien invita. */
+    role: varchar('role', { length: 50 }).notNull().default('member'),
+    roleMembresias: varchar('role_membresias', { length: 50 }),
+    roleCampeonatos: varchar('role_campeonatos', { length: 50 }),
+    roleAcademy: varchar('role_academy', { length: 50 }),
+    /** `PENDIENTE` · `ACEPTADA` · `RECHAZADA` · `CANCELADA`. */
+    status: varchar('status', { length: 20 }).notNull().default('PENDIENTE'),
+    /** Lo que le escribe el maestro («eres del grupo de los martes»). */
+    note: varchar('note', { length: 300 }),
+    invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
+    respondedAt: timestamp('responded_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (t) => [
+    // Una sola invitación EN ESPERA por correo y club, por lo mismo que en
+    // `org_join_requests`: pulsar dos veces «invitar» —o volver a intentarlo
+    // porque no se veía nada— llenaba la lista del mismo correo repetido.
+    // Las respondidas no estorban: a quien rechazó se le puede volver a
+    // invitar, que es lo que pasa cuando alguien se lo piensa mejor.
+    uniqueIndex('ux_org_invitations_pendiente')
+      .on(t.orgId, t.email)
+      .where(sql`${t.status} = 'PENDIENTE'`),
+  ],
+);
 
 // ── Tabla: audit_auth ──────────────────────────────────────────────────────
 export const auditAuth = eco.table('audit_auth', {

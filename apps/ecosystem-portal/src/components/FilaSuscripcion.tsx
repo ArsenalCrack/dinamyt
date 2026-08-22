@@ -11,6 +11,7 @@ import {
   type Plan,
 } from '@/lib/api';
 import { CampoFecha } from '@/components/CampoFecha';
+import { SelectMenu } from '@/components/SelectMenu';
 
 /**
  * Una suscripción de organización, con todo lo que se le puede hacer.
@@ -111,28 +112,24 @@ export function FilaSuscripcion({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-          <label className="sr-only" htmlFor={`estado-${sub.id}`}>
-            Estado de la suscripción
-          </label>
-          <select
-            id={`estado-${sub.id}`}
-            value={sub.status}
+          <SelectMenu
+            valor={sub.status}
             disabled={ocupado}
-            onChange={(e) =>
+            onChange={(v) =>
               void onAccion(
-                () => cambiarEstadoSuscripcionAPI(sub.id, e.target.value),
+                () => cambiarEstadoSuscripcionAPI(sub.id, v),
                 'Estado actualizado.',
                 'No se pudo cambiar el estado.',
               )
             }
-            style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
-          >
-            {ESTADOS_SUSCRIPCION.map((e) => (
-              <option key={e.valor} value={e.valor}>
-                {e.etiqueta}
-              </option>
-            ))}
-          </select>
+            opciones={ESTADOS_SUSCRIPCION.map((e) => ({
+              valor: e.valor,
+              etiqueta: e.etiqueta,
+            }))}
+            etiquetaAria="Estado de la suscripción"
+            style={{ width: 'auto', minWidth: '9rem' }}
+            botonStyle={{ padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
+          />
           <button
             type="button"
             onClick={() => setEditando(!editando)}
@@ -172,20 +169,18 @@ export function FilaSuscripcion({
       {editando && (
         <div className="flex flex-col gap-2 border-t pt-2" style={{ borderColor: 'var(--border)' }}>
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="block text-xs">
+            <div className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Plan</span>
-              <select
-                className="mt-1 w-full"
-                value={form.planId}
-                onChange={(e) => setForm({ ...form, planId: e.target.value })}
-              >
-                {planes.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <div className="mt-1">
+                <SelectMenu
+                  valor={form.planId}
+                  onChange={(v) => setForm({ ...form, planId: v })}
+                  opciones={planes.map((p) => ({ valor: p.id, etiqueta: p.name }))}
+                  etiquetaAria="Plan de la suscripción"
+                  placeholder="Plan…"
+                />
+              </div>
+            </div>
             <label className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Monto total</span>
               <input

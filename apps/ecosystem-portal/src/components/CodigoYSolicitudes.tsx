@@ -7,34 +7,70 @@ import {
   quitarCodigoClubAPI,
   solicitudesDelClubAPI,
   responderSolicitudAPI,
+  invitarPersonaAPI,
+  invitacionesDelClubAPI,
+  cancelarInvitacionAPI,
   extraerError,
   type SolicitudDeEntrada,
+  type InvitacionDelClub,
 } from '@/lib/api';
 import { Avatar } from '@/components/Avatar';
+import { SelectMenu } from '@/components/SelectMenu';
 import { nombreRol } from '@/lib/roles';
 
 /**
- * El código del club y la bandeja de quien pide entrar — la mitad del maestro.
+ * **Entrada al club: las dos puertas, juntas.**
+ *
+ * ── Por qué las dos viven aquí ──
+ *
+ * Entrar a un club siempre lo deciden DOS personas, y solo cambia quién habla
+ * primero:
+ *
+ *   · **El código** — la persona lo teclea y pide entrar; el maestro acepta.
+ *   · **La invitación** — el maestro la manda; la persona acepta.
+ *
+ * La invitación estaba al final de la lista de gente, disfrazada de «+ Añadir»
+ * junto a un buscador y una paginación, y no era ni lo uno ni lo otro: metía la
+ * fila de `org_members` en el acto, sin preguntarle a nadie. Vivía lejos de su
+ * pareja y hacía lo contrario de lo que decía. Ahora las dos puertas están en
+ * la misma tarjeta, cada una con su lista de espera debajo, y ninguna mete a
+ * nadie en ningún sitio sin su visto bueno.
  *
  * ── Por qué el código no se enseña solo ──
  *
  * Se crea la primera vez que alguien pulsa «ver el código». Un club que nunca
  * lo mira nunca lo tiene, y esa es la postura segura por defecto: la entrada
  * por código es una puerta, y las puertas se abren a propósito.
- *
- * ── Por qué la bandeja va JUNTO al código ──
- *
- * Porque son la misma decisión partida en dos momentos. Repartir un código sin
- * mirar quién llega es exactamente cómo entra al club gente que nadie invitó, y
- * si la bandeja vive en otra pantalla, nadie la abre.
  */
 
-/** Roles que el maestro puede dar al aceptar. El general va emparejado. */
-const AL_ACEPTAR: { valor: string; etiqueta: string; membresias: string }[] = [
+/**
+ * Roles que el maestro puede dar, y con qué entran a Membresías.
+ *
+ * La MISMA lista para las dos puertas: aceptar una solicitud y mandar una
+ * invitación acaban los dos en una fila de `org_members`, y ofrecer roles
+ * distintos según por dónde entre la persona es cómo se acaba con dos alumnos
+ * iguales que la app trata distinto.
+ */
+const ROLES_DE_ENTRADA: { valor: string; etiqueta: string; membresias: string }[] = [
   { valor: 'student', etiqueta: 'Alumno', membresias: 'student' },
   { valor: 'staff', etiqueta: 'Auxiliar / recepción', membresias: 'staff' },
   { valor: 'coach', etiqueta: 'Acudiente', membresias: 'guardian' },
 ];
+
+const OPCIONES_ROL = ROLES_DE_ENTRADA.map((r) => ({
+  valor: r.valor,
+  etiqueta: r.etiqueta,
+}));
+
+const paraMembresias = (rol: string) =>
+  ROLES_DE_ENTRADA.find((r) => r.valor === rol)?.membresias ?? 'student';
+
+/** Cómo se ve el estado de una invitación ya respondida. */
+const COLOR_ESTADO: Record<string, { borderColor: string; color: string }> = {
+  ACEPTADA: { borderColor: '#3ecf8e', color: '#3ecf8e' },
+  RECHAZADA: { borderColor: 'var(--danger)', color: 'var(--danger)' },
+  CANCELADA: { borderColor: 'var(--border-strong)', color: 'var(--text-muted)' },
+};
 
 export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
   const [codigo, setCodigo] = useState<string | null>(null);
@@ -45,6 +81,24 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
 
+  // ── La invitación ───────────────────────────────────────────────────────
+  const [invitaciones, setInvitaciones] = useState<InvitacionDelClub[]>([]);
+  const [nueva, setNueva] = useState({
+    email: '',
+    role: 'student',
+    fullName: '',
+    note: '',
+  });
+  /**
+   * El enlace que se devuelve cuando el correo NO salió.
+   *
+   * Es la muleta mientras el club no tenga proveedor de correo configurado: el
+   * maestro lo copia y lo manda por WhatsApp. Con el correo funcionando no
+   * aparece nunca — el enlace es una llave, y quien invita no debería ser quien
+   * la reparte.
+   */
+  const [enlaceSuelto, setEnlaceSuelto] = useState<string | null>(null);
+
   const cargarSolicitudes = useCallback(async () => {
     try {
       setSolicitudes(await solicitudesDelClubAPI(orgId));
@@ -53,9 +107,20 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
     }
   }, [orgId]);
 
+  const cargarInvitaciones = useCallback(async () => {
+    try {
+      setInvitaciones(await invitacionesDelClubAPI(orgId));
+    } catch {
+      // Que no se puedan listar las invitaciones no impide mandar una: el
+      // formulario sigue funcionando y esta lista simplemente no se dibuja.
+      setInvitaciones([]);
+    }
+  }, [orgId]);
+
   useEffect(() => {
     void cargarSolicitudes();
-  }, [cargarSolicitudes]);
+    void cargarInvitaciones();
+  }, [cargarSolicitudes, cargarInvitaciones]);
 
   async function accion<T>(fn: () => Promise<T>, exito: string, fallo: string) {
     setOcupado(true);
@@ -87,21 +152,63 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
   async function responder(s: SolicitudDeEntrada, aceptar: boolean) {
     const elegido = rolElegido[s.id] ?? 'student';
-    const par = AL_ACEPTAR.find((r) => r.valor === elegido);
     const r = await accion(
       () =>
         responderSolicitudAPI(s.id, {
           aceptar,
           role: elegido,
-          roleMembresias: par?.membresias ?? 'student',
+          roleMembresias: paraMembresias(elegido),
         }),
       aceptar
-        ? `${s.fullName} entró al club como ${nombreRol(elegido)}.`
+        ? `${s.fullName} entró al club como ${nombreRol(elegido)}. Le avisamos por correo.`
         : `Se rechazó la solicitud de ${s.fullName}.`,
       'No se pudo responder la solicitud.',
     );
     if (r) await cargarSolicitudes();
   }
+
+  async function invitar() {
+    setEnlaceSuelto(null);
+    const correo = nueva.email.trim();
+    const r = await accion(
+      () =>
+        invitarPersonaAPI(orgId, {
+          email: correo,
+          role: nueva.role,
+          roleMembresias: paraMembresias(nueva.role),
+          fullName: nueva.fullName.trim() || undefined,
+          note: nueva.note.trim() || undefined,
+        }),
+      // El texto cambia según lo que de verdad pasó al otro lado, y no es un
+      // matiz: «invitación enviada» cuando el correo no salió es la forma más
+      // rápida de que el maestro se quede esperando una respuesta que nadie
+      // sabe que tiene que dar.
+      '',
+      'No se pudo enviar la invitación.',
+    );
+    if (!r) return;
+
+    const nombreVisible = nueva.fullName.trim() || correo;
+    if (r.aviso.enviadoPorCorreo) {
+      setOk(
+        r.cuenta === 'existente'
+          ? `Invitación enviada a ${correo}. Le aparece en su DINAMYT para que la acepte.`
+          : `Le creamos la cuenta a ${nombreVisible} y le mandamos el enlace para poner su contraseña. La invitación le espera dentro.`,
+      );
+    } else {
+      setOk(
+        r.cuenta === 'existente'
+          ? `${correo} tiene la invitación esperando en su DINAMYT. Avísale tú: este club todavía no manda correos.`
+          : `Cuenta creada. Este club todavía no manda correos: pásale tú este enlace para que ponga su contraseña.`,
+      );
+      if (r.aviso.enlace) setEnlaceSuelto(r.aviso.enlace);
+    }
+
+    setNueva({ email: '', role: nueva.role, fullName: '', note: '' });
+    await cargarInvitaciones();
+  }
+
+  const enElAire = invitaciones.filter((i) => i.status === 'PENDIENTE');
 
   return (
     <section
@@ -109,12 +216,20 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
     >
       <h2 className="mb-1 text-lg font-semibold">Entrada al club</h2>
-      <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Reparte este código y quien lo teclee en DINAMYT te aparecerá aquí para
-        que lo aceptes. Al aceptarlo, su ficha se crea sola en Membresías.
+      <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
+        Dos puertas, y las dos las cierra alguien: <b>tú repartes el código</b> y
+        aceptas a quien lo teclee, o <b>tú invitas</b> y la persona acepta. En
+        cualquiera de las dos, su ficha se crea sola en Membresías al entrar.
       </p>
 
-      {/* ── El código ─────────────────────────────────────────────────── */}
+      {/* ══ Puerta 1 · El código ════════════════════════════════════════ */}
+      <h3
+        className="eyebrow mb-2"
+        style={{ color: 'var(--gold-dim)' }}
+      >
+        1 · Tu código
+      </h3>
+
       {!pedido ? (
         <button
           onClick={() => void verCodigo()}
@@ -181,10 +296,10 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         </div>
       )}
 
-      {/* ── La bandeja ────────────────────────────────────────────────── */}
-      <h3 className="mb-2 mt-5 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+      {/* ── La bandeja del código ──────────────────────────────────────── */}
+      <h4 className="mb-2 mt-5 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
         Piden entrar ({solicitudes.length})
-      </h3>
+      </h4>
 
       {solicitudes.length === 0 && (
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -224,24 +339,17 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-              <label className="sr-only" htmlFor={`rol-sol-${s.id}`}>
-                Rol de {s.fullName} al entrar
-              </label>
-              <select
-                id={`rol-sol-${s.id}`}
-                value={rolElegido[s.id] ?? 'student'}
-                onChange={(e) =>
-                  setRolElegido({ ...rolElegido, [s.id]: e.target.value })
-                }
+              {/* El desplegable del ecosistema, no el gris del sistema
+                  operativo: ver `SelectMenu.tsx`. */}
+              <SelectMenu
+                valor={rolElegido[s.id] ?? 'student'}
+                onChange={(v) => setRolElegido({ ...rolElegido, [s.id]: v })}
+                opciones={OPCIONES_ROL}
+                etiquetaAria={`Rol de ${s.fullName} al entrar`}
                 disabled={ocupado}
-                style={{ width: 'auto', padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
-              >
-                {AL_ACEPTAR.map((r) => (
-                  <option key={r.valor} value={r.valor}>
-                    {r.etiqueta}
-                  </option>
-                ))}
-              </select>
+                style={{ width: 'auto', minWidth: '10.5rem' }}
+                botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+              />
               <button
                 onClick={() => void responder(s, true)}
                 disabled={ocupado}
@@ -255,6 +363,149 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                 className="btn btn-outline btn-sm"
               >
                 Rechazar
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* ══ Puerta 2 · La invitación ════════════════════════════════════ */}
+      <hr className="my-6" style={{ borderColor: 'var(--border)' }} />
+
+      <h3 className="eyebrow mb-2" style={{ color: 'var(--gold-dim)' }}>
+        2 · Invitar por correo
+      </h3>
+      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+        Le llega un correo y le aparece en su DINAMYT. <b>No entra hasta que
+        acepte</b>: aquí se pregunta, no se agrega. Si todavía no tiene cuenta,
+        se la creamos y le mandamos el enlace para que ponga su contraseña.
+      </p>
+
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <input
+          placeholder="correo@persona.com"
+          type="email"
+          maxLength={200}
+          value={nueva.email}
+          onChange={(e) => setNueva({ ...nueva, email: e.target.value })}
+          aria-label="Correo de quien invitas"
+          className="min-w-0"
+        />
+        <SelectMenu
+          valor={nueva.role}
+          onChange={(v) => setNueva({ ...nueva, role: v })}
+          opciones={OPCIONES_ROL}
+          etiquetaAria="Rol con el que entraría"
+          disabled={ocupado}
+          style={{ minWidth: '11rem' }}
+        />
+      </div>
+
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <label className="block text-xs">
+          <span style={{ color: 'var(--text-muted)' }}>
+            Nombre completo — solo si todavía no tiene cuenta
+          </span>
+          <input
+            className="mt-1"
+            maxLength={200}
+            value={nueva.fullName}
+            onChange={(e) => setNueva({ ...nueva, fullName: e.target.value })}
+            placeholder="ANA RESTREPO"
+          />
+        </label>
+        <label className="block text-xs">
+          <span style={{ color: 'var(--text-muted)' }}>
+            Un mensaje para ella (opcional)
+          </span>
+          <input
+            className="mt-1"
+            maxLength={300}
+            value={nueva.note}
+            onChange={(e) => setNueva({ ...nueva, note: e.target.value })}
+            placeholder="«eres del grupo de los martes»"
+          />
+        </label>
+      </div>
+
+      <button
+        onClick={() => void invitar()}
+        disabled={ocupado || !nueva.email.trim()}
+        className="btn btn-gold mt-3"
+      >
+        ✉ Enviar invitación
+      </button>
+
+      {enlaceSuelto && (
+        <div
+          className="mt-3 rounded-lg border p-3 text-xs"
+          style={{ borderColor: 'var(--gold-dim)', background: 'var(--bg-elevated)' }}
+        >
+          <p className="mb-1 font-semibold">Pásale este enlace:</p>
+          <p className="break-all" style={{ color: 'var(--gold)' }}>
+            {enlaceSuelto}
+          </p>
+        </div>
+      )}
+
+      {/* ── Las invitaciones en el aire ─────────────────────────────────── */}
+      <h4 className="mb-2 mt-5 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+        Invitaciones sin responder ({enElAire.length})
+      </h4>
+
+      {enElAire.length === 0 && (
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          No tienes ninguna esperando.
+        </p>
+      )}
+
+      <ul className="flex flex-col gap-2">
+        {enElAire.map((i) => (
+          <li
+            key={i.id}
+            className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <Avatar src={i.avatarUrl} nombre={i.fullName ?? i.email} size={32} />
+              <div className="min-w-0">
+                <p className="truncate font-semibold" title={i.fullName ?? i.email}>
+                  {i.fullName ?? i.email}
+                </p>
+                <p
+                  className="truncate text-xs"
+                  style={{ color: 'var(--text-muted)' }}
+                  title={i.email}
+                >
+                  {i.email} · {nombreRol(i.role)}
+                </p>
+                {/* La diferencia importa: sin contraseña, la persona todavía no
+                    tiene dónde aceptar nada. */}
+                {!i.cuentaLista && (
+                  <span className="badge mt-1 inline-block">
+                    Aún no ha puesto su contraseña
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className="badge" style={COLOR_ESTADO[i.status]}>
+                Esperando
+              </span>
+              <button
+                onClick={() =>
+                  void accion(
+                    () => cancelarInvitacionAPI(i.id).then(cargarInvitaciones),
+                    `Se retiró la invitación de ${i.email}.`,
+                    'No se pudo retirar la invitación.',
+                  )
+                }
+                disabled={ocupado}
+                className="btn btn-outline btn-sm"
+                style={{ color: 'var(--danger)' }}
+                title={`Retirar la invitación de ${i.email}`}
+              >
+                Retirar
               </button>
             </div>
           </li>

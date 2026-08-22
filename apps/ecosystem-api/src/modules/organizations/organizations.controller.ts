@@ -163,6 +163,44 @@ export class OrganizationsController {
     );
   }
 
+  // ── GET /organizations/invitaciones/mias — las que ME esperan ────────────
+  // Estática y ANTES de `:id/…`, por lo mismo que `solicitudes/mias`.
+  @Get('invitaciones/mias')
+  @UseGuards(EcosystemJwtGuard)
+  misInvitaciones(@CurrentUser() user: JwtPayload) {
+    return this.orgsService.misInvitaciones(user.sub);
+  }
+
+  // ── POST /organizations/invitaciones/:id/responder — decide la persona ────
+  //
+  // Sin `exigirGestorDe`: quien responde es justo la persona invitada, que por
+  // definición todavía no gestiona nada. Lo que protege esta ruta es que el
+  // servicio comprueba que la invitación sea SUYA.
+  @Post('invitaciones/:id/responder')
+  @UseGuards(EcosystemJwtGuard)
+  responderInvitacion(
+    @Param('id') id: string,
+    @Body() body: { aceptar: boolean },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orgsService.responderInvitacion(
+      id,
+      user.sub,
+      body?.aceptar === true,
+    );
+  }
+
+  // ── DELETE /organizations/invitaciones/:id — el maestro la retira ─────────
+  @Delete('invitaciones/:id')
+  @UseGuards(EcosystemJwtGuard)
+  cancelarInvitacion(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.orgsService.cancelarInvitacion(
+      id,
+      user.sub,
+      user.is_super_admin,
+    );
+  }
+
   // ── GET /organizations/usuarios — buscador para el panel de Accesos ───────
   @Get('usuarios')
   @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
@@ -208,6 +246,45 @@ export class OrganizationsController {
     return this.orgsService.listarSolicitudes(id, todas === '1');
   }
 
+  // ── POST /organizations/:id/invitaciones — invitar a alguien al club ─────
+  //
+  // Es lo que sustituye al «+ Añadir» del panel del maestro. La diferencia no
+  // es de nombre: aquí NO nace ninguna pertenencia. Nace cuando la persona
+  // acepta (ver `invitarPersona`).
+  @Post(':id/invitaciones')
+  @UseGuards(EcosystemJwtGuard)
+  async invitarPersona(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      email: string;
+      role?: string;
+      roleMembresias?: string;
+      roleCampeonatos?: string;
+      roleAcademy?: string;
+      note?: string;
+      /** Obligatorio si esa persona todavía no tiene cuenta. */
+      fullName?: string;
+      phone?: string;
+    },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    await this.orgsService.exigirGestorDe(user.sub, id, user.is_super_admin);
+    return this.orgsService.invitarPersona(id, user.sub, body);
+  }
+
+  // ── GET /organizations/:id/invitaciones — las que el club tiene en el aire ─
+  @Get(':id/invitaciones')
+  @UseGuards(EcosystemJwtGuard)
+  async invitacionesDelClub(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Query('todas') todas?: string,
+  ) {
+    await this.orgsService.exigirGestorDe(user.sub, id, user.is_super_admin);
+    return this.orgsService.invitacionesDelClub(id, todas === '1');
+  }
+
   // ── GET /organizations/:id/hijas — clubes de una federación ───────────────
   @Get(':id/hijas')
   @UseGuards(EcosystemJwtGuard)
@@ -229,7 +306,11 @@ export class OrganizationsController {
     },
     @CurrentUser() user: JwtPayload,
   ) {
-    await this.orgsService.exigirAdminDe(user.sub, parentId, user.is_super_admin);
+    await this.orgsService.exigirAdminDe(
+      user.sub,
+      parentId,
+      user.is_super_admin,
+    );
     return this.orgsService.create({ ...body, parentId });
   }
 
@@ -399,7 +480,11 @@ export class OrganizationsController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    await this.orgsService.exigirRelacionCon(user.sub, orgId, user.is_super_admin);
+    await this.orgsService.exigirRelacionCon(
+      user.sub,
+      orgId,
+      user.is_super_admin,
+    );
     // `Number('')` da 0 y `Number('abc')` da NaN: los dos acabarían pidiendo
     // cero filas o reventando la consulta. Se filtran aquí.
     const aNumero = (v?: string) => {

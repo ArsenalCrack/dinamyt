@@ -147,6 +147,9 @@ describe('AuthService · la cuenta NO existe hasta que se verifica el correo', (
       'nueva.alumna@gmail.com',
       '123456',
       'EMAIL_VERIFY',
+      // El nombre viaja para que el correo salude a quien lo recibe: uno que
+      // sabe tu nombre se distingue a simple vista de uno de pesca.
+      'ANA RESTREPO',
     );
   });
 
@@ -186,6 +189,7 @@ describe('AuthService · verificar el código', () => {
   const PENDIENTE = {
     id: 'p1',
     email: 'ana@gmail.com',
+    fullName: 'ANA',
     code: '123456',
     attempts: 0,
     sends: 1,
@@ -281,6 +285,7 @@ describe('AuthService · verificar el código', () => {
       'ana@gmail.com',
       '999999',
       'EMAIL_VERIFY',
+      'ANA',
     );
     expect(res.codigoDigitos).toBe(6);
   });

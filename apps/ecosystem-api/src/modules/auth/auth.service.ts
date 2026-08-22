@@ -116,7 +116,12 @@ export class AuthService {
       gender,
     });
 
-    const enviado = await this.mailer.sendOtp(email, code, 'EMAIL_VERIFY');
+    const enviado = await this.mailer.sendOtp(
+      email,
+      code,
+      'EMAIL_VERIFY',
+      fullName,
+    );
 
     return {
       message: `Te enviamos un código de ${AuthService.CODIGO_DIGITOS} dígitos a ${email}.`,
@@ -304,9 +309,8 @@ export class AuthService {
         );
       }
 
-      const usuario = await this.usersService.confirmarRegistroPendiente(
-        pendiente,
-      );
+      const usuario =
+        await this.usersService.confirmarRegistroPendiente(pendiente);
       // Se entra directo. El código llegó a ese correo y alguien lo tecleó:
       // esa es toda la prueba que existe de que la dirección es suya, y pedirle
       // ahora la contraseña que acaba de elegir es preguntar dos veces.
@@ -391,7 +395,12 @@ export class AuthService {
     const { fila, code } = await this.usersService.renovarCodigoPendiente(
       pendiente.id,
     );
-    const enviado = await this.mailer.sendOtp(email, code, 'EMAIL_VERIFY');
+    const enviado = await this.mailer.sendOtp(
+      email,
+      code,
+      'EMAIL_VERIFY',
+      pendiente.fullName,
+    );
 
     return {
       message: `Te enviamos un código nuevo a ${email}.`,
@@ -494,6 +503,41 @@ export class AuthService {
     return { access_token: token };
   }
 
+  /**
+   * Vuelve a firmar el token de quien ya tiene sesión, con lo que la base dice
+   * AHORA.
+   *
+   * ── El agujero que tapa ──
+   *
+   * El token se firma al iniciar sesión y ahí dentro van el club, los roles por
+   * app y `app_scopes` (ver `buildToken`). Todo eso lo cambia OTRA persona: el
+   * maestro que acepta una solicitud, el admin que activa la suscripción del
+   * club. Quien tenía la sesión abierta seguía llevando el token de antes, así
+   * que el alumno recién aceptado entraba a DINAMYT y no veía ni su club ni sus
+   * aplicaciones — y peor, Membresías tampoco le creaba la ficha, porque eso
+   * también depende del `org_id` del token (`lib/aprovisionar.ts`).
+   *
+   * La única cura era cerrar sesión y volver a entrar, y eso no lo adivina
+   * nadie: desde fuera se ve como «la aplicación no me deja».
+   *
+   * ── Por qué no es un token de refresco de verdad ──
+   *
+   * Porque no hace falta ninguno: esto exige un token VIGENTE (lo comprueba el
+   * guard) y devuelve otro igual de vigente con los datos al día. No alarga la
+   * sesión más allá de lo que ya duraba el token que se presenta, así que un
+   * token robado no se convierte aquí en acceso perpetuo.
+   */
+  async refrescarSesion(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('Usuario no encontrado.');
+    // Las mismas puertas que el login: una cuenta suspendida entre dos
+    // refrescos no puede seguir renovándose sola.
+    if (!user.isActive) {
+      throw new UnauthorizedException('Tu cuenta está suspendida.');
+    }
+    return { access_token: await this.buildToken(user) };
+  }
+
   // ── Información completa de la cuenta (para el perfil) ────────────────────
   async getCuenta(userId: string) {
     const user = await this.usersService.findById(userId);
@@ -562,7 +606,12 @@ export class AuthService {
     if (!user) return respuesta;
 
     const code = await this.usersService.generateOtp(user.id, 'PASSWORD_RESET');
-    await this.mailer.sendOtp(user.email, code, 'PASSWORD_RESET');
+    await this.mailer.sendOtp(
+      user.email,
+      code,
+      'PASSWORD_RESET',
+      user.fullName,
+    );
     return respuesta;
   }
 
@@ -647,7 +696,11 @@ export class AuthService {
 
     // Después de comprobar el enlace y no antes: quien llega con un enlace
     // caducado tiene que enterarse de eso, no de que su contraseña es corta.
-    validarContrasena(newPassword, [user.email, user.fullName, user.documentId]);
+    validarContrasena(newPassword, [
+      user.email,
+      user.fullName,
+      user.documentId,
+    ]);
 
     await this.usersService.ponerContrasena(userId, newPassword);
     return {

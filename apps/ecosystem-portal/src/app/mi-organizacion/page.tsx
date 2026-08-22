@@ -10,7 +10,6 @@ import {
   setOrgActivaAPI,
   eliminarOrgAPI,
   listMiembrosAPI,
-  invitarMiembroAPI,
   cambiarRolMiembroAPI,
   quitarMiembroAPI,
   actualizarOrgInfoAPI,
@@ -67,7 +66,6 @@ export default function MiOrganizacionPage() {
   const [ocupado, setOcupado] = useState(false);
   const [cargando, setCargando] = useState(true);
 
-  const [invitacion, setInvitacion] = useState({ email: '', role: '' });
   const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: '' });
 
   // Ficha del club/organización seleccionada.
@@ -141,10 +139,6 @@ export default function MiOrganizacionPage() {
       red2: o?.socialLinks?.[1] ?? '',
       isPublic: o?.isPublic ?? false,
     });
-    setInvitacion((inv) => ({
-      ...inv,
-      role: o && esOrgGrande(o.type) ? 'judge' : 'competitor',
-    }));
     if (o && esOrgGrande(o.type)) {
       invitacionesClubEnviadasAPI(sel)
         .then(setEnviadas)
@@ -512,12 +506,24 @@ export default function MiOrganizacionPage() {
           )}
         </section>
 
-        {/* ── Entrada por código + bandeja de solicitudes ────────────────
-            Va ANTES de la lista de gente y no al final: quien está esperando
-            entrar es lo primero que hay que atender, y una bandeja escondida
-            debajo de doscientos alumnos es una bandeja que nadie abre. */}
-        {orgSel && <CodigoYSolicitudes key={orgSel.id} orgId={orgSel.id} />}
       </div>
+
+      {/* ── Entrada al club: el código y las invitaciones ──────────────────
+          Va ANTES de la lista de gente y no al final: quien está esperando
+          entrar —o esperando que le respondan— es lo primero que hay que
+          atender, y una bandeja escondida debajo de doscientos alumnos es una
+          bandeja que nadie abre.
+
+          Y va a lo ANCHO, fuera de la rejilla de dos columnas: son dos puertas
+          con su lista de espera y un formulario de cuatro campos. En media
+          pantalla los campos salían uno debajo de otro en una columna de
+          cuatro dedos, con la mitad derecha del monitor en blanco — el mismo
+          motivo por el que la ficha del club tiene su propia sección. */}
+      {orgSel && (
+        <div className="mt-5">
+          <CodigoYSolicitudes key={orgSel.id} orgId={orgSel.id} />
+        </div>
+      )}
 
       {/* ── Miembros de la org seleccionada ───────────────────────────── */}
       <section className="card mt-5 p-5">
@@ -527,8 +533,8 @@ export default function MiOrganizacionPage() {
         {orgSel && (
           <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
             {esOrgGrande(orgSel.type)
-              ? 'Como organización agregas administradores y jueces. Los competidores los agrega cada club.'
-              : 'Como club agregas maestros, coaches y competidores. Los jueces los agrega la organización.'}
+              ? 'Quien ya está dentro. Aquí cambias su rol y editas su ficha; para sumar a alguien, invítalo desde «Entrada al club».'
+              : 'Quien ya está dentro. Aquí cambias su rol y editas su ficha; para sumar a alguien, usa «Entrada al club» — tu código o una invitación.'}
           </p>
         )}
         {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría «sin
@@ -600,46 +606,18 @@ export default function MiOrganizacionPage() {
           )}
         </ul>
 
+        {/* La paginación cierra la lista, y ya no tiene debajo un formulario
+            pegado a ella. Aquí vivía el «+ Añadir»: un correo, un rol y un
+            botón que metía a la persona en el club en el acto, sin
+            preguntarle. Se mudó a «Entrada al club» —que es donde está su
+            pareja, el código— y ahora es una invitación de verdad: la persona
+            la acepta o la rechaza. Ver `CodigoYSolicitudes.tsx`. */}
         <Paginacion
           offset={offsetGente}
           limit={POR_PAGINA}
           total={totalMiembros}
           onIr={setOffsetGente}
         />
-
-        <div className="flex flex-wrap gap-2">
-          <input
-            placeholder="correo@persona.com"
-            type="email"
-            maxLength={200}
-            value={invitacion.email}
-            onChange={(e) => setInvitacion({ ...invitacion, email: e.target.value })}
-            className="min-w-0 flex-1"
-          />
-          <select
-            value={invitacion.role}
-            onChange={(e) => setInvitacion({ ...invitacion, role: e.target.value })}
-          >
-            {rolesPermitidos.map((r) => (
-              <option key={r} value={r}>
-                {nombreRol(r)}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() =>
-              accion(
-                () => invitarMiembroAPI(sel!, invitacion.email.trim(), invitacion.role),
-                'Miembro añadido.',
-                'No se pudo añadir (¿existe la cuenta?).',
-              )
-            }
-            disabled={ocupado || !sel || !invitacion.email.trim()}
-            className="btn btn-gold"
-          >
-            + Añadir
-          </button>
-        </div>
       </section>
 
       {/* ── Ficha del club (la ven los miembros en «Mi club») ──────────────

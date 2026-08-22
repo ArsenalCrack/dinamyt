@@ -13,8 +13,20 @@ import {
   subscriptionPlans,
   orgClubInvitations,
   orgJoinRequests,
+  orgInvitations,
 } from '../../db/schema';
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, or } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  isNull,
+  or,
+} from 'drizzle-orm';
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
 import { MailerService } from '../auth/mailer.service';
@@ -34,6 +46,26 @@ const ROLES_POR_TIPO: Record<string, string[]> = {
   LEAGUE: ['admin', 'judge'],
   CLUB: ['maestro', 'owner', 'staff', 'coach', 'competitor', 'student'],
   ACADEMY: ['maestro', 'owner', 'staff', 'coach', 'competitor', 'student'],
+};
+
+/**
+ * Cómo se llama cada rol en un correo.
+ *
+ * El portal ya tiene el suyo (`lib/roles.ts`), pero el correo lo escribe el
+ * servidor y allí no llega. Sin esto, al alumno le llegaba «te invitó como
+ * student», que en la pantalla nunca ha visto escrito así.
+ */
+const NOMBRE_DE_ROL: Record<string, string> = {
+  admin: 'Administrador',
+  owner: 'Dueño',
+  maestro: 'Maestro',
+  staff: 'Auxiliar',
+  coach: 'Coach',
+  judge: 'Juez',
+  competitor: 'Alumno',
+  student: 'Alumno',
+  guardian: 'Acudiente',
+  member: 'Miembro',
 };
 
 @Injectable()
@@ -352,7 +384,10 @@ export class OrganizationsService {
 
   // ── Clubes / organizaciones hijas de una federación ───────────────────────
   async findHijas(orgId: string) {
-    return db.select().from(organizations).where(eq(organizations.parentId, orgId));
+    return db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.parentId, orgId));
   }
 
   // ── Activar / desactivar una organización ──────────────────────────────────
@@ -421,7 +456,8 @@ export class OrganizationsService {
       .from(users)
       .where(eq(users.email, email.toLowerCase()))
       .limit(1);
-    if (!user) throw new NotFoundException('No se encontró un usuario con ese correo.');
+    if (!user)
+      throw new NotFoundException('No se encontró un usuario con ese correo.');
 
     // Membresía: crear o actualizar el rol.
     const [previa] = await db
@@ -444,7 +480,10 @@ export class OrganizationsService {
     const activas = await db
       .select({ appsIncluded: subscriptionPlans.appsIncluded })
       .from(subscriptions)
-      .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+      .innerJoin(
+        subscriptionPlans,
+        eq(subscriptions.planId, subscriptionPlans.id),
+      )
       .where(
         and(
           eq(subscriptions.orgId, orgId),
@@ -460,7 +499,9 @@ export class OrganizationsService {
         .where(eq(subscriptionPlans.isActive, true));
       const plan = planes.find((p) => p.appsIncluded?.includes(app));
       if (!plan) {
-        throw new BadRequestException(`No hay un plan activo que incluya "${app}".`);
+        throw new BadRequestException(
+          `No hay un plan activo que incluya "${app}".`,
+        );
       }
       const inicio = new Date();
       const fin = new Date();
@@ -530,7 +571,9 @@ export class OrganizationsService {
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
       .returning();
     if (!result[0]) {
-      throw new NotFoundException('Ese usuario no es miembro de la organización.');
+      throw new NotFoundException(
+        'Ese usuario no es miembro de la organización.',
+      );
     }
     return result[0];
   }
@@ -542,7 +585,9 @@ export class OrganizationsService {
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
       .returning();
     if (!result[0]) {
-      throw new NotFoundException('Ese usuario no es miembro de la organización.');
+      throw new NotFoundException(
+        'Ese usuario no es miembro de la organización.',
+      );
     }
     return { ok: true };
   }
@@ -603,7 +648,9 @@ export class OrganizationsService {
       .update(organizations)
       .set({
         ...(data.name !== undefined && { name: data.name }),
-        ...(data.description !== undefined && { description: data.description }),
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
         ...(data.address !== undefined && { address: data.address }),
         ...(data.schedule !== undefined && { schedule: data.schedule }),
         ...(data.phone !== undefined && { phone: data.phone }),
@@ -611,7 +658,9 @@ export class OrganizationsService {
         ...(data.city !== undefined && { city: data.city }),
         ...(data.country !== undefined && { country: data.country }),
         ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
-        ...(data.socialLinks !== undefined && { socialLinks: data.socialLinks }),
+        ...(data.socialLinks !== undefined && {
+          socialLinks: data.socialLinks,
+        }),
         ...(data.delegation !== undefined && { delegation: data.delegation }),
         ...(data.delegationCountry !== undefined && {
           delegationCountry: data.delegationCountry,
@@ -699,8 +748,7 @@ export class OrganizationsService {
     return filas.map((f) => ({
       ...f,
       gestores: gestores.filter((g) => g.orgId === f.id),
-      organizacionPadre:
-        padres.find((p) => p.id === f.parentId)?.name ?? null,
+      organizacionPadre: padres.find((p) => p.id === f.parentId)?.name ?? null,
     }));
   }
 
@@ -774,7 +822,9 @@ export class OrganizationsService {
     }
     const club = await this.findById(clubId);
     if (club.type !== 'CLUB' && club.type !== 'ACADEMY') {
-      throw new BadRequestException('Solo se pueden invitar clubes o academias.');
+      throw new BadRequestException(
+        'Solo se pueden invitar clubes o academias.',
+      );
     }
     if (club.parentId === orgId) {
       throw new BadRequestException('Ese club ya pertenece a tu organización.');
@@ -796,7 +846,9 @@ export class OrganizationsService {
       )
       .limit(1);
     if (pendiente) {
-      throw new BadRequestException('Ese club ya tiene una invitación pendiente.');
+      throw new BadRequestException(
+        'Ese club ya tiene una invitación pendiente.',
+      );
     }
     const [inv] = await db
       .insert(orgClubInvitations)
@@ -1225,6 +1277,7 @@ export class OrganizationsService {
         })
         .where(eq(orgJoinRequests.id, solicitudId))
         .returning();
+      await this.avisarDeLaRespuesta(solicitud.orgId, solicitud.userId, false);
       return { solicitud: fila, miembro: null };
     }
 
@@ -1278,6 +1331,472 @@ export class OrganizationsService {
       .where(eq(orgJoinRequests.id, solicitudId))
       .returning();
 
+    await this.avisarDeLaRespuesta(solicitud.orgId, solicitud.userId, true);
+
     return { solicitud: fila, miembro };
+  }
+
+  /**
+   * Le cuenta a la persona lo que su maestro decidió.
+   *
+   * ── El bucle que cerraba esto ──
+   *
+   * Quien tecleaba el código veía «te avisamos cuando tu maestro la acepte», y
+   * ese aviso no existía en ninguna parte: había que volver a entrar al portal
+   * a probar suerte, sin saber si faltaban diez minutos o tres días.
+   *
+   * Un correo que no sale no puede tumbar la respuesta del maestro —él ya hizo
+   * lo suyo y la pertenencia ya está escrita—, así que esto no lanza nunca.
+   */
+  private async avisarDeLaRespuesta(
+    orgId: string,
+    userId: string,
+    aceptada: boolean,
+  ): Promise<void> {
+    try {
+      const [persona] = await db
+        .select({ email: users.email, fullName: users.fullName })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const [org] = await db
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, orgId))
+        .limit(1);
+      if (!persona || !org) return;
+      await this.mailer.avisarSolicitudResuelta(
+        persona.email,
+        org.name,
+        aceptada,
+        persona.fullName,
+      );
+    } catch {
+      // El aviso es cortesía; la decisión ya está tomada y escrita.
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  INVITAR A UNA PERSONA AL CLUB  (el camino B, pero PREGUNTANDO)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // ── Qué cambia respecto a `inviteMember` ──
+  //
+  // `inviteMember` se llama invitar y no lo es: mete la fila de `org_members`
+  // en el acto y la persona se entera después, si acaso. Eso está bien para el
+  // super-admin, que administra el ecosistema entero y a veces tiene que
+  // colocar a alguien donde toca. Para un maestro no: su alumno tiene cuenta
+  // propia, y meterlo en un club sin preguntarle es exactamente lo que el
+  // código del club (`org_join_requests`) evita en el otro sentido.
+  //
+  // Aquí la pertenencia nace SOLO cuando la persona acepta. Mientras tanto la
+  // invitación se ve por los dos lados: el maestro sabe que está en el aire y
+  // la persona la encuentra esperando al entrar a DINAMYT.
+
+  private static normalizarCorreo(valor: string): string {
+    return (valor ?? '').trim().toLowerCase();
+  }
+
+  /**
+   * El maestro invita a alguien a su club por correo.
+   *
+   * Tres situaciones, y ninguna acaba en `org_members`:
+   *
+   *   · **Ya tiene cuenta** → la invitación le aparece en su panel de DINAMYT
+   *     y se le avisa por correo. Decide ella.
+   *   · **No tiene cuenta** → se le crea (sin contraseña, como en el camino B)
+   *     y se le manda el enlace para ponerla. La invitación le está esperando
+   *     dentro cuando entre.
+   *   · **Ya había pedido entrar con el código** → no se invita a quien ya
+   *     está llamando a la puerta: se le dice al maestro que la acepte en su
+   *     bandeja, que es un gesto y no dos.
+   */
+  async invitarPersona(
+    orgId: string,
+    gestorUserId: string,
+    datos: {
+      email: string;
+      role?: string;
+      roleMembresias?: string;
+      roleCampeonatos?: string;
+      roleAcademy?: string;
+      note?: string;
+      /** Solo si esa persona todavía no tiene cuenta. */
+      fullName?: string;
+      phone?: string;
+    },
+  ) {
+    const org = await this.findById(orgId);
+    const role = datos.role ?? 'student';
+
+    const permitidos = ROLES_POR_TIPO[org.type] ?? [];
+    if (permitidos.length > 0 && !permitidos.includes(role)) {
+      throw new BadRequestException(
+        `Una organización de tipo ${org.type} no asigna el rol '${role}'.`,
+      );
+    }
+
+    const correo = OrganizationsService.normalizarCorreo(datos.email);
+    if (!correo) throw new BadRequestException('Falta el correo.');
+
+    const [existente] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, correo))
+      .limit(1);
+
+    // ── Puertas que se cierran antes de crear nada ────────────────────────
+    if (existente) {
+      const [yaMiembro] = await db
+        .select({ id: orgMembers.id })
+        .from(orgMembers)
+        .where(
+          and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, existente.id)),
+        )
+        .limit(1);
+      if (yaMiembro) {
+        throw new BadRequestException(
+          'Esa persona ya está en tu club. La encuentras en la lista de gente.',
+        );
+      }
+
+      const [pidiendo] = await db
+        .select({ id: orgJoinRequests.id })
+        .from(orgJoinRequests)
+        .where(
+          and(
+            eq(orgJoinRequests.orgId, orgId),
+            eq(orgJoinRequests.userId, existente.id),
+            eq(orgJoinRequests.status, 'PENDIENTE'),
+          ),
+        )
+        .limit(1);
+      if (pidiendo) {
+        throw new BadRequestException(
+          'Esa persona ya pidió entrar con el código de tu club. Acéptala en la bandeja de arriba.',
+        );
+      }
+    }
+
+    const rolesDeApp = {
+      // El alumno del portal es `student` en Membresías; si quien invita no
+      // dice otra cosa, se pone el que corresponde y no un `null` que dejaría
+      // a la persona sin rol en la app a la que su club la está llamando.
+      roleMembresias:
+        datos.roleMembresias ??
+        (role === 'competitor' || role === 'student' ? 'student' : null),
+      roleCampeonatos: datos.roleCampeonatos ?? null,
+      roleAcademy: datos.roleAcademy ?? null,
+    };
+
+    // ── La cuenta, si hace falta crearla ──────────────────────────────────
+    //
+    // Va ANTES de tocar la invitación a propósito: si falta el nombre esto
+    // lanza, y con el orden al revés la invitación que ya había se quedaba con
+    // el rol nuevo de una invitación que nunca llegó a mandarse.
+    let usuario = existente;
+    let cuentaNueva = false;
+    if (!usuario) {
+      const nombre = (datos.fullName ?? '').trim();
+      if (!nombre) {
+        throw new BadRequestException(
+          'Esa persona todavía no tiene cuenta: hace falta su nombre completo para crearla.',
+        );
+      }
+      usuario = await this.usersService.crearInvitado({
+        email: correo,
+        fullName: nombre.toLocaleUpperCase('es'),
+        phone: datos.phone ?? null,
+      });
+      cuentaNueva = true;
+    }
+
+    // ── ¿Ya había una en el aire? Se refresca en vez de chocar ────────────
+    const [pendiente] = await db
+      .select()
+      .from(orgInvitations)
+      .where(
+        and(
+          eq(orgInvitations.orgId, orgId),
+          eq(orgInvitations.email, correo),
+          eq(orgInvitations.status, 'PENDIENTE'),
+        ),
+      )
+      .limit(1);
+
+    let invitacion;
+    if (pendiente) {
+      // El maestro casi siempre repite el gesto porque quiere REENVIARLA (o
+      // porque se equivocó de rol). Reventar con «ya la invitaste» le deja sin
+      // salida: no hay ninguna pantalla para cambiarle el rol a una invitación.
+      [invitacion] = await db
+        .update(orgInvitations)
+        .set({
+          role,
+          ...rolesDeApp,
+          note: (datos.note ?? '').trim().slice(0, 300) || pendiente.note,
+          userId: usuario.id,
+          invitedByUserId: gestorUserId,
+        })
+        .where(eq(orgInvitations.id, pendiente.id))
+        .returning();
+    } else {
+      [invitacion] = await db
+        .insert(orgInvitations)
+        .values({
+          orgId,
+          email: correo,
+          userId: usuario.id,
+          role,
+          ...rolesDeApp,
+          note: (datos.note ?? '').trim().slice(0, 300) || null,
+          invitedByUserId: gestorUserId,
+        })
+        .returning();
+    }
+
+    // ── El aviso ──────────────────────────────────────────────────────────
+    const [gestor] = await db
+      .select({ fullName: users.fullName })
+      .from(users)
+      .where(eq(users.id, gestorUserId))
+      .limit(1);
+
+    // Sin contraseña no hay dónde aceptar nada: lo primero es la llave de su
+    // cuenta. La invitación le estará esperando al entrar.
+    if (!usuario.passwordHash) {
+      const token = await this.jwtService.firmarInvitacion(usuario.id);
+      const portal = process.env.PORTAL_URL ?? 'https://dinamyt.org';
+      const enlace = `${portal}/poner-contrasena?token=${token}`;
+      const enviada = await this.mailer.enviarInvitacion(
+        correo,
+        enlace,
+        org.name,
+        JwtTokenService.DIAS_INVITACION,
+      );
+      return {
+        invitacion,
+        cuenta: cuentaNueva ? ('nueva' as const) : ('invitada' as const),
+        aviso: {
+          enviadoPorCorreo: enviada,
+          // El enlace solo se devuelve si el correo NO salió: es la muleta
+          // para mandarlo por WhatsApp mientras no haya proveedor.
+          enlace: enviada ? undefined : enlace,
+          venceEnDias: JwtTokenService.DIAS_INVITACION,
+        },
+      };
+    }
+
+    const enviada = await this.mailer.enviarInvitacionAClub(
+      correo,
+      org.name,
+      NOMBRE_DE_ROL[role] ?? role,
+      gestor?.fullName ?? null,
+      usuario.fullName,
+    );
+
+    return {
+      invitacion,
+      cuenta: 'existente' as const,
+      aviso: { enviadoPorCorreo: enviada },
+    };
+  }
+
+  /** Las invitaciones que este club tiene en el aire (y las respondidas). */
+  async invitacionesDelClub(orgId: string, incluirRespondidas = false) {
+    await this.findById(orgId);
+    const filtro = incluirRespondidas
+      ? eq(orgInvitations.orgId, orgId)
+      : and(
+          eq(orgInvitations.orgId, orgId),
+          eq(orgInvitations.status, 'PENDIENTE'),
+        );
+
+    const filas = await db
+      .select({
+        id: orgInvitations.id,
+        email: orgInvitations.email,
+        role: orgInvitations.role,
+        roleMembresias: orgInvitations.roleMembresias,
+        status: orgInvitations.status,
+        note: orgInvitations.note,
+        createdAt: orgInvitations.createdAt,
+        respondedAt: orgInvitations.respondedAt,
+        userId: users.id,
+        fullName: users.fullName,
+        avatarUrl: users.avatarUrl,
+        hash: users.passwordHash,
+      })
+      .from(orgInvitations)
+      .leftJoin(users, eq(orgInvitations.userId, users.id))
+      .where(filtro)
+      .orderBy(desc(orgInvitations.createdAt));
+
+    // El hash NUNCA sale de aquí: lo que se manda es si LO HAY, que es lo que
+    // le dice al maestro «esta persona todavía no ha puesto su contraseña».
+    return filas.map(({ hash, ...f }) => ({
+      ...f,
+      cuentaLista: Boolean(hash),
+    }));
+  }
+
+  /** El maestro se arrepiente. No borra: deja constancia. */
+  async cancelarInvitacion(
+    invitacionId: string,
+    gestorUserId: string,
+    esSuper: boolean,
+  ) {
+    const [inv] = await db
+      .select()
+      .from(orgInvitations)
+      .where(eq(orgInvitations.id, invitacionId))
+      .limit(1);
+    if (!inv) throw new NotFoundException('Invitación no encontrada.');
+    await this.exigirGestorDe(gestorUserId, inv.orgId, esSuper);
+    if (inv.status !== 'PENDIENTE') {
+      throw new BadRequestException('Esa invitación ya fue respondida.');
+    }
+    const [fila] = await db
+      .update(orgInvitations)
+      .set({ status: 'CANCELADA', respondedAt: new Date() })
+      .where(eq(orgInvitations.id, invitacionId))
+      .returning();
+    return fila;
+  }
+
+  /**
+   * Las invitaciones que ME esperan.
+   *
+   * Busca por correo y no solo por `user_id` porque una invitación puede
+   * haberse escrito ANTES de que existiera la cuenta. De paso las enlaza: la
+   * próxima consulta ya no tiene que cruzar por correo.
+   */
+  async misInvitaciones(userId: string) {
+    const [yo] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!yo) return [];
+
+    await db
+      .update(orgInvitations)
+      .set({ userId })
+      .where(
+        and(
+          eq(orgInvitations.email, yo.email),
+          eq(orgInvitations.status, 'PENDIENTE'),
+          isNull(orgInvitations.userId),
+        ),
+      );
+
+    return db
+      .select({
+        id: orgInvitations.id,
+        status: orgInvitations.status,
+        role: orgInvitations.role,
+        note: orgInvitations.note,
+        createdAt: orgInvitations.createdAt,
+        orgId: organizations.id,
+        orgName: organizations.name,
+        orgType: organizations.type,
+        orgCity: organizations.city,
+        orgLogoUrl: organizations.logoUrl,
+      })
+      .from(orgInvitations)
+      .innerJoin(organizations, eq(orgInvitations.orgId, organizations.id))
+      .where(
+        and(
+          eq(orgInvitations.userId, userId),
+          eq(orgInvitations.status, 'PENDIENTE'),
+          eq(organizations.isActive, true),
+        ),
+      )
+      .orderBy(desc(orgInvitations.createdAt));
+  }
+
+  /**
+   * La persona acepta o rechaza. **Aceptar es el alta**, igual que en el otro
+   * sentido: nace la fila de `org_members` con los roles que puso quien
+   * invitó, y con ella el token que la lleva a Membresías.
+   */
+  async responderInvitacion(
+    invitacionId: string,
+    userId: string,
+    aceptar: boolean,
+  ) {
+    const [inv] = await db
+      .select()
+      .from(orgInvitations)
+      .where(eq(orgInvitations.id, invitacionId))
+      .limit(1);
+    if (!inv) throw new NotFoundException('Invitación no encontrada.');
+
+    // La invitación es de quien la recibe, y de nadie más. Se comprueba por
+    // `user_id` y por correo: las que se escribieron antes de que la cuenta
+    // existiera pueden llegar aquí sin enlazar.
+    const [yo] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    const esMia =
+      inv.userId === userId || (yo ? inv.email === yo.email : false);
+    if (!esMia) throw new ForbiddenException('Esa invitación no es tuya.');
+
+    if (inv.status !== 'PENDIENTE') {
+      throw new BadRequestException('Esa invitación ya fue respondida.');
+    }
+
+    if (!aceptar) {
+      const [fila] = await db
+        .update(orgInvitations)
+        .set({ status: 'RECHAZADA', respondedAt: new Date(), userId })
+        .where(eq(orgInvitations.id, invitacionId))
+        .returning();
+      return { invitacion: fila, miembro: null, org: null };
+    }
+
+    const org = await this.findById(inv.orgId);
+    if (!org.isActive) {
+      throw new BadRequestException(
+        'Ese club está suspendido: habla con tu maestro.',
+      );
+    }
+
+    // Puede haber entrado por otra puerta mientras la invitación esperaba (el
+    // código del club, por ejemplo). Aceptar tiene que seguir funcionando.
+    const [yaMiembro] = await db
+      .select()
+      .from(orgMembers)
+      .where(
+        and(eq(orgMembers.orgId, inv.orgId), eq(orgMembers.userId, userId)),
+      )
+      .limit(1);
+
+    const miembro =
+      yaMiembro ??
+      (
+        await db
+          .insert(orgMembers)
+          .values({
+            orgId: inv.orgId,
+            userId,
+            role: inv.role,
+            roleMembresias: inv.roleMembresias,
+            roleCampeonatos: inv.roleCampeonatos,
+            roleAcademy: inv.roleAcademy,
+            invitedByUserId: inv.invitedByUserId,
+          })
+          .returning()
+      )[0];
+
+    const [fila] = await db
+      .update(orgInvitations)
+      .set({ status: 'ACEPTADA', respondedAt: new Date(), userId })
+      .where(eq(orgInvitations.id, invitacionId))
+      .returning();
+
+    return { invitacion: fila, miembro, org: { id: org.id, name: org.name } };
   }
 }

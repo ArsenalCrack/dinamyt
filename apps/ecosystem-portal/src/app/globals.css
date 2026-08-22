@@ -155,6 +155,16 @@ input[type="password"]::-ms-clear { display: none; }
     background: rgba(255, 85, 119, 0.12);
     filter: none;
   }
+  /* Botón de dentro de una fila, donde el tamaño normal empuja a los demás
+     fuera de la tarjeta. Se escribía `btn-sm` en la paginación, en la bandeja
+     de solicitudes y en el roster desde el principio — y no estaba definido en
+     ninguna parte, así que salían todos del tamaño grande. Membresías sí lo
+     tenía: esta es la copia que faltaba (ver `UNA-SOLA-APP.md`, §2). */
+  .btn-sm {
+    padding: 0.38rem 0.7rem;
+    font-size: 0.8rem;
+    border-radius: 0.45rem;
+  }
 
   /* ── Tarjetas ───────────────────────────────────────────────────────── */
   .card {

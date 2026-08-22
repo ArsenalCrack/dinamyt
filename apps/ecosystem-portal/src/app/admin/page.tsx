@@ -38,6 +38,8 @@ import { FilaSuscripcion } from '@/components/FilaSuscripcion';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 import { ROLES_SUPERADMIN, nombreRol } from '@/lib/roles';
 import { FilaMiembro } from '@/components/FilaMiembro';
+import { SelectMenu } from '@/components/SelectMenu';
+
 const TIPOS_ORG = ['FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY'] as const;
 
 /**
@@ -240,19 +242,14 @@ export default function AdminEcosistemaPage() {
               value={nuevaOrg.name}
               onChange={(e) => setNuevaOrg({ ...nuevaOrg, name: e.target.value })}
             />
-            <select
-              value={nuevaOrg.type}
-              onChange={(e) =>
-                setNuevaOrg({ ...nuevaOrg, type: e.target.value as (typeof TIPOS_ORG)[number] })
+            <SelectMenu
+              valor={nuevaOrg.type}
+              onChange={(v) =>
+                setNuevaOrg({ ...nuevaOrg, type: v as (typeof TIPOS_ORG)[number] })
               }
-              style={selectStyle}
-            >
-              {TIPOS_ORG.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+              opciones={TIPOS_ORG.map((t) => ({ valor: t, etiqueta: t }))}
+              etiquetaAria="Tipo de organización"
+            />
             <input
               placeholder="Ciudad"
               value={nuevaOrg.city}
@@ -361,17 +358,16 @@ export default function AdminEcosistemaPage() {
                   onChange={(e) => setInvitacion({ ...invitacion, email: e.target.value })}
                   className="min-w-0 flex-1"
                 />
-                <select
-                  value={invitacion.role}
-                  onChange={(e) => setInvitacion({ ...invitacion, role: e.target.value })}
-                  style={selectStyle}
-                >
-                  {ROLES_SUPERADMIN.map((r) => (
-                    <option key={r} value={r}>
-                      {nombreRol(r)}
-                    </option>
-                  ))}
-                </select>
+                <SelectMenu
+                  valor={invitacion.role}
+                  onChange={(v) => setInvitacion({ ...invitacion, role: v })}
+                  opciones={ROLES_SUPERADMIN.map((r) => ({
+                    valor: r,
+                    etiqueta: nombreRol(r),
+                  }))}
+                  etiquetaAria="Rol en la organización"
+                  style={{ minWidth: '11rem' }}
+                />
                 <button
                   onClick={() =>
                     accion(
@@ -407,18 +403,13 @@ export default function AdminEcosistemaPage() {
                 )}
               </ul>
               <div className="grid gap-2 sm:grid-cols-2">
-                <select
-                  value={nuevaSub.planId}
-                  onChange={(e) => setNuevaSub({ ...nuevaSub, planId: e.target.value })}
-                  style={selectStyle}
-                >
-                  <option value="">Plan…</option>
-                  {planes.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                <SelectMenu
+                  valor={nuevaSub.planId}
+                  onChange={(v) => setNuevaSub({ ...nuevaSub, planId: v })}
+                  opciones={planes.map((p) => ({ valor: p.id, etiqueta: p.name }))}
+                  etiquetaAria="Plan de la suscripción"
+                  placeholder="Plan…"
+                />
                 <input
                   placeholder="Monto total"
                   value={nuevaSub.totalAmount}
@@ -503,28 +494,24 @@ export default function AdminEcosistemaPage() {
                 </p>
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                <label className="sr-only" htmlFor={`estado-personal-${s.id}`}>
-                  Estado de la suscripción de {s.userFullName}
-                </label>
-                <select
-                  id={`estado-personal-${s.id}`}
-                  value={s.status}
+                <SelectMenu
+                  valor={s.status}
                   disabled={ocupado}
-                  onChange={(e) =>
+                  onChange={(v) =>
                     accion(
-                      () => cambiarEstadoSuscripcionPersonalAPI(s.id, e.target.value),
+                      () => cambiarEstadoSuscripcionPersonalAPI(s.id, v),
                       'Estado actualizado.',
                       'No se pudo cambiar el estado.',
                     )
                   }
-                  style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
-                >
-                  {ESTADOS_SUSCRIPCION.map((e) => (
-                    <option key={e.valor} value={e.valor}>
-                      {e.etiqueta}
-                    </option>
-                  ))}
-                </select>
+                  opciones={ESTADOS_SUSCRIPCION.map((e) => ({
+                    valor: e.valor,
+                    etiqueta: e.etiqueta,
+                  }))}
+                  etiquetaAria={`Estado de la suscripción de ${s.userFullName}`}
+                  style={{ width: 'auto', minWidth: '9rem' }}
+                  botonStyle={{ padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
+                />
                 <button
                   onClick={() => {
                     if (
@@ -562,20 +549,13 @@ export default function AdminEcosistemaPage() {
               setNuevaSubPersonal({ ...nuevaSubPersonal, userEmail: e.target.value })
             }
           />
-          <select
-            value={nuevaSubPersonal.planId}
-            onChange={(e) =>
-              setNuevaSubPersonal({ ...nuevaSubPersonal, planId: e.target.value })
-            }
-            style={selectStyle}
-          >
-            <option value="">Plan…</option>
-            {planes.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <SelectMenu
+            valor={nuevaSubPersonal.planId}
+            onChange={(v) => setNuevaSubPersonal({ ...nuevaSubPersonal, planId: v })}
+            opciones={planes.map((p) => ({ valor: p.id, etiqueta: p.name }))}
+            etiquetaAria="Plan de la suscripción personal"
+            placeholder="Plan…"
+          />
           <CampoFecha
             valor={nuevaSubPersonal.startsAt}
             onChange={(v) => setNuevaSubPersonal({ ...nuevaSubPersonal, startsAt: v })}
@@ -808,24 +788,34 @@ function AccesosRapidos({
             ))}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <select value={app} onChange={(e) => setApp(e.target.value)} style={selectStyle}>
-              <option value="campeonatos">Campeonatos</option>
-              <option value="academy">Academy</option>
-            </select>
-            <select value={rol} onChange={(e) => setRol(e.target.value)} style={selectStyle}>
-              {ROLES_SUPERADMIN.map((r) => (
-                <option key={r} value={r}>
-                  {nombreRol(r)}
-                </option>
-              ))}
-            </select>
-            <select value={orgId} onChange={(e) => setOrgId(e.target.value)} style={selectStyle}>
-              {orgs.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
+            <SelectMenu
+              valor={app}
+              onChange={setApp}
+              opciones={[
+                { valor: 'campeonatos', etiqueta: 'Campeonatos' },
+                { valor: 'academy', etiqueta: 'Academy' },
+              ]}
+              etiquetaAria="Aplicación"
+              style={{ width: 'auto', minWidth: '10rem' }}
+            />
+            <SelectMenu
+              valor={rol}
+              onChange={setRol}
+              opciones={ROLES_SUPERADMIN.map((r) => ({
+                valor: r,
+                etiqueta: nombreRol(r),
+              }))}
+              etiquetaAria="Rol"
+              style={{ width: 'auto', minWidth: '10rem' }}
+            />
+            <SelectMenu
+              valor={orgId}
+              onChange={setOrgId}
+              opciones={orgs.map((o) => ({ valor: o.id, etiqueta: o.name }))}
+              etiquetaAria="Organización"
+              placeholder="Organización…"
+              style={{ width: 'auto', minWidth: '13rem' }}
+            />
             <button
               onClick={async () => {
                 await onGrant(orgId, sel.email, rol, app);
@@ -846,11 +836,3 @@ function AccesosRapidos({
     </section>
   );
 }
-
-const selectStyle: React.CSSProperties = {
-  background: 'var(--bg-input)',
-  border: '1px solid var(--border)',
-  borderRadius: '0.5rem',
-  padding: '0.5rem 0.7rem',
-  color: 'var(--text)',
-};

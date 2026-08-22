@@ -1,15 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api, {
   obtenerToken,
   decodificarToken,
   cerrarSesion,
+  refrescarSesionAPI,
   misOrganizacionesAPI,
   miClubAPI,
+  misInvitacionesAPI,
+  responderInvitacionAPI,
+  extraerError,
   type TokenPayload,
+  type MiInvitacion,
 } from '@/lib/api';
 import { nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
@@ -29,6 +34,33 @@ export default function DashboardPage() {
   const [gestiona, setGestiona] = useState<boolean | null>(null);
   const [nombreClub, setNombreClub] = useState<string | null>(null);
   const [foto, setFoto] = useState<string | null>(null);
+  const [invitaciones, setInvitaciones] = useState<MiInvitacion[]>([]);
+  const [ocupado, setOcupado] = useState(false);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(
+    null,
+  );
+
+  const cargar = useCallback(async (p: TokenPayload) => {
+    // Ambas consultas fallan sin romper la página: lo que decide qué tarjeta
+    // se enseña es «Mi organización» (la gestiona) o «Mi club» (solo
+    // pertenece).
+    const [orgs, club, perfil, invs] = await Promise.allSettled([
+      misOrganizacionesAPI(),
+      miClubAPI(),
+      api.get(`/users/${p.sub}/profile`),
+      misInvitacionesAPI(),
+    ]);
+    setGestiona(orgs.status === 'fulfilled' && orgs.value.length > 0);
+    setNombreClub(
+      club.status === 'fulfilled' && club.value.length > 0
+        ? club.value[0].name
+        : null,
+    );
+    if (perfil.status === 'fulfilled') {
+      setFoto((perfil.value.data as { avatarUrl: string | null }).avatarUrl);
+    }
+    setInvitaciones(invs.status === 'fulfilled' ? invs.value : []);
+  }, []);
 
   useEffect(() => {
     const t = obtenerToken();
@@ -44,22 +76,54 @@ export default function DashboardPage() {
     }
     setPayload(p);
 
-    // Decide qué tarjeta mostrar: «Mi organización» (la gestiona) o
-    // «Mi club» (solo pertenece). Ambas consultas fallan sin romper la página.
-    Promise.allSettled([
-      misOrganizacionesAPI(),
-      miClubAPI(),
-      api.get(`/users/${p.sub}/profile`),
-    ]).then(([orgs, club, perfil]) => {
-      setGestiona(orgs.status === 'fulfilled' && orgs.value.length > 0);
-      if (club.status === 'fulfilled' && club.value.length > 0) {
-        setNombreClub(club.value[0].name);
-      }
-      if (perfil.status === 'fulfilled') {
-        setFoto((perfil.value.data as { avatarUrl: string | null }).avatarUrl);
-      }
+    /**
+     * **Lo primero al abrir el dashboard es volver a pedir el token.**
+     *
+     * Dentro del token van el club, los roles por app y `app_scopes`, y todo
+     * eso lo cambia OTRA persona: el maestro que acepta tu solicitud, el admin
+     * que activa la suscripción del club. Quien tenía la sesión abierta seguía
+     * con el token de cuando entró, así que el alumno recién aceptado abría
+     * esta pantalla y no veía ni su club ni sus aplicaciones — y Membresías
+     * tampoco le creaba la ficha, porque eso también sale del `org_id` del
+     * token. Desde fuera se veía como «la aplicación no me deja».
+     *
+     * Se pinta con el token viejo mientras tanto (`setPayload(p)` de arriba)
+     * para que la pantalla no parpadee en blanco, y se repinta con el nuevo.
+     */
+    void refrescarSesionAPI().then((fresco) => {
+      const vigente = fresco ?? p;
+      if (fresco) setPayload(fresco);
+      void cargar(vigente);
     });
-  }, [router]);
+  }, [router, cargar]);
+
+  async function responderInvitacion(inv: MiInvitacion, aceptar: boolean) {
+    setOcupado(true);
+    setMsg(null);
+    try {
+      await responderInvitacionAPI(inv.id, aceptar);
+      // Aceptar CREA la pertenencia, así que el token de este navegador acaba
+      // de quedarse viejo otra vez. Sin este refresco, la persona acepta y
+      // sigue sin ver ni su club ni sus apps hasta la próxima recarga.
+      const fresco = await refrescarSesionAPI();
+      const vigente = fresco ?? payload;
+      if (fresco) setPayload(fresco);
+      if (vigente) await cargar(vigente);
+      setMsg({
+        tipo: 'ok',
+        texto: aceptar
+          ? `Ya eres parte de ${inv.orgName}.`
+          : `Rechazaste la invitación de ${inv.orgName}.`,
+      });
+    } catch (e) {
+      setMsg({
+        tipo: 'error',
+        texto: extraerError(e, 'No se pudo responder la invitación.'),
+      });
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   function salir() {
     cerrarSesion();
@@ -99,6 +163,75 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {msg && (
+        <p
+          className="mb-4 text-sm"
+          style={{ color: msg.tipo === 'ok' ? 'var(--ok)' : 'var(--danger)' }}
+        >
+          {msg.texto}
+        </p>
+      )}
+
+      {/* ── Te invitaron ───────────────────────────────────────────────
+          Lo primero de la pantalla, por delante incluso de las aplicaciones:
+          es lo único aquí que espera una respuesta tuya, y de ella depende
+          todo lo demás. Antes no existía —el maestro te metía en su club sin
+          preguntarte— y ese era justamente el problema. */}
+      {invitaciones.length > 0 && (
+        <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
+          <h2 className="mb-1 text-lg font-semibold">
+            ✉ Te invitaron a un club
+          </h2>
+          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Decides tú. Si aceptas, tu ficha se crea sola en Membresías y verás
+            los horarios y la sede de tu club.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {invitaciones.map((inv) => (
+              <li
+                key={inv.id}
+                className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <Avatar src={inv.orgLogoUrl} nombre={inv.orgName} size={36} />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold" title={inv.orgName}>
+                      {inv.orgName}
+                    </p>
+                    <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Te invita como {nombreRol(inv.role)}
+                      {inv.orgCity ? ` · ${inv.orgCity}` : ''}
+                    </p>
+                    {inv.note && (
+                      <p className="mt-0.5 truncate text-xs italic" title={inv.note}>
+                        «{inv.note}»
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => void responderInvitacion(inv, true)}
+                    disabled={ocupado}
+                    className="btn btn-gold btn-sm"
+                  >
+                    Aceptar
+                  </button>
+                  <button
+                    onClick={() => void responderInvitacion(inv, false)}
+                    disabled={ocupado}
+                    className="btn btn-outline btn-sm"
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* ── Sin club ───────────────────────────────────────────────────
           Se dibuja solo para quien no pertenece a ninguno, y va ARRIBA de las
           aplicaciones a propósito: sin club, casi todas le van a decir que no.
@@ -109,9 +242,20 @@ export default function DashboardPage() {
           `gestiona === false` (y no `!gestiona`) porque `null` significa «aún
           no se sabe»: enseñarlo mientras carga lo haría parpadear en la
           pantalla de todo el mundo. */}
-      {gestiona === false && nombreClub === null && (
+      {gestiona === false && nombreClub === null && invitaciones.length === 0 && (
         <div className="mb-5">
-          <EntrarAClub onEntrado={() => router.refresh()} />
+          {/* Al entrar con el código nace una solicitud, y el token de este
+              navegador no se entera hasta que el maestro responda. Se refresca
+              igualmente por si el maestro ya había dicho que sí. */}
+          <EntrarAClub
+            onEntrado={() => {
+              void refrescarSesionAPI().then((fresco) => {
+                const vigente = fresco ?? payload;
+                if (fresco) setPayload(fresco);
+                if (vigente) void cargar(vigente);
+              });
+            }}
+          />
         </div>
       )}
 

@@ -57,6 +57,13 @@
       "when": 1787326414563,
       "tag": "0007_registro_pendiente",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787373668710,
+      "tag": "0008_invitaciones_al_club",
+      "breakpoints": true
     }
   ]
 }

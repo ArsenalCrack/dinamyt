@@ -88,6 +88,22 @@ export class AuthController {
     return this.authService.login(body.email, body.password);
   }
 
+  // ── POST /auth/refresh — volver a firmar el token con lo de AHORA ─────────
+  //
+  // Lo llama el portal al abrir el dashboard. Es lo que hace que al alumno que
+  // su maestro acaba de aceptar le aparezcan su club y sus aplicaciones sin
+  // tener que cerrar sesión — que era la única cura y no la adivinaba nadie.
+  //
+  // El tope por IP es generoso porque una recarga de pantalla lo dispara, pero
+  // existe: firmar un token cuesta, y esta ruta la puede llamar cualquiera con
+  // una sesión abierta.
+  @Throttle({ global: { limit: 30, ttl: 60_000 } })
+  @Post('refresh')
+  @UseGuards(EcosystemJwtGuard)
+  refresh(@CurrentUser() user: JwtPayload) {
+    return this.authService.refrescarSesion(user.sub);
+  }
+
   // ── GET /auth/me — información completa de la cuenta (autenticado) ────────
   @Get('me')
   @UseGuards(EcosystemJwtGuard)
@@ -119,7 +135,12 @@ export class AuthController {
   @Post('reset-password')
   resetPassword(
     @Body()
-    body: { email?: string; userId?: string; code: string; newPassword: string },
+    body: {
+      email?: string;
+      userId?: string;
+      code: string;
+      newPassword: string;
+    },
   ) {
     return this.authService.resetPassword(body);
   }

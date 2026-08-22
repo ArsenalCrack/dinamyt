@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { Avatar } from '@/components/Avatar';
+import { SelectMenu } from '@/components/SelectMenu';
 import { NOMBRE_ROL, nombreRol, opcionesDeRol } from '@/lib/roles';
 import type { Miembro } from '@/lib/api';
 
@@ -87,27 +88,28 @@ export function FilaMiembro({
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-        <label className="sr-only" htmlFor={`rol-${m.memberId}`}>
-          Rol de {m.fullName} en la organización
-        </label>
-        {/* `width: auto` a mano: la regla base de `globals.css` da a todo
-            `select` un ancho del 100 %, pensada para los formularios de una
-            columna. Dentro de una fila estira el desplegable hasta empujar los
-            botones fuera de la tarjeta. */}
-        <select
-          id={`rol-${m.memberId}`}
-          value={m.role}
-          onChange={(e) => onCambiarRol(e.target.value)}
+        {/* El desplegable del ecosistema y no el `<select>` nativo: este es el
+            «tipo de usuario» del panel del maestro, y se pintaba con los
+            colores del sistema operativo —gris, distinto en cada navegador, y
+            en Android con su propia hoja a pantalla completa— en medio de una
+            interfaz que no es nada de eso. Ver `SelectMenu.tsx`.
+
+            El ancho va a mano porque la regla base de `globals.css` da a los
+            campos un ancho del 100 %, pensada para los formularios de una
+            columna; dentro de una fila estiraría hasta empujar los botones
+            fuera de la tarjeta. */}
+        <SelectMenu
+          valor={m.role}
+          onChange={onCambiarRol}
+          opciones={opcionesDeRol(m.role, asignables).map((r) => ({
+            valor: r,
+            etiqueta: nombreRol(r),
+          }))}
+          etiquetaAria={`Rol de ${m.fullName} en la organización`}
           disabled={ocupado}
-          title={`Rol en el portal: ${nombreRol(m.role)}`}
-          style={{ width: 'auto', padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
-        >
-          {opcionesDeRol(m.role, asignables).map((r) => (
-            <option key={r} value={r}>
-              {nombreRol(r)}
-            </option>
-          ))}
-        </select>
+          style={{ width: 'auto', minWidth: '9.5rem' }}
+          botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+        />
         {acciones}
       </div>
     </li>

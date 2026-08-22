@@ -184,6 +184,34 @@ export async function loginAPI(email: string, password: string) {
 }
 
 /**
+ * Vuelve a pedir el token con lo que la base dice AHORA, y lo guarda.
+ *
+ * ── Por qué hace falta ──
+ *
+ * Dentro del token van el club, los roles por app y `app_scopes`, y todo eso
+ * lo cambia OTRA persona: el maestro que acepta tu solicitud, el admin que
+ * activa la suscripción del club. Quien tenía la sesión abierta seguía con el
+ * token viejo, así que el alumno recién aceptado abría DINAMYT y no veía ni su
+ * club ni sus aplicaciones. La única cura era cerrar sesión y volver a entrar,
+ * y eso desde fuera se ve como «la aplicación no me deja».
+ *
+ * Devuelve el contenido nuevo del token, o `null` si no se pudo (sin sesión,
+ * o la API caída): quien llama sigue con lo que tenía en vez de quedarse en
+ * blanco.
+ */
+export async function refrescarSesionAPI(): Promise<TokenPayload | null> {
+  try {
+    const res = await api.post('/auth/refresh');
+    const token = (res.data as { access_token?: string }).access_token;
+    if (!token) return null;
+    guardarToken(token);
+    return decodificarToken(token);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Crear cuenta. **No crea la cuenta**: crea un registro a la espera del código.
  *
  * La API ya no devuelve un `userId` —no hay usuario todavía— sino el correo al
@@ -590,6 +618,82 @@ export const responderSolicitudAPI = async (
     roleAcademy?: string;
   },
 ) => (await api.post(`/organizations/solicitudes/${id}/responder`, datos)).data;
+
+// ── Invitaciones del club a una persona (el maestro ofrece, la persona decide) ─
+
+/** Una invitación vista desde el club que la mandó. */
+export interface InvitacionDelClub {
+  id: string;
+  email: string;
+  role: string;
+  roleMembresias: string | null;
+  status: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | 'CANCELADA' | string;
+  note: string | null;
+  createdAt: string;
+  respondedAt: string | null;
+  /** `null` mientras no exista cuenta con ese correo. */
+  userId: string | null;
+  fullName: string | null;
+  avatarUrl: string | null;
+  /** `false` = tiene cuenta pero todavía no ha puesto su contraseña. */
+  cuentaLista: boolean;
+}
+
+/** Una invitación vista desde quien la recibe. */
+export interface MiInvitacion {
+  id: string;
+  status: string;
+  role: string;
+  note: string | null;
+  createdAt: string;
+  orgId: string;
+  orgName: string;
+  orgType: string;
+  orgCity: string | null;
+  orgLogoUrl: string | null;
+}
+
+export interface ResultadoInvitacion {
+  invitacion: InvitacionDelClub;
+  cuenta: 'existente' | 'nueva' | 'invitada';
+  aviso: {
+    enviadoPorCorreo: boolean;
+    /** Solo llega si el correo NO salió: la muleta para mandarlo a mano. */
+    enlace?: string;
+    venceEnDias?: number;
+  };
+}
+
+export const invitarPersonaAPI = async (
+  orgId: string,
+  datos: {
+    email: string;
+    role?: string;
+    roleMembresias?: string;
+    note?: string;
+    fullName?: string;
+    phone?: string;
+  },
+): Promise<ResultadoInvitacion> =>
+  (await api.post(`/organizations/${orgId}/invitaciones`, datos)).data;
+
+export const invitacionesDelClubAPI = async (
+  orgId: string,
+  todas = false,
+): Promise<InvitacionDelClub[]> =>
+  (await api.get(`/organizations/${orgId}/invitaciones`, {
+    params: todas ? { todas: '1' } : undefined,
+  })).data;
+
+export const cancelarInvitacionAPI = async (id: string) =>
+  (await api.delete(`/organizations/invitaciones/${id}`)).data;
+
+export const misInvitacionesAPI = async (): Promise<MiInvitacion[]> =>
+  (await api.get('/organizations/invitaciones/mias')).data;
+
+export const responderInvitacionAPI = async (id: string, aceptar: boolean) =>
+  (await api.post(`/organizations/invitaciones/${id}/responder`, { aceptar }))
+    .data;
 
 export const verCodigoClubAPI = async (
   orgId: string,

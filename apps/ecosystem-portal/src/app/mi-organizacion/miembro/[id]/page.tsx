@@ -17,6 +17,7 @@ import {
 } from '@/lib/validacion';
 import { Avatar } from '@/components/Avatar';
 import { CampoFecha } from '@/components/CampoFecha';
+import { SelectMenu } from '@/components/SelectMenu';
 
 interface PerfilMiembro {
   id: string;
@@ -299,56 +300,62 @@ export default function EditarMiembroPage() {
               />
             </div>
           </div>
-          <label className="block text-sm">
+          {/* Los cuatro desplegables de esta ficha van con el del ecosistema
+              (`SelectMenu`), el mismo de Membresías y Campeonatos. Eran los
+              últimos `<select>` nativos del panel del maestro: se pintaban con
+              los colores del sistema operativo —gris, distinto en cada
+              navegador, y en Android con su propia hoja a pantalla completa—
+              dentro de una ficha que no es nada de eso. */}
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Género</span>
             {/* Aquí SÍ se puede corregir: es el maestro. En el perfil de la
                 persona el campo se cierra una vez puesto. */}
-            <select
-              className="mt-1 w-full"
-              value={form.gender}
-              onChange={(e) => setForm({ ...form, gender: e.target.value })}
-            >
-              <option value="">— Sin registrar —</option>
-              {GENEROS.map((g) => (
-                <option key={g.valor} value={g.valor}>
-                  {g.etiqueta}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
+            <div className="mt-1">
+              <SelectMenu
+                valor={form.gender}
+                onChange={(v) => setForm({ ...form, gender: v })}
+                opciones={GENEROS.map((g) => ({
+                  valor: g.valor,
+                  etiqueta: g.etiqueta,
+                }))}
+                etiquetaAria="Género"
+                placeholder="— Sin registrar —"
+              />
+            </div>
+          </div>
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Tipo de sangre</span>
-            <select
-              className="mt-1 w-full"
-              value={form.bloodType}
-              onChange={(e) => setForm({ ...form, bloodType: e.target.value })}
-            >
-              <option value="">— Selecciona —</option>
-              {TIPOS_SANGRE.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
+            <div className="mt-1">
+              <SelectMenu
+                valor={form.bloodType}
+                onChange={(v) => setForm({ ...form, bloodType: v })}
+                opciones={TIPOS_SANGRE.map((t) => ({ valor: t, etiqueta: t }))}
+                etiquetaAria="Tipo de sangre"
+                placeholder="— Selecciona —"
+              />
+            </div>
+          </div>
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Cinturón (promoción)</span>
-            <select
-              className="mt-1 w-full"
-              value={cinturon}
-              onChange={(e) => setCinturon(e.target.value)}
-            >
-              <option value="">— Sin grado —</option>
-              {cinturon && !CINTURONES_GRADO.includes(cinturon as never) && (
-                <option value={cinturon}>{cinturon}</option>
-              )}
-              {CINTURONES_GRADO.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="mt-1">
+              {/* El grado que ya lleva la persona va SIEMPRE en la lista,
+                  aunque no esté en el catálogo: un desplegable cuyo valor no
+                  está entre sus opciones no se queda vacío, enseña la primera
+                  — y quien mira cree que ese es su cinturón. */}
+              <SelectMenu
+                valor={cinturon}
+                onChange={setCinturon}
+                opciones={[
+                  ...(cinturon && !CINTURONES_GRADO.includes(cinturon as never)
+                    ? [{ valor: cinturon, etiqueta: cinturon }]
+                    : []),
+                  ...CINTURONES_GRADO.map((c) => ({ valor: c, etiqueta: c })),
+                ]}
+                etiquetaAria="Cinturón"
+                placeholder="— Sin grado —"
+              />
+            </div>
+          </div>
           <label className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Teléfono</span>
             <input
@@ -403,23 +410,20 @@ export default function EditarMiembroPage() {
               }
             />
           </label>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Parentesco</span>
-            <select
-              className="mt-1 w-full"
-              value={form.emergencyContactRelationship}
-              onChange={(e) =>
-                setForm({ ...form, emergencyContactRelationship: e.target.value })
-              }
-            >
-              <option value="">— Selecciona —</option>
-              {PARENTESCOS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="mt-1">
+              <SelectMenu
+                valor={form.emergencyContactRelationship}
+                onChange={(v) =>
+                  setForm({ ...form, emergencyContactRelationship: v })
+                }
+                opciones={PARENTESCOS.map((p) => ({ valor: p, etiqueta: p }))}
+                etiquetaAria="Parentesco"
+                placeholder="— Selecciona —"
+              />
+            </div>
+          </div>
         </div>
 
         <label className="block text-sm">

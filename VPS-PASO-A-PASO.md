@@ -1952,7 +1952,9 @@ MAIL_DAILY_MAX=90
 
 ```bash
 sudo systemctl restart dinamyt-id
-sudo journalctl -u dinamyt-id -n 20 --no-pager | grep -i correo
+# `--since` y no `-n 20`: al arrancar, Nest imprime una línea por cada una de
+# las 62 rutas DESPUÉS del mensaje del correo. Con la cola corta no se ve.
+sudo journalctl -u dinamyt-id --since "5 min ago" --no-pager | grep -iE "correo|smtp"
 ```
 
 ✅ Tiene que decir `Correo por SMTP: smtp.resend.com:587`. Si dice «SMTP_HOST
