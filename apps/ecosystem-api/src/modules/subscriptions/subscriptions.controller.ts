@@ -74,6 +74,22 @@ export class SubscriptionsController {
   // ⚠️ Estáticas y declaradas ANTES que las de `:id`. En Nest gana la primera
   // que coincide, y `avisos` encajaría en `:id` si fuera al revés.
 
+  // ── GET /subscriptions/resumen — cuánto entró y cómo van los clubes ──────
+  //
+  // Una sola ruta y no cinco: las cinco preguntas se hacen a la vez, al abrir
+  // el panel, y separarlas serían cinco viajes para pintar una pantalla.
+  @Get('resumen')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  resumen(@Query('mes') mes?: string, @Query('meses') meses?: string) {
+    const n = Number(meses);
+    return this.subsService.resumen({
+      // 'YYYY-MM' o nada. Cualquier otra cosa se ignora en vez de reventar la
+      // pantalla entera por un parámetro de la barra de direcciones.
+      mes: /^\d{4}-\d{2}$/.test(mes ?? '') ? mes : undefined,
+      meses: Number.isFinite(n) && n > 0 ? n : undefined,
+    });
+  }
+
   // ── GET /subscriptions/vencimientos — el recordatorio para el super-admin ─
   @Get('vencimientos')
   @UseGuards(EcosystemJwtGuard, SuperAdminGuard)

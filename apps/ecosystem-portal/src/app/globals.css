@@ -29,6 +29,16 @@
   --info: #4d9fff;
   --hong: #e8002a;
   --chung: #2266ff;
+  /* ── Series de los graficos ──
+     Dos hues, y estos dos exactos: son los que pasan las seis comprobaciones
+     del validador de paleta contra el fondo de tarjeta (#15151f) —banda de
+     luminosidad, croma minimo, separacion para daltonismo (dE 28 en protan,
+     20 en tritan) y contraste >= 3:1—. El oro de marca (#f0b800) y el azul
+     de aviso (#4d9fff) se salen de la banda por arriba: brillan tanto sobre
+     tinta que las barras se comen la lectura del eje.
+     Se asignan por identidad y en orden fijo, nunca ciclados. */
+  --serie-1: #b88d00;
+  --serie-2: #3f86e8;
 }
 
 body {

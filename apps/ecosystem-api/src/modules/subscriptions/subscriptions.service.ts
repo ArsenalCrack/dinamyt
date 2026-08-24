@@ -13,7 +13,7 @@ import {
   orgMembers,
   users,
 } from '../../db/schema';
-import { and, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, ne } from 'drizzle-orm';
 import { MailerService } from '../auth/mailer.service';
 import {
   anclaDe,
@@ -21,6 +21,7 @@ import {
   diasFaltantes,
   estadoSuscripcion,
   hoyStr,
+  iniciosDePeriodo,
   siguienteVencimiento,
   type EstadoSuscripcion,
 } from '../../common/ciclo';
@@ -798,6 +799,257 @@ export class SubscriptionsService {
       avisadas: enviados,
       omitidas: omitidos,
       correoConfigurado: this.mailer.habilitado(),
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  EL RESUMEN: CUÁNTO ENTRÓ, CUÁNTO FALTA Y CÓMO ESTÁN LOS CLUBES
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Es el equivalente, para el dueño del ecosistema, del panel de recaudo que
+  // el maestro ya tiene en Membresías: las mismas preguntas, un piso más
+  // arriba. Allí el maestro cobra mensualidades a sus alumnos; aquí se cobran
+  // suscripciones a los clubes.
+  //
+  // ── La distinción que hace que los números se puedan explicar ──
+  //
+  // **Caja no es lo mismo que devengado.** Un club que paga tres meses de golpe
+  // en agosto mete todo ese dinero en la CAJA de agosto, pero le corresponde a
+  // agosto, septiembre y octubre. Sin separarlo, el panel diría que agosto fue
+  // un mes extraordinario y que octubre no entró nada — y eso no hay forma de
+  // explicárselo a nadie. Es la misma decisión que ya tomó el panel de
+  // Membresías, y por el mismo motivo.
+
+  /** 'YYYY-MM' de hoy. */
+  private static mesActual(): string {
+    return hoyStr().slice(0, 7);
+  }
+
+  /** Los `n` últimos meses en 'YYYY-MM', del más viejo al más nuevo. */
+  private static ultimosMeses(n: number, hasta: string): string[] {
+    const [a, m] = hasta.split('-').map(Number);
+    const out: string[] = [];
+    for (let i = n - 1; i >= 0; i--) {
+      out.push(new Date(Date.UTC(a, m - 1 - i, 1)).toISOString().slice(0, 7));
+    }
+    return out;
+  }
+
+  /**
+   * Reparte un pago entre los meses a los que de verdad corresponde.
+   *
+   * Un abono (`periodos: 0`) no compra tiempo: cuenta entero en el mes en que
+   * se recibió. Los que sí compran meses se reparten a partes iguales desde
+   * `periodoDesde`.
+   */
+  private static porMesDevengado(pago: {
+    amount: string;
+    paidAt: Date | null;
+    periodos: number;
+    periodoDesde: string | null;
+  }): { mes: string; monto: number }[] {
+    const total = SubscriptionsService.aNumero(pago.amount);
+    const mesCaja = (pago.paidAt ?? new Date()).toISOString().slice(0, 7);
+
+    if (pago.periodos < 1 || !pago.periodoDesde) {
+      return [{ mes: mesCaja, monto: total }];
+    }
+    const inicios = iniciosDePeriodo({
+      desde: pago.periodoDesde,
+      meses: pago.periodos,
+    });
+    const porPeriodo = total / inicios.length;
+    return inicios.map((i) => ({ mes: i.slice(0, 7), monto: porPeriodo }));
+  }
+
+  /**
+   * Todo lo que hace falta para saber cómo va el negocio, en una sola consulta.
+   *
+   * Una sola y no cinco porque las cinco preguntas se hacen a la vez —al abrir
+   * el panel— y separarlas serían cinco viajes para pintar una pantalla.
+   */
+  async resumen(opciones: { mes?: string; meses?: number } = {}) {
+    const hoy = hoyStr();
+    const mes = opciones.mes ?? SubscriptionsService.mesActual();
+    const cuantos = Math.min(Math.max(opciones.meses ?? 6, 1), 24);
+    const meses = SubscriptionsService.ultimosMeses(cuantos, mes);
+
+    // ── Las suscripciones de organización, con su club y su plan ──────────
+    const subs = await db
+      .select({
+        id: subscriptions.id,
+        status: subscriptions.status,
+        endsAt: subscriptions.endsAt,
+        totalAmount: subscriptions.totalAmount,
+        paidAmount: subscriptions.paidAmount,
+        paymentStatus: subscriptions.paymentStatus,
+        createdAt: subscriptions.createdAt,
+        orgId: organizations.id,
+        orgName: organizations.name,
+        orgType: organizations.type,
+        planId: subscriptionPlans.id,
+        planName: subscriptionPlans.name,
+        priceMonthly: subscriptionPlans.priceMonthly,
+      })
+      .from(subscriptions)
+      .innerJoin(organizations, eq(subscriptions.orgId, organizations.id))
+      .innerJoin(
+        subscriptionPlans,
+        eq(subscriptions.planId, subscriptionPlans.id),
+      );
+
+    // ── Los pagos, con el club al que pertenecen ──────────────────────────
+    const pagos = await db
+      .select({
+        amount: subscriptionPayments.amount,
+        method: subscriptionPayments.method,
+        paidAt: subscriptionPayments.paidAt,
+        periodos: subscriptionPayments.periodos,
+        periodoDesde: subscriptionPayments.periodoDesde,
+        subscriptionId: subscriptionPayments.subscriptionId,
+        userSubscriptionId: subscriptionPayments.userSubscriptionId,
+      })
+      .from(subscriptionPayments);
+
+    // ── Dinero, mes a mes ─────────────────────────────────────────────────
+    const caja = new Map<string, { total: number; pagos: number }>();
+    const devengado = new Map<string, number>();
+    const porMetodo = new Map<string, { total: number; pagos: number }>();
+
+    for (const p of pagos) {
+      const monto = SubscriptionsService.aNumero(p.amount);
+      const mesCaja = (p.paidAt ?? new Date()).toISOString().slice(0, 7);
+
+      const enCaja = caja.get(mesCaja) ?? { total: 0, pagos: 0 };
+      caja.set(mesCaja, { total: enCaja.total + monto, pagos: enCaja.pagos + 1 });
+
+      for (const trozo of SubscriptionsService.porMesDevengado(p)) {
+        devengado.set(trozo.mes, (devengado.get(trozo.mes) ?? 0) + trozo.monto);
+      }
+
+      // El desglose por forma de pago es del mes que se está mirando: sirve
+      // para cuadrar la caja, y cuadrar la caja se hace de un mes concreto.
+      if (mesCaja === mes) {
+        const m = porMetodo.get(p.method) ?? { total: 0, pagos: 0 };
+        porMetodo.set(p.method, { total: m.total + monto, pagos: m.pagos + 1 });
+      }
+    }
+
+    // ── Estado de cada club ───────────────────────────────────────────────
+    const estados = { al_dia: 0, por_vencer: 0, vencida: 0, suspendida: 0 };
+    /** Lo que está facturado y sin cobrar. */
+    const porCobrar: {
+      subscriptionId: string;
+      orgName: string;
+      planName: string;
+      debe: number;
+      venceEl: string | null;
+      estado: EstadoSuscripcion;
+    }[] = [];
+    /** Lo que entraría cada mes si todos renovaran su plan. */
+    let esperadoMensual = 0;
+    const porPlan = new Map<string, { name: string; clubes: number; mensual: number }>();
+
+    for (const s of subs) {
+      const venceEl = comoFecha(s.endsAt);
+      const est = estadoSuscripcion(venceEl, hoy);
+
+      if (s.status === 'SUSPENDED' || s.status === 'EXPIRED') {
+        estados.suspendida += 1;
+      } else if (est === 'vencida') {
+        estados.vencida += 1;
+      } else if (est === 'por_vencer') {
+        estados.por_vencer += 1;
+      } else {
+        estados.al_dia += 1;
+      }
+
+      // Solo cuenta como ingreso recurrente lo que está vivo: una suspendida no
+      // va a pagar el mes que viene, y meterla en la previsión la infla.
+      const viva = s.status === 'ACTIVE' && est !== 'vencida';
+      const precio = SubscriptionsService.aNumero(s.priceMonthly);
+      if (viva) esperadoMensual += precio;
+
+      const p = porPlan.get(s.planId) ?? {
+        name: s.planName,
+        clubes: 0,
+        mensual: 0,
+      };
+      p.clubes += 1;
+      if (viva) p.mensual += precio;
+      porPlan.set(s.planId, p);
+
+      const debe =
+        SubscriptionsService.aNumero(s.totalAmount) -
+        SubscriptionsService.aNumero(s.paidAmount);
+      // Medio peso de diferencia es redondeo, no una deuda.
+      if (debe > 0.5) {
+        porCobrar.push({
+          subscriptionId: s.id,
+          orgName: s.orgName,
+          planName: s.planName,
+          debe,
+          venceEl,
+          estado: est,
+        });
+      }
+    }
+
+    porCobrar.sort((a, b) => b.debe - a.debe);
+
+    // ── Clubes y cuentas ──────────────────────────────────────────────────
+    const [{ clubes }] = await db
+      .select({ clubes: count() })
+      .from(organizations)
+      .where(eq(organizations.isActive, true));
+
+    const [{ personas }] = await db
+      .select({ personas: count() })
+      .from(users)
+      .where(eq(users.isActive, true));
+
+    const conSuscripcion = new Set(subs.map((s) => s.orgId)).size;
+
+    return {
+      mes,
+      dinero: {
+        recaudadoMes: Math.round(caja.get(mes)?.total ?? 0),
+        devengadoMes: Math.round(devengado.get(mes) ?? 0),
+        pagosMes: caja.get(mes)?.pagos ?? 0,
+        esperadoMensual: Math.round(esperadoMensual),
+        porCobrarTotal: Math.round(porCobrar.reduce((t, c) => t + c.debe, 0)),
+        porMes: meses.map((m) => ({
+          mes: m,
+          recaudado: Math.round(caja.get(m)?.total ?? 0),
+          devengado: Math.round(devengado.get(m) ?? 0),
+          pagos: caja.get(m)?.pagos ?? 0,
+        })),
+        porMetodo: [...porMetodo.entries()]
+          .map(([metodo, v]) => ({
+            metodo,
+            total: Math.round(v.total),
+            pagos: v.pagos,
+          }))
+          .sort((a, b) => b.total - a.total),
+      },
+      clubes: {
+        total: clubes,
+        conSuscripcion,
+        // Un club activo sin ninguna suscripción es alguien a quien nunca se le
+        // cobró: no es un moroso, es una venta sin cerrar.
+        sinSuscripcion: Math.max(clubes - conSuscripcion, 0),
+        ...estados,
+      },
+      personas: { total: personas },
+      porCobrar: porCobrar.slice(0, 20),
+      porPlan: [...porPlan.entries()]
+        .map(([planId, v]) => ({
+          planId,
+          name: v.name,
+          clubes: v.clubes,
+          mensual: Math.round(v.mensual),
+        }))
+        .sort((a, b) => b.mensual - a.mensual),
     };
   }
 }

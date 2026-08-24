@@ -43,6 +43,7 @@ import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 import { ROLES_SUPERADMIN, nombreRol } from '@/lib/roles';
 import { FilaMiembro } from '@/components/FilaMiembro';
 import { SelectMenu } from '@/components/SelectMenu';
+import { PanelRecaudo } from '@/components/PanelRecaudo';
 
 const TIPOS_ORG = ['FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY'] as const;
 
@@ -168,7 +169,10 @@ export default function AdminEcosistemaPage() {
   const subsDeOrg = orgSel ? subs.filter((s) => s.orgId === orgSel.id) : [];
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6">
+    // `max-w-7xl` y no `6xl`: esto es un panel de escritorio con listas de
+    // gente y de suscripciones, no un formulario. Las 128 px de más son las que
+    // hacen que un nombre completo y un correo quepan en la misma línea.
+    <main className="mx-auto min-h-screen max-w-7xl px-4 py-8 sm:px-6">
       <Link href="/dashboard" className="text-sm" style={{ color: 'var(--text-muted)' }}>
         ← Dashboard
       </Link>
@@ -190,6 +194,9 @@ export default function AdminEcosistemaPage() {
       {/* ── VENCIMIENTOS: lo único de esta pantalla que caduca ──────────── */}
       <Vencimientos ocupado={ocupado} onAccion={accion} />
 
+      {/* ── RECAUDO: cuánto entró, cuánto falta y cómo están los clubes ─── */}
+      <PanelRecaudo />
+
       {/* ── ACCESOS RÁPIDOS: correo → app + rol → un clic ───────────────── */}
       <AccesosRapidos
         orgs={orgs}
@@ -209,9 +216,20 @@ export default function AdminEcosistemaPage() {
       {/* ── CUENTAS BLOQUEADAS por intentos fallidos ────────────────────── */}
       <CuentasBloqueadas ocupado={ocupado} />
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      {/* ── El reparto del ancho ──
+          Antes eran dos columnas iguales, y la de la derecha —miembros y
+          suscripciones— se quedaba con la mitad de la pantalla mientras la
+          izquierda gastaba lo mismo en una lista de nombres de club. Con la
+          lista de gente partida otra vez en dos, cada fila acababa en un cuarto
+          del ancho y el nombre no cabía.
+
+          Ahora la izquierda ocupa lo que necesita (una columna fija) y todo lo
+          demás va al detalle. Y se queda pegada al desplazar: se elige un club
+          arriba y se mira su gente abajo, así que tenerla siempre a la vista
+          ahorra subir y bajar. */}
+      <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
         {/* ── Organizaciones ─────────────────────────────────────────────── */}
-        <section className="card p-5">
+        <section className="card p-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
           <h2 className="mb-3 text-lg font-semibold">Organizaciones</h2>
           <ul className="mb-4 flex flex-col gap-2">
             {orgs.map((o) => (
@@ -307,9 +325,12 @@ export default function AdminEcosistemaPage() {
                 aria-label="Buscar entre los miembros de la organización"
                 className="mb-3"
               />
-              {/* Dos columnas en pantalla ancha, como en «Mi organización»:
-                  una tira de veinte filas dejaba media pantalla en blanco. */}
-              <ul className="mb-4 grid gap-2 lg:grid-cols-2">
+              {/* Una sola columna, a propósito. Con el detalle ya ancho, cada
+                  fila tiene sitio de sobra para el nombre completo, el correo y
+                  los roles por app en la misma línea que los controles.
+                  Partirla en dos devolvería el problema que se acaba de
+                  arreglar: filas de 400 px con un desplegable de 152 dentro. */}
+              <ul className="mb-4 flex flex-col gap-2">
                 {miembros.map((m) => (
                   <FilaMiembro
                     key={m.memberId}

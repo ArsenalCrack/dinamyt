@@ -22,10 +22,20 @@ import type { Miembro } from '@/lib/api';
  * `min-w-0`, y los controles al lado. Un correo largo —que son casi todos:
  * `nombre.apellido@algo.com`— no cabía, no se recortaba, y empujaba los
  * botones fuera de la tarjeta o encima del texto. Aquí el bloque de identidad
- * es una rejilla que puede encogerse (`minWidth: 0`), el correo se recorta con
- * puntos suspensivos y lleva su `title` para poder leerlo entero, y en pantalla
- * estrecha los controles bajan a su propia línea en vez de pelearse por el
- * ancho.
+ * es una rejilla que puede encogerse (`minWidth: 0`) y el correo se recorta con
+ * puntos suspensivos, con su `title` para poder leerlo entero.
+ *
+ * ── Por qué se mide con `@container` y no con `sm:` ──
+ *
+ * **Este era el bug de los nombres tapados.** `sm:flex-row` mira el ancho de la
+ * VENTANA, no el de la fila. En el panel del super-admin esta fila vivía dentro
+ * de media pantalla partida otra vez en dos columnas —un cuarto del ancho
+ * total, unos 260 px— y aun así `sm:` la ponía en horizontal, porque la ventana
+ * sí era ancha. El desplegable de rol pide 152 px y los botones lo suyo, así
+ * que al nombre no le quedaba nada: se recortaba hasta desaparecer.
+ *
+ * Con `@container` la fila se mide a sí misma. Estrecha, apila; ancha, pone los
+ * controles al lado. Da igual en cuántas columnas la metan.
  */
 
 /** Un rol de app, solo si la persona participa en ella. */
@@ -58,9 +68,10 @@ export function FilaMiembro({
 
   return (
     <li
-      className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+      className="@container rounded-lg border px-3 py-2.5 text-sm"
       style={{ borderColor: 'var(--border)' }}
     >
+      <div className="flex flex-col gap-2 @md:flex-row @md:items-center @md:justify-between @md:gap-3">
       {/* Identidad. `min-w-0` en los dos niveles: sin él, el hijo de un flex
           se niega a encogerse por debajo de su contenido y el recorte no
           llega a aplicarse nunca. */}
@@ -87,7 +98,7 @@ export function FilaMiembro({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 @md:shrink-0">
         {/* El desplegable del ecosistema y no el `<select>` nativo: este es el
             «tipo de usuario» del panel del maestro, y se pintaba con los
             colores del sistema operativo —gris, distinto en cada navegador, y
@@ -111,6 +122,7 @@ export function FilaMiembro({
           botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
         />
         {acciones}
+      </div>
       </div>
     </li>
   );

@@ -26,7 +26,7 @@ export interface OpcionSelect {
  * a pantalla completa— en medio de una interfaz que no es nada de eso. El
  * portal era la última de las tres apps que lo seguía usando: este es
  * literalmente el MISMO componente que Membresías y Campeonatos, traído tal
- * cual para que las tres se sientan una sola (ver `OPERAR.md`, §4.8).
+ * cual para que las tres se sientan una sola (ver `OPERAR.md`, §4.9).
  *
  * Abrir y cerrar es estado de React puro, así que SIEMPRE se pliega: al elegir,
  * al tocar fuera y con Escape. El teclado también manda (flechas, Enter, Home,

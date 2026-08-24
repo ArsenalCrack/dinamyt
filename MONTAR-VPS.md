@@ -996,6 +996,9 @@ TRUST_PROXY_HOPS=1
 COOKIE_SAMESITE=lax
 COOKIE_SECURE=true
 CRON_SECRET=EL_QUE_GENERASTE_EN_6.3
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:soporte@dinamyt.org
 ```
 
 ```bash
@@ -1006,6 +1009,7 @@ nano /srv/membresias/apps/membresias-web/.env.production
 MEMBRESIAS_API_ORIGIN=http://127.0.0.1:3004
 NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL=https://dinamyt.org
 CRON_SECRET=EL_MISMO_DE_LA_API
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=LA_MISMA_PUBLICA_DE_LA_API
 ```
 
 ⚠️ `MEMBRESIAS_API_ORIGIN` y `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` se leen **al
@@ -1022,6 +1026,30 @@ compilar**, no al arrancar: si las cambias, hay que volver a compilar la web.
 >
 > `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` (en la web) es la que dibuja el botón
 > «entrar con DINAMYT» y el camino de vuelta al portal.
+
+> **Las llaves VAPID son las que hacen que al ALUMNO le llegue el aviso de que
+> su mensualidad vence.** Es el único canal que tiene: Membresías no manda
+> correos —ni tiene con qué— porque quien no tiene correo usable entra igual,
+> con carnet QR o PIN. Su aviso va por **Web Push** a la PWA del celular.
+>
+> Se generan una vez, con las apps ya compiladas:
+>
+> ```bash
+> cd /srv/membresias && pnpm --filter @dinamyt/membresias-api gen:vapid
+> ```
+>
+> Saca tres líneas. La privada y la pública van al `.env` de la API; **la
+> pública va TAMBIÉN al `.env.production` de la web** como
+> `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Sin llaves, `enviarPush` devuelve `false` y no
+> sale nada — sin error, sin aviso, sin nada.
+>
+> ⚠️ `NEXT_PUBLIC_VAPID_PUBLIC_KEY` **vive dentro del build**: después de
+> ponerla hay que recompilar `membresias-web`. Reiniciar no basta.
+>
+> Y falta un tercer paso que no es del servidor: **cada alumno tiene que pulsar
+> «Activar avisos»** una vez, en `/mi`. El navegador no deja mandar
+> notificaciones sin que su dueño lo permita. En iPhone, además, solo funciona
+> si la app está **añadida a la pantalla de inicio**.
 
 ## 6.7 Compilar Membresías
 

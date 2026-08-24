@@ -597,6 +597,54 @@ export const historialSuscripcionPersonalAPI = async (
 ): Promise<PagoSuscripcion[]> =>
   (await api.get(`/subscriptions/user/${id}/pagos`)).data;
 
+/** Todo lo que hace falta para saber cómo va el negocio, en una sola consulta. */
+export interface ResumenSuscripciones {
+  /** 'YYYY-MM' del mes que se está mirando. */
+  mes: string;
+  dinero: {
+    /** Lo que entró en CAJA este mes. */
+    recaudadoMes: number;
+    /** Lo que le CORRESPONDE a este mes (un pago de tres meses se reparte). */
+    devengadoMes: number;
+    pagosMes: number;
+    /** Lo que entraría cada mes si todos renovaran su plan. */
+    esperadoMensual: number;
+    /** Facturado y sin cobrar. */
+    porCobrarTotal: number;
+    porMes: { mes: string; recaudado: number; devengado: number; pagos: number }[];
+    porMetodo: { metodo: string; total: number; pagos: number }[];
+  };
+  clubes: {
+    total: number;
+    conSuscripcion: number;
+    sinSuscripcion: number;
+    al_dia: number;
+    por_vencer: number;
+    vencida: number;
+    suspendida: number;
+  };
+  personas: { total: number };
+  porCobrar: {
+    subscriptionId: string;
+    orgName: string;
+    planName: string;
+    debe: number;
+    venceEl: string | null;
+    estado: string;
+  }[];
+  porPlan: { planId: string; name: string; clubes: number; mensual: number }[];
+}
+
+export const resumenSuscripcionesAPI = async (
+  mes?: string,
+  meses?: number,
+): Promise<ResumenSuscripciones> =>
+  (
+    await api.get('/subscriptions/resumen', {
+      params: { ...(mes ? { mes } : {}), ...(meses ? { meses } : {}) },
+    })
+  ).data;
+
 export const vencimientosAPI = async (dias?: number): Promise<Vencimiento[]> =>
   (
     await api.get('/subscriptions/vencimientos', {

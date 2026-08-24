@@ -178,7 +178,74 @@ idénticos y ninguno se explica solo.
 | `relation … already exists` | El diario está en el esquema `drizzle` y este proyecto lo lleva dentro de `ecosystem`. Se arregla una vez: `pnpm db:migrar --mover-diario` |
 | `permission denied` | Al usuario de la app le falta `CREATE`. Como `postgres`: `GRANT CREATE ON DATABASE dinamyt TO dinamyt_eco;` |
 
-## 2.7 La reconciliación de identidades
+## 2.7 Encender el reloj de los avisos
+
+**Los dos avisos —el de las suscripciones de los clubes y el de las
+mensualidades de los alumnos— necesitan que alguien los dispare cada día.** El
+reloj era el cron de Vercel, y Vercel ya no existe en este proyecto: al mudarse
+al VPS se trajeron las apps y **el reloj se quedó allí**. No falla: sencillamente
+no ocurre, que es la clase de avería más difícil de ver.
+
+Se enciende una vez. Primero, el secreto del ecosistema (Membresías ya tiene el
+suyo desde el montaje):
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+Esa cadena va a `CRON_SECRET` en `/srv/dinamyt/apps/ecosystem-api/.env`. **Sin
+ella la ruta responde 404 a propósito**: una ruta sin autenticar que manda correo
+a todos los clubes no puede quedarse abierta «por si acaso».
+
+```bash
+sudo install -m 750 -o dinamyt -g dinamyt /srv/dinamyt/scripts/avisos-diarios.sh /usr/local/bin/dinamyt-avisos
+```
+
+```bash
+sudo tee /etc/systemd/system/dinamyt-avisos.service >/dev/null <<'EOF'
+[Unit]
+Description=DINAMYT — avisos diarios (suscripciones y mensualidades)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=dinamyt
+ExecStart=/usr/local/bin/dinamyt-avisos
+EOF
+```
+
+```bash
+sudo tee /etc/systemd/system/dinamyt-avisos.timer >/dev/null <<'EOF'
+[Unit]
+Description=Dispara los avisos de DINAMYT una vez al día
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+```
+
+`Persistent=true` no es un detalle: si el servidor estuvo apagado a las ocho, el
+aviso sale al arrancar en vez de perderse ese día.
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now dinamyt-avisos.timer && systemctl list-timers dinamyt-avisos --no-pager
+```
+
+Probarlo sin esperar a mañana, y ver qué contestó cada API:
+
+```bash
+sudo systemctl start dinamyt-avisos && sudo journalctl -u dinamyt-avisos -n 20 --no-pager
+```
+
+✅ Dos líneas, una por app. `[ecosystem/suscripciones] ok: {"revisadas":…}` y
+`[membresias/mensualidades] ok: {"clubes":…}`. Si alguna dice «sin CRON_SECRET»,
+a esa `.env` le falta la variable.
+
+## 2.8 La reconciliación de identidades
 
 ```bash
 cd /srv/dinamyt/apps/ecosystem-api && sudo -u postgres RECONCILIACION_DATABASE_URL=postgresql:///dinamyt node scripts/reconciliar-identidades.mjs --informe /tmp/ensayo.json
@@ -352,8 +419,76 @@ Los avisos:
 El disparo diario es `POST /subscriptions/avisos/cron` con la cabecera
 `x-cron-secret`. Sin `CRON_SECRET` la ruta responde 404: una ruta sin autenticar
 que manda correo a todos los clubes no puede quedarse abierta «por si acaso».
+Cómo encender el reloj: §2.7.
 
-## 4.6 La persona se edita en el portal; la ficha, en su app
+### El panel de recaudo
+
+`GET /subscriptions/resumen` responde todo lo que pinta la tarjeta «📊 Recaudo y
+estado» de `/admin`. **La distinción que hace que los números se puedan
+explicar** es la misma que ya hace el panel del maestro en Membresías:
+
+| | Qué es |
+|---|---|
+| **Recaudado** | La caja: lo que entró este mes, venga de donde venga |
+| **Devengado** | Lo que le CORRESPONDE a este mes |
+
+Un club que paga tres meses de golpe en agosto mete todo ese dinero en la caja
+de agosto, pero le toca a agosto, septiembre y octubre. Con una sola cifra,
+agosto parecía extraordinario y octubre un desastre.
+
+**Esperado al mes** es lo que entraría si todos renovaran, y solo cuenta lo que
+está vivo: una suscripción suspendida no va a pagar el mes que viene, y meterla
+infla la previsión.
+
+> **Los colores de las barras no son el oro de marca.** El oro (`#f0b800`) y el
+> azul de aviso (`#4d9fff`) se salen por arriba de la banda de luminosidad sobre
+> tinta: brillan tanto que las barras se comen la lectura del eje. Los dos que se
+> usan (`--serie-1`, `--serie-2` en `globals.css`) son los que pasan las seis
+> comprobaciones del validador contra ese fondo, incluida la separación para
+> daltonismo. **Si añades una serie, valídala; no la elijas a ojo.**
+
+## 4.6 Qué le llega a cada quien, y por dónde
+
+Son dos sistemas de avisos distintos, con dos destinatarios distintos y dos
+canales distintos. Confundirlos es fácil y caro:
+
+| Avisa a | De qué | Por dónde | Quién lo manda |
+|---|---|---|---|
+| **El maestro** | Su club le vence la suscripción a DINAMYT | **Correo** (Resend) | `ecosystem-api` |
+| **El alumno** | Su mensualidad del club vence | **Notificación en la app** (campana) y **Web Push** al celular | `membresias-api` |
+
+### Al alumno NO le llega correo, y es a propósito
+
+**Membresías no tiene proveedor de correo.** No es un olvido ni algo a medio
+hacer: no tiene ni la dependencia instalada. La razón es la regla que sostiene
+todo el producto — **quien no tiene correo usable también entra** (carnet QR o
+PIN), y su ficha vive sin cuenta. Un aviso por correo dejaría fuera justo a la
+gente a la que el maestro más persigue para cobrar.
+
+Su canal es el **Web Push**: la app es una PWA, el alumno la instala en su
+celular y el aviso le llega ahí, gratis y sin límite mensual. Y queda además en
+la campana de la app, para cuando entre.
+
+> **Ojo con el tope si alguna vez se piensa en correo para alumnos.** Resend
+> gratis da **100 al día** para todo DINAMYT. Con quinientos alumnos, un aviso
+> de vencimiento al mes se come el cupo en tres días — y con él los códigos de
+> verificación de las cuentas nuevas, que son los que no pueden fallar.
+
+### Qué hace falta para que los avisos del alumno funcionen
+
+`[ ]` **Las llaves VAPID.** Sin `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` en
+      `membresias-api` —y la pública también en `membresias-web`— `enviarPush`
+      devuelve `false` y no sale nada. Se generan con
+      `pnpm --filter @dinamyt/membresias-api gen:vapid`.
+
+`[ ]` **El reloj diario** (§2.7). Sin él, los avisos solo existen cuando el
+      maestro pulsa «Generar avisos» en su panel.
+
+Mientras las dos cosas no estén, lo único que ocurre es el botón del maestro, y
+lo único que genera es el aviso in-app. Es un estado válido —nada se rompe— pero
+conviene saber que es el que hay.
+
+## 4.7 La persona se edita en el portal; la ficha, en su app
 
 | Dato | Dónde vive | Quién lo edita |
 |---|---|---|
@@ -372,7 +507,7 @@ carnet sigue saliendo con las iniciales para siempre.
 puede estar en otra máquina; escribir en las tablas de otra app obliga a que las
 dos migren a la vez para siempre.
 
-## 4.7 Una contraseña para todo DINAMYT
+## 4.8 Una contraseña para todo DINAMYT
 
 Se fija en el portal y las apps la **copian**. Nunca al revés, y nunca en dos
 sitios a la vez.
@@ -390,7 +525,7 @@ Una ficha **sin** `eco_sub` —el alumno sin correo, que entra por carnet QR o
 PIN— no tiene cuenta del ecosistema y este aviso no la toca jamás. Su contraseña
 sigue siendo asunto de su club.
 
-## 4.8 Que las tres apps se sientan una sola
+## 4.9 Que las tres apps se sientan una sola
 
 > Los colores, los tamaños y las formas se definen **una** vez y las tres apps
 > los leen. Ninguna app define un color propio.
@@ -409,7 +544,7 @@ gritar números a dos metros), el carnet de Membresías (está hecho para
 imprimirse) y el modo local de Campeonatos (arranca sin ecosistema, con su
 propio login).
 
-## 4.9 El mapa de la API del ecosistema
+## 4.10 El mapa de la API del ecosistema
 
 El contrato que consumen las apps —lo único que no se puede cambiar sin avisar a
 las otras tres— es el payload del JWT. Vive en `@dinamyt/shared`:
@@ -646,6 +781,31 @@ sin nada detrás da **525**.
       SSO—, pero el portal no lo sabe (`org_members` no tiene estado) y le sigue
       enseñando «Entrar a Membresías». Cerrarlo exige que el ecosistema lea el
       estado de Membresías, o que el botón cuente lo que pasó cuando falle.
+
+`[ ]` **Al alumno no le llega ningún aviso automático todavía**: faltan las
+      llaves VAPID y el reloj diario. Ver §4.6 — están los dos comandos.
+
+`[ ]` **WhatsApp para los avisos del alumno.** Es el canal que la gente de
+      verdad lee, y el que el maestro ya usa a mano. **No está construido.**
+      Lo que costaría, para decidirlo con números en vez de con ganas:
+
+      · **El dinero es lo de menos.** Meta cobra por mensaje entregado desde
+        julio de 2025, y Colombia es de los mercados más baratos: una plantilla
+        de *utilidad* cuesta entre **0,0008 y 0,003 USD**. Un aviso al mes a
+        quinientos alumnos son **menos de dos dólares**. Ya no hay tramo
+        gratuito mensual, pero sí una regla que aquí sale a favor: si la persona
+        te escribió primero, tienes 24 h para responderle **gratis**.
+      · **Lo caro es entrar.** Cuenta de Meta Business, **verificación de la
+        empresa** (documentos, días de espera), un número de teléfono dedicado
+        que no esté ya en WhatsApp normal, y **cada plantilla aprobada una por
+        una** por Meta antes de poder mandarla.
+      · **Lo que habría que escribir**: un `WhatsappService` gemelo del
+        `MailerService` (mismo criterio: sin token configurado, la función no
+        existe), guardar el `phone` en formato E.164, y un registro de envíos
+        para no repetir.
+      · ⛔ **Las librerías que automatizan WhatsApp Web** (`whatsapp-web.js`,
+        Baileys) **no**. Violan los términos y el número acaba bloqueado — el
+        del club, que es el que usan para todo.
 
 `[ ]` **Campeonatos no lee el `#token=`.** Su `/login` existe, pero el salto
       desde el portal aterriza en su formulario en vez de iniciar sesión. Se
