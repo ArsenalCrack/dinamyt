@@ -10,6 +10,8 @@ import {
   sesionActual,
   obtenerToken,
   extraerError,
+  seRecuerda,
+  INACTIVIDAD_MINUTOS,
   type TokenPayload,
 } from '@/lib/api';
 import { CampoContrasena } from '@/components/CampoContrasena';
@@ -33,6 +35,38 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [tocado, setTocado] = useState(false);
   const [cargando, setCargando] = useState(false);
+
+  /**
+   * ¿Guardar la sesión en este equipo?
+   *
+   * ── Por qué existe esta casilla ──
+   *
+   * Hasta ahora el pase iba SIEMPRE a `localStorage`, que sobrevive a cerrar
+   * el navegador, a apagar el equipo y a que la persona se vaya a su casa.
+   * Quien entraba desde un computador prestado —el de un amigo, el de un
+   * locutorio, el del club— dejaba su cuenta abierta ahí y no tenía forma de
+   * evitarlo.
+   *
+   * Sin marcar, el pase vive solo mientras la ventana esté abierta.
+   *
+   * Empieza marcada porque casi todo el mundo entra desde su propio celular, y
+   * desmarcarla ahí sería pedir la contraseña cada vez sin ganar nada. Lo que
+   * importa es que en el equipo prestado se PUEDA desmarcar — y que el estado
+   * se recuerde, para que quien lo hizo una vez no tenga que acordarse la
+   * siguiente.
+   */
+  const [recordar, setRecordar] = useState(true);
+  useEffect(() => setRecordar(seRecuerda()), []);
+
+  /**
+   * Por qué se acabó la sesión anterior, si es que se acabó por algo.
+   *
+   * Lo pone el interceptor de `lib/api.ts` con el mensaje que mandó el
+   * servidor. Antes cualquier 401 dejaba a la persona en un login mudo, sin
+   * pista de qué había pasado, y eso se lee como «la aplicación me echó sin
+   * motivo».
+   */
+  const motivoDelCierre = search.get('motivo');
 
   const correo = validarCorreo(email);
   /**
@@ -113,7 +147,10 @@ function LoginForm() {
   }
 
   function entrarConOtraCuenta() {
-    cerrarSesion();
+    // `void`: cerrar en el servidor puede tardar, y la pantalla tiene que
+    // cambiar ya. El pase local se borra dentro de `cerrarSesion` antes de
+    // salir a la red, así que aquí no queda nada que entregar.
+    void cerrarSesion();
     setAbierta(null);
     setError(null);
   }
@@ -131,7 +168,7 @@ function LoginForm() {
     setCargando(true);
     try {
       const { access_token } = await loginAPI(email, password);
-      guardarToken(access_token);
+      guardarToken(access_token, recordar);
       entregarSesion(access_token, soloAlPortal);
     } catch (err) {
       setError(extraerError(err, 'No se pudo iniciar sesión.'));
@@ -163,6 +200,19 @@ function LoginForm() {
           DINAMYT
         </span>
       </Link>
+
+      {motivoDelCierre && !abierta && (
+        <p
+          className="w-full max-w-sm rounded-lg border p-3 text-sm"
+          style={{
+            borderColor: 'var(--border)',
+            background: 'var(--bg-elevated)',
+            color: 'var(--text-muted)',
+          }}
+        >
+          {motivoDelCierre}
+        </p>
+      )}
 
       {abierta ? (
         <section className="card w-full max-w-sm p-6">
@@ -282,6 +332,26 @@ function LoginForm() {
               . Con eso tu correo queda confirmado.
             </p>
           )}
+          <label className="mt-4 flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={recordar}
+              onChange={(e) => setRecordar(e.target.checked)}
+              className="mt-0.5"
+              style={{ accentColor: 'var(--gold)' }}
+            />
+            <span>
+              Mantener la sesión iniciada en este equipo
+              <span
+                className="mt-0.5 block text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {recordar
+                  ? `Desmárcalo si el equipo no es tuyo. En cualquier caso, la sesión se cierra sola tras ${INACTIVIDAD_MINUTOS} minutos sin actividad.`
+                  : 'La sesión se cerrará al cerrar el navegador.'}
+              </span>
+            </span>
+          </label>
           <button
             type="submit"
             disabled={cargando}

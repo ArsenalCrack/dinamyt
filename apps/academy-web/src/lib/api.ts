@@ -1,62 +1,101 @@
 'use client';
 
 import axios from 'axios';
+import {
+  cabecerasDeZona,
+  guardarToken,
+  obtenerToken,
+  olvidarToken,
+} from './sesion';
 
 // API de Academy (rutas en la raíz, sin prefijo). El login se delega al ecosystem.
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3007';
 const ECOSYSTEM_API_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_API_URL || 'http://localhost:3001';
 
-const TOKEN_KEY = 'dinamyt_token';
+/**
+ * Dónde vive el pase, cuándo se renueva y cuándo se muere: en `lib/sesion.ts`.
+ *
+ * Se re-exporta desde aquí porque toda la app lo importa de `@/lib/api` desde
+ * antes de que ese módulo existiera, y mover treinta importaciones para ganar
+ * una línea no arregla nada.
+ */
+export {
+  guardarToken,
+  obtenerToken,
+  olvidarToken,
+  leerPase,
+  seRecuerda,
+  recordarEnEsteEquipo,
+  vigilarSesion,
+  marcarActividad,
+  INACTIVIDAD_MINUTOS,
+  AVISO_SEGUNDOS,
+} from './sesion';
 
 /**
- * Margen contra el reloj del navegador. Un reloj adelantado unos segundos
- * respecto al servidor daría por viva una sesión que la API ya rechaza; es
- * preferible darla por muerta un poco antes de tiempo.
+ * Cerrar sesión **de verdad**.
+ *
+ * ── Lo que hacía antes ──
+ *
+ * Borrar la copia del navegador. El pase original seguía siendo válido hasta
+ * caducar solo, así que quien se sentara después en ese mismo computador —o
+ * quien lo hubiera copiado— seguía entrando. «Salir» era una palabra sin
+ * acción detrás.
+ *
+ * Ahora se le pide al ecosystem que cierre la fila de la sesión, y desde ese
+ * momento el pase no vale en ninguna app: ni aquí, ni en el portal, ni en
+ * Campeonatos.
+ *
+ * Lo local se borra ANTES de esperar al servidor: salir no puede depender de
+ * que haya red. Si la llamada falla, el reloj de inactividad del ecosystem
+ * cierra la sesión en veinte minutos; al revés, una API caída dejaría a
+ * alguien dentro de la cuenta de la que intenta salir.
  */
-const MARGEN_EXPIRACION_SEG = 30;
-
-export function guardarToken(token: string) {
-  if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
+export async function cerrarSesion(): Promise<void> {
+  const token = obtenerToken();
+  olvidarToken();
+  if (!token) return;
+  try {
+    await axios.post(
+      `${ECOSYSTEM_API_URL}/auth/logout`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 5000 },
+    );
+  } catch {
+    // Ver arriba: el reloj del ecosystem es la red de seguridad.
+  }
 }
 
 /**
- * ¿Este token todavía vale como sesión? Solo mira la fecha de caducidad: la
- * firma la comprueba la API, y aquí no hay llave con la que hacerlo.
+ * Vuelve a pedir el pase al ecosystem, que es el único que los firma.
+ *
+ * Academy no emite tokens y no puede: verifica la firma contra el JWKS y ya.
+ * Por eso esto va al ecosystem y no a la API de aquí. Devuelve `false` si la
+ * sesión ya no está abierta —cerrada desde otro dispositivo, caducada, o
+ * porque su dueño cambió la contraseña—, y eso es lo que hace que una sesión
+ * revocada muera también aquí sin que Academy tenga que consultar nada en cada
+ * petición.
  */
-function vigente(token: string): boolean {
+export async function refrescarSesionAPI(): Promise<boolean> {
+  const token = obtenerToken();
+  if (!token) return false;
   try {
-    const parte = token.split('.')[1];
-    const p = JSON.parse(atob(parte.replace(/-/g, '+').replace(/_/g, '/')));
-    // Sin `exp` no es un token nuestro: todos los que firma el ecosystem lo
-    // llevan (ver `jwt.service.ts`).
-    if (typeof p.exp !== 'number') return false;
-    return p.exp * 1000 > Date.now() + MARGEN_EXPIRACION_SEG * 1000;
+    const res = await axios.post(
+      `${ECOSYSTEM_API_URL}/auth/refresh`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}`, ...cabecerasDeZona() },
+        timeout: 15000,
+      },
+    );
+    const nuevo = (res.data as { access_token?: string }).access_token;
+    if (!nuevo) return false;
+    guardarToken(nuevo);
+    return true;
   } catch {
     return false;
   }
-}
-
-/**
- * El token de la sesión, o `null` si no hay o si ya caducó.
- *
- * **Que haya una cadena guardada no significa que haya sesión.** Con un token
- * de ayer, cada pantalla se daba por autorizada, pedía datos, recibía 401 y
- * rebotaba al login, que volvía a encontrar el mismo token. Borrarlo aquí hace
- * que ese rebote pase una vez y no vuelva.
- */
-export function obtenerToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  const t = localStorage.getItem(TOKEN_KEY);
-  if (!t) return null;
-  if (!vigente(t)) {
-    localStorage.removeItem(TOKEN_KEY);
-    return null;
-  }
-  return t;
-}
-export function cerrarSesion() {
-  if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);
 }
 
 export const api = axios.create({ baseURL: API_URL });
@@ -78,21 +117,34 @@ function manejar401(error: unknown) {
     typeof window !== 'undefined' &&
     window.location.pathname !== '/login'
   ) {
-    cerrarSesion();
-    window.location.href = '/login';
+    // El motivo del servidor viaja hasta el login: desde que las sesiones se
+    // pueden cerrar, un 401 tiene explicaciones que a la persona le importan
+    // («se cerró sola tras 20 minutos», «la cerraste desde otro dispositivo»),
+    // y tirarlas para enseñar «no autorizado» es lo que hace creer que la
+    // aplicación falla.
+    const motivo = extraerError(error, '');
+    olvidarToken();
+    window.location.href = motivo
+      ? `/login?motivo=${encodeURIComponent(motivo)}`
+      : '/login';
   }
   return Promise.reject(error);
 }
 api.interceptors.response.use((r) => r, manejar401);
 
 /** Inicia sesión contra el ecosystem y guarda el token. */
-export async function login(email: string, password: string): Promise<string> {
-  const res = await axios.post(`${ECOSYSTEM_API_URL}/auth/login`, {
-    email,
-    password,
-  });
+export async function login(
+  email: string,
+  password: string,
+  recordar?: boolean,
+): Promise<string> {
+  const res = await axios.post(
+    `${ECOSYSTEM_API_URL}/auth/login`,
+    { email, password },
+    { headers: cabecerasDeZona() },
+  );
   const token = res.data.access_token as string;
-  guardarToken(token);
+  guardarToken(token, recordar);
   return token;
 }
 

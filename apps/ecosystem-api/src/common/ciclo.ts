@@ -39,11 +39,38 @@ function diasDelMes(anio: number, mesIndice0: number): number {
   return new Date(Date.UTC(anio, mesIndice0 + 1, 0)).getUTCDate();
 }
 
-/** Hoy como 'YYYY-MM-DD'. En el servidor va con `TZ=America/Bogota`. */
-export function hoyStr(d = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+/**
+ * Hoy como 'YYYY-MM-DD', en la zona que se le diga.
+ *
+ * ── Por qué la zona es un parámetro ───────────────────────────────────────
+ *
+ * Antes esto leía el reloj local del proceso, que en el VPS es
+ * `TZ=America/Bogota`. Mientras todos los clubes estuvieran en Colombia daba
+ * igual; en cuanto hay uno en España, «vence hoy» se calcula con el día de
+ * Bogotá y ese club recibe el aviso de vencimiento con un día de desfase — o
+ * lo recibe cuando para él ya venció.
+ *
+ * La zona del club vive en `organizations.timezone`. Quien no la pase se
+ * queda con el comportamiento de siempre, que es lo correcto para todo lo que
+ * no pertenece a ningún club en concreto.
+ */
+export function hoyStr(zona?: string | null, ahora = new Date()): string {
+  if (zona) {
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: zona,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(ahora);
+    } catch {
+      // Una zona que este Node no conoce no puede tumbar el cálculo de un
+      // vencimiento: se cae al reloj del servidor, como antes.
+    }
+  }
+  const y = ahora.getFullYear();
+  const m = String(ahora.getMonth() + 1).padStart(2, '0');
+  const day = String(ahora.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
@@ -98,7 +125,9 @@ export function siguienteVencimiento(entrada: {
 }): string {
   const { hoy, vencimientoAnterior } = entrada;
   const base =
-    vencimientoAnterior && vencimientoAnterior > hoy ? vencimientoAnterior : hoy;
+    vencimientoAnterior && vencimientoAnterior > hoy
+      ? vencimientoAnterior
+      : hoy;
   const ancla = entrada.anclaGuardada ?? anclaDe(base);
   return sumarMeses(base, Math.max(1, entrada.meses), ancla);
 }
@@ -126,9 +155,14 @@ export function iniciosDePeriodo(entrada: {
 }
 
 /** Días que faltan para el vencimiento. Negativo si ya pasó. */
-export function diasFaltantes(vence: string | null, hoy: string): number | null {
+export function diasFaltantes(
+  vence: string | null,
+  hoy: string,
+): number | null {
   if (!vence) return null;
-  return Math.round((parse(vence).getTime() - parse(hoy).getTime()) / 86_400_000);
+  return Math.round(
+    (parse(vence).getTime() - parse(hoy).getTime()) / 86_400_000,
+  );
 }
 
 /**
@@ -146,5 +180,7 @@ export function estadoSuscripcion(
 ): EstadoSuscripcion {
   if (!vence) return 'sin_fecha';
   if (vence < hoy) return 'vencida';
-  return (diasFaltantes(vence, hoy) ?? 0) <= ventanaDias ? 'por_vencer' : 'al_dia';
+  return (diasFaltantes(vence, hoy) ?? 0) <= ventanaDias
+    ? 'por_vencer'
+    : 'al_dia';
 }

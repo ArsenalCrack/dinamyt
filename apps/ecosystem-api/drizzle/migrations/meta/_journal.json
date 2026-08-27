@@ -71,6 +71,13 @@
       "when": 1787415123485,
       "tag": "0009_renovar_suscripciones",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787500000000,
+      "tag": "0010_sesiones_revocables",
+      "breakpoints": true
     }
   ]
 }

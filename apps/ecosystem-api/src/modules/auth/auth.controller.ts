@@ -3,16 +3,49 @@ import {
   Post,
   Body,
   Get,
+  Delete,
+  Param,
   Query,
+  Req,
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtTokenService } from './jwt.service';
 import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from './jwt.service';
+import type { ContextoPeticion } from './auth.service';
+
+/**
+ * Lo que se sabe del navegador que llama, sacado de la propia petición.
+ *
+ * El navegador y la IP acaban en la lista de dispositivos conectados, para que
+ * alguien pueda reconocer «ese es el computador de la sala» y cerrarlo. La
+ * zona horaria y el idioma llegan en cabeceras que ponen los clientes del
+ * portal y de Academy, y sirven para escribirle los correos a su hora — el
+ * navegador ya pinta bien lo suyo, pero el servidor no tiene forma de
+ * adivinarlo.
+ *
+ * Todo esto lo escribe el cliente y **nada de ello autoriza nada**: se guarda
+ * para enseñarlo y para dar formato, nunca para decidir quién entra.
+ */
+function contextoDe(req: Request): ContextoPeticion {
+  const cabecera = (n: string) => {
+    const v = req.headers[n];
+    return typeof v === 'string' ? v : Array.isArray(v) ? v[0] : null;
+  };
+  return {
+    userAgent: cabecera('user-agent'),
+    // Detrás del Nginx del VPS, `req.ip` es el del propio proxy; el original
+    // viaja en `X-Forwarded-For`, y el primero de la lista es el del cliente.
+    ip: cabecera('x-forwarded-for')?.split(',')[0].trim() || req.ip || null,
+    timezone: cabecera('x-zona-horaria'),
+    locale: cabecera('x-idioma'),
+  };
+}
 
 @Controller('auth')
 export class AuthController {
@@ -54,8 +87,11 @@ export class AuthController {
   // cuentas creadas antes del registro en dos actos (ver AuthService).
   @Throttle({ global: { limit: 6, ttl: 60_000 } })
   @Post('verify-email')
-  verifyEmail(@Body() body: { email?: string; userId?: string; code: string }) {
-    return this.authService.verifyEmail(body);
+  verifyEmail(
+    @Body() body: { email?: string; userId?: string; code: string },
+    @Req() req: Request,
+  ) {
+    return this.authService.verifyEmail(body, contextoDe(req));
   }
 
   // Reenviar el código del registro. El freno de verdad —la espera entre
@@ -81,11 +117,14 @@ export class AuthController {
 
   @Throttle({ global: { limit: 10, ttl: 60_000 } })
   @Post('login')
-  login(@Body() body: { email?: string; password?: string }) {
+  login(
+    @Body() body: { email?: string; password?: string },
+    @Req() req: Request,
+  ) {
     if (!body || !body.email || !body.password) {
       throw new BadRequestException('Faltan credenciales (email y password).');
     }
-    return this.authService.login(body.email, body.password);
+    return this.authService.login(body.email, body.password, contextoDe(req));
   }
 
   // ── POST /auth/refresh — volver a firmar el token con lo de AHORA ─────────
@@ -100,8 +139,14 @@ export class AuthController {
   @Throttle({ global: { limit: 30, ttl: 60_000 } })
   @Post('refresh')
   @UseGuards(EcosystemJwtGuard)
-  refresh(@CurrentUser() user: JwtPayload) {
-    return this.authService.refrescarSesion(user.sub);
+  refresh(@CurrentUser() user: JwtPayload, @Req() req: Request) {
+    // `jti!` sin comprobar: el guard ya rechazó cualquier pase que no lo
+    // lleve, así que aquí no puede faltar.
+    return this.authService.refrescarSesion(
+      user.sub,
+      user.jti!,
+      contextoDe(req),
+    );
   }
 
   // ── GET /auth/me — información completa de la cuenta (autenticado) ────────
@@ -122,6 +167,7 @@ export class AuthController {
       user.sub,
       body.currentPassword,
       body.newPassword,
+      user.jti,
     );
   }
 
@@ -158,6 +204,48 @@ export class AuthController {
   @Post('verify-token')
   verifyToken(@Body() body: { token: string }) {
     return this.authService.verifyToken(body.token);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SESIONES — salir de verdad, y ver desde dónde se está dentro
+  //
+  // Hasta aquí «salir» era borrar la copia del token en el navegador, y el
+  // original seguía abriendo puertas hasta caducar solo. Estas cuatro rutas
+  // son lo que convierte esa palabra en una acción.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /** Cierra ESTA sesión. Lo llama `/salir` del portal antes de irse. */
+  @Post('logout')
+  @UseGuards(EcosystemJwtGuard)
+  logout(@CurrentUser() user: JwtPayload) {
+    return this.authService.cerrarSesion(user.jti);
+  }
+
+  /**
+   * Cierra todas las demás. Es el botón de «me dejé la sesión abierta en otro
+   * lado», y la respuesta al susto del computador prestado.
+   */
+  @Post('logout-all')
+  @UseGuards(EcosystemJwtGuard)
+  logoutAll(@CurrentUser() user: JwtPayload) {
+    return this.authService.cerrarLasDemas(user.sub, user.jti);
+  }
+
+  /** Los dispositivos conectados, para pintarlos en el perfil. */
+  @Get('sesiones')
+  @UseGuards(EcosystemJwtGuard)
+  sesiones(@CurrentUser() user: JwtPayload) {
+    return this.authService.sesionesAbiertas(user.sub, user.jti);
+  }
+
+  /** Cierra UNA de la lista. Solo las propias: lo comprueba el servicio. */
+  @Delete('sesiones/:id')
+  @UseGuards(EcosystemJwtGuard)
+  cerrarSesionConcreta(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.authService.cerrarUna(user.sub, id);
   }
 
   @Get('jwks')

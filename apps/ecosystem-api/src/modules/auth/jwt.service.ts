@@ -22,7 +22,9 @@ export class JwtTokenService {
           return readFileSync('/' + envPath, 'utf8');
         } catch (err2) {}
       }
-      throw new Error(`Fallo al leer llave JWT en path: ${envPath}. Revisa tus variables de entorno y Secret Files.`);
+      throw new Error(
+        `Fallo al leer llave JWT en path: ${envPath}. Revisa tus variables de entorno y Secret Files.`,
+      );
     }
   }
 
@@ -45,15 +47,61 @@ export class JwtTokenService {
    */
   static readonly EMISOR_SESION = 'dinamyt-ecosystem';
 
-  // Emitir token JWT
-  async signToken(payload: JwtPayload): Promise<string> {
-    const expiresIn = parseInt(process.env.JWT_EXPIRES_IN ?? '86400');
+  /**
+   * Lo que dura un pase: media hora.
+   *
+   * ── Por qué es un techo y no un ajuste ────────────────────────────────────
+   *
+   * La revocación de sesiones (ver `SessionsService`) descansa ENTERA en que
+   * el pase dure poco. Academy y Campeonatos verifican la firma sin
+   * preguntarle nada a nadie —eso es lo que las hace rápidas e
+   * independientes—, así que una sesión ya cerrada sigue entrando en ellas
+   * exactamente lo que le quede al pase que lleva encima.
+   *
+   * `JWT_EXPIRES_IN` se sigue leyendo, pero **solo puede acortar**. En el VPS
+   * vale 86400 —un día, de cuando el token ERA la sesión— y respetarlo haría
+   * que «cerrar sesión en todos lados» tardara un día en significar algo en
+   * Academy. Que una variable de entorno olvidada pueda debilitar esto en
+   * silencio es justo el tipo de agujero que este trabajo vino a tapar; que
+   * pueda apretarlo, en cambio, no le hace daño a nadie.
+   */
+  static readonly PASE_SEG = 30 * 60;
 
-    return new jose.SignJWT({ ...payload })
+  private duracionDelPase(): number {
+    const crudo = parseInt(process.env.JWT_EXPIRES_IN ?? '');
+    if (!Number.isFinite(crudo) || crudo <= 0) return JwtTokenService.PASE_SEG;
+    if (crudo > JwtTokenService.PASE_SEG) {
+      if (!JwtTokenService.avisadoDelRecorte) {
+        JwtTokenService.avisadoDelRecorte = true;
+        console.warn(
+          `[auth] JWT_EXPIRES_IN=${crudo}s se ignora: un pase revocable dura ` +
+            `${JwtTokenService.PASE_SEG}s como mucho. El navegador lo renueva solo contra ` +
+            `POST /auth/refresh, así que nadie nota la diferencia salvo quien intente ` +
+            `entrar con una sesión ya cerrada — que es de lo que se trata.`,
+        );
+      }
+      return JwtTokenService.PASE_SEG;
+    }
+    return crudo;
+  }
+  private static avisadoDelRecorte = false;
+
+  /**
+   * Firma el PASE de una sesión.
+   *
+   * `jti` es el `id` de la fila en `ecosystem.sessions`, y es lo que hace que
+   * este token se pueda matar: sin él, un JWT firmado vale hasta que caduca
+   * solo y no hay forma de echar a nadie.
+   */
+  async signToken(payload: JwtPayload & { jti: string }): Promise<string> {
+    const { jti, ...resto } = payload;
+    return new jose.SignJWT({ ...resto })
       .setProtectedHeader({ alg: 'RS256' })
+      .setJti(jti)
+      .setSubject(payload.sub)
       .setIssuedAt()
       .setIssuer(JwtTokenService.EMISOR_SESION)
-      .setExpirationTime(Math.floor(Date.now() / 1000) + expiresIn)
+      .setExpirationTime(Math.floor(Date.now() / 1000) + this.duracionDelPase())
       .sign(this.privateKey);
   }
 

@@ -6,9 +6,11 @@ import {
   userDisciplines,
   userGuardians,
   orgMembers,
+  organizations,
   pendingRegistrations,
 } from '../../db/schema';
-import { eq, and, gt, lt, isNull, sql } from 'drizzle-orm';
+import { eq, and, gt, lt, inArray, isNull, sql } from 'drizzle-orm';
+import { ROLES_GESTOR } from '../../common/roles';
 import { encryptField, decryptField } from '../../common/crypto';
 import { espejarPersona, espejarContrasena } from '../../common/espejo-membresias';
 import * as bcrypt from 'bcryptjs';
@@ -322,11 +324,19 @@ export class UsersService {
       emergencyContactRelationship?: string | null;
       medicalNotes?: string | null;
       bloodType?: string | null;
+      /** IANA. `null` devuelve a la detección automática del navegador. */
+      timezone?: string | null;
+      /** ¿La eligió la persona a mano? Ver el esquema de `users`. */
+      timezoneManual?: boolean;
     },
   ) {
     const [row] = await db
       .update(users)
       .set({
+        ...(data.timezone !== undefined && { timezone: data.timezone }),
+        ...(data.timezoneManual !== undefined && {
+          timezoneManual: data.timezoneManual,
+        }),
         ...(data.fullName !== undefined && { fullName: data.fullName }),
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.birthDate !== undefined && { birthDate: data.birthDate }),
@@ -443,24 +453,89 @@ export class UsersService {
     return row;
   }
 
-  // ¿El solicitante es admin/owner/maestro de alguna org a la que pertenece el
-  // usuario objetivo? Habilita al maestro a gestionar el perfil de sus alumnos.
-  async isOrgManagerOf(requesterId: string, targetUserId: string): Promise<boolean> {
-    const managerRoles = ['admin', 'owner', 'maestro'];
+  /**
+   * ¿El solicitante gestiona a esta persona?
+   *
+   * La gestiona cuando comparten una organización que él manda: su club, como
+   * maestro, dueño o admin. Es lo que habilita al maestro a corregir el
+   * apellido de su alumno, ponerle el cinturón o subirle la foto.
+   *
+   * ── Por qué también sube a la federación ──
+   *
+   * Porque la otra mitad del sistema ya lo hacía y las dos tenían que decir lo
+   * mismo. `OrganizationsService.esGestorDe` cuenta como gestor de un club al
+   * admin de la federación que lo tiene afiliado; esta regla se quedaba
+   * mirando solo el club. Ese admin podía entonces quitar a un miembro y
+   * cambiarle el rol, pero al abrir su ficha —en la misma pantalla y con la
+   * misma sesión— recibía «No tienes permiso sobre este perfil».
+   *
+   * Se replica la profundidad de `esAdminDe`, que acepta al admin de la org o
+   * al de su padre: club → liga → federación es todo lo que existe hoy.
+   *
+   * ── Y por qué el maestro NO sube ──
+   *
+   * Por encima del club solo cuenta `admin`. Un maestro manda en su club, no
+   * en los demás clubes de su federación: si contara cualquier rol gestor, el
+   * maestro de un club acabaría editando las fichas de los alumnos del club
+   * vecino por el solo hecho de estar los dos afiliados a la misma liga.
+   *
+   * ⚠️ Ojo con lo que esto implica al dar de baja a alguien: la regla cuelga de
+   * `org_members`, así que en el instante en que se quita a una persona del
+   * club su maestro deja de poder tocar su ficha. Es correcto —el perfil es de
+   * la persona en todo el ecosistema, no del club— pero es la explicación del
+   * 403 que aparece si se intenta editar a alguien recién dado de baja.
+   */
+  async isOrgManagerOf(
+    requesterId: string,
+    targetUserId: string,
+  ): Promise<boolean> {
+    const targetOrgIds = (
+      await db
+        .select({ orgId: orgMembers.orgId })
+        .from(orgMembers)
+        .where(eq(orgMembers.userId, targetUserId))
+    ).map((t) => t.orgId);
+    if (targetOrgIds.length === 0) return false;
+
     const reqMemberships = await db
       .select({ orgId: orgMembers.orgId, role: orgMembers.role })
       .from(orgMembers)
       .where(eq(orgMembers.userId, requesterId));
-    const managedOrgIds = reqMemberships
-      .filter((m) => managerRoles.includes(m.role))
-      .map((m) => m.orgId);
-    if (managedOrgIds.length === 0) return false;
+    if (reqMemberships.length === 0) return false;
 
-    const targetMemberships = await db
-      .select({ orgId: orgMembers.orgId })
-      .from(orgMembers)
-      .where(eq(orgMembers.userId, targetUserId));
-    return targetMemberships.some((t) => managedOrgIds.includes(t.orgId));
+    // 1) Comparten organización y él la manda. El caso normal: el maestro y su
+    //    alumno, los dos en el mismo club.
+    const gestionadas = new Set(
+      reqMemberships
+        .filter((m) => ROLES_GESTOR.includes(m.role))
+        .map((m) => m.orgId),
+    );
+    if (targetOrgIds.some((id) => gestionadas.has(id))) return true;
+
+    // 2) O él manda la organización que tiene afiliado a ese club.
+    const adminDe = new Set(
+      reqMemberships.filter((m) => m.role === 'admin').map((m) => m.orgId),
+    );
+    if (adminDe.size === 0) return false;
+
+    const padres = (
+      await db
+        .select({ parentId: organizations.parentId })
+        .from(organizations)
+        .where(inArray(organizations.id, targetOrgIds))
+    )
+      .map((o) => o.parentId)
+      .filter((id): id is string => Boolean(id));
+    if (padres.length === 0) return false;
+    if (padres.some((id) => adminDe.has(id))) return true;
+
+    // Un escalón más, que es hasta donde llega `esAdminDe`: el club cuelga de
+    // una liga y la liga de una federación.
+    const abuelos = await db
+      .select({ parentId: organizations.parentId })
+      .from(organizations)
+      .where(inArray(organizations.id, padres));
+    return abuelos.some((o) => o.parentId && adminDe.has(o.parentId));
   }
 
   // ── El documento, que es la SEGUNDA llave única de la persona ──────────────

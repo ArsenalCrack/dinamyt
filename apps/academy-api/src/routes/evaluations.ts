@@ -13,6 +13,7 @@ import { requireAcademy } from '../plugins/auth';
 import { esMaestroDe } from '../lib/users';
 import { esUuid, matriculaDe, gradosAccesibles } from '../lib/enrollments';
 import { notaBloque, notaFinal } from '../lib/scoring';
+import { formatearInstante } from '@dinamyt/shared';
 import { notificar, estudiantesDe, maestrosDe } from '../lib/notify';
 import { registrarActividad } from '../lib/activity';
 
@@ -294,9 +295,17 @@ export async function evaluationsRoutes(app: FastifyInstance) {
       await notificar(db, await estudiantesDe(db, body.martialArtId, body.gradeId), {
         type: 'tarea_nueva',
         title: `📝 ${ETIQUETA_KIND[kind]} nueva: ${evaluacion.title}`,
-        body: evaluacion.dueAt
-          ? `Vence el ${new Date(evaluacion.dueAt).toLocaleDateString('es-CO')}.`
-          : null,
+        // La fecha límite es un INSTANTE (se elige con un `datetime-local`),
+        // así que hay que escribirla en la zona de cada estudiante. Con el
+        // reloj del servidor, un alumno en otro país leía «vence el martes»
+        // cuando para él vencía el miércoles — o al revés, que es peor.
+        body: (zona) =>
+          evaluacion.dueAt
+            ? `Vence el ${formatearInstante(evaluacion.dueAt, zona, {
+                dateStyle: 'long',
+                timeStyle: 'short',
+              })}.`
+            : null,
         link: `/evaluaciones/${evaluacion.id}`,
       });
 

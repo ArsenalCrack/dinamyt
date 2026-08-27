@@ -3,6 +3,7 @@ import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { NavBar } from '@/components/NavBar';
 import { PwaRegister } from '@/components/PwaRegister';
+import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
 
 // Tipografía del ecosistema (espejo del portal): display deportivo, cuerpo
 // humanista y mono de marcador para grados, fechas y notas.
@@ -42,6 +43,10 @@ export default function RootLayout({
         <PwaRegister />
         <NavBar />
         {children}
+        {/* El reloj de inactividad. Va en el layout para que corra en todas
+            las pantallas: una sesión abandonada no se cierra sola solo en las
+            que alguien se acordó de ponerlo. */}
+        <VigilanteDeSesion />
       </body>
     </html>
   );

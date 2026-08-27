@@ -18,6 +18,7 @@ import {
 } from '@/lib/api';
 import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
+import { fechaCivil, instante } from '@/lib/fechas';
 
 /**
  * Una suscripción de organización, con todo lo que se le puede hacer.
@@ -154,12 +155,13 @@ export function FilaSuscripcion({
               // La fecha se dice entera: «hasta 12/2» no distingue el año, y una
               // suscripción vencida hace doce meses se lee igual que una de la
               // semana que viene.
-              title={new Date(sub.endsAt).toLocaleDateString('es-CO', {
-                dateStyle: 'full',
-              })}
+              title={fechaCivil(sub.endsAt, { dateStyle: 'full' })}
             >
-              {vencida ? 'venció' : 'hasta'} el{' '}
-              {new Date(sub.endsAt).toLocaleDateString('es-CO')}
+              {/* `fechaCivil` y no `toLocaleDateString`: el vencimiento es un
+                  día del calendario, no un instante. Convertido a la zona de
+                  quien mira, una suscripción que vence el 31 se pintaba como
+                  el 30 en Bogotá — y como el 1 del mes siguiente en Madrid. */}
+              {vencida ? 'venció' : 'hasta'} el {fechaCivil(sub.endsAt)}
             </span>
           </p>
         </div>
@@ -259,7 +261,7 @@ export function FilaSuscripcion({
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {vencida
               ? 'Está vencida: el periodo nuevo empieza hoy.'
-              : `Le quedan días: el periodo nuevo empieza el ${new Date(sub.endsAt).toLocaleDateString('es-CO')} y no pierde ninguno.`}
+              : `Le quedan días: el periodo nuevo empieza el ${fechaCivil(sub.endsAt)} y no pierde ninguno.`}
           </p>
           <div className="grid gap-2 sm:grid-cols-4">
             <label className="block text-xs">
@@ -401,7 +403,9 @@ export function FilaSuscripcion({
                   {pagos.map((pg) => (
                     <tr key={pg.id} style={{ borderTop: '1px solid var(--border)' }}>
                       <td className="py-1.5 pr-3 whitespace-nowrap">
-                        {new Date(pg.paidAt).toLocaleDateString('es-CO')}
+                        {/* Un pago SÍ es un instante: se registró en un momento
+                            concreto, y va en la zona de quien lo mira. */}
+                        {instante(pg.paidAt, { dateStyle: 'medium' })}
                       </td>
                       <td className="py-1.5 pr-3 text-right whitespace-nowrap font-semibold">
                         {dinero(pg.amount)}

@@ -2,6 +2,7 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from './jwt.service';
 import { MailerService } from './mailer.service';
+import { sesionesFalsas } from './sesiones.doble.spec';
 
 /**
  * El camino B (§2.1): el maestro crea la cuenta, la persona pone la contraseña.
@@ -29,7 +30,7 @@ describe('Invitación · poner la contraseña desde el enlace', () => {
       }),
     } as unknown as JwtTokenService;
 
-    const service = new AuthService(users, jwt, {} as MailerService);
+    const service = new AuthService(users, jwt, {} as MailerService, sesionesFalsas());
     return { service, ponerContrasena };
   }
 
@@ -128,11 +129,57 @@ describe('JwtTokenService · un enlace de invitación no abre una sesión', () =
       role_campeonatos: null,
       role_membresias: null,
       is_super_admin: false,
+      jti: '33333333-3333-4333-8333-333333333333',
     });
     await expect(jwt.verificarInvitacion(sesion)).rejects.toThrow();
     await expect(jwt.verifyToken(sesion)).resolves.toMatchObject({
       email: 'alguien@dinamyt.org',
     });
+  });
+
+  it('el pase lleva la sesión a la que pertenece, y sin ella no se puede cerrar', async () => {
+    // `jti` es lo único que permite revocar un token firmado. Si algún día se
+    // pierde por el camino, la sesión vuelve a ser inmortal y nadie se entera
+    // hasta que alguien intente salir de verdad — por eso se prueba aquí.
+    const pase = await jwt.signToken({
+      sub: '44444444-4444-4444-8444-444444444444',
+      email: 'otra@dinamyt.org',
+      fullName: 'OTRA',
+      org_id: null,
+      app_scopes: [],
+      role_academy: null,
+      role_campeonatos: null,
+      role_membresias: null,
+      is_super_admin: false,
+      jti: '55555555-5555-4555-8555-555555555555',
+    });
+    await expect(jwt.verifyToken(pase)).resolves.toMatchObject({
+      jti: '55555555-5555-4555-8555-555555555555',
+    });
+  });
+
+  it('el pase dura media hora, no un día', async () => {
+    // La revocación descansa entera en esto: Academy verifica la firma sin
+    // preguntar nada, así que una sesión cerrada sigue entrando ahí
+    // exactamente lo que le quede al pase. Con un día, «cerrar sesión en todos
+    // lados» tardaría un día en significar algo.
+    const pase = await jwt.signToken({
+      sub: '66666666-6666-4666-8666-666666666666',
+      email: 'tercera@dinamyt.org',
+      fullName: 'TERCERA',
+      org_id: null,
+      app_scopes: [],
+      role_academy: null,
+      role_campeonatos: null,
+      role_membresias: null,
+      is_super_admin: false,
+      jti: '77777777-7777-4777-8777-777777777777',
+    });
+    const payload = await jwt.verifyToken(pase);
+    const { exp } = payload as unknown as { exp: number };
+    const duracion = exp - Math.floor(Date.now() / 1000);
+    expect(duracion).toBeLessThanOrEqual(30 * 60 + 5);
+    expect(duracion).toBeGreaterThan(25 * 60);
   });
 });
 

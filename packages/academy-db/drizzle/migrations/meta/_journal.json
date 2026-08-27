@@ -43,6 +43,13 @@
       "when": 1783807411208,
       "tag": "0005_tranquil_sandman",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787500100000,
+      "tag": "0006_zona_de_la_persona",
+      "breakpoints": true
     }
   ]
 }

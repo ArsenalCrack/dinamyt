@@ -1,0 +1,12 @@
+-- La zona horaria de la persona, espejada del ecosistema.
+--
+-- Academy no la pregunta ni la elige: la trae el token (`timezone`), igual que
+-- el nombre y el correo, y se guarda por la misma razón que ellos — hay textos
+-- que se escriben en el servidor, cuando la persona no está delante, y ahí no
+-- hay navegador que ponga la hora buena. El aviso de «tienes una evaluación
+-- nueva, vence el …» salía con la hora del VPS (`TZ=America/Bogota`) para todo
+-- el mundo.
+--
+-- Nullable: quien todavía no ha vuelto a entrar desde el cambio no la tiene, y
+-- entonces se usa la del servidor, como antes.
+ALTER TABLE "academy"."academy_users" ADD COLUMN "timezone" varchar(64);

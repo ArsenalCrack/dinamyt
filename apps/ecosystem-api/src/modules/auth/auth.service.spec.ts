@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from './jwt.service';
 import { MailerService } from './mailer.service';
+import { SessionsService } from './sessions.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -16,6 +17,7 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: {} },
         { provide: JwtTokenService, useValue: {} },
         { provide: MailerService, useValue: {} },
+        { provide: SessionsService, useValue: {} },
       ],
     }).compile();
 

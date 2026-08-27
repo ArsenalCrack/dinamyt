@@ -40,7 +40,17 @@ async function bootstrap() {
   app.enableCors({
     origin: origins,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // `X-Zona-Horaria` y `X-Idioma`: dónde está y en qué idioma lee quien
+    // pregunta. **Tienen que estar en esta lista.** Una cabecera que no
+    // aparezca aquí no es que se ignore: el navegador falla la comprobación
+    // previa y la petición ENTERA no sale, así que olvidarlas no rompería las
+    // horas de los correos — rompería el inicio de sesión desde Academy.
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Zona-Horaria',
+      'X-Idioma',
+    ],
   });
 
   const port = process.env.PORT ?? 3001;

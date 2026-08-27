@@ -8,6 +8,7 @@ import {
   validarContrasena,
   validarTelefono,
 } from '../../common/validacion';
+import { sesionesFalsas } from './sesiones.doble.spec';
 
 /**
  * El registro, que es la puerta de entrada al ecosistema entero.
@@ -113,6 +114,7 @@ describe('AuthService · la cuenta NO existe hasta que se verifica el correo', (
       users,
       {} as JwtTokenService,
       mailer as unknown as MailerService,
+      sesionesFalsas(),
     );
     // El token se firma con una llave que aquí no existe: lo único que importa
     // de él en estas pruebas es que se pida.
@@ -217,6 +219,7 @@ describe('AuthService · verificar el código', () => {
       users,
       {} as JwtTokenService,
       mailer as unknown as MailerService,
+      sesionesFalsas(),
     );
     jest
       .spyOn(
@@ -310,6 +313,7 @@ describe('AuthService · «olvidé mi contraseña» no dice quién existe', () =
         users,
         {} as JwtTokenService,
         mailer as unknown as MailerService,
+        sesionesFalsas(),
       ),
       mailer,
     };

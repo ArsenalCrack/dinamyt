@@ -1,20 +1,58 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { login, guardarToken, obtenerToken, extraerError } from '@/lib/api';
+import { Suspense, useEffect, useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  login,
+  guardarToken,
+  obtenerToken,
+  extraerError,
+  seRecuerda,
+  INACTIVIDAD_MINUTOS,
+} from '@/lib/api';
 import { getRolEfectivo, limpiarRolCache, rutaInicio } from '@/lib/session';
 import { CampoContrasena } from '@/components/CampoContrasena';
 
 const PORTAL_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
 
-export default function Login() {
+export default function LoginPage() {
+  // `useSearchParams` obliga a un límite de Suspense en el App Router.
+  return (
+    <Suspense fallback={null}>
+      <Login />
+    </Suspense>
+  );
+}
+
+function Login() {
   const router = useRouter();
+  const search = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+
+  /**
+   * ¿Guardar la sesión en este equipo?
+   *
+   * Sin marcar, el pase muere al cerrar el navegador. Es lo que hay que hacer
+   * en el computador de la sala o en el de un amigo — hasta ahora no se podía:
+   * el pase iba siempre a `localStorage`, que sobrevive a cerrar el navegador,
+   * a apagar el equipo y a que la persona se vaya a su casa.
+   *
+   * Empieza marcada porque casi todo el mundo entra desde su propio celular.
+   * Lo que importa es que en el equipo prestado se PUEDA desmarcar.
+   */
+  const [recordar, setRecordar] = useState(true);
+  useEffect(() => setRecordar(seRecuerda()), []);
+
+  /**
+   * Por qué se acabó la sesión anterior. Lo pone el interceptor de `lib/api`
+   * con el mensaje del ecosystem: sin él, cualquier 401 dejaba a la persona en
+   * un login mudo, que se lee como «la aplicación me echó sin motivo».
+   */
+  const motivoDelCierre = search.get('motivo');
 
   /**
    * Saltar al portal a iniciar sesión y volver aquí con la sesión hecha.
@@ -65,7 +103,7 @@ export default function Login() {
     setError('');
     setCargando(true);
     try {
-      await login(email, password);
+      await login(email, password, recordar);
       await entrar();
     } catch (err) {
       // El ecosystem explica el motivo real (correo inexistente, contraseña
@@ -125,6 +163,37 @@ export default function Login() {
             ¿Olvidaste tu contraseña?
           </a>
         </p>
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.5rem',
+            marginBottom: '0.9rem',
+            fontSize: '0.85rem',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={recordar}
+            onChange={(e) => setRecordar(e.target.checked)}
+            style={{ width: 'auto', marginTop: '0.2rem', accentColor: 'var(--gold)' }}
+          />
+          <span>
+            Mantener la sesión iniciada en este equipo
+            <span className="muted" style={{ display: 'block', fontSize: '0.75rem' }}>
+              {recordar
+                ? `Desmárcalo si el equipo no es tuyo. En cualquier caso, la sesión se cierra sola tras ${INACTIVIDAD_MINUTOS} minutos sin actividad.`
+                : 'La sesión se cerrará al cerrar el navegador.'}
+            </span>
+          </span>
+        </label>
+
+        {motivoDelCierre && !error && (
+          <p className="muted" style={{ marginBottom: '0.8rem', fontSize: '0.85rem' }}>
+            {motivoDelCierre}
+          </p>
+        )}
 
         {error && <p className="msg-error" style={{ marginBottom: '0.8rem', fontSize: '0.85rem' }}>{error}</p>}
 

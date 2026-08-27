@@ -139,6 +139,34 @@ sudo systemctl restart dinamyt-id dinamyt-portal && sudo systemctl status dinamy
 > `db:migrar` usa el migrador de `drizzle-orm` —mismo diario, mismo orden,
 > mismos ficheros— y funciona con dependencias de producción.
 
+## 2.3-bis Desplegar Academy
+
+```bash
+cd /srv/dinamyt && git pull && pnpm install --frozen-lockfile && pnpm --filter @dinamyt/shared build && pnpm --filter @dinamyt/academy-db build && pnpm --filter @dinamyt/academy-api build && pnpm --filter @dinamyt/academy-web build
+```
+
+```bash
+cd /srv/dinamyt/packages/academy-db && pnpm db:migrar
+```
+
+```bash
+sudo systemctl restart academy-api academy-web && sudo systemctl status academy-api --no-pager
+```
+
+> **`db:migrar`, no `db:migrate`** — la misma trampa que en el ecosystem, y
+> hasta ahora Academy **no tenía** el equivalente: MONTAR-VPS decía «compilar,
+> migrar y crear los servicios» sin decir con qué, y lo único que había era
+> `drizzle-kit`, que en un servidor con `--prod` no está. Una migración de
+> Academy no tenía camino a producción.
+>
+> Si falla con **«type … already exists»**, el diario está en el esquema
+> equivocado (lo dejaban así las bases sembradas por la versión vieja de
+> `db:local:setup`). Una vez, mirando lo que dice:
+>
+> ```bash
+> cd /srv/dinamyt/packages/academy-db && pnpm db:migrar --mover-diario
+> ```
+
 ## 2.4 Desplegar Membresías
 
 ```bash
@@ -560,6 +588,8 @@ interface JwtPayload {
   role_campeonatos: string | null;
   role_academy: string | null;
   is_super_admin: boolean;
+  jti: string;               // LA SESIÓN a la que pertenece este pase (§4.11)
+  timezone: string | null;   // dónde está la persona (§4.12)
 }
 ```
 
@@ -578,8 +608,11 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 | `POST /login` · `/forgot-password` · `/reset-password` | pública | |
 | `POST /set-password` | pública | Canjea el enlace de invitación del maestro |
 | `POST /refresh` | sesión | Vuelve a firmar el token con lo de ahora (§4.3) |
-| `GET /me` · `POST /change-password` | sesión | |
-| `POST /verify-token` · `GET /jwks` | las apps | |
+| `GET /me` · `POST /change-password` | sesión | Cambiar la contraseña **cierra las demás sesiones** (§4.11) |
+| `POST /logout` | sesión | Cierra ESTA sesión de verdad, en el servidor |
+| `POST /logout-all` | sesión | Cierra todas las demás («me la dejé abierta en otro lado») |
+| `GET /sesiones` · `DELETE /sesiones/:id` | sesión | Dispositivos conectados, y cerrar uno |
+| `POST /verify-token` · `GET /jwks` | las apps | `verify-token` **sí** mira si la sesión sigue abierta; `jwks` no puede |
 
 ### `/organizations`
 
@@ -619,6 +652,84 @@ Todo del super-admin, salvo `GET /subscriptions/org/:orgId` (autenticado) y
 
 Hay ejemplos listos para usar en
 [`apps/ecosystem-api/requests/auth.http`](apps/ecosystem-api/requests/auth.http).
+
+## 4.11 El token no es la sesión: es su pase
+
+Hasta agosto de 2026 «cerrar sesión» no cerraba nada. El token era la sesión
+entera —firmado, veinticuatro horas, sin registro en ninguna parte—, así que
+salir solo borraba la copia del navegador: el original seguía abriendo puertas
+hasta caducar solo. Quien entraba desde un computador prestado y se iba dejaba
+su cuenta abierta ahí hasta el día siguiente, y **cambiar la contraseña tampoco
+echaba a nadie**.
+
+Ahora la sesión es una fila de `ecosystem.sessions` y el token lleva su id en
+`jti`. Si la fila está revocada, el pase no abre — por perfecta que sea su firma.
+
+**Tres relojes, y hacen falta los tres:**
+
+| | Cuánto | Para qué |
+|---|---|---|
+| Inactividad | 20 min | El computador prestado que alguien dejó abierto |
+| Tope absoluto | 12 h | Que quien toca la pantalla cada rato vuelva a escribir su contraseña alguna vez |
+| Revocación | inmediata | Salir, salir de todos lados, cambiar o recuperar la contraseña |
+
+**El pase dura 30 minutos, y de eso depende todo lo demás.** Academy y
+Campeonatos verifican la firma sin preguntarle nada a nadie —es lo que las hace
+rápidas e independientes—, así que una sesión cerrada sigue entrando en ellas
+exactamente lo que le quede al pase. Con media hora ese es el peor caso, y **no
+hay que tocar ni una línea de esas apps**: el único que firma es el ecosystem, y
+cuando el navegador vuelve a pedir pase, aquí se comprueba la fila y se dice que
+no.
+
+Por eso `JWT_EXPIRES_IN` **solo puede acortar**. Un valor mayor se ignora y se
+avisa por consola: que una variable de entorno olvidada debilite esto en
+silencio es justo el agujero que se vino a tapar.
+
+**En el navegador** (`lib/sesion.ts`, igual en el portal y en Academy):
+
+- El pase va a `sessionStorage` si no se marca «mantener la sesión iniciada», y
+  entonces muere al cerrar el navegador.
+- `VigilanteDeSesion` avisa un minuto antes del cierre por inactividad y renueva
+  el pase **solo si ha habido actividad**. Esa condición no es un detalle: sin
+  ella, una pestaña olvidada renovaría para siempre y el reloj de inactividad no
+  serviría de nada.
+
+**Al desplegar esto, todo el mundo vuelve a iniciar sesión una vez.** Los pases
+de antes no llevan `jti` y el guard los rechaza diciéndolo con esas palabras.
+
+## 4.12 La hora de cada quien
+
+Dos cosas que parecen la misma y no lo son:
+
+- Una **fecha civil** —un vencimiento, un cumpleaños— es un día del calendario y
+  **no tiene zona**. El 31 es el 31 en Bogotá y en Tokio. Se guarda al mediodía
+  UTC (`fechaCivilAInstante`) y se pinta fijando `timeZone: 'UTC'`
+  (`fechaCivil`). Convertirla no la traduce: la corre un día. Eso pasaba —
+  `new Date('2026-08-31')` es la medianoche UTC, que en Bogotá es el 30.
+- Un **instante** —cuándo se registró un pago, cuándo entró alguien— sí tiene
+  zona, y va en la de quien lee.
+
+**En pantalla nunca hizo falta guardar nada**: el navegador sabe dónde está. Lo
+que sí hacía falta es para lo que se escribe en el SERVIDOR, cuando la persona
+no está delante — los correos de vencimiento y los avisos de Academy salían con
+la hora del VPS (`TZ=America/Bogota`) para todo el mundo.
+
+| Dónde | Qué manda | Para qué |
+|---|---|---|
+| `users.timezone` | dónde está la PERSONA | Los correos y avisos que se le escriben |
+| `organizations.timezone` | dónde está el CLUB | Horarios, asistencia y el «hoy» de los vencimientos |
+
+La de la persona la detecta el navegador y viaja en las cabeceras
+`X-Zona-Horaria` y `X-Idioma` (que **tienen que estar en `allowedHeaders` del
+CORS**: si no, el navegador no llega ni a mandar la petición). Se guarda sola en
+cada login y en cada renovación, así que a quien viaja le llegan las cosas en su
+hora sin tocar nada. Elegirla a mano en el perfil marca `timezone_manual` y la
+protege de esa detección — una preferencia que se borra sola no es una
+preferencia.
+
+La del club es distinta a propósito: «la clase es a las 7 pm» es hora **del
+salón**, y convertirla a la de un maestro que está de viaje sería el error
+contrario.
 
 ---
 
@@ -834,9 +945,47 @@ sin nada detrás da **525**.
 
 `[ ]` **«Volver a mi ecosistema»** y el selector de apps dentro de cada app.
 
-`[ ]` **Cerrar sesión en una app cierra en el ecosistema.** Hoy cada una cierra
-      la suya y la otra sigue abierta — la forma más rápida de que alguien crea
-      que se salió y no lo hizo.
+`[x]` ~~**Cerrar sesión en una app cierra en el ecosistema.**~~ Hecho el 24 de
+      agosto de 2026: `POST /auth/logout` cierra la fila de la sesión y a partir
+      de ahí el pase no vale en ninguna app. Ver §4.11.
+
+`[ ]` **Idioma y tema en el ecosystem, elegidos por la persona.** Hoy el idioma
+      está clavado en el código (`'es-CO'` en cada `toLocaleDateString`, y los
+      textos escritos a mano en español) y el tema es uno solo: los `globals.css`
+      de las tres apps definen la paleta oscura y no hay claro ni preferencia
+      del sistema.
+
+      **La mitad del camino ya está hecha** por el trabajo de zona horaria del
+      24 de agosto, y conviene aprovecharla en vez de empezar de cero:
+
+      · `users.locale` **ya existe** y ya se llena solo: el navegador manda
+        `X-Idioma` en cada login y renovación (ver §4.12). Hoy solo se guarda;
+        falta leerlo.
+      · `lib/fechas.ts` (las dos webs) ya toma el idioma de `navigator.language`
+        en vez de tenerlo clavado. Lo que sigue clavado son los `'es-CO'`
+        sueltos que quedan repartidos por las pantallas.
+      · El patrón de preferencia protegida ya está resuelto y probado:
+        `timezone_manual` distingue «lo detectamos» de «lo eligió». Idioma y
+        tema necesitan exactamente lo mismo — copiar esa forma, no inventar otra.
+
+      **Lo que falta de verdad:**
+
+      · **Tema**: `users.theme` (`sistema` | `claro` | `oscuro`), tokens de color
+        en `:root` con un bloque `@media (prefers-color-scheme: light)` y un
+        `[data-theme]` que gane sobre él. Va **junto** con el pendiente de §6.2
+        de unificar los tokens en `packages/shared/estilos.css`: hacerlo antes
+        significaría escribir la paleta clara tres veces, en tres `globals.css`.
+        Y hay que pintar el tema **antes del primer render** (un script pequeño
+        en el `layout`), o la pantalla parpadea en oscuro antes de aclararse.
+      · **Idioma**: `users.locale` como preferencia editable en el perfil, y
+        sacar los textos a un diccionario. Es lo más caro de los dos —son todas
+        las cadenas de cuatro aplicaciones—, así que conviene decidir primero
+        **si hay a quién servírselo**: hoy todo el uso es Colombia. El orden
+        barato es al revés del que parece: primero que las FECHAS y los NÚMEROS
+        respeten `locale` (ya casi está), y solo después traducir los textos.
+
+      Las dos preferencias van donde ya está «Tu hora», en el perfil del portal:
+      es la pantalla de «cómo quiero ver DINAMYT» y ya existe.
 
 > **El plan maestro** (el tablero de bloques B0…B5) vive dentro del espejo:
 > `productos/campeonatos/PLAN-ECOSYSTEM-VPS.md`. **Se edita en `dinamyt-combat`**,

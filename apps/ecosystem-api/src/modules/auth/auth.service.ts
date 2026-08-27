@@ -6,6 +6,8 @@ import {
 import { UsersService } from '../users/users.service';
 import { JwtTokenService, JwtPayload } from './jwt.service';
 import { MailerService } from './mailer.service';
+import { SessionsService } from './sessions.service';
+import { zonaValida } from '@dinamyt/shared';
 import { db } from '../../db';
 import {
   users,
@@ -45,6 +47,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtTokenService,
     private readonly mailer: MailerService,
+    private readonly sessions: SessionsService,
   ) {}
 
   // ════════════════════════════════════════════════════════════════════════
@@ -276,7 +279,10 @@ export class AuthService {
   // `userId` se sigue aceptando por el camino heredado: las cuentas creadas
   // antes de este cambio están en `users` sin verificar y tienen que poder
   // terminar de confirmarse.
-  async verifyEmail(datos: { email?: string; userId?: string; code: string }) {
+  async verifyEmail(
+    datos: { email?: string; userId?: string; code: string },
+    contexto?: ContextoPeticion,
+  ) {
     const code = (datos.code ?? '').replace(/\D/g, '');
     if (code.length !== AuthService.CODIGO_DIGITOS) {
       throw new BadRequestException(
@@ -317,7 +323,7 @@ export class AuthService {
       return {
         message: 'Cuenta creada y correo verificado.',
         email: usuario.email,
-        access_token: await this.buildToken(usuario),
+        ...(await this.abrirSesion(usuario, contexto)),
       };
     }
 
@@ -344,10 +350,10 @@ export class AuthService {
       return {
         message: 'Correo verificado correctamente.',
         email: usuario.email,
-        access_token: await this.buildToken({
-          ...usuario,
-          isEmailVerified: true,
-        }),
+        ...(await this.abrirSesion(
+          { ...usuario, isEmailVerified: true },
+          contexto,
+        )),
       };
     }
 
@@ -419,7 +425,7 @@ export class AuthService {
   static readonly MAX_INTENTOS = 5;
   static readonly BLOQUEO_MINUTOS = 15;
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, contexto?: ContextoPeticion) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException(
@@ -499,8 +505,7 @@ export class AuthService {
       });
     }
 
-    const token = await this.buildToken(user);
-    return { access_token: token };
+    return this.abrirSesion(user, contexto);
   }
 
   /**
@@ -523,11 +528,20 @@ export class AuthService {
    * ── Por qué no es un token de refresco de verdad ──
    *
    * Porque no hace falta ninguno: esto exige un token VIGENTE (lo comprueba el
-   * guard) y devuelve otro igual de vigente con los datos al día. No alarga la
-   * sesión más allá de lo que ya duraba el token que se presenta, así que un
-   * token robado no se convierte aquí en acceso perpetuo.
+   * guard, que además comprueba que la SESIÓN siga abierta) y devuelve otro
+   * pase de la misma sesión. No alarga nada por su cuenta: los tres relojes
+   * —inactividad, máximo absoluto y revocación— viven en `sessions`, y si
+   * cualquiera de ellos dio la hora, el guard no deja llegar hasta aquí.
+   *
+   * ── Y ahora también es el latido ──
+   *
+   * Como el pase dura media hora, el navegador vuelve por aquí solo cada
+   * poco. Eso es lo que hace que una sesión cerrada desde otro dispositivo se
+   * apague en toda la federación —Academy incluida— sin que esas apps tengan
+   * que preguntar nada a nadie: cuando les caduca el pase que llevan, el
+   * siguiente no llega.
    */
-  async refrescarSesion(userId: string) {
+  async refrescarSesion(userId: string, jti: string, contexto?: ContextoPeticion) {
     const user = await this.usersService.findById(userId);
     if (!user) throw new UnauthorizedException('Usuario no encontrado.');
     // Las mismas puertas que el login: una cuenta suspendida entre dos
@@ -535,7 +549,11 @@ export class AuthService {
     if (!user.isActive) {
       throw new UnauthorizedException('Tu cuenta está suspendida.');
     }
-    return { access_token: await this.buildToken(user) };
+    const alDia = await this.anotarZona(user, contexto);
+    return {
+      access_token: await this.buildToken(alDia, jti),
+      sesion: { inactividadMinutos: SessionsService.INACTIVIDAD_MINUTOS },
+    };
   }
 
   // ── Información completa de la cuenta (para el perfil) ────────────────────
@@ -559,6 +577,7 @@ export class AuthService {
     userId: string,
     currentPassword: string,
     newPassword: string,
+    jtiActual?: string,
   ) {
     const user = await this.usersService.findById(userId);
     if (!user) throw new UnauthorizedException('Usuario no encontrado.');
@@ -579,7 +598,26 @@ export class AuthService {
       );
     }
     await this.usersService.updatePassword(userId, newPassword);
-    return { message: 'Contraseña actualizada.' };
+
+    // ── Y se echa a todos los demás ──────────────────────────────────────
+    //
+    // Esto es la mitad del sentido de cambiar una contraseña, y hasta ahora no
+    // pasaba: quien la cambiaba porque sospechaba que alguien estaba dentro de
+    // su cuenta cambiaba la cerradura y dejaba al intruso adentro, con su
+    // sesión abierta, hasta un día entero. La sesión desde la que se pide se
+    // conserva —nadie quiere que le echen a mitad del formulario.
+    const cerradas = await this.sessions.revocarTodas(
+      userId,
+      'cambio-contrasena',
+      jtiActual,
+    );
+    return {
+      message:
+        cerradas > 0
+          ? `Contraseña actualizada. Cerramos ${cerradas === 1 ? 'la otra sesión abierta' : `las otras ${cerradas} sesiones abiertas`}.`
+          : 'Contraseña actualizada.',
+      sesionesCerradas: cerradas,
+    };
   }
 
   // ── Recuperar contraseña ──────────────────────────────────────────────────
@@ -659,9 +697,21 @@ export class AuthService {
     if (!user.isEmailVerified) {
       await this.usersService.markEmailVerified(user.id);
     }
+
+    // ── Aquí no se salva NINGUNA ────────────────────────────────────────
+    //
+    // A diferencia de `changePassword`, quien llega por «olvidé mi
+    // contraseña» normalmente no tiene ninguna sesión abierta que proteger, y
+    // muchas veces está aquí precisamente porque cree que alguien más entró.
+    // Dejar viva aunque sea una sería dejar la puerta que se vino a cerrar.
+    const cerradas = await this.sessions.revocarTodas(user.id, 'recuperacion');
     return {
-      message: 'Contraseña actualizada. Ya puedes iniciar sesión.',
+      message:
+        cerradas > 0
+          ? `Contraseña actualizada y ${cerradas === 1 ? 'la sesión que había abierta se cerró' : `las ${cerradas} sesiones que había abiertas se cerraron`}. Ya puedes iniciar sesión.`
+          : 'Contraseña actualizada. Ya puedes iniciar sesión.',
       email: user.email,
+      sesionesCerradas: cerradas,
     };
   }
 
@@ -710,13 +760,36 @@ export class AuthService {
   }
 
   // ── Verificar token (lo consumen las otras apps) ──────────────────────────
+  /**
+   * Comprobar un pase desde otra app.
+   *
+   * Aquí **sí** se mira la sesión, a diferencia de las apps federadas, que
+   * verifican la firma por su cuenta y no preguntan. Quien se molesta en
+   * llamar a esta ruta está pidiendo la respuesta buena, y la respuesta buena
+   * incluye si la persona cerró sesión hace un minuto.
+   *
+   * No renueva el reloj de inactividad (`tocar: false`): comprobar un token no
+   * es que alguien esté usando la aplicación, y si lo renovara, cualquier
+   * servicio que compruebe en bucle mantendría vivas para siempre sesiones que
+   * nadie está tocando.
+   */
   async verifyToken(token: string) {
+    let payload;
     try {
-      const payload = await this.jwtService.verifyToken(token);
-      return { valid: true, payload };
+      payload = await this.jwtService.verifyToken(token);
     } catch {
       throw new UnauthorizedException('Token inválido o expirado.');
     }
+    if (!payload.jti) {
+      throw new UnauthorizedException(
+        'Ese token es de una versión anterior. Hay que volver a iniciar sesión.',
+      );
+    }
+    const estado = await this.sessions.validar(payload.jti, false);
+    if (!estado.viva) {
+      throw new UnauthorizedException('Esa sesión ya está cerrada.');
+    }
+    return { valid: true, payload };
   }
 
   // ── Construir el payload del token ────────────────────────────────────────
@@ -732,7 +805,14 @@ export class AuthService {
   // suscripción activa — es decir, para TODOS los clubes recién reconciliados
   // (§2.4): la gente entraría al portal sin club y las apps no sabrían quién
   // es. Ahora la pertenencia manda; la suscripción solo llena `app_scopes`.
-  private async buildToken(user: User): Promise<string> {
+  //
+  // `jti` es la sesión a la que pertenece el pase que se está firmando. No es
+  // decorativo: es lo único que permite cerrar esta sesión después. Se pide
+  // como parámetro —y no se genera aquí— porque una renovación tiene que
+  // seguir siendo LA MISMA sesión: si cada refresco abriera una nueva, la
+  // lista de dispositivos conectados de cualquiera tendría cincuenta filas al
+  // final del día y cerrar la de ayer no serviría de nada.
+  private async buildToken(user: User, jti: string): Promise<string> {
     const now = new Date();
 
     // ── 0. Pertenencias del usuario (identidad) ──────────────────────────
@@ -851,8 +931,149 @@ export class AuthService {
       role_campeonatos: roleCampeonatos,
       role_membresias: roleMembresias,
       is_super_admin: user.isSuperAdmin ?? false,
+      // Viaja en el token para que las apps federadas puedan pintar horas sin
+      // preguntarle al ecosystem por cada pantalla. En el navegador no hace
+      // falta —él ya sabe dónde está—, pero sí en cualquier cosa que se
+      // genere fuera de él.
+      timezone: user.timezone ?? null,
     };
 
-    return this.jwtService.signToken(payload);
+    return this.jwtService.signToken({ ...payload, jti });
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SESIONES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Abre una sesión y devuelve su primer pase.
+   *
+   * Es el único sitio por el que se entra: login, verificación del registro y
+   * canje de invitación acaban todos aquí. Si mañana aparece otra puerta, que
+   * pase por esta función y la sesión quedará registrada —y por tanto se podrá
+   * cerrar— sin que nadie tenga que acordarse.
+   */
+  private async abrirSesion(user: User, contexto?: ContextoPeticion) {
+    // La zona se aplica al usuario que se va a firmar, no solo a la base.
+    //
+    // Antes se guardaba y se firmaba el `user` de antes, así que el token del
+    // PRIMER inicio de sesión salía sin zona y las apps federadas no la veían
+    // hasta la primera renovación —media hora después—. Media hora es
+    // exactamente el rato en el que alguien entra, mira su horario y se va.
+    const alDia = await this.anotarZona(user, contexto);
+    const sesion = await this.sessions.abrir({
+      userId: user.id,
+      userAgent: contexto?.userAgent,
+      ip: contexto?.ip,
+    });
+    return {
+      access_token: await this.buildToken(alDia, sesion.id),
+      sesion: {
+        expiraEl: sesion.expiresAt.toISOString(),
+        inactividadMinutos: SessionsService.INACTIVIDAD_MINUTOS,
+      },
+    };
+  }
+
+  /**
+   * Guarda dónde está la persona, si el navegador lo dijo y ella no lo ha
+   * elegido a mano.
+   *
+   * Se hace al entrar y en cada renovación: quien se muda o viaja empieza a
+   * recibir los correos en su hora sin tener que enterarse de que existe una
+   * pantalla de preferencias. Quien sí entró a elegirla queda a salvo por
+   * `timezoneManual` — ver el esquema.
+   *
+   * Devuelve el usuario **como queda**, para que quien vaya a firmar un token
+   * ponga dentro la zona nueva y no la de la petición anterior.
+   */
+  private async anotarZona(
+    user: User,
+    contexto?: ContextoPeticion,
+  ): Promise<User> {
+    if (!contexto) return user;
+    const zona = zonaValida(contexto.timezone) ? contexto.timezone! : null;
+    const idioma =
+      contexto.locale && contexto.locale.length <= 10 ? contexto.locale : null;
+
+    const cambios: { timezone?: string; locale?: string } = {};
+    if (zona && !user.timezoneManual && user.timezone !== zona) {
+      cambios.timezone = zona;
+    }
+    if (idioma && user.locale !== idioma) cambios.locale = idioma;
+    if (!Object.keys(cambios).length) return user;
+
+    // Sin `await` sobre el camino de la respuesta: que el reloj de alguien no
+    // retrase su inicio de sesión. Si falla, el peor caso es que los correos
+    // sigan saliendo en la zona anterior.
+    void db
+      .update(users)
+      .set({ ...cambios, updatedAt: new Date() })
+      .where(eq(users.id, user.id))
+      .catch(() => undefined);
+
+    return { ...user, ...cambios };
+  }
+
+  /** Cierra la sesión desde la que se pide. Es el «salir» de verdad. */
+  async cerrarSesion(jti: string | undefined) {
+    if (jti) await this.sessions.revocar(jti, 'salir');
+    return { message: 'Sesión cerrada.' };
+  }
+
+  /**
+   * Cierra todas las demás sesiones de la persona.
+   *
+   * La que pide se conserva a propósito: quien se acuerda del computador que
+   * dejó abierto lo hace desde su celular, y echarle también del celular
+   * convierte una medida de seguridad en un castigo.
+   */
+  async cerrarLasDemas(userId: string, jtiActual?: string) {
+    const cerradas = await this.sessions.revocarTodas(
+      userId,
+      'salir-todas',
+      jtiActual,
+    );
+    return {
+      cerradas,
+      message:
+        cerradas === 0
+          ? 'No había ninguna otra sesión abierta.'
+          : cerradas === 1
+            ? 'Se cerró la otra sesión abierta.'
+            : `Se cerraron las otras ${cerradas} sesiones abiertas.`,
+    };
+  }
+
+  /** Los dispositivos conectados, con la sesión actual marcada. */
+  async sesionesAbiertas(userId: string, jtiActual?: string) {
+    const abiertas = await this.sessions.listar(userId);
+    return abiertas.map((s) => ({ ...s, actual: s.id === jtiActual }));
+  }
+
+  /** Cierra UNA sesión concreta de la lista. Solo las propias. */
+  async cerrarUna(userId: string, jti: string) {
+    if (!(await this.sessions.pertenece(jti, userId))) {
+      // Mismo mensaje que si no existiera: decir «esa sesión es de otro»
+      // convertiría este endpoint en una forma de comprobar identificadores
+      // ajenos.
+      throw new BadRequestException('Esa sesión ya no está abierta.');
+    }
+    await this.sessions.revocar(jti, 'salir-todas');
+    return { message: 'Sesión cerrada.' };
+  }
+}
+
+/**
+ * Lo que se sabe del navegador que hace la petición.
+ *
+ * Los tres datos se leen de la petición en el controlador y viajan juntos: el
+ * navegador y la IP para que la persona reconozca sus dispositivos, y la zona
+ * horaria para escribirle los correos a su hora.
+ */
+export interface ContextoPeticion {
+  userAgent?: string | null;
+  ip?: string | null;
+  timezone?: string | null;
+  locale?: string | null;
 }

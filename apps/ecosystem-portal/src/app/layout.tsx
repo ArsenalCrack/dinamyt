@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
 
 // Tipografía del ecosistema: display deportivo (Archivo, eje de anchura),
 // cuerpo humanista (Instrument Sans) y mono de marcador (IBM Plex Mono).
@@ -33,7 +34,13 @@ export default function RootLayout({
       lang="es"
       className={`${display.variable} ${cuerpo.variable} ${mono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* El reloj de inactividad. Va en el layout para que corra en todas
+            las pantallas: una sesión abandonada no se cierra sola solo en las
+            que alguien se acordó de ponerlo. */}
+        <VigilanteDeSesion />
+      </body>
     </html>
   );
 }

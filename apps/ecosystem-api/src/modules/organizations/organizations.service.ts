@@ -31,10 +31,13 @@ import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
 import { MailerService } from '../auth/mailer.service';
 import { espejarClub } from '../../common/espejo-membresias';
+import { ROLES_GESTOR } from '../../common/roles';
+import { patronBusqueda } from '../../common/busqueda';
 
 // Quién puede GESTIONAR una organización (editar su ficha, invitar gente,
-// responder invitaciones): el admin, el dueño o el maestro del club.
-const ROLES_GESTOR = ['admin', 'owner', 'maestro'];
+// responder invitaciones): el admin, el dueño o el maestro del club. El
+// catálogo vive en `common/roles.ts` porque esta no es la única regla que
+// pregunta por él, y tenerlo copiado ya separó dos de ellas una vez.
 
 // Reparto de roles según el tipo de organización (decisión de producto):
 // la federación/liga agrega jueces y administradores; el club agrega
@@ -526,8 +529,22 @@ export class OrganizationsService {
     };
   }
 
-  // ── Buscar usuarios con sus membresías (panel de Accesos) ──────────────────
+  /**
+   * Buscar personas en TODO el sistema, para el panel de Accesos.
+   *
+   * Es el único buscador del ecosistema que no se limita a un club, y es a
+   * propósito: su trabajo es dar acceso a una aplicación a cualquier cuenta,
+   * incluida la de alguien que todavía no está en ninguna organización. Lo que
+   * lo sostiene es el `SuperAdminGuard` de la ruta. Ver el mapa completo de
+   * alcances en `common/busqueda.ts`.
+   *
+   * Busca por correo Y por nombre. Antes solo por correo, y eso lo hacía
+   * parecer roto sin estarlo: escribir el nombre de alguien que existe no
+   * devolvía nada, y la pantalla contestaba «Sin resultados» sin decir que la
+   * pregunta era otra.
+   */
   async buscarUsuarios(search?: string) {
+    const patron = patronBusqueda(search);
     const filas = await db
       .select({
         id: users.id,
@@ -536,7 +553,11 @@ export class OrganizationsService {
         isActive: users.isActive,
       })
       .from(users)
-      .where(search ? ilike(users.email, `%${search}%`) : undefined)
+      .where(
+        patron
+          ? or(ilike(users.email, patron), ilike(users.fullName, patron))
+          : undefined,
+      )
       .limit(30);
     if (filas.length === 0) return [];
     const membresias = await db
@@ -791,7 +812,10 @@ export class OrganizationsService {
   }
 
   // ── Clubes/academias del sistema (buscador para invitar o inscribirse) ─────
+  // Directorio de vitrina: lo ve cualquier sesión, así que devuelve el nombre y
+  // la ciudad del club y nunca su gente. Ver `common/busqueda.ts`.
   async listarClubes(search?: string) {
+    const patron = patronBusqueda(search);
     return db
       .select({
         id: organizations.id,
@@ -805,7 +829,7 @@ export class OrganizationsService {
         and(
           inArray(organizations.type, ['CLUB', 'ACADEMY']),
           eq(organizations.isActive, true),
-          search ? ilike(organizations.name, `%${search}%`) : undefined,
+          patron ? ilike(organizations.name, patron) : undefined,
         ),
       )
       .orderBy(organizations.name)
@@ -983,19 +1007,18 @@ export class OrganizationsService {
     // Verificar que la organización existe
     await this.findById(orgId);
 
-    const termino = (opciones.search ?? '').trim();
+    const termino = patronBusqueda(opciones.search);
     // Tope duro además del que pida quien llama: un `?limit=100000` no puede
     // devolver el club entero por la puerta de atrás.
     const limit = Math.min(Math.max(opciones.limit ?? 20, 1), 100);
     const offset = Math.max(opciones.offset ?? 0, 0);
 
+    // El `eq(orgId)` va SIEMPRE, con búsqueda y sin ella: este buscador ve un
+    // club y solo uno. Ver `common/busqueda.ts`.
     const filtro = termino
       ? and(
           eq(orgMembers.orgId, orgId),
-          or(
-            ilike(users.fullName, `%${termino}%`),
-            ilike(users.email, `%${termino}%`),
-          ),
+          or(ilike(users.fullName, termino), ilike(users.email, termino)),
         )
       : eq(orgMembers.orgId, orgId);
 

@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   UseGuards,
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt.service';
+import { zonaValida } from '@dinamyt/shared';
 import {
   validarNombre,
   validarNombreCompleto,
@@ -62,9 +64,31 @@ export class UsersController {
       emergencyContactRelationship?: string | null;
       medicalNotes?: string | null;
       bloodType?: string | null;
+      /**
+       * Zona horaria IANA, elegida a mano.
+       *
+       * Distinta de la que detecta el navegador en cada inicio de sesión: esa
+       * se sobreescribe sola cuando la persona viaja, y debe hacerlo. Elegirla
+       * aquí es decir «escríbeme siempre a esta hora», y por eso marca
+       * `timezoneManual` — una preferencia que se borra sola no es una
+       * preferencia. `null` vuelve a la detección automática.
+       */
+      timezone?: string | null;
     },
   ) {
     await this.assertCanManage(user, id);
+
+    // La zona la elige cada quien para SÍ MISMO. Un gestor puede corregir el
+    // nombre o el tipo de sangre de un alumno —son datos del club—, pero la
+    // hora a la que se le escribe a alguien no es cosa de otro.
+    if (body.timezone !== undefined && user.sub !== id) {
+      throw new BadRequestException(
+        'La zona horaria solo la puede cambiar la propia persona.',
+      );
+    }
+    if (body.timezone && !zonaValida(body.timezone)) {
+      throw new BadRequestException('Esa zona horaria no existe.');
+    }
 
     // ── Campos PROTEGIDOS: identidad de la persona ─────────────────────────
     // El nombre y la fecha de nacimiento solo los corrige el maestro del club
@@ -135,6 +159,9 @@ export class UsersController {
 
     return this.usersService.updateProfile(id, {
       ...body,
+      // Elegirla a mano la protege de la detección automática; quitarla
+      // devuelve a la persona al comportamiento por defecto.
+      ...(body.timezone !== undefined && { timezoneManual: !!body.timezone }),
       birthDate:
         body.birthDate === undefined
           ? undefined

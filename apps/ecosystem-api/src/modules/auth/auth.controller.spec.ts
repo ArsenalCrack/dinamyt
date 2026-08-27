@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtTokenService } from './jwt.service';
+import { SessionsService } from './sessions.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -13,6 +14,9 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: {} },
         { provide: JwtTokenService, useValue: {} },
+        // El guard de las rutas autenticadas lo necesita: desde que la sesión
+        // se puede cerrar, comprobar la firma ya no basta.
+        { provide: SessionsService, useValue: {} },
       ],
     }).compile();
 

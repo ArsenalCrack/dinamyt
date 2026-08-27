@@ -21,6 +21,8 @@ import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
+import { DispositivosConectados } from '@/components/DispositivosConectados';
+import { ZonaHoraria } from '@/components/ZonaHoraria';
 
 interface Disciplina {
   id: string;
@@ -48,6 +50,10 @@ interface Perfil {
   medicalNotes: string | null;
   bloodType: string | null;
   isEmailVerified: boolean | null;
+  /** Zona horaria IANA. Con ella se le escriben los correos y los avisos. */
+  timezone: string | null;
+  /** ¿La eligió a mano? Entonces la detección automática no la pisa. */
+  timezoneManual: boolean | null;
   createdAt: string | null;
   disciplines: Disciplina[];
   guardians: Acudiente[];
@@ -589,6 +595,18 @@ export default function PerfilPage() {
           Actualizar contraseña
         </button>
       </form>
+
+      {/* Va justo debajo de «cambiar contraseña» a propósito: son la misma
+          preocupación. Quien viene aquí porque cree que alguien entró en su
+          cuenta necesita las dos cosas, y en este orden — cambiar la cerradura
+          no sirve de nada si el intruso sigue dentro con su sesión abierta. */}
+      <ZonaHoraria
+        usuarioId={perfil.id}
+        zonaGuardada={perfil.timezone}
+        manual={!!perfil.timezoneManual}
+      />
+
+      <DispositivosConectados />
     </main>
   );
 }

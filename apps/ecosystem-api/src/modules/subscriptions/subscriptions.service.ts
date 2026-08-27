@@ -1,3 +1,4 @@
+import { fechaCivilAInstante } from '@dinamyt/shared';
 import {
   Injectable,
   NotFoundException,
@@ -25,6 +26,10 @@ import {
   siguienteVencimiento,
   type EstadoSuscripcion,
 } from '../../common/ciclo';
+// Quién manda un club: a esta gente le llega el aviso de vencimiento. Es el
+// mismo catálogo que decide quién gestiona la organización, no una lista
+// parecida — por eso se importa en vez de repetirse.
+import { ROLES_GESTOR } from '../../common/roles';
 
 /** Formas de pago que se pueden registrar. Las mismas que Membresías. */
 export const METODOS_PAGO = [
@@ -34,9 +39,6 @@ export const METODOS_PAGO = [
   'daviplata',
   'otro',
 ] as const;
-
-/** Quién manda un club: a esta gente le llega el aviso de vencimiento. */
-const ROLES_GESTOR = ['admin', 'owner', 'maestro'];
 
 @Injectable()
 export class SubscriptionsService {
@@ -56,8 +58,8 @@ export class SubscriptionsService {
       .values({
         orgId: data.orgId,
         planId: data.planId,
-        startsAt: new Date(data.startsAt),
-        endsAt: new Date(data.endsAt),
+        startsAt: aInstante(data.startsAt),
+        endsAt: aInstante(data.endsAt),
         totalAmount: data.totalAmount ?? null,
         // status y paymentStatus toman sus defaults del schema
       })
@@ -298,8 +300,8 @@ export class SubscriptionsService {
       .limit(1);
     if (!actual) throw new NotFoundException('Suscripción no encontrada.');
 
-    const startsAt = data.startsAt ? new Date(data.startsAt) : actual.startsAt;
-    const endsAt = data.endsAt ? new Date(data.endsAt) : actual.endsAt;
+    const startsAt = data.startsAt ? aInstante(data.startsAt) : actual.startsAt;
+    const endsAt = data.endsAt ? aInstante(data.endsAt) : actual.endsAt;
     if (
       Number.isNaN(startsAt.getTime()) ||
       Number.isNaN(endsAt.getTime())
@@ -521,7 +523,7 @@ export class SubscriptionsService {
     const [fila] = await db
       .update(subscriptions)
       .set({
-        endsAt: new Date(`${hasta}T23:59:59.000Z`),
+        endsAt: fechaCivilAInstante(hasta),
         status: 'ACTIVE',
         renewalMonths: meses,
         anchorDay: ancla,
@@ -599,7 +601,7 @@ export class SubscriptionsService {
     const [fila] = await db
       .update(userSubscriptions)
       .set({
-        endsAt: new Date(`${hasta}T23:59:59.000Z`),
+        endsAt: fechaCivilAInstante(hasta),
         status: 'ACTIVE',
         renewalMonths: meses,
         anchorDay: ancla,
@@ -665,8 +667,6 @@ export class SubscriptionsService {
    * que hay que filtrar con la vista cada mañana.
    */
   async vencimientos(ventanaDias = 7) {
-    const hoy = hoyStr();
-
     const filas = await db
       .select({
         id: subscriptions.id,
@@ -683,6 +683,7 @@ export class SubscriptionsService {
         orgType: organizations.type,
         orgEmail: organizations.email,
         orgPhone: organizations.phone,
+        orgTimezone: organizations.timezone,
         planId: subscriptionPlans.id,
         planName: subscriptionPlans.name,
         priceMonthly: subscriptionPlans.priceMonthly,
@@ -703,6 +704,14 @@ export class SubscriptionsService {
     return filas
       .map((f) => {
         const venceEl = comoFecha(f.endsAt);
+        // «Hoy» en la zona DEL CLUB, no en la del servidor.
+        //
+        // Con el reloj del VPS (`TZ=America/Bogota`), un club en España
+        // recibía el aviso de vencimiento con un día de desfase: para él ya
+        // había vencido y para el servidor todavía no, o al revés. Mientras
+        // todos los clubes estuvieran en Colombia daba igual; en cuanto hay
+        // uno fuera, deja de darlo.
+        const hoy = hoyStr(f.orgTimezone);
         return {
           ...f,
           venceEl,
@@ -1052,4 +1061,31 @@ export class SubscriptionsService {
         .sort((a, b) => b.mensual - a.mensual),
     };
   }
+}
+
+/**
+ * La fecha que llega en el cuerpo de una petición, convertida a lo que se
+ * guarda.
+ *
+ * ── El error que arregla ───────────────────────────────────────────────────
+ *
+ * `new Date('2026-08-31')` NO es el 31 de agosto: es la medianoche del 31 en
+ * **UTC**, que en Bogotá es el 30 a las siete de la tarde. Guardado así y
+ * leído por el navegador con `toLocaleDateString`, un club que vence el 31
+ * aparecía venciendo el 30. Nadie tocó nada y la fecha cambió sola.
+ *
+ * Y la ruta de renovación hacía lo contrario —`T23:59:59.000Z`—, que tapa el
+ * problema en América y lo invierte en España: la misma fecha salía distinta
+ * según por dónde hubiera entrado. `fechaCivilAInstante` guarda al mediodía
+ * UTC, el único punto que cae dentro del mismo día civil en todas las zonas
+ * habitadas, así que lea quien lea la columna el día es el mismo.
+ *
+ * Si llega algo que no es una fecha civil —un ISO completo con hora, de un
+ * cliente antiguo— se respeta tal cual: aquí no es el sitio de rechazarlo, y
+ * quien llama ya comprueba que sea una fecha válida.
+ */
+function aInstante(valor: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(valor.trim())
+    ? fechaCivilAInstante(valor.trim())
+    : new Date(valor);
 }

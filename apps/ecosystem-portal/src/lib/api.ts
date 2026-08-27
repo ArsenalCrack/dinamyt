@@ -1,6 +1,14 @@
 'use client';
 
 import axios from 'axios';
+import {
+  cabecerasDeZona,
+  decodificarToken,
+  guardarToken,
+  obtenerToken,
+  olvidarToken,
+  type TokenPayload,
+} from './sesion';
 
 const API_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_API_URL || 'http://localhost:3001';
@@ -13,12 +21,23 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const t = obtenerToken();
   if (t) config.headers.Authorization = `Bearer ${t}`;
+  // Dónde está quien pregunta. El servidor no puede adivinarlo, y de esto
+  // dependen las horas de los correos que le va a escribir.
+  for (const [k, v] of Object.entries(cabecerasDeZona())) {
+    config.headers[k] = v;
+  }
   return config;
 });
 
 /**
  * Sesión expirada / token inválido → limpiar sesión y volver al login (nunca
  * en el propio /auth/login ni si ya estás en /login).
+ *
+ * El mensaje del servidor viaja hasta el login. Desde que las sesiones se
+ * pueden cerrar, un 401 tiene motivos que a la persona le importan —«se cerró
+ * sola tras 20 minutos», «la cerraste desde otro dispositivo», «cambiaste la
+ * contraseña»— y tirarlos para enseñar «no autorizado» es lo que hace que la
+ * gente crea que la aplicación falla.
  */
 api.interceptors.response.use(
   (r) => r,
@@ -30,14 +49,16 @@ api.interceptors.response.use(
       typeof window !== 'undefined' &&
       window.location.pathname !== '/login'
     ) {
-      cerrarSesion();
-      window.location.href = '/login';
+      const motivo = extraerError(error, '');
+      olvidarToken();
+      window.location.href = motivo
+        ? `/login?motivo=${encodeURIComponent(motivo)}`
+        : '/login';
     }
     return Promise.reject(error);
   },
 );
 
-const TOKEN_KEY = 'dinamyt_token';
 /**
  * El registro que espera su código. **Es el CORREO, no un id de usuario.**
  *
@@ -51,60 +72,68 @@ const TOKEN_KEY = 'dinamyt_token';
 const PENDING_KEY = 'dinamyt_registro_pendiente';
 
 /**
- * Margen contra el reloj del navegador. Un reloj adelantado unos segundos
- * respecto al servidor daría por viva una sesión que la API ya rechaza; es
- * preferible darla por muerta un poco antes de tiempo.
- */
-const MARGEN_EXPIRACION_SEG = 30;
-
-export function guardarToken(token: string) {
-  if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
-}
-
-/**
- * ¿Este token todavía vale como sesión?
+ * Dónde vive el pase y cuándo se muere: en `lib/sesion.ts`.
  *
- * Solo mira la fecha de caducidad: la firma la comprueba la API, y aquí no hay
- * llave con la que hacerlo. Es suficiente para lo que se usa — no dejar pasar
- * como sesión algo que ya está muerto.
+ * Se re-exporta desde aquí porque medio portal lo importa de `@/lib/api` desde
+ * antes de que existiera ese módulo, y mover cuarenta importaciones para
+ * ganar una línea no arregla nada.
  */
-export function tokenVigente(token: string): boolean {
-  const p = decodificarToken(token);
-  // Sin `exp` no es un token nuestro: todos los que firma el ecosystem lo
-  // llevan (ver `jwt.service.ts`).
-  if (!p || typeof p.exp !== 'number') return false;
-  return p.exp * 1000 > Date.now() + MARGEN_EXPIRACION_SEG * 1000;
-}
-
-/**
- * El token de la sesión, o `null` si no hay o si ya caducó.
- *
- * **Que haya una cadena guardada no significa que haya sesión**, y confundir
- * las dos cosas es lo que provocaba el bucle: con un token de ayer en
- * `localStorage`, todas las pantallas se daban por autorizadas, pedían datos a
- * la API, recibían 401 y rebotaban al login… que volvía a encontrar el mismo
- * token y volvía a entregarlo. Un token caducado se borra aquí mismo, así que
- * el rebote pasa una vez y no vuelve.
- */
-export function obtenerToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  const t = localStorage.getItem(TOKEN_KEY);
-  if (!t) return null;
-  if (!tokenVigente(t)) {
-    localStorage.removeItem(TOKEN_KEY);
-    return null;
-  }
-  return t;
-}
+export {
+  guardarToken,
+  obtenerToken,
+  olvidarToken,
+  tokenVigente,
+  decodificarToken,
+  seRecuerda,
+  recordarEnEsteEquipo,
+  vigilarSesion,
+  marcarActividad,
+  INACTIVIDAD_MINUTOS,
+  AVISO_SEGUNDOS,
+  type TokenPayload,
+} from './sesion';
 
 /** El payload de la sesión viva, o `null`. Para pintar quién está dentro. */
 export function sesionActual(): TokenPayload | null {
   const t = obtenerToken();
   return t ? decodificarToken(t) : null;
 }
-export function cerrarSesion() {
-  if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);
+
+/**
+ * Cerrar sesión **de verdad**.
+ *
+ * ── Lo que hacía antes ──
+ *
+ * Borrar la copia del navegador. Nada más. El pase original seguía siendo
+ * válido en el servidor hasta caducar solo, así que quien lo hubiera copiado
+ * —o quien se sentara en ese mismo computador y lo sacara del almacén— seguía
+ * entrando. «Salir» era una palabra sin acción detrás.
+ *
+ * Ahora se avisa al servidor para que cierre la fila de la sesión, y a partir
+ * de ese momento el pase no vale en ninguna app del ecosistema.
+ *
+ * ── Por qué se borra lo local ANTES de esperar al servidor ──
+ *
+ * Porque salir no puede depender de que haya red. Si la llamada falla, la
+ * sesión ya no está en este navegador; el servidor la cerrará por inactividad
+ * a los veinte minutos. Al revés —esperar y luego borrar— una API caída
+ * dejaría a alguien dentro de una cuenta de la que está intentando salir.
+ */
+export async function cerrarSesion(): Promise<void> {
+  const token = obtenerToken();
+  olvidarToken();
+  if (!token) return;
+  try {
+    await axios.post(
+      `${API_URL}/auth/logout`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 5000 },
+    );
+  } catch {
+    // Ver arriba: el reloj de inactividad del servidor es la red de seguridad.
+  }
 }
+
 export interface RegistroEnEspera {
   email: string;
   /** ISO. Pasada esta hora el registro ya no existe en el servidor. */
@@ -154,30 +183,6 @@ export function olvidarRegistroPendiente() {
   if (typeof window !== 'undefined') localStorage.removeItem(PENDING_KEY);
 }
 
-export interface TokenPayload {
-  sub: string;
-  email: string;
-  fullName: string;
-  org_id: string | null;
-  app_scopes: string[];
-  role_academy: string | null;
-  role_campeonatos: string | null;
-  role_membresias: string | null;
-  is_super_admin: boolean;
-  exp?: number;
-}
-
-/** Decodifica (sin verificar) el payload del JWT, solo para mostrar datos en UI. */
-export function decodificarToken(token: string): TokenPayload | null {
-  try {
-    const base = token.split('.')[1];
-    const json = atob(base.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json) as TokenPayload;
-  } catch {
-    return null;
-  }
-}
-
 export async function loginAPI(email: string, password: string) {
   const res = await api.post('/auth/login', { email, password });
   return res.data as { access_token: string };
@@ -209,6 +214,39 @@ export async function refrescarSesionAPI(): Promise<TokenPayload | null> {
   } catch {
     return null;
   }
+}
+
+// ── Dispositivos conectados ─────────────────────────────────────────────────
+//
+// La cura del susto: alguien se acuerda del computador que dejó abierto en
+// otro sitio, lo ve aquí y lo cierra desde su celular sin levantarse.
+
+export interface SesionAbierta {
+  id: string;
+  /** «Chrome en Windows», «Safari en iPhone»… */
+  dispositivo: string;
+  ip: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  /** La sesión desde la que se está mirando la lista. */
+  actual: boolean;
+}
+
+export async function sesionesAbiertasAPI(): Promise<SesionAbierta[]> {
+  const res = await api.get('/auth/sesiones');
+  return res.data as SesionAbierta[];
+}
+
+/** Cierra UNA de la lista. */
+export async function cerrarSesionAPI(id: string) {
+  const res = await api.delete(`/auth/sesiones/${id}`);
+  return res.data as { message: string };
+}
+
+/** Cierra todas menos esta. El botón de «me la dejé abierta en otro lado». */
+export async function cerrarLasDemasAPI() {
+  const res = await api.post('/auth/logout-all');
+  return res.data as { cerradas: number; message: string };
 }
 
 /**

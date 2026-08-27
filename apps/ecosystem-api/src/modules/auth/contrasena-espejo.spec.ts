@@ -3,6 +3,7 @@ import { UsersService } from '../users/users.service';
 import { JwtTokenService } from './jwt.service';
 import { MailerService } from './mailer.service';
 import { espejarContrasena } from '../../common/espejo-membresias';
+import { sesionesFalsas } from './sesiones.doble.spec';
 
 /**
  * La contraseña es UNA para todo DINAMYT, y se fija AQUÍ.
@@ -54,6 +55,7 @@ function armar(parches: Record<string, unknown> = {}) {
     users,
     {} as JwtTokenService,
     { sendOtp: jest.fn() } as unknown as MailerService,
+    sesionesFalsas(),
   );
   jest
     .spyOn(
@@ -98,7 +100,7 @@ describe('AuthService · la contraseña nueva se copia a Membresías', () => {
       verificarInvitacion: jest.fn().mockResolvedValue('u1'),
     } as unknown as JwtTokenService;
 
-    const service = new AuthService(users, jwt, {} as MailerService);
+    const service = new AuthService(users, jwt, {} as MailerService, sesionesFalsas());
     await service.setPassword('enlace', 'ClaveNueva9');
 
     expect(users.ponerContrasena).toHaveBeenCalledWith('u1', 'ClaveNueva9');

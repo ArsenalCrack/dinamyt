@@ -44,6 +44,7 @@ import { ROLES_SUPERADMIN, nombreRol } from '@/lib/roles';
 import { FilaMiembro } from '@/components/FilaMiembro';
 import { SelectMenu } from '@/components/SelectMenu';
 import { PanelRecaudo } from '@/components/PanelRecaudo';
+import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
 
 const TIPOS_ORG = ['FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY'] as const;
 
@@ -313,6 +314,11 @@ export default function AdminEcosistemaPage() {
           )}
           {orgSel && (
             <>
+              {/* El otro rótulo de alcance (ver «Accesos rápidos» arriba): esta
+                  caja NO sale de la organización seleccionada. */}
+              <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Alcance: solo dentro de <strong>{orgSel.name}</strong>.
+              </p>
               {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría
                   «sin miembros» con los resultados esperando en la 1. */}
               <input
@@ -322,7 +328,7 @@ export default function AdminEcosistemaPage() {
                   setOffsetGente(0);
                 }}
                 placeholder="Buscar por nombre o correo…"
-                aria-label="Buscar entre los miembros de la organización"
+                aria-label={`Buscar entre los miembros de ${orgSel.name}`}
                 className="mb-3"
               />
               {/* Una sola columna, a propósito. Con el detalle ya ancho, cada
@@ -516,8 +522,11 @@ export default function AdminEcosistemaPage() {
                           : 'var(--text-muted)',
                     }}
                   >
+                    {/* El vencimiento es un día del calendario, no un
+                        instante: `fechaCivil` lo pinta tal cual está escrito
+                        en vez de correrlo con el reloj de quien mira. */}
                     {new Date(s.endsAt) < new Date() ? 'venció' : 'hasta'} el{' '}
-                    {new Date(s.endsAt).toLocaleDateString('es-CO')}
+                    {fechaCivil(s.endsAt)}
                   </span>
                 </p>
               </div>
@@ -689,7 +698,7 @@ function CuentasBloqueadas({ ocupado }: { ocupado: boolean }) {
                 <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
                   · {c.email} · {c.failedLoginAttempts ?? 0} intentos
                   {c.lockedUntil
-                    ? ` · hasta ${new Date(c.lockedUntil).toLocaleTimeString('es')}`
+                    ? ` · hasta ${instante(c.lockedUntil, { timeStyle: 'short' })}`
                     : ''}
                 </span>
               </span>
@@ -747,13 +756,24 @@ function AccesosRapidos({
       <h2 className="mb-1 text-lg font-semibold" style={{ color: 'var(--gold)' }}>
         ⚡ Accesos rápidos
       </h2>
-      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Busca el correo, elige la app y el rol, y dale acceso con un clic
+      <p className="mb-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+        Busca a la persona, elige la app y el rol, y dale acceso con un clic
         (membresía + suscripción activa, todo en uno).
+      </p>
+      {/* ── El rótulo de alcance ──
+          Esta caja y la de «Miembros», más abajo, se parecen y buscan en sitios
+          opuestos: aquí en todo el sistema, allí dentro de una sola
+          organización. Sin decirlo, buscar a un alumno del club y verlo salir
+          acompañado de otros veinte de clubes ajenos parece un fallo — y al
+          revés, no encontrar aquí a alguien parece que no existe. El alcance de
+          cada ruta está escrito en `common/busqueda.ts` de la API. */}
+      <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+        Alcance: <strong>todo el ecosistema</strong>, no una organización.
       </p>
 
       <input
-        placeholder="Buscar por correo (mín. 2 letras)…"
+        placeholder="Buscar por nombre o correo (mín. 2 letras)…"
+        aria-label="Buscar personas en todo el ecosistema"
         value={busqueda}
         onChange={(e) => {
           setBusqueda(e.target.value);
@@ -986,7 +1006,9 @@ function Vencimientos({
                   de menos. */}
               {v.lastReminderAt && (
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Avisado el {new Date(v.lastReminderAt).toLocaleDateString('es-CO')}
+                  {/* Cuándo se le escribió es un instante: va en la hora de
+                      quien está mirando el panel. */}
+                  Avisado {haceCuanto(v.lastReminderAt)}
                 </p>
               )}
             </div>

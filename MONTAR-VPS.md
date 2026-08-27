@@ -1074,7 +1074,15 @@ DATABASE_URL=postgresql://dinamyt_eco:CLAVE_ECO@127.0.0.1:5432/dinamyt
 DB_SCHEMA=ecosystem
 JWT_PRIVATE_KEY_PATH=./keys/private.pem
 JWT_PUBLIC_KEY_PATH=./keys/public.pem
-JWT_EXPIRES_IN=86400
+# Lo que dura el PASE, no la sesión. Desde que las sesiones se pueden cerrar
+# (tabla `ecosystem.sessions`), el token es un pase de media hora que el
+# navegador renueva solo contra POST /auth/refresh; la sesión vive en la base y
+# muere por inactividad (20 min), por su tope de 12 h o porque alguien la cierra.
+# Esta variable SOLO puede acortar el pase: un valor mayor se ignora y se avisa
+# por consola. Si durase un día, «cerrar sesión en todos lados» tardaría un día
+# en significar algo en Academy y Campeonatos, que verifican la firma sin
+# preguntarle nada a nadie. Puedes borrarla: el valor por defecto ya es 1800.
+JWT_EXPIRES_IN=1800
 PORT=3001
 NODE_ENV=production
 TRUST_PROXY_HOPS=1
@@ -1569,7 +1577,17 @@ academy.dinamyt.org {
 ```
 
 Compilar, migrar y crear los servicios `academy-api` (`:3007`) y `academy-web`
-(`:3008`) igual que en la fase 7.
+(`:3008`) igual que en la fase 7. El migrar es:
+
+```bash
+cd /srv/dinamyt/packages/academy-db && pnpm db:migrar
+```
+
+> **`db:migrar`, no `db:migrate`.** El segundo es `drizzle-kit`, una
+> **devDependency**: en un servidor instalado con `--prod` no está. Es la misma
+> trampa que el ecosystem ya documenta, y hasta el 24 de agosto de 2026 Academy
+> **no tenía** el equivalente — este párrafo decía «migrar» sin decir con qué, y
+> no había ningún comando que funcionara aquí. Ver OPERAR.md §2.3-bis.
 
 > El microservicio de figuras (`academy-figuras`, Python `:3009`) **no** se
 > despliega en B1: la evaluación de figuras quedará sin funcionar hasta que se

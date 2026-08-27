@@ -25,6 +25,15 @@ export const academyUsers = aca.table(
     localRole: rolAcademyEnum('local_role'),
     /** Foto de perfil (data-URL comprimida), sincronizada del ecosystem. */
     avatarUrl: text('avatar_url'),
+    /**
+     * Zona horaria IANA de la persona, espejada del token del ecosystem.
+     *
+     * Academy no la pregunta ni la elige. Existe porque hay textos que se
+     * escriben en el SERVIDOR, cuando la persona no está delante —el aviso de
+     * «evaluación nueva, vence el …»—, y ahí no hay navegador que ponga la
+     * hora buena: salían con la del VPS para todo el mundo.
+     */
+    timezone: varchar('timezone', { length: 64 }),
     suspended: boolean('suspended').notNull().default(false),
     /** Soft delete local (RNF-ACA-06): no toca la cuenta del ecosistema. */
     deletedAt: timestamp('deleted_at'),

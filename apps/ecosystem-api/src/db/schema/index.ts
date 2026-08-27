@@ -59,6 +59,16 @@ export const organizations = eco.table('organizations', {
   phone: varchar('phone', { length: 30 }),
   city: varchar('city', { length: 100 }),
   country: varchar('country', { length: 100 }).default('Colombia'),
+  /**
+   * Zona horaria IANA del CLUB, no de quien mira la pantalla.
+   *
+   * Es la que manda en los horarios de entrenamiento y en la asistencia: «la
+   * clase es a las 7 pm» es hora de aquí, del salón. Convertirla a la zona de
+   * un maestro que está de viaje sería justo el error contrario al que
+   * arregla `users.timezone`, y mucho peor: haría que el horario publicado
+   * cambiara según quién lo abre.
+   */
+  timezone: varchar('timezone', { length: 64 }).default('America/Bogota'),
   // ── Ficha pública del club (la llena el maestro/admin del club; la ven sus
   //    miembros desde el portal — «Mi club») ─────────────────────────────────
   description: text('description'),
@@ -184,9 +194,95 @@ export const users = eco.table('users', {
   bloodType: varchar('blood_type', { length: 5 }),
   // Dato sensible (salud): cifrar en la capa de aplicación antes de persistir.
   medicalNotes: text('medical_notes'),
+  // ── Dónde está la PERSONA ──────────────────────────────────────────────────
+  /**
+   * Zona horaria IANA (`America/Bogota`, `Europe/Madrid`…). La detecta el
+   * navegador al iniciar sesión y se puede cambiar en el perfil.
+   *
+   * Sirve para escribir la hora de lo que PASÓ: cuándo entró, cuándo se
+   * registró un pago, a qué hora salió un aviso. En pantalla el navegador ya
+   * pone la suya solo; esta columna existe para lo que se genera en el
+   * servidor —los correos, sobre todo—, que hasta ahora salía en hora de
+   * Bogotá para todo el mundo porque el VPS corre con `TZ=America/Bogota`.
+   *
+   * **No se aplica a fechas civiles.** Un vencimiento o un cumpleaños no
+   * tienen zona: el 31 es el 31 en todo el planeta. Ver `packages/shared`.
+   */
+  timezone: varchar('timezone', { length: 64 }),
+  /** `es-CO`, `es-ES`, `en-US`… Cómo se le escriben las fechas y los números. */
+  locale: varchar('locale', { length: 10 }),
+  /**
+   * ¿La eligió la persona a mano en su perfil?
+   *
+   * La detección automática es lo que hace que a quien viaja le lleguen los
+   * correos en su hora sin tocar nada. Pero pisaría la elección de quien entró
+   * al perfil y puso la suya a propósito —«escríbeme siempre en hora de
+   * Colombia aunque esté fuera»—, y una preferencia que se borra sola no es
+   * una preferencia. Con esta bandera, lo automático solo escribe cuando nadie
+   * ha dicho nada.
+   */
+  timezoneManual: boolean('timezone_manual').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+/**
+ * ── Tabla: sessions ────────────────────────────────────────────────────────
+ *
+ * El registro de quién está dentro, y la pieza que le faltaba a «cerrar
+ * sesión» para significar algo.
+ *
+ * Antes la sesión era ÚNICAMENTE el JWT. Nadie llevaba la cuenta, así que
+ * salir solo borraba la copia del navegador: el token seguía siendo válido
+ * hasta caducar solo un día después, y cambiar la contraseña no echaba a
+ * nadie. Con esta tabla el token deja de ser la sesión y pasa a ser el
+ * PASE de una sesión que vive aquí: lleva un `jti` que es el `id` de esta
+ * fila, y si la fila está revocada el pase no abre, por perfecta que sea su
+ * firma.
+ *
+ * Que el token dure poco (30 min) es lo que hace que esto funcione en toda la
+ * federación sin tocar Academy ni Campeonatos: ellas siguen verificando la
+ * firma sin preguntar nada, y una sesión revocada muere en todas partes en
+ * cuanto su pase caduca y el ecosystem se niega a firmar otro.
+ */
+export const sessions = eco.table(
+  'sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * Qué navegador y desde dónde. No es estadística: es lo que permite a
+     * alguien reconocer «ese es el computador prestado» en la lista de
+     * dispositivos conectados de su perfil y cerrarlo desde su celular.
+     */
+    userAgent: text('user_agent'),
+    ip: varchar('ip', { length: 60 }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    /** La última señal de vida. De esto depende el cierre por inactividad. */
+    lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+    /**
+     * El techo absoluto: pase lo que pase, la sesión muere aquí. Sin él, quien
+     * toca la pantalla cada quince minutos no vuelve a escribir su contraseña
+     * nunca, y una sesión que no caduca jamás es una contraseña que nadie
+     * vuelve a comprobar.
+     */
+    expiresAt: timestamp('expires_at').notNull(),
+    revokedAt: timestamp('revoked_at'),
+    /**
+     * Por qué se cerró. Se guarda para poder DECIRLO —«se cerró porque
+     * cambiaste la contraseña»— en vez de devolver a alguien al login sin
+     * explicación, que es como se construye la sensación de que la aplicación
+     * está rota. Ver `MotivoCierre`.
+     */
+    revokedReason: varchar('revoked_reason', { length: 30 }),
+  },
+  (t) => [
+    index('ix_sessions_user').on(t.userId, t.lastSeenAt),
+    index('ix_sessions_expires').on(t.expiresAt),
+  ],
+);
 
 // ── Tabla: otp_codes ───────────────────────────────────────────────────────
 export const otpCodes = eco.table('otp_codes', {

@@ -17,10 +17,14 @@ import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt.service';
+import { SessionsService } from '../auth/sessions.service';
 
 @Controller('subscriptions')
 export class SubscriptionsController {
-  constructor(private readonly subsService: SubscriptionsService) {}
+  constructor(
+    private readonly subsService: SubscriptionsService,
+    private readonly sessions: SessionsService,
+  ) {}
 
   // ── POST /subscriptions — crear suscripción org (solo super admin) ────────
   @Post()
@@ -118,13 +122,33 @@ export class SubscriptionsController {
   // quedarse abierta «por si acaso». Es el mismo criterio que usa Membresías
   // con su cron de avisos.
   @Post('avisos/cron')
-  avisarPorCron(@Headers('x-cron-secret') secreto?: string) {
+  async avisarPorCron(@Headers('x-cron-secret') secreto?: string) {
     const esperado = process.env.CRON_SECRET;
     if (!esperado) throw new NotFoundException('No encontrado.');
     if (secreto !== esperado) {
       throw new UnauthorizedException('Secreto de cron inválido.');
     }
-    return this.subsService.avisarVencimientos();
+
+    // De paso, la limpieza de sesiones muertas.
+    //
+    // Va aquí y no en su propio reloj porque no hace falta otro: este es el
+    // único disparo diario que existe. Sin ninguna limpieza,
+    // `ecosystem.sessions` crece una fila por inicio de sesión y no baja
+    // nunca — no rompe nada a corto plazo, y justo por eso se olvidaría hasta
+    // que fuera un problema.
+    //
+    // Envuelta en `try`: si la limpieza falla, lo peor que pasa es que sobren
+    // filas viejas. Dejar que tumbe la petición cambiaría eso por que no
+    // salgan los correos de vencimiento, y de eso el club se entera cuando ya
+    // no puede abrir sus aplicaciones.
+    let limpiadas = 0;
+    try {
+      limpiadas = await this.sessions.limpiar();
+    } catch {
+      limpiadas = -1; // «se intentó y falló», distinguible de «no había nada»
+    }
+
+    return { ...(await this.subsService.avisarVencimientos()), limpiadas };
   }
 
   // ── GET /subscriptions/org/:orgId — suscripciones de una org (autenticado)─

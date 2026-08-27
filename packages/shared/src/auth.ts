@@ -26,4 +26,21 @@ export interface JwtPayload {
   /** Rol del usuario en Membresías. Ver `MembresiasRole` para los valores previstos. */
   role_membresias: string | null;
   is_super_admin: boolean;
+  /**
+   * La sesión a la que pertenece este token: el `id` de la fila en
+   * `ecosystem.sessions`.
+   *
+   * **Es lo que convierte el token en un pase revocable.** Sin él, un JWT
+   * firmado vale hasta que caduca solo y no hay forma de echar a nadie:
+   * «cerrar sesión» borraba la copia del navegador y el original seguía
+   * abriendo puertas. Con él, el ecosystem comprueba la fila antes de dejar
+   * pasar, y cerrar la sesión —o cambiar la contraseña— la mata de verdad.
+   *
+   * Opcional en el tipo, y solo por los tokens emitidos ANTES de que
+   * existieran las sesiones: el guard los rechaza (ver `EcosystemJwtGuard`),
+   * pero el tipo tiene que poder describirlos para explicarlo.
+   */
+  jti?: string;
+  /** Zona horaria IANA de la persona, para las apps que pintan horas. */
+  timezone?: string | null;
 }

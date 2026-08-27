@@ -30,6 +30,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrar": "node scripts/migrar.mjs",
     "db:studio": "drizzle-kit studio",
     "db:local:setup": "node scripts/pglite-setup.mjs"
   },

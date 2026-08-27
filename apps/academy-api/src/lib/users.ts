@@ -67,6 +67,7 @@ export async function sincronizarUsuarioLocal(
         ecosystemUserId: payload.sub,
         fullName: payload.fullName ?? null,
         email: payload.email ?? null,
+        timezone: payload.timezone ?? null,
       })
       .returning();
     return creado;
@@ -74,13 +75,18 @@ export async function sincronizarUsuarioLocal(
 
   if (
     (payload.fullName && payload.fullName !== existente.fullName) ||
-    (payload.email && payload.email !== existente.email)
+    (payload.email && payload.email !== existente.email) ||
+    // La zona cambia cuando la persona viaja o se muda, y el ecosystem la
+    // vuelve a detectar en cada renovación del pase. Espejarla aquí es lo que
+    // hace que los avisos que escribe Academy salgan con SU hora.
+    (payload.timezone && payload.timezone !== existente.timezone)
   ) {
     const [actualizado] = await db
       .update(academyUsers)
       .set({
         fullName: payload.fullName ?? existente.fullName,
         email: payload.email ?? existente.email,
+        timezone: payload.timezone ?? existente.timezone,
         updatedAt: new Date(),
       })
       .where(eq(academyUsers.id, existente.id))

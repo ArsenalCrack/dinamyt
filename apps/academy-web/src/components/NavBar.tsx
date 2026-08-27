@@ -131,7 +131,11 @@ export function NavBar() {
   );
 
   function salir() {
-    cerrarSesion();
+    // `void`: el pase local se borra dentro de `cerrarSesion` ANTES de salir a
+    // la red, así que la pantalla puede cambiar ya. Esperar a que el ecosystem
+    // conteste solo conseguiría que «salir» se quedara colgado cuando la API
+    // está lenta.
+    void cerrarSesion();
     limpiarRolCache();
     setSesion(null);
     setAbierto(false);

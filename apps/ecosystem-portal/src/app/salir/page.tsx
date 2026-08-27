@@ -44,14 +44,27 @@ function Salir() {
   const [destino] = useState(() => destinoSeguro(search.get('redirect')));
 
   useEffect(() => {
-    cerrarSesion();
-    // `location.href` y no `router.replace`: el destino habitual está en otro
-    // origen, y ahí el router de Next no llega.
-    if (destino) {
-      window.location.href = destino.url;
-      return;
-    }
-    router.replace('/login');
+    // Se ESPERA a que el servidor cierre la sesión antes de seguir, y esa
+    // espera es el cambio que da sentido a esta pantalla.
+    //
+    // Antes `cerrarSesion` solo borraba la copia local: el pase seguía siendo
+    // válido en el servidor hasta caducar solo, así que quien lo hubiera
+    // copiado —o quien se sentara después en ese mismo computador— seguía
+    // entrando. Ahora la llamada cierra la fila de la sesión y a partir de ahí
+    // el pase no vale en ninguna app del ecosistema.
+    //
+    // Si la red falla, `cerrarSesion` no lanza: el pase local ya se borró y el
+    // reloj de inactividad del servidor cierra la sesión en veinte minutos.
+    // Salir no puede quedarse atascado esperando a una API caída.
+    void cerrarSesion().then(() => {
+      // `location.href` y no `router.replace`: el destino habitual está en otro
+      // origen, y ahí el router de Next no llega.
+      if (destino) {
+        window.location.href = destino.url;
+        return;
+      }
+      router.replace('/login');
+    });
   }, [destino, router]);
 
   return (
