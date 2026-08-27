@@ -94,9 +94,17 @@ pnpm turbo build test
 pnpm --filter @dinamyt/ecosystem-api reconciliar:ensayo
 ```
 
+```bash
+pnpm --filter @dinamyt/ecosystem-api sesion:ensayo
+```
+
 El segundo levanta un PostgreSQL de verdad (en WebAssembly), le aplica las
 migraciones reales y corre la reconciliación dos veces. Si tocas algo de
 identidad, esto tiene que seguir en verde.
+
+El tercero hace lo mismo con el reloj de las sesiones, y **pone la base en la
+zona del VPS a propósito**: es lo único que destapa el desfase de §5.1-bis, que
+en local no se ve porque PGlite arranca en UTC.
 
 ## 2.2 En el servidor, todos los días
 
@@ -753,6 +761,43 @@ Si al matar la sesión aparece otra igual, **es la app regenerándola**: párala
 El parche permanente ya está puesto:
 `ALTER DATABASE dinamyt SET idle_in_transaction_session_timeout = '5min'`.
 
+## 5.1-bis `DEFAULT now()` en una columna sin zona no es la hora que crees
+
+**Costó un despliegue entero.** Al día siguiente de poner las sesiones
+revocables, entrar y ser echado al instante con «tu sesión se cerró sola tras 20
+minutos sin actividad» — recién entrado, sin haber estado quieto un segundo.
+
+El mecanismo, que no se parece en nada al síntoma:
+
+- Casi todas las columnas de fecha del ecosistema son `timestamp` **sin zona**.
+- Postgres escribe `now()` como **la hora de pared de la base**. En el VPS eso
+  es `America/Bogota`, porque PostgreSQL sigue al sistema y ahí se corrió
+  `timedatectl set-timezone America/Bogota`.
+- Drizzle **lee** las columnas sin zona dando por hecho que lo guardado es UTC
+  (`mapFromDriverValue` hace `valor + '+0000'`).
+
+Las dos mitades usan convenios distintos. Una fila escrita por la base y leída
+por la aplicación aparece **cinco horas en el pasado**.
+
+**En local no se ve**, y por eso llegó a producción: PGlite arranca en `GMT`,
+que coincide con lo que espera Drizzle. Cuadraba por casualidad.
+
+**La regla:** si una fecha se va a comparar con `Date.now()`, la escribe
+**JavaScript**, nunca `DEFAULT now()`. Lo que se escribe desde JS va y vuelve
+en UTC por los dos lados, y la zona de la base deja de importar.
+
+En `sessions` las columnas ya **no tienen** `defaultNow()` —ni en el esquema de
+Drizzle ni en la base (migración 0011)—, así que el tipo obliga a dar el valor
+y esto no puede volver por descuido. El ensayo que lo vigila:
+
+```bash
+cd apps/ecosystem-api && pnpm sesion:ensayo
+```
+
+Levanta PGlite **en la zona de Bogotá** a propósito, y además comprueba que un
+`now()` de la base seguiría saliendo 300 minutos desviado: si esa comprobación
+falla, es que el ensayo se está corriendo en UTC y no está probando nada.
+
 ## 5.2 `postgresql:///base` no significa lo mismo para todos
 
 Para `psql` es «por el socket Unix». Para el driver de Node es **TCP a
@@ -917,6 +962,20 @@ sin nada detrás da **525**.
       · ⛔ **Las librerías que automatizan WhatsApp Web** (`whatsapp-web.js`,
         Baileys) **no**. Violan los términos y el número acaba bloqueado — el
         del club, que es el que usan para todo.
+
+`[ ]` **Los `created_at` de toda la base van cinco horas desviados en el VPS.**
+      Es el mismo mecanismo de §5.1-bis, pero en las columnas que solo se
+      MUESTRAN: `DEFAULT now()` escribe hora de Bogotá y Drizzle la lee como
+      UTC. No rompe ninguna decisión —lo único que comparaba una de estas
+      fechas contra el reloj eran las sesiones, y eso ya está arreglado—, pero
+      sí desplaza lo que se pinta. Se nota de verdad en un solo caso: quien se
+      registró entre medianoche y las 5 de la mañana aparece con la fecha del
+      día anterior en «Miembro desde».
+
+      El arreglo bueno es pasar esas columnas a `timestamptz`, que elimina la
+      clase de fallo entera en vez de taparla. Es una migración que toca ~15
+      tablas, así que va sola y con respaldo delante, no de propina en otro
+      cambio.
 
 `[ ]` **Campeonatos no lee el `#token=`.** Su `/login` existe, pero el salto
       desde el portal aterriza en su formulario en vez de iniciar sesión. Se

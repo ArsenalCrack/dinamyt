@@ -110,6 +110,11 @@ function explicar(motivo: MotivoCierre): string {
       return 'Esta sesión se cerró desde otro dispositivo.';
     case 'admin':
       return 'Un administrador cerró esta sesión.';
+    case 'reloj-torcido':
+      // No se le cuenta el detalle técnico: para quien lo lee, lo único
+      // accionable es volver a entrar. El motivo queda escrito en la fila
+      // para quien mire la tabla.
+      return 'Tuvimos que cerrar las sesiones abiertas por una corrección del sistema. Vuelve a entrar.';
     default:
       return 'Tu sesión ya está cerrada. Vuelve a entrar.';
   }

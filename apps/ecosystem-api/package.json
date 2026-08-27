@@ -27,7 +27,8 @@
     "db:seed": "pnpm build && node dist/db/seed.js",
     "db:local:setup": "node scripts/pglite-setup.mjs",
     "reconciliar": "node scripts/reconciliar-identidades.mjs",
-    "reconciliar:ensayo": "node scripts/probar-reconciliacion.mjs"
+    "reconciliar:ensayo": "node scripts/probar-reconciliacion.mjs",
+    "sesion:ensayo": "node scripts/probar-reloj-sesion.mjs"
   },
   "dependencies": {
     "@dinamyt/shared": "workspace:*",

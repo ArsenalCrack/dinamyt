@@ -259,9 +259,25 @@ export const sessions = eco.table(
      */
     userAgent: text('user_agent'),
     ip: varchar('ip', { length: 60 }),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
+    /**
+     * ── Sin `defaultNow()`, y es lo que hace que esto funcione ────────────
+     *
+     * Estas columnas son `timestamp` **sin zona**. Postgres escribe `now()`
+     * como la hora de pared de LA BASE, y Drizzle lee las columnas sin zona
+     * dando por hecho que lo guardado es UTC. Mientras las dos coincidan no se
+     * nota; en el VPS no coinciden —PostgreSQL sigue al sistema, que está en
+     * `America/Bogota`— y una sesión recién creada se leía con cinco horas de
+     * antigüedad. El guard la daba por muerta de inactividad y echaba a la
+     * persona nada más entrar.
+     *
+     * Sin default, el tipo OBLIGA a dar el valor al insertar, así que lo pone
+     * siempre JavaScript (ver `SessionsService.abrir`) y la zona de la base
+     * deja de importar. Quitar el default no es cosmética: es lo que impide
+     * que el fallo vuelva por descuido.
+     */
+    createdAt: timestamp('created_at').notNull(),
     /** La última señal de vida. De esto depende el cierre por inactividad. */
-    lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at').notNull(),
     /**
      * El techo absoluto: pase lo que pase, la sesión muere aquí. Sin él, quien
      * toca la pantalla cada quince minutos no vuelve a escribir su contraseña
@@ -475,7 +491,9 @@ export const subscriptionPayments = eco.table(
     periodoDesde: date('periodo_desde'),
     periodoHasta: date('periodo_hasta'),
     /** Quién lo registró (el super-admin). */
-    registeredByUserId: uuid('registered_by_user_id').references(() => users.id),
+    registeredByUserId: uuid('registered_by_user_id').references(
+      () => users.id,
+    ),
     notes: text('notes'),
     createdAt: timestamp('created_at').defaultNow(),
   },

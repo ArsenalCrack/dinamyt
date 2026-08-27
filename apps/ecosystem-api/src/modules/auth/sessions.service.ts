@@ -90,13 +90,37 @@ export class SessionsService {
     userAgent?: string | null;
     ip?: string | null;
   }): Promise<{ id: string; expiresAt: Date }> {
+    // ── Las tres fechas las pone JavaScript, NUNCA la base ─────────────────
+    //
+    // Y no es preferencia de estilo: dejar `now()` aquí rompía el inicio de
+    // sesión entero en producción.
+    //
+    // Las columnas son `timestamp` **sin zona**. Postgres escribe `now()` como
+    // la hora de pared de LA BASE, y Drizzle lee las columnas sin zona dando
+    // por hecho que lo guardado es UTC (`valor + '+0000'`). Mientras las dos
+    // coincidan no se nota nada; en el VPS no coinciden —PostgreSQL sigue al
+    // sistema, que está en `America/Bogota`— así que una sesión recién nacida
+    // se leía con `lastSeenAt` **cinco horas en el pasado**.
+    //
+    // El resultado era desconcertante y parecía cualquier otra cosa: entrabas,
+    // te dejaba pasar, y el primer guard que miraba la sesión la daba por
+    // muerta de inactividad y te echaba con «tu sesión se cerró sola tras 20
+    // minutos» — recién entrado.
+    //
+    // Escribiéndolas desde aquí, ida y vuelta usan el mismo convenio (UTC) y
+    // la zona de la base deja de importar. Las columnas ya no llevan
+    // `defaultNow()` en el esquema **a propósito**: así el compilador obliga a
+    // dar el valor y esto no puede volver por descuido.
+    const ahora = new Date();
     const expiresAt = new Date(
-      Date.now() + SessionsService.MAXIMO_HORAS * 60 * 60 * 1000,
+      ahora.getTime() + SessionsService.MAXIMO_HORAS * 60 * 60 * 1000,
     );
     const [fila] = await db
       .insert(sessions)
       .values({
         userId: datos.userId,
+        createdAt: ahora,
+        lastSeenAt: ahora,
         // Se recorta: el `User-Agent` lo escribe el cliente y puede venir tan
         // largo como quiera. La columna es `text`, pero guardar kilobytes de
         // cabecera por sesión no aporta nada a «¿desde qué navegador entré?».
@@ -352,6 +376,14 @@ export type MotivoCierre =
   | 'inactividad'
   | 'caducada'
   | 'admin'
+  /**
+   * Cerrada por la migración 0011: nació con `DEFAULT now()` y su reloj puede
+   * estar corrido varias horas respecto al de la aplicación. No se corrige
+   * —no hay forma de saber con qué desfase se escribió cada una— y se cierra,
+   * que es lo que el guard iba a hacer de todos modos en cuanto alguien la
+   * usara.
+   */
+  | 'reloj-torcido'
   | 'desconocida';
 
 /** Una sesión abierta, tal y como se le enseña a su dueño. */
