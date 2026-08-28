@@ -4,6 +4,7 @@ import axios from 'axios';
 import {
   cabecerasDeZona,
   guardarToken,
+  obtenerPaseCrudo,
   obtenerToken,
   olvidarToken,
 } from './sesion';
@@ -23,6 +24,7 @@ const ECOSYSTEM_API_URL =
 export {
   guardarToken,
   obtenerToken,
+  obtenerPaseCrudo,
   olvidarToken,
   leerPase,
   seRecuerda,
@@ -53,13 +55,17 @@ export {
  * alguien dentro de la cuenta de la que intenta salir.
  */
 export async function cerrarSesion(): Promise<void> {
-  const token = obtenerToken();
+  // El pase CRUDO, no `obtenerToken()`: ese devuelve `null` en cuanto vence, y
+  // sin pase el ecosystem no sabe qué fila cerrar. El caso «pestaña abierta
+  // desde hace un rato» era justo el que dejaba la sesión viva después de
+  // salir. Ver `obtenerPaseCrudo`.
+  const token = obtenerPaseCrudo();
   olvidarToken();
   if (!token) return;
   try {
     await axios.post(
       `${ECOSYSTEM_API_URL}/auth/logout`,
-      {},
+      { token },
       { headers: { Authorization: `Bearer ${token}` }, timeout: 5000 },
     );
   } catch {

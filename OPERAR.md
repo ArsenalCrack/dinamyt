@@ -789,7 +789,7 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 | `POST /set-password` | pública | Canjea el enlace de invitación del maestro |
 | `POST /refresh` | sesión | Vuelve a firmar el token con lo de ahora (§4.3) |
 | `GET /me` · `POST /change-password` | sesión | Cambiar la contraseña **cierra las demás sesiones** (§4.11) |
-| `POST /logout` | sesión | Cierra ESTA sesión de verdad, en el servidor |
+| `POST /logout` | **firma** | Cierra ESTA sesión de verdad. Acepta el pase **vencido**: si no, salir tarde no cerraba nada (§5.12) |
 | `POST /logout-all` | sesión | Cierra todas las demás («me la dejé abierta en otro lado») |
 | `GET /sesiones` · `DELETE /sesiones/:id` | sesión | Dispositivos conectados, y cerrar uno |
 | `POST /verify-token` · `GET /jwks` | las apps | `verify-token` **sí** mira si la sesión sigue abierta; `jwks` no puede |
@@ -1098,6 +1098,38 @@ Con la nube naranja: `TRUST_PROXY_HOPS=2`, SSL/TLS en **Full (strict)**, puerto
 80 abierto (renovación del certificado), y **ningún registro DNS gris apuntando
 a tu IP** — uno solo tira a la basura todo el beneficio. Un subdominio proxiado
 sin nada detrás da **525**.
+
+## 5.12 «Salir» que hay que pulsar dos veces
+
+Salir de Membresías, ver el login un instante… y aparecer otra vez dentro. A la
+segunda sí se salía del todo. **Tres causas, y las tres se ven igual desde
+fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
+
+1. **La web decidía con una marca suya si pasar por el portal.** Quien entra por
+   DINAMYT tiene DOS sesiones: la cookie de Membresías y la del portal, en otro
+   dominio y solo cerrable pasando por él. Si esa marca del `localStorage`
+   faltaba —la borraba cualquier 401, y nunca existía si se había entrado con
+   contraseña— no se pasaba por el portal, la sesión de DINAMYT quedaba viva, y
+   el siguiente «entrar con DINAMYT» metía a la persona dentro sin enseñar una
+   sola pantalla. Ahora **lo dice el servidor** en la respuesta del logout, y
+   estando federado se pasa por `PORTAL/salir` **siempre**.
+2. **Un logout fallido se daba por bueno.** Si `POST /auth/logout` no salía —API
+   dormida en Render, 503 de mantenimiento, un corte— se limpiaba lo local y se
+   seguía como si nada. La cookie seguía valiendo, y la vuelta aterrizaba en
+   `/login`, que es **la pantalla que mete dentro a quien tenga sesión**. A la
+   segunda la API ya estaba despierta. Ahora se vuelve a `/login?salida=portal`
+   (o `?salida=sola` sin ecosistema), que **no entra a nadie**, dice en voz alta
+   lo que se cerró, y remata el cierre si detecta que quedó sesión viva.
+3. **El pase vencido no cerraba nada.** El pase dura 30 min y la sesión hasta 12
+   h (§4.11). Quien volvía a una pestaña abierta y pulsaba Salir tenía el pase
+   vencido: el guard contestaba 401, el navegador se quedaba sin su copia y la
+   fila seguía abierta —y su pase todavía entraba en Academy y Campeonatos—.
+   `POST /auth/logout` ya no lleva guard: verifica **solo la firma**, tolerando
+   hasta 12 h de vencimiento. Revocar solo quita acceso, nunca lo da.
+
+> **La regla:** salir no puede depender de que la red funcione, de que el pase
+> esté en fecha, ni de una marca que el navegador puede haber perdido. Y la
+> pantalla en la que se aterriza al salir **no puede ser la que deja entrar**.
 
 ---
 

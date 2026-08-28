@@ -128,6 +128,47 @@ export class JwtTokenService {
     return payload as unknown as JwtPayload;
   }
 
+  /**
+   * Cuánto se acepta un pase ya vencido **solo para cerrar su sesión**.
+   *
+   * Doce horas es el techo absoluto de una sesión (`SessionsService`), así que
+   * un pase vencido hace más de eso no puede corresponder a ninguna fila viva:
+   * pasado ese punto no queda nada que revocar y no hay razón para mirarlo.
+   */
+  static readonly VENCIDO_ACEPTABLE_SEG = 12 * 60 * 60;
+
+  /**
+   * Verifica un pase **ignorando su caducidad**, y solo para salir.
+   *
+   * ── Por qué existe esta grieta, y por qué no lo es ────────────────────────
+   *
+   * El pase dura media hora y la sesión hasta doce. Con `verifyToken` a secas,
+   * quien vuelve a la pestaña una hora después y pulsa «Salir» recibe un 401:
+   * su pase caducó, así que el servidor no puede saber QUÉ fila cerrar… y la
+   * fila sigue abierta, renovable, viva en Academy y en Campeonatos. Salir se
+   * convertía justo en lo que este trabajo vino a quitar: borrar la copia del
+   * navegador y dejar la sesión de pie.
+   *
+   * Aceptar aquí un pase vencido no abre nada: lo único que se puede hacer con
+   * él es REVOCAR la sesión que nombra. Quien tenga un pase ajeno en la mano ya
+   * podía usarlo mientras estuvo en fecha; lo peor que consigue con esta ruta es
+   * echar de su propia cuenta a alguien que de todas formas quería salir.
+   * Firmar sigue siendo obligatorio, y con la llave privada no lo hace nadie.
+   */
+  async verificarPaseParaCerrar(token: string): Promise<JwtPayload> {
+    const { payload } = await jose.jwtVerify(token, this.publicKey, {
+      algorithms: ['RS256'],
+      issuer: JwtTokenService.EMISOR_SESION,
+      // `clockTolerance` es la forma que da jose de decir «este `exp` no me
+      // importa». No se toca `nbf` ni la firma: solo el reloj.
+      clockTolerance: JwtTokenService.VENCIDO_ACEPTABLE_SEG,
+    });
+    if (payload.purpose) {
+      throw new Error('Ese token no es una sesión.');
+    }
+    return payload as unknown as JwtPayload;
+  }
+
   // ── El enlace de invitación ───────────────────────────────────────────────
   //
   // Emisor DISTINTO al de las sesiones, y esa es la pieza que lo hace seguro:

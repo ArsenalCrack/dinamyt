@@ -37,14 +37,22 @@ let tokenEnMemoria: string | null = null;
 /** Solo el perfil, para pintar rápido. Sin él, nada: el token no se guarda. */
 const USER_KEY = 'membresias_user';
 /**
- * Si esta sesion nacio del portal DINAMYT.
+ * Restos de cuando la web recordaba POR SU CUENTA si la sesión venía del
+ * portal. Ya no: lo dice el servidor en la respuesta de `POST /auth/logout`.
  *
- * Lo necesita el boton de Salir: cerrar solo la sesion de aqui deja la del
- * portal viva, y al pulsar «entrar con DINAMYT» el portal devuelve otro token
- * al instante, sin preguntar nada. Por fuera eso se ve como si salir no
- * funcionara — se sale y se vuelve a estar dentro.
+ * La marca vivía aquí y se perdía sola. La borraba cualquier 401 —el propio
+ * `cerrarSesion` de abajo la borraba— y no llegaba a existir si se había
+ * entrado con contraseña, aunque hubiera sesión del portal abierta en el mismo
+ * navegador. Cuando faltaba, «Salir» no pasaba por el portal, la sesión de
+ * DINAMYT seguía viva, y el siguiente «entrar con DINAMYT» metía a la persona
+ * dentro sin enseñarle una sola pantalla: salir y aparecer dentro otra vez.
+ * Solo a la SEGUNDA se salía del todo, porque esa reentrada sí había dejado la
+ * marca puesta. Ver `NavBar.salir`.
+ *
+ * La clave se sigue borrando para no dejar basura en navegadores que ya la
+ * tienen.
  */
-const ORIGEN_SSO_KEY = 'membresias_origen_sso';
+const ORIGEN_SSO_KEY_VIEJA = 'membresias_origen_sso';
 const COOKIE_CSRF = 'membresias_csrf';
 
 export type Rol = 'owner' | 'staff' | 'guardian' | 'student';
@@ -148,18 +156,7 @@ export function cerrarSesion() {
   // Restos de la versión anterior, cuando el token vivía aquí. Se borra para
   // no dejar sesiones viejas al alcance de cualquier script.
   localStorage.removeItem('membresias_token');
-  localStorage.removeItem(ORIGEN_SSO_KEY);
-}
-
-/** Deja constancia de que esta sesión vino del portal. */
-export function marcarOrigenSso() {
-  if (typeof window !== 'undefined') localStorage.setItem(ORIGEN_SSO_KEY, '1');
-}
-
-/** ¿Esta sesión vino del portal? Lo pregunta el botón de Salir. */
-export function vinoDelPortal(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(ORIGEN_SSO_KEY) === '1';
+  localStorage.removeItem(ORIGEN_SSO_KEY_VIEJA);
 }
 
 // `withCredentials` es lo que hace que la cookie de sesión viaje (y que el
@@ -286,15 +283,46 @@ export async function login(email: string, password: string): Promise<RespuestaL
   return data;
 }
 
-/** Cierra la sesión también en el servidor: la cookie httpOnly solo la borra él. */
-export async function logout(): Promise<void> {
+/** Lo que se sabe después de intentar salir. Lo lee el botón de Salir. */
+export interface Salida {
+  /**
+   * Si el servidor confirmó el cierre. En `false` la cookie httpOnly PUEDE
+   * seguir viva —solo el servidor puede borrarla—, así que quien llame tiene
+   * que contar con que la sesión no está cerrada del todo.
+   */
+  confirmada: boolean;
+  /**
+   * Si esta instalación tiene portal DINAMYT y por tanto hay una segunda
+   * sesión que cerrar. `null` cuando el servidor no contestó.
+   */
+  portal: boolean | null;
+}
+
+/**
+ * Cierra la sesión también en el servidor: la cookie httpOnly solo la borra él.
+ *
+ * **El fallo ya no se traga en silencio.** Antes, si la llamada no salía —la
+ * API dormida en Render, un 503 de mantenimiento, un corte de red— esto
+ * limpiaba lo local y devolvía como si todo hubiera ido bien. La cookie seguía
+ * valiendo, así que al aterrizar de vuelta en `/login` el `GET /auth/me`
+ * contestaba 200 y la pantalla metía a la persona dentro otra vez. Al segundo
+ * intento la API ya estaba despierta y sí se salía: el mismo «hay que pulsarlo
+ * dos veces». Ahora se devuelve lo que de verdad pasó y `/login?salida=1`
+ * remata el trabajo si hizo falta.
+ */
+export async function logout(): Promise<Salida> {
+  let salida: Salida = { confirmada: false, portal: null };
   try {
-    await api.post('/auth/logout');
+    const { data } = await api.post<{ ok?: boolean; portal?: boolean }>(
+      '/auth/logout',
+    );
+    salida = { confirmada: true, portal: data?.portal ?? null };
   } catch {
-    // Si la API no responde, la sesión local se limpia igual: dejar al usuario
-    // "dentro" porque falló la red sería peor.
+    // La sesión local se limpia igual: dejar a alguien "dentro" porque falló
+    // la red sería peor. Lo que NO se hace es dar el cierre por bueno.
   }
   cerrarSesion();
+  return salida;
 }
 
 /** Revalida la sesión contra el servidor (rol y club pueden haber cambiado). */
@@ -332,7 +360,6 @@ export async function entrarConSso(token: string): Promise<RespuestaLogin> {
   const { data } = await api.post<RespuestaLogin>('/auth/sso', { token });
   guardarToken(data.token);
   guardarUsuario(data.user);
-  marcarOrigenSso();
   return data;
 }
 

@@ -325,9 +325,22 @@ export async function authRoutes(app: FastifyInstance) {
   // ── POST /auth/logout — cierra la sesión del navegador ────────────────────
   // Sin guard: si la cookie ya no vale, borrarla debe funcionar igual. Lo
   // contrario deja al usuario con una sesión rota que no puede ni cerrar.
+  //
+  // ── Por qué la respuesta lleva `portal` ───────────────────────────────────
+  //
+  // Cerrar la sesión de aquí no cierra la del portal DINAMYT, que vive en otro
+  // dominio y solo se cierra pasando por él. Quién decide si hay que ir era
+  // hasta ahora una marca en el `localStorage` de la web, y esa marca se
+  // perdía sola —la borraba cualquier 401, y no existía si se había entrado
+  // con contraseña—. Cuando faltaba, «Salir» cerraba media sesión: el portal
+  // seguía reconociendo a la persona y la devolvía dentro al instante. De ahí
+  // el «hay que pulsar Salir dos veces».
+  //
+  // Ahora lo dice el servidor, que es quien sabe si esta instalación está
+  // federada, y no se puede perder ni quedar viejo.
   app.post('/auth/logout', async (_req, reply) => {
     cerrarSesion(reply);
-    return { ok: true };
+    return { ok: true, portal: ssoHabilitado() };
   });
 
   // ── GET /auth/me — quién soy y en qué club estoy ──────────────────────────

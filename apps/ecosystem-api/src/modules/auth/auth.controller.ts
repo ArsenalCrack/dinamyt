@@ -47,6 +47,22 @@ function contextoDe(req: Request): ContextoPeticion {
   };
 }
 
+/**
+ * El pase que trae la petición, sin comprobar nada.
+ *
+ * Lo usa `POST /auth/logout`, que ya no lleva guard. Se acepta también en el
+ * cuerpo porque `navigator.sendBeacon` —lo que un día usará el cierre al cerrar
+ * la pestaña— no sabe poner cabeceras.
+ */
+function paseDe(req: Request): string | null {
+  const cabecera = req.headers['authorization'];
+  if (typeof cabecera === 'string' && cabecera.startsWith('Bearer ')) {
+    return cabecera.slice(7);
+  }
+  const body = req.body as { token?: unknown } | undefined;
+  return typeof body?.token === 'string' && body.token ? body.token : null;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -214,11 +230,24 @@ export class AuthController {
   // son lo que convierte esa palabra en una acción.
   // ══════════════════════════════════════════════════════════════════════════
 
-  /** Cierra ESTA sesión. Lo llama `/salir` del portal antes de irse. */
+  /**
+   * Cierra ESTA sesión. Lo llama `/salir` del portal antes de irse.
+   *
+   * **Sin guard, y eso es el arreglo.** Con `EcosystemJwtGuard` delante, salir
+   * exigía un pase en fecha; pero el pase dura media hora y la sesión hasta
+   * doce, así que quien volvía a una pestaña abierta un rato después recibía un
+   * 401 al pulsar «Salir». El navegador se quedaba sin su copia —y la persona,
+   * convencida de haber salido— mientras la fila seguía abierta y su pase
+   * todavía entraba en Academy y en Campeonatos. La comprobación que sí hace
+   * falta la hace el servicio: la firma. Ver `cerrarSesionDelPase`.
+   *
+   * El tope por IP está porque la ruta ya no la protege un guard: revocar es
+   * barato, pero no gratis, y nadie necesita salir treinta veces por minuto.
+   */
+  @Throttle({ global: { limit: 30, ttl: 60_000 } })
   @Post('logout')
-  @UseGuards(EcosystemJwtGuard)
-  logout(@CurrentUser() user: JwtPayload) {
-    return this.authService.cerrarSesion(user.jti);
+  logout(@Req() req: Request) {
+    return this.authService.cerrarSesionDelPase(paseDe(req));
   }
 
   /**

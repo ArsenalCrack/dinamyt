@@ -77,6 +77,11 @@ const es = {
   'login.sinCuenta': '¿No tienes cuenta?',
   'login.registrate': 'Regístrate en DINAMYT',
   'login.volverAlPortal': 'Ir al portal DINAMYT',
+  // Se enseña al aterrizar aquí desde «Salir» (`/login?salida=1`). Confirma
+  // en voz alta lo que se acaba de hacer: sin una frase, salir y ver otra vez
+  // el formulario se lee como «no pasó nada» y la gente vuelve a pulsarlo.
+  'login.sesionCerrada': 'Cerraste tu sesión.',
+  'login.sesionCerradaDinamyt': 'Cerraste tu sesión en Membresías y en DINAMYT.',
 
   // Comunes
   'comun.cargando': 'Cargando…',
@@ -694,6 +699,8 @@ const en: Record<ClaveTexto, string> = {
   'login.sinCuenta': 'No account yet?',
   'login.registrate': 'Sign up at DINAMYT',
   'login.volverAlPortal': 'Go to the DINAMYT portal',
+  'login.sesionCerrada': 'You signed out.',
+  'login.sesionCerradaDinamyt': 'You signed out of Membresías and of DINAMYT.',
 
   'comun.cargando': 'Loading…',
   'comun.guardar': 'Save',

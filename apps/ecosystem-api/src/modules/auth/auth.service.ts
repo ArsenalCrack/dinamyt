@@ -1022,6 +1022,39 @@ export class AuthService {
   }
 
   /**
+   * Cierra la sesión que nombra un pase, **aunque el pase ya haya caducado**.
+   *
+   * ── Por qué no lo hace el guard ───────────────────────────────────────────
+   *
+   * Porque el guard exige un pase en fecha, y esta es la única ruta donde eso
+   * es contraproducente. El pase dura media hora; la sesión, hasta doce. Quien
+   * vuelve a una pestaña abierta después de comer y pulsa «Salir» tiene el pase
+   * vencido y la sesión viva: con el guard delante recibía un 401, el navegador
+   * se quedaba sin su copia y la fila seguía abierta —renovable, y todavía
+   * válida en Academy y en Campeonatos hasta que la inactividad la cerrara—.
+   * Es exactamente el «salir que no sale» que estas rutas vinieron a arreglar.
+   *
+   * ── Por qué es seguro contestar siempre lo mismo ──────────────────────────
+   *
+   * Un pase que no verifica no cierra nada, pero la respuesta no lo dice: quien
+   * prueba tokens a ciegas no aprende de aquí si acertó. Y quien tiene uno de
+   * verdad en la mano no gana nada usándolo aquí — lo único que consigue es
+   * REVOCAR, que es quitar acceso, nunca darlo.
+   */
+  async cerrarSesionDelPase(token: string | null) {
+    const cerrada = { message: 'Sesión cerrada.' };
+    if (!token) return cerrada;
+    try {
+      const pase = await this.jwtService.verificarPaseParaCerrar(token);
+      if (pase.jti) await this.sessions.revocar(pase.jti, 'salir');
+    } catch {
+      // Firma rota, emisor ajeno o pase de hace más de doce horas: no hay
+      // ninguna fila que este token pueda nombrar. Salir no falla por eso.
+    }
+    return cerrada;
+  }
+
+  /**
    * Cierra todas las demás sesiones de la persona.
    *
    * La que pide se conserva a propósito: quien se acuerda del computador que

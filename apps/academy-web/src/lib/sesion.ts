@@ -81,6 +81,22 @@ export function obtenerToken(): string | null {
   return t;
 }
 
+/**
+ * El pase guardado **tal cual**, caducado o no.
+ *
+ * `obtenerToken` devuelve `null` en cuanto vence, y eso es lo correcto para
+ * todo… menos para salir. El pase dura media hora y la sesión hasta doce, así
+ * que quien vuelve a una pestaña abierta un rato después tiene el pase vencido
+ * y la sesión abierta: sin mandar nada, el ecosystem no sabe qué fila cerrar y
+ * la sesión sigue de pie —en el portal, en Campeonatos y aquí— hasta que la
+ * inactividad la cierre sola. La API lo acepta vencido SOLO para cerrarlo (ver
+ * `verificarPaseParaCerrar` en ecosystem-api).
+ */
+export function obtenerPaseCrudo(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(CLAVE_PASE) ?? localStorage.getItem(CLAVE_PASE);
+}
+
 export function olvidarToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(CLAVE_PASE);

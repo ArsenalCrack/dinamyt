@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { claveRol, useAuth } from '@/lib/auth';
-import { vinoDelPortal } from '@/lib/api';
 import { IDIOMAS, useI18n, type ClaveTexto } from '@/lib/i18n';
 import { aplicarTema, getTema, type Tema } from '@/lib/theme';
 import { Avatar } from './Avatar';
@@ -160,7 +159,7 @@ export function NavBar() {
   }
 
   /**
-   * Salir de verdad — y eso incluye al portal si fue él quien te dejó entrar.
+   * Salir de verdad, de una sola vez, y de las DOS sesiones.
    *
    * Se espera al logout antes de navegar: la cookie de sesión la borra el
    * servidor, y si se cambia de página antes el navegador puede cancelar la
@@ -168,19 +167,37 @@ export function NavBar() {
    *
    * ── Por qué hay que ir hasta el portal ──
    *
-   * La sesión del portal vive en SU dominio, y ningún navegador deja que esta
-   * app la toque. Cerrando solo la de aquí, el portal seguía reconociéndote:
-   * pulsabas «entrar con DINAMYT» y te devolvía un token nuevo al instante, sin
-   * preguntar nada ni enseñar una sola pantalla. Salir y volver a estar dentro,
-   * una y otra vez — que es exactamente como se ve un botón de salir roto,
-   * aunque el de aquí hiciera su trabajo.
+   * Quien entra por DINAMYT tiene DOS sesiones: la de aquí (cookie de este
+   * dominio) y la del portal (su dominio, que ningún navegador deja tocar desde
+   * fuera). Cerrando solo la de aquí, el portal seguía reconociendo a la
+   * persona: al pulsar «entrar con DINAMYT» devolvía un pase nuevo al instante,
+   * sin preguntar nada ni enseñar una sola pantalla. Salir y aparecer dentro
+   * otra vez — que es exactamente como se ve un botón de salir roto, aunque el
+   * de aquí hubiera hecho su trabajo.
    *
-   * `vinoDelPortal()` se lee ANTES del logout: `cerrarSesion()` borra esa marca
-   * junto con lo demás, y después ya no hay a quién preguntarle.
+   * ── Por qué ya no se pregunta «¿viniste del portal?» ──
    *
-   * A quien entró con su contraseña no se le manda al portal: no tiene ninguna
-   * sesión allí que cerrar, y el viaje solo le enseñaría un dominio que no
-   * pidió.
+   * **Ahí estaba el bug de las dos pulsaciones.** Esa pregunta se respondía con
+   * una marca en el `localStorage` de esta app, y la marca se perdía sola: la
+   * borraba cualquier 401, y no llegaba a existir si se había entrado con
+   * contraseña aunque hubiera sesión del portal abierta en el mismo navegador.
+   * Sin marca no se pasaba por el portal, la sesión de DINAMYT quedaba viva, y
+   * el siguiente «entrar con DINAMYT» metía a la persona dentro sin enseñarle
+   * nada. Solo a la SEGUNDA se salía del todo, porque esa reentrada sí había
+   * dejado la marca puesta.
+   *
+   * Ahora no hay pregunta que fallar: si esta instalación está federada —lo
+   * dice el servidor al cerrar, no una marca del navegador— se pasa por el
+   * portal SIEMPRE. `/salir` allí no pide nada, no pregunta nada y funciona
+   * igual si no había sesión que cerrar: cuesta una redirección y quita la
+   * clase entera de fallos.
+   *
+   * ── Por qué se vuelve a `/login?salida=1` ──
+   *
+   * Porque `/login` a secas mete dentro a quien tenga sesión, y aterrizar ahí
+   * después de salir es pedirle a la pantalla que deshaga lo que se acaba de
+   * hacer. Con `?salida=1` esa puerta se cierra y, si algo quedó vivo, se
+   * remata allí. Ver `app/login/page.tsx`.
    *
    * ── Por qué se sale con `location` y no con el router ──
    *
@@ -189,20 +206,28 @@ export function NavBar() {
    * medio pintar, ni un estado de React con su nombre. Y de paso no depende de
    * que el router esté sano — que es justo lo que falló tres veces seguidas
    * aquí, siempre con el mismo disfraz: «pulso Salir y no pasa nada».
-   *
-   * Cuesta unos milisegundos más. Un botón de salir que a veces no sale cuesta
-   * bastante más que eso.
    */
   async function salir() {
-    const porElPortal = vinoDelPortal() && Boolean(PORTAL_URL);
-    await logout();
+    const salida = await logout();
     setAbierto(false);
-    if (porElPortal) {
-      const vuelta = encodeURIComponent(`${window.location.origin}/login`);
-      window.location.href = `${PORTAL_URL}/salir?redirect=${vuelta}`;
-      return;
-    }
-    window.location.href = '/login';
+
+    // `portal` viene del servidor. Si no contestó, se cae a lo único que se
+    // sabe sin él: que este despliegue tiene portal configurado. Pasar de más
+    // solo cuesta una redirección; pasar de menos deja media sesión abierta.
+    const hayPortal = (salida.portal ?? true) && Boolean(PORTAL_URL);
+
+    // El valor dice de CUÁNTAS sesiones se salió, y de eso depende la frase que
+    // se lee al aterrizar: en el club que usa Membresías por su cuenta no hay
+    // ningún DINAMYT del que salir, y prometérselo sería mentir. Viaja en la
+    // dirección y no se consulta al llegar porque aquí ya se sabe, y preguntarlo
+    // otra vez haría que la frase cambiara delante de quien la está leyendo.
+    const vuelta = `${window.location.origin}/login?salida=${
+      hayPortal ? 'portal' : 'sola'
+    }`;
+
+    window.location.href = hayPortal
+      ? `${PORTAL_URL}/salir?redirect=${encodeURIComponent(vuelta)}`
+      : '/login?salida=sola';
   }
 
   return (

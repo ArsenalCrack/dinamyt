@@ -50,7 +50,7 @@ const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 export default function Login() {
   const router = useRouter();
   const { t } = useI18n();
-  const { login, loginConCodigo, loginConSso, user, cargando } = useAuth();
+  const { login, loginConCodigo, loginConSso, logout, user, cargando } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -61,10 +61,72 @@ export default function Login() {
   /** Un token se canjea UNA vez. Ver el comentario largo de arriba. */
   const canjeado = useRef(false);
 
-  // Quien ya tiene sesión no debería quedarse mirando el formulario.
+  /**
+   * Se llega aquí desde «Salir» (`?salida=1`), y eso lo cambia todo.
+   *
+   * ── Qué pasaba sin esto ──
+   *
+   * Salir terminaba en `/login` a secas, y `/login` es la pantalla que mete
+   * dentro a quien tenga sesión. Bastaba con que algo sobreviviera al cierre
+   * —la API dormida que no atendió el `POST /auth/logout`, un 503, un corte de
+   * red— para que el `GET /auth/me` de esta misma pantalla contestara 200 y la
+   * persona apareciera de vuelta dentro de Membresías un segundo después de
+   * haber pulsado Salir. Al segundo intento la API ya estaba despierta y sí se
+   * salía: de ahí el «hay que pulsarlo dos veces».
+   *
+   * Con la marca puesta esta pantalla es un punto final, no una puerta: no
+   * entra a nadie, no canjea ningún token, y si detecta que quedó sesión viva
+   * la vuelve a cerrar. Es la red de seguridad del botón de Salir.
+   *
+   * Es un `ref` y no estado porque tiene que estar decidido ANTES de que
+   * corran los efectos de abajo, y porque deja de valer en cuanto alguien
+   * empieza a entrar a propósito desde aquí (ver `enviar`).
+   */
+  const enSalida = useRef(
+    typeof window === 'undefined'
+      ? null
+      : (new URLSearchParams(window.location.search).get('salida') as
+          | 'portal'
+          | 'sola'
+          | null),
+  );
+  /**
+   * Lo mismo, para poder DECIRLO en pantalla sin romper la hidratación.
+   *
+   * `portal` = se cerraron las dos sesiones, la de aquí y la de DINAMYT.
+   * `sola` = esta instalación no tiene portal, así que solo había una.
+   */
+  const [avisoSalida, setAvisoSalida] = useState<'portal' | 'sola' | null>(null);
+  /** Dos remates y se para: cerrar en bucle sería peor que no cerrar. */
+  const remates = useRef(0);
+
   useEffect(() => {
+    setAvisoSalida(enSalida.current);
+  }, []);
+
+  // Quien ya tiene sesión no debería quedarse mirando el formulario… salvo
+  // cuando acaba de pulsar Salir, que es justo cuando el formulario es lo
+  // único correcto que se le puede enseñar.
+  useEffect(() => {
+    if (enSalida.current) return;
     if (!cargando && user && !conCodigo) router.replace(rutaInicio(user));
   }, [cargando, user, router, conCodigo]);
+
+  /**
+   * Se salió, pero el servidor todavía reconoce la sesión: se cierra otra vez.
+   *
+   * Que `user` tenga valor después de un `/auth/me` cumplido significa que la
+   * cookie httpOnly sigue viva, y solo el servidor puede borrarla. Aquí se le
+   * vuelve a pedir. El contador es el freno: si el servidor sigue sin poder
+   * cerrar, se para y se enseña el formulario — que es la verdad visible más
+   * cercana a lo que la persona pidió, y desde donde puede volver a entrar.
+   */
+  useEffect(() => {
+    if (!enSalida.current || cargando || !user) return;
+    if (remates.current >= 2) return;
+    remates.current += 1;
+    void logout();
+  }, [cargando, user, logout]);
 
   /**
    * Entrada por QR: el maestro genera el código en la ficha del alumno y este
@@ -82,6 +144,12 @@ export default function Login() {
 
     if (canjeado.current) return;
     canjeado.current = true;
+
+    // Un QR recién escaneado es una entrada deliberada, gane la carrera que
+    // gane contra el remate de la salida. Sin esto, el remate cerraría la
+    // sesión que este canje acaba de abrir.
+    enSalida.current = null;
+    setAvisoSalida(null);
 
     setConCodigo(true);
     loginConCodigo(codigo)
@@ -128,6 +196,9 @@ export default function Login() {
     const token = decodeURIComponent(hash.slice(7));
     if (!token) return;
 
+    // Nadie entra por una pantalla a la que se llegó saliendo. El portal nunca
+    // manda las dos cosas juntas; el cierre está aquí por si un día lo hace.
+    if (enSalida.current) return;
     if (canjeado.current) return;
     canjeado.current = true;
 
@@ -143,6 +214,10 @@ export default function Login() {
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
+    // Quien teclea su contraseña aquí ya no está saliendo: está entrando. Sin
+    // levantar la marca, el remate de arriba cerraría la sesión recién abierta.
+    enSalida.current = null;
+    setAvisoSalida(null);
     setError('');
     setEnviando(true);
     try {
@@ -234,6 +309,16 @@ export default function Login() {
           required
           style={{ margin: '0.3rem 0 1.1rem' }}
         />
+
+        {avisoSalida && !error && (
+          <p className="muted" style={{ marginBottom: '0.8rem', fontSize: '0.85rem' }}>
+            {t(
+              avisoSalida === 'portal'
+                ? 'login.sesionCerradaDinamyt'
+                : 'login.sesionCerrada',
+            )}
+          </p>
+        )}
 
         {error && (
           <p className="msg-error" style={{ marginBottom: '0.8rem', fontSize: '0.85rem' }}>

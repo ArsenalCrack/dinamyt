@@ -5,6 +5,7 @@ import {
   cabecerasDeZona,
   decodificarToken,
   guardarToken,
+  obtenerPaseCrudo,
   obtenerToken,
   olvidarToken,
   type TokenPayload,
@@ -81,6 +82,7 @@ const PENDING_KEY = 'dinamyt_registro_pendiente';
 export {
   guardarToken,
   obtenerToken,
+  obtenerPaseCrudo,
   olvidarToken,
   tokenVigente,
   decodificarToken,
@@ -120,13 +122,18 @@ export function sesionActual(): TokenPayload | null {
  * dejaría a alguien dentro de una cuenta de la que está intentando salir.
  */
 export async function cerrarSesion(): Promise<void> {
-  const token = obtenerToken();
+  // El pase CRUDO, no `obtenerToken()`: ese devuelve `null` en cuanto vence, y
+  // sin pase el servidor no sabe qué fila cerrar. El pase dura media hora y la
+  // sesión hasta doce, así que el caso «pestaña abierta desde hace un rato» era
+  // justo el que dejaba la sesión viva después de salir. La API lo acepta
+  // vencido y solo para esto (ver `verificarPaseParaCerrar` en el ecosystem).
+  const token = obtenerPaseCrudo();
   olvidarToken();
   if (!token) return;
   try {
     await axios.post(
       `${API_URL}/auth/logout`,
-      {},
+      { token },
       { headers: { Authorization: `Bearer ${token}` }, timeout: 5000 },
     );
   } catch {

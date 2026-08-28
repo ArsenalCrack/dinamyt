@@ -100,6 +100,21 @@ export function obtenerToken(): string | null {
   return t;
 }
 
+/**
+ * El pase guardado **tal cual**, caducado o no.
+ *
+ * `obtenerToken` devuelve `null` cuando el pase venció, y eso es lo correcto
+ * para todo… menos para salir. La sesión dura hasta doce horas y el pase media,
+ * así que quien vuelve a una pestaña abierta un rato después tiene el pase
+ * vencido y la sesión abierta: si al pulsar «Salir» no se manda nada, el
+ * servidor no sabe qué fila cerrar y la sesión sigue de pie. La API acepta un
+ * pase vencido SOLO para cerrarlo (ver `verificarPaseParaCerrar`).
+ */
+export function obtenerPaseCrudo(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(CLAVE_PASE) ?? localStorage.getItem(CLAVE_PASE);
+}
+
 export function olvidarToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(CLAVE_PASE);
