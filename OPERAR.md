@@ -77,11 +77,12 @@ nunca depende de que alguien se acordara de sincronizar.
 - **Exigir correo para que alguien entre.** Quien no tiene correo usable entra
   con carnet QR o PIN, y su ficha vive sin cuenta.
 - **Propagar `is_super_admin` automáticamente.** Se concede a mano, mirando.
-- **Dejar un club sin nadie que lo mande.** Ya pasó: una ✕ en el panel sacó al
-  MAESTRO de su propio club, y el club se quedó sin quien editara su ficha,
-  repartiera su código o mirara a su gente — su maestro incluido, porque el
-  permiso cuelga de esa misma fila. Hoy lo impide el servidor (§4.7-bis); si
-  hace falta cerrar un club de verdad, **primero se desactiva**.
+- **Dejar a alguien fuera de lo que administra, y menos a sí mismo.** Ya pasó:
+  una ✕ en el panel sacó al MAESTRO de su propio club, y el club se quedó sin
+  quien editara su ficha, repartiera su código o mirara a su gente — su maestro
+  incluido, porque el permiso cuelga de esa misma fila. Hoy lo impiden las dos
+  reglas del servidor (§4.7-bis), **en las tres aplicaciones**; si hace falta
+  cerrar un club de verdad, **primero se desactiva**.
 - **Romper el modo local de Campeonatos.** Sin internet, sin ecosistema, tiene
   que arrancar igual: es la marcha atrás del día del evento.
 
@@ -252,6 +253,12 @@ Quitar a un miembro **borra** su fila de `org_members`: no hay papelera. Y si el
 que salió era el maestro, el portal no lo arregla —el alta es una invitación que
 él mismo tendría que mandar, y acaba de quedarse sin panel—. Lo fiel de verdad
 es el respaldo (§2.5); esto es para cuando no lo hay.
+
+El nombre se puede teclear **sin tildes** («condor cucuta» encuentra «Cóndor
+Cúcuta»): las dos mitades se aplanan, la búsqueda aquí y la columna allí con
+`translate()`. Si aun así no cuadra nada, el error **enseña la lista** de lo que
+hay con sus ids, para copiar el bueno y repetir con `--club <id>` — que es el
+cruce exacto y el que conviene usar cuando algo se resiste.
 
 > Después de restaurarlo, **tiene que volver a entrar**: el rol viaja dentro del
 > token y el suyo sigue siendo el de antes hasta que caduque (30 min) o cierre
@@ -608,31 +615,59 @@ conviene tener escritas:
 
 Para comprobar que el canal está vivo: §2.6-bis.
 
-## 4.7-bis El último que manda en un club no se puede quitar
+## 4.7-bis Nadie se queda sin quien mande, y nadie se echa a sí mismo
 
 `org_members` es lo que decide quién administra una organización: el rol
 `maestro`, `owner` o `admin` en esa fila. Todo cuelga de ahí — el panel de «Mi
 organización», la ficha del club, el código de entrada, la lista de gente.
 
-Así que **si esa fila se borra, el club se queda huérfano**, y quien lo nota
-primero es su propio maestro: entra al portal y ya no gestiona nada. Y no se
-arregla solo, porque el alta de miembros ya no mete a nadie a mano — es una
-invitación que la persona acepta, y quien tendría que mandarla es él.
+Así que **si esa fila se borra, quien la pierde se queda fuera en el acto**, y
+si era la única de mando, el club entero queda huérfano. Y no se arregla solo:
+el alta de miembros ya no mete a nadie a mano —es una invitación que la persona
+acepta— y quien tendría que mandarla es justamente el que acaba de salir.
 
-Por eso la regla está en el SERVICIO y no en la pantalla
-(`OrganizationsService.exigirQueNoSeQuedeSinGestor`): a `org_members` se entra
-por tres puertas —la ✕, el desplegable de rol y el panel de Accesos— y
-cualquiera de las tres dejaba el club sin nadie.
+Son **dos reglas**, y ninguna se deduce de la otra:
 
-- Quitar o degradar al **último** gestor propio de una organización → **409**,
-  con el mensaje diciendo qué hacer.
+| | Qué prohíbe | A quién protege |
+|---|---|---|
+| **1 · A sí mismo, nunca** | Quitarte o degradarte tú, en una organización que administras. Aunque queden otros diez administradores | A la **persona**, de sí misma: pierde su club de un clic y no puede deshacerlo |
+| **2 · El último, tampoco** | Que nadie —ni el super-admin, ni el admin de la federación— deje una organización sin ningún gestor propio | A la **organización**, de cualquiera |
+
+La regla 1 es la del **dueño del plan**: el que compró la suscripción y tiene los
+permisos no puede echarse de lo que paga. La 2 no la cubría, porque un club con
+un maestro y un auxiliar-admin no se quedaba huérfano — pero el maestro sí se
+quedaba fuera.
+
+Viven en el SERVICIO y no en la pantalla
+(`OrganizationsService.exigirQueNoSeRompaElMando`) porque a `org_members` se
+entra por tres puertas —la ✕, el desplegable de rol y el panel de Accesos— y
+cualquiera de las tres hacía el mismo daño. Las dos responden **409** con el
+mensaje diciendo qué hacer.
+
 - Solo cuentan los gestores **propios**. El admin de la federación padre PUEDE
   gestionar el club (§4.2), pero un club cuyo único gestor vive en la federación
   es un club huérfano igual.
-- **La salida:** sobre una organización **desactivada** la regla se levanta.
+- Pasar de `maestro` a `admin` sí se puede, también a uno mismo: los dos mandan.
+- **La salida:** sobre una organización **desactivada** las dos se levantan.
   Cerrar un club es desactivarlo, vaciarlo y borrarlo — tres pasos a propósito,
   porque `remove()` exige que esté vacío y sin esta puerta no se podría cerrar
   ninguno.
+
+### Lo mismo en las otras dos
+
+El agujero era el mismo en las tres, con distinto nombre. Membresías y Academy
+ya cerraban el «me elimino», pero **ninguna cerraba el «me degrado»**, que es la
+misma puerta: el rol es lo que abre el panel, así que ponerse el de alumno se
+cierra la administración igual de rápido y con la misma marcha atrás (ninguna).
+
+| App | Dónde | Qué se cerró |
+|---|---|---|
+| Ecosistema | `organizations.service.ts` | Quitarse **y** degradarse, más la regla del último |
+| Membresías | `routes/users.ts`, `PATCH /users/:id` | Cambiarse el rol a uno mismo. Desactivarse y borrarse ya estaban. El superadmin sí puede, porque tiene cómo deshacerlo |
+| Academy | `routes/admin.ts`, `PATCH /admin/users/:id` | Quitarse el `localRole` de `admin`. Suspenderse y eliminarse ya estaban |
+
+> **Membresías se despliega aparte** (§2.4) y su código vive en
+> `D:\Repositorios\dinamyt-membresias` — nunca en `productos/membresias` (§1.1).
 
 Y como red aparte, cada baja y cada ascenso quedan escritos en el registro del
 servicio (`Baja: … sale de … (era maestro; lo hace …)`), que es lo único que
@@ -712,6 +747,11 @@ La regla para decidir: **¿lo nota alguien que no está delante de esta
 pantalla?** Si sí, se pregunta. Crear cosas nuevas no se pregunta, porque lo que
 se crea de más se borra.
 
+Y lo que el servidor no va a dejar hacer, la pantalla **no lo ofrece**: en tu
+propia fila de la lista de gente no hay ✕ y el desplegable de rol va bloqueado,
+con una insignia «Tú» y el motivo en el `title` (§4.7-bis). Un botón que existe
+para contestar que no se puede es peor que no tenerlo.
+
 ## 4.10 El mapa de la API del ecosistema
 
 El contrato que consumen las apps —lo único que no se puede cambiar sin avisar a
@@ -767,7 +807,7 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 | `GET /mi-club` · `POST /mi-club` | sesión | Ver mi club · fundar el mío |
 | `GET /mias` · `PATCH /:id` · `GET /:id/members` | gestor | Lo que administro |
 | `POST /:id/invite` | super-admin | Alta directa, sin preguntar (§4.4) |
-| `PATCH` y `DELETE /:id/members/:userId` | gestor | Cambiar rol · quitar. **409 si es el último que manda** (§4.7-bis) |
+| `PATCH` y `DELETE /:id/members/:userId` | gestor | Cambiar rol · quitar. **409 si te lo haces a ti mismo, o si es el último que manda** (§4.7-bis) |
 | `GET /clubes` · `POST /:id/invitar-club` · `GET /invitaciones-club/mias` | varios | Federación ↔ club |
 
 ### `/subscriptions` y `/subscription-plans`

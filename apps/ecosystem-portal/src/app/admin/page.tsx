@@ -76,6 +76,9 @@ export default function AdminEcosistemaPage() {
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const { confirmar, dialogo } = useConfirmar();
+  // Quién está mirando. Ni el super-admin se saca a sí mismo de una
+  // organización que administra: perdería su panel igual que cualquiera.
+  const [yo, setYo] = useState<string | null>(null);
 
   // Formularios
   const [nuevaOrg, setNuevaOrg] = useState({ name: '', type: 'CLUB' as (typeof TIPOS_ORG)[number], city: '', country: 'Colombia' });
@@ -108,6 +111,7 @@ export default function AdminEcosistemaPage() {
       return;
     }
     setAutorizado(true);
+    setYo(payload.sub);
     cargar().catch((e) =>
       setMsg({ tipo: 'error', texto: extraerError(e, 'No se pudo cargar el panel.') }),
     );
@@ -363,6 +367,7 @@ export default function AdminEcosistemaPage() {
                     miembro={m}
                     asignables={ROLES_SUPERADMIN}
                     ocupado={ocupado}
+                    esUnoMismo={m.userId === yo}
                     onCambiarRol={(rol) =>
                       void confirmarYHacer(
                         {
@@ -379,6 +384,15 @@ export default function AdminEcosistemaPage() {
                       )
                     }
                     acciones={
+                      m.userId === yo ? (
+                        <span
+                          className="text-xs"
+                          style={{ color: 'var(--text-muted)' }}
+                          title="No puedes sacarte a ti mismo de una organización que administras: perderías su panel y no podrías devolvértelo."
+                        >
+                          —
+                        </span>
+                      ) : (
                       <button
                         onClick={() =>
                           void confirmarYHacer(
@@ -402,6 +416,7 @@ export default function AdminEcosistemaPage() {
                       >
                         ✕
                       </button>
+                      )
                     }
                   />
                 ))}

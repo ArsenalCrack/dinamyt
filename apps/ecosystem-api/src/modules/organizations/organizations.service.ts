@@ -85,7 +85,7 @@ export class OrganizationsService {
   ) {}
 
   /**
-   * ── Un club no se queda sin quien lo mande ────────────────────────────────
+   * ── Nadie se queda sin quien mande, y nadie se echa a sí mismo ────────────
    *
    * **Esto existe porque ya pasó.** Desde el panel, un clic en la ✕ de una fila
    * sacó al MAESTRO de su propio club: una fila menos en `org_members` y, en
@@ -100,34 +100,54 @@ export class OrganizationsService {
    * invitarlo es justamente el maestro que acaba de quedarse fuera. Sin el
    * super-admin, el club se queda huérfano para siempre.
    *
-   * Así que la regla es de la BASE, no de la pantalla: **la última persona que
-   * manda en una organización no se puede quitar ni degradar.** Vale para la ✕
-   * y para el desplegable de rol, para el maestro y para el super-admin, y da
-   * igual desde qué panel se pulse.
+   * Así que la regla es del SERVICIO, no de la pantalla. Son dos, y no sobra
+   * ninguna:
+   *
+   * **1 · A sí mismo, nunca.** Quien manda en una organización no puede
+   * quitarse ni degradarse. Da igual que queden otros diez administradores: el
+   * daño no es que la organización se quede sin nadie, es que **quien pulsa
+   * pierde su propio club en el acto y no puede deshacerlo** — el permiso para
+   * volver a entrar era justo el que acaba de borrar. Es el dueño del plan
+   * quedándose fuera de lo que paga, con un clic y sin marcha atrás.
+   *
+   * **2 · El último, tampoco.** Aunque lo haga otra persona con permiso —el
+   * super-admin, el admin de la federación—, dejar una organización sin ningún
+   * gestor propio la deja huérfana.
+   *
+   * La 1 no se deduce de la 2 ni al revés: la primera protege a la PERSONA de
+   * sí misma; la segunda protege a la ORGANIZACIÓN de cualquiera.
+   *
+   * ── Quién puede entonces ──
+   *
+   * Otro gestor de la organización, o el super-admin. Es a propósito: sacar a
+   * alguien del mando lo decide alguien que se queda dentro para verlo.
    *
    * ── La salida, que la hay ──
    *
    * Un club se cierra de verdad alguna vez, y `remove()` exige que esté vacío
-   * — con esta regla y sin puerta, vaciarlo sería imposible. La puerta es
-   * DESACTIVARLO primero: sobre una organización inactiva la regla se levanta.
-   * Es un acto aparte, deliberado y reversible, y deja el cierre en dos pasos
-   * en vez de en un clic.
+   * — con estas reglas y sin puerta, vaciarlo sería imposible. La puerta es
+   * DESACTIVARLO primero: sobre una organización inactiva las dos se levantan.
+   * Es un acto aparte, deliberado y reversible, y deja el cierre en tres pasos
+   * —desactivar, vaciar, borrar— en vez de en un clic.
    *
    * ── Lo que NO mira ──
    *
-   * Solo cuenta los gestores PROPIOS de la organización, no los heredados.
-   * `esGestorDe` da permiso al admin de la federación sobre sus clubes
-   * afiliados, y eso está bien para PODER hacer las cosas; pero un club cuyo
-   * único gestor vive en la federación es un club huérfano igual — su maestro
-   * no puede entrar a su propio panel.
+   * Para la regla 2 solo cuentan los gestores PROPIOS de la organización, no
+   * los heredados. `esGestorDe` da permiso al admin de la federación sobre sus
+   * clubes afiliados, y eso está bien para PODER hacer las cosas; pero un club
+   * cuyo único gestor vive en la federación es un club huérfano igual — su
+   * maestro no puede entrar a su propio panel.
    *
    * @param rolNuevo el rol que tendría después; `null` si se va de la
    *   organización.
+   * @param porUserId quién lo está haciendo. Sin él, la regla 1 no se puede
+   *   comprobar, así que **todas las puertas tienen que pasarlo**.
    */
-  private async exigirQueNoSeQuedeSinGestor(
+  private async exigirQueNoSeRompaElMando(
     orgId: string,
     userId: string,
     rolNuevo: string | null,
+    porUserId?: string,
   ) {
     const [fila] = await db
       .select({ role: orgMembers.role })
@@ -136,7 +156,7 @@ export class OrganizationsService {
       .limit(1);
     // No es miembro: el 404 lo da quien llama, que sabe decirlo mejor.
     if (!fila) return;
-    // No mandaba, o va a seguir mandando: la organización no pierde a nadie.
+    // No mandaba, o va a seguir mandando: no se rompe nada.
     if (!esRolGestor(fila.role)) return;
     if (esRolGestor(rolNuevo)) return;
 
@@ -148,6 +168,23 @@ export class OrganizationsService {
     // Desactivada: se está cerrando a propósito y hay que poder vaciarla.
     if (org?.isActive === false) return;
 
+    const donde = org?.name ? `«${org.name}»` : 'la organización';
+
+    // ── Regla 1 · a sí mismo, nunca ──────────────────────────────────────────
+    if (porUserId && porUserId === userId) {
+      throw new ConflictException(
+        rolNuevo
+          ? `No puedes quitarte a ti mismo el mando de ${donde}: perderías su ` +
+              `panel en el acto y no podrías devolvértelo. Pídeselo a otra ` +
+              `persona que administre ${donde}, o al super administrador.`
+          : `No puedes sacarte a ti mismo de ${donde}: perderías su panel en el ` +
+              `acto y no podrías volver a entrar por tu cuenta. Si de verdad ` +
+              `quieres salir, que te saque otra persona que administre ${donde}, ` +
+              `o el super administrador.`,
+      );
+    }
+
+    // ── Regla 2 · el último, tampoco ─────────────────────────────────────────
     const [otro] = await db
       .select({ id: orgMembers.id })
       .from(orgMembers)
@@ -161,7 +198,6 @@ export class OrganizationsService {
       .limit(1);
     if (otro) return;
 
-    const donde = org?.name ? `«${org.name}»` : 'la organización';
     throw new ConflictException(
       rolNuevo
         ? `Es la única persona que manda en ${donde}: si le quitas el mando, ` +
@@ -567,7 +603,12 @@ export class OrganizationsService {
       // Aquí también se degrada a alguien: el panel de Accesos escribe el mismo
       // `role` que el desplegable, y por esta puerta entraba sin pasar por la
       // regla del último gestor.
-      await this.exigirQueNoSeQuedeSinGestor(orgId, user.id, role);
+      await this.exigirQueNoSeRompaElMando(
+        orgId,
+        user.id,
+        role,
+        invitedByUserId,
+      );
       await db
         .update(orgMembers)
         .set({ role })
@@ -693,7 +734,7 @@ export class OrganizationsService {
     role: string,
     porUserId?: string,
   ) {
-    await this.exigirQueNoSeQuedeSinGestor(orgId, userId, role);
+    await this.exigirQueNoSeRompaElMando(orgId, userId, role, porUserId);
     const result = await db
       .update(orgMembers)
       .set({ role })
@@ -714,7 +755,7 @@ export class OrganizationsService {
 
   // ── Quitar un miembro de la organización ──────────────────────────────────
   async removeMember(orgId: string, userId: string, porUserId?: string) {
-    await this.exigirQueNoSeQuedeSinGestor(orgId, userId, null);
+    await this.exigirQueNoSeRompaElMando(orgId, userId, null, porUserId);
     const result = await db
       .delete(orgMembers)
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))

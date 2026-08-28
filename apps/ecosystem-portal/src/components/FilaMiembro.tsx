@@ -36,6 +36,14 @@ import type { Miembro } from '@/lib/api';
  *
  * Con `@container` la fila se mide a sí misma. Estrecha, apila; ancha, pone los
  * controles al lado. Da igual en cuántas columnas la metan.
+ *
+ * ── La fila de uno mismo ──
+ *
+ * Se pinta distinta a propósito. El servidor ya impide que quien manda en una
+ * organización se quite o se degrade —perdería su panel en el acto y no podría
+ * deshacerlo—, pero una pantalla que ofrece un botón y luego contesta que no se
+ * puede es una pantalla que miente. Aquí el desplegable de rol va bloqueado y
+ * el botón de quitar no se dibuja: lo que no se puede hacer no se enseña.
  */
 
 /** Un rol de app, solo si la persona participa en ella. */
@@ -54,6 +62,7 @@ export function FilaMiembro({
   onCambiarRol,
   ocupado,
   acciones,
+  esUnoMismo = false,
 }: {
   miembro: Miembro;
   /** Roles que ESTA pantalla puede asignar. El actual se añade solo. */
@@ -62,9 +71,15 @@ export function FilaMiembro({
   ocupado?: boolean;
   /** Botones propios de cada pantalla (editar perfil, quitar…). */
   acciones?: ReactNode;
+  /** ¿Esta fila es la de quien está mirando la pantalla? */
+  esUnoMismo?: boolean;
 }) {
   const m = miembro;
   const tieneApps = Boolean(m.roleMembresias || m.roleCampeonatos || m.roleAcademy);
+  // Quien manda no se toca a sí mismo. A un alumno mirándose no le estorba
+  // nada, pero tampoco tiene nada que cambiarse: se bloquea igual y así la
+  // regla es una sola y se entiende de un vistazo.
+  const bloqueado = Boolean(ocupado) || esUnoMismo;
 
   return (
     <li
@@ -80,6 +95,14 @@ export function FilaMiembro({
         <div className="min-w-0">
           <p className="truncate font-semibold" title={m.fullName}>
             {m.fullName}
+            {esUnoMismo && (
+              <span
+                className="badge badge-gold ml-1.5 align-middle"
+                title="Eres tú: tu propio rol no lo cambias desde aquí"
+              >
+                Tú
+              </span>
+            )}
           </p>
           <p
             className="truncate text-xs"
@@ -109,18 +132,33 @@ export function FilaMiembro({
             campos un ancho del 100 %, pensada para los formularios de una
             columna; dentro de una fila estiraría hasta empujar los botones
             fuera de la tarjeta. */}
-        <SelectMenu
-          valor={m.role}
-          onChange={onCambiarRol}
-          opciones={opcionesDeRol(m.role, asignables).map((r) => ({
-            valor: r,
-            etiqueta: nombreRol(r),
-          }))}
-          etiquetaAria={`Rol de ${m.fullName} en la organización`}
-          disabled={ocupado}
-          style={{ width: 'auto', minWidth: '9.5rem' }}
-          botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
-        />
+        {/* El `title` va en el envoltorio y no en el `SelectMenu`: el
+            componente no recibe uno, y un control bloqueado sin explicación es
+            justo el que hace pensar que la aplicación está rota. */}
+        <span
+          title={
+            esUnoMismo
+              ? 'Tu propio rol no lo cambias tú: pídeselo a otra persona que administre la organización, o al super administrador.'
+              : undefined
+          }
+        >
+          <SelectMenu
+            valor={m.role}
+            onChange={onCambiarRol}
+            opciones={opcionesDeRol(m.role, asignables).map((r) => ({
+              valor: r,
+              etiqueta: nombreRol(r),
+            }))}
+            etiquetaAria={
+              esUnoMismo
+                ? `Tu rol en la organización (${nombreRol(m.role)}); no lo puedes cambiar tú`
+                : `Rol de ${m.fullName} en la organización`
+            }
+            disabled={bloqueado}
+            style={{ width: 'auto', minWidth: '9.5rem' }}
+            botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+          />
+        </span>
         {acciones}
       </div>
       </div>

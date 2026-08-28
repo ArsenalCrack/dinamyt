@@ -1,16 +1,22 @@
 /**
- * La regla del último gestor: un club no se queda sin quien lo mande.
+ * Las dos reglas que sostienen el mando de una organización.
  *
- * Se prueba aparte porque el fallo que la motivó no dejaba rastro. Un clic en
+ * Se prueban aparte porque el fallo que las motivó no dejaba rastro. Un clic en
  * la ✕ del panel sacó al MAESTRO de su propio club: el borrado salió bien, no
  * hubo error que leer, y el club quedó sin nadie que pudiera administrarlo —su
- * maestro incluido, porque el permiso cuelga de esa misma fila—. La regla vive
- * en el servicio y no en la pantalla justamente por eso: entra por tres puertas
+ * maestro incluido, porque el permiso cuelga de esa misma fila—. Viven en el
+ * servicio y no en la pantalla justamente por eso: se entra por tres puertas
  * (la ✕, el desplegable de rol y el panel de Accesos) y cualquiera de las tres
- * lo dejaba huérfano.
+ * hacía el mismo daño.
  *
- * Los casos de abajo son las dos mitades: qué se prohíbe, y por dónde se sale
- * cuando el club de verdad se cierra.
+ *   1 · **A sí mismo, nunca.** Aunque queden otros diez administradores: quien
+ *       pulsa pierde su club en el acto y no puede deshacerlo.
+ *   2 · **El último, tampoco.** Aunque lo haga otra persona con permiso: la
+ *       organización se queda huérfana.
+ *
+ * Ninguna se deduce de la otra —la primera protege a la persona de sí misma, la
+ * segunda a la organización de cualquiera— y por eso hay casos de las dos, más
+ * los de la puerta por la que se sale cuando el club de verdad se cierra.
  */
 
 // La capa de datos se sustituye entera: aquí se prueban las DECISIONES del
@@ -164,6 +170,88 @@ describe('Quitar a un miembro', () => {
     await expect(service.removeMember(CLUB, OTRO)).rejects.toThrow(
       /no es miembro/i,
     );
+  });
+});
+
+describe('Quitarse a uno mismo', () => {
+  /**
+   * El caso que la 2 no cubre: el club tiene OTRO administrador, así que no se
+   * queda huérfano — pero el maestro que pulsa se queda fuera de su propio club
+   * y sin forma de volver, porque el permiso que necesitaría es el que acaba de
+   * borrar.
+   */
+  it('el maestro no se saca a sí mismo, ni con otro admin en el club', async () => {
+    const { service, cuenta } = armar(
+      respuestas({ rol: 'maestro', hayOtro: true }),
+    );
+    await expect(service.removeMember(CLUB, MAESTRO, MAESTRO)).rejects.toThrow(
+      ConflictException,
+    );
+    expect(cuenta.borradas).toBe(0);
+  });
+
+  it('el mensaje le dice a quién pedírselo', async () => {
+    const { service } = armar(respuestas({ rol: 'maestro', hayOtro: true }));
+    await expect(service.removeMember(CLUB, MAESTRO, MAESTRO)).rejects.toThrow(
+      /que te saque otra persona|super administrador/i,
+    );
+  });
+
+  it('tampoco se degrada a sí mismo a alumno', async () => {
+    const { service, cuenta } = armar(
+      respuestas({ rol: 'maestro', hayOtro: true }),
+    );
+    await expect(
+      service.updateMemberRole(CLUB, MAESTRO, 'competitor', MAESTRO),
+    ).rejects.toThrow(ConflictException);
+    expect(cuenta.escrituras).toBe(0);
+  });
+
+  it('pero sí puede pasarse de maestro a admin: sigue mandando', async () => {
+    const { service, cuenta } = armar(
+      respuestas({ rol: 'maestro', hayOtro: true }),
+      [{ id: 'fila', role: 'admin' }],
+    );
+    await expect(
+      service.updateMemberRole(CLUB, MAESTRO, 'admin', MAESTRO),
+    ).resolves.toMatchObject({ role: 'admin' });
+    expect(cuenta.escrituras).toBe(1);
+  });
+
+  /** Sacar a otro es lo normal: la regla es sobre uno mismo, no sobre el rol. */
+  it('a OTRA persona sí la saca, y por eso la regla no estorba', async () => {
+    const { service, cuenta } = armar(
+      respuestas({ rol: 'maestro', hayOtro: true }),
+      [{ id: 'fila', role: 'maestro' }],
+    );
+    await expect(service.removeMember(CLUB, MAESTRO, OTRO)).resolves.toEqual({
+      ok: true,
+    });
+    expect(cuenta.borradas).toBe(1);
+  });
+
+  it('un alumno que se va no rompe nada: la regla es sobre el mando', async () => {
+    const { service, cuenta } = armar(respuestas({ rol: 'student' }), [
+      { id: 'fila', role: 'student' },
+    ]);
+    await expect(service.removeMember(CLUB, OTRO, OTRO)).resolves.toEqual({
+      ok: true,
+    });
+    expect(cuenta.borradas).toBe(1);
+  });
+
+  /** La misma puerta de siempre: un club desactivado se está cerrando. */
+  it('sobre un club DESACTIVADO sí puede salirse solo', async () => {
+    const { service, cuenta } = armar(
+      respuestas({ rol: 'maestro', activo: false, hayOtro: true }),
+      [{ id: 'fila', role: 'maestro' }],
+    );
+    await expect(service.removeMember(CLUB, MAESTRO, MAESTRO)).resolves.toEqual(
+      {
+        ok: true,
+      },
+    );
+    expect(cuenta.borradas).toBe(1);
   });
 });
 

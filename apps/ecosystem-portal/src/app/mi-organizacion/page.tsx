@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   obtenerToken,
+  sesionActual,
   misOrganizacionesAPI,
   crearClubHijoAPI,
   setOrgActivaAPI,
@@ -67,6 +68,10 @@ export default function MiOrganizacionPage() {
   const [ocupado, setOcupado] = useState(false);
   const [cargando, setCargando] = useState(true);
   const { confirmar, dialogo } = useConfirmar();
+  // Quién está mirando. Su propia fila no lleva ✕ ni desplegable de rol: el
+  // servidor no le dejaría quitarse el mando y una pantalla que ofrece lo que
+  // luego rechaza es peor que una que no lo ofrece.
+  const yo = sesionActual()?.sub ?? null;
 
   const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: '' });
 
@@ -621,6 +626,7 @@ export default function MiOrganizacionPage() {
               miembro={m}
               asignables={rolesPermitidos}
               ocupado={ocupado}
+              esUnoMismo={m.userId === yo}
               onCambiarRol={(rol) =>
                 void confirmarYHacer(
                   {
@@ -648,6 +654,15 @@ export default function MiOrganizacionPage() {
                   >
                     ✎ Perfil
                   </Link>
+                  {m.userId === yo ? (
+                    <span
+                      className="text-xs"
+                      style={{ color: 'var(--text-muted)' }}
+                      title="No puedes sacarte de tu propio club. Si de verdad quieres salir, que te saque otra persona que lo administre, o el super administrador."
+                    >
+                      —
+                    </span>
+                  ) : (
                   <button
                     onClick={() =>
                       void confirmarYHacer(
@@ -671,6 +686,7 @@ export default function MiOrganizacionPage() {
                   >
                     ✕
                   </button>
+                  )}
                 </>
               }
             />

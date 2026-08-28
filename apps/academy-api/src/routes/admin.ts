@@ -76,14 +76,26 @@ export async function adminRoutes(app: FastifyInstance) {
         .where(eq(academyUsers.id, id))
         .limit(1);
       if (!objetivo) return reply.code(404).send({ error: 'Usuario no encontrado.' });
-      // Un admin no puede dejarse a sí mismo fuera de Academy.
-      if (
-        objetivo.ecosystemUserId === req.user!.sub &&
-        (body.suspended === true || body.eliminar)
-      ) {
+      // ── Un admin no puede dejarse a sí mismo fuera de Academy ─────────────
+      //
+      // Suspenderse y eliminarse ya estaban cerrados. **Degradarse no**, y es
+      // la misma puerta con otro nombre: `localRole` es lo que abre este panel
+      // (`requireAcademy(['admin'])`), así que ponerse `student` a uno mismo se
+      // cierra la administración en el acto y sin forma de deshacerlo — el
+      // permiso que haría falta para volver es justo el que se acaba de quitar.
+      // El mismo agujero que se tapó en el ecosistema para `org_members`.
+      const aSiMismo = objetivo.ecosystemUserId === req.user!.sub;
+      if (aSiMismo && (body.suspended === true || body.eliminar)) {
         return reply
           .code(422)
           .send({ error: 'No puedes suspenderte ni eliminarte a ti mismo.' });
+      }
+      if (aSiMismo && body.localRole !== undefined && body.localRole !== 'admin') {
+        return reply.code(422).send({
+          error:
+            'No puedes quitarte a ti mismo el rol de administrador: perderías ' +
+            'este panel y no podrías devolvértelo. Pídeselo a otro administrador.',
+        });
       }
 
       const [usuario] = await db

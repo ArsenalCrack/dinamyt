@@ -35,11 +35,27 @@ export const ROL_EN_MEMBRESIAS = {
 export const ROLES_GESTOR = ['admin', 'owner', 'maestro'];
 
 /**
+ * Las tildes que se aplanan y en qué se aplanan. **Los dos del mismo largo**:
+ * `translate()` los empareja carácter a carácter.
+ */
+export const CON_TILDE = 'áàäâãéèëêíìïîóòöôõúùüûñç';
+export const SIN_TILDE = 'aaaaaeeeeiiiiooooouuuunc';
+
+/**
  * Sin tildes, sin dobles espacios y en minúsculas.
  *
- * Ojo: normaliza LO QUE SE BUSCA, no lo que hay en la base —ahí se compara con
- * `lower()` a secas—. Buscar «martinez» no encuentra a «Martínez»; el correo o
- * el id no fallan nunca, y son lo que conviene usar.
+ * ── Por qué las comparaciones llevan `translate()` al lado ──
+ *
+ * Esto aplana LO QUE SE BUSCA. Si la base se compara con `lower()` a secas, el
+ * resultado es peor que no normalizar nada: buscar «Hapkido del Condor Cúcuta»
+ * se convierte en «...cucuta», que ya no cuadra con el «Cúcuta» que hay
+ * guardado — y el guion contesta «ninguna organización cuadra» sobre una
+ * organización que existe. Pasó a la primera.
+ *
+ * Por eso las dos mitades se aplanan: aquí con `normalize('NFD')` y allí con
+ * `translate(lower(...), CON_TILDE, SIN_TILDE)`. Se usa `translate` y no la
+ * extensión `unaccent` porque `unaccent` hay que instalarla, y un guion de
+ * reparación no puede depender de que alguien se acordara.
  */
 export const clave = (v) =>
   String(v ?? '')
@@ -63,6 +79,30 @@ async function gestoresDe(tx, orgId) {
      WHERE m.org_id = ${orgId} AND m.role IN ${tx(ROLES_GESTOR)}
      ORDER BY u.full_name
   `;
+}
+
+/** Las palabras de tres letras para arriba. «del», «de», «la» no distinguen nada. */
+const palabrasDe = (texto) => clave(texto).split(' ').filter((p) => p.length >= 3);
+
+/**
+ * Cuando no cuadra nada, enseñar lo que SÍ hay.
+ *
+ * Un «no cuadra» a secas deja al que lo lee adivinando si escribió mal el
+ * nombre, si el club se llama de otra forma o si de verdad no existe. Con la
+ * lista delante, las tres preguntas se contestan solas.
+ *
+ * Se ordena por cuántas palabras comparte, y si no comparte ninguna se enseña
+ * el principio de la lista igual: en un despliegue real son unas pocas docenas.
+ */
+function ordenarPorParecido(filas, buscado) {
+  const palabras = palabrasDe(buscado);
+  return filas
+    .map((f) => ({
+      fila: f,
+      puntos: palabras.filter((p) => clave(f.name ?? f.full_name).includes(p)).length,
+    }))
+    .sort((a, b) => b.puntos - a.puntos)
+    .map((x) => x.fila);
 }
 
 /**
@@ -91,12 +131,28 @@ export async function restaurar(tx, opciones) {
      WHERE lower(email) = ${b}
         OR lower(document_id) = ${b}
         OR (${UUID.test(buscadoPersona)} AND id::text = ${buscadoPersona})
-        OR lower(full_name) LIKE ${'%' + b + '%'}
+        OR translate(lower(full_name), ${CON_TILDE}, ${SIN_TILDE}) LIKE ${'%' + b + '%'}
      LIMIT 25
   `;
 
   if (personas.length === 0) {
-    throw new NoSePuede(`Nadie cuadra con «${buscadoPersona}».`);
+    const cerca = await tx`
+      SELECT id, email, full_name
+        FROM ecosystem.users
+       ORDER BY full_name
+       LIMIT 60
+    `;
+    const sugeridas = ordenarPorParecido(cerca, buscadoPersona).slice(0, 10);
+    throw new NoSePuede(
+      `Nadie cuadra con «${buscadoPersona}».` +
+        (sugeridas.length
+          ? '\n  Por si acaso, algunas de las que hay:\n' +
+            sugeridas
+              .map((p) => `    ${p.full_name} · ${p.email ?? 'sin correo'} · ${p.id}`)
+              .join('\n') +
+            '\n  Si no está, búscala por correo o por documento.'
+          : ''),
+    );
   }
   if (personas.length > 1) {
     throw new NoSePuede(
@@ -116,12 +172,28 @@ export async function restaurar(tx, opciones) {
       FROM ecosystem.organizations
      WHERE lower(slug) = ${c}
         OR (${UUID.test(buscadoClub)} AND id::text = ${buscadoClub})
-        OR lower(name) LIKE ${'%' + c + '%'}
+        OR translate(lower(name), ${CON_TILDE}, ${SIN_TILDE}) LIKE ${'%' + c + '%'}
      LIMIT 25
   `;
 
   if (clubes.length === 0) {
-    throw new NoSePuede(`Ninguna organización cuadra con «${buscadoClub}».`);
+    const cerca = await tx`
+      SELECT id, name, slug, type
+        FROM ecosystem.organizations
+       ORDER BY name
+       LIMIT 60
+    `;
+    const sugeridas = ordenarPorParecido(cerca, buscadoClub).slice(0, 15);
+    throw new NoSePuede(
+      `Ninguna organización cuadra con «${buscadoClub}».` +
+        (sugeridas.length
+          ? '\n  Estas son las que hay (las más parecidas primero):\n' +
+            sugeridas
+              .map((o) => `    ${o.name} · ${o.slug ?? 'sin slug'} · ${o.type} · ${o.id}`)
+              .join('\n') +
+            '\n  Copia el id de la buena y repite con --club <id>.'
+          : ''),
+    );
   }
   if (clubes.length > 1) {
     throw new NoSePuede(

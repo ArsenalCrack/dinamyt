@@ -94,17 +94,17 @@ const tx = adaptador(pg);
 console.log('\n2. Un club con su maestro y su alumna');
 const [club] = await tx`
   INSERT INTO ecosystem.organizations (name, slug, type)
-  VALUES ('Club de Pablo', 'club-de-pablo', 'CLUB')
+  VALUES ('Hapkido del Cóndor Cúcuta', 'club-de-pablo', 'CLUB')
   RETURNING id
 `;
 const [otroClub] = await tx`
   INSERT INTO ecosystem.organizations (name, slug, type)
-  VALUES ('Club de Pablo Segundo', 'club-de-pablo-2', 'CLUB')
+  VALUES ('Hapkido del Cóndor Pamplona', 'club-de-pablo-2', 'CLUB')
   RETURNING id
 `;
 const [maestro] = await tx`
   INSERT INTO ecosystem.users (email, full_name)
-  VALUES ('pablo@ejemplo.com', 'Pablo Bustamante')
+  VALUES ('pablo@ejemplo.com', 'Pablo Bustamante Rodríguez')
   RETURNING id
 `;
 const [alumna] = await tx`
@@ -133,10 +133,14 @@ const huerfano = await tx`
 `;
 comprobar('el club se quedó sin nadie que lo mande', huerfano.length === 0);
 
-console.log('\n4. La restauración');
+console.log('\n4. La restauración, tecleándolo sin tildes');
+// Se teclea SIN tildes y con el nombre tal cual lo dice la gente. Este es el
+// caso que falló de verdad la primera vez: aplanar solo la búsqueda dejaba
+// «cucuta» sin cuadrar con el «Cúcuta» guardado, y el guion contestaba que la
+// organización no existía.
 const informe = await restaurar(tx, {
-  persona: 'pablo@ejemplo.com',
-  club: 'club-de-pablo',
+  persona: 'Pablo Bustamante',
+  club: 'Hapkido del Condor Cucuta',
   rol: 'maestro',
   desde: '2024-03-01',
 });
@@ -145,7 +149,7 @@ comprobar('antes no mandaba nadie', informe.gestoresAntes.length === 0);
 comprobar(
   'después manda Pablo',
   informe.gestoresDespues.length === 1 &&
-    informe.gestoresDespues[0].nombre === 'Pablo Bustamante' &&
+    informe.gestoresDespues[0].nombre === 'Pablo Bustamante Rodríguez' &&
     informe.gestoresDespues[0].rol === 'maestro',
   informe.gestoresDespues,
 );
@@ -185,7 +189,7 @@ console.log('\n6. Lo que NO hace por su cuenta');
 // Un nombre a medias que cuadra con dos clubes: no elige, se planta.
 let saltó = null;
 try {
-  await restaurar(tx, { persona: 'pablo@ejemplo.com', club: 'Club de Pablo' });
+  await restaurar(tx, { persona: 'pablo@ejemplo.com', club: 'Hapkido del Cóndor' });
 } catch (e) {
   saltó = e;
 }
@@ -236,6 +240,22 @@ try {
 comprobar(
   'a quien no existe lo dice claro',
   saltó instanceof NoSePuede && /Nadie cuadra/.test(saltó.message),
+  saltó?.message,
+);
+
+// Un «no cuadra» a secas deja adivinando si el nombre estaba mal escrito, si el
+// club se llama de otra forma o si de verdad no existe. La lista lo contesta.
+saltó = null;
+try {
+  await restaurar(tx, { persona: 'pablo@ejemplo.com', club: 'Dojang Inventado' });
+} catch (e) {
+  saltó = e;
+}
+comprobar(
+  'cuando no cuadra ningún club, el error trae la lista de los que hay',
+  saltó instanceof NoSePuede &&
+    /Hapkido del Cóndor Cúcuta/.test(saltó.message) &&
+    /--club <id>/.test(saltó.message),
   saltó?.message,
 );
 
