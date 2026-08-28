@@ -453,7 +453,12 @@ export class OrganizationsController {
     @CurrentUser() user: JwtPayload,
   ) {
     await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
-    return this.orgsService.updateMemberRole(orgId, userId, body.role);
+    return this.orgsService.updateMemberRole(
+      orgId,
+      userId,
+      body.role,
+      user.sub,
+    );
   }
 
   // ── DELETE /organizations/:id/members/:userId — quitar miembro ────────────
@@ -465,7 +470,7 @@ export class OrganizationsController {
     @CurrentUser() user: JwtPayload,
   ) {
     await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
-    return this.orgsService.removeMember(orgId, userId);
+    return this.orgsService.removeMember(orgId, userId, user.sub);
   }
 
   // ── GET /organizations/:id/members — listar miembros ──────────────────────

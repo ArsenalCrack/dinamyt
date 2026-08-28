@@ -1,7 +1,9 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
 import { db } from '../../db';
@@ -25,13 +27,14 @@ import {
   ilike,
   inArray,
   isNull,
+  ne,
   or,
 } from 'drizzle-orm';
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
 import { MailerService } from '../auth/mailer.service';
 import { espejarClub } from '../../common/espejo-membresias';
-import { ROLES_GESTOR } from '../../common/roles';
+import { ROLES_GESTOR, esRolGestor } from '../../common/roles';
 import { patronBusqueda } from '../../common/busqueda';
 
 // Quién puede GESTIONAR una organización (editar su ficha, invitar gente,
@@ -73,11 +76,103 @@ const NOMBRE_DE_ROL: Record<string, string> = {
 
 @Injectable()
 export class OrganizationsService {
+  private readonly log = new Logger(OrganizationsService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtTokenService,
     private readonly mailer: MailerService,
   ) {}
+
+  /**
+   * ── Un club no se queda sin quien lo mande ────────────────────────────────
+   *
+   * **Esto existe porque ya pasó.** Desde el panel, un clic en la ✕ de una fila
+   * sacó al MAESTRO de su propio club: una fila menos en `org_members` y, en
+   * ese mismo instante, un club sin nadie que pueda editar su ficha, repartir
+   * su código de entrada, responder a sus solicitudes ni mirar a su gente. Y su
+   * maestro, sin panel: `esGestorDe` cuelga de esa fila, así que al perderla
+   * dejó de gestionar el club que fundó. Nada avisó, nada falló, y no hubo
+   * ningún error que leer — el borrado salió perfecto.
+   *
+   * Recuperarlo tampoco es un clic: el alta de miembros del portal ya no mete a
+   * nadie a mano (es una invitación que la persona acepta), y quien tendría que
+   * invitarlo es justamente el maestro que acaba de quedarse fuera. Sin el
+   * super-admin, el club se queda huérfano para siempre.
+   *
+   * Así que la regla es de la BASE, no de la pantalla: **la última persona que
+   * manda en una organización no se puede quitar ni degradar.** Vale para la ✕
+   * y para el desplegable de rol, para el maestro y para el super-admin, y da
+   * igual desde qué panel se pulse.
+   *
+   * ── La salida, que la hay ──
+   *
+   * Un club se cierra de verdad alguna vez, y `remove()` exige que esté vacío
+   * — con esta regla y sin puerta, vaciarlo sería imposible. La puerta es
+   * DESACTIVARLO primero: sobre una organización inactiva la regla se levanta.
+   * Es un acto aparte, deliberado y reversible, y deja el cierre en dos pasos
+   * en vez de en un clic.
+   *
+   * ── Lo que NO mira ──
+   *
+   * Solo cuenta los gestores PROPIOS de la organización, no los heredados.
+   * `esGestorDe` da permiso al admin de la federación sobre sus clubes
+   * afiliados, y eso está bien para PODER hacer las cosas; pero un club cuyo
+   * único gestor vive en la federación es un club huérfano igual — su maestro
+   * no puede entrar a su propio panel.
+   *
+   * @param rolNuevo el rol que tendría después; `null` si se va de la
+   *   organización.
+   */
+  private async exigirQueNoSeQuedeSinGestor(
+    orgId: string,
+    userId: string,
+    rolNuevo: string | null,
+  ) {
+    const [fila] = await db
+      .select({ role: orgMembers.role })
+      .from(orgMembers)
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+      .limit(1);
+    // No es miembro: el 404 lo da quien llama, que sabe decirlo mejor.
+    if (!fila) return;
+    // No mandaba, o va a seguir mandando: la organización no pierde a nadie.
+    if (!esRolGestor(fila.role)) return;
+    if (esRolGestor(rolNuevo)) return;
+
+    const [org] = await db
+      .select({ name: organizations.name, isActive: organizations.isActive })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    // Desactivada: se está cerrando a propósito y hay que poder vaciarla.
+    if (org?.isActive === false) return;
+
+    const [otro] = await db
+      .select({ id: orgMembers.id })
+      .from(orgMembers)
+      .where(
+        and(
+          eq(orgMembers.orgId, orgId),
+          ne(orgMembers.userId, userId),
+          inArray(orgMembers.role, ROLES_GESTOR),
+        ),
+      )
+      .limit(1);
+    if (otro) return;
+
+    const donde = org?.name ? `«${org.name}»` : 'la organización';
+    throw new ConflictException(
+      rolNuevo
+        ? `Es la única persona que manda en ${donde}: si le quitas el mando, ` +
+            `nadie podrá administrarla. Nombra antes a otro maestro o ` +
+            `administrador, y después cámbiale el rol.`
+        : `Es la única persona que manda en ${donde}: al quitarla, nadie ` +
+            `podría administrarla —ni ella misma volver a entrar—. Nombra antes ` +
+            `a otro maestro o administrador. Si lo que quieres es cerrar ${donde}, ` +
+            `desactívala primero.`,
+    );
+  }
 
   // ── Crear organización ────────────────────────────────────────────────────
   async create(data: {
@@ -469,6 +564,10 @@ export class OrganizationsService {
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, user.id)))
       .limit(1);
     if (previa) {
+      // Aquí también se degrada a alguien: el panel de Accesos escribe el mismo
+      // `role` que el desplegable, y por esta puerta entraba sin pasar por la
+      // regla del último gestor.
+      await this.exigirQueNoSeQuedeSinGestor(orgId, user.id, role);
       await db
         .update(orgMembers)
         .set({ role })
@@ -585,7 +684,16 @@ export class OrganizationsService {
   // ── Cambiar el rol de un miembro ──────────────────────────────────────────
   // El rol de la membresía es el que viaja en el JWT como role_campeonatos /
   // role_academy cuando la org tiene una suscripción activa.
-  async updateMemberRole(orgId: string, userId: string, role: string) {
+  //
+  // `porUserId` es quien lo hace, y solo se usa para dejarlo escrito en el
+  // registro: un rol que cambió solo no se puede investigar.
+  async updateMemberRole(
+    orgId: string,
+    userId: string,
+    role: string,
+    porUserId?: string,
+  ) {
+    await this.exigirQueNoSeQuedeSinGestor(orgId, userId, role);
     const result = await db
       .update(orgMembers)
       .set({ role })
@@ -596,11 +704,17 @@ export class OrganizationsService {
         'Ese usuario no es miembro de la organización.',
       );
     }
+    if (esRolGestor(role)) {
+      this.log.log(
+        `Mando: ${userId} pasa a ${role} en ${orgId} (lo hace ${porUserId ?? '?'}).`,
+      );
+    }
     return result[0];
   }
 
   // ── Quitar un miembro de la organización ──────────────────────────────────
-  async removeMember(orgId: string, userId: string) {
+  async removeMember(orgId: string, userId: string, porUserId?: string) {
+    await this.exigirQueNoSeQuedeSinGestor(orgId, userId, null);
     const result = await db
       .delete(orgMembers)
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
@@ -610,6 +724,13 @@ export class OrganizationsService {
         'Ese usuario no es miembro de la organización.',
       );
     }
+    // La fila ya no existe: si esto hay que deshacerlo, este renglón es lo
+    // único que dice a quién, de dónde y con qué rol estaba. Ver
+    // `scripts/restaurar-membresia.mjs`.
+    this.log.warn(
+      `Baja: ${userId} sale de ${orgId} (era ${result[0].role}; ` +
+        `lo hace ${porUserId ?? '?'}).`,
+    );
     return { ok: true };
   }
 

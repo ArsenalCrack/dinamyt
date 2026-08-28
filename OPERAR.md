@@ -77,6 +77,11 @@ nunca depende de que alguien se acordara de sincronizar.
 - **Exigir correo para que alguien entre.** Quien no tiene correo usable entra
   con carnet QR o PIN, y su ficha vive sin cuenta.
 - **Propagar `is_super_admin` automáticamente.** Se concede a mano, mirando.
+- **Dejar un club sin nadie que lo mande.** Ya pasó: una ✕ en el panel sacó al
+  MAESTRO de su propio club, y el club se quedó sin quien editara su ficha,
+  repartiera su código o mirara a su gente — su maestro incluido, porque el
+  permiso cuelga de esa misma fila. Hoy lo impide el servidor (§4.7-bis); si
+  hace falta cerrar un club de verdad, **primero se desactiva**.
 - **Romper el modo local de Campeonatos.** Sin internet, sin ecosistema, tiene
   que arrancar igual: es la marcha atrás del día del evento.
 
@@ -213,6 +218,44 @@ idénticos y ninguno se explica solo.
 | `tenant or user not found` · `ENOTFOUND` · `ECONNREFUSED` | La base del `.env` no existe o no responde. No es un problema de migraciones |
 | `relation … already exists` | El diario está en el esquema `drizzle` y este proyecto lo lleva dentro de `ecosystem`. Se arregla una vez: `pnpm db:migrar --mover-diario` |
 | `permission denied` | Al usuario de la app le falta `CREATE`. Como `postgres`: `GRANT CREATE ON DATABASE dinamyt TO dinamyt_eco;` |
+
+## 2.6-bis ¿Llega lo que se guarda a Membresías?
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && pnpm espejo:diagnostico
+```
+
+No escribe nada: manda un aviso vacío y cuenta qué contestó Membresías. Existe
+porque **el espejo está hecho para no romper nada cuando falla** (§4.7), y el
+precio de eso es que cuando no funciona no se nota: se nota una semana después,
+cuando el carnet sale con la foto vieja.
+
+| Lo que dice | Qué es |
+|---|---|
+| `EL ESPEJO ESTÁ APAGADO` | Falta `MEMBRESIAS_SYNC_URL` o `ECOSYSTEM_SYNC_SECRET` aquí. En local es lo normal; en el VPS no |
+| `NO SE LLEGA A ESA DIRECCIÓN` | membresias-api no responde, o la URL no es su origen. No es cosa de secretos |
+| `404, y es a propósito` | Allí `ECOSYSTEM_SYNC_SECRET` está vacía y la ruta no existe. Ponle la misma y reinicia |
+| `SECRETO DISTINTO (401)` | Las dos la tienen, pero no es la misma |
+| `EL CANAL ESTÁ ABIERTO` | Funciona. Y debajo sale **lo que el espejo NO lleva**, que es lo que casi siempre se está buscando |
+
+## 2.6-ter Devolver a alguien a su club
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && sudo -u postgres RESTAURAR_DATABASE_URL=postgresql:///dinamyt node scripts/restaurar-membresia.mjs --persona correo@de.la.persona --club "Nombre del club"
+```
+
+Sin `--aplicar` es un **ensayo**: hace el trabajo entero dentro de una
+transacción y la deshace, así que lo que imprime es lo que pasaría de verdad.
+Cuando lo que diga sea lo que esperabas, el mismo comando con `--aplicar`.
+
+Quitar a un miembro **borra** su fila de `org_members`: no hay papelera. Y si el
+que salió era el maestro, el portal no lo arregla —el alta es una invitación que
+él mismo tendría que mandar, y acaba de quedarse sin panel—. Lo fiel de verdad
+es el respaldo (§2.5); esto es para cuando no lo hay.
+
+> Después de restaurarlo, **tiene que volver a entrar**: el rol viaja dentro del
+> token y el suyo sigue siendo el de antes hasta que caduque (30 min) o cierre
+> sesión.
 
 ## 2.7 Encender el reloj de los avisos
 
@@ -543,6 +586,64 @@ carnet sigue saliendo con las iniciales para siempre.
 puede estar en otra máquina; escribir en las tablas de otra app obliga a que las
 dos migren a la vez para siempre.
 
+### Lo que el espejo NO lleva (y por qué Membresías no se enteró)
+
+Los tres avisos llevan **datos de la persona y del club**: nombre, teléfono,
+foto, cinturón, «entrena desde», nacimiento, tipo de sangre, contacto de
+emergencia; nombre, ciudad y escudo del club; y el hash de la contraseña.
+
+**No viaja a qué club pertenece cada quien, ni con qué rol.** Eso vive en
+`ecosystem.org_members` aquí y en `membresias.users.org_id` allí — dos tablas
+distintas que nadie sincroniza. Quitar a alguien de un club en el portal, o
+cambiarle el rol, **no se nota en Membresías**: allí sigue en su club, con su
+plan y su historial.
+
+Eso es deliberado: el dinero y la asistencia de un alumno no pueden desaparecer
+porque alguien pulse una ✕ en otra aplicación. Pero tiene dos consecuencias que
+conviene tener escritas:
+
+- El día que la ✕ sacó al maestro de su club, Membresías **no se enteró**, y por
+  eso el carnet y los pagos siguieron en su sitio. Fue suerte, no diseño.
+- Cuando alguien sale de un club **de verdad**, hay que darlo de baja en las dos.
+
+Para comprobar que el canal está vivo: §2.6-bis.
+
+## 4.7-bis El último que manda en un club no se puede quitar
+
+`org_members` es lo que decide quién administra una organización: el rol
+`maestro`, `owner` o `admin` en esa fila. Todo cuelga de ahí — el panel de «Mi
+organización», la ficha del club, el código de entrada, la lista de gente.
+
+Así que **si esa fila se borra, el club se queda huérfano**, y quien lo nota
+primero es su propio maestro: entra al portal y ya no gestiona nada. Y no se
+arregla solo, porque el alta de miembros ya no mete a nadie a mano — es una
+invitación que la persona acepta, y quien tendría que mandarla es él.
+
+Por eso la regla está en el SERVICIO y no en la pantalla
+(`OrganizationsService.exigirQueNoSeQuedeSinGestor`): a `org_members` se entra
+por tres puertas —la ✕, el desplegable de rol y el panel de Accesos— y
+cualquiera de las tres dejaba el club sin nadie.
+
+- Quitar o degradar al **último** gestor propio de una organización → **409**,
+  con el mensaje diciendo qué hacer.
+- Solo cuentan los gestores **propios**. El admin de la federación padre PUEDE
+  gestionar el club (§4.2), pero un club cuyo único gestor vive en la federación
+  es un club huérfano igual.
+- **La salida:** sobre una organización **desactivada** la regla se levanta.
+  Cerrar un club es desactivarlo, vaciarlo y borrarlo — tres pasos a propósito,
+  porque `remove()` exige que esté vacío y sin esta puerta no se podría cerrar
+  ninguno.
+
+Y como red aparte, cada baja y cada ascenso quedan escritos en el registro del
+servicio (`Baja: … sale de … (era maestro; lo hace …)`), que es lo único que
+queda cuando la fila ya no está:
+
+```bash
+sudo journalctl -u dinamyt-id --since "2 days ago" --no-pager | grep -E "Baja:|Mando:"
+```
+
+Para deshacerlo cuando ya pasó: §2.6-ter.
+
 ## 4.8 Una contraseña para todo DINAMYT
 
 Se fija en el portal y las apps la **copian**. Nunca al revés, y nunca en dos
@@ -579,6 +680,37 @@ Lo que **no** se unifica: el combate en vivo de Campeonatos (está hecho para
 gritar números a dos metros), el carnet de Membresías (está hecho para
 imprimirse) y el modo local de Campeonatos (arranca sin ecosistema, con su
 propio login).
+
+## 4.9-bis Se pregunta antes de lo que le cambia la vida a otro
+
+Membresías lleva tiempo preguntando antes de borrar una clase. El portal no
+preguntaba nada: la ✕ de una fila de miembro quitaba a esa persona **al primer
+toque**, y así salió el maestro de su propio club. El mismo botón, en el celular,
+mide 40 px y vive pegado a otros cuatro.
+
+Ahora hay un diálogo propio (`components/Confirmar.tsx`), y no el `confirm` del
+navegador: conserva lo que aquel tenía a favor —es modal, tapa la lista, **el
+foco arranca en «Cancelar»**, así que quien viene dando Enter a ciegas cancela—
+y no arrastra lo que tenía en contra: aquí cabe el nombre entero, se lee con la
+tipografía de la casa y ningún navegador móvil lo silencia «para el resto de la
+sesión».
+
+Se pregunta por **lo que le cambia a otra persona el acceso, el rol o el
+dinero**, no solo por lo que borra:
+
+| Se pregunta | No se pregunta |
+|---|---|
+| Quitar a un miembro · cambiarle el rol | Guardar la ficha del club, subir el escudo |
+| Desactivar un club · eliminarlo | Activarlo (devuelve acceso: equivocarse no quita nada) |
+| Aceptar o rechazar una afiliación, una solicitud o una invitación | Buscar, paginar, mirar |
+| Cambiar el código del club · cerrar la entrada por código | Crear una organización o una suscripción nueva |
+| Borrar o suspender una suscripción · renovarla dándola por pagada | Corregir fechas en el formulario de edición |
+| Dar un acceso rápido (puede **sobrescribir** el rol que ya tenía) | |
+| Mandar los avisos de vencimiento (son correos de verdad) | |
+
+La regla para decidir: **¿lo nota alguien que no está delante de esta
+pantalla?** Si sí, se pregunta. Crear cosas nuevas no se pregunta, porque lo que
+se crea de más se borra.
 
 ## 4.10 El mapa de la API del ecosistema
 
@@ -635,6 +767,7 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 | `GET /mi-club` · `POST /mi-club` | sesión | Ver mi club · fundar el mío |
 | `GET /mias` · `PATCH /:id` · `GET /:id/members` | gestor | Lo que administro |
 | `POST /:id/invite` | super-admin | Alta directa, sin preguntar (§4.4) |
+| `PATCH` y `DELETE /:id/members/:userId` | gestor | Cambiar rol · quitar. **409 si es el último que manda** (§4.7-bis) |
 | `GET /clubes` · `POST /:id/invitar-club` · `GET /invitaciones-club/mias` | varios | Federación ↔ club |
 
 ### `/subscriptions` y `/subscription-plans`

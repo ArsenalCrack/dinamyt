@@ -40,8 +40,9 @@ import {
 import { CampoFecha } from '@/components/CampoFecha';
 import { FilaSuscripcion } from '@/components/FilaSuscripcion';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
-import { ROLES_SUPERADMIN, nombreRol } from '@/lib/roles';
+import { ROLES_SUPERADMIN, mandaEnLaOrg, nombreRol } from '@/lib/roles';
 import { FilaMiembro } from '@/components/FilaMiembro';
+import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
 import { SelectMenu } from '@/components/SelectMenu';
 import { PanelRecaudo } from '@/components/PanelRecaudo';
 import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
@@ -74,6 +75,7 @@ export default function AdminEcosistemaPage() {
 
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const { confirmar, dialogo } = useConfirmar();
 
   // Formularios
   const [nuevaOrg, setNuevaOrg] = useState({ name: '', type: 'CLUB' as (typeof TIPOS_ORG)[number], city: '', country: 'Colombia' });
@@ -157,6 +159,24 @@ export default function AdminEcosistemaPage() {
     } finally {
       setOcupado(false);
     }
+  }
+
+  /**
+   * Lo mismo que `accion`, pero preguntando primero.
+   *
+   * Este panel manda sobre clubes que no son suyos y sobre gente que no está
+   * delante: aquí una ✕ pulsada sin querer se nota en otra ciudad. Se pregunta
+   * por lo que le cambia a alguien el rol, el acceso o el dinero; crear cosas
+   * nuevas no se pregunta, porque lo que se crea de más se borra.
+   */
+  async function confirmarYHacer(
+    peticion: PeticionConfirmar,
+    fn: () => Promise<unknown>,
+    ok: string,
+    fallback: string,
+  ) {
+    if (!(await confirmar(peticion))) return;
+    await accion(fn, ok, fallback);
   }
 
   if (!autorizado) {
@@ -344,7 +364,15 @@ export default function AdminEcosistemaPage() {
                     asignables={ROLES_SUPERADMIN}
                     ocupado={ocupado}
                     onCambiarRol={(rol) =>
-                      accion(
+                      void confirmarYHacer(
+                        {
+                          titulo: `¿Cambiar a ${m.fullName} a «${nombreRol(rol)}» en ${orgSel.name}?`,
+                          detalle:
+                            mandaEnLaOrg(m.role) && !mandaEnLaOrg(rol)
+                              ? 'Dejará de administrar la organización: perderá su panel, su ficha y su gente.'
+                              : 'Cambia lo que puede hacer en la organización y en las aplicaciones.',
+                          textoOk: 'Cambiar el rol',
+                        },
                         () => cambiarRolMiembroAPI(orgSel.id, m.userId, rol),
                         'Rol actualizado.',
                         'No se pudo cambiar el rol.',
@@ -353,7 +381,15 @@ export default function AdminEcosistemaPage() {
                     acciones={
                       <button
                         onClick={() =>
-                          accion(
+                          void confirmarYHacer(
+                            {
+                              titulo: `¿Quitar a ${m.fullName} de ${orgSel.name}?`,
+                              detalle: mandaEnLaOrg(m.role)
+                                ? 'Es de quienes administran la organización: al quitarla pierde su panel EN EL ACTO y no puede volver a entrar sola. Si es el maestro del club, se queda sin club.'
+                                : 'Sale de la lista y pierde el acceso a las aplicaciones de la organización. Su cuenta y su perfil siguen existiendo.',
+                              textoOk: 'Quitar',
+                              tono: 'peligro',
+                            },
                             () => quitarMiembroAPI(orgSel.id, m.userId),
                             'Miembro quitado.',
                             'No se pudo quitar.',
@@ -535,7 +571,13 @@ export default function AdminEcosistemaPage() {
                   valor={s.status}
                   disabled={ocupado}
                   onChange={(v) =>
-                    accion(
+                    void confirmarYHacer(
+                      {
+                        titulo: `¿Poner la suscripción de ${s.userFullName} en «${ESTADOS_SUSCRIPCION.find((e) => e.valor === v)?.etiqueta ?? v}»?`,
+                        detalle:
+                          'El estado decide si el plan le abre las aplicaciones o no. El cambio es inmediato.',
+                        textoOk: 'Cambiar el estado',
+                      },
                       () => cambiarEstadoSuscripcionPersonalAPI(s.id, v),
                       'Estado actualizado.',
                       'No se pudo cambiar el estado.',
@@ -550,20 +592,20 @@ export default function AdminEcosistemaPage() {
                   botonStyle={{ padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
                 />
                 <button
-                  onClick={() => {
-                    if (
-                      !window.confirm(
-                        `¿Quitarle a ${s.userFullName} el plan «${s.planName}»? No se puede deshacer.`,
-                      )
-                    ) {
-                      return;
-                    }
-                    void accion(
+                  onClick={() =>
+                    void confirmarYHacer(
+                      {
+                        titulo: `¿Quitarle a ${s.userFullName} el plan «${s.planName}»?`,
+                        detalle:
+                          'Pierde el acceso que le daba ese plan y la fila desaparece. No se puede deshacer.',
+                        textoOk: 'Borrar la suscripción',
+                        tono: 'peligro',
+                      },
                       () => eliminarSuscripcionPersonalAPI(s.id),
                       'Suscripción personal borrada.',
                       'No se pudo borrar.',
-                    );
-                  }}
+                    )
+                  }
                   disabled={ocupado}
                   className="btn btn-danger btn-sm"
                 >
@@ -626,6 +668,10 @@ export default function AdminEcosistemaPage() {
           + Crear suscripción personal
         </button>
       </section>
+
+      {/* La pregunta de «¿seguro?». Una sola por pantalla: la dispara quien la
+          necesite y se dibuja encima de todo. Ver `components/Confirmar.tsx`. */}
+      {dialogo}
     </main>
   );
 }
@@ -726,6 +772,7 @@ function AccesosRapidos({
   ocupado: boolean;
   onGrant: (orgId: string, email: string, role: string, app: string) => Promise<void>;
 }) {
+  const { confirmar, dialogo } = useConfirmar();
   const [busqueda, setBusqueda] = useState('');
   const [resultados, setResultados] = useState<UsuarioBusqueda[]>([]);
   const [sel, setSel] = useState<UsuarioBusqueda | null>(null);
@@ -866,6 +913,20 @@ function AccesosRapidos({
             />
             <button
               onClick={async () => {
+                // Este botón no solo AÑADE: si la persona ya estaba en esa
+                // organización, le SOBRESCRIBE el rol que tenía. Y crea una
+                // suscripción de un año si hace falta. Merece la pregunta.
+                const yaEstaba = sel.membresias.find(
+                  (m) => m.org === orgs.find((o) => o.id === orgId)?.name,
+                );
+                const ok = await confirmar({
+                  titulo: `¿Dar a ${sel.fullName} acceso a ${app} como «${nombreRol(rol)}»?`,
+                  detalle: yaEstaba
+                    ? `Ya está en esa organización como «${nombreRol(yaEstaba.role)}»: este botón le cambia el rol por el nuevo. Si la organización no tiene un plan con ${app}, también le crea uno de un año.`
+                    : `Entra a la organización con ese rol. Si no tiene un plan con ${app}, también le crea uno de un año.`,
+                  textoOk: 'Dar el acceso',
+                });
+                if (!ok) return;
                 await onGrant(orgId, sel.email, rol, app);
                 setSel(null);
                 setBusqueda('');
@@ -881,6 +942,7 @@ function AccesosRapidos({
           </div>
         </div>
       )}
+      {dialogo}
     </section>
   );
 }
@@ -914,6 +976,7 @@ function Vencimientos({
   ocupado?: boolean;
   onAccion: (fn: () => Promise<unknown>, exito: string, fallo: string) => Promise<unknown>;
 }) {
+  const { confirmar, dialogo } = useConfirmar();
   const [filas, setFilas] = useState<Vencimiento[]>([]);
   const [cargando, setCargando] = useState(true);
   const [recarga, setRecarga] = useState(0);
@@ -959,8 +1022,20 @@ function Vencimientos({
         </div>
         <button
           type="button"
-          onClick={() =>
-            void onAccion(
+          onClick={async () => {
+            // Sale de la pantalla: son correos de verdad, a gente de verdad, y
+            // no hay forma de recogerlos.
+            if (
+              !(await confirmar({
+                titulo: '¿Mandar el aviso de vencimiento a los maestros?',
+                detalle:
+                  'Les llega un correo a los clubes con la suscripción vencida o por vencer. No se repite el mismo aviso antes de una semana, pero el que salga ya no se puede recoger.',
+                textoOk: 'Mandar los avisos',
+              }))
+            ) {
+              return;
+            }
+            await onAccion(
               () =>
                 avisarVencimientosAPI().then((r) => {
                   setRecarga((n) => n + 1);
@@ -968,8 +1043,8 @@ function Vencimientos({
                 }),
               'Avisos enviados a los maestros.',
               'No se pudieron enviar los avisos.',
-            )
-          }
+            );
+          }}
           disabled={ocupado}
           className="btn btn-outline btn-sm"
           title="Manda el correo de vencimiento a los maestros. No repite el mismo aviso antes de una semana."
@@ -1015,19 +1090,31 @@ function Vencimientos({
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               <button
                 type="button"
-                onClick={() =>
-                  void onAccion(
+                onClick={async () => {
+                  // Renovar no mueve una fecha: da el mes por COBRADO, y eso
+                  // entra en el panel de recaudo. Un clic de más descuadra las
+                  // cuentas del mes sin que nada parezca haber fallado.
+                  const meses = v.renewalMonths ?? 1;
+                  if (
+                    !(await confirmar({
+                      titulo: `¿Renovar ${v.orgName} por ${meses} mes${meses === 1 ? '' : 'es'}?`,
+                      detalle:
+                        'Corre la fecha de vencimiento y da ese periodo por pagado al precio del plan, así que cuenta en el recaudo. Si el pago fue parcial o de otro monto, usa el formulario de la fila.',
+                      textoOk: 'Renovar y dar por pagado',
+                    }))
+                  ) {
+                    return;
+                  }
+                  await onAccion(
                     () =>
-                      renovarSuscripcionAPI(v.id, {
-                        meses: v.renewalMonths ?? 1,
-                      }).then((r) => {
+                      renovarSuscripcionAPI(v.id, { meses }).then((r) => {
                         setRecarga((n) => n + 1);
                         return r;
                       }),
                     `${v.orgName} renovada.`,
                     'No se pudo renovar.',
-                  )
-                }
+                  );
+                }}
                 disabled={ocupado}
                 className="btn btn-gold btn-sm"
                 // Un mes al precio del plan, dado por pagado: es el 95 % de las
@@ -1050,6 +1137,7 @@ function Vencimientos({
           </li>
         ))}
       </ul>
+      {dialogo}
     </section>
   );
 }

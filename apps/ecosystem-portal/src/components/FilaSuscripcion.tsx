@@ -18,6 +18,7 @@ import {
 } from '@/lib/api';
 import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
+import { useConfirmar } from '@/components/Confirmar';
 import { fechaCivil, instante } from '@/lib/fechas';
 
 /**
@@ -88,6 +89,7 @@ export function FilaSuscripcion({
     fallo: string,
   ) => Promise<unknown>;
 }) {
+  const { confirmar, dialogo } = useConfirmar();
   const [editando, setEditando] = useState(false);
   const [renovando, setRenovando] = useState(false);
   const [abono, setAbono] = useState('');
@@ -174,13 +176,28 @@ export function FilaSuscripcion({
           <SelectMenu
             valor={sub.status}
             disabled={ocupado}
-            onChange={(v) =>
-              void onAccion(
+            onChange={async (v) => {
+              // Un toque en este desplegable apaga las aplicaciones del club
+              // ENTERO, y quien se entera es el maestro cuando ya no puede
+              // entrar. Cuesta una pregunta.
+              const etiqueta =
+                ESTADOS_SUSCRIPCION.find((e) => e.valor === v)?.etiqueta ?? v;
+              if (
+                !(await confirmar({
+                  titulo: `¿Poner la suscripción de ${sub.orgName} en «${etiqueta}»?`,
+                  detalle:
+                    'El estado decide si el club puede abrir las aplicaciones del plan. El cambio es inmediato para toda su gente.',
+                  textoOk: 'Cambiar el estado',
+                }))
+              ) {
+                return;
+              }
+              await onAccion(
                 () => cambiarEstadoSuscripcionAPI(sub.id, v),
                 'Estado actualizado.',
                 'No se pudo cambiar el estado.',
-              )
-            }
+              );
+            }}
             opciones={ESTADOS_SUSCRIPCION.map((e) => ({
               valor: e.valor,
               etiqueta: e.etiqueta,
@@ -218,18 +235,26 @@ export function FilaSuscripcion({
           </button>
           <button
             type="button"
-            onClick={() => {
-              // Confirmación del navegador y no un diálogo propio: es una
-              // acción rara, del super-admin, y un `confirm` no se puede
-              // pulsar sin querer al deslizar la lista en el celular.
+            onClick={async () => {
+              // Aquí había un `window.confirm`, y tenía razón en lo que
+              // importaba: una pregunta que se pueda contestar sin dejar de
+              // deslizar la lista no sirve de nada. El diálogo del portal
+              // conserva eso —es modal y el foco arranca en «Cancelar»—, y
+              // además cabe el nombre entero del club, se lee con la
+              // tipografía de la casa y ningún navegador móvil lo silencia
+              // «para el resto de la sesión».
               if (
-                !window.confirm(
-                  `¿Borrar la suscripción «${sub.planName}» de ${sub.orgName}? No se puede deshacer.`,
-                )
+                !(await confirmar({
+                  titulo: `¿Borrar la suscripción «${sub.planName}» de ${sub.orgName}?`,
+                  detalle:
+                    'El club pierde las aplicaciones de ese plan y la fila desaparece con su historial de pagos. No se puede deshacer: si solo quieres cortarle el acceso, suspéndela en el desplegable de estado.',
+                  textoOk: 'Borrar la suscripción',
+                  tono: 'peligro',
+                }))
               ) {
                 return;
               }
-              void onAccion(
+              await onAccion(
                 () => eliminarSuscripcionAPI(sub.id),
                 'Suscripción borrada.',
                 'No se pudo borrar.',
@@ -570,6 +595,7 @@ export function FilaSuscripcion({
           </div>
         </div>
       )}
+      {dialogo}
     </li>
   );
 }

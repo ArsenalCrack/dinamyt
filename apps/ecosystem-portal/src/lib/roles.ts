@@ -79,3 +79,18 @@ export function opcionesDeRol(
   );
   return [...new Set([actual, ...resto])];
 }
+
+/**
+ * Los roles que ADMINISTRAN una organización. Es el mismo catálogo que el del
+ * servidor (`common/roles.ts` en ecosystem-api), y aquí sirve para AVISAR antes
+ * de tiempo: la pantalla puede decir «dejará de administrar el club» mientras
+ * todavía se puede cancelar, en vez de dejar que el 409 lo explique después.
+ *
+ * La regla de verdad —que el último que manda no se puede quitar ni degradar—
+ * vive allí, no aquí: entra por tres puertas y una de ellas no es una pantalla.
+ */
+export const ROLES_GESTOR = ['admin', 'owner', 'maestro'] as const;
+
+/** `true` si con ese rol se administra la organización. */
+export const mandaEnLaOrg = (rol: string | null | undefined): boolean =>
+  Boolean(rol && (ROLES_GESTOR as readonly string[]).includes(rol));

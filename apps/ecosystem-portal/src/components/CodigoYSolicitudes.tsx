@@ -17,6 +17,7 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { SelectMenu } from '@/components/SelectMenu';
 import { nombreRol } from '@/lib/roles';
+import { useConfirmar } from '@/components/Confirmar';
 
 /**
  * **Entrada al club: las dos puertas, juntas.**
@@ -78,6 +79,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
   const [solicitudes, setSolicitudes] = useState<SolicitudDeEntrada[]>([]);
   const [rolElegido, setRolElegido] = useState<Record<string, string>>({});
   const [ocupado, setOcupado] = useState(false);
+  const { confirmar, dialogo } = useConfirmar();
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
 
@@ -152,6 +154,25 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
   async function responder(s: SolicitudDeEntrada, aceptar: boolean) {
     const elegido = rolElegido[s.id] ?? 'student';
+    // Aceptar mete a alguien en el club y rechazar le cierra la puerta: las dos
+    // le llegan a una persona por correo y ninguna se deshace desde aquí.
+    const ok = await confirmar(
+      aceptar
+        ? {
+            titulo: `¿Dejar entrar a ${s.fullName} como «${nombreRol(elegido)}»?`,
+            detalle:
+              'Entra al club con ese rol y se le avisa por correo. Si te equivocas de rol, se cambia después en la lista de gente.',
+            textoOk: 'Aceptar la entrada',
+          }
+        : {
+            titulo: `¿Rechazar la solicitud de ${s.fullName}?`,
+            detalle:
+              'La solicitud desaparece. Para entrar tendrá que volver a teclear el código del club, o invitarle tú.',
+            textoOk: 'Rechazar',
+            tono: 'peligro',
+          },
+    );
+    if (!ok) return;
     const r = await accion(
       () =>
         responderSolicitudAPI(s.id, {
@@ -247,13 +268,23 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
             {codigo}
           </code>
           <button
-            onClick={() =>
-              void accion(
+            onClick={async () => {
+              if (
+                !(await confirmar({
+                  titulo: '¿Cambiar el código del club?',
+                  detalle:
+                    'El de ahora deja de servir en el acto: quien lo tenga apuntado o le haya llegado por WhatsApp ya no podrá entrar con él. Quien YA entró sigue dentro.',
+                  textoOk: 'Cambiar el código',
+                }))
+              ) {
+                return;
+              }
+              await accion(
                 () => rotarCodigoClubAPI(orgId).then((r) => setCodigo(r.joinCode)),
                 'Código nuevo. El anterior ya no sirve.',
                 'No se pudo cambiar el código.',
-              )
-            }
+              );
+            }}
             disabled={ocupado}
             className="btn btn-outline btn-sm"
             // Rotar no expulsa a nadie: quien ya entró, entró.
@@ -262,13 +293,24 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
             Cambiar
           </button>
           <button
-            onClick={() =>
-              void accion(
+            onClick={async () => {
+              if (
+                !(await confirmar({
+                  titulo: '¿Cerrar la entrada por código?',
+                  detalle:
+                    'Tu club deja de admitir a nadie por código. La única forma de entrar pasa a ser la invitación, una por una. Se puede volver a abrir cuando quieras, pero con un código nuevo.',
+                  textoOk: 'Cerrar la entrada',
+                  tono: 'peligro',
+                }))
+              ) {
+                return;
+              }
+              await accion(
                 () => quitarCodigoClubAPI(orgId).then(() => setCodigo(null)),
                 'Entrada por código cerrada.',
                 'No se pudo cerrar la entrada.',
-              )
-            }
+              );
+            }}
             disabled={ocupado}
             className="btn btn-danger btn-sm"
           >
@@ -493,13 +535,24 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                 Esperando
               </span>
               <button
-                onClick={() =>
-                  void accion(
+                onClick={async () => {
+                  if (
+                    !(await confirmar({
+                      titulo: `¿Retirar la invitación de ${i.email}?`,
+                      detalle:
+                        'El enlace que le mandamos deja de valer. Si aún quieres que entre, tendrás que invitarle otra vez.',
+                      textoOk: 'Retirar',
+                      tono: 'peligro',
+                    }))
+                  ) {
+                    return;
+                  }
+                  await accion(
                     () => cancelarInvitacionAPI(i.id).then(cargarInvitaciones),
                     `Se retiró la invitación de ${i.email}.`,
                     'No se pudo retirar la invitación.',
-                  )
-                }
+                  );
+                }}
                 disabled={ocupado}
                 className="btn btn-outline btn-sm"
                 style={{ color: 'var(--danger)' }}
@@ -514,6 +567,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
       {error && <p className="msg-error mt-3 text-sm">{error}</p>}
       {ok && <p className="msg-ok mt-3 text-sm">{ok}</p>}
+      {dialogo}
     </section>
   );
 }

@@ -34,3 +34,7 @@
  * mutable, y una tupla de solo lectura obliga a copiarla en cada llamada.
  */
 export const ROLES_GESTOR: string[] = ['admin', 'owner', 'maestro'];
+
+/** `true` si ese rol MANDA en la organización. */
+export const esRolGestor = (rol: string | null | undefined): boolean =>
+  Boolean(rol && ROLES_GESTOR.includes(rol));

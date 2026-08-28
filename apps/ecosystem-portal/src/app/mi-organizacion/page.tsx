@@ -25,8 +25,9 @@ import {
   type InvitacionClub,
 } from '@/lib/api';
 import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
-import { ROLES_CLUB, ROLES_ORG, nombreRol } from '@/lib/roles';
+import { ROLES_CLUB, ROLES_ORG, mandaEnLaOrg, nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
+import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
 import { FilaMiembro } from '@/components/FilaMiembro';
 import { CodigoYSolicitudes } from '@/components/CodigoYSolicitudes';
 import { PaisCiudad } from '@/components/PaisCiudad';
@@ -65,6 +66,7 @@ export default function MiOrganizacionPage() {
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [cargando, setCargando] = useState(true);
+  const { confirmar, dialogo } = useConfirmar();
 
   const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: '' });
 
@@ -198,6 +200,25 @@ export default function MiOrganizacionPage() {
     }
   }
 
+  /**
+   * Lo mismo que `accion`, pero preguntando primero.
+   *
+   * Se pregunta por todo lo que le cambia a OTRA persona lo que puede hacer
+   * —quitarla del club, cambiarle el rol— y por lo que apaga un club entero.
+   * Lo que solo toca la ficha del propio club (guardarla, subir el escudo) se
+   * queda sin pregunta: es un formulario con su botón, se ve lo que se cambió
+   * y se vuelve a cambiar. Ver `components/Confirmar.tsx`.
+   */
+  async function confirmarYHacer(
+    peticion: PeticionConfirmar,
+    fn: () => Promise<unknown>,
+    ok: string,
+    fallback: string,
+  ) {
+    if (!(await confirmar(peticion))) return;
+    await accion(fn, ok, fallback);
+  }
+
   async function buscarClubes() {
     try {
       const res = await listarClubesAPI(busquedaClub.trim() || undefined);
@@ -286,7 +307,13 @@ export default function MiOrganizacionPage() {
                 <span className="flex gap-2">
                   <button
                     onClick={() =>
-                      accion(
+                      void confirmarYHacer(
+                        {
+                          titulo: `¿Afiliar tu club a ${inv.orgName}?`,
+                          detalle:
+                            'Sus administradores podrán ver a tu gente y gestionar tu club junto contigo.',
+                          textoOk: 'Aceptar la afiliación',
+                        },
                         () => responderInvitacionClubAPI(inv.id, true),
                         'Invitación aceptada: tu club ya hace parte de la organización.',
                         'No se pudo aceptar.',
@@ -299,7 +326,14 @@ export default function MiOrganizacionPage() {
                   </button>
                   <button
                     onClick={() =>
-                      accion(
+                      void confirmarYHacer(
+                        {
+                          titulo: `¿Rechazar la invitación de ${inv.orgName}?`,
+                          detalle:
+                            'La invitación desaparece. Si cambias de idea, tendrán que volver a invitarte.',
+                          textoOk: 'Rechazar',
+                          tono: 'peligro',
+                        },
                         () => responderInvitacionClubAPI(inv.id, false),
                         'Invitación rechazada.',
                         'No se pudo rechazar.',
@@ -355,11 +389,26 @@ export default function MiOrganizacionPage() {
                         </button>
                         <button
                           onClick={() =>
-                            accion(
-                              () => setOrgActivaAPI(h.id, h.isActive === false),
-                              h.isActive === false ? 'Club activado.' : 'Club desactivado.',
-                              'No se pudo cambiar.',
-                            )
+                            // Activar no se pregunta: devuelve el acceso, y
+                            // equivocarse ahí no le quita nada a nadie.
+                            h.isActive === false
+                              ? void accion(
+                                  () => setOrgActivaAPI(h.id, true),
+                                  'Club activado.',
+                                  'No se pudo cambiar.',
+                                )
+                              : void confirmarYHacer(
+                                  {
+                                    titulo: `¿Desactivar ${h.name}?`,
+                                    detalle:
+                                      'Su gente deja de entrar a las aplicaciones del club hasta que lo vuelvas a activar. Nadie pierde su ficha ni su historial.',
+                                    textoOk: 'Desactivar',
+                                    tono: 'peligro',
+                                  },
+                                  () => setOrgActivaAPI(h.id, false),
+                                  'Club desactivado.',
+                                  'No se pudo cambiar.',
+                                )
                           }
                           disabled={ocupado}
                           className="btn btn-outline"
@@ -369,7 +418,14 @@ export default function MiOrganizacionPage() {
                         </button>
                         <button
                           onClick={() =>
-                            accion(
+                            void confirmarYHacer(
+                              {
+                                titulo: `¿Eliminar ${h.name}?`,
+                                detalle:
+                                  'Desaparece del ecosistema y no se puede deshacer. Solo se puede si ya está vacío —sin miembros ni suscripciones—; si todavía tiene gente, desactívalo en su lugar.',
+                                textoOk: 'Eliminar el club',
+                                tono: 'peligro',
+                              },
                               () => eliminarOrgAPI(h.id),
                               'Club eliminado.',
                               'No se pudo eliminar (debe estar vacío).',
@@ -466,7 +522,13 @@ export default function MiOrganizacionPage() {
                       </span>
                       <button
                         onClick={() =>
-                          accion(
+                          void confirmarYHacer(
+                            {
+                              titulo: `¿Invitar a ${c.name} a afiliarse?`,
+                              detalle:
+                                'Le llega la invitación a su maestro, que la acepta o la rechaza. Nada cambia hasta que responda.',
+                              textoOk: 'Enviar la invitación',
+                            },
                             () => invitarClubAPI(federaciones[0].id, c.id),
                             'Invitación enviada al club: su maestro debe aceptarla.',
                             'No se pudo invitar.',
@@ -560,7 +622,15 @@ export default function MiOrganizacionPage() {
               asignables={rolesPermitidos}
               ocupado={ocupado}
               onCambiarRol={(rol) =>
-                accion(
+                void confirmarYHacer(
+                  {
+                    titulo: `¿Cambiar a ${m.fullName} a «${nombreRol(rol)}»?`,
+                    detalle:
+                      mandaEnLaOrg(m.role) && !mandaEnLaOrg(rol)
+                        ? `Dejará de administrar ${orgSel?.name ?? 'el club'}: no podrá editar la ficha, repartir el código de entrada ni ver a su gente.`
+                        : `Cambia lo que puede hacer dentro de ${orgSel?.name ?? 'el club'} y en las aplicaciones.`,
+                    textoOk: 'Cambiar el rol',
+                  },
                   () => cambiarRolMiembroAPI(sel!, m.userId, rol),
                   'Rol actualizado.',
                   'No se pudo cambiar el rol.',
@@ -580,7 +650,15 @@ export default function MiOrganizacionPage() {
                   </Link>
                   <button
                     onClick={() =>
-                      accion(
+                      void confirmarYHacer(
+                        {
+                          titulo: `¿Quitar a ${m.fullName} de ${orgSel?.name ?? 'el club'}?`,
+                          detalle: mandaEnLaOrg(m.role)
+                            ? 'Es de quienes administran el club: al quitarla pierde su panel y no puede volver a entrar sola. Habría que invitarla otra vez.'
+                            : 'Sale de la lista y pierde el acceso a las aplicaciones del club. Su cuenta y su perfil siguen existiendo; para volver hay que invitarla de nuevo.',
+                          textoOk: 'Quitar del club',
+                          tono: 'peligro',
+                        },
                         () => quitarMiembroAPI(sel!, m.userId),
                         'Miembro quitado.',
                         'No se pudo quitar.',
@@ -814,6 +892,10 @@ export default function MiOrganizacionPage() {
           </button>
         </section>
       )}
+
+      {/* La pregunta de «¿seguro?». Una sola por pantalla: la dispara quien la
+          necesite y se dibuja encima de todo. Ver `components/Confirmar.tsx`. */}
+      {dialogo}
     </main>
   );
 }

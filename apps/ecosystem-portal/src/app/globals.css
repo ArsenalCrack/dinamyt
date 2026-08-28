@@ -591,3 +591,61 @@ main { animation: aparecer 0.3s ease; }
   .codigo { gap: 0.3rem; }
   .codigo input { width: 2.4rem; height: 3rem; font-size: 1.25rem; }
 }
+
+/* ── El «¿seguro?» (components/Confirmar.tsx) ─────────────────────────────
+   Tapa la lista entera a propósito: lo que dispara este diálogo son botones de
+   40 px pegados unos a otros, y la pregunta no sirve de nada si se puede
+   contestar sin dejar de deslizar. */
+.confirmar-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+.confirmar-caja {
+  width: 100%;
+  max-width: 26rem;
+  padding: 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dim);
+  border-radius: 0.9rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+.confirmar-titulo {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+}
+.confirmar-detalle {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+/* Los dos botones invertidos, y no por gusto: en el HTML «Cancelar» va PRIMERO
+   —para que el foco y el tabulador lleguen antes a lo seguro— y en pantalla
+   tiene que verse donde se espera. `row-reverse` lo deja a la izquierda en el
+   escritorio; `column-reverse` lo deja ABAJO en el celular, que es lo que
+   alcanza el pulgar sin estirarse. Los dos sentidos apuntan a lo mismo: el
+   gesto perezoso cancela. */
+.confirmar-botones {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+}
+.confirmar-botones .btn { width: 100%; }
+@media (min-width: 480px) {
+  .confirmar-botones {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+  }
+  .confirmar-botones .btn { width: auto; }
+}
