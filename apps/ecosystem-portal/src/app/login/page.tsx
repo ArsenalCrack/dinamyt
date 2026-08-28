@@ -11,7 +11,6 @@ import {
   obtenerToken,
   extraerError,
   seRecuerda,
-  INACTIVIDAD_MINUTOS,
   type TokenPayload,
 } from '@/lib/api';
 import { CampoContrasena } from '@/components/CampoContrasena';
@@ -65,8 +64,30 @@ function LoginForm() {
    * servidor. Antes cualquier 401 dejaba a la persona en un login mudo, sin
    * pista de qué había pasado, y eso se lee como «la aplicación me echó sin
    * motivo».
+   *
+   * ── Se enseña UNA vez, y por eso no se lee de la URL al pintar ──
+   *
+   * Viene en `?motivo=`, y leerlo directo del `search` lo dejaba pegado: la
+   * frase seguía ahí al recargar, y al recargar otra vez, contando algo que ya
+   * pasó y que la persona ya leyó. Un aviso que no se va deja de ser un aviso
+   * y pasa a ser parte de la pantalla.
+   *
+   * Se copia al estado y se borra de la dirección con `replaceState` —sin
+   * `router.replace`, que volvería a renderizar y no hace falta—. El resto de
+   * parámetros (`redirect`, `email`) se conservan: son los que dicen a dónde
+   * volver y qué correo ya venía escrito.
    */
-  const motivoDelCierre = search.get('motivo');
+  const [motivoDelCierre, setMotivoDelCierre] = useState<string | null>(null);
+  useEffect(() => {
+    const m = search.get('motivo');
+    if (!m) return;
+    setMotivoDelCierre(m);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('motivo');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    // Solo al llegar: es un mensaje de una vez, no un valor que se siga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const correo = validarCorreo(email);
   /**
@@ -332,25 +353,19 @@ function LoginForm() {
               . Con eso tu correo queda confirmado.
             </p>
           )}
-          <label className="mt-4 flex items-start gap-2 text-sm">
+          {/* La casilla va sola, sin explicación debajo. La frase se entiende
+              por sí misma, y contar aquí el cierre por inactividad era
+              adelantar una regla que a quien va a entrar no le sirve para
+              decidir nada. Donde sí se cuenta es en el perfil, junto a los
+              dispositivos conectados, que es donde alguien va a buscarla. */}
+          <label className="mt-4 flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={recordar}
               onChange={(e) => setRecordar(e.target.checked)}
-              className="mt-0.5"
               style={{ accentColor: 'var(--gold)' }}
             />
-            <span>
-              Mantener la sesión iniciada en este equipo
-              <span
-                className="mt-0.5 block text-xs"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                {recordar
-                  ? `Desmárcalo si el equipo no es tuyo. En cualquier caso, la sesión se cierra sola tras ${INACTIVIDAD_MINUTOS} minutos sin actividad.`
-                  : 'La sesión se cerrará al cerrar el navegador.'}
-              </span>
-            </span>
+            <span>Mantener la sesión iniciada en este equipo</span>
           </label>
           <button
             type="submit"

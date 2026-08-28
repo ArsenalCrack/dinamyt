@@ -8,7 +8,6 @@ import {
   obtenerToken,
   extraerError,
   seRecuerda,
-  INACTIVIDAD_MINUTOS,
 } from '@/lib/api';
 import { getRolEfectivo, limpiarRolCache, rutaInicio } from '@/lib/session';
 import { CampoContrasena } from '@/components/CampoContrasena';
@@ -51,8 +50,22 @@ function Login() {
    * Por qué se acabó la sesión anterior. Lo pone el interceptor de `lib/api`
    * con el mensaje del ecosystem: sin él, cualquier 401 dejaba a la persona en
    * un login mudo, que se lee como «la aplicación me echó sin motivo».
+   *
+   * Se enseña UNA vez: viene en `?motivo=`, y leerlo directo del `search` lo
+   * dejaba pegado — la frase seguía ahí al recargar, contando algo que ya pasó
+   * y que la persona ya leyó. Se copia al estado y se borra de la dirección.
    */
-  const motivoDelCierre = search.get('motivo');
+  const [motivoDelCierre, setMotivoDelCierre] = useState<string | null>(null);
+  useEffect(() => {
+    const m = search.get('motivo');
+    if (!m) return;
+    setMotivoDelCierre(m);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('motivo');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    // Solo al llegar: es un mensaje de una vez, no un valor que se siga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Saltar al portal a iniciar sesión y volver aquí con la sesión hecha.
@@ -167,26 +180,22 @@ function Login() {
         <label
           style={{
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             gap: '0.5rem',
             marginBottom: '0.9rem',
             fontSize: '0.85rem',
           }}
         >
+          {/* Sin explicación debajo, igual que en el portal: la frase se
+              entiende sola, y el cierre por inactividad se cuenta donde alguien
+              va a buscarlo (el perfil), no aquí. */}
           <input
             type="checkbox"
             checked={recordar}
             onChange={(e) => setRecordar(e.target.checked)}
-            style={{ width: 'auto', marginTop: '0.2rem', accentColor: 'var(--gold)' }}
+            style={{ width: 'auto', accentColor: 'var(--gold)' }}
           />
-          <span>
-            Mantener la sesión iniciada en este equipo
-            <span className="muted" style={{ display: 'block', fontSize: '0.75rem' }}>
-              {recordar
-                ? `Desmárcalo si el equipo no es tuyo. En cualquier caso, la sesión se cierra sola tras ${INACTIVIDAD_MINUTOS} minutos sin actividad.`
-                : 'La sesión se cerrará al cerrar el navegador.'}
-            </span>
-          </span>
+          <span>Mantener la sesión iniciada en este equipo</span>
         </label>
 
         {motivoDelCierre && !error && (
