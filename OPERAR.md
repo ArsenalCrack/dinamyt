@@ -1102,12 +1102,43 @@ candado antes del DDL:
     db.session.commit()
 ```
 
-> ⚠️ **Aplicado en el servidor el 29 ago 2026, y NO está en git.**
-> `dinamyt-combat` no estaba clonado, así que el parche vive solo en
-> `/srv/campeonatos/backend/wsgi.py` (con `wsgi.py.bak` al lado). **El próximo
-> despliegue lo borra y la caída vuelve.** Es deuda con fecha de caducidad:
-> hasta que se commitee, cualquiera que despliegue Campeonatos tira el servicio
-> sin saber por qué.
+> ✅ **Cerrado el 29 ago 2026** en `dinamyt-combat` (`7a740cd`, ya en `main`),
+> desplegado y con el espejo del monorepo al día. De propina, `rls.py` pone
+> ahora `SET LOCAL lock_timeout = '5s'` antes de cada sentencia: no evita el
+> bloqueo, pero hace que **falle en cinco segundos y se imprima** en «RLS
+> incompleto» en vez de colgar el arranque en silencio — que es exactamente lo
+> que costó la mañana.
+
+### La trampa del despliegue, que volvió a tirarlo media hora
+
+Con el arreglo ya escrito, el servicio **se cayó otra vez**. El parche estaba en
+una rama **empujada pero sin fusionar a `main`**, y el despliegue hizo lo que
+decía el manual:
+
+- `git checkout -- backend/wsgi.py` → **descartó el parche vivo** del servidor.
+- `git pull` → **no trajo nada**, porque en `main` no había nada nuevo.
+
+El servidor se quedó con el código roto y volvió al bucle. **Antes de descartar
+un parche que está sosteniendo el servicio, comprueba que lo que va a
+sustituirlo ya está en la rama que vas a traer:**
+
+```bash
+git -C /srv/campeonatos fetch origin && git -C /srv/campeonatos log --oneline -1 origin/main
+```
+
+Y si el arreglo vive en una rama sin fusionar, se trae ella directamente en vez
+de esperar a `main` — es un avance rápido y no hay conflicto posible:
+
+```bash
+cd /srv/campeonatos && git fetch origin && git merge --ff-only origin/<rama> && sudo systemctl restart campeonatos-api
+```
+
+✅ La comprobación que no miente, después de cualquier despliegue: que el
+arreglo **esté en el archivo**, no que el comando saliera sin error.
+
+```bash
+grep -c "db.session.commit()" /srv/campeonatos/backend/wsgi.py; grep -c "lock_timeout" /srv/campeonatos/backend/app/rls.py
+```
 
 ## 5.2 `postgresql:///base` no significa lo mismo para todos
 
@@ -1353,18 +1384,16 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
 `[ ]` **`backend/app/config.py:64` de Campeonatos** trae `admin@dinamyt.com`
       por defecto, y ese dominio es de otra persona. Debe ser `.org`.
 
-`[ ]` **Campeonatos ejecuta DDL al arrancar** (§5.1). **Ya tiró el servicio una
-      mañana entera** — el relato completo y cómo se reconoce, en §5.1-ter. El
-      bloqueo en sí está parcheado en el servidor con un `db.session.commit()`
-      en `wsgi.py`, **pero ese parche no está en git y el próximo despliegue lo
-      borra**. Lo que falta:
+`[x]` ~~**Campeonatos ejecuta DDL al arrancar**~~ — el bloqueo, cerrado el 29 de
+      agosto de 2026 (`7a740cd` en `dinamyt-combat`, desplegado y espejado).
+      Tiró el servicio una mañana entera; el relato y cómo se reconoce están en
+      §5.1-ter. El `db.session.commit()` suelta el candado y el
+      `SET LOCAL lock_timeout = '5s'` hace visible cualquier recaída.
 
-      · **Commitear el arreglo en `dinamyt-combat`.** Es lo primero, y hasta que
-        pase, desplegar Campeonatos vuelve a tirarlo.
-      · `SET lock_timeout = '5s'` antes del DDL en `rls.py`, para que la próxima
-        vez **falle en cinco segundos en vez de colgarse cinco minutos**. No
-        evita el bloqueo: lo hace visible, que es lo que faltó aquí.
-      · Cerrar la sesión en el `teardown_appcontext` de Flask.
+`[ ]` **Cerrar la sesión en el `teardown_appcontext` de Flask.** Es lo que queda
+      del hueco anterior. Sin ello, el DDL ya no se bloquea, pero una petición
+      que deje su transacción abierta sigue reteniendo candados hasta que el
+      `idle_in_transaction_session_timeout` la corte. Es higiene, no urgencia.
 
 ## 6.2 Después del campeonato (desde el 14 de octubre)
 
