@@ -295,3 +295,95 @@ persona**. Automatizarlo genera identidades duplicadas: el problema caro.
 
 **Es independiente de B3.** Funciona con la identidad única o sin ella, así que
 construirlo no depende de esperar a nadie — y B3 tampoco lo invalida después.
+
+---
+
+## Publicar mientras el evento corre, para que el público lo siga
+
+El paso 3 de arriba deja el transporte abierto a propósito, y aquí está su mejor
+uso: **durante el evento, el local publica hacia la VPS cada pocos minutos.**
+
+No es sincronización: es **publicación**. El local sigue siendo el único que
+escribe, la VPS solo recibe, y el envío es *best-effort*. Si no hay red cuando
+toca, no pasa nada: se publica en el siguiente intento. **El modo de fallo es
+«el público ve resultados de hace veinte minutos», no «se para el campeonato».**
+
+Casi todo está construido: `_construir_resultados(camp_id)` ya arma el contenido
+—y su docstring dice que lo comparten el endpoint público en vivo y la
+exportación—, `ResultadoPublicado` ya tiene `export_uuid` único y `exportado_at`,
+`importar_resultados()` ya existe, y `RESPALDO_MINUTOS` ya es el patrón de «haz
+esto cada N minutos» en el local.
+
+### Las cinco reglas que lo hacen seguro
+
+1. **Solo hacia arriba.** El local **no descarga nada** durante el evento. En
+   cuanto descarga, hay dos escritores.
+2. **Instantánea completa, nunca incrementos.** «Lo que cambió desde la última
+   vez» exige que las dos partes coincidan en qué se vio — eso es estado, y el
+   estado es lo que se rompe con una red intermitente. Una instantánea completa
+   es idempotente: mandarla dos veces da igual.
+3. **Nunca en el camino de una petición.** Va en un hilo aparte y con timeout
+   corto. Si un juez pulsa «punto» y eso espera a la VPS, has metido internet en
+   el camino crítico. Ojo con eventlet: una llamada bloqueante en el sitio
+   equivocado congela el bucle de sockets.
+4. **La VPS, en solo lectura para ese campeonato** (`sede != nube`). Si alguien
+   lo edita en el portal, la siguiente publicación se lo lleva por delante.
+5. **El público ve la hora del dato**: «Resultados a las 11:42», no «en vivo».
+   Con red mala puede haber veinte minutos de retraso, y quien esté decidiendo
+   si va al pabellón merece saberlo.
+
+> ⚠️ **El reintento tardío que pisa lo bueno.** Con red inestable, la publicación
+> de las 11:40 puede llegar **después** de la de las 11:45. La VPS tiene que
+> comparar `exportado_at` y **descartar lo que llegue más viejo que lo que ya
+> tiene**. El campo ya existe en el modelo; solo falta usarlo.
+
+> **Y guarda el hash de lo último enviado**: si nada cambió, no mandes. En un
+> hotspot de celular eso es la diferencia entre publicar cada tres minutos y
+> quemarle los datos a alguien.
+
+---
+
+## La arquitectura: una sola app, dos modos
+
+Se evaluó partir el producto —dejar en la VPS solo lo visual y las inscripciones,
+y la lógica de puntuación **solo** en el local— y **se descartó**. La diferencia
+entre local y VPS es **de estado, no de código**:
+
+| | Partir la app | **Una app, dos modos** ✅ |
+|---|---|---|
+| Conflictos de escritura | Imposibles por construcción | Imposibles por el candado de `sede` — misma garantía |
+| Codebase | **Dos**, que divergen solos | **Una**. Todo cambio se prueba en los dos lados |
+| Campeonato pequeño con buen wifi | **Nunca** se podría correr en la VPS | Se puede, si su `sede` es `nube` |
+| Si muere el PC del evento | Segundo portátil, y nada más | Segundo portátil, y **en el peor caso** seguir las llaves que falten en la VPS |
+| El camino local | Un producto aparte que se ejercita solo en eventos | El mismo binario de siempre |
+
+La razón de fondo es la misma que la regla 7 de `B3-RIESGOS.md`: **un camino que
+solo corre en la emergencia se pudre en silencio.** Si el local es una compilación
+distinta, deriva. Si es el mismo binario en otro modo, cada cambio pasa por él.
+
+Y el beneficio que perseguía partirlo —que no haya dos escritores— ya lo da el
+candado de propiedad, que además es **reversible** y por campeonato.
+
+---
+
+## El nombre en la red del pabellón
+
+Los jueces **no teclean nada**: el QR del tatami lleva la URL completa
+(`/acceso#token=…`, armada desde `ip_local`). Esto solo hace falta para la mesa
+y para la pantalla del público.
+
+`[ ]` **Reserva de DHCP** para el PC, que ya está en la lista de la compra.
+
+`[ ]` **Entrada de DNS estática en el router**: `campeonato.dinamyt` →
+      `192.168.0.30`. El router ya es el DNS de esa red, así que resuelve para
+      todo el que se conecte a él.
+
+`[ ]` **Con punto, no una sola palabra.** `campeonato` a secas lo tratan como
+      búsqueda Chrome y varios navegadores de Android. `campeonato.dinamyt` se
+      interpreta como dirección.
+
+`[ ]` **Servir en el puerto 80** para quitar el `:3000` de la URL.
+
+> **Y la IP en un papel, grande, igual.** El nombre es comodidad; la IP es la
+> garantía. Si el DNS del router falla a media mañana, `http://192.168.0.30`
+> sigue funcionando y nadie tiene que entender por qué.
