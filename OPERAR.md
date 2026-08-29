@@ -373,6 +373,68 @@ Las demás banderas:
 > `ALTER TABLE` al arrancar: es exactamente el bloqueo de §5.1-ter, solo que con
 > los papeles cambiados. Espera a que termine.
 
+### Cómo salió · aplicada el 29 de agosto de 2026
+
+Censo de partida: **ecosystem 48 · membresías 37 · campeonatos 12**.
+
+| | |
+|---|---|
+| Cuentas creadas | **0** |
+| Personas enlazadas con una cuenta que ya existía | **46** |
+| Fichas sin correo válido (se quedan sin cuenta, entran por QR/PIN) | 0 |
+| Clubes creados en el ecosistema | **8** (con `--crear-clubes-campeonatos`) |
+| Clubes enlazados con uno existente | 5 |
+| Filas nuevas en `org_members` | 9 |
+| Personas sin club al que enlazarlas | 4 |
+
+**La línea que importa es `0 cuentas creadas`.** De 49 fichas entre las dos apps,
+las 46 con correo enlazaron con cuentas que **ya existían**: esto no fue una
+migración, fue **poner las uniones que faltaban**. Es lo que cura el
+«No existe una cuenta con ese correo» que veía en el portal quien sí entraba en
+Membresías.
+
+> **Y una deuda documentada se evaporó.** El plan avisaba de que a los importados
+> se les marcaría `is_email_verified = true` sin comprobación real, y que habría
+> que pedirles verificación de verdad cuando hubiera correo. **Con cero cuentas
+> creadas no hay importados**, así que esa deuda nunca llegó a existir.
+
+**Las 4 personas sin club, y por qué está bien:** dos son usuarios de Membresías
+que sencillamente no pertenecen a ningún club. Las otras dos tienen en
+Campeonatos un nombre de club que no cruza con ninguna organización — y no es
+contradictorio con el `0 de Campeonatos SIN cruzar`: `Competidor.club` es **texto
+libre**, mientras que los clubes salen de la lista de los maestros. Una variante
+de escritura o un nombre viejo no encaja con nada. Se arreglan a mano.
+
+### La limpieza de superadmins que vino después
+
+El guion **detecta pero no concede** los superadmins de las apps, y es
+deliberado: un guion que reparte permisos de administrador no debe existir. Hay
+**tres banderas independientes**, una por app:
+
+| App | Tabla | Columna |
+|---|---|---|
+| Ecosystem | `ecosystem.users` | `is_super_admin` |
+| Membresías | `membresias.users` | `is_super_admin` |
+| Campeonatos | `campeonatos.usuarios` | `es_superadmin` |
+
+El 29 de agosto se retiraron dos que sobraban —la cuenta personal del dueño en
+Membresías, y `admin-campeonatos@dinamyt.org` en Campeonatos, que es la clase de
+admin por app que B3 viene a eliminar—, dejando solo `admin@dinamyt.org`.
+
+```bash
+sudo -u postgres psql -d dinamyt -P pager=off -c "select 'membresias' as app, email, is_super_admin as super from membresias.users where is_super_admin union all select 'campeonatos', email, es_superadmin from campeonatos.usuarios where es_superadmin order by app, email;"
+```
+
+> ⚠️ **Se quita la bandera; NO se borra la cuenta.** Campeonatos tiene diez claves
+> foráneas contra `usuarios.id` y su aislamiento por workspace filtra por
+> `created_by`: borrar una cuenta que creó competidores o tatamis deja esas filas
+> con un dueño inexistente, **y entran en la base pero el administrador deja de
+> verlas**. Sin error, sin aviso, y se descubre el día del campeonato.
+
+> ⚠️ **Y antes de quitarse el propio permiso, entrar con el que va a quedar.**
+> Es la misma regla que el portal ya aplica a la gente: nadie se saca ni se
+> degrada a sí mismo sin que quede alguien con las llaves.
+
 ---
 
 # PARTE 3 · El correo
