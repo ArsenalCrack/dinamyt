@@ -662,6 +662,38 @@ El disparo diario es `POST /subscriptions/avisos/cron` con la cabecera
 que manda correo a todos los clubes no puede quedarse abierta «por si acaso».
 Cómo encender el reloj: §2.7.
 
+### La federación contrata y sus clubes heredan
+
+Es la **decisión 11** del plan maestro, y desde el 29 de agosto de 2026 el
+ecosistema la cumple: GHA Venezuela paga el plan de Campeonatos y **sus clubes
+afiliados lo abren**, sin que cada uno tenga que contratar el suyo.
+
+Cómo se calcula, al firmar cada pase: se parte de los clubes de la persona
+(`org_members`), se **sube por `parent_id`** hasta la raíz y se suma lo que abre
+cada eslabón de la cadena (`common/jerarquia.ts` + `buildToken`).
+
+| | |
+|---|---|
+| La herencia **baja, nunca sube** | Un club con plan propio no se lo pasa a su federación, ni a los clubes hermanos |
+| El plan propio **se suma** al heredado | Un club afiliado que además paga Membresías abre las dos cosas |
+| Que Membresías se venda **por club** | Es comercial, y lo decide **qué plan contrata la federación** (`apps_included`), no el código. Si a una federación se le vende un plan que incluye `membresias`, sus clubes lo abren |
+| Un `parent_id` en círculo **no cuelga el login** | Tope de 10 saltos y corte al reconocer a alguien por segunda vez, con sus casos en `jerarquia.spec.ts` |
+
+> ⏱️ **No es instantáneo, y no es un fallo.** Los `app_scopes` viajan dentro del
+> pase, que dura 30 minutos (§4.11). Afiliar un club —o darle plan a la
+> federación— se nota **en la siguiente renovación del pase o al volver a
+> entrar**. Si alguien necesita verlo ya: que salga y entre.
+
+**Afiliar un club es cosa de dos**, igual que entrar a uno (§4.4): la federación
+invita desde «Mi organización» —seleccionándola en «Estructura», y ahí mismo
+«Invitar un club existente»— y el **maestro del club acepta**. Nadie se lleva un
+club a su federación sin que su maestro diga que sí.
+
+> ⚠️ **Una federación creada desde `/admin` no tiene miembros**, así que no
+> aparece en «Mi organización» de nadie y no hay desde dónde afiliarle clubes.
+> El orden es: crearla → **darle acceso a su administrador** (el «acceso rápido»
+> del panel, con rol `admin`) → esa persona ya la ve y puede invitar clubes.
+
 ### El panel de recaudo
 
 `GET /subscriptions/resumen` responde todo lo que pinta la tarjeta «📊 Recaudo y
@@ -1400,20 +1432,60 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
 
 ## 6.1 Huecos conocidos
 
-`[ ]` **El usuario no tiene por dónde escribirte.** `soporte@dinamyt.org` ya
-      recibe (§3.5), pero **no aparece en ninguna pantalla**. Las dos únicas
-      direcciones del portal son `admin@dinamyt.org`: en
-      `planes/page.tsx:8` —por variable, con ese valor por defecto— y escrita a
-      mano en `privacidad/page.tsx:89`. Una página de precios y una política
-      legal no son donde busca ayuda quien tiene un problema con su cuenta.
+`[ ]` **Los planes que hay no son los de verdad: el cobro será POR USUARIO.**
+      *(escrito el 29 ago 2026)* Los de la base son precios fijos al mes
+      —`Plan Membresías` 60.000, `Academy` 50.000, los de Campeonatos «a
+      cotizar»— y **la intención siempre fue tarifa por usuario**: un club de 15
+      alumnos y uno de 300 no pagan lo mismo.
 
-      **La tarea:** un punto de contacto visible —pie de página del portal, o
-      entrada en el menú de la persona— apuntando a `soporte@`; y unificar las
-      dos que ya existen en una sola constante, o la dirección acaba repartida
-      por tres sitios y cambiarla se convierte en una búsqueda. Va con la misma
-      variable que ya usa `planes` (`NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`), pero
-      separando **contacto de soporte** de **contacto administrativo**: son dos
-      buzones distintos a propósito.
+      **No se toca antes del campeonato**, y va con la portada y los planes de
+      la Fase 2 porque es la misma conversación. Lo que hay que resolver
+      —dónde vive el precio unitario y el mínimo facturable, **qué cuenta como
+      usuario** (que es lo que decide la factura), y que `total_amount` deja de
+      ser una constante, lo que cambia el «esperado al mes» del panel de
+      recaudo— está escrito en **§10.1 del plan maestro**, que es su sitio.
+
+      ⚠️ Mientras tanto: **no publiques esos precios**. `/planes` los enseña, y
+      hoy solo lo abre quien tiene el enlace.
+
+`[ ]` **Una federación creada desde `/admin` nace sin nadie que la gestione.**
+      El panel la crea, pero no le pone ningún miembro, y todas las pantallas de
+      federación cuelgan de `org_members`: no aparece en «Mi organización» de
+      nadie, así que no hay desde dónde crearle clubes ni afiliárselos. Se sale
+      dándole acceso a su administrador (§4.5), pero eso hay que saberlo.
+
+      **La tarea:** que `/admin` enseñe la estructura —de quién cuelga cada
+      club, y qué clubes tiene cada federación— y permita afiliar desde ahí,
+      siempre por invitación: quien manda en el club sigue decidiendo. Lo
+      contrario —afiliar a dedo desde el panel— convierte al super-admin en el
+      único que entiende la estructura.
+
+`[x]` ~~**El usuario no tiene por dónde escribirte.**~~ Hecho el 29 de agosto de
+      2026. `soporte@dinamyt.org` ya recibía (§3.5) pero no aparecía en ninguna
+      pantalla; ahora está en el **pie del portal**, y el pie vive en el
+      `layout`, así que sale en **todas** — login, registro, recuperar y
+      poner-contraseña incluidas. Ese es el punto: quien no consigue entrar no
+      tiene ningún menú donde buscar ayuda.
+
+      Las dos direcciones se unificaron en `src/lib/contacto.ts`
+      (`CORREO_SOPORTE` y `CORREO_ADMIN`), que es lo que impide que vuelvan a
+      repartirse: `planes` tenía la suya en una constante local y `privacidad`
+      la tenía escrita a mano. Siguen siendo **dos buzones distintos a
+      propósito** — soporte para problemas de cuenta, admin para lo
+      administrativo (planes, cotizaciones, habeas data)— y cada uno tiene su
+      variable: `NEXT_PUBLIC_SUPPORT_CONTACT_EMAIL` y
+      `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`. **En producción no hay que tocar
+      nada**: los valores por defecto ya son los buenos.
+
+      El pie del `layout` sustituyó al que tenía escrito la portada, que era el
+      único que había: ahora hay uno solo, en `components/PieDePagina.tsx`. Y
+      como cada página trae su `min-h-screen`, `globals.css` reparte la pantalla
+      entre el `<main>` y el pie (`body > main { flex: 1 0 auto; min-height: 0 }`);
+      sin eso, **todas** las vistas cortas habrían salido con tres líneas de
+      scroll que no llevan a ninguna parte.
+
+      ⚠️ Al ser `NEXT_PUBLIC_*`, cambiar cualquiera de las dos obliga a **volver
+      a compilar** el portal (§1.3).
 
 `[x]` ~~**Nadie recibe lo que se escribe a `soporte@dinamyt.org`, y el dominio
       no publica política DMARC.**~~ Hecho el 29 de agosto de 2026: Email
@@ -1475,8 +1547,13 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
       desde el portal aterriza en su formulario en vez de iniciar sesión. Se
       edita en `dinamyt-combat`, que todavía no está clonado.
 
-`[ ]` **`backend/app/config.py:64` de Campeonatos** trae `admin@dinamyt.com`
-      por defecto, y ese dominio es de otra persona. Debe ser `.org`.
+`[ ]` **Quedan dos `admin@dinamyt.com` en Campeonatos**, y ese dominio es de
+      otra persona. *(revisado el 29 ago 2026)* **El del código ya no está**:
+      `backend/app/config.py:64` dice `.org` desde el 19 de agosto —lo arregló
+      el barrido de §1.5 del plan maestro, que eran ocho apariciones y no dos—.
+      Lo que sobrevive es documentación que la gente copia y pega:
+      `backend/.env.example:32` y `INICIAR-LOCAL.md:11`. Se edita en
+      `dinamyt-combat`, no en el espejo.
 
 `[x]` ~~**Campeonatos ejecuta DDL al arrancar**~~ — el bloqueo, cerrado el 29 de
       agosto de 2026 (`7a740cd` en `dinamyt-combat`, desplegado y espejado).
