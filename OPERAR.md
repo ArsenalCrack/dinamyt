@@ -345,10 +345,22 @@ entra en `/root`.
 
 # PARTE 3 · El correo
 
-## 3.1 Sin `SMTP_HOST`, la función de correo NO EXISTE
+## 3.1 Enviar ya funciona. Recibir, todavía no
 
-No se rompe: no existe. Es el mismo criterio que el SSO y `CRON_SECRET`, y es lo
-que permitió que el ecosistema estuviera en producción sin proveedor contratado.
+Son dos mitades independientes, y hoy solo está puesta una:
+
+| Mitad | Para qué | Con qué | Estado |
+|---|---|---|---|
+| **Enviar** | Códigos de verificación, invitaciones, avisos de vencimiento | **Resend**, por SMTP | ✅ **en producción** |
+| **Recibir** | Que `soporte@` y `admin@dinamyt.org` lleguen a un buzón de verdad | **Cloudflare Email Routing** | ✅ **en producción** — §3.5 |
+| **Política del dominio** | Que nadie pueda mandar correo diciendo ser DINAMYT | **DMARC**, gestionado por Cloudflare | ✅ **publicada en `p=none`** — §3.5 |
+
+## 3.1-bis Sin `SMTP_HOST`, la función de correo NO EXISTE
+
+Sigue siendo verdad, y es lo que permite que **en tu PC no haga falta ningún
+proveedor**: sin la variable no se rompe nada, la función sencillamente no
+existe. Es el mismo criterio que el SSO y `CRON_SECRET`, y es lo que permitió
+que el ecosistema estuviera en producción antes de contratar a nadie.
 Quien llama recibe un `false` y decide qué contar:
 
 - El **código del registro** sale por el registro del servidor
@@ -407,6 +419,55 @@ sudo journalctl -u dinamyt-id --since "5 min ago" --no-pager | grep -iE "correo|
 Después, en el portal: **Crear cuenta** con un correo tuyo de verdad, mira la
 cabecera del mensaje (en Gmail: **⋮ → Mostrar original**) y comprueba
 **SPF: PASS**, **DKIM: PASS**, **DMARC: PASS**.
+
+## 3.5 Cómo quedó montado el correo
+
+**Terminado el 29 de agosto de 2026.** Comprobado en el DNS contra tres
+resolutores (`1.1.1.1`, `8.8.8.8` y `9.9.9.9`), que es lo único que cuenta:
+el panel puede decir que sí y el DNS decir que no.
+
+| Registro | Valor | Para qué |
+|---|---|---|
+| `MX` raíz | `route1/2/3.mx.cloudflare.net` | **Recibir** en `soporte@` y `admin@` |
+| `TXT` SPF raíz | `v=spf1 include:_spf.mx.cloudflare.net ~all` | Quién puede mandar como el dominio |
+| `MX` + SPF en `send.dinamyt.org` | `…amazonses.com` | **Enviar** por Resend |
+| `TXT` `resend._domainkey` | la clave DKIM | Firma con `d=dinamyt.org` — **es lo que alinea el DMARC** |
+| `TXT` `_dmarc` | `v=DMARC1; p=none; rua=mailto:…@dmarc-reports.cloudflare.net` | Política del dominio, informes al panel de Cloudflare |
+
+Cómo se montó cada pieza: [MONTAR-VPS.md](MONTAR-VPS.md), **Anexo E**.
+
+### Tres cosas que hay que saber para no romperlo
+
+**1 · Un solo registro SPF por nombre, y un solo TXT de DMARC.** El SPF de la
+raíz es de Email Routing y el de `send` es de Resend: viven en nombres distintos
+a propósito. Meter un segundo SPF en el mismo nombre **los rompe los dos**, en
+silencio y con el correo cayendo en spam; se fusionan en una línea con los dos
+`include:`. Y **dos** registros `_dmarc` equivalen a **ninguno**: la norma manda
+descartar el dominio entero.
+
+**2 · Un fragmento sin `=` dentro del `_dmarc` lo invalida a medias.** Pasó al
+montarlo: quedó un `mailto:…` suelto delante del `rua=`. Los analizadores
+permisivos lo saltan y los estrictos descartan el registro, así que el DMARC
+funciona «según a quién le preguntes» — que es peor que no tenerlo, porque
+parece que sí. Si se edita a mano, se comprueba después con `Resolve-DnsName`
+o `dig`, nunca mirando el panel.
+
+**3 · Las respuestas de soporte gastan la cuota de los códigos.** El «Enviar
+como» de Gmail (Anexo E.5) sale por el SMTP de Resend, o sea del mismo bote de
+**100 al día** — y `MAIL_DAILY_MAX` no las cuenta, porque se cuenta dentro del
+código de ecosystem-api. Hoy sobra sitio; cuando no sobre, buzón propio.
+
+### Lo que queda por decidir: subir la política
+
+`p=none` significa «avísame, no bloquees». Los informes llegan al panel de
+Cloudflare (**Email → DMARC Management**), no al correo. Con dos semanas de
+informes limpios se sube a `quarantine`, y más tarde a `reject`.
+
+> ⚠️ **No se sube la política durante el campeonato.** Del 1 al 13 de octubre
+> todo está congelado (§6.2 del plan maestro), y un `reject` mal calibrado justo
+> cuando salen las invitaciones y los códigos a competidores y maestros es el
+> peor momento posible para averiguarlo. El orden: `quarantine` a mediados de
+> septiembre, `reject` desde el 14 de octubre.
 
 ---
 
@@ -1136,6 +1197,28 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
 # PARTE 6 · Lo que queda pendiente
 
 ## 6.1 Huecos conocidos
+
+`[ ]` **El usuario no tiene por dónde escribirte.** `soporte@dinamyt.org` ya
+      recibe (§3.5), pero **no aparece en ninguna pantalla**. Las dos únicas
+      direcciones del portal son `admin@dinamyt.org`: en
+      `planes/page.tsx:8` —por variable, con ese valor por defecto— y escrita a
+      mano en `privacidad/page.tsx:89`. Una página de precios y una política
+      legal no son donde busca ayuda quien tiene un problema con su cuenta.
+
+      **La tarea:** un punto de contacto visible —pie de página del portal, o
+      entrada en el menú de la persona— apuntando a `soporte@`; y unificar las
+      dos que ya existen en una sola constante, o la dirección acaba repartida
+      por tres sitios y cambiarla se convierte en una búsqueda. Va con la misma
+      variable que ya usa `planes` (`NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`), pero
+      separando **contacto de soporte** de **contacto administrativo**: son dos
+      buzones distintos a propósito.
+
+`[x]` ~~**Nadie recibe lo que se escribe a `soporte@dinamyt.org`, y el dominio
+      no publica política DMARC.**~~ Hecho el 29 de agosto de 2026: Email
+      Routing con `soporte@` y `admin@`, y `_dmarc` en `p=none` con los informes
+      al panel de Cloudflare. Queda **subir la política a `quarantine`** a
+      mediados de septiembre, y a `reject` **después del 14 de octubre**, nunca
+      durante el campeonato. Ver §3.5.
 
 `[ ]` **Un alumno desactivado en Membresías choca contra un 403 sin
       explicación.** `isActive:false` corta el paso en `abrirSesion` —login y

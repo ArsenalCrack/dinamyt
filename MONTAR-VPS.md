@@ -1743,23 +1743,64 @@ dominio recién comprado no recibe ni envía correo hasta que se lo montas, y so
 
 ## E.1 · Recibir: Cloudflare Email Routing ⏱ 10 min
 
-1. En el panel de Cloudflare, con `dinamyt.org` seleccionado: menú **Email** →
-   **Email Routing** → **Get started**.
-2. **Destination address**: tu Gmail. Cloudflare te manda un correo de
-   verificación — ábrelo y confirma, o nada de esto funciona.
-3. **Custom addresses**: crea las dos que ya están escritas en la configuración
-   del servidor:
+> **Si «Email Routing» no aparece en el menú Email.** Cloudflare ha reordenado
+> esa sección más de una vez, y suele quedar **debajo de «DMARC Management» y
+> «Email Security»**, fuera de la parte visible de la barra lateral: baja del
+> todo antes de darlo por perdido. La vía que no depende del menú:
+>
+> ```
+> https://dash.cloudflare.com/?to=/:account/dinamyt.org/email/routing
+> ```
+>
+> El `:account` lo resuelve Cloudflare solo. **Comprobado el 29 ago 2026:** los
+> NS de `dinamyt.org` son `chuck`/`magnolia.ns.cloudflare.com`, o sea zona
+> completa — que es el requisito de Email Routing, así que disponible tiene que
+> estar. Si aun así esa dirección no abre, el equivalente es **ImprovMX**
+> (gratis, mismo reenvío) o **Zoho Mail** gratis si quieres bandeja de verdad;
+> en los tres casos los `MX` van en la **raíz**.
 
-   | Dirección | Va a |
-   |---|---|
-   | `soporte@dinamyt.org` | tu Gmail |
-   | `admin@dinamyt.org` | tu Gmail |
+1. **Email Routing vive en la CUENTA, no en el dominio.** Es lo que despista:
+   se entra por **Account home → Email Routing** (o por la URL de arriba), no
+   por el menú del dominio. La primera vez sale una pantalla «Enable Email
+   Routing» con un solo botón: **+ Onboard Domain** → elige `dinamyt.org`.
+2. **Destination address**: tu Gmail. Cloudflare te manda un correo de
+   verificación — ábrelo y confirma, o nada de esto funciona. (Se hace desde
+   **Destination Addresses**, y se puede tener verificado antes de incorporar
+   ningún dominio.)
+3. **Las direcciones se crean en la pestaña «Routing rules».** El panel las
+   llamaba «Custom addresses» y ya no: es **+ Create routing rule**, una por
+   cada dirección, con la acción **Send to an email**:
+
+   | Custom address | Action | Destination |
+   |---|---|---|
+   | `soporte@dinamyt.org` | Send to an email | tu Gmail |
+   | `admin@dinamyt.org` | Send to an email | tu Gmail |
+
+   **El «Catch-all» se queda `Disabled`.** Decide qué pasa con el correo
+   dirigido a direcciones sin regla (`info@`, `ventas@`, `hola@`…).
+   Desactivado rebota con `550` y quien escribió **se entera**; en `Drop` se
+   borra en silencio y el remitente cree que llegó —el fallo silencioso, que en
+   este proyecto no se acepta en ningún sitio—; y reenviándolo todo te llega
+   también el spam a direcciones inventadas del dominio.
 
 4. Cloudflare te ofrece **añadir los registros solo**. Acepta: pone tres `MX`
    y un `TXT` con `v=spf1 include:_spf.mx.cloudflare.net ~all`.
 
-✅ Mándate un correo desde tu propio Gmail a `soporte@dinamyt.org`. Si te
-llega de vuelta, esta mitad está hecha.
+> ⚠️ **Email Routing solo debe tocar la RAÍZ.** El subdominio `send.dinamyt.org`
+> es de Resend —su `MX`, su SPF y el DKIM—, y ahí no se entra. Si el asistente
+> ofreciera modificarlo, di que no. Activar la recepción **no afecta al envío**:
+> son nombres distintos y Resend sigue funcionando durante todo el proceso.
+
+✅ **La prueba, desde una cuenta que NO sea la de destino.** Si te la mandas
+desde el mismo Gmail al que reenvía, **Gmail la descarta por duplicada** y
+parece que no llegó nada. Cloudflare hasta te manda un correo explicándolo
+(«*Missing email from … ?*») — y **ese aviso ya es la prueba** de que la regla
+funciona, porque para mandarlo tuvo que procesar el mensaje.
+
+No lo confundas con el fallo de verdad: si la regla **no** existe, lo que vuelve
+es un rebote de Google con `550 5.1.1 Address does not exist`. Ese `550` lo
+dice el servidor de Cloudflare, no Gmail — o sea que los `MX` están bien y lo
+que falta es la regla.
 
 > **Ojo con responder.** Email Routing **solo recibe**. Si contestas desde tu
 > Gmail, el remitente será tu Gmail personal, no `soporte@dinamyt.org`. Para
@@ -1824,13 +1865,36 @@ sin configurar», el `.env` no se guardó o el servicio no se reinició.
 
 ## E.3 · Proteger: DMARC ⏱ 2 min
 
-En Cloudflare → **DNS** → **Add record**:
+**No lo escribas a mano. Deja que Cloudflare lo gestione:**
+**Email → DMARC Management → Enable**. Le das permiso sobre el registro
+`_dmarc` y él pone su propia dirección de informes —única de tu zona— con el
+`rua=` bien puesto. A cambio, **recibe y grafica los informes dentro del panel**
+en vez de mandarte un XML comprimido al día por cada proveedor.
 
-| Campo | Valor |
-|---|---|
-| Type | `TXT` |
-| Name | `_dmarc` |
-| Content | `v=DMARC1; p=none; rua=mailto:soporte@dinamyt.org` |
+La alternativa a mano es **DNS → Add record**, `TXT` sobre `_dmarc` con
+`v=DMARC1; p=none; rua=mailto:dmarc@dinamyt.org` — y entonces hace falta también
+una regla de reenvío para `dmarc@` (E.1) y un filtro en Gmail, o los XML acaban
+en la bandeja donde esperas a los alumnos. Con 12-13 correos al día son 2 a 5
+informes diarios: pocos, pero ilegibles sin un analizador, que es justo lo que
+DMARC Management te ahorra.
+
+> ⚠️ **Si ya había un `_dmarc` escrito a mano, DMARC Management NO lo limpia:
+> añade lo suyo detrás.** Queda algo como
+> `v=DMARC1; p=none; mailto:loquefuera; rua=mailto:…@dmarc-reports.cloudflare.net`,
+> y ese `mailto:` suelto **no tiene `=`**, así que no es una etiqueta válida:
+> los analizadores permisivos lo saltan y los estrictos descartan el registro
+> entero. Hay que borrar el resto **a mano, una vez**, y dejar solo la línea de
+> Cloudflare. Después, no se toca más.
+
+✅ Compruébalo en el **DNS**, no en el panel — y contra más de un resolutor,
+porque el caché de uno puede tardar una hora en ponerse al día:
+
+```powershell
+foreach ($s in @('1.1.1.1','8.8.8.8','9.9.9.9')) { "$s -> " + ((Resolve-DnsName _dmarc.dinamyt.org -Type TXT -Server $s).Strings -join '') }
+```
+
+Tiene que salir **un solo registro** y con `rua=`. **Dos registros `_dmarc`
+equivalen a ninguno**: la norma manda descartar el dominio entero.
 
 **Empieza en `p=none`.** Significa «avísame, no bloquees»: durante dos semanas
 recibes informes de quién manda correo en tu nombre. Cuando los informes estén
@@ -1850,6 +1914,87 @@ primer día es la forma más rápida de que tus propios correos dejen de llegar.
 > aviso de «hay clase hoy» por correo serían 100 diarios —el tope exacto, todos
 > los días—: por eso ese aviso va por push y por la campana, **nunca** por
 > correo.
+
+## E.5 · Responder *como* `soporte@dinamyt.org` ⏱ 10 min
+
+Email Routing **solo recibe**. Si contestas desde tu Gmail, el remitente será tu
+dirección personal — y en la respuesta a quien pidió ayuda a DINAMYT, eso se
+nota.
+
+En Gmail: **Configuración → Ver toda la configuración → Cuentas e importación →
+«Enviar como» → Añadir otra dirección de correo**.
+
+| Campo | Valor |
+|---|---|
+| Dirección | `soporte@dinamyt.org` |
+| Servidor SMTP | `smtp.resend.com` |
+| Puerto | `587` (TLS) |
+| Usuario | `resend` |
+| Contraseña | una API key de Resend **nueva, creada solo para esto** — ver el aviso |
+
+Gmail manda un código de confirmación a `soporte@dinamyt.org`, que te llega por
+el reenvío de E.1. **Hazlo después de crear las reglas de E.1**, o ese código
+rebota. Y funciona porque `dinamyt.org` ya está verificado en Resend (E.2).
+
+> 🔑 **Una clave aparte para Gmail, no la de producción.** En Resend:
+> **API Keys → Create API Key**, nombre `gmail-soporte`, permiso de *Sending
+> access*. Dos razones, y la primera es de seguridad: **una API key de Resend
+> puede mandar como CUALQUIER dirección del dominio**, `no-reply@dinamyt.org`
+> incluida —la de los códigos de verificación y los enlaces de contraseña—, así
+> que puesta en un Gmail, cualquiera con acceso a esa cuenta puede escribir en
+> nombre de DINAMYT. Y la segunda es práctica: una clave propia se revoca sola
+> el día que haga falta, sin tocar el VPS ni parar el correo del producto, y en
+> Resend se ve qué mandó cada una.
+
+> **Las API keys de Resend se ven UNA sola vez**, al crearlas: el panel lista
+> nombre y fecha, nunca el valor. La única copia de la de producción está en
+> `sudo grep '^SMTP_PASS=' /srv/dinamyt/apps/ecosystem-api/.env`. Si se
+> perdiera: creas otra, la pones en `SMTP_PASS`,
+> `sudo systemctl restart dinamyt-id`, compruebas con el journal de E.2 y
+> borras la vieja en Resend.
+
+> ⚠️ **Cada respuesta de soporte gasta cuota de los códigos de verificación.**
+> Resend da **100 al día para todo DINAMYT**, y lo que salga por este SMTP viene
+> del mismo bote. Peor: `MAIL_DAILY_MAX` se cuenta **dentro del código** de
+> ecosystem-api, así que la app **no ve** estos envíos y su contador se queda
+> corto. Con el volumen de hoy sobra sitio; cuando no sobre, la salida es un
+> buzón propio (**Zoho Mail** gratis: una cuenta, dominio propio, envía y
+> recibe, con cuota aparte) en lugar de reenvío + «Enviar como».
+
+### Los dos ajustes que hay que tocar después, o no sirve de nada
+
+`[ ]` **«Tratarla como un alias»: marcada** (es lo que viene por defecto). Aquí
+      es lo correcto, porque `soporte@` entrega en esta misma cuenta.
+
+`[ ]` **Configuración → Cuentas e importación → «Al responder a un mensaje» →
+      «Responder desde la misma dirección a la que se ha enviado el mensaje».**
+      Sin esto Gmail contesta siempre desde la dirección por defecto: alguien
+      escribe a `soporte@dinamyt.org` y le respondes con tu Gmail personal, que
+      es justo lo que se quería evitar. Es un radio button y está desmarcado de
+      fábrica.
+
+> **El código de confirmación puede caer en Spam.** Un correo reenviado rompe el
+> SPF del remitente original —Google, en este caso— y algunos filtros lo
+> castigan por eso. Pasa en el primero y no significa que el montaje esté mal.
+
+### Plantillas: son dos cosas distintas y no se mezclan
+
+| Qué | Quién lo manda | Con qué |
+|---|---|---|
+| **Respuesta de soporte** — alguien pregunta, tú contestas | Tú, a mano | **Plantillas de Gmail**: Configuración → Avanzada → *Plantillas* → activar. Luego, en el compositor, **⋮ → Plantillas → Guardar borrador como plantilla** |
+| **Correo del producto** — código, invitación, aviso de vencimiento | La app, sola | `MailerService`, en `apps/ecosystem-api/src/modules/auth/mailer.service.ts` |
+
+Una respuesta de soporte con el HTML de marca de un correo transaccional parece
+publicidad y se lee peor que cuatro líneas claras. Y al revés: un correo que
+manda la app **nunca** se escribe a mano.
+
+Si hace falta un correo **nuevo del producto**, es un método más en
+`MailerService` reutilizando `plantilla()` —el armazón con el escudo, ya
+resuelto— y sus piezas `bloqueCodigo()`, `boton()`, `lista()` y `aviso()`.
+El escudo viaja **adjunto con `cid:`** y no enlazado, y eso no se cambia:
+Outlook y Thunderbird no bajan imágenes remotas hasta que la persona pulsa, y el
+correo del código de verificación es el peor momento para que la marca aparezca
+como un cuadro roto.
 
 ---
 ---
