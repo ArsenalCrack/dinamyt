@@ -283,24 +283,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Footer ────────────────────────────────────────────────────── */}
-      <footer className="border-t py-8" style={{ borderColor: 'var(--border)' }}>
-        <div
-          className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 text-sm sm:px-6"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <span className="inline-flex items-center gap-2">
-            <img src="/logo.png" alt="" width={22} height={22} />
-            DINAMYT Ecosystem · Hapkido
-          </span>
-          <nav className="flex gap-4">
-            <Link href="/planes">Planes</Link>
-            <Link href="/registro">Registro</Link>
-            <Link href="/privacidad">Privacidad</Link>
-            <a href={`${CAMPEONATOS_URL}/pantalla`}>Resultados</a>
-          </nav>
-        </div>
-      </footer>
+      {/* El pie ya no vive aquí: es el mismo del layout, en todas las
+          pantallas (`components/PieDePagina.tsx`). */}
     </main>
   );
 }

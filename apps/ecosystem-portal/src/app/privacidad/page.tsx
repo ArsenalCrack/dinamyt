@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { CORREO_ADMIN, CORREO_SOPORTE } from '@/lib/contacto';
 
 export const metadata: Metadata = {
   title: 'Política de privacidad — DINAMYT',
@@ -86,8 +87,13 @@ export default function PrivacidadPage() {
               Mi perfil
             </Link>
             ; para supresión de la cuenta o reclamos escribe a{' '}
-            <a href="mailto:admin@dinamyt.org" style={{ color: 'var(--gold)' }}>
-              admin@dinamyt.org
+            <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
+              {CORREO_ADMIN}
+            </a>
+            , y si lo que tienes es un problema para entrar o usar tu cuenta,
+            a{' '}
+            <a href={`mailto:${CORREO_SOPORTE}`} style={{ color: 'var(--gold)' }}>
+              {CORREO_SOPORTE}
             </a>
             . Los menores de edad se registran y gestionan con autorización de su
             acudiente.

@@ -47,6 +47,21 @@ body {
   font-family: var(--font-body), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   margin: 0;
   min-height: 100vh;
+  /* La pantalla la comparten el <main> de la página y el pie del layout. */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Cada página trae su propio `min-h-screen`. Sin anular esa altura mínima, el
+   pie quedaría empujado fuera de la primera vista SIEMPRE, y toda pantalla
+   corta —login, verificar, salir— aparecería con tres líneas de scroll que no
+   llevan a ninguna parte. El `flex: 1` deja el pie abajo del todo cuando la
+   página es corta, y lo empuja hacia el final cuando es larga.
+   Va sin capa a propósito: así gana sobre la utilidad de Tailwind, que sí
+   está en una. */
+body > main {
+  flex: 1 0 auto;
+  min-height: 0;
 }
 
 a { color: inherit; text-decoration: none; }

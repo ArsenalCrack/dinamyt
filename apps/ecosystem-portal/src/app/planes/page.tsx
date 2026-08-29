@@ -3,9 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { listPlanesAPI, type Plan } from '@/lib/api';
-
-const CONTACTO_ADMIN =
-  process.env.NEXT_PUBLIC_ADMIN_CONTACT_EMAIL || 'admin@dinamyt.org';
+import { CORREO_ADMIN } from '@/lib/contacto';
 
 const NOMBRE_APP: Record<string, string> = {
   academy: 'Academy',
@@ -84,7 +82,7 @@ export default function PlanesPage() {
                 <p className="text-sm font-semibold">Precio a la medida del evento</p>
                 <a
                   className="btn btn-outline mt-2 w-full"
-                  href={`mailto:${CONTACTO_ADMIN}?subject=${encodeURIComponent(
+                  href={`mailto:${CORREO_ADMIN}?subject=${encodeURIComponent(
                     `DINAMYT — Cotización: ${plan.name}`,
                   )}`}
                 >
@@ -113,7 +111,7 @@ export default function PlanesPage() {
       <p className="mt-8 text-sm" style={{ color: 'var(--text-muted)' }}>
         Las suscripciones se activan por organización (club, liga o federación).
         ¿Dudas sobre cuál te conviene?{' '}
-        <a href={`mailto:${CONTACTO_ADMIN}`} style={{ color: 'var(--gold)' }}>
+        <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
           Escríbenos
         </a>
         .

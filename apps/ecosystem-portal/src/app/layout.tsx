@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import { PieDePagina } from '@/components/PieDePagina';
 import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
 
 // Tipografía del ecosistema: display deportivo (Archivo, eje de anchura),
@@ -36,6 +37,10 @@ export default function RootLayout({
     >
       <body>
         {children}
+        {/* El pie va aquí por el mismo motivo que el reloj: para que salga en
+            todas las pantallas. La de soporte tiene que verse sobre todo en
+            login y registro, donde no hay menú al que ir. */}
+        <PieDePagina />
         {/* El reloj de inactividad. Va en el layout para que corra en todas
             las pantallas: una sesión abandonada no se cierra sola solo en las
             que alguien se acordó de ponerlo. */}
