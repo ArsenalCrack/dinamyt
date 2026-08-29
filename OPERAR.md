@@ -341,6 +341,38 @@ Sin `--aplicar` es un ensayo: hace **todo** el trabajo y deshace la transacción
 El informe va a `/tmp` porque quien escribe es el usuario `postgres`, que no
 entra en `/root`.
 
+### Tiene que ser `postgres`, y el guion lo comprueba
+
+Correrlo con el rol de la aplicación **no vale**, y no falla en silencio: se
+planta con este mensaje.
+
+    Base dinamyt, conectado como dinamyt_eco.
+    ✗ No se cambió nada: la transacción se deshizo entera.
+    El rol "dinamyt_eco" no es superusuario. Las tablas de Membresías y
+    Campeonatos tienen RLS en modo FORCE: un rol normal vería solo una parte de
+    las filas, y el guion daría por reconciliado lo que nunca vio.
+
+**Ese es el comportamiento correcto**, no un estorbo. Con RLS en `FORCE`, un rol
+normal ve un subconjunto de las filas — así que el ensayo saldría corto y
+diríamos «no queda nadie por reconciliar» sobre gente que el guion nunca llegó a
+ver. La bandera `--sin-superusuario` existe para saltárselo, y su propia ayuda la
+llama peligrosa: **no la uses para un ensayo del que te vayas a fiar.**
+
+Las demás banderas:
+
+| Bandera | Qué hace |
+|---|---|
+| `--aplicar` | Escribe de verdad. Sin ella, ensayo en seco |
+| `--informe <ruta.json>` | Guarda el detalle completo |
+| `--url <cadena>` | La conexión, si no va por `RECONCILIACION_DATABASE_URL` |
+| `--crear-clubes-campeonatos` | Crea también los clubes que solo conoce Campeonatos |
+| `--ayuda` | Las lista todas |
+
+> ⚠️ **Mientras corra, no reinicies `campeonatos-api`.** La reconciliación
+> mantiene una transacción abierta sobre las tablas, y Campeonatos lanza
+> `ALTER TABLE` al arrancar: es exactamente el bloqueo de §5.1-ter, solo que con
+> los papeles cambiados. Espera a que termine.
+
 ---
 
 # PARTE 3 · El correo
