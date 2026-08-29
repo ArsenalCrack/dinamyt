@@ -11,12 +11,14 @@ import { zonaValida } from '@dinamyt/shared';
 import { db } from '../../db';
 import {
   users,
+  organizations,
   orgMembers,
   subscriptions,
   subscriptionPlans,
   userSubscriptions,
 } from '../../db/schema';
-import { eq, and, gt, InferSelectModel } from 'drizzle-orm';
+import { eq, and, gt, inArray, InferSelectModel } from 'drizzle-orm';
+import { cadenasDeMando, MAX_SALTOS_JERARQUIA } from '../../common/jerarquia';
 import {
   validarNombreCompleto,
   validarDocumento,
@@ -812,6 +814,46 @@ export class AuthService {
   // seguir siendo LA MISMA sesión: si cada refresco abriera una nueva, la
   // lista de dispositivos conectados de cualquiera tendría cincuenta filas al
   // final del día y cerrar la de ayer no serviría de nada.
+  /**
+   * De quién cuelga cada organización, subiendo por niveles hasta la raíz.
+   *
+   * Se sube por niveles —una consulta por salto— y no con un `WITH RECURSIVE`
+   * porque son dos o tres saltos como mucho y esto se lee sin saber SQL
+   * recursivo; y no una consulta por club porque entonces el coste dependería
+   * de a cuántos clubes pertenece la persona.
+   *
+   * El tope de saltos protege el login: un `parent_id` mal puesto que forme un
+   * ciclo no puede convertir el inicio de sesión en un bucle. La otra mitad de
+   * esa defensa está en `cadenasDeMando`.
+   */
+  private async padresDe(ids: string[]): Promise<Map<string, string | null>> {
+    const padreDe = new Map<string, string | null>();
+    let frontera = [...new Set(ids)];
+
+    for (
+      let salto = 0;
+      salto < MAX_SALTOS_JERARQUIA && frontera.length;
+      salto++
+    ) {
+      const filas = await db
+        .select({ id: organizations.id, parentId: organizations.parentId })
+        .from(organizations)
+        .where(inArray(organizations.id, frontera));
+
+      for (const fila of filas) padreDe.set(fila.id, fila.parentId);
+
+      frontera = [
+        ...new Set(
+          filas.flatMap((f) =>
+            f.parentId && !padreDe.has(f.parentId) ? [f.parentId] : [],
+          ),
+        ),
+      ];
+    }
+
+    return padreDe;
+  }
+
   private async buildToken(user: User, jti: string): Promise<string> {
     const now = new Date();
 
@@ -827,28 +869,61 @@ export class AuthService {
       .from(orgMembers)
       .where(eq(orgMembers.userId, user.id));
 
-    // ── 1. Suscripciones organizacionales activas del usuario ────────────
-    // Join: org_members → subscriptions → subscription_plans
-    // Filtra: subscriptions.status = 'ACTIVE' AND ends_at > NOW()
-    const orgSubs = await db
-      .select({
-        orgId: orgMembers.orgId,
-        role: orgMembers.role,
-        appsIncluded: subscriptionPlans.appsIncluded,
-      })
-      .from(orgMembers)
-      .innerJoin(subscriptions, eq(orgMembers.orgId, subscriptions.orgId))
-      .innerJoin(
-        subscriptionPlans,
-        eq(subscriptions.planId, subscriptionPlans.id),
-      )
-      .where(
-        and(
-          eq(orgMembers.userId, user.id),
-          eq(subscriptions.status, 'ACTIVE'),
-          gt(subscriptions.endsAt, now),
-        ),
-      );
+    // ── 1. Suscripciones organizacionales activas — LAS SUYAS Y LAS DE ARRIBA
+    //
+    // Decisión 11 del plan maestro: **la organización contrata y sus clubes
+    // heredan**. La federación paga el plan de Campeonatos y sus clubes
+    // afiliados lo abren; hasta aquí el join era
+    // `org_members.org_id = subscriptions.org_id` y el plan de la federación
+    // no llegaba a nadie más que a quien fuera miembro de la federación misma.
+    //
+    // Lo que NO cambia: la herencia baja, nunca sube. Un club con su propio
+    // plan no se lo pasa a su federación ni a sus clubes hermanos, y su plan
+    // propio SE SUMA al heredado en vez de sustituirlo — un club afiliado que
+    // además paga Membresías abre las dos cosas.
+    const orgIdsPropias = [...new Set(pertenencias.map((p) => p.orgId))];
+    const cadenas = cadenasDeMando(
+      await this.padresDe(orgIdsPropias),
+      orgIdsPropias,
+    );
+    const orgIdsConAncestros = [...new Set([...cadenas.values()].flat())];
+
+    const subsPorOrg =
+      orgIdsConAncestros.length === 0
+        ? []
+        : await db
+            .select({
+              orgId: subscriptions.orgId,
+              appsIncluded: subscriptionPlans.appsIncluded,
+            })
+            .from(subscriptions)
+            .innerJoin(
+              subscriptionPlans,
+              eq(subscriptions.planId, subscriptionPlans.id),
+            )
+            .where(
+              and(
+                inArray(subscriptions.orgId, orgIdsConAncestros),
+                eq(subscriptions.status, 'ACTIVE'),
+                gt(subscriptions.endsAt, now),
+              ),
+            );
+
+    // Lo que abre cada organización de la cadena, para repartirlo después
+    // entre los clubes que cuelgan de ella.
+    const abrePorOrg = new Map<string, string[]>();
+    for (const fila of subsPorOrg) {
+      const previo = abrePorOrg.get(fila.orgId) ?? [];
+      abrePorOrg.set(fila.orgId, [...previo, ...(fila.appsIncluded ?? [])]);
+    }
+
+    // Y lo que abre cada club DE LA PERSONA: lo suyo más lo de sus padres.
+    const orgSubs = orgIdsPropias.map((orgId) => ({
+      orgId,
+      appsIncluded: (cadenas.get(orgId) ?? [orgId]).flatMap(
+        (eslabon) => abrePorOrg.get(eslabon) ?? [],
+      ),
+    }));
 
     // ── 2. Suscripciones personales activas del usuario ─────────────────
     // Join: user_subscriptions → subscription_plans
@@ -888,8 +963,18 @@ export class AuthService {
 
     // ── 4. Determinar org_id y roles ────────────────────────────────────
     // El club es el de la pertenencia; entre varios gana el que tenga
-    // suscripción activa, que es el que la persona va a poder abrir.
-    const conSuscripcion = new Set(orgSubs.map((s) => s.orgId));
+    // suscripción activa, que es el que la persona va a poder abrir. Cuenta
+    // igual la heredada de su federación: para quien mira la pantalla, un
+    // club que abre Campeonatos porque su federación paga es exactamente tan
+    // «abrible» como uno que lo paga él.
+    //
+    // El filtro por lista no vacía NO es de adorno: `orgSubs` trae ahora una
+    // fila por cada club de la persona, tenga plan o no. Sin él, el primer
+    // club de la lista ganaría siempre y `org_id` acabaría apuntando a uno
+    // que no abre nada.
+    const conSuscripcion = new Set(
+      orgSubs.filter((s) => s.appsIncluded.length > 0).map((s) => s.orgId),
+    );
     const principal =
       pertenencias.find((p) => conSuscripcion.has(p.orgId)) ??
       pertenencias[0] ??

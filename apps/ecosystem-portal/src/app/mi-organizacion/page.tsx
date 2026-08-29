@@ -263,7 +263,31 @@ export default function MiOrganizacionPage() {
     );
   }
 
-  const federaciones = orgs.filter((o) => esOrgGrande(o.type) && o.myRole === 'admin');
+  /**
+   * Las federaciones y ligas que gestiono.
+   *
+   * El filtro era `myRole === 'admin'`, y era MÁS ESTRICTO QUE EL SERVIDOR:
+   * `exigirAdminDe` acepta a cualquier gestor (`admin`, `owner`, `maestro`).
+   * Quien fundó su liga y quedó como `owner` tenía permiso para invitar clubes
+   * y ninguna pantalla desde donde hacerlo.
+   */
+  const federaciones = orgs.filter(
+    (o) => esOrgGrande(o.type) && mandaEnLaOrg(o.myRole),
+  );
+
+  /**
+   * Sobre QUÉ organización actúan «crear club» e «invitar club»: la
+   * seleccionada arriba, no `federaciones[0]`.
+   *
+   * Con una sola federación daba igual. Con dos, los botones decían el nombre
+   * de la primera y afiliaban a la primera aunque estuvieras mirando la
+   * segunda — un club afiliado a la federación equivocada, sin ningún aviso, y
+   * deshacerlo es sacarlo a mano.
+   */
+  const federacionActiva =
+    orgSel && esOrgGrande(orgSel.type) && mandaEnLaOrg(orgSel.myRole)
+      ? orgSel
+      : null;
   // Un maestro que solo gestiona su club no "administra una organización":
   // su panel se llama por lo que es.
   const soloClubes = orgs.every((o) => !esOrgGrande(o.type));
@@ -452,10 +476,27 @@ export default function MiOrganizacionPage() {
           </ul>
 
           {/* Federación/liga: crear club propio o invitar uno existente */}
-          {federaciones.length > 0 && (
+          {/* Se gestionan los clubes de la federación SELECCIONADA. Si hay
+              varias y estás mirando un club, se dice cómo llegar en vez de
+              esconder la sección: un botón que no está no se echa de menos,
+              pero tampoco se encuentra. */}
+          {federaciones.length > 0 && !federacionActiva && (
+            <p
+              className="mt-5 border-t pt-4 text-sm"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+            >
+              Para crear o afiliar clubes, elige arriba tu{' '}
+              {federaciones.length === 1
+                ? `${TIPO[federaciones[0].type]?.toLowerCase() ?? 'organización'}: ${federaciones[0].name}`
+                : 'federación o liga'}
+              .
+            </p>
+          )}
+
+          {federacionActiva && (
             <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
               <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-                Nuevo club de {federaciones[0].name}
+                Nuevo club de {federacionActiva.name}
               </h3>
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="block text-sm sm:col-span-2">
@@ -480,7 +521,7 @@ export default function MiOrganizacionPage() {
                 onClick={() =>
                   accion(
                     () =>
-                      crearClubHijoAPI(federaciones[0].id, {
+                      crearClubHijoAPI(federacionActiva.id, {
                         name: nuevoClub.name.trim(),
                         type: 'CLUB',
                         city: nuevoClub.city.trim() || undefined,
@@ -534,7 +575,7 @@ export default function MiOrganizacionPage() {
                                 'Le llega la invitación a su maestro, que la acepta o la rechaza. Nada cambia hasta que responda.',
                               textoOk: 'Enviar la invitación',
                             },
-                            () => invitarClubAPI(federaciones[0].id, c.id),
+                            () => invitarClubAPI(federacionActiva.id, c.id),
                             'Invitación enviada al club: su maestro debe aceptarla.',
                             'No se pudo invitar.',
                           )
