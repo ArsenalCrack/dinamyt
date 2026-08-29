@@ -337,32 +337,70 @@ esto cada N minutos» en el local.
 > comparar `exportado_at` y **descartar lo que llegue más viejo que lo que ya
 > tiene**. El campo ya existe en el modelo; solo falta usarlo.
 
+### Qué sube solo, y qué no
+
+Esta es la línea que más se confunde, porque las dos cosas viajan «de vuelta»:
+
+| | ¿Sube solo? | Cuándo |
+|---|---|---|
+| **Resultados**: podios, rankings, llaves terminadas | ✅ **Sí, automático** | Cada pocos minutos durante el evento, y el último envío al terminar |
+| **Altas del día**: personas e inscripciones creadas en el local | ❌ **No** | Se pasan **a mano** después, desde la carpeta `instance/` |
+
+Lo primero es la **decisión 9** y se construye. Lo segundo es la **decisión 7**,
+aplazada al 14 de octubre por elegir B3 para septiembre.
+
+> **Consecuencia práctica del 9 de octubre:** quien se inscriba en la puerta
+> competirá y su medalla llegará al público como la de todos —los resultados
+> suben solos—, pero **esa persona no existirá en la VPS** hasta que alguien la
+> teclee. Por eso la carpeta `instance/` va a dos sitios distintos al terminar:
+> es la única copia de quién compitió.
+
 > **Y guarda el hash de lo último enviado**: si nada cambió, no mandes. En un
 > hotspot de celular eso es la diferencia entre publicar cada tres minutos y
 > quemarle los datos a alguien.
 
 ---
 
-## La arquitectura: una sola app, dos modos
+## La arquitectura: una base de código, dos papeles
 
-Se evaluó partir el producto —dejar en la VPS solo lo visual y las inscripciones,
-y la lógica de puntuación **solo** en el local— y **se descartó**. La diferencia
-entre local y VPS es **de estado, no de código**:
+Son **dos preguntas distintas** y conviene no mezclarlas, porque tienen
+respuestas distintas.
 
-| | Partir la app | **Una app, dos modos** ✅ |
+**¿Una base de código o dos?** → **Una.** Dos compilaciones divergen solas, y la
+del local —la que corre el evento— acabaría siendo la que menos se prueba.
+
+**¿La VPS opera campeonatos alguna vez?** → **No. Nunca.** La consola de
+puntuación, los tatamis y el combate en vivo son del local, siempre. En el
+despliegue de la VPS esa parte **no se expone**: su papel es **inscribir antes** y
+**mostrar durante y después**.
+
+| | La VPS | El local |
 |---|---|---|
-| Conflictos de escritura | Imposibles por construcción | Imposibles por el candado de `sede` — misma garantía |
-| Codebase | **Dos**, que divergen solos | **Una**. Todo cambio se prueba en los dos lados |
-| Campeonato pequeño con buen wifi | **Nunca** se podría correr en la VPS | Se puede, si su `sede` es `nube` |
-| Si muere el PC del evento | Segundo portátil, y nada más | Segundo portátil, y **en el peor caso** seguir las llaves que falten en la VPS |
-| El camino local | Un producto aparte que se ejercita solo en eventos | El mismo binario de siempre |
+| Inscripciones antes del evento | ✅ | ✅ (las del día) |
+| **Consola de puntuación y tatamis** | ❌ **nunca** | ✅ |
+| Combate en vivo, sockets | ❌ | ✅ |
+| Vista pública de resultados | ✅ | ✅ |
+| **Quién escribe durante el evento** | ❌ solo lectura | ✅ **el único** |
 
-La razón de fondo es la misma que la regla 7 de `B3-RIESGOS.md`: **un camino que
-solo corre en la emergencia se pudre en silencio.** Si el local es una compilación
-distinta, deriva. Si es el mismo binario en otro modo, cada cambio pasa por él.
+### Por qué la VPS no puede operar, aunque técnicamente podría
 
-Y el beneficio que perseguía partirlo —que no haya dos escritores— ya lo da el
-candado de propiedad, que además es **reversible** y por campeonato.
+Si el campeonato **se pudiera** correr desde internet, algún día se correría — y
+el camino local pasaría a ser el que solo se usa cuando algo falla. **Un camino
+que solo corre en la emergencia se pudre en silencio**, que es la misma regla 7
+de `B3-RIESGOS.md`.
+
+Corriendo **siempre** en local, el camino del evento es el mismo todos los días y
+está probado por definición. Y los dos escritores dejan de ser un riesgo que hay
+que vigilar: **no existe una segunda consola** que pudiera escribir.
+
+Se paga un precio, y conviene decirlo en voz alta: **un campeonato pequeño con
+buen wifi tampoco se podrá correr por internet.** Es un precio aceptado a cambio
+de que la consola del evento sea siempre la misma.
+
+> **Se implementa con configuración, no con un fork.** Mismo binario: el
+> despliegue de la VPS arranca en modo nube y no expone las rutas de consola. El
+> candado de `sede` sigue existiendo como red de seguridad, pero deja de ser lo
+> único que separa a los dos.
 
 ---
 
