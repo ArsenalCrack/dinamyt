@@ -623,17 +623,33 @@ la campana de la app, para cuando entre.
 
 ### Qué hace falta para que los avisos del alumno funcionen
 
-`[ ]` **Las llaves VAPID.** Sin `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` en
-      `membresias-api` —y la pública también en `membresias-web`— `enviarPush`
-      devuelve `false` y no sale nada. Se generan con
-      `pnpm --filter @dinamyt/membresias-api gen:vapid`.
+`[x]` **Las llaves VAPID.** *(comprobado el 29 ago 2026)* Están las tres en
+      `membresias-api/.env` y la pública coincide con la de la web.
 
-`[ ]` **El reloj diario** (§2.7). Sin él, los avisos solo existen cuando el
-      maestro pulsa «Generar avisos» en su panel.
+`[x]` **El reloj diario** (§2.7). *(comprobado el 29 ago 2026)*
+      `dinamyt-avisos.timer` está `enabled` y dispara a las 08:00; en el journal
+      salen sus dos líneas cada mañana.
 
-Mientras las dos cosas no estén, lo único que ocurre es el botón del maestro, y
-lo único que genera es el aviso in-app. Es un estado válido —nada se rompe— pero
-conviene saber que es el que hay.
+### Y aun así no llega nada: la tercera pieza es la gente
+
+`[ ]` **Nadie está suscrito.** El aviso diario dice
+      `{"clubes":3,"creados":12,"pushEnviados":0}` — doce avisos creados, cero
+      enviados, todos los días. No es configuración: es que **nadie ha instalado
+      la PWA y aceptado las notificaciones**, así que no hay destinatarios.
+
+```bash
+sudo -u postgres psql -d dinamyt -P pager=off -c "select count(*) as suscripciones from membresias.push_subscriptions;"
+```
+
+      Si sale 0, es eso. Se cierra desde el celular, no desde el servidor:
+      instalar Membresías («Añadir a pantalla de inicio»), entrar y activar los
+      avisos. Al día siguiente `pushEnviados` deja de ser 0.
+
+> ⚠️ **Dónde mirar, que cuesta una confusión.** `membresias-web` **no tiene
+> `.env`**: sus variables viven en **`.env.production`**. Buscar en el archivo
+> equivocado hace parecer que falta la clave pública cuando está puesta. Y
+> `NEXT_PUBLIC_*` se hornea **en el build**: si algún día se cambia, hay que
+> reconstruir la web, no basta con reiniciarla.
 
 ## 4.7 La persona se edita en el portal; la ficha, en su app
 
@@ -1287,8 +1303,12 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
       enseñando «Entrar a Membresías». Cerrarlo exige que el ecosistema lea el
       estado de Membresías, o que el botón cuente lo que pasó cuando falle.
 
-`[ ]` **Al alumno no le llega ningún aviso automático todavía**: faltan las
-      llaves VAPID y el reloj diario. Ver §4.6 — están los dos comandos.
+`[ ]` **Al alumno no le llega ningún aviso automático todavía — pero ya no es
+      culpa del servidor.** *(comprobado el 29 ago 2026)* Las llaves VAPID están
+      puestas y coinciden, y el reloj diario lleva días disparando a las 08:00.
+      Lo que falta es **que alguien se suscriba**: `pushEnviados` es 0 cada día
+      porque nadie ha instalado la PWA ni aceptado los avisos. Se cierra desde
+      un celular, no desde el VPS. Ver §4.6.
 
 `[ ]` **WhatsApp para los avisos del alumno.** Es el canal que la gente de
       verdad lee, y el que el maestro ya usa a mano. **No está construido.**
