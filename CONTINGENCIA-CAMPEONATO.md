@@ -14,6 +14,28 @@ Eso ya está construido (`PLAN-SINCRONIZACION-LOCAL-ONLINE.md` de Campeonatos).
 Lo que hace falta es **haberse traído los datos antes**, y eso es lo que
 organiza este documento.
 
+> ## ⛔ No se puede empezar en la VPS y pasarse a local a mitad
+>
+> Es la pregunta que surge sola —«si se va el internet en pleno campeonato, me
+> muevo al local y sigo»— y **la respuesta es no**. Tres razones, y la tercera
+> lo cierra:
+>
+> 1. **El paquete no lleva los combates.** `exportar_campeonato()` exporta
+>    campeonato, tatamis, usuarios, asignaciones, competidores, inscripciones y
+>    llaves. `combates` y `eventos_combate` **no están**: te llevarías las
+>    llaves como estaban, sin nada de lo peleado desde entonces.
+> 2. **El estado vivo del tatami es un JSON en el servidor**
+>    (`_persistir_estados()`, en `sockets/combate_ns.py`) — fuera de la base y
+>    fuera del paquete. El marcador en curso, el combate actual, el reloj y las
+>    propuestas de los jueces pendientes de mesa no viajan.
+> 3. **Sin internet no puedes ni exportar.** La exportación es una llamada HTTP
+>    **a la VPS**. El mecanismo que te rescataría necesita justo lo que acaba de
+>    fallar.
+>
+> Por eso el evento **corre en local desde el minuto uno**. No es una precaución
+> exagerada: es la única configuración que sobrevive. **El local no es el plan B,
+> es el plan A.**
+
 ---
 
 ## Qué pasa si se cae cada cosa
@@ -185,3 +207,91 @@ Escrito aquí para que se decida a tiempo, no el día 9.
 | **Resultados en vivo para el público** | Durante el evento, quien mire `campeonatos.dinamyt.org` ve los datos de antes de empezar | Publicar resultados por bloques desde el local cuando haya internet, o aceptarlo y avisarlo |
 | **Fotos de los competidores** | Viajan dentro del paquete si están en la ficha | Nada, pero ojo con el peso del archivo si hay muchas |
 | **La identidad del ecosistema** | El paquete crea a la gente **sin contraseña** y sin `eco_sub`: el local no sabe nada del ecosistema, que es justo lo que se quiere | Nada. Es el diseño, no un olvido |
+
+---
+
+# Anexo 2 · La solución permanente: traspaso de propiedad
+
+> Lo de arriba resuelve **el campeonato de octubre**. Esto es lo que hay que
+> construir para que el de dentro de un año **se resuelva solo**, sin que nadie
+> tenga que acordarse de nada. Va después del 14 de octubre.
+
+## El eslabón débil no es la conexión: es la memoria
+
+Vuelve a leer la última fila de «Qué pasa si se cae cada cosa»:
+
+> *«Te olvidaste de exportar el paquete y el VPS está caído → **No hay evento.**»*
+
+Es el único fallo sin marcha atrás, y el único que depende de que **una persona
+se acuerde**. Todo lo demás del plan tiene repuesto: hay segundo portátil,
+segundo router, UPS y tres copias del paquete. Contra el olvido no hay repuesto.
+
+## Lo que NO se debe construir: sincronización bidireccional
+
+Dos copias que pueden escribir lo mismo a la vez obligan a resolver conflictos
+campo a campo — y esa resolución se estrenaría el peor día del año. El propio
+plan de sincronización ya lo evaluó y lo descartó como mecanismo principal:
+*la red del polideportivo no es fiable, y un sync a medias es peor que un archivo
+en USB.*
+
+## Lo que sí: un solo dueño a la vez, y el dueño se traspasa
+
+En vez de resolver conflictos, **hacerlos imposibles**. Tres mecanismos:
+
+### 1 · El local se mantiene caliente solo
+
+Mientras haya internet, la instalación local **descarga el paquete cada pocos
+minutos, sola**. Nadie «exporta antes del evento»: el local está *siempre* listo.
+
+En pantalla, siempre visible:
+
+    Al día · última sincronización hace 3 min
+    Sin conexión desde las 09:14 · trabajando en local
+
+Si el VPS muere a las seis de la mañana del día 9, el local ya tiene todo lo de
+las 5:50. **La memoria sale del camino crítico**, que es el único objetivo real
+de este anexo.
+
+### 2 · El campeonato tiene dueño, y se traspasa explícitamente
+
+Un estado nuevo en el campeonato: `sede = nube | local:<id-instalación>`.
+
+- Se marca «este campeonato corre en local» → **la VPS lo pone en solo lectura**.
+  Se cierran las inscripciones allí y nadie lo edita.
+- El local pasa a ser **el único que escribe**. Todo lo que crea lleva su `uid` y
+  el identificador de la instalación.
+- Al terminar, el local **devuelve la propiedad**: empuja su delta y la VPS
+  reabre.
+
+**Un escritor a la vez.** No hace falta resolver conflictos porque no puede
+haberlos, y eso es demostrable — una fusión campo a campo nunca lo es del todo.
+
+### 3 · El transporte es lo de menos
+
+El mismo JSON viaja **por HTTP si hay red, por USB si no**. HTTP es la comodidad;
+USB es la garantía. Y como el traspaso del punto 2 ya ocurrió, la vuelta puede
+esperar días sin que nada se corrompa.
+
+> Esto automatiza **el estar preparado**, no el momento crítico. Es la diferencia
+> que hace que el diseño respete el veredicto de siempre sobre el sync
+> automático en vez de contradecirlo.
+
+## Lo que NO puede ser automático, y hay que aceptar
+
+Decidir si el «Juan Pérez» que se inscribió en el tatami es el «Juan Pérez» que
+ya tiene cuenta en DINAMYT. El sistema puede **proponer** coincidencias —por
+documento, por nombre + club, por fecha de nacimiento— pero **confirma una
+persona**. Automatizarlo genera identidades duplicadas: el problema caro.
+
+## Lo que cambia en el código, que es poco
+
+| Cambio | Dónde |
+|---|---|
+| `Campeonato.sede` + `instalacion_id` | `models/campeonato.py`, vía `schema_compat.py` — sin migraciones |
+| Descarga periódica mientras haya red | Nuevo, solo en el local. Reutiliza `exportar_campeonato()` |
+| Indicador de frescura | Frontend, una franja siempre visible |
+| Bloqueo de solo lectura en la VPS | Un guard sobre el campeonato con `sede != nube` |
+| Devolución de propiedad | Extiende el paquete de vuelta con las altas del día |
+
+**Es independiente de B3.** Funciona con la identidad única o sin ella, así que
+construirlo no depende de esperar a nadie — y B3 tampoco lo invalida después.
