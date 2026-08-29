@@ -1032,6 +1032,67 @@ Levanta PGlite **en la zona de Bogotá** a propósito, y además comprueba que u
 `now()` de la base seguiría saliendo 300 minutos desviado: si esa comprobación
 falla, es que el ensayo se está corriendo en UTC y no está probando nada.
 
+## 5.1-ter Campeonatos se bloqueaba contra sí mismo al arrancar
+
+**Costó una mañana de servicio caído, el 29 de agosto de 2026.** El síntoma:
+`campeonatos.dinamyt.org` cargaba la página, pero **todo lo que colgaba de
+`/api/` y `/socket.io/` se quedaba esperando para siempre** — ni un 502, ni un
+error en ningún registro, y `systemctl` diciendo `active`.
+
+El mecanismo, que no se parece al síntoma:
+
+1. `wsgi.py` siembra al arrancar. `seed_admin()` hace
+   `Usuario.query.filter_by(email=…).first()` y, **cuando el admin ya existe y
+   ya es superadmin, sale por una rama sin `commit()`**
+   (`seed_admin.py:24-26`). La transacción del ORM queda abierta reteniendo un
+   `ACCESS SHARE` sobre `usuarios`.
+2. Diez líneas después, `ensure_rls()` lanza
+   `ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY` **desde otra conexión del
+   pool** (`rls.py:205`, `db.engine.begin()`). Pide `ACCESS EXCLUSIVE` sobre esa
+   misma tabla y **espera a su propio hermano**.
+3. A los cinco minutos exactos, `idle_in_transaction_session_timeout` mata la
+   sesión ociosa y el `ALTER` consigue por fin el candado…
+4. …pero el cierre del contexto de Flask hace `ROLLBACK` sobre una conexión ya
+   muerta, el worker sale con código 3, **gunicorn apaga el master entero**
+   («Worker failed to boot») y systemd lo levanta. Ciclo de cinco minutos, para
+   siempre.
+
+**El `try/except` de `wsgi.py` no protege de esto**, y su comentario engaña por
+eso: **un bloqueo no es una excepción**. La excepción llega cinco minutos tarde
+y en el cierre del contexto, fuera del `try`.
+
+### Cómo se distingue de §5.1
+
+- `NRestarts` sube solo. El reinicio manual «funciona» y a los cinco minutos
+  vuelve a caer.
+- Directo al puerto, saltándose Caddy, **también** se cuelga:
+  `curl -m 12 http://127.0.0.1:5000/`.
+- Y sobre todo, en `pg_stat_activity` el bloqueado y el bloqueador son **el
+  mismo usuario**:
+
+```bash
+sudo -u postgres psql -d dinamyt -P pager=off -c "select pid, usename, state, wait_event_type, pg_blocking_pids(pid) as bloqueado_por, now()-xact_start as tx_edad, left(query,60) from pg_stat_activity where datname='dinamyt' order by xact_start nulls last;"
+```
+
+Si los dos son `dinamyt_camp`, es esto — y **no se arregla matando conexiones**:
+matarlas es exactamente lo que ya hace el timeout cada cinco minutos.
+
+### El arreglo
+
+Una línea en `wsgi.py`, entre los seeds y el bloque de RLS, que suelta el
+candado antes del DDL:
+
+```python
+    db.session.commit()
+```
+
+> ⚠️ **Aplicado en el servidor el 29 ago 2026, y NO está en git.**
+> `dinamyt-combat` no estaba clonado, así que el parche vive solo en
+> `/srv/campeonatos/backend/wsgi.py` (con `wsgi.py.bak` al lado). **El próximo
+> despliegue lo borra y la caída vuelve.** Es deuda con fecha de caducidad:
+> hasta que se commitee, cualquiera que despliegue Campeonatos tira el servicio
+> sin saber por qué.
+
 ## 5.2 `postgresql:///base` no significa lo mismo para todos
 
 Para `psql` es «por el socket Unix». Para el driver de Node es **TCP a
@@ -1272,9 +1333,18 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
 `[ ]` **`backend/app/config.py:64` de Campeonatos** trae `admin@dinamyt.com`
       por defecto, y ese dominio es de otra persona. Debe ser `.org`.
 
-`[ ]` **Campeonatos ejecuta DDL al arrancar** (§5.1). Dos costuras lo cierran:
-      un `SET lock_timeout = '5s'` antes del DDL, y cerrar la sesión en el
-      `teardown_appcontext` de Flask.
+`[ ]` **Campeonatos ejecuta DDL al arrancar** (§5.1). **Ya tiró el servicio una
+      mañana entera** — el relato completo y cómo se reconoce, en §5.1-ter. El
+      bloqueo en sí está parcheado en el servidor con un `db.session.commit()`
+      en `wsgi.py`, **pero ese parche no está en git y el próximo despliegue lo
+      borra**. Lo que falta:
+
+      · **Commitear el arreglo en `dinamyt-combat`.** Es lo primero, y hasta que
+        pase, desplegar Campeonatos vuelve a tirarlo.
+      · `SET lock_timeout = '5s'` antes del DDL en `rls.py`, para que la próxima
+        vez **falle en cinco segundos en vez de colgarse cinco minutos**. No
+        evita el bloqueo: lo hace visible, que es lo que faltó aquí.
+      · Cerrar la sesión en el `teardown_appcontext` de Flask.
 
 ## 6.2 Después del campeonato (desde el 14 de octubre)
 
