@@ -355,52 +355,77 @@ aplazada al 14 de octubre por elegir B3 para septiembre.
 > teclee. Por eso la carpeta `instance/` va a dos sitios distintos al terminar:
 > es la única copia de quién compitió.
 
+### El documento es la llave que lo arregla después
+
+Aunque la ficha se quede atrás, **lo competido no se pierde para su dueño** — y
+esto es lo que hace que valga la pena pedir el documento en la mesa de
+inscripción del evento:
+
+| | Campo | Tipo |
+|---|---|---|
+| Campeonatos | `competidores.documento` | `varchar(30)`, único |
+| Ecosystem | `users.document_id` | `varchar(30)`, único |
+
+Mismo formato y único en los dos lados. Así, cuando esa persona **se cree su
+cuenta de DINAMYT meses después**, el sistema puede buscar competidores con su
+mismo documento y sin dueño, y proponérselos:
+
+> *«Encontramos 3 participaciones a nombre de tu documento. ¿Son tuyas?»*
+
+Funciona **hacia atrás**: reclama también lo competido hace años. Es el bloque
+**C9** de B3 (§4.2 del plan maestro), y depende del **C8** — la columna que
+enlaza un competidor con una persona.
+
+> ⚠️ **Se confirma, no se asigna solo.** Un documento tecleado a las prisas en la
+> mesa de inscripción puede tener un dígito cambiado, y atribuirle a alguien las
+> medallas de otro en silencio es peor que no atribuir nada. El sistema propone;
+> la persona confirma; y un administrador puede deshacerlo.
+
+> **Y quien no dio documento no se puede reclamar solo.** Ese enlace lo hace el
+> maestro a mano. Es la razón práctica para pedir el documento aunque ese día
+> parezca papeleo de más.
+
 > **Y guarda el hash de lo último enviado**: si nada cambió, no mandes. En un
 > hotspot de celular eso es la diferencia entre publicar cada tres minutos y
 > quemarle los datos a alguien.
 
 ---
 
-## La arquitectura: una base de código, dos papeles
+## La arquitectura: una base de código, y un candado que decide
 
-Son **dos preguntas distintas** y conviene no mezclarlas, porque tienen
-respuestas distintas.
+Son **dos preguntas distintas** y conviene no mezclarlas.
 
 **¿Una base de código o dos?** → **Una.** Dos compilaciones divergen solas, y la
 del local —la que corre el evento— acabaría siendo la que menos se prueba.
 
-**¿La VPS opera campeonatos alguna vez?** → **No. Nunca.** La consola de
-puntuación, los tatamis y el combate en vivo son del local, siempre. En el
-despliegue de la VPS esa parte **no se expone**: su papel es **inscribir antes** y
-**mostrar durante y después**.
+**¿Quién opera un campeonato?** → **Lo decide el candado, no el código.** Cada
+campeonato lleva su `sede`: `local:<id-instalación>` o `nube`. El que no es dueño
+lo ve en **solo lectura**.
 
-| | La VPS | El local |
-|---|---|---|
-| Inscripciones antes del evento | ✅ | ✅ (las del día) |
-| **Consola de puntuación y tatamis** | ❌ **nunca** | ✅ |
-| Combate en vivo, sockets | ❌ | ✅ |
-| Vista pública de resultados | ✅ | ✅ |
-| **Quién escribe durante el evento** | ❌ solo lectura | ✅ **el único** |
+### La regla de uso, que no es lo mismo que la capacidad
 
-### Por qué la VPS no puede operar, aunque técnicamente podría
+**Los campeonatos de verdad —los que llenan un pabellón— corren siempre en
+local, desde el minuto uno.** La VPS inscribe antes y muestra durante y después.
 
-Si el campeonato **se pudiera** correr desde internet, algún día se correría — y
-el camino local pasaría a ser el que solo se usa cuando algo falla. **Un camino
-que solo corre en la emergencia se pudre en silencio**, que es la misma regla 7
-de `B3-RIESGOS.md`.
+**Pero la capacidad no se amputa**, por dos razones:
 
-Corriendo **siempre** en local, el camino del evento es el mismo todos los días y
-está probado por definición. Y los dos escritores dejan de ser un riesgo que hay
-que vigilar: **no existe una segunda consola** que pudiera escribir.
+- **Un minicampeonato sin el PC del evento a mano es un caso real.** Prohibirlo
+  para siempre es un precio alto por una garantía que el candado ya da.
+- **Quitar la consola no evitaba los dos escritores.** Eso lo evita el candado,
+  que se pone y se quita. Una capacidad borrada, no.
 
-Se paga un precio, y conviene decirlo en voz alta: **un campeonato pequeño con
-buen wifi tampoco se podrá correr por internet.** Es un precio aceptado a cambio
-de que la consola del evento sea siempre la misma.
+### Entonces, ¿qué impide que el camino local se pudra?
 
-> **Se implementa con configuración, no con un fork.** Mismo binario: el
-> despliegue de la VPS arranca en modo nube y no expone las rutas de consola. El
-> candado de `sede` sigue existiendo como red de seguridad, pero deja de ser lo
-> único que separa a los dos.
+El miedo era legítimo —un camino que solo corre en la emergencia se pudre en
+silencio, la regla 7 de `B3-RIESGOS.md`— pero **no se arregla amputando, se
+arregla con una costumbre**, y la costumbre ya está escrita aquí:
+
+> **El simulacro antes de cada campeonato** (§1.1), y el evento corriendo en
+> local desde el minuto uno. Si cada campeonato de verdad usa ese camino, y antes
+> de cada uno se ensaya, está probado. No hace falta quitar nada.
+
+> **Se implementa con configuración, no con un fork.** Mismo binario en los dos
+> sitios; lo que cambia es de quién es el candado.
 
 ---
 
