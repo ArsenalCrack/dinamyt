@@ -364,6 +364,26 @@ export class OrganizationsController {
     return this.orgsService.invitarClub(orgId, body.clubId, user.sub);
   }
 
+  // ── POST /organizations/:id/afiliar-club — el super-admin, a dedo ─────────
+  // Sin invitación y sin preguntarle al maestro: ver el comentario largo del
+  // servicio. La federación sigue teniendo que invitar (`invitar-club`).
+  @Post(':id/afiliar-club')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  afiliarClub(@Param('id') orgId: string, @Body() body: { clubId: string }) {
+    return this.orgsService.afiliarClubDirecto(orgId, body.clubId);
+  }
+
+  // ── DELETE /organizations/:id/clubes/:clubId — sacarlo de la federación ───
+  // El deshacer del de arriba, y por eso lleva el mismo guardia.
+  @Delete(':id/clubes/:clubId')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  desafiliarClub(
+    @Param('id') orgId: string,
+    @Param('clubId') clubId: string,
+  ) {
+    return this.orgsService.desafiliarClub(orgId, clubId);
+  }
+
   // ── GET /organizations/:id/invitaciones-club — enviadas por la org ────────
   @Get(':id/invitaciones-club')
   @UseGuards(EcosystemJwtGuard)

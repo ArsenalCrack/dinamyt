@@ -973,6 +973,18 @@ export const actualizarOrgInfoAPI = async (
 ) => (await api.patch(`/organizations/${orgId}`, data)).data;
 export const invitarClubAPI = async (orgId: string, clubId: string) =>
   (await api.post(`/organizations/${orgId}/invitar-club`, { clubId })).data;
+/**
+ * Afiliar un club **a dedo**, sin invitación. Solo el super-admin.
+ *
+ * Es el camino del panel de `/admin`. El de la federación sigue siendo
+ * `invitarClubAPI`: ahí sí se le pregunta al maestro, y esa diferencia es la
+ * regla, no un descuido. El porqué está en `afiliarClubDirecto` (ecosystem-api).
+ */
+export const afiliarClubAPI = async (orgId: string, clubId: string) =>
+  (await api.post(`/organizations/${orgId}/afiliar-club`, { clubId })).data;
+/** El deshacer del anterior: saca al club de su federación. */
+export const desafiliarClubAPI = async (orgId: string, clubId: string) =>
+  (await api.delete(`/organizations/${orgId}/clubes/${clubId}`)).data;
 export const invitacionesClubEnviadasAPI = async (
   orgId: string,
 ): Promise<InvitacionClub[]> =>

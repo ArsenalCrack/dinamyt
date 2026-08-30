@@ -1043,6 +1043,113 @@ export class OrganizationsService {
     return inv;
   }
 
+  // ── Afiliar un club a dedo, sin preguntarle a nadie (solo super-admin) ────
+  /**
+   * Cuelga el club de la federación **en el acto**. Sin invitación.
+   *
+   * ── Por qué existe, teniendo `invitarClub` al lado ────────────────────────
+   *
+   * Son dos caminos con dos dueños distintos, y esa es toda la diferencia:
+   *
+   *   · `invitarClub` es de la FEDERACIÓN. Ahí la invitación no es burocracia:
+   *     una federación no puede llevarse un club ajeno sin que su maestro diga
+   *     que sí, igual que nadie entra a un club sin que lo dejen (§4.4).
+   *   · Esta es del SUPER-ADMIN, que es quien monta la estructura del
+   *     ecosistema y ya crea, desactiva y borra organizaciones desde el mismo
+   *     panel. Pedirle una invitación —y que el maestro del club, que muchas
+   *     veces es él mismo montando el club de un cliente, la acepte desde otra
+   *     cuenta— era pedirle permiso a sí mismo para hacer su trabajo.
+   *
+   * **No sustituye a la invitación, la acompaña.** Quien manda en la
+   * federación sigue teniendo que preguntar.
+   *
+   * ── Lo que cambia de verdad al afiliar ────────────────────────────────────
+   *
+   * La gente del club pasa a abrir lo que la federación tenga contratado
+   * (§4.5), y eso **no es instantáneo**: los `app_scopes` viajan dentro del
+   * pase, que dura 30 minutos. Se nota en la siguiente renovación o al volver
+   * a entrar.
+   *
+   * ── Un club que ya cuelga de otra federación NO se mueve de un tirón ──────
+   *
+   * Se pide sacarlo primero. Mover en un solo paso significa quitarle a toda
+   * su gente los planes de la federación vieja y darle los de la nueva sin que
+   * nadie llegue a leer que eso pasó; en dos pasos, el de en medio es
+   * exactamente el aviso que hace falta.
+   */
+  async afiliarClubDirecto(orgId: string, clubId: string) {
+    const org = await this.findById(orgId);
+    if (org.type !== 'FEDERATION' && org.type !== 'LEAGUE') {
+      throw new BadRequestException(
+        'Solo una federación o liga puede tener clubes afiliados.',
+      );
+    }
+    const club = await this.findById(clubId);
+    if (club.type !== 'CLUB' && club.type !== 'ACADEMY') {
+      throw new BadRequestException('Solo se afilian clubes o academias.');
+    }
+    if (club.parentId === orgId) {
+      throw new BadRequestException('Ese club ya pertenece a esta organización.');
+    }
+    if (club.parentId) {
+      throw new BadRequestException(
+        'Ese club ya pertenece a otra organización: sácalo de ella primero.',
+      );
+    }
+
+    // `isNull` en el WHERE y no solo el id: entre la comprobación de arriba y
+    // esta línea cabe otra petición afiliándolo. Sin él, la última en llegar
+    // se lo lleva en silencio.
+    await db
+      .update(organizations)
+      .set({ parentId: orgId, updatedAt: new Date() })
+      .where(and(eq(organizations.id, clubId), isNull(organizations.parentId)));
+
+    // Si había una invitación esperando, deja de esperar. Al maestro no se le
+    // puede seguir preguntando por algo que ya pasó — y una invitación viva a
+    // una federación en la que ya está es la clase de resto que después nadie
+    // sabe interpretar.
+    await db
+      .update(orgClubInvitations)
+      .set({ status: 'ACEPTADA', respondedAt: new Date() })
+      .where(
+        and(
+          eq(orgClubInvitations.orgId, orgId),
+          eq(orgClubInvitations.clubId, clubId),
+          eq(orgClubInvitations.status, 'PENDIENTE'),
+        ),
+      );
+
+    return { ok: true, orgId, clubId };
+  }
+
+  // ── Sacar un club de su federación (solo super-admin) ─────────────────────
+  /**
+   * El deshacer de `afiliarClubDirecto`, y por eso nace con él.
+   *
+   * Afiliar a dedo sin poder desafiliar deja un panel en el que un clic mal
+   * dado solo se arregla con SQL. No es lo mismo que salirse: aquí no hay a
+   * quién preguntar porque quien decide es el mismo que decidió afiliar.
+   *
+   * ⚠️ **Le quita a toda la gente del club lo que la federación pagaba.** Lo
+   * que el club tenga contratado por su cuenta se queda; lo heredado, no
+   * (§4.5). Y como todo lo que viaja en el pase, se nota en la siguiente
+   * renovación, no al instante.
+   */
+  async desafiliarClub(orgId: string, clubId: string) {
+    const club = await this.findById(clubId);
+    if (club.parentId !== orgId) {
+      throw new BadRequestException(
+        'Ese club no cuelga de esa organización.',
+      );
+    }
+    await db
+      .update(organizations)
+      .set({ parentId: null, updatedAt: new Date() })
+      .where(eq(organizations.id, clubId));
+    return { ok: true, orgId, clubId };
+  }
+
   // ── Invitaciones enviadas por una organización ─────────────────────────────
   async invitacionesClubEnviadas(orgId: string) {
     return db

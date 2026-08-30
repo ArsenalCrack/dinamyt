@@ -707,30 +707,43 @@ cada eslabón de la cadena (`common/jerarquia.ts` + `buildToken`).
 > federación— se nota **en la siguiente renovación del pase o al volver a
 > entrar**. Si alguien necesita verlo ya: que salga y entre.
 
-**Afiliar un club es cosa de dos**, igual que entrar a uno (§4.4): la federación
-invita desde «Mi organización» —seleccionándola en «Estructura», y ahí mismo
-«Invitar un club existente»— y el **maestro del club acepta**. Nadie se lleva un
-club a su federación sin que su maestro diga que sí.
+### Quién afilia un club, y por qué a uno se le pregunta y al otro no
 
-**Y desde el 30 de agosto de 2026 también se invita desde `/admin`.** El panel
-del super-admin enseña la estructura —cada federación con sus clubes debajo, y
-al final los que no cuelgan de nadie— y, al seleccionar una federación, trae su
-propio «Invitar a un club existente». **Sigue siendo por invitación**: el
-super-admin no cuelga clubes a dedo, porque eso lo convertiría en el único que
-entiende —y sostiene— la estructura.
+Hay **dos caminos**, y la diferencia no es un descuido: es de quién es cada uno.
 
-| Desde… | Quién | Qué hace |
+| Desde… | Quién | Qué pasa |
 |---|---|---|
-| «Mi organización» | El `admin` de la federación | Invita clubes y crea clubes nuevos dentro |
-| `/admin` | El super-admin | Lo mismo, sin pertenecer a la federación |
-| El portal del club | El **maestro** del club invitado | **Acepta o rechaza.** Sin esto no pasa nada |
+| «Mi organización» | El `admin` de la **federación** | **Invita.** Le llega al maestro del club, que acepta o rechaza. Nada cambia hasta que responda |
+| `/admin` | El **super-admin** | **Afilia en el acto.** No se le pregunta a nadie. Y lo puede deshacer con la ✕ |
+
+La invitación existe para que una federación no se lleve un club ajeno sin que
+su maestro diga que sí — es la misma regla que entrar a un club (§4.4). **El
+super-admin no está en esa conversación**: monta la estructura del ecosistema y
+desde ese mismo panel ya crea, desactiva y borra organizaciones. Pedirle que se
+mandara una invitación a sí mismo y se la aceptara desde otra cuenta era
+ceremonia, no salvaguarda.
+
+Lo que sí hacía falta era **poder deshacerlo**: cada club afiliado lleva su ✕ en
+el panel. Un panel que afilia de un clic y solo se corrige con SQL es peor que
+uno que no afilia.
+
+**El panel enseña además la estructura** —cada federación con sus clubes debajo,
+y al final los que no cuelgan de nadie—, que es lo que antes no se veía: en una
+lista plana, un club afiliado y uno huérfano se ven igual.
+
+| Regla | Por qué |
+|---|---|
+| Un club que ya cuelga de OTRA federación **no se mueve de un tirón** | Hay que sacarlo primero. Mover en un paso le quita a toda su gente unos planes y le da otros sin que nadie llegue a leer que pasó; el paso de en medio **es** el aviso |
+| Sacar un club **le quita lo heredado, no lo suyo** | Lo que el club pague por su cuenta se queda |
+| Afiliar cierra la invitación que estuviera esperando | Al maestro no se le sigue preguntando algo que ya pasó |
+| Nada de esto se nota al instante | Los `app_scopes` viajan en el pase (30 min). Quien lo necesite ya: que salga y entre |
 
 > ⚠️ **Una federación creada desde `/admin` sigue naciendo sin nadie dentro**, y
 > mientras no tenga miembros no aparece en «Mi organización» de nadie. Ya no es
-> un silencio: al crearla queda seleccionada y el panel lo dice en un aviso. El
-> orden sigue siendo crearla → **añadirle su administrador** → esa persona ya la
-> ve. Lo que cambió es que ahora se puede seguir sin ese paso, porque el propio
-> panel afilia.
+> un silencio: al crearla queda seleccionada y el panel lo dice en un aviso.
+> Pero **ya no bloquea nada**: el panel afilia clubes sin necesidad de que la
+> federación tenga administrador. Ponérselo sigue siendo lo correcto — es quien
+> después mira a su gente y responde por ella.
 >
 > Y el desplegable de rol de «+ Añadir» ya solo ofrece lo que ese tipo de
 > organización acepta: una federación admite `admin` y `judge` y nada más. Antes
@@ -1054,7 +1067,15 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 | `GET /mias` · `PATCH /:id` · `GET /:id/members` | gestor | Lo que administro |
 | `POST /:id/invite` | super-admin | Alta directa, sin preguntar (§4.4) |
 | `PATCH` y `DELETE /:id/members/:userId` | gestor | Cambiar rol · quitar. **409 si te lo haces a ti mismo, o si es el último que manda** (§4.7-bis) |
-| `GET /clubes` · `POST /:id/invitar-club` · `GET /invitaciones-club/mias` | varios | Federación ↔ club |
+| `GET /clubes` · `POST /:id/invitar-club` · `GET /invitaciones-club/mias` | varios | Federación ↔ club, **por invitación** |
+| `POST /:id/afiliar-club` · `DELETE /:id/clubes/:clubId` | super-admin | Afiliar **a dedo** · sacarlo. Sin preguntarle al maestro (§4.5) |
+
+> **Las dos rutas de afiliar, que son distintas a propósito:**
+> `POST /organizations/:id/invitar-club` la usa el `admin` de la federación y
+> **crea una invitación**; `POST /organizations/:id/afiliar-club` la usa el
+> super-admin y **escribe el `parent_id` directamente**. Su deshacer es
+> `DELETE /organizations/:id/clubes/:clubId`, con el mismo guardia. El porqué
+> del reparto está en §4.5.
 
 ### `/subscriptions` y `/subscription-plans`
 
@@ -1681,10 +1702,13 @@ que la cookie sobrevivió.
       los roles que ese tipo de organización acepta (una federación, `admin` y
       `judge`; antes ofrecía seis y cuatro acababan en un 400 mudo).
 
-      **Lo que NO se hizo, y a propósito:** desafiliar desde el panel. No hay
-      ruta para ello y no la tendrá de propina — sacar a un club de su
-      federación le quita los planes heredados a toda su gente (§4.5), y eso
-      merece su propia decisión, no un botón al lado del de invitar.
+      **Y el mismo día se afinó**: desde `/admin` no se invita, se **afilia
+      directo**. La invitación protege al maestro de que una federación se
+      lleve su club sin preguntar; el super-admin no está en esa conversación
+      —ya crea, desactiva y borra organizaciones desde ese panel—, así que
+      pedirle que se mandara una invitación a sí mismo era ceremonia. Con su
+      deshacer al lado (la ✕ de cada club afiliado), que es lo que hace que
+      afiliar de un clic no sea una trampa. Las dos rutas y el reparto: §4.5.
 
 `[x]` ~~**El usuario no tiene por dónde escribirte.**~~ Hecho el 29 de agosto de
       2026. `soporte@dinamyt.org` ya recibía (§3.5) pero no aparecía en ninguna

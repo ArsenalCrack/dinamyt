@@ -28,7 +28,8 @@ import {
   listarBloqueadosAPI,
   desbloquearUsuarioAPI,
   crearClubHijoAPI,
-  invitarClubAPI,
+  afiliarClubAPI,
+  desafiliarClubAPI,
   listarClubesAPI,
   invitacionesClubEnviadasAPI,
   extraerError,
@@ -909,16 +910,22 @@ function FilaOrg({
  * clubes. El callejón sin salida se abría por sí solo con solo pulsar «+ Crear
  * organización».
  *
- * ── Afiliar sigue siendo POR INVITACIÓN, también desde aquí ──
+ * ── Aquí se afilia A DEDO, y en «Mi organización» se invita ──
  *
- * El super-admin no cuelga clubes a dedo. Se manda una invitación y **el
- * maestro del club la acepta o la rechaza** desde su portal, exactamente igual
- * que si la mandara la federación. Afiliar a dedo desde el panel convertiría a
- * quien lo opera en el único que entiende la estructura —y en el único
- * responsable de ella—, que es justo lo contrario de lo que hace falta.
+ * No es una excepción a la regla de que afiliar es cosa de dos (§4.4, §4.5):
+ * es que aquí no hay dos. La invitación existe para que una federación no se
+ * lleve un club ajeno sin que su maestro diga que sí. El super-admin no está
+ * en esa conversación — está montando la estructura, y desde este mismo panel
+ * ya crea, desactiva y borra organizaciones. Pedirle que se mande una
+ * invitación a sí mismo y se la acepte desde otra cuenta era ceremonia, no
+ * salvaguarda.
  *
- * Crear un club NUEVO dentro sí es directo: no hay maestro a quien preguntar
- * todavía porque el club no existe hasta que se pulsa el botón.
+ * Lo que sí hace falta es poder DESHACERLO, y por eso cada club afiliado lleva
+ * su ✕: un panel que afilia de un clic y solo se corrige con SQL es peor que
+ * uno que no afilia.
+ *
+ * Crear un club NUEVO dentro también es directo, y ahí ni siquiera hay debate:
+ * no hay maestro a quien preguntar porque el club no existe hasta pulsar.
  */
 function ClubesDeLaFederacion({
   org,
@@ -983,9 +990,14 @@ function ClubesDeLaFederacion({
     <section className="card mt-5 p-5">
       <h2 className="mb-1 text-lg font-semibold">Clubes de {org.name}</h2>
       <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Un club afiliado hereda los planes que contrate {org.name} (§4.5). Los
-        clubes que ya existen se <strong>invitan</strong>: su maestro acepta o
-        rechaza, y nada cambia hasta que responda.
+        Un club afiliado hereda los planes que contrate {org.name} (§4.5).
+        Desde aquí se afilia <strong>directo</strong>, sin invitación y sin
+        esperar a que su maestro responda: este panel monta la estructura. La
+        federación, desde «Mi organización», sí tiene que invitar.
+      </p>
+      <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+        ⏱️ No es instantáneo: los planes viajan dentro del pase, que dura 30
+        minutos. Quien necesite verlo ya, que salga y entre.
       </p>
 
       <ul className="mb-5 flex flex-col gap-1.5">
@@ -999,7 +1011,35 @@ function ClubesDeLaFederacion({
               <strong>{c.name}</strong>
               {c.city && <span style={{ color: 'var(--text-muted)' }}> · {c.city}</span>}
             </span>
-            <span className="badge">{c.type}</span>
+            <span className="flex items-center gap-2">
+              <span className="badge">{c.type}</span>
+              {/* El deshacer de «Afiliar». Sin él, un clic mal dado en el
+                  buscador de al lado solo se arregla con SQL. */}
+              <button
+                onClick={() =>
+                  void onConfirmar(
+                    {
+                      titulo: `¿Sacar a ${c.name} de ${org.name}?`,
+                      detalle:
+                        `Deja de heredar los planes de ${org.name}: su gente pierde el acceso a ` +
+                        'las apps que pagaba la federación. Lo que el club tenga contratado por su ' +
+                        'cuenta se queda. Se nota en la siguiente renovación del pase.',
+                      textoOk: 'Sacarlo de la federación',
+                      tono: 'peligro',
+                    },
+                    () => desafiliarClubAPI(org.id, c.id),
+                    `${c.name} ya no cuelga de ${org.name}.`,
+                    'No se pudo desafiliar.',
+                  )
+                }
+                disabled={ocupado}
+                className="btn btn-outline"
+                style={{ color: 'var(--danger)' }}
+                title={`Sacar a ${c.name} de ${org.name}`}
+              >
+                ✕
+              </button>
+            </span>
           </li>
         ))}
         {clubes.length === 0 && (
@@ -1013,7 +1053,7 @@ function ClubesDeLaFederacion({
         {/* ── Invitar uno que ya existe ─────────────────────────────────── */}
         <div>
           <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-            Invitar a un club existente
+            Afiliar un club existente
           </h3>
           <div className="flex flex-wrap gap-2">
             <input
@@ -1056,20 +1096,22 @@ function ClubesDeLaFederacion({
                     onClick={() =>
                       void onConfirmar(
                         {
-                          titulo: `¿Invitar a ${c.name} a afiliarse a ${org.name}?`,
+                          titulo: `¿Afiliar a ${c.name} a ${org.name}?`,
                           detalle:
-                            'Le llega la invitación a su maestro, que la acepta o la rechaza. Nada cambia hasta que responda.',
-                          textoOk: 'Enviar la invitación',
+                            `Queda dentro en el acto: a su maestro no se le pregunta. Su gente pasa a ` +
+                            `abrir los planes que tenga ${org.name}, en la siguiente renovación del pase. ` +
+                            'Se puede deshacer con la ✕ de la lista de arriba.',
+                          textoOk: 'Afiliarlo ahora',
                         },
-                        () => invitarClubAPI(org.id, c.id),
-                        `Invitación enviada a ${c.name}: su maestro debe aceptarla.`,
-                        'No se pudo invitar.',
+                        () => afiliarClubAPI(org.id, c.id),
+                        `${c.name} ya cuelga de ${org.name}.`,
+                        'No se pudo afiliar.',
                       ).then(() => setTick((n) => n + 1))
                     }
                     disabled={ocupado}
                     className="btn btn-gold"
                   >
-                    Invitar
+                    Afiliar
                   </button>
                 )}
               </li>
@@ -1083,11 +1125,14 @@ function ClubesDeLaFederacion({
 
           {enviadas.length > 0 && (
             <>
+              {/* Ya no salen de aquí —este panel afilia directo— sino de «Mi
+                  organización». Se siguen enseñando porque una invitación
+                  esperando explica por qué un club todavía no está dentro. */}
               <h3
                 className="mb-1 mt-4 text-sm font-semibold"
                 style={{ color: 'var(--text-muted)' }}
               >
-                Invitaciones enviadas
+                Invitaciones que envió la federación
               </h3>
               <ul className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                 {enviadas.map((inv) => (
