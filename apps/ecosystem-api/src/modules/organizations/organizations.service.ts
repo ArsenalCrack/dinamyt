@@ -976,7 +976,7 @@ export class OrganizationsService {
   // ── Clubes/academias del sistema (buscador para invitar o inscribirse) ─────
   // Directorio de vitrina: lo ve cualquier sesión, así que devuelve el nombre y
   // la ciudad del club y nunca su gente. Ver `common/busqueda.ts`.
-  async listarClubes(search?: string) {
+  async listarClubes(search?: string, soloLibres = false) {
     const patron = patronBusqueda(search);
     return db
       .select({
@@ -992,6 +992,11 @@ export class OrganizationsService {
           inArray(organizations.type, ['CLUB', 'ACADEMY']),
           eq(organizations.isActive, true),
           patron ? ilike(organizations.name, patron) : undefined,
+          // Filtrar AQUÍ y no en el navegador, por el `limit` de abajo: con
+          // cien clubes afiliados delante, los libres —los únicos que sirven
+          // en un buscador de afiliar— se quedaban fuera del corte y la lista
+          // salía vacía sin que nada dijera por qué.
+          soloLibres ? isNull(organizations.parentId) : undefined,
         ),
       )
       .orderBy(organizations.name)

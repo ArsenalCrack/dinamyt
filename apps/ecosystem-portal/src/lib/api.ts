@@ -951,8 +951,24 @@ export const crearMiClubAPI = async (data: {
 // llamada fallaba siempre y el `catch` de quien la usaba dejaba los
 // desplegables vacíos. El catálogo vive ahora en `lib/geo.ts` y lo consume el
 // componente `PaisCiudad`.
-export const listarClubesAPI = async (search?: string): Promise<ClubBusqueda[]> =>
-  (await api.get('/organizations/clubes', { params: { search } })).data;
+/**
+ * El directorio de clubes, para los buscadores de afiliar e invitar.
+ *
+ * `libres` deja fuera a los que ya cuelgan de alguna federación. No es un
+ * adorno: un club afiliado no se puede invitar ni afiliar —el servidor lo
+ * rechaza— así que enseñarlo en una lista de la que solo se puede afiliar era
+ * ofrecer un botón que contesta que no. Y con el tope de 100 resultados, los
+ * que no servían empujaban fuera a los que sí.
+ */
+export const listarClubesAPI = async (
+  search?: string,
+  libres = false,
+): Promise<ClubBusqueda[]> =>
+  (
+    await api.get('/organizations/clubes', {
+      params: { search, libres: libres ? 1 : undefined },
+    })
+  ).data;
 export const actualizarOrgInfoAPI = async (
   orgId: string,
   data: {

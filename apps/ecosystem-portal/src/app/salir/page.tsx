@@ -57,10 +57,16 @@ function Salir() {
     // reloj de inactividad del servidor cierra la sesión en veinte minutos.
     // Salir no puede quedarse atascado esperando a una API caída.
     void cerrarSesion().then(() => {
-      // `location.href` y no `router.replace`: el destino habitual está en otro
+      // `location` y no `router.replace`: el destino habitual está en otro
       // origen, y ahí el router de Next no llega.
+      //
+      // Y `replace` y no `href`: esta pantalla es un paso, no un destino.
+      // Empujándola al historial, la flecha atrás volvía aquí y esto cerraba
+      // la sesión y reenviaba otra vez — un rebote del que solo se sale
+      // pulsando atrás muy rápido. Sustituyendo la entrada, atrás lleva a
+      // donde se estaba antes de salir.
       if (destino) {
-        window.location.href = destino.url;
+        window.location.replace(destino.url);
         return;
       }
       router.replace('/login');

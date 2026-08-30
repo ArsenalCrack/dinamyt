@@ -84,10 +84,16 @@ export class OrganizationsController {
   }
 
   // ── GET /organizations/clubes — clubes/academias del sistema (buscador) ───
+  // `?libres=1` deja fuera a los que ya cuelgan de una federación: es lo que
+  // piden los buscadores de afiliar e invitar, donde un club afiliado solo
+  // sirve para ofrecer un botón que el servidor va a rechazar.
   @Get('clubes')
   @UseGuards(EcosystemJwtGuard)
-  listarClubes(@Query('search') search?: string) {
-    return this.orgsService.listarClubes(search);
+  listarClubes(
+    @Query('search') search?: string,
+    @Query('libres') libres?: string,
+  ) {
+    return this.orgsService.listarClubes(search, libres === '1');
   }
 
   // ── GET /organizations/invitaciones-club/mias — pendientes de mis clubes ──

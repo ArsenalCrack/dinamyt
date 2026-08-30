@@ -29,6 +29,7 @@ import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
 import { ROLES_CLUB, ROLES_ORG, mandaEnLaOrg, nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
+import { Aviso, type Mensaje } from '@/components/Aviso';
 import { FilaMiembro } from '@/components/FilaMiembro';
 import { CodigoYSolicitudes } from '@/components/CodigoYSolicitudes';
 import { PaisCiudad } from '@/components/PaisCiudad';
@@ -64,7 +65,7 @@ export default function MiOrganizacionPage() {
   const [offsetGente, setOffsetGente] = useState(0);
   /** Sube tras cada acción sobre un miembro y hace que la lista se recargue. */
   const [recargaGente, setRecargaGente] = useState(0);
-  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [msg, setMsg] = useState<Mensaje | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [cargando, setCargando] = useState(true);
   const { confirmar, dialogo } = useConfirmar();
@@ -226,7 +227,9 @@ export default function MiOrganizacionPage() {
 
   async function buscarClubes() {
     try {
-      const res = await listarClubesAPI(busquedaClub.trim() || undefined);
+      // Solo los que no cuelgan de nadie: a un club ya afiliado no se le
+      // puede mandar una invitación, y el servidor la rechaza.
+      const res = await listarClubesAPI(busquedaClub.trim() || undefined, true);
       // Solo clubes sin organización (los afiliados no se pueden invitar).
       setClubesEncontrados(res.filter((c) => !c.parentId && c.id !== sel));
     } catch {
@@ -306,14 +309,11 @@ export default function MiOrganizacionPage() {
           : 'La organización afilia clubes y agrega administradores y jueces; cada club agrega a sus maestros, coaches y alumnos.'}
       </p>
 
-      {msg && (
-        <p
-          className="mb-4 text-sm"
-          style={{ color: msg.tipo === 'ok' ? '#3ecf8e' : 'var(--danger)' }}
-        >
-          {msg.texto}
-        </p>
-      )}
+      {/* Flotante, y no un párrafo aquí arriba. La lista de gente está dos
+          pantallas más abajo, y desde ahí este renglón no se veía nunca: se
+          pulsaba la ✕, se confirmaba, y la pantalla parecía no hacer nada —
+          con el motivo escrito fuera de la vista. Ver `Aviso`. */}
+      <Aviso msg={msg} onCerrar={() => setMsg(null)} />
 
       {/* ── Invitaciones RECIBIDAS por mis clubes (aceptar / rechazar) ────── */}
       {recibidas.length > 0 && (

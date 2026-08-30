@@ -707,6 +707,30 @@ cada eslabón de la cadena (`common/jerarquia.ts` + `buildToken`).
 > federación— se nota **en la siguiente renovación del pase o al volver a
 > entrar**. Si alguien necesita verlo ya: que salga y entre.
 
+### El club tiene Membresías y su federación también: ¿cuál manda?
+
+**Ninguno. No compiten: se suman.** `app_scopes` es la UNIÓN de todo lo que
+abre cada eslabón de la cadena —el plan del club, el de su federación, y las
+suscripciones personales de la persona— y después se quitan los repetidos
+(`buildToken`, paso 3). No hay «fuente de verdad» que gane, porque la pregunta
+que se responde ahí no es *cuál plan* sino *qué apps abre esta persona*, y a esa
+pregunta dos planes que dicen `membresias` contestan lo mismo.
+
+Con lo cual, para el ACCESO da igual cuál sobre. Pero **no da igual para nada
+más**, y esto es lo que hay que tener claro:
+
+| | |
+|---|---|
+| **Se cobra dos veces** | Son dos filas de `subscriptions` con su monto cada una, y el panel de recaudo suma las dos como esperado del mes. Nada detecta que el club está pagando algo que su federación ya le da |
+| **Vencer no se nota** | Si el del club caduca y el de la federación sigue vivo, nadie pierde el acceso — y por tanto nadie avisa de que hay una suscripción vencida. El aviso de vencimiento (§4.6) sí sale, al maestro |
+| **Quitar el de la federación tampoco** | Mientras el del club siga activo. El «se rompió al desafiliar» aparece solo cuando lo heredado era lo único que había |
+
+> **Qué hacer cuando pasa.** Decidir **quién paga** y dejar una sola
+> suscripción viva: si paga la federación por todos, la del club se deja
+> vencer o se pasa a `CANCELLED`; si el club paga lo suyo, el plan de la
+> federación no debería incluir `membresias`. Mientras las dos estén `ACTIVE`,
+> los números del panel de recaudo están inflados por esa diferencia.
+
 ### Quién afilia un club, y por qué a uno se le pregunta y al otro no
 
 Hay **dos caminos**, y la diferencia no es un descuido: es de quién es cada uno.
@@ -873,6 +897,33 @@ conviene tener escritas:
 - Cuando alguien sale de un club **de verdad**, hay que darlo de baja en las dos.
 
 Para comprobar que el canal está vivo: §2.6-bis.
+
+### «Le cambié el rol y solo se vio en Campeonatos»
+
+Pasa, y las dos mitades son correctas. **El rol del pase solo decide el rol
+local la primera vez**, cuando la app crea la fila de esa persona; a partir de
+ahí manda el rol de la app. Es la misma regla en las tres:
+
+| App | Dónde nace el rol | Qué manda después |
+|---|---|---|
+| Campeonatos | `espejo.py`, al crear el espejo | `usuarios.rol` |
+| Academy | Al crear su fila | Su rol local |
+| Membresías | `aprovisionarFicha`, al crear la ficha | `users.role` |
+
+Así que el cambio se ve en la app donde esa persona **todavía no tenía fila** —
+entró después de tocarle el rol y su fila nació con el nuevo— y no se ve en la
+que ya la tenía. Desde fuera parece que una obedeció y la otra no; lo que pasó
+es que a una se le preguntó y a la otra no hacía falta.
+
+**Por qué es así y no al revés:** un cambio de rol en el portal no puede
+degradar en silencio al administrador de un campeonato en marcha, ni cambiarle
+el rol a quien está cobrando mensualidades. El portal dice quién es la persona;
+cada app dice qué es **dentro de ella**.
+
+> **Qué hacer:** cambiar el rol también en la app, en su propia pantalla de
+> gente. El panel del portal enseña los roles de cada app en insignias dentro
+> de cada fila justamente para que se vea cuándo no coinciden — pero solo los
+> **lee**, no los escribe.
 
 ## 4.7-bis Nadie se queda sin quien mande, y nadie se echa a sí mismo
 
@@ -1211,9 +1262,18 @@ administrar, inscribir y puntuar — no tiene una sola pantalla para él.
 | `admin` · `maestro` · `coach` · `judge` | Entra a la consola |
 | `competitor` · `student` · vacío | **No entra**, y se le dice por qué con un enlace de vuelta al portal |
 
-La regla vive en los **dos** lados: el portal no le enseña el botón
-(`lib/roles.ts`) y el servidor rechaza el pase (`app/espejo.py`). Esconder el
+La regla vive en los **dos** lados: el portal no le ofrece la consola
+(`lib/roles.ts`) y el servidor rechaza el pase (`app/espejo.py`). Ofrecer el
 botón no es la seguridad; es no mandar a nadie a una puerta que le van a cerrar.
+
+> **Pero al que no opera ya no se le esconde la tarjeta entera.** *(30 ago
+> 2026)* Hasta ahora, quien tenía el plan sin un rol que operara no veía
+> **nada** en «Tus aplicaciones»: ni el botón ni una explicación. Y eso se lee
+> como «tengo Campeonatos pagado y el portal no me lo enseña», que es justo lo
+> que pasó. Ahora la tarjeta sale igual y lo que cambia es el destino: quien
+> opera salta a su consola con el pase; **quien no, va a las páginas públicas
+> de Campeonatos** —los campeonatos abiertos y los resultados—, que no piden
+> sesión y son lo que esa persona estaba buscando.
 
 > **Y el pase de un alumno no crea ninguna fila** en `usuarios`. Sin esa regla,
 > una federación con doscientos alumnos serían doscientas filas de gente que no
@@ -1284,6 +1344,27 @@ las dos, firmar con la nueva, retirar la vieja—, que sin `kid` era imposible.
 > ⚠️ **Al desplegar el ecosistema, los pases viejos siguen valiendo** (no llevan
 > `kid` y Campeonatos usa entonces la llave única), pero **si algún día el JWKS
 > publica dos llaves sin `kid`, Campeonatos se niega**: ahí no se adivina.
+
+---
+
+## 4.14 Academy está apagada en el portal
+
+*(30 de agosto de 2026)* La app **sigue viva**: desplegada, respondiendo por
+`academy.dinamyt.org`, con sus datos y su login propio. Lo que se retiró es el
+botón «Entrar a Academy» del panel de aplicaciones del dashboard, porque el
+producto todavía no se ofrece.
+
+**El interruptor es uno solo**: `ACADEMY_EN_EL_PORTAL` en
+`apps/ecosystem-portal/src/lib/apps.ts`. Para volver a encenderla: ponerlo en
+`true` y **recompilar el portal** (§1.3 — reiniciar no basta; el comando es
+§2.3). No hay nada más que tocar: los planes que incluyen `academy` siguen
+dando su scope, el rol sigue viajando en el pase y el salto por `#token=` sigue
+funcionando. El botón vuelve donde estaba, para quien tenga el scope.
+
+> ⚠️ **Lo que a propósito NO apaga:** la lista blanca de `appsDelEcosistema()`,
+> en ese mismo archivo, sigue incluyendo Academy. Es la que valida a dónde puede
+> volver `/salir`; quitarla de ahí dejaría sin camino de vuelta a quien tenga hoy
+> una sesión de Academy abierta. **Apagar un botón no puede romper una salida.**
 
 ---
 
@@ -1663,6 +1744,50 @@ que la cookie sobrevivió.
 
 > Con esto **las tres apps aplican la misma regla**, que era lo que faltaba para
 > poder recordarla.
+
+### Y aún se podía volver atrás a la consola
+
+*(30 ago 2026, el mismo día)* Salir funcionaba, pero la flecha atrás devolvía a
+la pantalla de la que se acababa de salir —con el diálogo de «¿cerrar sesión?»
+todavía abierto, porque el navegador la restaura del **bfcache** tal como
+estaba—. Ahí no funcionaba nada: la sesión estaba cerrada de verdad y cada
+petición contestaba 401. **Una pantalla muerta que parece viva es peor que no
+poder volver.**
+
+La causa era `window.location.href`, que **empuja** una entrada al historial.
+Con `location.replace` se sustituye, y la flecha atrás lleva a donde se estaba
+antes de entrar a la consola. Lo mismo en `PORTAL/salir`, que además rebotaba:
+volver atrás a esa pantalla la hacía cerrar sesión y reenviar otra vez.
+
+> **La regla:** una salida no es una navegación. Lo que se deja atrás no puede
+> quedar a una flecha de distancia.
+
+## 5.14 Un aviso fuera de la pantalla es un botón roto
+
+«El botón de quitar miembros no funciona.» No estaba roto: el servidor
+contestaba —a veces que sí, a veces con el 409 de «es la única persona que
+manda en esta organización» (§4.7-bis)— y el portal pintaba la respuesta en un
+párrafo **debajo del título**, arriba del todo.
+
+En `/mi-organizacion` y en `/admin`, la lista de gente está a dos o tres
+pantallas de scroll de ahí. Se pulsaba la ✕, se confirmaba, el diálogo se
+cerraba… y no pasaba nada visible. La explicación estaba escrita, decía
+exactamente qué hacer, y **nadie la leyó nunca**.
+
+Arreglado con `components/Aviso.tsx`, que va fijo sobre la página: se ve desde
+cualquier punto. El «hecho» se retira solo a los cinco segundos; **el error no**,
+porque los del servidor traen instrucciones y un aviso que se desvanece se lee
+a medias.
+
+> **La regla:** el resultado de una acción se enseña donde está la mano que la
+> pulsó, no donde empieza la página. Una pantalla que se queda callada después
+> de un clic **es** un botón roto, aunque el servidor haya hecho su trabajo.
+
+Del mismo día y de la misma familia: **el diálogo de confirmar no bloqueaba el
+scroll** de la página de detrás. Se leía la pregunta sobre una fila, el dedo
+arrastraba el fondo, y al cerrar se estaba en otra parte de la lista sin saber a
+quién se acababa de responder. Una línea (`body { overflow: hidden }` mientras
+está abierto) en el portal y en Campeonatos.
 
 ---
 

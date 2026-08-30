@@ -17,6 +17,7 @@ import api, {
   type MiInvitacion,
 } from '@/lib/api';
 import { nombreRol, operaCampeonatos } from '@/lib/roles';
+import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { Avatar } from '@/components/Avatar';
 import { EntrarAClub } from '@/components/EntrarAClub';
 
@@ -318,31 +319,49 @@ export default function DashboardPage() {
         <h2 className="mb-4 text-lg font-semibold">Tus aplicaciones</h2>
 
         <div className="flex flex-col gap-3">
-          {(payload.is_super_admin ||
-            (payload.app_scopes.includes('campeonatos') &&
-              operaCampeonatos(payload.role_campeonatos))) && (
-            // SSO por redirección: el token viaja en el fragmento (#) — nunca
-            // llega al servidor — y la app lo canjea por su cookie al aterrizar
-            // (su `/login` ya lee el `#token=`; antes se quedaba en su
-            // formulario). La ruta es `/login` y no `/admin/login`: esa segunda
-            // no existe y este enlace llegó a dar un 404.
-            //
-            // ⚠️ **Tener el plan no basta**: se pide además un rol que opere.
-            // Desde que la federación puede pagar Campeonatos por todos sus
-            // clubes, el alumno de un club afiliado trae el scope en su pase, y
-            // la consola de Campeonatos solo sabe de administrar, inscribir y
-            // puntuar — no tiene una pantalla para él. Enseñarle el botón era
-            // mandarlo a un 403. Lo suyo (sus inscripciones, sus resultados)
-            // vivirá aquí, en el portal.
-            <a
-              href={`${CAMPEONATOS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
-              className="rounded-lg px-4 py-3 font-semibold"
-              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
-            >
-              Entrar a Campeonatos
-              {payload.role_campeonatos ? ` (${nombreRol(payload.role_campeonatos)})` : ''}
-            </a>
-          )}
+          {/* ── Campeonatos: la tarjeta sale SIEMPRE que haya plan ────────
+              Antes se pedían dos cosas —el plan y un rol que opere— y quien
+              tenía el plan sin el rol no veía absolutamente nada: ni el botón,
+              ni una explicación. Desde fuera, «tengo Campeonatos pagado y el
+              portal no me lo enseña».
+
+              Sigue siendo verdad que **tener el plan no es operar la consola**
+              (§4.13): administrar, inscribir y puntuar es lo único que hay
+              dentro, y un alumno no tiene ahí una sola pantalla. Lo que cambia
+              es a dónde se le manda, no si se le enseña:
+
+                · **Quien opera** → salta a su consola con el pase en el
+                  fragmento (`#token=`, que nunca llega al servidor).
+                · **Quien no** → a las páginas PÚBLICAS de Campeonatos, que no
+                  piden sesión: los campeonatos abiertos y los resultados. Es
+                  lo suyo, y es lo que estaba buscando.
+
+              Mandarlo a `/login` sería mandarlo a un 403 con su formulario
+              delante. Esconderlo era no contestarle. */}
+          {(payload.is_super_admin || payload.app_scopes.includes('campeonatos')) &&
+            (payload.is_super_admin || operaCampeonatos(payload.role_campeonatos) ? (
+              <a
+                href={`${CAMPEONATOS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
+                className="rounded-lg px-4 py-3 font-semibold"
+                style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
+              >
+                Entrar a Campeonatos
+                {payload.role_campeonatos ? ` (${nombreRol(payload.role_campeonatos)})` : ''}
+              </a>
+            ) : (
+              <a
+                href={`${CAMPEONATOS_URL}/campeonatos`}
+                className="rounded-lg border px-4 py-3"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <span className="block font-semibold">Ver campeonatos y resultados</span>
+                <span className="mt-0.5 block text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Tu club tiene Campeonatos. La consola es para quien organiza,
+                  inscribe o juzga; aquí ves los campeonatos abiertos y sus
+                  resultados, sin escribir contraseña.
+                </span>
+              </a>
+            ))}
           {(payload.is_super_admin ||
             payload.app_scopes.includes('membresias')) && (
             // Mismo SSO por fragmento que Campeonatos: membresias-web guarda el
@@ -356,7 +375,11 @@ export default function DashboardPage() {
               {payload.role_membresias ? ` (${nombreRol(payload.role_membresias)})` : ''}
             </a>
           )}
-          {(payload.is_super_admin || payload.app_scopes.includes('academy')) && (
+          {/* Academy está apagada en el portal: el interruptor y el porqué
+              están en `lib/apps.ts` (`ACADEMY_EN_EL_PORTAL`). La app sigue
+              viva por su dirección; lo que no se ofrece es la puerta. */}
+          {ACADEMY_EN_EL_PORTAL &&
+            (payload.is_super_admin || payload.app_scopes.includes('academy')) && (
             // Mismo SSO por fragmento: academy-web guarda el token al aterrizar
             // en /login#token=… sin segundo formulario.
             <a

@@ -56,6 +56,7 @@ import {
 } from '@/lib/roles';
 import { FilaMiembro } from '@/components/FilaMiembro';
 import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
+import { Aviso, type Mensaje } from '@/components/Aviso';
 import { SelectMenu } from '@/components/SelectMenu';
 import { PanelRecaudo } from '@/components/PanelRecaudo';
 import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
@@ -86,7 +87,7 @@ export default function AdminEcosistemaPage() {
   /** Sube tras cada acción sobre un miembro y hace que la lista se recargue. */
   const [recargaGente, setRecargaGente] = useState(0);
 
-  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [msg, setMsg] = useState<Mensaje | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const { confirmar, dialogo } = useConfirmar();
   // Quién está mirando. Ni el super-admin se saca a sí mismo de una
@@ -301,11 +302,10 @@ export default function AdminEcosistemaPage() {
         en su token como <code>role_campeonatos</code> / <code>role_academy</code>.
       </p>
 
-      {msg && (
-        <p className={`mb-4 text-sm ${msg.tipo === 'ok' ? '' : ''}`} style={{ color: msg.tipo === 'ok' ? '#3ecf8e' : 'var(--danger)' }}>
-          {msg.texto}
-        </p>
-      )}
+      {/* Flotante, y no un párrafo aquí arriba: la lista de gente y la de
+          clubes están dos pantallas más abajo, y desde ahí este renglón no se
+          veía nunca. Ver el comentario de `Aviso`. */}
+      <Aviso msg={msg} onCerrar={() => setMsg(null)} />
 
       {/* ── VENCIMIENTOS: lo único de esta pantalla que caduca ──────────── */}
       <Vencimientos ocupado={ocupado} onAccion={accion} />
@@ -468,7 +468,10 @@ export default function AdminEcosistemaPage() {
               {/* El otro rótulo de alcance (ver «Accesos rápidos» arriba): esta
                   caja NO sale de la organización seleccionada. */}
               <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Alcance: solo dentro de <strong>{orgSel.name}</strong>.
+                Alcance: solo dentro de <strong>{orgSel.name}</strong>. El rol
+                que se cambia aquí es el <strong>general</strong>; el de cada
+                app (las insignias de cada fila) lo manda la propia app y no
+                cambia con este — ver §4.7 de OPERAR.
               </p>
 
               {/* El silencio que había que romper: una organización sin nadie
@@ -956,7 +959,6 @@ function ClubesDeLaFederacion({
   const clubes = orgs
     .filter((o) => o.parentId === org.id)
     .sort((a, b) => a.name.localeCompare(b.name));
-  const nombreDe = (id: string) => orgs.find((o) => o.id === id)?.name ?? 'otra organización';
 
   useEffect(() => {
     let vivo = true;
@@ -978,7 +980,9 @@ function ClubesDeLaFederacion({
   async function buscar() {
     setBuscando(true);
     try {
-      setEncontrados(await listarClubesAPI(busqueda.trim() || undefined));
+      // `true` = solo los que no cuelgan de nadie. Los demás no se pueden
+      // afiliar, y ocupaban sitio dentro del tope de 100 resultados.
+      setEncontrados(await listarClubesAPI(busqueda.trim() || undefined, true));
     } catch {
       setEncontrados([]);
     } finally {
@@ -1081,44 +1085,41 @@ function ClubesDeLaFederacion({
                   <strong>{c.name}</strong>
                   {c.city && <span style={{ color: 'var(--text-muted)' }}> · {c.city}</span>}
                 </span>
-                {/* Un club que ya cuelga de alguien no se puede invitar, y el
-                    servidor lo rechaza. Se dice de quién cuelga en vez de
-                    esconderlo: quien busca un club y no lo encuentra vuelve a
-                    buscarlo, y la respuesta a por qué no aparece está aquí. */}
-                {c.parentId === org.id ? (
-                  <span className="badge">Ya afiliado</span>
-                ) : c.parentId ? (
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Afiliado a {nombreDe(c.parentId)}
-                  </span>
-                ) : (
-                  <button
-                    onClick={() =>
-                      void onConfirmar(
-                        {
-                          titulo: `¿Afiliar a ${c.name} a ${org.name}?`,
-                          detalle:
-                            `Queda dentro en el acto: a su maestro no se le pregunta. Su gente pasa a ` +
-                            `abrir los planes que tenga ${org.name}, en la siguiente renovación del pase. ` +
-                            'Se puede deshacer con la ✕ de la lista de arriba.',
-                          textoOk: 'Afiliarlo ahora',
-                        },
-                        () => afiliarClubAPI(org.id, c.id),
-                        `${c.name} ya cuelga de ${org.name}.`,
-                        'No se pudo afiliar.',
-                      ).then(() => setTick((n) => n + 1))
-                    }
-                    disabled={ocupado}
-                    className="btn btn-gold"
-                  >
-                    Afiliar
-                  </button>
-                )}
+                <button
+                  onClick={() =>
+                    void onConfirmar(
+                      {
+                        titulo: `¿Afiliar a ${c.name} a ${org.name}?`,
+                        detalle:
+                          `Queda dentro en el acto: a su maestro no se le pregunta. Su gente pasa a ` +
+                          `abrir los planes que tenga ${org.name}, en la siguiente renovación del pase. ` +
+                          'Se puede deshacer con la ✕ de la lista de arriba.',
+                        textoOk: 'Afiliarlo ahora',
+                      },
+                      () => afiliarClubAPI(org.id, c.id),
+                      `${c.name} ya cuelga de ${org.name}.`,
+                      'No se pudo afiliar.',
+                    ).then(() => {
+                      // Fuera de los resultados en cuanto entra. La búsqueda es
+                      // una foto del momento en que se pulsó «Buscar», y dejarlo
+                      // ahí invita a pulsar «Afiliar» otra vez sobre un club que
+                      // ya está dentro — y a leer un error que no lo parece.
+                      setEncontrados((lista) => lista.filter((x) => x.id !== c.id));
+                      setTick((n) => n + 1);
+                    })
+                  }
+                  disabled={ocupado}
+                  className="btn btn-gold"
+                >
+                  Afiliar
+                </button>
               </li>
             ))}
             {encontrados.length === 0 && busqueda && !buscando && (
               <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Ningún club coincide con «{busqueda}».
+                Ningún club <strong>sin federación</strong> coincide con «
+                {busqueda}». Los que ya cuelgan de una no salen aquí: para
+                mover uno, sácalo primero de la suya.
               </li>
             )}
           </ul>

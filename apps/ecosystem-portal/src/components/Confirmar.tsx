@@ -124,6 +124,14 @@ function DialogoConfirmar({
     const antes = document.activeElement as HTMLElement | null;
     cancelarRef.current?.focus();
 
+    // La página de detrás no se mueve mientras la pregunta está abierta.
+    // Sin esto, el gesto de desplazar sobre el fondo oscuro seguía recorriendo
+    // la lista: se leía la pregunta sobre una fila y al cerrar se estaba en
+    // otra parte del panel, sin saber a quién se acababa de responder. En el
+    // celular es peor, porque el pulgar cae justo encima del fondo.
+    const scrollPrevio = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     function alTeclear(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -149,6 +157,7 @@ function DialogoConfirmar({
     document.addEventListener('keydown', alTeclear);
     return () => {
       document.removeEventListener('keydown', alTeclear);
+      document.body.style.overflow = scrollPrevio;
       antes?.focus?.();
     };
   }, [onCerrar]);
