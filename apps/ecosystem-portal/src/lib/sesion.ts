@@ -143,12 +143,25 @@ export function segundosDePase(token: string): number {
   return p.exp - Math.floor(Date.now() / 1000);
 }
 
-/** Decodifica (sin verificar) el payload del JWT, solo para mostrar datos. */
+/**
+ * Decodifica (sin verificar) el payload del JWT, solo para mostrar datos.
+ *
+ * ⚠️ **`atob` no devuelve texto, devuelve bytes.** Cada carácter del resultado
+ * es un byte, así que una «ó» —que en UTF-8 son dos, `C3 B3`— sale como dos
+ * caracteres: «Ã³». Con el JSON.parse encima, «Ana Gómez» acababa saludando
+ * como «ANA GÃ³MEZ» en el panel, y le pasa a casi todos los nombres de aquí.
+ *
+ * El token viaja bien; lo que estaba mal era leerlo. `TextDecoder` interpreta
+ * esos bytes como lo que son.
+ */
 export function decodificarToken(token: string): TokenPayload | null {
   try {
     const base = token.split('.')[1];
-    const json = atob(base.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json) as TokenPayload;
+    const bytes = Uint8Array.from(
+      atob(base.replace(/-/g, '+').replace(/_/g, '/')),
+      (caracter) => caracter.charCodeAt(0),
+    );
+    return JSON.parse(new TextDecoder().decode(bytes)) as TokenPayload;
   } catch {
     return null;
   }

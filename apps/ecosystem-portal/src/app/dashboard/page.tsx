@@ -27,6 +27,25 @@ const MEMBRESIAS_URL =
 const ACADEMY_URL =
   process.env.NEXT_PUBLIC_ACADEMY_URL || 'http://localhost:3008';
 
+/**
+ * Lo que se le cuenta a quien Campeonatos devolvió para acá.
+ *
+ * Su consola es para administrar, inscribir y puntuar; quien no hace nada de
+ * eso no tiene por qué acabar mirando su formulario de acceso. Cuando el canje
+ * del pase la rechaza, la app lo manda de vuelta con el motivo y **el mensaje
+ * se da aquí**, que es donde la persona ya está y donde estará lo suyo.
+ */
+const AVISO_CAMPEONATOS: Record<string, string> = {
+  sin_consola:
+    'Campeonatos es la consola de quien organiza, inscribe o juzga. Lo tuyo —tus inscripciones y tus resultados— lo verás aquí, en DINAMYT.',
+  sin_plan:
+    'Tu club no tiene Campeonatos en su plan. Habla con tu maestro si crees que debería tenerlo.',
+  desactivado:
+    'Tu usuario está desactivado en Campeonatos. Pídele a tu maestro que lo active.',
+  correo_ocupado:
+    'Tu correo está enlazado con otra cuenta en Campeonatos. Escríbenos a soporte@dinamyt.org para que lo revisemos.',
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [payload, setPayload] = useState<TokenPayload | null>(null);
@@ -96,6 +115,29 @@ export default function DashboardPage() {
       void cargar(vigente);
     });
   }, [router, cargar]);
+
+  /**
+   * El motivo por el que Campeonatos devolvió a esta persona, si la devolvió.
+   *
+   * Se copia al estado y se borra de la dirección, igual que el `?motivo=` del
+   * login: un aviso que sigue ahí al recargar deja de ser un aviso y pasa a ser
+   * parte de la pantalla.
+   */
+  const [avisoCampeonatos, setAvisoCampeonatos] = useState<string | null>(null);
+  useEffect(() => {
+    // Se lee de `window` y no con `useSearchParams`: ese hook obliga a
+    // envolver la página en un `<Suspense>` —si no, la compilación se planta
+    // con «should be wrapped in a suspense boundary»— y aquí no hace falta
+    // ninguna espera, porque esto solo se mira al llegar, ya en el navegador.
+    const motivo = new URLSearchParams(window.location.search).get('campeonatos');
+    if (!motivo) return;
+    setAvisoCampeonatos(AVISO_CAMPEONATOS[motivo] ?? null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('campeonatos');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    // Solo al llegar: es un mensaje de una vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function responderInvitacion(inv: MiInvitacion, aceptar: boolean) {
     setOcupado(true);
@@ -170,6 +212,16 @@ export default function DashboardPage() {
         >
           {msg.texto}
         </p>
+      )}
+
+      {avisoCampeonatos && (
+        <div
+          className="card mb-5 p-4 text-sm"
+          role="status"
+          style={{ borderColor: 'var(--gold)', color: 'var(--text-muted)' }}
+        >
+          {avisoCampeonatos}
+        </div>
       )}
 
       {/* ── Te invitaron ───────────────────────────────────────────────
