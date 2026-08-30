@@ -1174,6 +1174,37 @@ se retira —después del campeonato— es `POST /auth/register`, que es lo que 
 verdad contradice «las cuentas nacen en el ecosistema». Membresías aplica este
 mismo criterio, y tres apps con la misma regla es una regla que se recuerda.
 
+### El maestro estrena su club al entrar
+
+El pase trae `org_id` —un identificador—, y aquí hace falta el **nombre**:
+`usuarios.club` es texto libre y es lo que se imprime en la llave, en el acta y
+en la planilla. Así que al crear el espejo se le pregunta al ecosistema por esa
+organización, **con el pase de la propia persona**: responde lo que ella ya
+puede ver y Campeonatos no guarda ninguna credencial más. La raíz de la API se
+deriva de `ECOSYSTEM_JWKS_URL`, así que no hay una segunda variable que pueda
+apuntar a otro sitio.
+
+| | |
+|---|---|
+| **Solo si no tiene club** | Los clubes los edita el administrador y un maestro puede dirigir varios dojangs. Rellenar por encima en cada inicio de sesión borraría ese trabajo — y con él la delegación, que es como se agrupan los reportes |
+| **Solo a los maestros** | El juez puntúa donde lo asignen. Preguntarlo sería una petición al ecosistema por cada juez que entra la mañana del campeonato |
+| **Falla hacia fuera** | Dos segundos de espera; si el ecosistema no contesta se entra igual y sin club. Un ecosistema lento no puede impedir que un maestro entre |
+
+### `eco_sub` es `uuid` en PostgreSQL y texto en SQLite
+
+Esa columna **ya existía en producción**: la creó el guion de reconciliación del
+29 de agosto —como `uuid`, con índice único— y dejó **12 de los 22** usuarios de
+Campeonatos ya enlazados. Declararla `String` a secas dejaba buscar (PostgreSQL
+convierte el literal) pero la **lectura devolvía un objeto `UUID`**, y comparar
+ese objeto con la cadena del pase da distinto **siempre**: a quien llegara por
+la puerta del correo se le habría contestado «ese correo ya está enlazado con
+otra cuenta» siendo él mismo. Un fallo que **en SQLite no aparece**, que es
+donde corren las pruebas y el modo local.
+
+Cerrado por tres lados: el modelo usa el tipo nativo en PostgreSQL (devolviendo
+texto), la comparación normaliza con `str()`, y `schema_compat` crea la columna
+como `uuid` para que una base nueva tenga la misma forma que la de producción.
+
 ### La trampa del `kid`, que costó una tarde
 
 `PyJWKClient` **solo considera «llave de firma» la que lleva `kid`**. El JWKS
