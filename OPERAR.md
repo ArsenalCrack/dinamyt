@@ -62,8 +62,9 @@ nunca depende de que alguien se acordara de sincronizar.
 | Variable | Dónde | Si falta… |
 |---|---|---|
 | `TRUST_PROXY_HOPS` | las tres APIs | Todo el mundo cae en el mismo cubo del limitador: 10 inicios de sesión por minuto **para la plataforma entera**. `1` = solo Caddy · `2` = con Cloudflare |
-| `ECOSYSTEM_JWKS_URL` | membresias-api | El SSO no existe: saltas desde el portal y te vuelve a pedir la contraseña. **Vacía a propósito solo en el modo local del campeonato** |
-| `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` | membresias-web | No aparece «entrar con DINAMYT» ni el camino de vuelta |
+| `ECOSYSTEM_JWKS_URL` | membresias-api **y campeonatos-api** | El SSO no existe: saltas desde el portal y te vuelve a pedir la contraseña. Y ahora también: «Salir» ya no pasa por el portal, así que la sesión de DINAMYT queda viva (§5.12). **Vacía a propósito solo en el modo local del campeonato** |
+| `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` | membresias-web **y campeonatos-web** | No aparece «entrar con DINAMYT» ni el camino de vuelta. En Campeonatos el valor por defecto ya es `https://dinamyt.org`, así que solo estorba si el portal vive en otro dominio |
+| `NEXT_PUBLIC_CAMPEONATOS_URL` | ecosystem-portal | `PORTAL/salir?redirect=…` **descarta el destino** —está en lista blanca (`lib/apps.ts`)— y quien sale de Campeonatos aterriza en el login del portal en vez del suyo. Sin ella vale `http://localhost:3003`, que en el VPS no es nadie |
 | `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe, y el pie de los correos apunta a ninguna parte |
 | `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: ver §3 |
 | `CRON_SECRET` | ecosystem-api | El aviso diario de suscripciones **no existe** (la ruta responde 404). El botón del panel sigue funcionando |
@@ -189,6 +190,28 @@ cd /srv/membresias && git pull && pnpm install --frozen-lockfile && pnpm --filte
 
 Aquí reiniciar ES migrar. Si la API **no arranca**, es que la migración falló:
 ese es el aviso, no un misterio.
+
+## 2.4-bis Desplegar Campeonatos
+
+```bash
+cd /srv/campeonatos && git pull && backend/venv/bin/pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build && sudo systemctl restart campeonatos-api campeonatos-web && systemctl is-active campeonatos-api campeonatos-web
+```
+
+> **El `pip install` no sobra**, aunque el despliegue de siempre fuera solo
+> `git pull` + compilar la web: el pase del ecosistema es RS256 y PyJWT lo
+> verifica con `cryptography`, que antes no estaba en el entorno. Sin ese paso,
+> Campeonatos arranca y **rechaza todos los pases** con un error de librería que
+> no menciona ninguna llave.
+
+> ⚠️ **Antes del primer despliegue con SSO**, las dos variables de §1.4 tienen
+> que estar puestas: `ECOSYSTEM_JWKS_URL` en `backend/.env` (apuntando al origen
+> **local** del ecosistema, `http://127.0.0.1:3001/auth/jwks` — el porqué está
+> en §5.13) y `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` en
+> `frontend/.env.production`, que se hornea al compilar (§1.3).
+
+> Campeonatos **no migra**: crea lo que le falta al arrancar
+> (`schema_compat`). Lo que eso implica —y por qué una vez tiró el servicio
+> media mañana— está en §5.1-ter.
 
 ## 2.5 Respaldar antes de tocar
 
@@ -689,10 +712,30 @@ invita desde «Mi organización» —seleccionándola en «Estructura», y ahí 
 «Invitar un club existente»— y el **maestro del club acepta**. Nadie se lleva un
 club a su federación sin que su maestro diga que sí.
 
-> ⚠️ **Una federación creada desde `/admin` no tiene miembros**, así que no
-> aparece en «Mi organización» de nadie y no hay desde dónde afiliarle clubes.
-> El orden es: crearla → **darle acceso a su administrador** (el «acceso rápido»
-> del panel, con rol `admin`) → esa persona ya la ve y puede invitar clubes.
+**Y desde el 30 de agosto de 2026 también se invita desde `/admin`.** El panel
+del super-admin enseña la estructura —cada federación con sus clubes debajo, y
+al final los que no cuelgan de nadie— y, al seleccionar una federación, trae su
+propio «Invitar a un club existente». **Sigue siendo por invitación**: el
+super-admin no cuelga clubes a dedo, porque eso lo convertiría en el único que
+entiende —y sostiene— la estructura.
+
+| Desde… | Quién | Qué hace |
+|---|---|---|
+| «Mi organización» | El `admin` de la federación | Invita clubes y crea clubes nuevos dentro |
+| `/admin` | El super-admin | Lo mismo, sin pertenecer a la federación |
+| El portal del club | El **maestro** del club invitado | **Acepta o rechaza.** Sin esto no pasa nada |
+
+> ⚠️ **Una federación creada desde `/admin` sigue naciendo sin nadie dentro**, y
+> mientras no tenga miembros no aparece en «Mi organización» de nadie. Ya no es
+> un silencio: al crearla queda seleccionada y el panel lo dice en un aviso. El
+> orden sigue siendo crearla → **añadirle su administrador** → esa persona ya la
+> ve. Lo que cambió es que ahora se puede seguir sin ese paso, porque el propio
+> panel afilia.
+>
+> Y el desplegable de rol de «+ Añadir» ya solo ofrece lo que ese tipo de
+> organización acepta: una federación admite `admin` y `judge` y nada más. Antes
+> ofrecía los seis de siempre y cuatro acababan en un 400 que no decía por qué —
+> justo al intentar poner al administrador que hacía falta.
 
 ### El panel de recaudo
 
@@ -1569,6 +1612,37 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
 > esté en fecha, ni de una marca que el navegador puede haber perdido. Y la
 > pantalla en la que se aterriza al salir **no puede ser la que deja entrar**.
 
+### Lo mismo en Campeonatos, y qué era distinto
+
+*(30 de agosto de 2026)* En cuanto se pudo saltar desde el portal (§4.13),
+volvió el mismo síntoma: salir de Campeonatos, volver a DINAMYT y estar dentro
+otra vez sin ver una pantalla. **Era la causa 1 sola**, y las otras dos no
+aplicaban igual:
+
+| | Membresías | Campeonatos |
+|---|---|---|
+| **1. No se pasaba por el portal** | Lo decidía una marca del `localStorage` | **No se pasaba nunca**: «Salir» solo cerraba su propia cookie |
+| **2. El logout fallido se daba por bueno** | Sí | Sí — y `logoutAPI` seguía tragándoselo en silencio |
+| **3. El pase vencido no cerraba nada** | Sí | **No**: `POST /auth/logout` aquí nunca tuvo guard |
+
+El arreglo es el de Membresías, pieza por pieza: el servidor dice en la
+respuesta del logout si hay portal (`{ok, portal}`, y `portal` es
+`ECOSYSTEM_JWKS_URL` puesta — no una marca del navegador), se pasa por
+`PORTAL/salir` **siempre** que lo haya, y se aterriza en `/login?salida=portal`
+(o `?salida=sola` sin ecosistema), que **no canjea ningún `#token=`**, dice qué
+se cerró, y remata el cierre —dos intentos como mucho— si `GET /auth/me` revela
+que la cookie sobrevivió.
+
+> **Ojo con la pantalla que deja entrar: aquí es `/`, no `/login`.** El login de
+> Campeonatos nunca metió a nadie dentro; quien lo hace es la raíz, que lee el
+> perfil cacheado y reenvía a `/admin`, `/maestro` o `/juez`. Por eso salir
+> aterriza en `/login` y no en `/` — y por eso `?salida` hace falta igual: sin
+> él, el `#token=` que quedara en la URL abriría sesión otra vez en la misma
+> pantalla en la que se acaba de cerrar.
+
+> Con esto **las tres apps aplican la misma regla**, que era lo que faltaba para
+> poder recordarla.
+
 ---
 
 # PARTE 6 · Lo que queda pendiente
@@ -1591,17 +1665,26 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
       ⚠️ Mientras tanto: **no publiques esos precios**. `/planes` los enseña, y
       hoy solo lo abre quien tiene el enlace.
 
-`[ ]` **Una federación creada desde `/admin` nace sin nadie que la gestione.**
-      El panel la crea, pero no le pone ningún miembro, y todas las pantallas de
-      federación cuelgan de `org_members`: no aparece en «Mi organización» de
-      nadie, así que no hay desde dónde crearle clubes ni afiliárselos. Se sale
-      dándole acceso a su administrador (§4.5), pero eso hay que saberlo.
+`[x]` ~~**Una federación creada desde `/admin` nace sin nadie que la
+      gestione.**~~ Hecho el 30 de agosto de 2026. `/admin` enseña ahora la
+      **estructura** —cada federación con sus clubes debajo, y al final los que
+      no cuelgan de nadie, donde antes había una lista plana en la que un club
+      afiliado y uno huérfano se veían igual— y, al seleccionar una federación,
+      trae su propio bloque para **invitar clubes existentes** y para **crear
+      clubes nuevos dentro**. Afiliar sigue siendo por invitación: el maestro
+      del club acepta o rechaza. Cómo queda repartido: §4.5.
 
-      **La tarea:** que `/admin` enseñe la estructura —de quién cuelga cada
-      club, y qué clubes tiene cada federación— y permita afiliar desde ahí,
-      siempre por invitación: quien manda en el club sigue decidiendo. Lo
-      contrario —afiliar a dedo desde el panel— convierte al super-admin en el
-      único que entiende la estructura.
+      Nacer vacía **sigue siendo posible** —hay motivo para preparar la
+      estructura antes de que llegue su gente— pero ya no es un silencio: la
+      organización recién creada queda seleccionada, el panel avisa de que
+      todavía no la administra nadie, y el desplegable de «+ Añadir» ofrece solo
+      los roles que ese tipo de organización acepta (una federación, `admin` y
+      `judge`; antes ofrecía seis y cuatro acababan en un 400 mudo).
+
+      **Lo que NO se hizo, y a propósito:** desafiliar desde el panel. No hay
+      ruta para ello y no la tendrá de propina — sacar a un club de su
+      federación le quita los planes heredados a toda su gente (§4.5), y eso
+      merece su propia decisión, no un botón al lado del de invitar.
 
 `[x]` ~~**El usuario no tiene por dónde escribirte.**~~ Hecho el 29 de agosto de
       2026. `soporte@dinamyt.org` ya recibía (§3.5) pero no aparecía en ninguna
@@ -1691,9 +1774,14 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
       ya está clonado en `D:\Repositorios\dinamyt-combat`. Cómo funciona y qué
       decide quién entra: §4.13.
 
-      **Falta desplegarlo**, y ese despliegue no es solo `git pull`: necesita
-      `pip install -r requirements.txt` (la nueva `cryptography`, que PyJWT
-      necesita para RS256) y `ECOSYSTEM_JWKS_URL` puesta en el servicio.
+      **Falta desplegarlo.** El comando entero, con el `pip install` que no
+      sobra y las dos variables que hay que poner antes: **§2.4-bis**.
+
+      Y con el salto llegó su reverso: salir de Campeonatos no cerraba la
+      sesión de DINAMYT, así que volver al portal metía a la persona dentro
+      otra vez. Arreglado el 30 de agosto con el mismo criterio de Membresías
+      —§5.12—, así que **entra en el mismo despliegue**: toca el backend
+      (`/auth/logout` responde `portal`) y la web (el botón y `/login?salida=`).
 
 `[ ]` **Quedan dos `admin@dinamyt.com` en Campeonatos**, y ese dominio es de
       otra persona. *(revisado el 29 ago 2026)* **El del código ya no está**:

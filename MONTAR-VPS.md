@@ -923,10 +923,21 @@ COOKIE_SAMESITE=Lax
 COOKIE_SECURE=true
 BCRYPT_ROUNDS=10
 TZ=America/Bogota
+ECOSYSTEM_JWKS_URL=http://127.0.0.1:3001/auth/jwks
 ```
 
 ⚠️ `FRONTEND_URL` va **exacta y sin barra final**. Con una barra de más, el CORS
 rechaza a tu propia web y no entra nadie.
+
+> **`ECOSYSTEM_JWKS_URL` es el SSO entero de Campeonatos**, y hace dos cosas:
+> deja entrar desde el portal sin segunda contraseña, y hace que «Salir» pase
+> por DINAMYT a cerrar también la sesión de allá. Sin ella, Campeonatos es
+> autónoma —su propio formulario, su propia sesión—, que es **exactamente lo
+> que hay que ver el día del campeonato, sin internet**.
+>
+> Va al origen **local** (`127.0.0.1:3001`), no a `https://id.dinamyt.org`: bajo
+> eventlet, un nombre que no resuelve cuelga la app diez segundos por petición
+> pase lo que pase con el tope de espera. El relato está en §5.13 de OPERAR.
 
 ```bash
 nano /srv/campeonatos/frontend/.env.production
@@ -935,6 +946,7 @@ nano /srv/campeonatos/frontend/.env.production
 ```bash
 NEXT_PUBLIC_API_MODE=proxy
 NEXT_PUBLIC_SOCKET_URL=https://campeonatos.dinamyt.org
+NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL=https://dinamyt.org
 ```
 
 ⚠️ **Este archivo tiene que existir ANTES de compilar.** Las variables
@@ -946,6 +958,15 @@ volver a compilar o no surten efecto.
 - `NEXT_PUBLIC_SOCKET_URL` es **obligatoria**: sin ella el marcador en vivo busca
   el puerto 5000 del mismo host, que no está abierto a internet, y los jueces ven
   «sin conexión».
+- `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` es a dónde va «Salir» a cerrar la sesión de
+  DINAMYT y a dónde se devuelve a quien no opera campeonatos. Su valor por
+  defecto ya es este, así que solo hay que escribirla si el portal se muda.
+
+⚠️ Y en el **portal** (`/srv/dinamyt/apps/ecosystem-portal/.env.production`)
+tiene que estar `NEXT_PUBLIC_CAMPEONATOS_URL=https://campeonatos.dinamyt.org`,
+que ya aparece en §6.8. No es solo el botón del dashboard: `PORTAL/salir` valida
+el destino contra esa lista blanca, y si no coincide **descarta la vuelta** y
+deja a la persona en el login del portal.
 
 ## 6.5 Compilar Campeonatos
 

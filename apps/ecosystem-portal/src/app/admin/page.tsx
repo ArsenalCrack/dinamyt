@@ -27,7 +27,13 @@ import {
   eliminarSuscripcionPersonalAPI,
   listarBloqueadosAPI,
   desbloquearUsuarioAPI,
+  crearClubHijoAPI,
+  invitarClubAPI,
+  listarClubesAPI,
+  invitacionesClubEnviadasAPI,
   extraerError,
+  type ClubBusqueda,
+  type InvitacionClub,
   type Organizacion,
   type Miembro,
   type Plan,
@@ -40,7 +46,13 @@ import {
 import { CampoFecha } from '@/components/CampoFecha';
 import { FilaSuscripcion } from '@/components/FilaSuscripcion';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
-import { ROLES_SUPERADMIN, mandaEnLaOrg, nombreRol } from '@/lib/roles';
+import {
+  ROLES_SUPERADMIN,
+  esParaguas,
+  mandaEnLaOrg,
+  nombreRol,
+  rolesAsignablesEn,
+} from '@/lib/roles';
 import { FilaMiembro } from '@/components/FilaMiembro';
 import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
 import { SelectMenu } from '@/components/SelectMenu';
@@ -173,6 +185,47 @@ export default function AdminEcosistemaPage() {
    * por lo que le cambia a alguien el rol, el acceso o el dinero; crear cosas
    * nuevas no se pregunta, porque lo que se crea de más se borra.
    */
+  /**
+   * Crea la organización **y la deja seleccionada**.
+   *
+   * Una federación creada desde aquí nace sin un solo miembro, y todas las
+   * pantallas de federación cuelgan de `org_members`: no le sale a nadie en
+   * «Mi organización», así que no hay desde dónde crearle clubes ni
+   * afiliárselos. Nacía muerta y no lo decía en ninguna parte — había que
+   * saberlo.
+   *
+   * Seleccionarla al crearla deja al super-admin justo delante de la caja de
+   * «+ Añadir», con el aviso de que todavía no la administra nadie. No impide
+   * crear una organización vacía —hay motivos para hacerlo, como preparar la
+   * estructura antes de que llegue su gente— pero deja de ser un silencio.
+   */
+  async function crearOrg() {
+    setMsg(null);
+    setOcupado(true);
+    try {
+      const creada = await crearOrganizacionAPI({
+        ...nuevaOrg,
+        city: nuevaOrg.city || undefined,
+      });
+      await cargar();
+      setOrgSel(creada);
+      setBusquedaGente('');
+      setOffsetGente(0);
+      setNuevaOrg({ ...nuevaOrg, name: '', city: '' });
+      setMsg({
+        tipo: 'ok',
+        texto: `${creada.name} creada. Todavía no la administra nadie: añade abajo a quien vaya a hacerlo.`,
+      });
+    } catch (e) {
+      setMsg({
+        tipo: 'error',
+        texto: extraerError(e, 'No se pudo crear la organización.'),
+      });
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   async function confirmarYHacer(
     peticion: PeticionConfirmar,
     fn: () => Promise<unknown>,
@@ -192,6 +245,43 @@ export default function AdminEcosistemaPage() {
   }
 
   const subsDeOrg = orgSel ? subs.filter((s) => s.orgId === orgSel.id) : [];
+
+  /**
+   * La lista de la izquierda, con la ESTRUCTURA a la vista.
+   *
+   * Era una lista plana ordenada por nada, y en ella un club afiliado y uno
+   * huérfano se veían exactamente igual. Eso es lo que hacía invisible el
+   * problema de verdad: una federación recién creada, sin nadie dentro y sin
+   * un solo club colgando, ocupaba la misma línea que una que llevaba veinte.
+   *
+   * Se agrupa en el navegador y no en el servidor porque `GET /organizations`
+   * ya devuelve la fila entera —`parentId` incluido— y son decenas de filas,
+   * no miles: pedir un endpoint nuevo para reordenar lo que ya está aquí
+   * sería una petición de más en cada carga del panel.
+   */
+  const paraguas = orgs
+    .filter((o) => esParaguas(o.type))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const hijasDe = (id: string) =>
+    orgs.filter((o) => o.parentId === id).sort((a, b) => a.name.localeCompare(b.name));
+  /** Clubes que no cuelgan de nadie. Son los afiliables. */
+  const huerfanos = orgs
+    .filter((o) => !esParaguas(o.type) && !o.parentId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  /**
+   * El rol que se ofrece al añadir gente, según DÓNDE se la añade.
+   *
+   * Una federación solo acepta administradores y jueces (lo valida el
+   * servidor). Ofrecer «Maestro» ahí era prometer algo que acababa en un 400.
+   */
+  const rolesQueAcepta = orgSel ? rolesAsignablesEn(orgSel.type) : ROLES_SUPERADMIN;
+  const rolInvitacion = rolesQueAcepta.includes(invitacion.role)
+    ? invitacion.role
+    : rolesQueAcepta[0];
+
+  /** Nadie ha entrado todavía: la organización no tiene quien la administre. */
+  const orgSinNadie = Boolean(orgSel) && totalMiembros === 0 && !busquedaGente;
 
   return (
     // `max-w-7xl` y no `6xl`: esto es un panel de escritorio con listas de
@@ -256,32 +346,70 @@ export default function AdminEcosistemaPage() {
         {/* ── Organizaciones ─────────────────────────────────────────────── */}
         <section className="card p-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
           <h2 className="mb-3 text-lg font-semibold">Organizaciones</h2>
-          <ul className="mb-4 flex flex-col gap-2">
-            {orgs.map((o) => (
-              <li key={o.id}>
-                <button
-                  onClick={() => setOrgSel(orgSel?.id === o.id ? null : o)}
-                  className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm"
-                  style={{
-                    borderColor: orgSel?.id === o.id ? 'var(--gold)' : 'var(--border)',
-                  }}
+
+          {/* Cada federación con sus clubes debajo, y al final los que no
+              cuelgan de nadie. Ver el comentario de `paraguas` arriba. */}
+          <div className="mb-4 flex flex-col gap-3">
+            {paraguas.map((fed) => {
+              const clubes = hijasDe(fed.id);
+              return (
+                <div key={fed.id}>
+                  <FilaOrg org={fed} sel={orgSel?.id === fed.id} onSel={setOrgSel}>
+                    <span className="badge">{fed.type}</span>
+                    <span className="badge">
+                      {clubes.length === 1 ? '1 club' : `${clubes.length} clubes`}
+                    </span>
+                  </FilaOrg>
+                  {/* La sangría con línea es lo que dice «cuelga de». Sin ella
+                      volvería a ser una lista plana con los nombres en otro
+                      orden. */}
+                  <ul
+                    className="ml-3 mt-1 flex flex-col gap-1 border-l pl-3"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    {clubes.map((c) => (
+                      <li key={c.id}>
+                        <FilaOrg org={c} sel={orgSel?.id === c.id} onSel={setOrgSel} pequena>
+                          <span className="badge">{c.type}</span>
+                        </FilaOrg>
+                      </li>
+                    ))}
+                    {clubes.length === 0 && (
+                      <li className="py-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        Sin clubes afiliados.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              );
+            })}
+
+            {huerfanos.length > 0 && (
+              <div>
+                <h3
+                  className="mb-1 text-xs font-semibold uppercase tracking-wide"
+                  style={{ color: 'var(--text-muted)' }}
                 >
-                  <span>
-                    <strong>{o.name}</strong>
-                    <span className="ml-2 badge">{o.type}</span>
-                  </span>
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    {orgSel?.id === o.id ? '▲' : '▼'}
-                  </span>
-                </button>
-              </li>
-            ))}
-            {orgs.length === 0 && (
-              <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Aún no hay organizaciones.
-              </li>
+                  Sin federación
+                </h3>
+                <ul className="flex flex-col gap-1">
+                  {huerfanos.map((c) => (
+                    <li key={c.id}>
+                      <FilaOrg org={c} sel={orgSel?.id === c.id} onSel={setOrgSel}>
+                        <span className="badge">{c.type}</span>
+                      </FilaOrg>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
-          </ul>
+
+            {orgs.length === 0 && (
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                Aún no hay organizaciones.
+              </p>
+            )}
+          </div>
 
           <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
             Nueva organización
@@ -312,18 +440,16 @@ export default function AdminEcosistemaPage() {
             />
           </div>
           <button
-            onClick={() =>
-              accion(
-                () => crearOrganizacionAPI({ ...nuevaOrg, city: nuevaOrg.city || undefined }),
-                'Organización creada.',
-                'No se pudo crear la organización.',
-              )
-            }
+            onClick={() => void crearOrg()}
             disabled={ocupado || !nuevaOrg.name.trim()}
             className="btn btn-gold mt-3"
           >
             + Crear organización
           </button>
+          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Nace vacía. Añádele enseguida a quien la administre: sin nadie
+            dentro no le sale a ningún usuario en «Mi organización».
+          </p>
         </section>
 
         {/* ── Miembros + suscripciones de la org seleccionada ───────────── */}
@@ -343,6 +469,23 @@ export default function AdminEcosistemaPage() {
               <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                 Alcance: solo dentro de <strong>{orgSel.name}</strong>.
               </p>
+
+              {/* El silencio que había que romper: una organización sin nadie
+                  dentro no es un caso raro, es lo que sale de «+ Crear
+                  organización», y hasta que alguien entra no existe para nadie
+                  más que para esta pantalla. */}
+              {orgSinNadie && (
+                <p
+                  className="mb-3 rounded-lg border px-3 py-2 text-sm"
+                  style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+                >
+                  Nadie está dentro de {orgSel.name} todavía, así que nadie la
+                  administra: no le sale a ningún usuario en «Mi organización».
+                  {esParaguas(orgSel.type)
+                    ? ' Añade abajo a su administrador y desde su «Mi organización» podrá crear y afiliar clubes.'
+                    : ' Añade abajo a su maestro.'}
+                </p>
+              )}
               {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría
                   «sin miembros» con los resultados esperando en la 1. */}
               <input
@@ -443,10 +586,13 @@ export default function AdminEcosistemaPage() {
                   onChange={(e) => setInvitacion({ ...invitacion, email: e.target.value })}
                   className="min-w-0 flex-1"
                 />
+                {/* Los roles que ESTE tipo de organización acepta, no los
+                    seis de siempre: en una federación, cuatro de ellos los
+                    rechaza el servidor con un 400 que no dice por qué. */}
                 <SelectMenu
-                  valor={invitacion.role}
+                  valor={rolInvitacion}
                   onChange={(v) => setInvitacion({ ...invitacion, role: v })}
-                  opciones={ROLES_SUPERADMIN.map((r) => ({
+                  opciones={rolesQueAcepta.map((r) => ({
                     valor: r,
                     etiqueta: nombreRol(r),
                   }))}
@@ -456,7 +602,7 @@ export default function AdminEcosistemaPage() {
                 <button
                   onClick={() =>
                     accion(
-                      () => invitarMiembroAPI(orgSel.id, invitacion.email.trim(), invitacion.role),
+                      () => invitarMiembroAPI(orgSel.id, invitacion.email.trim(), rolInvitacion),
                       'Miembro añadido.',
                       'No se pudo añadir (¿existe la cuenta?).',
                     )
@@ -537,6 +683,20 @@ export default function AdminEcosistemaPage() {
           )}
         </section>
       </div>
+
+      {/* ── Los clubes de la federación seleccionada ─────────────────────
+          Va fuera de la rejilla y a ancho completo: lleva un buscador de
+          clubes con sus resultados, y metido en la columna del detalle
+          competiría por el sitio con la lista de gente. */}
+      {orgSel && esParaguas(orgSel.type) && (
+        <ClubesDeLaFederacion
+          org={orgSel}
+          orgs={orgs}
+          ocupado={ocupado}
+          onAccion={accion}
+          onConfirmar={confirmarYHacer}
+        />
+      )}
 
       {/* ── Suscripciones personales ─────────────────────────────────────── */}
       <section className="card mt-5 p-5">
@@ -700,6 +860,312 @@ export default function AdminEcosistemaPage() {
  * Cuentas bloqueadas por agotar los intentos de inicio de sesión.
  * El super-admin las desbloquea desde aquí sin esperar a que venza el tiempo.
  */
+/**
+ * Una fila de la lista de organizaciones. Existe porque ahora hay tres sitios
+ * donde se pinta la misma —la federación, su club, y el club sin federación— y
+ * tres copias del mismo botón es cómo una de ellas deja de resaltarse al
+ * seleccionarla.
+ */
+function FilaOrg({
+  org,
+  sel,
+  onSel,
+  pequena,
+  children,
+}: {
+  org: Organizacion;
+  sel: boolean;
+  onSel: (o: Organizacion | null) => void;
+  pequena?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={() => onSel(sel ? null : org)}
+      className={`flex w-full items-center justify-between gap-2 rounded-lg border text-left ${
+        pequena ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'
+      }`}
+      style={{ borderColor: sel ? 'var(--gold)' : 'var(--border)' }}
+    >
+      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <strong className="truncate">{org.name}</strong>
+        {children}
+      </span>
+      <span style={{ color: 'var(--text-muted)' }}>{sel ? '▲' : '▼'}</span>
+    </button>
+  );
+}
+
+/**
+ * Los clubes de una federación, y las dos maneras de sumarle uno.
+ *
+ * ── Por qué esto faltaba, y qué se rompía sin ello ──
+ *
+ * La maquinaria de afiliar existe desde hace tiempo, pero solo se llegaba a
+ * ella desde «Mi organización» —la pantalla de quien manda EN la federación—.
+ * Y una federación creada desde este panel nace sin nadie dentro, así que no
+ * había ningún «quien manda» que pudiera abrirla: la federación existía, no
+ * salía en la pantalla de nadie, y desde aquí tampoco se le podían colgar
+ * clubes. El callejón sin salida se abría por sí solo con solo pulsar «+ Crear
+ * organización».
+ *
+ * ── Afiliar sigue siendo POR INVITACIÓN, también desde aquí ──
+ *
+ * El super-admin no cuelga clubes a dedo. Se manda una invitación y **el
+ * maestro del club la acepta o la rechaza** desde su portal, exactamente igual
+ * que si la mandara la federación. Afiliar a dedo desde el panel convertiría a
+ * quien lo opera en el único que entiende la estructura —y en el único
+ * responsable de ella—, que es justo lo contrario de lo que hace falta.
+ *
+ * Crear un club NUEVO dentro sí es directo: no hay maestro a quien preguntar
+ * todavía porque el club no existe hasta que se pulsa el botón.
+ */
+function ClubesDeLaFederacion({
+  org,
+  orgs,
+  ocupado,
+  onAccion,
+  onConfirmar,
+}: {
+  org: Organizacion;
+  orgs: Organizacion[];
+  ocupado: boolean;
+  onAccion: (fn: () => Promise<unknown>, ok: string, fallback: string) => Promise<void>;
+  onConfirmar: (
+    peticion: PeticionConfirmar,
+    fn: () => Promise<unknown>,
+    ok: string,
+    fallback: string,
+  ) => Promise<void>;
+}) {
+  const [enviadas, setEnviadas] = useState<InvitacionClub[]>([]);
+  const [busqueda, setBusqueda] = useState('');
+  const [encontrados, setEncontrados] = useState<ClubBusqueda[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: 'Colombia' });
+  /** Sube tras cada invitación y hace que se relean las enviadas. */
+  const [tick, setTick] = useState(0);
+
+  const clubes = orgs
+    .filter((o) => o.parentId === org.id)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const nombreDe = (id: string) => orgs.find((o) => o.id === id)?.name ?? 'otra organización';
+
+  useEffect(() => {
+    let vivo = true;
+    invitacionesClubEnviadasAPI(org.id)
+      .then((i) => vivo && setEnviadas(i))
+      .catch(() => vivo && setEnviadas([]));
+    return () => {
+      vivo = false;
+    };
+  }, [org.id, tick]);
+
+  // Al cambiar de federación, los resultados de la búsqueda anterior no valen:
+  // el botón «Invitar» que los acompaña ya apuntaría a otra organización.
+  useEffect(() => {
+    setBusqueda('');
+    setEncontrados([]);
+  }, [org.id]);
+
+  async function buscar() {
+    setBuscando(true);
+    try {
+      setEncontrados(await listarClubesAPI(busqueda.trim() || undefined));
+    } catch {
+      setEncontrados([]);
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  return (
+    <section className="card mt-5 p-5">
+      <h2 className="mb-1 text-lg font-semibold">Clubes de {org.name}</h2>
+      <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+        Un club afiliado hereda los planes que contrate {org.name} (§4.5). Los
+        clubes que ya existen se <strong>invitan</strong>: su maestro acepta o
+        rechaza, y nada cambia hasta que responda.
+      </p>
+
+      <ul className="mb-5 flex flex-col gap-1.5">
+        {clubes.map((c) => (
+          <li
+            key={c.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-sm"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <span className="min-w-0 truncate">
+              <strong>{c.name}</strong>
+              {c.city && <span style={{ color: 'var(--text-muted)' }}> · {c.city}</span>}
+            </span>
+            <span className="badge">{c.type}</span>
+          </li>
+        ))}
+        {clubes.length === 0 && (
+          <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Todavía no hay ningún club afiliado.
+          </li>
+        )}
+      </ul>
+
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+        {/* ── Invitar uno que ya existe ─────────────────────────────────── */}
+        <div>
+          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+            Invitar a un club existente
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            <input
+              placeholder="Buscar club por nombre…"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void buscar();
+              }}
+              className="min-w-0 flex-1"
+            />
+            <button onClick={() => void buscar()} disabled={buscando} className="btn btn-outline">
+              {buscando ? 'Buscando…' : 'Buscar'}
+            </button>
+          </div>
+
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {encontrados.map((c) => (
+              <li
+                key={c.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-sm"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <span className="min-w-0 truncate">
+                  <strong>{c.name}</strong>
+                  {c.city && <span style={{ color: 'var(--text-muted)' }}> · {c.city}</span>}
+                </span>
+                {/* Un club que ya cuelga de alguien no se puede invitar, y el
+                    servidor lo rechaza. Se dice de quién cuelga en vez de
+                    esconderlo: quien busca un club y no lo encuentra vuelve a
+                    buscarlo, y la respuesta a por qué no aparece está aquí. */}
+                {c.parentId === org.id ? (
+                  <span className="badge">Ya afiliado</span>
+                ) : c.parentId ? (
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Afiliado a {nombreDe(c.parentId)}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() =>
+                      void onConfirmar(
+                        {
+                          titulo: `¿Invitar a ${c.name} a afiliarse a ${org.name}?`,
+                          detalle:
+                            'Le llega la invitación a su maestro, que la acepta o la rechaza. Nada cambia hasta que responda.',
+                          textoOk: 'Enviar la invitación',
+                        },
+                        () => invitarClubAPI(org.id, c.id),
+                        `Invitación enviada a ${c.name}: su maestro debe aceptarla.`,
+                        'No se pudo invitar.',
+                      ).then(() => setTick((n) => n + 1))
+                    }
+                    disabled={ocupado}
+                    className="btn btn-gold"
+                  >
+                    Invitar
+                  </button>
+                )}
+              </li>
+            ))}
+            {encontrados.length === 0 && busqueda && !buscando && (
+              <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                Ningún club coincide con «{busqueda}».
+              </li>
+            )}
+          </ul>
+
+          {enviadas.length > 0 && (
+            <>
+              <h3
+                className="mb-1 mt-4 text-sm font-semibold"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Invitaciones enviadas
+              </h3>
+              <ul className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                {enviadas.map((inv) => (
+                  <li key={inv.id}>
+                    {inv.clubName}:{' '}
+                    <span
+                      className="badge"
+                      style={
+                        inv.status === 'ACEPTADA'
+                          ? { borderColor: '#3ecf8e', color: '#3ecf8e' }
+                          : inv.status === 'RECHAZADA'
+                            ? { borderColor: 'var(--danger)', color: 'var(--danger)' }
+                            : undefined
+                      }
+                    >
+                      {inv.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+
+        {/* ── O crear uno nuevo, ya colgando de ella ─────────────────────── */}
+        <div>
+          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+            Crear un club nuevo dentro
+          </h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input
+              placeholder="Nombre del club *"
+              maxLength={200}
+              value={nuevoClub.name}
+              onChange={(e) => setNuevoClub({ ...nuevoClub, name: e.target.value })}
+              className="sm:col-span-2"
+            />
+            <input
+              placeholder="Ciudad"
+              value={nuevoClub.city}
+              onChange={(e) => setNuevoClub({ ...nuevoClub, city: e.target.value })}
+            />
+            <input
+              placeholder="País"
+              value={nuevoClub.country}
+              onChange={(e) => setNuevoClub({ ...nuevoClub, country: e.target.value })}
+            />
+          </div>
+          <button
+            onClick={() =>
+              void onAccion(
+                () =>
+                  crearClubHijoAPI(org.id, {
+                    name: nuevoClub.name.trim(),
+                    type: 'CLUB',
+                    city: nuevoClub.city.trim() || undefined,
+                    country: nuevoClub.country.trim() || undefined,
+                  }),
+                `Club creado dentro de ${org.name}. Añádele su maestro.`,
+                'No se pudo crear el club.',
+              ).then(() => setNuevoClub({ ...nuevoClub, name: '', city: '' }))
+            }
+            disabled={ocupado || !nuevoClub.name.trim()}
+            className="btn btn-gold mt-3"
+          >
+            + Crear club
+          </button>
+          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Este sí queda afiliado en el acto: no hay maestro a quien preguntar
+            porque el club no existía hasta ahora. Selecciónalo a la izquierda
+            para ponerle el suyo.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CuentasBloqueadas({ ocupado }: { ocupado: boolean }) {
   const [bloqueadas, setBloqueadas] = useState<CuentaBloqueada[]>([]);
   const [msg, setMsg] = useState('');

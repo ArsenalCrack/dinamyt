@@ -49,6 +49,32 @@ export const nombreRol = (rol: string | null | undefined): string =>
 export const ROLES_ORG = ['admin', 'judge'] as const;
 export const ROLES_CLUB = ['maestro', 'coach', 'competitor'] as const;
 
+/**
+ * Los roles que ESA organización acepta al meter a alguien nuevo.
+ *
+ * Es el mismo reparto que valida el servidor al invitar (`ROLES_POR_TIPO` en
+ * `organizations.service.ts`), y aquí existe porque el panel del super-admin
+ * ofrecía los seis de `ROLES_SUPERADMIN` para cualquier tipo. En una
+ * federación, cuatro de ellos —maestro, coach, alumno, miembro— los rechaza el
+ * servidor con un 400, y el panel los seguía enseñando: se elegía «Maestro»,
+ * se pulsaba «+ Añadir» y salía un error que no explicaba que el rol no
+ * existía ahí. Peor todavía cuando lo que se quería era justo lo contrario:
+ * poner al administrador de una federación recién creada, que es el único que
+ * después puede afiliarle clubes.
+ *
+ * El super-admin sigue pudiendo CAMBIAR un rol a lo que quiera (el servidor no
+ * valida ese camino): esto solo acota la puerta de entrada.
+ */
+export function rolesAsignablesEn(tipo: string): readonly string[] {
+  return tipo === 'FEDERATION' || tipo === 'LEAGUE'
+    ? ROLES_ORG
+    : (['maestro', 'owner', 'staff', 'coach', 'competitor'] as const);
+}
+
+/** ¿Es una organización paraguas —la que agrupa clubes— o un club? */
+export const esParaguas = (tipo: string): boolean =>
+  tipo === 'FEDERATION' || tipo === 'LEAGUE';
+
 /** Todos los roles generales que el super-admin puede poner a mano. */
 export const ROLES_SUPERADMIN = [
   'admin',

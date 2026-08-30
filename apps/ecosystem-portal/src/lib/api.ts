@@ -375,6 +375,15 @@ export interface Organizacion {
   type: 'FEDERATION' | 'LEAGUE' | 'CLUB' | 'ACADEMY';
   city: string | null;
   country: string | null;
+  /**
+   * De qué federación o liga cuelga, o `null` si de ninguna.
+   *
+   * `GET /organizations` siempre lo devolvió —selecciona la fila entera— pero
+   * el tipo lo escondía, y por eso el panel del super-admin pintaba una lista
+   * plana en la que un club afiliado y uno huérfano se veían igual. La
+   * estructura es lo primero que hay que ver para poder cambiarla.
+   */
+  parentId: string | null;
 }
 export interface Miembro {
   memberId: string;
