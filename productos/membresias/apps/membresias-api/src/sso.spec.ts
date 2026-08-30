@@ -416,4 +416,65 @@ describe('membresias-api — la ficha que nace del ecosistema', () => {
     expect(filas[0].role).toBe('student');
     await app.close();
   });
+
+  /**
+   * La ficha que ya existía y NUNCA se había enlazado.
+   *
+   * Es el caso de todas las que creó el maestro a mano (`POST /users`) y de
+   * todas las que trajo la reconciliación por correo: se las reconocía por el
+   * correo en cada entrada y `eco_sub` se quedaba vacío para siempre. Con el
+   * hueco abierto, esa ficha se quedaba fuera de las dos cosas que dependen del
+   * enlace —la reja de `lib/ecosistema.ts` y el espejo del portal—, y encima
+   * habría quedado huérfana el día que su dueño cambiara de correo.
+   */
+  it('enlaza con el ecosistema la ficha que reconoce por el correo', async () => {
+    const { db, orgId, ids } = await crearEscenario();
+    await conEspejo(db, orgId);
+    const app = buildApp({ db, verifyToken: verificadorDePrueba });
+
+    // De partida no tiene enlace: es una ficha nacida aquí.
+    const [antes] = await db.select().from(users).where(eq(users.id, ids.alumno)).limit(1);
+    expect(antes.ecoSub).toBeNull();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/sso',
+      payload: {
+        token: tokenDelPortal({
+          sub: ECO_SUB,
+          email: 'alumno1@club.com',
+          fullName: 'Alumno Uno',
+          org_id: ECO_ORG,
+          role_membresias: 'student',
+        }),
+      },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const [despues] = await db.select().from(users).where(eq(users.id, ids.alumno)).limit(1);
+    expect(despues.ecoSub).toBe(ECO_SUB);
+
+    // La prueba de que el enlace sirve: con OTRO correo —el que se acaba de
+    // cambiar en el portal— sigue entrando a la misma ficha, con sus pagos y
+    // sus asistencias, en vez de estrenar una vacía.
+    const res2 = await app.inject({
+      method: 'POST',
+      url: '/auth/sso',
+      payload: {
+        token: tokenDelPortal({
+          sub: ECO_SUB,
+          email: 'otro-correo@club.com',
+          fullName: 'Alumno Uno',
+          org_id: ECO_ORG,
+          role_membresias: 'student',
+        }),
+      },
+    });
+    expect(res2.statusCode).toBe(200);
+    expect(res2.json().user.id).toBe(ids.alumno);
+    expect(await db.select().from(users).where(eq(users.email, 'otro-correo@club.com'))).toHaveLength(
+      0,
+    );
+    await app.close();
+  });
 });

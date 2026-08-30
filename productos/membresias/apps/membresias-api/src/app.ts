@@ -23,6 +23,7 @@ import { checkinRoutes } from './routes/checkin';
 import { reportsRoutes } from './routes/reports';
 import { notificationsRoutes } from './routes/notifications';
 import { pushRoutes } from './routes/push';
+import { syncRoutes } from './routes/sync';
 
 export interface BuildAppDeps {
   /** Verificador de tokens. Por defecto el híbrido (propio + SSO opcional);
@@ -77,6 +78,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(reportsRoutes);
   void app.register(notificationsRoutes);
   void app.register(pushRoutes);
+  void app.register(syncRoutes);
 
   return app;
 }

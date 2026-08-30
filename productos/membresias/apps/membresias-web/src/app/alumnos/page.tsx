@@ -42,6 +42,10 @@ interface Persona {
   emergencyPhone: string | null;
   role: Rol;
   isActive: boolean;
+  /** Si su ficha la gobierna el portal DINAMYT. Ver `lib/ecosistema.ts`. */
+  enElEcosistema: boolean;
+  /** Su id en el portal, para enlazar derecho a su ficha de allí. */
+  ecoSub: string | null;
 }
 
 /** Una clase del club, tal como la enseña el desplegable. */
@@ -49,6 +53,9 @@ interface Clase {
   id: string;
   name: string;
 }
+
+/** Portal DINAMYT: donde se editan los datos de quien llegó por él. */
+const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 
 const ROLES: { valor: Rol; clave: 'rol.student' | 'rol.guardian' | 'rol.staff' }[] = [
   { valor: 'student', clave: 'rol.student' },
@@ -731,12 +738,33 @@ export default function Alumnos() {
                 <td>
                   {esMaestro && (
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        onClick={() => abrirEdicion(p)}
-                      >
-                        ✎ {t('comun.editar')}
-                      </button>
+                      {/* Quien llegó por DINAMYT tiene su ficha allí: aquí el
+                          botón lleva al portal en vez de abrir un formulario
+                          que la API va a rechazar. Ver `lib/ecosistema.ts`. */}
+                      {p.enElEcosistema ? (
+                        PORTAL_URL && (
+                          <a
+                            className="btn btn-outline btn-sm"
+                            href={
+                              p.ecoSub
+                                ? `${PORTAL_URL}/mi-organizacion/miembro/${p.ecoSub}`
+                                : `${PORTAL_URL}/mi-organizacion`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={t('eco.fichaDelPortal')}
+                          >
+                            ✎ {t('eco.editarEnPortal')} ↗
+                          </a>
+                        )
+                      ) : (
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => abrirEdicion(p)}
+                        >
+                          ✎ {t('comun.editar')}
+                        </button>
+                      )}
                       <Link href={`/alumnos/${p.id}`} className="btn btn-outline btn-sm">
                         {t('panel.verFicha')}
                       </Link>

@@ -17,6 +17,11 @@ import {
   textoOpcional,
 } from '../lib/validacion';
 import { decodificarImagen, direccionLogo, imagenGuardada } from '../lib/imagenes';
+import {
+  enElEcosistema,
+  mensajeContrasenaEnElPortal,
+  mensajeSoloEnElPortal,
+} from '../lib/ecosistema';
 import { todayStr } from '../lib/billing';
 import { leerPagina, patron } from '../lib/paginacion';
 
@@ -67,6 +72,21 @@ export async function orgsRoutes(app: FastifyInstance) {
     const body = (req.body ?? {}) as { logoUrl?: string | null };
     if (body.logoUrl === undefined) {
       return reply.code(422).send({ error: 'No hay nada que cambiar.' });
+    }
+
+    // Un club del ecosistema tiene su escudo en el portal, que es de donde lo
+    // leen también Campeonatos y Academy. Ponerlo aquí daría dos escudos
+    // distintos para el mismo club según por qué puerta se entre. Ver
+    // `lib/ecosistema.ts`.
+    const [club] = await req.db
+      .select({ ecoOrgId: orgs.ecoOrgId })
+      .from(orgs)
+      .where(eq(orgs.id, orgId))
+      .limit(1);
+    if (enElEcosistema(club?.ecoOrgId)) {
+      return reply
+        .code(403)
+        .send({ error: mensajeSoloEnElPortal('El escudo de un club de DINAMYT') });
     }
 
     const escudo = imagenGuardada(body.logoUrl, 'El logo');
@@ -367,6 +387,12 @@ export async function orgsRoutes(app: FastifyInstance) {
       const db = req.db;
       const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
       if (!u) return reply.code(404).send({ error: 'Usuario no encontrado.' });
+
+      // Lo mismo que en `POST /users/:id/password`: con cuenta del ecosistema,
+      // la contraseña se fija en el portal y aquí solo se copia.
+      if (enElEcosistema(u.ecoSub)) {
+        return reply.code(409).send({ error: mensajeContrasenaEnElPortal('ajena') });
+      }
 
       await db
         .update(users)

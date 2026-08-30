@@ -76,6 +76,9 @@ const es = {
   // al portal y no a un formulario propio (ver UNA-SOLA-APP.md §2).
   'login.sinCuenta': '¿No tienes cuenta?',
   'login.registrate': 'Regístrate en DINAMYT',
+  // La contraseña es una sola para todo el ecosistema y se recupera allí: el
+  // portal la copia hasta aquí, así que la nueva sirve también en esta app.
+  'login.olvidada': '¿Olvidaste tu contraseña?',
   'login.volverAlPortal': 'Ir al portal DINAMYT',
   // Se enseña al aterrizar aquí desde «Salir» (`/login?salida=1`). Confirma
   // en voz alta lo que se acaba de hacer: sin una frase, salir y ver otra vez
@@ -281,6 +284,17 @@ const es = {
   'encuadre.centrar': 'Volver al centro',
   'encuadre.enElCarnet': 'En el carnet',
   'encuadre.guardar': 'Usar así',
+
+  // ── Lo que vive en DINAMYT y aquí solo se lee ──
+  // Sale cuando el club está dentro del ecosistema: la ficha de la persona la
+  // escribe el portal, porque la misma cuenta entra también a Campeonatos y a
+  // Academy. Un club que usa Membresías por su cuenta no ve nada de esto.
+  'eco.fichaDelPortal':
+    'Estos datos son de la persona en todo DINAMYT y se editan en el portal: aquí se ven. Lo del club —su plan, su PIN, su clase, sus cobros y su carnet— se sigue haciendo desde esta pantalla.',
+  'eco.misDatosDelPortal':
+    'Tus datos son los mismos en todo DINAMYT y se editan en tu perfil del portal. Aquí se ven, y desde aquí sigues llevando lo de tu club.',
+  'eco.editarEnPortal': 'Editar en DINAMYT',
+  'eco.escudoEnPortal': 'El escudo del club se pone en su ficha de DINAMYT.',
 
   // Escudo del club: lo pone el maestro y lo ven todos sus alumnos
   'logo.titulo': 'Escudo del club',
@@ -698,6 +712,7 @@ const en: Record<ClaveTexto, string> = {
   'login.qrCaducado': 'That code has expired. Ask your master for another one.',
   'login.sinCuenta': 'No account yet?',
   'login.registrate': 'Sign up at DINAMYT',
+  'login.olvidada': 'Forgot your password?',
   'login.volverAlPortal': 'Go to the DINAMYT portal',
   'login.sesionCerrada': 'You signed out.',
   'login.sesionCerradaDinamyt': 'You signed out of Membresías and of DINAMYT.',
@@ -872,6 +887,13 @@ const en: Record<ClaveTexto, string> = {
   'encuadre.centrar': 'Back to centre',
   'encuadre.enElCarnet': 'On the card',
   'encuadre.guardar': 'Use it like this',
+
+  'eco.fichaDelPortal':
+    "These details belong to the person across all of DINAMYT and are edited in the portal; here they are read-only. Club matters — plan, PIN, class, payments and card — are still handled from this screen.",
+  'eco.misDatosDelPortal':
+    'Your details are the same across all of DINAMYT and are edited in your portal profile. Here you can see them, and you still handle your club from here.',
+  'eco.editarEnPortal': 'Edit in DINAMYT',
+  'eco.escudoEnPortal': "The club crest is set in the club's DINAMYT profile.",
 
   'logo.titulo': 'Club crest',
   'logo.poner': 'Add crest',

@@ -106,6 +106,9 @@ interface AvisoBreve {
   venceEl: string | null;
 }
 
+/** Portal DINAMYT: donde vive el perfil de quien entró por él. */
+const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
+
 /** Cuántas filas de historial destapa cada «ver más». */
 const PASO_HISTORIAL = 12;
 
@@ -849,6 +852,85 @@ export default function MiPanel() {
           marginBottom: '1rem',
         }}
       >
+        {/* ── Mis datos ──
+            Si entré por DINAMYT, mi perfil es el del portal y aquí solo se ve.
+            No es una restricción nueva por gusto: la misma cuenta entra también
+            a Campeonatos y a Academy, y editable por los dos lados acababa
+            dando dos teléfonos y dos fotos de la misma persona según por dónde
+            se mirara. Lo de mi club —mi plan, mis pagos, mi carnet— sigue
+            estando aquí. Ver `lib/ecosistema.ts` en la API. */}
+        {user?.enElEcosistema ? (
+          <div className="card" style={{ padding: '1rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.6rem',
+                marginBottom: '0.2rem',
+              }}
+            >
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 700 }}>{t('mi.miPerfil')}</h2>
+              {PORTAL_URL && (
+                <a
+                  className="btn btn-outline btn-sm"
+                  href={`${PORTAL_URL}/perfil`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t('eco.editarEnPortal')} ↗
+                </a>
+              )}
+            </div>
+            <p className="muted" style={{ fontSize: '0.72rem', marginBottom: '0.9rem' }}>
+              {t('eco.misDatosDelPortal')}
+            </p>
+            <dl
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px, 100%), 1fr))',
+                gap: '0.6rem 1.25rem',
+                fontSize: '0.85rem',
+              }}
+            >
+              <div>
+                <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('comun.nombre')}</dt>
+                <dd style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{user.fullName}</dd>
+              </div>
+              <div>
+                <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('comun.correo')}</dt>
+                <dd style={{ overflowWrap: 'anywhere' }}>{user.email}</dd>
+              </div>
+              <div>
+                <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('comun.telefono')}</dt>
+                <dd>{user.phone || '—'}</dd>
+              </div>
+              <div>
+                <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('ficha.nacimiento')}</dt>
+                <dd className="mono">
+                  {user.birthDate ? fmtFecha(user.birthDate, idioma) : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('ficha.sangre')}</dt>
+                <dd>{user.bloodType || '—'}</dd>
+              </div>
+              <div>
+                <dt className="muted" style={{ fontSize: '0.72rem' }}>
+                  {t('ficha.emergenciaNombre')}
+                </dt>
+                <dd style={{ overflowWrap: 'anywhere' }}>{user.emergencyName || '—'}</dd>
+              </div>
+              <div>
+                <dt className="muted" style={{ fontSize: '0.72rem' }}>
+                  {t('ficha.emergenciaTelefono')}
+                </dt>
+                <dd>{user.emergencyPhone || '—'}</dd>
+              </div>
+            </dl>
+          </div>
+        ) : (
         <form onSubmit={guardarPerfil} className="card" style={{ padding: '1rem' }}>
           <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
             {t('mi.miPerfil')}
@@ -986,7 +1068,35 @@ export default function MiPanel() {
             {t('comun.guardar')}
           </button>
         </form>
+        )}
 
+        {/* Igual que mis datos: si entré por DINAMYT, mi contraseña es la del
+            portal. Es UNA para todo el ecosistema y se fija allí; el portal la
+            copia hasta aquí (`POST /sync/contrasena`), así que con ella entro
+            también por este formulario de login. Dejar puesto el cambio sería
+            ofrecer un botón que la API rechaza —y, si no lo rechazara, tendría
+            una contraseña para el club y otra para DINAMYT. */}
+        {user?.enElEcosistema ? (
+          <div className="card" style={{ padding: '1rem' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+              {t('mi.cambiarContrasena')}
+            </h2>
+            <p className="muted" style={{ fontSize: '0.78rem', margin: '0 0 0.7rem' }}>
+              Tu contraseña es la de DINAMYT y sirve para todo el ecosistema.
+              Cámbiala en tu perfil del portal y aquí sigue entrando la misma.
+            </p>
+            {PORTAL_URL && (
+              <a
+                className="btn btn-outline btn-sm"
+                href={`${PORTAL_URL}/perfil`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Cambiarla en DINAMYT
+              </a>
+            )}
+          </div>
+        ) : (
         <form onSubmit={cambiarPassword} className="card" style={{ padding: '1rem' }}>
           <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
             {t('mi.cambiarContrasena')}
@@ -1020,6 +1130,7 @@ export default function MiPanel() {
             {t('comun.guardar')}
           </button>
         </form>
+        )}
       </div>
 
       {/* ── Mis pagos ──

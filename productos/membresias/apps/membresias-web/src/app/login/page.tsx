@@ -335,6 +335,22 @@ export default function Login() {
           {enviando ? t('login.entrando') : t('login.entrar')}
         </button>
 
+        {/* Solo con portal detrás, y por una razón concreta: la contraseña que
+            se recupera allí es la de DINAMYT, y el portal la copia hasta aquí
+            (`POST /sync/contrasena`), así que la nueva entra también por este
+            formulario. Sin ecosistema —Membresías por su cuenta— no hay nada
+            que recuperar por correo: esa contraseña se la pone el maestro. */}
+        {sso && (
+          <p style={{ marginTop: '0.75rem', textAlign: 'center', fontSize: '0.85rem' }}>
+            <a
+              href={`${PORTAL_URL}/recuperar${email ? `?email=${encodeURIComponent(email)}` : ''}`}
+              style={{ color: 'var(--gold)' }}
+            >
+              {t('login.olvidada')}
+            </a>
+          </p>
+        )}
+
         {sso && (
           <>
             <div

@@ -85,6 +85,19 @@ export interface Usuario {
   isSuperAdmin: boolean;
   orgId: string | null;
   isActive: boolean;
+  /**
+   * Si la ficha de esta persona la gobierna el portal DINAMYT.
+   *
+   * Cuando es `true`, sus datos personales —nombre, correo, teléfono, foto,
+   * nacimiento, sangre, cinturón y contacto de emergencia— se editan allí y
+   * aquí solo se leen: la misma cuenta entra también a Campeonatos y a
+   * Academy, y las tres tienen que decir lo mismo. Lo del CLUB (plan, estado,
+   * PIN, clase, pagos, carnet) se sigue editando aquí.
+   *
+   * En un club que usa Membresías como producto independiente es `false` y no
+   * cambia nada. Ver `lib/ecosistema.ts` en la API.
+   */
+  enElEcosistema: boolean;
 }
 
 export interface Club {
@@ -100,6 +113,8 @@ export interface Club {
    */
   ownerName: string | null;
   isActive: boolean;
+  /** Si el escudo del club lo pone el portal DINAMYT. Ver `Usuario`. */
+  enElEcosistema: boolean;
 }
 
 /**

@@ -42,6 +42,13 @@ const SIN_CONTEXTO = new Set([
   // filtro (ver `routes/notifications.ts`), así que envolverla en el contexto
   // de un club —que no tiene— solo abriría una transacción de más.
   '/notifications/cron',
+  // El espejo del portal (ver `routes/sync.ts`): quien llama es el otro
+  // servidor, no pertenece a ningún club y busca por `eco_sub` / `eco_org_id`.
+  // Mismo caso que `/auth/sso`, y con el mismo síntoma si se olvida: la ruta se
+  // queda colgada en vez de dar un error.
+  '/sync/persona',
+  '/sync/club',
+  '/sync/contrasena',
 ]);
 
 function contextoDe(req: FastifyRequest) {

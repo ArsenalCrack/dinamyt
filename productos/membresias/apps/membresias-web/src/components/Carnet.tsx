@@ -126,17 +126,35 @@ export function Carnet({
    * el punto—, así que cuando la columna es más estrecha se enseña a escala.
    * Sin esto, en un celular la vista previa se sale por la derecha.
    *
-   * Se mide al montar y al cambiar el tamaño de la ventana, que es lo único
-   * que mueve el ancho de esta columna.
+   * Se mide con `ResizeObserver` y no con el `resize` de la ventana: el ancho
+   * de esta columna también cambia sin que la ventana se mueva —la rejilla de
+   * la ficha se recoloca cuando terminan de llegar los datos del alumno—, y
+   * escuchando solo a la ventana la escala se quedaba con la medida de antes.
+   *
+   * ── Por qué `contentRect` y no las otras dos medidas ──
+   *
+   * En un marco de 331,5 px la caja de contenido mide 329,5 (el borde se lleva
+   * uno por lado), y ahí es donde tiene que caber el carnet:
+   *
+   * - `clientWidth` redondea a **330** → sobra medio píxel, que `overflow:
+   *   hidden` recorta por la derecha. Es lo que hacía que en el celular se
+   *   viera un pelo corrido a la izquierda.
+   * - `getBoundingClientRect().width` da **331,5**, pero es la caja de BORDE:
+   *   se pasa dos píxeles enteros.
+   * - `contentRect` da **329,5** — la de contenido, con decimales. Encaja justo.
+   *
+   * El observador dispara una primera vez al empezar a observar, así que no
+   * hace falta medir a mano antes.
    */
   useEffect(() => {
-    function medir() {
-      const ancho = caja.current?.clientWidth;
+    const nodo = caja.current;
+    if (!nodo) return;
+    const observador = new ResizeObserver(([entrada]) => {
+      const ancho = entrada.contentRect.width;
       if (ancho) setEscala(Math.min(1, ancho / ANCHO_PREVIA));
-    }
-    medir();
-    window.addEventListener('resize', medir);
-    return () => window.removeEventListener('resize', medir);
+    });
+    observador.observe(nodo);
+    return () => observador.disconnect();
   }, []);
 
   useEffect(() => {
@@ -261,22 +279,38 @@ export function Carnet({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       <div ref={caja} className="carnet-marco" style={{ height: ALTO_PREVIA * escala }}>
         {documento ? (
-          <iframe
-            ref={marco}
-            title={`${t('qr.titulo')} — ${nombre}`}
-            srcDoc={documento}
-            /* El documento es nuestro y del mismo origen; sin `allow-same-origin`
-               no se podría llamar a `print()` desde aquí. Sin `allow-scripts`:
-               dentro no hay ni una línea de JavaScript. */
-            sandbox="allow-same-origin allow-modals"
-            width={ANCHO_PREVIA}
-            height={ALTO_PREVIA}
+          /* ── Por qué hay una caja de más ──
+             El `transform` escala lo que se VE, pero no lo que el iframe ocupa:
+             para la maquetación sigue midiendo sus 372 px pase lo que pase. Con
+             `transformOrigin: top left` eso deja la tarjeta pegada a la
+             izquierda —muy visible en el escritorio, donde la columna es más
+             ancha que el carnet y quedaba todo el hueco a la derecha—.
+             Esta caja mide lo que el carnet mide YA escalado, así que
+             `margin: 0 auto` lo centra de verdad y reparte lo que sobre. */
+          <div
             style={{
-              border: 0,
-              transform: `scale(${escala})`,
-              transformOrigin: 'top left',
+              width: ANCHO_PREVIA * escala,
+              height: ALTO_PREVIA * escala,
+              margin: '0 auto',
             }}
-          />
+          >
+            <iframe
+              ref={marco}
+              title={`${t('qr.titulo')} — ${nombre}`}
+              srcDoc={documento}
+              /* El documento es nuestro y del mismo origen; sin `allow-same-origin`
+                 no se podría llamar a `print()` desde aquí. Sin `allow-scripts`:
+                 dentro no hay ni una línea de JavaScript. */
+              sandbox="allow-same-origin allow-modals"
+              width={ANCHO_PREVIA}
+              height={ALTO_PREVIA}
+              style={{
+                border: 0,
+                transform: `scale(${escala})`,
+                transformOrigin: 'top left',
+              }}
+            />
+          </div>
         ) : (
           <p className="muted" style={{ padding: '2rem', textAlign: 'center' }}>
             {t('comun.cargando')}

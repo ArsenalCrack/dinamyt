@@ -22,6 +22,12 @@ import {
   imagenGuardada,
 } from '../lib/imagenes';
 import { cinturon } from '../lib/cinturones';
+import {
+  camposVetados,
+  enElEcosistema,
+  mensajeContrasenaEnElPortal,
+  mensajeSoloEnElPortal,
+} from '../lib/ecosistema';
 import { leerPagina, patron } from '../lib/paginacion';
 import { todayStr } from '../lib/billing';
 import { ensureMembership } from '../lib/memberships';
@@ -65,6 +71,8 @@ interface FilaVista {
   role: (typeof users.$inferSelect)['role'];
   orgId: string | null;
   isActive: boolean;
+  /** Enlace con la cuenta del ecosistema. Ver `lib/ecosistema.ts`. */
+  ecoSub?: string | null;
   createdAt: Date | null;
   updatedAt?: Date | null;
 }
@@ -88,6 +96,21 @@ function vista(u: FilaVista) {
     role: u.role,
     orgId: u.orgId,
     isActive: u.isActive,
+    /**
+     * Si la ficha de esta persona la gobierna el portal DINAMYT. La pantalla lo
+     * usa para enseñar los datos en vez de un formulario; quien decide de
+     * verdad es el PATCH de aquí abajo.
+     */
+    enElEcosistema: enElEcosistema(u.ecoSub),
+    /**
+     * Quién es esta persona EN EL PORTAL. Solo viaja cuando el ecosistema
+     * manda, y es para una cosa: armar el enlace directo a su ficha allí
+     * (`/mi-organizacion/miembro/<ecoSub>`). Sin él, «edítalo en DINAMYT» deja
+     * al maestro buscando a mano entre doscientos alumnos. No abre ninguna
+     * puerta: el portal exige sesión y comprueba que quien pide gestione a esa
+     * persona.
+     */
+    ecoSub: enElEcosistema(u.ecoSub) ? (u.ecoSub ?? null) : null,
     createdAt: u.createdAt,
   };
 }
@@ -110,6 +133,7 @@ const COLUMNAS_VISTA = {
   orgId: users.orgId,
   isActive: users.isActive,
   isSuperAdmin: users.isSuperAdmin,
+  ecoSub: users.ecoSub,
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 } as const;
@@ -394,6 +418,20 @@ export async function usersRoutes(app: FastifyInstance) {
         isActive?: boolean;
       } & CuerpoFicha;
 
+      // ── La reja del ecosistema ──
+      // Si esta persona llegó por DINAMYT, su ficha la escribe el portal: aquí
+      // el maestro le sigue poniendo plan, PIN, clase, rol y acceso —que son
+      // del CLUB—, pero no su nombre ni su foto. Ver `lib/ecosistema.ts`.
+      if (enElEcosistema(u.ecoSub)) {
+        const vetados = camposVetados(body as Record<string, unknown>);
+        if (vetados.length > 0) {
+          return reply.code(403).send({
+            error: mensajeSoloEnElPortal('Los datos personales de tus alumnos'),
+            campos: vetados,
+          });
+        }
+      }
+
       const ficha = fichaDeSeguridad(body);
       if (!ficha.ok) return reply.code(422).send({ error: ficha.error });
       const cambios: Record<string, unknown> = { updatedAt: new Date(), ...ficha.valor };
@@ -454,6 +492,19 @@ export async function usersRoutes(app: FastifyInstance) {
       if (body.role !== undefined) {
         if (req.user!.role_membresias === 'staff' && !req.user!.is_super_admin) {
           return reply.code(403).send({ error: 'Solo el maestro cambia roles.' });
+        }
+        // Y nunca a uno mismo. Desactivarse ya estaba cerrado; degradarse era
+        // la misma puerta con otro nombre, y peor: `ROLES_ASIGNABLES` no
+        // incluye `owner`, así que el maestro que se toca el rol solo puede
+        // BAJARLO — y quedarse sin su club sin forma de devolvérselo, porque el
+        // permiso que haría falta es justo el que se acaba de quitar. El
+        // superadmin sí puede, porque él sigue teniendo cómo deshacerlo.
+        if (u.id === req.user!.sub && !req.user!.is_super_admin) {
+          return reply.code(400).send({
+            error:
+              'No puedes cambiarte el rol a ti mismo: perderías el panel de tu ' +
+              'club y no podrías devolvértelo.',
+          });
         }
         if (!ROLES_ASIGNABLES.includes(body.role as MembresiasRole)) {
           return reply.code(422).send({
@@ -568,6 +619,15 @@ export async function usersRoutes(app: FastifyInstance) {
       const db = req.db;
       const u = await delClub(db, orgId, id);
       if (!u || u.isSuperAdmin) return reply.code(404).send({ error: 'No encontrado.' });
+
+      // Quien tiene cuenta del ecosistema tiene UNA contraseña, y se fija en el
+      // portal. Si el maestro pudiera escribirle otra aquí, esa persona entraría
+      // al club con una y a DINAMYT con otra — y la del portal ganaría en cuanto
+      // volviera a cambiarla. Esta ruta sigue siendo la de siempre para las
+      // fichas sin cuenta: el alumno sin correo, que es para quien se hizo.
+      if (enElEcosistema(u.ecoSub)) {
+        return reply.code(409).send({ error: mensajeContrasenaEnElPortal('ajena') });
+      }
 
       await db
         .update(users)
