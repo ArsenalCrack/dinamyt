@@ -227,7 +227,13 @@ export default function Panel() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {esMaestro && (
+          {/* ── El escudo ──
+              Aquí ya no se cambia si el club es del ecosistema: se pone UNA vez
+              en la ficha del club del portal, que es de donde lo leen también
+              Campeonatos y Academy. Con un botón a cada lado, el mismo club
+              acababa con dos escudos distintos según por qué puerta se entrara.
+              El club que usa Membresías por su cuenta lo sigue teniendo aquí. */}
+          {esMaestro && !club?.enElEcosistema && (
             <button
               className="btn btn-outline btn-sm"
               onClick={() => setEditandoLogo((v) => !v)}
@@ -249,7 +255,7 @@ export default function Panel() {
         </div>
       </header>
 
-      {editandoLogo && esMaestro && (
+      {editandoLogo && esMaestro && !club?.enElEcosistema && (
         <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
           <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
             {t('logo.titulo')}

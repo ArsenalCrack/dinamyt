@@ -50,6 +50,13 @@ interface Persona {
   emergencyPhone: string | null;
   role: Rol;
   isActive: boolean;
+  /**
+   * Si la ficha de esta persona la gobierna el portal DINAMYT: aquí se lee y
+   * allí se edita. Ver `lib/ecosistema.ts` en la API.
+   */
+  enElEcosistema: boolean;
+  /** Su id en el portal, para enlazar derecho a su ficha de allí. */
+  ecoSub: string | null;
 }
 interface Membership {
   userId: string;
@@ -88,6 +95,9 @@ interface Attendance {
   checkinDate: string;
   method: string;
 }
+
+/** Portal DINAMYT: es donde se editan los datos de la persona. Ver más abajo. */
+const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 
 const ESTADOS_MEM = ['activo', 'inactivo', 'suspendido', 'retirado'] as const;
 const METODOS = ['efectivo', 'transferencia', 'nequi', 'daviplata'] as const;
@@ -511,7 +521,7 @@ export default function Ficha() {
   ];
 
   return (
-    <main style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem' }}>
+    <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}>
       <header
        
         style={{
@@ -678,13 +688,172 @@ export default function Ficha() {
             </p>
           </div>
 
+          {/* ── Las dos formas de devolverle la entrada a alguien ──
+              El QR abre la sesión sin teclear nada y la contraseña nueva se la
+              dicta el maestro: son la misma conversación («no puedo entrar»),
+              así que van juntas y no una arriba y otra al final de la página.
+              Las dos son del ACCESO, no de la ficha: siguen aquí aunque los
+              datos de la persona los mantenga el portal. */}
           {esMaestro && <AccesoQR userId={id} />}
+
+          {/* Con cuenta de DINAMYT, la contraseña NO se escribe aquí: es una
+              sola para todo el ecosistema y se fija en el portal, que la copia
+              hasta esta app (`POST /sync/contrasena`). Dejar el formulario
+              puesto sería ofrecer un botón que el servidor rechaza con un 409
+              —y, si no lo rechazara, esa persona acabaría con una contraseña
+              para el club y otra para DINAMYT—. Para lo que el maestro necesita
+              AHORA, en la puerta, está el QR de aquí arriba. */}
+          {esMaestro && persona?.enElEcosistema && (
+            <div className="card" style={{ padding: '1rem' }}>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+                {t('alumnos.nuevaContrasena')}
+              </h2>
+              <p className="muted" style={{ fontSize: '0.78rem', margin: 0 }}>
+                Su contraseña es la de DINAMYT y vive en el portal: la cambia
+                ella misma desde su perfil, o la recupera con «¿Olvidaste tu
+                contraseña?». Si necesita entrar ahora, usa el acceso por QR.
+              </p>
+            </div>
+          )}
+
+          {esMaestro && !persona?.enElEcosistema && (
+            <form onSubmit={cambiarPassword} className="card" style={{ padding: '1rem' }}>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+                {t('alumnos.nuevaContrasena')}
+              </h2>
+              {/* Arranca VISIBLE: el maestro la está fijando y se la tiene que
+                  dictar al alumno. El ojo está para taparla cuando hay gente
+                  mirando la pantalla. */}
+              <CampoContrasena
+                verInicial
+                autoComplete="new-password"
+                minLength={8}
+                maxLength={LIM.password}
+                required
+                value={nuevaPass}
+                onChange={(e) => setNuevaPass(e.target.value)}
+                placeholder={t('mi.contrasenaNueva')}
+              />
+              <Contador valor={nuevaPass} max={LIM.password} />
+              <p className="muted" style={{ fontSize: '0.7rem', margin: '0.35rem 0 0.6rem' }}>
+                {t('alumnos.contrasenaAyuda')}
+              </p>
+              <button type="submit" className="btn btn-outline btn-sm">
+                {t('comun.guardar')}
+              </button>
+            </form>
+          )}
         </div>
       </div>
 
-      {esMaestro && (
+      {/* ── Los datos de la PERSONA ──
+          Cuando el club vive en DINAMYT esto es una tarjeta de lectura con un
+          enlace al portal, y no un formulario. La misma cuenta entra también a
+          Campeonatos y a Academy: editable por los dos lados, ganaba el último
+          que guardara y el mismo alumno acababa con dos nombres y dos fotos
+          según por dónde se mirara. Lo del CLUB —plan, PIN, clase, cobros,
+          carnet, acceso— se sigue haciendo aquí abajo.
+
+          Un club que usa Membresías por su cuenta no tiene portal detrás: para
+          él `enElEcosistema` es falso y el formulario de siempre sigue en pie.
+          Ver `lib/ecosistema.ts` en la API, que es quien lo hace cumplir. */}
+      {esMaestro && persona?.enElEcosistema && (
+        <div className="card" style={{ padding: '1rem', marginBottom: '1.25rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.6rem',
+              marginBottom: '0.2rem',
+            }}
+          >
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700 }}>
+              {t(esAlumno ? 'ficha.datos' : 'ficha.datosMiembro')}
+            </h2>
+            {PORTAL_URL && (
+              <a
+                className="btn btn-outline btn-sm"
+                href={
+                  persona.ecoSub
+                    ? `${PORTAL_URL}/mi-organizacion/miembro/${persona.ecoSub}`
+                    : `${PORTAL_URL}/mi-organizacion`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t('eco.editarEnPortal')} ↗
+              </a>
+            )}
+          </div>
+          <p className="muted" style={{ fontSize: '0.72rem', marginBottom: '0.9rem' }}>
+            {t('eco.fichaDelPortal')}
+          </p>
+
+          {/* Dos columnas: son ocho datos de una línea cada uno, y en fila
+              india dejaban media tarjeta en blanco. */}
+          <dl
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(min(220px, 100%), 1fr))',
+              gap: '0.6rem 1.5rem',
+              fontSize: '0.85rem',
+            }}
+          >
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('comun.nombre')}</dt>
+              <dd style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{persona.fullName}</dd>
+            </div>
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('comun.correo')}</dt>
+              <dd style={{ overflowWrap: 'anywhere' }}>{persona.email}</dd>
+            </div>
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('comun.telefono')}</dt>
+              <dd>{persona.phone || '—'}</dd>
+            </div>
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('comun.cinturon')}</dt>
+              <dd><Cinturon nombre={persona.belt} /></dd>
+            </div>
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('ficha.entrenaDesde')}
+              </dt>
+              <dd className="mono">
+                {persona.trainsSince ? fmtFecha(persona.trainsSince, idioma) : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('ficha.nacimiento')}</dt>
+              <dd className="mono">
+                {persona.birthDate ? fmtFecha(persona.birthDate, idioma) : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>{t('ficha.sangre')}</dt>
+              <dd>{persona.bloodType || '—'}</dd>
+            </div>
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('ficha.emergenciaNombre')}
+              </dt>
+              <dd style={{ overflowWrap: 'anywhere' }}>{persona.emergencyName || '—'}</dd>
+            </div>
+            <div>
+              <dt className="muted" style={{ fontSize: '0.72rem' }}>
+                {t('ficha.emergenciaTelefono')}
+              </dt>
+              <dd>{persona.emergencyPhone || '—'}</dd>
+            </div>
+          </dl>
+
+        </div>
+      )}
+
+      {esMaestro && !persona?.enElEcosistema && (
         <div
-         
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit,minmax(min(280px, 100%), 1fr))',
@@ -884,341 +1053,327 @@ export default function Ficha() {
               {guardando === 'datos' ? t('comun.guardando') : t('comun.guardar')}
             </button>
           </form>
+        </div>
+      )}
 
-          {/* ── Plan, estado y PIN ──
-              Solo para alumnos: al maestro y a los auxiliares no se les asigna
-              plan ni entran por el kiosco, así que este formulario y el de
-              cobro de abajo no van con ellos (ver `esAlumno`). */}
-          {esAlumno && (
-            <>
-            <form onSubmit={guardarPlan} className="card" style={{ padding: '1rem' }}>
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
-                {t('ficha.planYEstado')}
-              </h2>
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('ficha.planActual')}
-              </label>
-              <div style={{ margin: '0.25rem 0 0.7rem' }}>
-                <SelectMenu
-                  valor={plan.currentPlanId}
-                  onChange={(v) => setPlan({ ...plan, currentPlanId: v })}
-                  etiquetaAria={t('ficha.planActual')}
-                  placeholder={t('ficha.sinPlanAsignado')}
-                  opciones={opcionesPlan}
-                  disabled={planes.length === 0}
-                />
-              </div>
-              {/* Su clase. Vive aquí y no arriba, con los datos personales,
-                  porque no es de la persona: es de su membresía EN ESTE club,
-                  igual que el plan y el estado, y se guarda en el mismo gesto.
-                  Solo se dibuja si el club tiene clases. */}
-              {clases.length > 0 && (
-                <>
-                  <label className="muted" style={{ fontSize: '0.75rem' }}>
-                    {t('grupos.asignar')}
-                  </label>
-                  <div style={{ margin: '0.25rem 0 0.7rem' }}>
-                    <SelectMenu
-                      valor={plan.groupId}
-                      onChange={(v) => setPlan({ ...plan, groupId: v })}
-                      etiquetaAria={t('grupos.asignar')}
-                      placeholder={t('grupos.sinAsignar')}
-                      opciones={[
-                        { valor: '', etiqueta: t('grupos.sinAsignar') },
-                        ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
-                      ]}
-                    />
-                  </div>
-                </>
-              )}
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('comun.estado')}
-              </label>
-              <div style={{ margin: '0.25rem 0 0.7rem' }}>
-                <SelectMenu
-                  valor={plan.status}
-                  onChange={(v) => setPlan({ ...plan, status: v })}
-                  etiquetaAria={t('comun.estado')}
-                  opciones={ESTADOS_MEM.map((s) => ({
-                    valor: s,
-                    etiqueta: t(`memb.${s}` as ClaveTexto),
-                  }))}
-                />
-              </div>
-              {/* ── La cobertura, a mano ──
-                  Solo la que le corresponde al plan elegido (ver `mostrarVence`
-                  y `mostrarClases` arriba). Esto es el paracaídas: el alumno que
-                  llega de otro sistema o que pagó por fuera. Lo normal es no
-                  tocarlo — el vencimiento y las clases los calcula el cobro de
-                  abajo, y ahí no hay dedazo posible. */}
-              {mostrarVence && (
-                <>
-                  <label className="muted" style={{ fontSize: '0.75rem' }}>
-                    {t('ficha.venceEl')}
-                  </label>
-                  <div style={{ margin: '0.25rem 0 0.2rem' }}>
-                    <CampoFecha
-                      valor={plan.venceEl}
-                      onChange={(v) => setPlan({ ...plan, venceEl: v })}
-                      min="2000-01-01"
-                      max="2100-12-31"
-                      ariaLabel={t('ficha.venceEl')}
-                    />
-                  </div>
-                  <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                    {t('ficha.venceAyuda')}{' '}
-                    {tipoPlanElegido === null && <em>{t('ficha.soloPorTiempo')}</em>}
-                  </p>
-                </>
-              )}
+      {/* ── Lo del CLUB: su plan y su cobro, uno al lado del otro ──
+          Los dos en su propia rejilla de dos columnas, y no mezclados con la
+          ficha de la persona. Antes iban los tres en la misma (datos, plan y
+          cobro): en 900 píxeles no caben tres columnas de 280, así que el cobro
+          bajaba a la segunda fila y quedaba debajo de los datos personales, en
+          la otra punta de la pantalla que el plan al que pertenece. Y son la
+          misma operación: se le pone el plan y se le cobra.
 
-              {mostrarClases && (
-                <>
-                  <label className="muted" style={{ fontSize: '0.75rem' }}>
-                    {t('ficha.clases')}
-                  </label>
-                  <input
-                    inputMode="numeric"
-                    value={plan.clasesRestantes}
-                    onChange={(e) =>
-                      setPlan({
-                        ...plan,
-                        clasesRestantes: soloDigitos(e.target.value, LIM.clases),
-                      })
-                    }
-                    maxLength={LIM.clases}
-                    style={{ margin: '0.25rem 0 0.2rem' }}
+          Solo para alumnos: al maestro y a los auxiliares no se les asigna plan
+          ni entran por el kiosco (ver `esAlumno`). */}
+      {esMaestro && esAlumno && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(min(320px, 100%), 1fr))',
+            gap: '1rem',
+            marginBottom: '1.25rem',
+          }}
+        >
+          <form onSubmit={guardarPlan} className="card" style={{ padding: '1rem' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
+              {t('ficha.planYEstado')}
+            </h2>
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.planActual')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.7rem' }}>
+              <SelectMenu
+                valor={plan.currentPlanId}
+                onChange={(v) => setPlan({ ...plan, currentPlanId: v })}
+                etiquetaAria={t('ficha.planActual')}
+                placeholder={t('ficha.sinPlanAsignado')}
+                opciones={opcionesPlan}
+                disabled={planes.length === 0}
+              />
+            </div>
+            {/* Su clase. Vive aquí y no arriba, con los datos personales,
+                porque no es de la persona: es de su membresía EN ESTE club,
+                igual que el plan y el estado, y se guarda en el mismo gesto.
+                Solo se dibuja si el club tiene clases. */}
+            {clases.length > 0 && (
+              <>
+                <label className="muted" style={{ fontSize: '0.75rem' }}>
+                  {t('grupos.asignar')}
+                </label>
+                <div style={{ margin: '0.25rem 0 0.7rem' }}>
+                  <SelectMenu
+                    valor={plan.groupId}
+                    onChange={(v) => setPlan({ ...plan, groupId: v })}
+                    etiquetaAria={t('grupos.asignar')}
+                    placeholder={t('grupos.sinAsignar')}
+                    opciones={[
+                      { valor: '', etiqueta: t('grupos.sinAsignar') },
+                      ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
+                    ]}
                   />
-                  <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                    {tipoPlanElegido === null
-                      ? t('ficha.soloPorClases')
-                      : t('ficha.clasesAyuda')}
-                  </p>
-                </>
-              )}
-
-              {/* La matrícula no es cobertura: no da tiempo ni clases. Sin esta
-                  línea, el formulario se quedaba sin ningún campo y parecía
-                  roto. */}
-              {tipoPlanElegido === 'matricula' && (
+                </div>
+              </>
+            )}
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('comun.estado')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.7rem' }}>
+              <SelectMenu
+                valor={plan.status}
+                onChange={(v) => setPlan({ ...plan, status: v })}
+                etiquetaAria={t('comun.estado')}
+                opciones={ESTADOS_MEM.map((s) => ({
+                  valor: s,
+                  etiqueta: t(`memb.${s}` as ClaveTexto),
+                }))}
+              />
+            </div>
+            {/* ── La cobertura, a mano ──
+                Solo la que le corresponde al plan elegido (ver `mostrarVence`
+                y `mostrarClases` arriba). Esto es el paracaídas: el alumno que
+                llega de otro sistema o que pagó por fuera. Lo normal es no
+                tocarlo — el vencimiento y las clases los calcula el cobro de
+                abajo, y ahí no hay dedazo posible. */}
+            {mostrarVence && (
+              <>
+                <label className="muted" style={{ fontSize: '0.75rem' }}>
+                  {t('ficha.venceEl')}
+                </label>
+                <div style={{ margin: '0.25rem 0 0.2rem' }}>
+                  <CampoFecha
+                    valor={plan.venceEl}
+                    onChange={(v) => setPlan({ ...plan, venceEl: v })}
+                    min="2000-01-01"
+                    max="2100-12-31"
+                    ariaLabel={t('ficha.venceEl')}
+                  />
+                </div>
                 <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                  {t('planes.ayuda.matricula')}
+                  {t('ficha.venceAyuda')}{' '}
+                  {tipoPlanElegido === null && <em>{t('ficha.soloPorTiempo')}</em>}
                 </p>
-              )}
+              </>
+            )}
 
-              {/* El PIN lo pone la app sola al inscribir al alumno; esto es para
-                  corregirlo —el que le tocó es difícil de teclear, o se lo contó
-                  a un compañero—. Si el nuevo ya es de otro, la API responde 409
-                  diciendo de quién, en vez de reventar contra el índice único. */}
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('ficha.pin')}
-              </label>
-              <div style={{ display: 'flex', gap: '0.4rem', margin: '0.25rem 0 0.2rem' }}>
+            {mostrarClases && (
+              <>
+                <label className="muted" style={{ fontSize: '0.75rem' }}>
+                  {t('ficha.clases')}
+                </label>
                 <input
                   inputMode="numeric"
-                  value={plan.checkinPin}
+                  value={plan.clasesRestantes}
                   onChange={(e) =>
-                    setPlan({ ...plan, checkinPin: soloDigitos(e.target.value, LIM.checkinPin) })
+                    setPlan({
+                      ...plan,
+                      clasesRestantes: soloDigitos(e.target.value, LIM.clases),
+                    })
                   }
-                  maxLength={LIM.checkinPin}
-                  className="mono"
-                  style={{ letterSpacing: '0.18em' }}
+                  maxLength={LIM.clases}
+                  style={{ margin: '0.25rem 0 0.2rem' }}
                 />
+                <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                  {tipoPlanElegido === null
+                    ? t('ficha.soloPorClases')
+                    : t('ficha.clasesAyuda')}
+                </p>
+              </>
+            )}
+
+            {/* La matrícula no es cobertura: no da tiempo ni clases. Sin esta
+                línea, el formulario se quedaba sin ningún campo y parecía
+                roto. */}
+            {tipoPlanElegido === 'matricula' && (
+              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                {t('planes.ayuda.matricula')}
+              </p>
+            )}
+
+            {/* El PIN lo pone la app sola al inscribir al alumno; esto es para
+                corregirlo —el que le tocó es difícil de teclear, o se lo contó
+                a un compañero—. Si el nuevo ya es de otro, la API responde 409
+                diciendo de quién, en vez de reventar contra el índice único. */}
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('ficha.pin')}
+            </label>
+            <div style={{ display: 'flex', gap: '0.4rem', margin: '0.25rem 0 0.2rem' }}>
+              <input
+                inputMode="numeric"
+                value={plan.checkinPin}
+                onChange={(e) =>
+                  setPlan({ ...plan, checkinPin: soloDigitos(e.target.value, LIM.checkinPin) })
+                }
+                maxLength={LIM.checkinPin}
+                className="mono"
+                style={{ letterSpacing: '0.18em' }}
+              />
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setPlan({ ...plan, checkinPin: pinAlAzar() })}
+                title={t('ficha.pinOtro')}
+                style={{ flexShrink: 0 }}
+              >
+                🎲
+              </button>
+            </div>
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('ficha.pinAyuda')}
+            </p>
+            <button type="submit" className="btn btn-gold btn-sm" disabled={guardando === 'plan'}>
+              {guardando === 'plan' ? t('comun.guardando') : t('comun.guardar')}
+            </button>
+          </form>
+
+          {/* ── Registrar un pago ──
+              El ÚNICO sitio donde se cobra. Antes también se podía desde la
+              tabla del panel, y entre las dos pantallas era fácil registrar el
+              mismo pago tres veces sin notarlo. Aquí, además, se elige el día
+              y cuántos meses cubre. */}
+          <form
+            id="cobrar"
+            ref={cobroRef}
+            onSubmit={(e) => registrarPago(e)}
+            className="card"
+            style={{ padding: '1rem' }}
+          >
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
+              {t('pago.titulo')}
+            </h2>
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('pago.plan')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.7rem' }}>
+              <SelectMenu
+                valor={cobro.planId}
+                // Elegir el plan rellena el monto con su precio por el número
+                // de periodos: es lo que se cobra el 99 % de las veces, y se
+                // puede corregir a mano.
+                onChange={(v) =>
+                  setCobro({
+                    ...cobro,
+                    planId: v,
+                    amount: montoSugerido(v, cobro.periodos),
+                  })
+                }
+                etiquetaAria={t('pago.plan')}
+                placeholder={t('pago.plan')}
+                opciones={opcionesPlan}
+                disabled={planes.length === 0}
+              />
+            </div>
+
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('pago.fecha')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.2rem' }}>
+              <CampoFecha
+                valor={cobro.paidAt}
+                onChange={(v) => setCobro({ ...cobro, paidAt: v })}
+                min="2000-01-01"
+                max={hoyISO()}
+                ariaLabel={t('pago.fecha')}
+                // El día del pago no se deja en blanco: sin él no hay pago
+                // que registrar (la API lo exige).
+                borrable={false}
+              />
+            </div>
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('pago.fechaAyuda')}
+            </p>
+
+            {/* Cuántos periodos cubre. Es la respuesta correcta a «pagó tres
+                meses»: uno solo pago de tres, no tres pagos. La matrícula no
+                lo lleva, porque se paga una vez y ya. */}
+            {planCobro && planCobro.type !== 'matricula' && (
+              <>
+                <label className="muted" style={{ fontSize: '0.75rem' }}>
+                  {t(clavePeriodos(planCobro.type))}
+                </label>
+                <input
+                  inputMode="numeric"
+                  value={cobro.periodos}
+                  onChange={(e) => {
+                    const periodos = soloDigitos(e.target.value, 2) || '1';
+                    setCobro({
+                      ...cobro,
+                      periodos,
+                      amount: montoSugerido(cobro.planId, periodos),
+                    });
+                  }}
+                  maxLength={2}
+                  style={{ margin: '0.25rem 0 0.2rem' }}
+                />
+                <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+                  {t(`pago.efecto.${planCobro.type}` as ClaveTexto)}
+                </p>
+              </>
+            )}
+
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('pago.monto')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.2rem' }}>
+              <CampoDinero
+                valor={cobro.amount}
+                onChange={(amount) => setCobro({ ...cobro, amount })}
+                ariaLabel={t('pago.monto')}
+              />
+            </div>
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('pago.montoSugerido')}
+            </p>
+
+            <label className="muted" style={{ fontSize: '0.75rem' }}>
+              {t('pago.metodo')}
+            </label>
+            <div style={{ margin: '0.25rem 0 0.7rem' }}>
+              <SelectMenu
+                valor={cobro.method}
+                onChange={(v) => setCobro({ ...cobro, method: v })}
+                etiquetaAria={t('pago.metodo')}
+                opciones={METODOS.map((m) => ({
+                  valor: m,
+                  etiqueta: t(`pago.metodo.${m}` as ClaveTexto),
+                }))}
+              />
+            </div>
+            <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
+              {t('ficha.cobrarAyuda')}
+            </p>
+
+            {/* La API cree que este pago ya se registró. No es un error: es una
+                pregunta, y por eso lleva su propio botón en vez de un aviso
+                rojo que no deja seguir. */}
+            {repetido && (
+              <div
+                className="card"
+                style={{
+                  padding: '0.7rem',
+                  marginBottom: '0.7rem',
+                  borderColor: 'var(--gold-dim)',
+                }}
+              >
+                <p style={{ fontSize: '0.78rem', color: 'var(--gold)' }}>⚠ {repetido}</p>
                 <button
                   type="button"
                   className="btn btn-outline btn-sm"
-                  onClick={() => setPlan({ ...plan, checkinPin: pinAlAzar() })}
-                  title={t('ficha.pinOtro')}
-                  style={{ flexShrink: 0 }}
+                  style={{ marginTop: '0.5rem' }}
+                  disabled={guardando === 'pago'}
+                  onClick={(e) => registrarPago(e as unknown as FormEvent, true)}
                 >
-                  🎲
+                  {t('pago.repetidoConfirmar')}
                 </button>
               </div>
-              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                {t('ficha.pinAyuda')}
-              </p>
-              <button type="submit" className="btn btn-gold btn-sm" disabled={guardando === 'plan'}>
-                {guardando === 'plan' ? t('comun.guardando') : t('comun.guardar')}
-              </button>
-            </form>
+            )}
 
-            {/* ── Registrar un pago ──
-                El ÚNICO sitio donde se cobra. Antes también se podía desde la
-                tabla del panel, y entre las dos pantallas era fácil registrar el
-                mismo pago tres veces sin notarlo. Aquí, además, se elige el día
-                y cuántos meses cubre. */}
-            <form
-              id="cobrar"
-              ref={cobroRef}
-              onSubmit={(e) => registrarPago(e)}
-              className="card"
-              style={{ padding: '1rem' }}
+            <button
+              type="submit"
+              className="btn btn-cta btn-sm"
+              disabled={!cobro.planId || guardando === 'pago'}
             >
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
-                {t('pago.titulo')}
-              </h2>
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('pago.plan')}
-              </label>
-              <div style={{ margin: '0.25rem 0 0.7rem' }}>
-                <SelectMenu
-                  valor={cobro.planId}
-                  // Elegir el plan rellena el monto con su precio por el número
-                  // de periodos: es lo que se cobra el 99 % de las veces, y se
-                  // puede corregir a mano.
-                  onChange={(v) =>
-                    setCobro({
-                      ...cobro,
-                      planId: v,
-                      amount: montoSugerido(v, cobro.periodos),
-                    })
-                  }
-                  etiquetaAria={t('pago.plan')}
-                  placeholder={t('pago.plan')}
-                  opciones={opcionesPlan}
-                  disabled={planes.length === 0}
-                />
-              </div>
-
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('pago.fecha')}
-              </label>
-              <div style={{ margin: '0.25rem 0 0.2rem' }}>
-                <CampoFecha
-                  valor={cobro.paidAt}
-                  onChange={(v) => setCobro({ ...cobro, paidAt: v })}
-                  min="2000-01-01"
-                  max={hoyISO()}
-                  ariaLabel={t('pago.fecha')}
-                  // El día del pago no se deja en blanco: sin él no hay pago
-                  // que registrar (la API lo exige).
-                  borrable={false}
-                />
-              </div>
-              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                {t('pago.fechaAyuda')}
-              </p>
-
-              {/* Cuántos periodos cubre. Es la respuesta correcta a «pagó tres
-                  meses»: uno solo pago de tres, no tres pagos. La matrícula no
-                  lo lleva, porque se paga una vez y ya. */}
-              {planCobro && planCobro.type !== 'matricula' && (
-                <>
-                  <label className="muted" style={{ fontSize: '0.75rem' }}>
-                    {t(clavePeriodos(planCobro.type))}
-                  </label>
-                  <input
-                    inputMode="numeric"
-                    value={cobro.periodos}
-                    onChange={(e) => {
-                      const periodos = soloDigitos(e.target.value, 2) || '1';
-                      setCobro({
-                        ...cobro,
-                        periodos,
-                        amount: montoSugerido(cobro.planId, periodos),
-                      });
-                    }}
-                    maxLength={2}
-                    style={{ margin: '0.25rem 0 0.2rem' }}
-                  />
-                  <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                    {t(`pago.efecto.${planCobro.type}` as ClaveTexto)}
-                  </p>
-                </>
-              )}
-
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('pago.monto')}
-              </label>
-              <div style={{ margin: '0.25rem 0 0.2rem' }}>
-                <CampoDinero
-                  valor={cobro.amount}
-                  onChange={(amount) => setCobro({ ...cobro, amount })}
-                  ariaLabel={t('pago.monto')}
-                />
-              </div>
-              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                {t('pago.montoSugerido')}
-              </p>
-
-              <label className="muted" style={{ fontSize: '0.75rem' }}>
-                {t('pago.metodo')}
-              </label>
-              <div style={{ margin: '0.25rem 0 0.7rem' }}>
-                <SelectMenu
-                  valor={cobro.method}
-                  onChange={(v) => setCobro({ ...cobro, method: v })}
-                  etiquetaAria={t('pago.metodo')}
-                  opciones={METODOS.map((m) => ({
-                    valor: m,
-                    etiqueta: t(`pago.metodo.${m}` as ClaveTexto),
-                  }))}
-                />
-              </div>
-              <p className="muted" style={{ fontSize: '0.7rem', marginBottom: '0.7rem' }}>
-                {t('ficha.cobrarAyuda')}
-              </p>
-
-              {/* La API cree que este pago ya se registró. No es un error: es una
-                  pregunta, y por eso lleva su propio botón en vez de un aviso
-                  rojo que no deja seguir. */}
-              {repetido && (
-                <div
-                  className="card"
-                  style={{
-                    padding: '0.7rem',
-                    marginBottom: '0.7rem',
-                    borderColor: 'var(--gold-dim)',
-                  }}
-                >
-                  <p style={{ fontSize: '0.78rem', color: 'var(--gold)' }}>⚠ {repetido}</p>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    style={{ marginTop: '0.5rem' }}
-                    disabled={guardando === 'pago'}
-                    onClick={(e) => registrarPago(e as unknown as FormEvent, true)}
-                  >
-                    {t('pago.repetidoConfirmar')}
-                  </button>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="btn btn-cta btn-sm"
-                disabled={!cobro.planId || guardando === 'pago'}
-              >
-                {guardando === 'pago' ? t('comun.guardando') : t('pago.registrar')}
-              </button>
-            </form>
-            </>
-          )}
-
-          {/* ── Contraseña ── */}
-          <form onSubmit={cambiarPassword} className="card" style={{ padding: '1rem' }}>
-            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
-              {t('alumnos.nuevaContrasena')}
-            </h2>
-            {/* Arranca VISIBLE: el maestro la está fijando y se la tiene que
-                dictar al alumno. El ojo está para taparla cuando hay gente
-                mirando la pantalla. */}
-            <CampoContrasena
-              verInicial
-              autoComplete="new-password"
-              minLength={8}
-              maxLength={LIM.password}
-              required
-              value={nuevaPass}
-              onChange={(e) => setNuevaPass(e.target.value)}
-              placeholder={t('mi.contrasenaNueva')}
-            />
-            <Contador valor={nuevaPass} max={LIM.password} />
-            <p className="muted" style={{ fontSize: '0.7rem', margin: '0.35rem 0 0.6rem' }}>
-              {t('alumnos.contrasenaAyuda')}
-            </p>
-            <button type="submit" className="btn btn-outline btn-sm">
-              {t('comun.guardar')}
+              {guardando === 'pago' ? t('comun.guardando') : t('pago.registrar')}
             </button>
           </form>
         </div>

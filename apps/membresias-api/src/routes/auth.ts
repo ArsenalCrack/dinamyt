@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { requireAuth } from '../plugins/auth';
 import type { JwtPayload } from '../types/auth';
@@ -29,6 +29,12 @@ import {
 import { direccionFoto, direccionLogo, imagenGuardada } from '../lib/imagenes';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { aprovisionarFicha } from '../lib/aprovisionar';
+import {
+  camposVetados,
+  enElEcosistema,
+  mensajeContrasenaEnElPortal,
+  mensajeSoloEnElPortal,
+} from '../lib/ecosistema';
 import { ssoHabilitado } from '../config';
 
 // Tope de intentos de login: 5 por correo y 20 por IP cada 5 minutos.
@@ -65,6 +71,12 @@ function vistaUsuario(u: typeof users.$inferSelect) {
     isSuperAdmin: u.isSuperAdmin,
     orgId: u.orgId,
     isActive: u.isActive,
+    /**
+     * Si esta ficha la gobierna el portal DINAMYT. Viaja para que la pantalla
+     * enseñe los datos en lugar de un formulario, y no para decidir nada: lo
+     * que decide es la API (ver `lib/ecosistema.ts`).
+     */
+    enElEcosistema: enElEcosistema(u.ecoSub),
   };
 }
 
@@ -94,6 +106,7 @@ async function vistaClub(db: Db, orgId: string) {
       city: orgs.city,
       logoUrl: orgs.logoUrl,
       isActive: orgs.isActive,
+      ecoOrgId: orgs.ecoOrgId,
       updatedAt: orgs.updatedAt,
     })
     .from(orgs)
@@ -108,11 +121,13 @@ async function vistaClub(db: Db, orgId: string) {
     .orderBy(asc(users.createdAt))
     .limit(1);
 
-  const { updatedAt, ...resto } = c;
+  const { updatedAt, ecoOrgId, ...resto } = c;
   return {
     ...resto,
     logoUrl: direccionLogo({ ...c, updatedAt }),
     ownerName: maestro?.fullName ?? null,
+    /** Si el escudo lo pone el portal DINAMYT. Ver `lib/ecosistema.ts`. */
+    enElEcosistema: enElEcosistema(ecoOrgId),
   };
 }
 
@@ -298,6 +313,44 @@ export async function authRoutes(app: FastifyInstance) {
           : [];
         if (!u && correo) {
           [u] = await db.select().from(users).where(eq(users.email, correo)).limit(1);
+
+          // ── El enlace que faltaba ──
+          //
+          // Reconocerla por el correo y abrir sesión sin más dejaba la ficha
+          // con `eco_sub` vacío PARA SIEMPRE: la vez siguiente se la volvía a
+          // buscar por correo, y así toda la vida. No es un dato cosmético que
+          // falta — son tres cosas rotas a la vez, y ninguna avisa:
+          //
+          //   · `enElEcosistema()` mira `eco_sub`, así que la reja de
+          //     `lib/ecosistema.ts` no se activaba: el nombre y la foto se
+          //     seguían pudiendo editar por los dos lados, que es exactamente
+          //     el empate que esa reja existe para cerrar.
+          //   · El espejo (`POST /sync/persona`, `/sync/contrasena`) busca por
+          //     `eco_sub`. Nada de lo que se guardara en el portal llegaba
+          //     aquí: la foto nueva, el cinturón nuevo, la contraseña nueva.
+          //   · Y el día que esa persona cambie su correo en el portal, aquí no
+          //     la encuentra ya nadie: se le crearía una ficha nueva y la vieja
+          //     —con sus pagos y sus asistencias— quedaría huérfana.
+          //
+          // Se enlaza en cuanto se la reconoce. El `UPDATE` va condicionado a
+          // que siga sin enlace: si entran dos pestañas a la vez, la segunda no
+          // pisa nada. Y el índice único de `eco_sub` no se puede violar aquí,
+          // porque una ficha con este `sub` la habría encontrado la consulta de
+          // arriba.
+          if (u && sub && !u.ecoSub) {
+            const [enlazada] = await db
+              .update(users)
+              .set({ ecoSub: sub, updatedAt: new Date() })
+              .where(and(eq(users.id, u.id), isNull(users.ecoSub)))
+              .returning();
+            if (enlazada) {
+              u = enlazada;
+              req.log.info(
+                { usuario: u.id, ecoSub: sub },
+                'ficha enlazada con su cuenta del ecosistema',
+              );
+            }
+          }
         }
         // Sin ficha: puede que no falte nada, solo que nadie la haya creado
         // todavía. Si el token dice que esta persona pertenece a un club que
@@ -325,9 +378,22 @@ export async function authRoutes(app: FastifyInstance) {
   // ── POST /auth/logout — cierra la sesión del navegador ────────────────────
   // Sin guard: si la cookie ya no vale, borrarla debe funcionar igual. Lo
   // contrario deja al usuario con una sesión rota que no puede ni cerrar.
+  //
+  // ── Por qué la respuesta lleva `portal` ───────────────────────────────────
+  //
+  // Cerrar la sesión de aquí no cierra la del portal DINAMYT, que vive en otro
+  // dominio y solo se cierra pasando por él. Quién decide si hay que ir era
+  // hasta ahora una marca en el `localStorage` de la web, y esa marca se
+  // perdía sola —la borraba cualquier 401, y no existía si se había entrado
+  // con contraseña—. Cuando faltaba, «Salir» cerraba media sesión: el portal
+  // seguía reconociendo a la persona y la devolvía dentro al instante. De ahí
+  // el «hay que pulsar Salir dos veces».
+  //
+  // Ahora lo dice el servidor, que es quien sabe si esta instalación está
+  // federada, y no se puede perder ni quedar viejo.
   app.post('/auth/logout', async (_req, reply) => {
     cerrarSesion(reply);
-    return { ok: true };
+    return { ok: true, portal: ssoHabilitado() };
   });
 
   // ── GET /auth/me — quién soy y en qué club estoy ──────────────────────────
@@ -366,6 +432,32 @@ export async function authRoutes(app: FastifyInstance) {
       emergencyPhone?: string | null;
     };
     const cambios: Record<string, unknown> = { updatedAt: new Date() };
+
+    /**
+     * ── La reja del ecosistema ──
+     *
+     * Quien llegó por DINAMYT no mantiene su ficha aquí: la mantiene en su
+     * perfil del portal, y de ahí la leen las tres apps. Antes se podía por
+     * los dos lados y ganaba el último que guardara, así que la misma persona
+     * acababa con dos teléfonos y dos fotos según dónde se mirara.
+     *
+     * Va lo primero de todo y responde con la lista de lo que rechazó: un 403
+     * a secas, en un formulario de siete campos, deja adivinando cuál sobra.
+     */
+    const [yoMismo] = await req.db
+      .select({ ecoSub: users.ecoSub })
+      .from(users)
+      .where(eq(users.id, req.user!.sub))
+      .limit(1);
+    if (enElEcosistema(yoMismo?.ecoSub)) {
+      const vetados = camposVetados(body as Record<string, unknown>);
+      if (vetados.length > 0) {
+        return reply.code(403).send({
+          error: mensajeSoloEnElPortal('Tus datos personales'),
+          campos: vetados,
+        });
+      }
+    }
 
     /**
      * La fecha de nacimiento: se pone una vez, y luego la corrige el maestro.
@@ -479,16 +571,21 @@ export async function authRoutes(app: FastifyInstance) {
         .limit(1);
       if (!u) return reply.code(404).send({ error: 'Usuario no encontrado.' });
 
-      // Quien entró por DINAMYT no tiene contraseña aquí, y su ficha lo dice
-      // (`password_hash` vacío). Sin esta comprobación se le respondería «la
-      // contraseña actual no es correcta», que es cierto y no ayuda: la manda a
-      // buscar una contraseña que no existe en vez de al sitio donde sí está.
+      // Dos casos, un solo mensaje, porque para quien lo lee son el mismo:
+      //
+      // · **Tiene cuenta del ecosistema** (`eco_sub`). Su contraseña se fija en
+      //   el portal y el portal la copia hasta aquí (`POST /sync/contrasena`).
+      //   Dejar que también se cambie desde este lado devolvería el empate de
+      //   siempre —gana el último que guarda— y la dejaría con dos contraseñas
+      //   para una sola cuenta. Ver `mensajeContrasenaEnElPortal`.
+      // · **No tiene contraseña aquí** (`password_hash` vacío): entró por SSO.
+      //   Sin esta comprobación se le respondería «la contraseña actual no es
+      //   correcta», que es cierto y no ayuda: la manda a buscar una contraseña
+      //   que no existe en vez de al sitio donde sí está.
+      //
       // Aquí no hay nada que delatar: la sesión ya dice quién es.
-      if (!u.passwordHash) {
-        return reply.code(400).send({
-          error:
-            'Tu contraseña vive en DINAMYT, no aquí: cámbiala en tu perfil del portal y sirve para todo el ecosistema.',
-        });
+      if (enElEcosistema(u.ecoSub) || !u.passwordHash) {
+        return reply.code(400).send({ error: mensajeContrasenaEnElPortal('propia') });
       }
 
       if (!(await verificarPassword(body.actual ?? '', u.passwordHash))) {

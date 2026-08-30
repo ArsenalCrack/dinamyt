@@ -74,3 +74,20 @@ export const ssoHabilitado = () => Boolean(config.ecosystemJwksUrl);
  * reconstruir el proceso — y para que las pruebas puedan ponerla y quitarla.
  */
 export const cronSecret = () => process.env.CRON_SECRET ?? '';
+
+/**
+ * Secreto del espejo del ecosistema (`POST /sync/persona`, `POST /sync/club`).
+ *
+ * Lo manda el portal en la cabecera `x-dinamyt-sync` cuando alguien guarda una
+ * ficha allí, y con él se actualiza la copia de aquí: la foto que el maestro
+ * sube en DINAMYT tiene que salir en el carnet que imprime esta app, y el
+ * carnet se pinta con `membresias.users`.
+ *
+ * Sin él esas dos rutas responden 404. Son las únicas que reescriben fichas sin
+ * sesión, y dejarlas abiertas «por si acaso» sería regalar el roster entero.
+ * Debe valer lo MISMO aquí y en `ecosystem-api`.
+ *
+ * Se lee en cada llamada, y no una vez al arrancar, para poder cambiarlo sin
+ * reconstruir el proceso — y para que las pruebas puedan ponerlo y quitarlo.
+ */
+export const syncSecret = () => process.env.ECOSYSTEM_SYNC_SECRET ?? '';

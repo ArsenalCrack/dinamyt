@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { crearEscenario, PASSWORD, type Escenario } from './testing/escenario';
 import { COOKIE_CSRF, COOKIE_SESION } from './lib/auth/cookies';
+import { config } from './config';
 
 /**
  * Sesión por cookie httpOnly y su defensa de CSRF.
@@ -161,6 +162,41 @@ describe('sesión por cookie', () => {
       const borrada = res.cookies.find((c) => c.name === nombre);
       expect(borrada).toBeDefined();
       expect(borrada!.value).toBe('');
+    }
+  });
+
+  /**
+   * Quien entra por DINAMYT tiene DOS sesiones, y esta respuesta es lo que
+   * hace que se cierren las dos de una sola pulsación.
+   *
+   * Antes lo decidía una marca en el `localStorage` de la web, y esa marca se
+   * perdía sola —la borraba cualquier 401, y no existía si se había entrado con
+   * contraseña—. Sin ella, «Salir» no pasaba por el portal, la sesión de
+   * DINAMYT quedaba viva, y el siguiente «entrar con DINAMYT» metía a la
+   * persona dentro sin enseñarle una sola pantalla. Había que pulsar Salir dos
+   * veces. Ahora lo dice el servidor, que es el único que lo sabe de verdad.
+   */
+  it('el logout dice si además hay que cerrar la sesión del portal', async () => {
+    const e = await crearEscenario();
+    const sesion = cookiesDe(await login(e))[COOKIE_SESION];
+    const salir = () =>
+      e.app.inject({
+        method: 'POST',
+        url: '/auth/logout',
+        cookies: { [COOKIE_SESION]: sesion },
+      });
+
+    const antes = config.ecosystemJwksUrl;
+    try {
+      config.ecosystemJwksUrl = 'https://dinamyt.example/.well-known/jwks.json';
+      expect((await salir()).json()).toMatchObject({ portal: true });
+
+      // El club que usa Membresías por su cuenta no tiene portal al que ir, y
+      // mandarlo allí sería enseñarle un dominio que no le corresponde.
+      config.ecosystemJwksUrl = '';
+      expect((await salir()).json()).toMatchObject({ portal: false });
+    } finally {
+      config.ecosystemJwksUrl = antes;
     }
   });
 });

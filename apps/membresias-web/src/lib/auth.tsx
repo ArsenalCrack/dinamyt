@@ -17,6 +17,7 @@ import {
   obtenerMe,
   obtenerUsuario,
   type Club,
+  type Salida,
   type Usuario,
 } from './api';
 import type { ClaveTexto } from './i18n';
@@ -42,7 +43,8 @@ interface AuthCtx {
   loginConCodigo: (token: string) => Promise<Usuario>;
   /** Entrar con el token que devuelve el portal DINAMYT (SSO por redirección). */
   loginConSso: (token: string) => Promise<Usuario>;
-  logout: () => Promise<void>;
+  /** Cierra la sesión y cuenta qué pasó. Ver `Salida` y `NavBar.salir`. */
+  logout: () => Promise<Salida>;
   /** Refresca el usuario tras editar el propio perfil. */
   refrescar: () => Promise<void>;
   esStaff: boolean;
@@ -145,11 +147,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // cerrar sesión pasa por pedírselo. Limpiar aquí a secas dejaría la sesión
   // viva en la API.
   const logout = useCallback(async () => {
-    await logoutApi();
+    const salida = await logoutApi();
     generacion.current += 1;
     limpiar();
     setUser(null);
     setClub(null);
+    return salida;
   }, []);
 
   const refrescar = useCallback(async () => {
