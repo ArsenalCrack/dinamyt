@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { loginAPI } from "@/lib/api";
-import { guardarToken, guardarUsuario } from "@/lib/sesion";
+import { abrirSesionConToken, getMeAPI, loginAPI, logoutAPI } from "@/lib/api";
+import { guardarToken, guardarUsuario, limpiarSesion } from "@/lib/sesion";
 import CampoContrasena from "@/components/CampoContrasena";
 import Logo from "@/components/Logo";
 import { IDIOMAS, useI18n } from "@/lib/i18n";
+import { PORTAL_URL } from "@/lib/portal";
 import { aplicarTema, getTema, type Tema } from "@/lib/theme";
+
+/** Dónde aterriza cada rol al entrar. Lo comparten el formulario y el salto
+ *  desde DINAMYT: dos copias de esto es cómo un rol acaba entrando a la
+ *  pantalla de otro. */
+function destinoDe(rol: string) {
+  if (rol === "admin") return "/admin";
+  if (rol === "maestro") return "/maestro";
+  return "/juez";
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,8 +40,148 @@ export default function LoginPage() {
     setTema(nuevo);
   }
 
+  // ── Se llega aquí SALIENDO, y eso lo cambia todo ─────────────────────────
+  //
+  // «Salir» ya no termina en `/login` a secas. Aterrizar ahí después de cerrar
+  // sesión es dejar a la persona delante de la única pantalla del sitio cuyo
+  // trabajo es meter gente dentro, con el pase todavía en la URL o la cookie
+  // todavía viva — y basta con que sobreviva cualquiera de las dos para que
+  // aparezca de vuelta en la consola un segundo después de haber salido. Ese
+  // es el «hay que pulsar Salir dos veces» que Membresías ya pagó (§5.12).
+  //
+  // Con `?salida` esta pantalla es un punto final, no una puerta: no canjea
+  // ningún pase, dice en voz alta lo que se cerró, y si detecta que quedó
+  // sesión viva la remata.
+  //
+  // Es un `ref` y no estado porque tiene que estar decidido ANTES de que corran
+  // los efectos de abajo, y porque deja de valer en cuanto alguien empieza a
+  // entrar a propósito desde aquí (ver `handleSubmit`).
+  const enSalida = useRef<"portal" | "sola" | null>(
+    typeof window === "undefined"
+      ? null
+      : (new URLSearchParams(window.location.search).get("salida") as
+          | "portal"
+          | "sola"
+          | null),
+  );
+  /**
+   * Lo mismo, para poder DECIRLO en pantalla sin romper la hidratación.
+   *
+   * `portal` = se cerraron las dos sesiones, la de aquí y la de DINAMYT.
+   * `sola` = esta instalación no habla con el ecosistema: solo había una.
+   */
+  const [avisoSalida, setAvisoSalida] = useState<"portal" | "sola" | null>(null);
+  /** Dos remates y se para: cerrar en bucle sería peor que no cerrar. */
+  const remates = useRef(0);
+
+  useEffect(() => {
+    setAvisoSalida(enSalida.current);
+  }, []);
+
+  /**
+   * Se salió, pero el servidor todavía reconoce la sesión: se cierra otra vez.
+   *
+   * El `POST /auth/logout` puede no haber salido —el backend reiniciándose, un
+   * 503 de mantenimiento, un corte— y esa llamada no lanza: limpia lo local y
+   * sigue. La cookie httpOnly, que solo borra el servidor, se queda viva. Aquí
+   * se le pregunta a él —`GET /auth/me` es la única respuesta que vale— y si
+   * contesta que sí, se le vuelve a pedir que cierre.
+   *
+   * El contador es el freno: si el servidor sigue sin poder cerrar, se para y
+   * se enseña el formulario, que es la verdad visible más cercana a lo que la
+   * persona pidió y desde donde puede volver a entrar.
+   */
+  useEffect(() => {
+    if (!enSalida.current) return;
+    let cancelado = false;
+    void (async () => {
+      while (!cancelado && remates.current < 2) {
+        try {
+          await getMeAPI();
+        } catch {
+          return; // El servidor ya no la reconoce: cerrada de verdad.
+        }
+        if (cancelado) return;
+        remates.current += 1;
+        await logoutAPI();
+      }
+    })();
+    return () => { cancelado = true; };
+  }, []);
+
+  // ── El salto desde DINAMYT ────────────────────────────────────────────────
+  //
+  // El portal manda aquí con el pase en el FRAGMENTO (`/login#token=…`), que
+  // no viaja al servidor ni queda en ningún registro. Se canjea por la cookie
+  // de sesión y se entra directo: es lo que faltaba para que «Entrar a
+  // Campeonatos» no acabara en este mismo formulario.
+  //
+  // ⚠️ El pase **no se guarda** con `guardarToken`. Ese token se manda como
+  // cabecera `Authorization` en TODAS las peticiones (ver el interceptor de
+  // `lib/api.ts`), y el pase es RS256 del ecosistema: el backend no lo sabe
+  // leer y rechazaría cada petición, con la cookie buena ya puesta. Quien
+  // autentica a partir de aquí es la cookie.
+  const [saltando, setSaltando] = useState(false);
+  const [avisoSalto, setAvisoSalto] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Nadie entra por una pantalla a la que se llegó saliendo. El portal nunca
+    // manda las dos cosas juntas; el cierre está aquí por si un día lo hace.
+    if (enSalida.current) return;
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const pase = params.get("token");
+    if (!pase) return;
+
+    // Fuera del historial y de la barra de direcciones antes de nada: un pase
+    // en la URL se comparte por captura de pantalla sin querer.
+    window.history.replaceState(null, "", window.location.pathname);
+
+    let cancelado = false;
+    setSaltando(true);
+    abrirSesionConToken(pase)
+      .then(({ user }) => {
+        if (cancelado) return;
+        guardarUsuario(user);
+        router.replace(destinoDe(user.rol));
+      })
+      .catch((err: unknown) => {
+        if (cancelado) return;
+        limpiarSesion();
+        const respuesta = (
+          err as { response?: { data?: { error?: string; motivo?: string } } }
+        ).response;
+
+        // ── Si el pase es válido pero esta consola no es para esa persona,
+        //    se la DEVUELVE al portal, no se la deja aquí ──
+        //
+        // Dejarla en este formulario es dejarla delante de una puerta que ya
+        // sabemos que no va a abrir: no tiene contraseña de aquí, y aunque la
+        // tuviera no hay nada dentro para ella. Lo suyo —sus inscripciones,
+        // sus resultados— vive en DINAMYT, así que allá vuelve, con el motivo
+        // para que el portal se lo explique en su idioma y en su sitio.
+        if (respuesta?.data?.motivo) {
+          window.location.replace(
+            `${PORTAL_URL}/dashboard?campeonatos=${encodeURIComponent(respuesta.data.motivo)}`,
+          );
+          return;
+        }
+
+        // Sin motivo es que no hubo respuesta: el servidor no contestó. Ahí sí
+        // se queda aquí, porque el formulario propio puede ser la salida.
+        setSaltando(false);
+        setAvisoSalto(respuesta?.data?.error || t("login.errorConexion"));
+      });
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Quien teclea su contraseña aquí ya no está saliendo: está entrando. Sin
+    // levantar la marca, el remate de arriba cerraría la sesión recién abierta.
+    enSalida.current = null;
+    setAvisoSalida(null);
     setError("");
     setLoading(true);
     try {
@@ -40,11 +190,7 @@ export default function LoginPage() {
       // guarda el token en memoria (socket y descargas) y el perfil cacheado.
       guardarToken(data.token);
       guardarUsuario(data.user);
-      router.push(
-        data.user.rol === "admin" ? "/admin"
-        : data.user.rol === "maestro" ? "/maestro"
-        : "/juez"
-      );
+      router.push(destinoDe(data.user.rol));
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setError(axiosErr.response?.data?.error || t("login.errorConexion"));
@@ -67,8 +213,49 @@ export default function LoginPage() {
           <p className="login-sub">Global Hapkido Association · GHA</p>
         </div>
 
+        {/* Volviendo de DINAMYT: mientras se canjea el pase no se enseña el
+            formulario, o parece que el salto no funcionó y la persona escribe
+            su contraseña encima. */}
+        {saltando && (
+          <p className="login-card-desc" style={{ textAlign: "center" }} role="status">
+            {t("comun.cargando")}
+          </p>
+        )}
+
+        {/* Se acaba de salir: se dice QUÉ se cerró. Sin esta línea, salir y
+            aparecer en el formulario de entrar se lee como que no funcionó —
+            que es exactamente la duda que traía el botón viejo. */}
+        {avisoSalida && (
+          <p
+            className="login-card-desc"
+            role="status"
+            style={{ textAlign: "center", maxWidth: 560, margin: "0 auto" }}
+          >
+            {t(avisoSalida === "portal" ? "login.sesionCerradaDinamyt" : "login.sesionCerrada")}
+          </p>
+        )}
+
+        {/* Y si el pase no abre esta consola —un alumno, un club sin plan—, se
+            dice por qué AQUÍ arriba, no dentro del formulario: lo que tiene
+            que hacer no es escribir una contraseña, es volver al portal. */}
+        {avisoSalto && (
+          <div
+            className="login-error animate-fade"
+            role="alert"
+            style={{ maxWidth: 560, margin: "0 auto 1rem" }}
+          >
+            {avisoSalto}{" "}
+            <a
+              href={PORTAL_URL}
+              style={{ color: "var(--gold)", textDecoration: "underline" }}
+            >
+              Volver a DINAMYT
+            </a>
+          </div>
+        )}
+
         {/* GRID: Pantalla Publica | Separator | Login */}
-        <div className="login-grid">
+        <div className="login-grid" hidden={saltando}>
 
           {/* ── PANTALLA PUBLICA ── */}
           <div className="login-card login-card-public animate-fade">
