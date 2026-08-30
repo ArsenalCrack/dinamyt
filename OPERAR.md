@@ -1372,6 +1372,43 @@ arreglo **esté en el archivo**, no que el comando saliera sin error.
 grep -c "db.session.commit()" /srv/campeonatos/backend/wsgi.py; grep -c "lock_timeout" /srv/campeonatos/backend/app/rls.py
 ```
 
+## 5.13 Bajo eventlet, un nombre que no resuelve cuelga diez segundos
+
+**Síntoma:** entrar a Campeonatos desde el portal responde **422** y el registro
+dice:
+
+    [ecosistema] pase rechazado: PyJWKClientConnectionError:
+    Fail to fetch data from the url, err: "<urlopen error [Errno -3] Lookup timed out>"
+
+Y al mismo tiempo, desde el mismo servidor:
+
+```bash
+curl -s -o /dev/null -w "dns=%{time_namelookup}s total=%{time_total}s codigo=%{http_code}
+" https://id.dinamyt.org/auth/jwks
+```
+
+…responde **200 en 95 ms, con el DNS en 9 ms**. No es la red, no es el
+cortafuegos y no es el token.
+
+**Es eventlet.** Campeonatos corre con `gunicorn -k eventlet`, que sustituye la
+resolución de nombres de Python por la suya (greendns) y no se entiende con el
+`systemd-resolved` de esta máquina. Medido el 30 de agosto: **10,4 s hasta
+rendirse**, y —esto es lo peor— **el `timeout` de la petición no lo acota**,
+porque no llega a haber petición. Con un solo worker, esos diez segundos son la
+app entera parada.
+
+**El arreglo es no usar nombres**: el ecosistema corre en esta misma máquina.
+
+    ECOSYSTEM_JWKS_URL=http://127.0.0.1:3001/auth/jwks
+
+Con eso son **0,01 s**, sin DNS, sin TLS y sin el rodeo por Cloudflare para
+pedirle una llave pública a un vecino. La alternativa —`EVENTLET_NO_GREENDNS=yes`
+en la unidad de systemd— también funciona, pero cambia el comportamiento de todo
+el proceso para arreglar una consulta.
+
+> **Membresías no tiene este problema** y por eso su SSO nunca lo enseñó: es
+> Node, con su propio resolutor. La trampa es de las apps Python con eventlet.
+
 ## 5.2 `postgresql:///base` no significa lo mismo para todos
 
 Para `psql` es «por el socket Unix». Para el driver de Node es **TCP a
