@@ -68,7 +68,7 @@ nunca depende de que alguien se acordara de sincronizar.
 | `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe, y el pie de los correos apunta a ninguna parte |
 | `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: ver §3 |
 | `CRON_SECRET` | ecosystem-api | El aviso diario de suscripciones **no existe** (la ruta responde 404). El botón del panel sigue funcionando |
-| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api **y** membresias-api | **El mismo valor en las dos.** Sin él, la foto, el escudo, el cinturón y la contraseña que se guardan en el portal no llegan a Membresías: el carnet se sigue imprimiendo con lo que hubiera y la contraseña vieja sigue valiendo en el club |
+| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api **y** membresias-api | **El mismo valor en las dos.** Sin él, la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan a Membresías: el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7) |
 | `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
 
 ## 1.5 Lo que nunca se hace
@@ -898,32 +898,65 @@ conviene tener escritas:
 
 Para comprobar que el canal está vivo: §2.6-bis.
 
-### «Le cambié el rol y solo se vio en Campeonatos»
+### «Le puse maestro y solo se vio en Campeonatos»
 
-Pasa, y las dos mitades son correctas. **El rol del pase solo decide el rol
-local la primera vez**, cuando la app crea la fila de esa persona; a partir de
-ahí manda el rol de la app. Es la misma regla en las tres:
+*(Arreglado el 30 de agosto de 2026.)* Eran **dos fallos encadenados**, y el
+primero no era «el rol local manda»: era que el rol **se tiraba a la basura**
+por el camino.
 
-| App | Dónde nace el rol | Qué manda después |
-|---|---|---|
-| Campeonatos | `espejo.py`, al crear el espejo | `usuarios.rol` |
-| Academy | Al crear su fila | Su rol local |
-| Membresías | `aprovisionarFicha`, al crear la ficha | `users.role` |
+#### 1 · `maestro` no existe en Membresías, y se perdía entero
 
-Así que el cambio se ve en la app donde esa persona **todavía no tenía fila** —
-entró después de tocarle el rol y su fila nació con el nuevo— y no se ve en la
-que ya la tenía. Desde fuera parece que una obedeció y la otra no; lo que pasó
-es que a una se le preguntó y a la otra no hacía falta.
+El pase lleva un rol por app. Cuando su columna está vacía —lo normal, casi
+nadie las pone a mano— se caía al rol general **solo si ese valor estaba en el
+catálogo de esa app**. Y los catálogos no se llaman igual:
 
-**Por qué es así y no al revés:** un cambio de rol en el portal no puede
-degradar en silencio al administrador de un campeonato en marcha, ni cambiarle
-el rol a quien está cobrando mensualidades. El portal dice quién es la persona;
-cada app dice qué es **dentro de ella**.
+| App | Su catálogo |
+|---|---|
+| Campeonatos | `admin` · `maestro` · `coach` · `competitor` · `judge` |
+| Membresías | `owner` · `staff` · `guardian` · `student` |
+| Academy | `admin` · `teacher` · `student` |
 
-> **Qué hacer:** cambiar el rol también en la app, en su propia pantalla de
-> gente. El panel del portal enseña los roles de cada app en insignias dentro
-> de cada fila justamente para que se vea cuándo no coinciden — pero solo los
-> **lee**, no los escribe.
+`maestro` está en el de Campeonatos, así que allí pasaba tal cual. En el de
+Membresías **no está**: el rol viajaba como `null`, la ficha nacía `student` y
+nadie se enteraba de por qué. La comprobación no estaba mal —colar `member`
+como rol de Membresías sería inventarse un permiso que la app no sabe leer—,
+estaba **incompleta**: le faltaba decir qué es un maestro en cada sitio.
+
+Ahora se **traduce** (`common/roles-por-app.ts`): el maestro del dojang es el
+`owner` de su club en Membresías y `teacher` en Academy, el coach es `staff`,
+el competidor es el alumno. Lo que no tiene equivalente —el `judge`, que es de
+la federación y no es nada dentro de un club— sigue viajando como `null`: se
+prefiere no decir nada a degradar al azar.
+
+> ⚠️ **Campeonatos no gana roles con esto.** Solo se le añadió
+> `student → competitor`, que no abre la consola (§4.13). Traducir
+> `owner → maestro` habría sido razonable y habría metido en la consola, de un
+> despliegue para otro, a gente que hoy no entra: una ampliación de permisos no
+> se cuela de propina en el arreglo de otra cosa.
+
+#### 2 · Y aun traducido, no llegaba a quien ya tenía ficha
+
+Porque el rol del pase **solo se lee al CREAR** la fila local. Quien ya estaba
+dentro de Membresías no se enteraba nunca — y allí no hay una pantalla evidente
+donde corregirlo. Quien administra tenía el botón y no tenía el efecto.
+
+Ahora el portal **avisa**: `POST /sync/rol`, por el mismo canal y con el mismo
+secreto que la foto y la contraseña (`ECOSYSTEM_SYNC_SECRET`). Se dispara al
+cambiar el rol desde `/admin` o desde «Mi organización».
+
+| | |
+|---|---|
+| **Esto no rompe la regla de arriba** | Lo que no viaja sigue sin viajar: la PERTENENCIA. Sacar a alguien de un club en el portal sigue sin tocar sus pagos, su asistencia ni su historial |
+| **Porque no es un silencio** | Alguien con permiso abrió el panel, eligió a una persona y le cambió el rol a propósito. Eso manda |
+| **El club no se queda sin dueño** | Membresías rechaza el aviso que dejaría un club sin ningún `owner` activo, y dice por qué. Es la misma regla de §4.7-bis, y hace falta otra vez allí porque aquí se mira `org_members`, que es otra tabla |
+| **La ficha sin cuenta del portal no se toca** | Busca por `eco_sub`. El alumno sin correo, que entra por carnet QR o PIN, sigue siendo asunto de su club |
+| **Nunca rompe el guardado** | Se dispara sin esperarlo. Si Membresías está caída, el rol se cambia igual aquí y allá queda el viejo hasta el próximo cambio |
+
+> **A quien ya le pasó:** vuelve a ponerle el rol en el panel. Ahora sí viaja.
+
+**Campeonatos y Academy siguen sin este aviso**: allí el rol local sigue
+mandando después de la primera vez, que es lo que impide degradar en silencio
+al administrador de un campeonato en marcha. Se cambian en su propia consola.
 
 ## 4.7-bis Nadie se queda sin quien mande, y nadie se echa a sí mismo
 
@@ -1120,6 +1153,12 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 | `PATCH` y `DELETE /:id/members/:userId` | gestor | Cambiar rol · quitar. **409 si te lo haces a ti mismo, o si es el último que manda** (§4.7-bis) |
 | `GET /clubes` · `POST /:id/invitar-club` · `GET /invitaciones-club/mias` | varios | Federación ↔ club, **por invitación** |
 | `POST /:id/afiliar-club` · `DELETE /:id/clubes/:clubId` | super-admin | Afiliar **a dedo** · sacarlo. Sin preguntarle al maestro (§4.5) |
+
+> **El espejo hacia Membresías** son cuatro avisos salientes, no rutas de
+> aquí: `POST /sync/persona`, `/sync/club`, `/sync/contrasena` y `/sync/rol`,
+> todos con la cabecera `x-dinamyt-sync`. Viven en
+> `common/espejo-membresias.ts` y los recibe `membresias-api`. Qué lleva cada
+> uno y qué NO: §4.7.
 
 > **Las dos rutas de afiliar, que son distintas a propósito:**
 > `POST /organizations/:id/invitar-club` la usa el `admin` de la federación y
@@ -1945,6 +1984,23 @@ está abierto) en el portal y en Campeonatos.
       Tiró el servicio una mañana entera; el relato y cómo se reconoce están en
       §5.1-ter. El `db.session.commit()` suelta el candado y el
       `SET LOCAL lock_timeout = '5s'` hace visible cualquier recaída.
+
+`[ ]` **`POST /sync/rol` no tiene prueba automatizada.** *(30 ago 2026)* La
+      ruta está escrita, compila y es gemela de `/sync/contrasena`, que sí las
+      tiene. Lo que falló fue el arnés: cualquier prueba que escriba en `users`
+      con el `db` del escenario y DESPUÉS llame a una ruta `/sync/*` deja
+      colgada la siguiente transacción de PGlite y se come el tiempo límite —
+      pasa igual con `/sync/persona`, que está probada y verde en su propio
+      archivo, así que no es la ruta nueva.
+
+      **Lo que sí está cubierto** es el fallo de verdad, que era la traducción
+      del rol: ocho casos en `roles-por-app.spec.ts` (ecosystem-api).
+
+      **La tarea:** entender por qué esa combinación cuelga —lo más probable es
+      cómo `crearEscenario` deja la conexión única de PGlite— y volver a poner
+      las cinco pruebas: llega el rol, se rechaza el que no existe aquí, la
+      puerta del secreto, el club no se queda sin dueño, y la ficha sin
+      `eco_sub` no se toca.
 
 `[ ]` **Cerrar la sesión en el `teardown_appcontext` de Flask.** Es lo que queda
       del hueco anterior. Sin ello, el DDL ya no se bloquea, pero una petición

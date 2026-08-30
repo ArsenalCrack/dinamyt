@@ -19,6 +19,7 @@ import {
 } from '../../db/schema';
 import { eq, and, gt, inArray, InferSelectModel } from 'drizzle-orm';
 import { cadenasDeMando, MAX_SALTOS_JERARQUIA } from '../../common/jerarquia';
+import { rolParaApp } from '../../common/roles-por-app';
 import {
   validarNombreCompleto,
   validarDocumento,
@@ -31,17 +32,10 @@ import {
 
 type User = InferSelectModel<typeof users>;
 
-// Catálogos de roles por app. Los tipos viven en `@dinamyt/shared`, pero son
-// tipos: no existen en tiempo de ejecución y aquí hay que comprobar valores.
-const ROLES_MEMBRESIAS = ['owner', 'staff', 'guardian', 'student'] as const;
-const ROLES_CAMPEONATOS = [
-  'admin',
-  'maestro',
-  'coach',
-  'competitor',
-  'judge',
-] as const;
-const ROLES_ACADEMY = ['admin', 'teacher', 'student'] as const;
+// Los catálogos y la traducción del rol general viven en `common/roles-por-app`
+// desde que se descubrió que `maestro` no llegaba a Membresías: allí el
+// catálogo no lo tiene, así que el rol se caía a `null` y la ficha nacía como
+// alumno. El comentario largo de ese archivo cuenta el fallo entero.
 
 @Injectable()
 export class AuthService {
@@ -982,27 +976,21 @@ export class AuthService {
 
     const orgId = principal?.orgId ?? null;
 
-    // El rol por app sale de su columna. Si está vacía se cae al rol general,
-    // pero solo cuando ese valor pertenece al catálogo de esa app: las filas
-    // viejas traen 'member' o 'admin', y colar 'member' como rol de Membresías
-    // sería inventarse un permiso que la app no sabe interpretar.
-    const rolDeApp = (
-      propio: string | null | undefined,
-      catalogo: readonly string[],
-    ): string | null => {
-      if (propio) return propio;
-      const general = principal?.role ?? null;
-      return general && catalogo.includes(general) ? general : null;
-    };
-
-    const roleAcademy = rolDeApp(principal?.roleAcademy, ROLES_ACADEMY);
-    const roleCampeonatos = rolDeApp(
+    // El rol por app sale de su columna; si está vacía —que es lo normal— se
+    // TRADUCE el general al catálogo de esa app. Antes solo se copiaba cuando
+    // el nombre coincidía, y por eso `maestro` llegaba a Campeonatos y se
+    // perdía camino de Membresías, que llama `owner` a esa misma persona.
+    const general = principal?.role ?? null;
+    const roleAcademy = rolParaApp('academy', principal?.roleAcademy, general);
+    const roleCampeonatos = rolParaApp(
+      'campeonatos',
       principal?.roleCampeonatos,
-      ROLES_CAMPEONATOS,
+      general,
     );
-    const roleMembresias = rolDeApp(
+    const roleMembresias = rolParaApp(
+      'membresias',
       principal?.roleMembresias,
-      ROLES_MEMBRESIAS,
+      general,
     );
 
     // ── 5. Construir y firmar el payload ────────────────────────────────

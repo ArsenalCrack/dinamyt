@@ -469,9 +469,10 @@ export default function AdminEcosistemaPage() {
                   caja NO sale de la organización seleccionada. */}
               <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                 Alcance: solo dentro de <strong>{orgSel.name}</strong>. El rol
-                que se cambia aquí es el <strong>general</strong>; el de cada
-                app (las insignias de cada fila) lo manda la propia app y no
-                cambia con este — ver §4.7 de OPERAR.
+                que se cambia aquí es el <strong>general</strong>, y viaja a
+                Membresías traducido (un maestro es el dueño de su club allí).
+                En Campeonatos y Academy manda el rol local a partir de la
+                primera entrada — §4.7 de OPERAR.
               </p>
 
               {/* El silencio que había que romper: una organización sin nadie

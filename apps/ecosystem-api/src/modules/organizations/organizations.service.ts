@@ -33,7 +33,8 @@ import {
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
 import { MailerService } from '../auth/mailer.service';
-import { espejarClub } from '../../common/espejo-membresias';
+import { espejarClub, espejarRol } from '../../common/espejo-membresias';
+import { rolParaApp } from '../../common/roles-por-app';
 import { ROLES_GESTOR, esRolGestor } from '../../common/roles';
 import { patronBusqueda } from '../../common/busqueda';
 
@@ -609,10 +610,19 @@ export class OrganizationsService {
         role,
         invitedByUserId,
       );
-      await db
+      const [actualizada] = await db
         .update(orgMembers)
         .set({ role })
-        .where(eq(orgMembers.id, previa.id));
+        .where(eq(orgMembers.id, previa.id))
+        .returning();
+      // Misma razón que en `updateMemberRole`: «+ Añadir» sobre alguien que ya
+      // estaba es un cambio de rol, y tiene que llegar igual.
+      if (actualizada) {
+        espejarRol(
+          user.id,
+          rolParaApp('membresias', actualizada.roleMembresias, actualizada.role),
+        );
+      }
     } else {
       await db
         .insert(orgMembers)
@@ -750,6 +760,12 @@ export class OrganizationsService {
         `Mando: ${userId} pasa a ${role} en ${orgId} (lo hace ${porUserId ?? '?'}).`,
       );
     }
+    // Y que se entere Membresías, que es donde este cambio no se veía nunca:
+    // allí el rol solo se leía al crear la ficha. Ver `espejarRol`.
+    espejarRol(
+      userId,
+      rolParaApp('membresias', result[0].roleMembresias, result[0].role),
+    );
     return result[0];
   }
 

@@ -182,3 +182,37 @@ export function espejarContrasena(userId: string, passwordHash: string): void {
   if (!passwordHash) return;
   void avisar('/sync/contrasena', { ecoSub: userId, passwordHash });
 }
+
+/**
+ * Copia el ROL. **Es el único dato de pertenencia que viaja, y es una decisión.**
+ *
+ * ── Lo que pasaba sin esto ──
+ *
+ * Se le ponía `maestro` a alguien en el portal y en Membresías seguía siendo
+ * alumno para siempre. El rol del pase solo se lee al CREAR la ficha
+ * (`aprovisionarFicha`), así que a quien ya la tenía no le llegaba nunca — y
+ * en la pantalla de Membresías no hay un sitio evidente donde corregirlo. El
+ * administrador del ecosistema tenía el botón y no tenía el efecto.
+ *
+ * ── Por qué esto NO contradice §4.7 ──
+ *
+ * La regla de allí es que **el portal no pisa lo que decide cada app en
+ * silencio**: quitar a alguien de un club aquí no le borra sus pagos allá, y
+ * un cambio de rol no puede degradar solo a quien está cobrando mensualidades.
+ * Lo que se abre aquí no es un silencio: alguien con permiso abrió el panel,
+ * eligió una persona y cambió su rol **a propósito**. Eso sí manda.
+ *
+ * Lo que sigue sin viajar: la pertenencia al club. Sacar a alguien de un club
+ * en el portal sigue sin tocar su ficha, sus pagos ni su historial.
+ *
+ * ── Lo que no se manda ──
+ *
+ * Un rol sin equivalente en Membresías (`judge`, que es de la federación) llega
+ * como `null` y entonces no se manda nada: no hay nada que decir, y forzarlo a
+ * `student` degradaría al azar. Y como todo el espejo, se dispara sin esperarlo
+ * y no puede romper el cambio de rol en el portal.
+ */
+export function espejarRol(userId: string, rolMembresias: string | null): void {
+  if (!rolMembresias) return;
+  void avisar('/sync/rol', { ecoSub: userId, role: rolMembresias });
+}
