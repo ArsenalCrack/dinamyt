@@ -21,7 +21,7 @@ Render o Supabase es historia: está en el registro de git, no aquí.
 |---|---|---|
 | Portal, identidad, Academy | `dinamyt` (este repo), en `apps/` | |
 | **Membresías** | `D:\Repositorios\dinamyt-membresias` | **NUNCA** en `productos/membresias` |
-| **Campeonatos** | `dinamyt-combat` (sin clonar todavía) | **NUNCA** en `productos/campeonatos` |
+| **Campeonatos** | `D:\Repositorios\dinamyt-combat` | **NUNCA** en `productos/campeonatos` |
 
 `productos/` son **espejos** traídos con `git subtree`. Un cambio hecho ahí se
 pierde en la siguiente sincronización, **y se pierde en silencio**: `git subtree
@@ -1115,6 +1115,81 @@ La del club es distinta a propósito: «la clase es a las 7 pm» es hora **del
 salón**, y convertirla a la de un maestro que está de viaje sería el error
 contrario.
 
+
+## 4.13 Entrar a Campeonatos desde DINAMYT
+
+**Funciona desde el 30 de agosto de 2026.** El botón del dashboard lleva el pase
+en el fragmento (`/login#token=…`), Campeonatos lo verifica contra el JWKS del
+ecosistema y abre **su propia cookie de sesión**. Sin segunda contraseña.
+
+### Las dos puertas de `POST /auth/sesion`
+
+| Entra con… | Quién la usa | Sesión que abre |
+|---|---|---|
+| **El pase del ecosistema** (RS256) | Quien salta desde el portal | **12 h** |
+| **Su token propio** (HS256) | El **QR del juez**, que no se toca | 72 h |
+
+Las 12 h no son un capricho: la sesión del ecosistema **se puede revocar**, y
+esta cookie ya no depende de ella. Doce horas cubren una jornada de competencia
+entera y acotan cuánto sobrevive aquí una sesión que allá ya se cerró. El QR
+conserva sus 72 porque se reparte por la mañana y tiene que aguantar el fin de
+semana **sin internet**.
+
+### Tener el plan no es operar un campeonato
+
+Es la distinción que hizo falta en cuanto la federación pudo pagar Campeonatos
+para todos sus clubes (§4.5): **cualquier alumno de un club afiliado trae
+`campeonatos` en sus `app_scopes`**. Y la consola de Campeonatos solo sabe de
+administrar, inscribir y puntuar — no tiene una sola pantalla para él.
+
+| Rol en el pase | Qué pasa |
+|---|---|
+| `admin` · `maestro` · `coach` · `judge` | Entra a la consola |
+| `competitor` · `student` · vacío | **No entra**, y se le dice por qué con un enlace de vuelta al portal |
+
+La regla vive en los **dos** lados: el portal no le enseña el botón
+(`lib/roles.ts`) y el servidor rechaza el pase (`app/espejo.py`). Esconder el
+botón no es la seguridad; es no mandar a nadie a una puerta que le van a cerrar.
+
+> **Y el pase de un alumno no crea ninguna fila** en `usuarios`. Sin esa regla,
+> una federación con doscientos alumnos serían doscientas filas de gente que no
+> va a entrar nunca, cada una ocupando un correo único en la consola.
+
+### La fila local es un espejo, y su rol manda
+
+`usuarios.eco_sub` guarda el `sub` de la cuenta del ecosistema. Al entrar: si ya
+hay espejo se usa; si existe una fila con ese correo se **enlaza** (toda la
+gente que ya operaba antes); si no existe, se crea — con una contraseña
+aleatoria que nadie conoce, así que **por el formulario no se entra con ella**.
+
+**El rol local manda sobre el del pase.** El pase solo decide el rol al crear la
+fila. Es el mismo criterio de Academy, y evita que un cambio de rol en el portal
+degrade en silencio al administrador de un campeonato en marcha.
+
+### El login propio de Campeonatos NO se retira
+
+Es **la marcha atrás del 9 de octubre**: sin internet no hay ecosistema al que
+preguntar, y una app que solo sabe entrar por SSO no arranca ese día. Lo que sí
+se retira —después del campeonato— es `POST /auth/register`, que es lo que de
+verdad contradice «las cuentas nacen en el ecosistema». Membresías aplica este
+mismo criterio, y tres apps con la misma regla es una regla que se recuerda.
+
+### La trampa del `kid`, que costó una tarde
+
+`PyJWKClient` **solo considera «llave de firma» la que lleva `kid`**. El JWKS
+del ecosistema publicaba una sola llave sin él, así que Campeonatos rechazaba
+todos los pases con *«el JWKS no contiene ninguna llave de firma»* — un mensaje
+que no nombra el `kid` por ninguna parte. `jose` (Membresías) se apaña con una
+llave única, y por eso allá el SSO funcionó a la primera.
+
+Arreglado en el ecosistema: firma con `kid` y lo publica, usando la **huella
+RFC 7638** de la propia llave. Con eso **ya se pueden rotar llaves** — publicar
+las dos, firmar con la nueva, retirar la vieja—, que sin `kid` era imposible.
+
+> ⚠️ **Al desplegar el ecosistema, los pases viejos siguen valiendo** (no llevan
+> `kid` y Campeonatos usa entonces la llave única), pero **si algún día el JWKS
+> publica dos llaves sin `kid`, Campeonatos se niega**: ahí no se adivina.
+
 ---
 
 # PARTE 5 · Las trampas que ya costaron una tarde
@@ -1543,9 +1618,14 @@ fuera**, que es lo que hacía tan difícil creer que fuera un solo fallo:
       tablas, así que va sola y con respaldo delante, no de propina en otro
       cambio.
 
-`[ ]` **Campeonatos no lee el `#token=`.** Su `/login` existe, pero el salto
-      desde el portal aterriza en su formulario en vez de iniciar sesión. Se
-      edita en `dinamyt-combat`, que todavía no está clonado.
+`[x]` ~~**Campeonatos no lee el `#token=`.**~~ Hecho el 30 de agosto de 2026:
+      el salto desde el portal abre sesión sin segunda contraseña, y `dinamyt-combat`
+      ya está clonado en `D:\Repositorios\dinamyt-combat`. Cómo funciona y qué
+      decide quién entra: §4.13.
+
+      **Falta desplegarlo**, y ese despliegue no es solo `git pull`: necesita
+      `pip install -r requirements.txt` (la nueva `cryptography`, que PyJWT
+      necesita para RS256) y `ECOSYSTEM_JWKS_URL` puesta en el servicio.
 
 `[ ]` **Quedan dos `admin@dinamyt.com` en Campeonatos**, y ese dominio es de
       otra persona. *(revisado el 29 ago 2026)* **El del código ya no está**:

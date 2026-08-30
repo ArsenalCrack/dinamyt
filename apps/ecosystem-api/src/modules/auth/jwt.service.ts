@@ -28,12 +28,44 @@ export class JwtTokenService {
     }
   }
 
+  /**
+   * El nombre de la llave con la que se firma: su huella RFC 7638.
+   *
+   * ── Por qué hace falta, y qué se rompió sin él ───────────────────────────
+   *
+   * El JWKS publicaba **una llave sin `kid`** y los pases tampoco lo llevaban.
+   * `jose` se apaña —si hay una sola llave, la usa— y por eso Membresías
+   * funcionó a la primera. **PyJWT no**: para `PyJWKClient`, una llave sin
+   * `kid` no es una llave de firma, así que Campeonatos rechazaba TODOS los
+   * pases con «el JWKS no contiene ninguna llave de firma». Costó una tarde
+   * encontrarlo porque el síntoma no menciona el `kid` por ninguna parte.
+   *
+   * Y sin `kid` **no se pueden rotar las llaves**: el día que el JWKS tenga
+   * dos, ningún verificador sabrá cuál firmó cada pase. Publicar dos llaves un
+   * tiempo, firmar con la nueva y retirar la vieja es todo el procedimiento de
+   * rotación, y descansa entero en este campo.
+   *
+   * Se usa la huella y no un nombre inventado a propósito: sale de la llave
+   * misma, así que dos llaves distintas nunca comparten `kid` y nadie tiene
+   * que acordarse de cambiarlo al generar una nueva.
+   */
+  private kid: string;
+
   async onModuleInit() {
     const privatePem = this.loadKey(process.env.JWT_PRIVATE_KEY_PATH!);
     const publicPem = this.loadKey(process.env.JWT_PUBLIC_KEY_PATH!);
 
     this.privateKey = await jose.importPKCS8(privatePem, 'RS256');
     this.publicKey = await jose.importSPKI(publicPem, 'RS256');
+    this.kid = await jose.calculateJwkThumbprint(
+      await jose.exportJWK(this.publicKey),
+      'sha256',
+    );
+  }
+
+  /** La cabecera de todo lo que firma este servicio. */
+  private cabecera(): { alg: 'RS256'; kid: string } {
+    return { alg: 'RS256', kid: this.kid };
   }
 
   /**
@@ -96,7 +128,7 @@ export class JwtTokenService {
   async signToken(payload: JwtPayload & { jti: string }): Promise<string> {
     const { jti, ...resto } = payload;
     return new jose.SignJWT({ ...resto })
-      .setProtectedHeader({ alg: 'RS256' })
+      .setProtectedHeader(this.cabecera())
       .setJti(jti)
       .setSubject(payload.sub)
       .setIssuedAt()
@@ -187,7 +219,7 @@ export class JwtTokenService {
   async firmarInvitacion(userId: string): Promise<string> {
     const segundos = JwtTokenService.DIAS_INVITACION * 24 * 60 * 60;
     return new jose.SignJWT({ purpose: 'set-password' })
-      .setProtectedHeader({ alg: 'RS256' })
+      .setProtectedHeader(this.cabecera())
       .setSubject(userId)
       .setIssuedAt()
       .setIssuer(JwtTokenService.EMISOR_INVITACION)
@@ -212,6 +244,10 @@ export class JwtTokenService {
     const jwk = await jose.exportJWK(this.publicKey);
     jwk.alg = 'RS256';
     jwk.use = 'sig';
+    // El `kid` no es decorativo: sin él PyJWT no reconoce la llave (ver
+    // arriba) y no hay forma de rotar llaves. Es el mismo que va en la
+    // cabecera de cada pase, porque los dos salen de la misma huella.
+    jwk.kid = this.kid;
     return { keys: [jwk] };
   }
 }
