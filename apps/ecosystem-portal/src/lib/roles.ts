@@ -91,6 +91,31 @@ export function opcionesDeRol(
  */
 export const ROLES_GESTOR = ['admin', 'owner', 'maestro'] as const;
 
+/**
+ * Los roles que OPERAN un campeonato: administran, inscriben o puntúan.
+ *
+ * **Tener el plan y operar la consola son dos cosas distintas**, y desde que
+ * la federación puede pagar Campeonatos para todos sus clubes hay que
+ * separarlas: el alumno de un club afiliado tiene `campeonatos` en sus
+ * `app_scopes` —su federación lo paga— y no tiene nada que hacer en una
+ * herramienta de mesa de control. Su historial, sus inscripciones y sus
+ * resultados van en el portal.
+ *
+ * El servidor de Campeonatos aplica exactamente esta misma regla al canjear el
+ * pase (`app/espejo.py`), así que esconder el botón no es la seguridad: es no
+ * mandar a nadie a una puerta que le van a cerrar.
+ */
+export const ROLES_CONSOLA_CAMPEONATOS = [
+  'admin',
+  'maestro',
+  'coach',
+  'judge',
+] as const;
+
+/** `true` si con ese rol se opera un campeonato. */
+export const operaCampeonatos = (rol: string | null | undefined): boolean =>
+  Boolean(rol && (ROLES_CONSOLA_CAMPEONATOS as readonly string[]).includes(rol));
+
 /** `true` si con ese rol se administra la organización. */
 export const mandaEnLaOrg = (rol: string | null | undefined): boolean =>
   Boolean(rol && (ROLES_GESTOR as readonly string[]).includes(rol));

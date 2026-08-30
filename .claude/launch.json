@@ -25,78 +25,147 @@
     {
       "name": "ecosystem-api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/ecosystem-api", "start:dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/ecosystem-api",
+        "start:dev"
+      ],
       "port": 3001
     },
     {
       "name": "campeonatos-api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/campeonatos-api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/campeonatos-api",
+        "dev"
+      ],
       "port": 3002
     },
     {
       "name": "campeonatos-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/campeonatos-web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/campeonatos-web",
+        "dev"
+      ],
       "port": 3003
     },
     {
       "name": "campeonatos-web-local",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/campeonatos-web-local", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/campeonatos-web-local",
+        "dev"
+      ],
       "port": 3003
     },
     {
       "name": "ecosystem-portal",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/ecosystem-portal", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/ecosystem-portal",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "campeonatos-combat",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/campeonatos-combat", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/campeonatos-combat",
+        "dev"
+      ],
       "port": 3005
     },
     {
       "name": "membresias-api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/membresias-api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/membresias-api",
+        "dev"
+      ],
       "port": 3004
     },
     {
       "name": "membresias-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/membresias-web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/membresias-web",
+        "dev"
+      ],
       "port": 3006
     },
     {
       "name": "membresias-agent",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/membresias-agent", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/membresias-agent",
+        "dev"
+      ],
       "port": 7070
     },
     {
       "name": "academy-api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/academy-api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/academy-api",
+        "dev"
+      ],
       "port": 3007
     },
     {
       "name": "academy-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@dinamyt/academy-web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@dinamyt/academy-web",
+        "dev"
+      ],
       "port": 3008
     },
     {
       "name": "academy-figuras",
       "runtimeExecutable": "apps/academy-figuras/.venv/Scripts/python.exe",
       "runtimeArgs": [
-        "-m", "uvicorn", "service.main:app",
-        "--port", "3009",
-        "--app-dir", "apps/academy-figuras"
+        "-m",
+        "uvicorn",
+        "service.main:app",
+        "--port",
+        "3009",
+        "--app-dir",
+        "apps/academy-figuras"
       ],
       "port": 3009
+    },
+    {
+      "//": "Campeonatos DE VERDAD, en D:/Repositorios/dinamyt-combat. Las entradas campeonatos-* de arriba apuntan a las copias VIEJAS del monorepo (productos/ es un espejo y apps/campeonatos-*-local es una copia sin commitear). Las variables las lee de backend/.env.",
+      "name": "combat-api",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "D:/Repositorios/dinamyt-combat/backend/run.py"
+      ],
+      "port": 5000
+    },
+    {
+      "name": "combat-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "D:/Repositorios/dinamyt-combat/frontend",
+        "dev",
+        "--port",
+        "3003"
+      ],
+      "port": 3003
     }
   ]
 }

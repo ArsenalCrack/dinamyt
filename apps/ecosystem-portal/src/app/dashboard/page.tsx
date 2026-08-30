@@ -16,7 +16,7 @@ import api, {
   type TokenPayload,
   type MiInvitacion,
 } from '@/lib/api';
-import { nombreRol } from '@/lib/roles';
+import { nombreRol, operaCampeonatos } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { EntrarAClub } from '@/components/EntrarAClub';
 
@@ -267,15 +267,21 @@ export default function DashboardPage() {
 
         <div className="flex flex-col gap-3">
           {(payload.is_super_admin ||
-            payload.app_scopes.includes('campeonatos')) && (
+            (payload.app_scopes.includes('campeonatos') &&
+              operaCampeonatos(payload.role_campeonatos))) && (
             // SSO por redirección: el token viaja en el fragmento (#) — nunca
-            // llega al servidor — y la app lo guarda al aterrizar.
+            // llega al servidor — y la app lo canjea por su cookie al aterrizar
+            // (su `/login` ya lee el `#token=`; antes se quedaba en su
+            // formulario). La ruta es `/login` y no `/admin/login`: esa segunda
+            // no existe y este enlace llegó a dar un 404.
             //
-            // ⚠️ La ruta es `/login`, no `/admin/login`: esa segunda NO EXISTE
-            // en el frontend de Campeonatos y este enlace daba un 404. Lo que
-            // todavía falta —y vive en `dinamyt-combat`, no aquí— es que su
-            // `/login` LEA el `#token=`; mientras tanto se aterriza en su
-            // formulario en vez de en una página que no existe.
+            // ⚠️ **Tener el plan no basta**: se pide además un rol que opere.
+            // Desde que la federación puede pagar Campeonatos por todos sus
+            // clubes, el alumno de un club afiliado trae el scope en su pase, y
+            // la consola de Campeonatos solo sabe de administrar, inscribir y
+            // puntuar — no tiene una pantalla para él. Enseñarle el botón era
+            // mandarlo a un 403. Lo suyo (sus inscripciones, sus resultados)
+            // vivirá aquí, en el portal.
             <a
               href={`${CAMPEONATOS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
               className="rounded-lg px-4 py-3 font-semibold"
