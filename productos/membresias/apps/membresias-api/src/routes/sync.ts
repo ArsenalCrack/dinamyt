@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'crypto';
 import type { FastifyInstance } from 'fastify';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { syncSecret } from '../config';
@@ -320,18 +320,24 @@ export async function syncRoutes(app: FastifyInstance) {
   //
   // ── A quién NO toca ──
   //
-  // Busca por `eco_sub`. La ficha sin cuenta del ecosistema —el alumno sin
-  // correo, que entra por carnet QR o PIN— no lo tiene, y su rol sigue siendo
-  // asunto de su club.
+  // Busca por `eco_sub` y, si no lo encuentra, por CORREO sobre una ficha sin
+  // enlazar —a la que ata de paso, igual que hace `POST /auth/sso`—. La ficha
+  // sin correo, la del alumno que entra por carnet QR o PIN, no la alcanza por
+  // ninguno de los dos caminos: su rol sigue siendo asunto de su club.
+  //
+  // El `is_super_admin` de esta instalación **no se toca nunca** por aquí: es
+  // el que atraviesa todos los clubes y se concede a mano, mirando. Su `role`
+  // sí se cambia como el de cualquiera — es lo que se imprime en el carnet.
   app.post('/sync/rol', async (req, reply) => {
     const puerta = abrir(req as never);
     if (puerta === 404) return reply.code(404).send({ error: 'No encontrado.' });
     if (puerta === 401) return reply.code(401).send({ error: 'Secreto inválido.' });
 
-    const body = (req.body ?? {}) as { ecoSub?: string; role?: string };
+    const body = (req.body ?? {}) as { ecoSub?: string; role?: string; email?: string };
 
     const ecoSub = typeof body.ecoSub === 'string' && UUID.test(body.ecoSub) ? body.ecoSub : null;
     if (!ecoSub) return reply.code(422).send({ error: 'Falta `ecoSub`.' });
+    const correo = (body.email ?? '').trim().toLowerCase();
 
     const rol = ROLES.find((r) => r === body.role) as Rol | undefined;
     if (!rol) {
@@ -343,33 +349,63 @@ export async function syncRoutes(app: FastifyInstance) {
     // Cruza clubes a propósito, igual que las otras dos: quien llama es el
     // ecosistema y no pertenece a ninguno. El filtro real es `eco_sub`.
     return sinFiltroDeClub(req.server.db, async (db: Db) => {
-      const [u] = await db
-        .select({
-          id: users.id,
-          orgId: users.orgId,
-          role: users.role,
-          isSuperAdmin: users.isSuperAdmin,
-        })
+      const columnas = {
+        id: users.id,
+        orgId: users.orgId,
+        role: users.role,
+        ecoSub: users.ecoSub,
+      };
+
+      let [u] = await db
+        .select(columnas)
         .from(users)
         .where(eq(users.ecoSub, ecoSub))
         .limit(1);
 
-      // Sin ficha no es un error: esa persona pertenece a un club del portal
-      // que todavía no usa Membresías.
-      if (!u) return { encontrada: false, aplicado: false };
-
-      // El superadmin de esta instalación no cambia de rol desde fuera. Su
-      // cuenta atraviesa todos los clubes y no cuelga de ninguna organización
-      // del portal: quien la toque, que la toque aquí y mirando.
-      if (u.isSuperAdmin) {
-        return {
-          encontrada: true,
-          aplicado: false,
-          motivo: 'Es el superadmin de Membresías: su rol no se cambia desde el portal.',
-        };
+      // ── El enlace que faltaba, y por el que esto no hacía nada ──
+      //
+      // Todo el espejo —la foto, el escudo, la contraseña y ahora el rol—
+      // busca por `eco_sub`. Una ficha creada por su club y nunca enlazada con
+      // el ecosistema **no la encuentra ninguno de los cuatro**, y como el
+      // aviso contestaba 200 sin más, no había forma de enterarse: se cambiaba
+      // el rol en el portal, aquí no pasaba nada, y ningún registro lo decía.
+      //
+      // Se enlaza igual que en `POST /auth/sso`: por el correo, que es único a
+      // los dos lados, y solo sobre una ficha que **todavía no tiene enlace**
+      // —el `isNull` en el WHERE, no en el `if`, para que dos avisos a la vez
+      // no se pisen—. A partir de aquí esa persona queda enlazada y los otros
+      // tres avisos también empiezan a llegarle.
+      let enlazada = false;
+      if (!u && correo) {
+        const [porCorreo] = await db
+          .select(columnas)
+          .from(users)
+          .where(and(eq(users.email, correo), isNull(users.ecoSub)))
+          .limit(1);
+        if (porCorreo) {
+          const [atada] = await db
+            .update(users)
+            .set({ ecoSub, updatedAt: new Date() })
+            .where(and(eq(users.id, porCorreo.id), isNull(users.ecoSub)))
+            .returning(columnas);
+          if (atada) {
+            u = atada;
+            enlazada = true;
+            req.log.info(
+              { usuario: atada.id, ecoSub },
+              'ficha enlazada con su cuenta del ecosistema desde /sync/rol',
+            );
+          }
+        }
       }
 
-      if (u.role === rol) return { encontrada: true, aplicado: false, motivo: 'Ya lo tenía.' };
+      // Sin ficha no es un error: esa persona pertenece a un club del portal
+      // que todavía no usa Membresías.
+      if (!u) return { encontrada: false, aplicado: false, enlazada };
+
+      if (u.role === rol) {
+        return { encontrada: true, aplicado: false, enlazada, motivo: 'Ya lo tenía.' };
+      }
 
       // ── El club no se queda sin dueño ──
       //
@@ -396,6 +432,7 @@ export async function syncRoutes(app: FastifyInstance) {
           return {
             encontrada: true,
             aplicado: false,
+            enlazada,
             motivo:
               'Es el único dueño de su club en Membresías: nadie podría cobrar ' +
               'ni dar de alta. Nombra otro dueño antes de bajarle el rol.',
@@ -409,7 +446,7 @@ export async function syncRoutes(app: FastifyInstance) {
         .where(eq(users.id, u.id));
 
       req.log.info({ usuario: u.id, de: u.role, a: rol }, 'rol cambiado desde el portal');
-      return { encontrada: true, aplicado: true, de: u.role, a: rol };
+      return { encontrada: true, aplicado: true, enlazada, de: u.role, a: rol };
     });
   });
 }
