@@ -2032,25 +2032,114 @@ el camino con una persona real y mirando el log. La única forma de encontrar la
 próxima cadena así es recorrer el camino entero antes de que lo recorra un
 maestro el 9 de octubre.
 
-El guion, de una sentada y con el `journalctl` abierto al lado:
+### El guion, paso a paso
 
-1. Crear una federación desde `/admin`, ponerle su administrador, crearle un
-   club dentro y afiliarle otro que ya exista (§4.5).
-2. Darle plan a la federación y comprobar que el club **hereda** — salir y
-   entrar para renovar el pase (§4.5).
-3. Desde Membresías, dar de alta a un alumno con un correo nuevo: tiene que
-   nacer su cuenta en DINAMYT y volver el enlace de contraseña (§4.4).
-4. Que ese alumno ponga su contraseña, entre al portal, y de ahí a Membresías.
-5. Cobrarle, marcarle asistencia, imprimirle el carnet.
-6. Cambiarle el rol a auxiliar desde el portal y ver que **cambia en
-   Membresías** (§4.7).
-7. Entrar a Campeonatos con un maestro, inscribir a alguien, y **salir**:
-   comprobar que la vuelta al portal ya no te mete dentro (§5.12).
+Cada paso tiene **lo que se hace en pantalla** y **lo que se comprueba en la
+base**. Lo segundo no es opcional: los cuatro eslabones del fallo del rol se
+veían todos igual desde la pantalla —«no pasa nada»— y distintos en la base.
 
-> **Lo que hay que mirar mientras**, que es la mitad del ensayo:
-> `sudo journalctl -u dinamyt-id -f`. Un `WARN [EspejoMembresias]` es un aviso
-> que no se aplicó, y ahora los dice todos (§4.7). Sin esa ventana abierta, el
-> ensayo solo prueba lo que se ve en pantalla.
+`scripts/ensayo.sh` es lo que responde cada comprobación. **Solo lee**: ni un
+`UPDATE`, ni un `INSERT`. Se puede correr en producción a media tarde.
+
+```bash
+cd /srv/dinamyt && bash scripts/ensayo.sh
+```
+
+Y una ventana aparte, abierta durante todo el ensayo — esto es la otra mitad:
+
+```bash
+sudo journalctl -u dinamyt-id -f
+```
+
+Un `WARN [EspejoMembresias]` es un aviso que no se aplicó. Hasta el 30 de agosto
+ese silencio era el problema; ahora los dice todos (§4.7).
+
+#### 0 · El punto de partida
+
+```bash
+cd /srv/dinamyt && bash scripts/ensayo.sh estado
+```
+
+Las seis apps `active`, **los dos hashes del secreto iguales** —si no, el espejo
+entero está muerto y el ensayo no prueba nada— y `POST /sync/alta` contestando
+**401** (un 404 es que falta `ECOSYSTEM_SYNC_SECRET`). Anota los números del
+resumen: al final tienen que haber cambiado en lo que esperas y en nada más.
+
+#### 1 · La estructura
+
+En pantalla: crear una federación desde `/admin`, ponerle su administrador,
+crearle un club dentro y **afiliarle otro que ya exista**.
+
+```bash
+bash scripts/ensayo.sh federacion 'NOMBRE DE LA FEDERACIÓN'
+```
+
+Los clubes colgando de ella, y **alguien con rol `admin`**. Sin eso la
+federación existe y no le sale a nadie en «Mi organización» (§4.5).
+
+#### 2 · La herencia
+
+En pantalla: darle plan a la federación. Después, con el correo de alguien del
+club **hijo** —no de la federación—:
+
+```bash
+bash scripts/ensayo.sh herencia alguien@delclub.com
+```
+
+Tiene que salir el plan de la federación como eslabón del club. Si sale aquí y
+la persona no lo ve en el portal, es el pase viejo: que salga y entre (§4.5).
+
+#### 3 · El alta desde Membresías
+
+En pantalla: dar de alta a un alumno con un **correo nuevo**. Tiene que volver
+el enlace de contraseña (§4.4).
+
+```bash
+bash scripts/ensayo.sh persona elnuevo@correo.com
+```
+
+Las tres cosas que importan: **cuenta en DINAMYT** con `tiene_contrasena = f`,
+**`enlazada = t`** en Membresías, y `contrasena_propia = f`. Si `enlazada` sale
+`f`, la ficha nació suelta y hay algo mal en el orden del alta.
+
+#### 4 · Que entre
+
+En pantalla: que esa persona abra el enlace, ponga su contraseña, entre al
+portal y de ahí salte a Membresías. Después, cobrarle, marcarle asistencia e
+imprimirle el carnet.
+
+Repite `persona`: ahora `tiene_contrasena = t`.
+
+#### 5 · El rol, que es donde estaba el fallo
+
+En pantalla: cambiarle el rol a **auxiliar** desde el portal.
+
+```bash
+bash scripts/ensayo.sh rol elnuevo@correo.com
+```
+
+`esperado_membresias` y `en_membresias` **iguales**, y
+`tiene_roles_de_app_escritos = f`. Si no cuadran:
+
+```bash
+bash scripts/ensayo.sh espejo
+```
+
+#### 6 · Campeonatos, ida y vuelta
+
+En pantalla: entrar con un maestro, inscribir a alguien, y **salir**. Al volver
+al portal no puede meterte dentro otra vez (§5.12). Y comprueba que a un alumno
+el portal le ofrece las páginas públicas, no la consola (§4.13).
+
+#### 7 · El cierre
+
+```bash
+bash scripts/ensayo.sh resumen && bash scripts/ensayo.sh sueltas
+```
+
+`fichas_sueltas` no puede haber subido: cada alta nueva nace enlazada. Si subió,
+algún camino sigue creando fichas sin cuenta y eso es lo siguiente que hay que
+mirar.
 
 ## 6.1 Huecos conocidos
 
