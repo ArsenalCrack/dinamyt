@@ -996,6 +996,49 @@ sudo -u postgres psql -d dinamyt -P pager=off -c "select e.email, e.id as eco_id
 | `eco_sub` vacío | **La ficha no estaba enlazada.** El siguiente cambio de rol la ata y la aplica |
 | `rol_membresias` distinto de lo traducido | El aviso no llegó: mira el log de arriba |
 
+#### 4 · Y la columna de app, que mandaba sobre todo lo anterior
+
+*(30 ago, por la noche.)* Con los tres eslabones de arriba arreglados, el aviso
+llegaba a Membresías y contestaba **«ya lo tenía»**. Y era verdad: le estaba
+mandando `student`.
+
+`org_members` guarda **cuatro** roles —el general y uno por app— y los de app
+**mandan sobre el general** (§4.7, la tabla de arriba). La reconciliación del 29
+de agosto los dejó escritos para las 46 personas que importó, con el rol que
+cada quien tenía en su app. Con `role_membresias = 'student'` puesto, cambiar el
+general a `maestro` no cambiaba **nada**:
+
+- el pase seguía llevando `student`, porque la columna propia gana;
+- el aviso mandaba `student`, y Membresías respondía «ya lo tenía»;
+- y el panel enseñaba la insignia `Membresías · Alumno` **al lado** del rol
+  nuevo, contradiciéndose sin que una sola línea lo explicara.
+
+**Ahora cambiar el rol general vacía las tres columnas de app.** A partir de ahí
+el rol de cada app sale del general traducido, que es lo que se pidió: quien
+administra cambia el rol de alguien **en todas las apps** desde el portal.
+
+> ⚠️ **Se lleva por delante un rol de app puesto a propósito** — el `judge` de
+> quien es alumno en su club y juez en la federación. Es deliberado, y el panel
+> lo dice antes de hacerlo (el diálogo nombra los que va a reemplazar). Para
+> devolverle el suyo está `POST /organizations/:id/invite`, que sí los escribe
+> uno por uno.
+
+> **Se vacían en vez de escribirles el valor traducido.** Vaciarlas dice «esta
+> persona no tiene nada especial en ninguna app», que es la verdad después de un
+> cambio hecho a mano — y deja que la traducción siga siendo correcta el día que
+> un catálogo cambie.
+
+#### El resumen, para no volver a recorrerlo entero
+
+Cuatro eslabones, y **cada uno tapaba al siguiente**:
+
+| | Qué pasaba | Dónde |
+|---|---|---|
+| 1 | `maestro` no está en el catálogo de Membresías y el rol se caía a `null` | `common/roles-por-app.ts` |
+| 2 | Aun traducido, solo se leía al CREAR la ficha | `POST /sync/rol` |
+| 3 | El aviso no encontraba la ficha sin enlazar, y contestaba 200 | Búsqueda por correo + `warn` en el log |
+| 4 | La columna `role_membresias` mandaba sobre el general | Se vacía al cambiar el rol |
+
 ### Varios maestros en un club, y qué imprime el carnet
 
 **No chocan, y no hay ningún límite.** `membresias.users.role` es una columna

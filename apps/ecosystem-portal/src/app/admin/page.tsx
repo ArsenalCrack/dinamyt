@@ -468,11 +468,11 @@ export default function AdminEcosistemaPage() {
               {/* El otro rótulo de alcance (ver «Accesos rápidos» arriba): esta
                   caja NO sale de la organización seleccionada. */}
               <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Alcance: solo dentro de <strong>{orgSel.name}</strong>. El rol
-                que se cambia aquí es el <strong>general</strong>, y viaja a
-                Membresías traducido (un maestro es el dueño de su club allí).
-                En Campeonatos y Academy manda el rol local a partir de la
-                primera entrada — §4.7 de OPERAR.
+                Alcance: solo dentro de <strong>{orgSel.name}</strong>. Cambiar
+                el rol aquí <strong>reemplaza los de cada app</strong> (las
+                insignias de la fila) y viaja a Membresías traducido: un maestro
+                es el dueño de su club allí. En Campeonatos y Academy el rol
+                local manda a partir de la primera entrada — §4.7 de OPERAR.
               </p>
 
               {/* El silencio que había que romper: una organización sin nadie
@@ -520,10 +520,28 @@ export default function AdminEcosistemaPage() {
                       void confirmarYHacer(
                         {
                           titulo: `¿Cambiar a ${m.fullName} a «${nombreRol(rol)}» en ${orgSel.name}?`,
-                          detalle:
-                            mandaEnLaOrg(m.role) && !mandaEnLaOrg(rol)
-                              ? 'Dejará de administrar la organización: perderá su panel, su ficha y su gente.'
-                              : 'Cambia lo que puede hacer en la organización y en las aplicaciones.',
+                          detalle: (
+                            <>
+                              {mandaEnLaOrg(m.role) && !mandaEnLaOrg(rol)
+                                ? 'Dejará de administrar la organización: perderá su panel, su ficha y su gente. '
+                                : 'Cambia lo que puede hacer en la organización y en las aplicaciones. '}
+                              {/* Lo que nadie sabía hasta que ya había pasado: el
+                                  rol de cada app manda sobre este, y si no se
+                                  borran, el cambio no se nota en ninguna parte. */}
+                              <strong>
+                                Y le reemplaza los roles de app que tuviera
+                                {(m.roleMembresias || m.roleCampeonatos || m.roleAcademy) &&
+                                  ` (hoy: ${[
+                                    m.roleMembresias && `Membresías ${nombreRol(m.roleMembresias)}`,
+                                    m.roleCampeonatos && `Campeonatos ${nombreRol(m.roleCampeonatos)}`,
+                                    m.roleAcademy && `Academy ${nombreRol(m.roleAcademy)}`,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(', ')})`}
+                                , que pasan a salir de este.
+                              </strong>
+                            </>
+                          ),
                           textoOk: 'Cambiar el rol',
                         },
                         () => cambiarRolMiembroAPI(orgSel.id, m.userId, rol),

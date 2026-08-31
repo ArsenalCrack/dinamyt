@@ -672,10 +672,17 @@ export default function MiOrganizacionPage() {
                 void confirmarYHacer(
                   {
                     titulo: `¿Cambiar a ${m.fullName} a «${nombreRol(rol)}»?`,
-                    detalle:
-                      mandaEnLaOrg(m.role) && !mandaEnLaOrg(rol)
-                        ? `Dejará de administrar ${orgSel?.name ?? 'el club'}: no podrá editar la ficha, repartir el código de entrada ni ver a su gente.`
-                        : `Cambia lo que puede hacer dentro de ${orgSel?.name ?? 'el club'} y en las aplicaciones.`,
+                    detalle: (
+                      <>
+                        {mandaEnLaOrg(m.role) && !mandaEnLaOrg(rol)
+                          ? `Dejará de administrar ${orgSel?.name ?? 'el club'}: no podrá editar la ficha, repartir el código de entrada ni ver a su gente. `
+                          : `Cambia lo que puede hacer dentro de ${orgSel?.name ?? 'el club'} y en las aplicaciones. `}
+                        <strong>
+                          Y le reemplaza los roles de app que tuviera, que pasan a
+                          salir de este.
+                        </strong>
+                      </>
+                    ),
                     textoOk: 'Cambiar el rol',
                   },
                   () => cambiarRolMiembroAPI(sel!, m.userId, rol),

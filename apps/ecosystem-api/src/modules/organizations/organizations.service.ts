@@ -610,9 +610,17 @@ export class OrganizationsService {
         role,
         invitedByUserId,
       );
+      // Los roles por app se borran igual que en `updateMemberRole`: este
+      // panel escribe el MISMO `role` que el desplegable, y dejar las columnas
+      // viejas puestas haría que el acceso recién dado no sirviera de nada.
       const [actualizada] = await db
         .update(orgMembers)
-        .set({ role })
+        .set({
+          role,
+          roleMembresias: null,
+          roleCampeonatos: null,
+          roleAcademy: null,
+        })
         .where(eq(orgMembers.id, previa.id))
         .returning();
       // Misma razón que en `updateMemberRole`: «+ Añadir» sobre alguien que ya
@@ -748,7 +756,34 @@ export class OrganizationsService {
     await this.exigirQueNoSeRompaElMando(orgId, userId, role, porUserId);
     const result = await db
       .update(orgMembers)
-      .set({ role })
+      // ── Y se BORRAN los roles por app ──
+      //
+      // **Aquí es donde el cambio de rol se quedaba a medias, y sin decirlo.**
+      // `role_membresias` y sus dos hermanas mandan sobre el general (ver
+      // `common/roles-por-app.ts`), y la reconciliación del 29 de agosto las
+      // dejó escritas para las 46 personas que importó: con `role_membresias`
+      // = 'student' puesto, cambiar el general a `maestro` no cambiaba nada.
+      // El pase seguía llevando `student`, el aviso a Membresías contestaba
+      // «ya lo tenía», y en el panel se veía la insignia vieja al lado del rol
+      // nuevo, contradiciéndose.
+      //
+      // Se borran en vez de escribirles el valor traducido: vaciarlas es
+      // decir «esta persona no tiene nada especial en ninguna app», que es la
+      // verdad después de un cambio de rol hecho a mano, y deja que la
+      // traducción siga siendo correcta el día que un catálogo cambie.
+      //
+      // ⚠️ Esto **se lleva por delante un rol de app puesto a propósito** —el
+      // `judge` de quien es alumno en su club y juez en la federación—. Es
+      // deliberado y es lo que se pidió: quien administra cambia el rol de
+      // alguien en todas las apps desde aquí. Si hace falta devolverle el
+      // suyo, se hace con `POST /organizations/:id/invite`, que sí los escribe
+      // uno por uno.
+      .set({
+        role,
+        roleMembresias: null,
+        roleCampeonatos: null,
+        roleAcademy: null,
+      })
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
       .returning();
     if (!result[0]) {
