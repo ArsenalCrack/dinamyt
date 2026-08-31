@@ -1948,6 +1948,25 @@ volver atrás a esa pantalla la hacía cerrar sesión y reenviar otra vez.
 > **La regla:** una salida no es una navegación. Lo que se deja atrás no puede
 > quedar a una flecha de distancia.
 
+## 5.16 `${v:-X}` no imprime «X»: imprime el valor
+
+Un guion de diagnóstico enseñaba la **huella** del secreto compartido, para
+poder comparar las dos instalaciones sin poner el secreto en pantalla. La línea:
+
+```bash
+printf '%s\n' "${v:+$(printf '%s' "$v" | sha256sum | cut -c1-12)}${v:-SIN PONER}"
+```
+
+La idea era «si está puesta, la huella; si no, SIN PONER». Lo que hace de verdad
+es **las dos cosas seguidas**: `${v:+…}` da la huella, y `${v:-SIN PONER}` da
+**el contenido de `v`** —`:-` solo usa el texto alternativo cuando la variable
+está vacía—. Así que salió la huella pegada al secreto en claro, en la terminal
+de producción y en su scrollback. Hubo que rotarlo.
+
+Arreglado con un `if` de cinco líneas. **La regla:** en la línea que enseña algo
+que no se puede enseñar, no hay ingenio que valga la pena. Y si un guion imprime
+un secreto una vez, ese secreto ya no vale: se rota, no se tapa.
+
 ## 5.15 Un archivo generado que está versionado bloquea el despliegue
 
 ```
@@ -2324,45 +2343,40 @@ mirar.
       y **no puede depender de la red el 9 de octubre**, así que ahí conviene
       esperar a después del campeonato.
 
-`[ ]` **Las fichas de Membresías que nacieron sin cuenta de DINAMYT.**
-      *(30 ago 2026)* El `POST /users` viejo creaba una cuenta local por cada
-      alumno inscrito, sin `eco_sub` (§4.4). Las de antes del 29 de agosto las
-      enlazó la reconciliación; las creadas entre esa fecha y el 30 siguen
-      sueltas, y las de quien **nunca tuvo cuenta en el portal** ni siquiera
-      tienen a qué enlazarse.
+`[x]` ~~**Las fichas de Membresías que nacieron sin cuenta de DINAMYT.**~~
+      **No queda ninguna** — `fichas_sueltas = 0` sobre 36, medido el 31 de
+      agosto de 2026 con `ensayo.sh resumen`. La reconciliación enlazó las
+      viejas, y el camino que las fabricaba —el `POST /users` que creaba una
+      cuenta local por cada alumno— ya no existe: desde el 30 de agosto la
+      cuenta nace en DINAMYT y la ficha nace enlazada (§4.4).
 
-      **Se cura solo por dos caminos** —al entrar por SSO (`/auth/sso` enlaza
-      por correo) y al cambiarle el rol (`/sync/rol` hace lo mismo)—, así que no
-      es urgente. Lo que no se cura solo es quien no tiene cuenta en DINAMYT:
-      a esa gente hay que invitarla. Para saber de cuántos se habla:
+      **Se vigila con `ensayo.sh resumen`**, y es la comprobación que cierra el
+      ensayo de §6.0: si ese número sube, algún camino volvió a crear fichas sin
+      cuenta y eso es lo siguiente que hay que buscar.
 
-      ```bash
-      sudo -u postgres psql -d dinamyt -P pager=off -c "select count(*) filter (where m.eco_sub is null) as sin_enlazar, count(*) filter (where m.eco_sub is null and e.id is null) as sin_cuenta_en_dinamyt from membresias.users m left join ecosystem.users e on e.email = m.email where m.is_super_admin = false;"
-      ```
+      > Quedan **10 usuarios de Campeonatos sin `eco_sub`** (de 22; la
+      > reconciliación enlazó 12). No hace falta hacer nada: se atan por correo
+      > la primera vez que entren desde el portal (§4.13). El contador
+      > `campeonatos_sueltos` los sigue.
 
-`[ ]` **La reconciliación dejó los `role_*` escritos, y ahora estorban.**
-      *(30 ago 2026)* Importó el rol que cada quien tenía en su app a
-      `org_members.role_membresias` y hermanas. Esas columnas **mandan sobre el
-      rol general** (§4.7), así que para las 46 personas que tocó, el rol del
-      portal no decide nada hasta que alguien se lo cambie a mano — que es
-      exactamente el fallo que costó cuatro rondas encontrar.
+`[x]` ~~**La reconciliación dejó los `role_*` escritos, y ahora estorban.**~~
+      Limpiado el 31 de agosto de 2026. Importó el rol que cada quien tenía en
+      su app a `org_members.role_membresias` y hermanas, y esas columnas
+      **mandan sobre el rol general** (§4.7): eran **43 filas de 45**, o sea que
+      para casi todo el mundo el rol del portal no decidía nada. Era el fallo
+      que costó cuatro rondas encontrar, esperando en el resto de las filas.
 
-      **Son 43 de 48** *(medido el 31 ago 2026 con `ensayo.sh estado`)*: para
-      casi todo el mundo, el rol del portal no decide nada.
+      `scripts/limpiar-roles-de-app.sh` vació 34 de Membresías y 11 de
+      Campeonatos. **Y el dato que hizo la decisión fácil: cero filas en «las
+      que dicen algo distinto»** — no había ni un solo rol de app puesto a
+      propósito, las 43 repetían el general traducido. Vaciar una de esas no
+      cambia el pase (`rolParaApp` cae a la traducción); lo que cambia es que el
+      portal vuelve a mandar. `con_rol_de_app_escrito` quedó en **0 de 45**.
 
-      Cambiar el rol desde el panel ya las vacía, una por una. Para vaciarlas
-      todas está `scripts/limpiar-roles-de-app.sh`, que toca **solo las que
-      repiten lo que ya dice el general traducido** — vaciar una de esas no
-      cambia nada, porque el pase seguirá llevando el mismo valor; lo que cambia
-      es que el rol del portal vuelve a mandar. Las que dicen algo distinto las
-      lista aparte y no las toca: ésas son decisiones de alguien.
-
-      ```bash
-      cd /srv/dinamyt && bash scripts/limpiar-roles-de-app.sh
-      ```
-
-      Sin `--aplicar` es un ensayo en seco dentro de una transacción que se
-      deshace, igual que la reconciliación (§2.8). Respaldo delante (§2.5).
+      El guion sigue ahí y **se vuelve a correr sin miedo**: en seco por defecto,
+      dentro de una transacción que se deshace, como la reconciliación (§2.8).
+      Si algún día vuelve a salir un número, la segunda tabla es lo que hay que
+      mirar antes del `--aplicar`.
 
 `[ ]` **Cerrar la sesión en el `teardown_appcontext` de Flask.** Es lo que queda
       del hueco anterior. Sin ello, el DDL ya no se bloquea, pero una petición
