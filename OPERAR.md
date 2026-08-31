@@ -1948,6 +1948,33 @@ volver atrás a esa pantalla la hacía cerrar sesión y reenviar otra vez.
 > **La regla:** una salida no es una navegación. Lo que se deja atrás no puede
 > quedar a una flecha de distancia.
 
+## 5.15 Un archivo generado que está versionado bloquea el despliegue
+
+```
+error: Your local changes to the following files would be overwritten by merge:
+        apps/membresias-web/next-env.d.ts
+Aborting
+```
+
+`next-env.d.ts` **lo escribe `next build`**, y su contenido cambia con la versión
+de Next y con si `.next/` existe. Estando versionado, el servidor lo modifica al
+compilar y **el siguiente `git pull` se planta** — todos los despliegues, para
+siempre, por un archivo que no tiene nada dentro que valga la pena conservar.
+
+Arreglado el 30 de agosto de 2026: fuera del índice y dentro de `.gitignore` en
+los tres repositorios (`ecosystem-portal` ya lo tenía; a `academy-web` y a
+`membresias-web` les faltaba). Se regenera solo al arrancar el build, incluso en
+un clon recién hecho.
+
+Si te lo encuentras en un despliegue viejo, o con otro archivo generado:
+
+```bash
+cd /srv/membresias && git checkout -- apps/membresias-web/next-env.d.ts && git pull
+```
+
+> **La regla:** lo que compila el servidor no se versiona. Si `git status` en el
+> VPS enseña archivos modificados que nadie tocó a mano, esos son.
+
 ## 5.14 Un aviso fuera de la pantalla es un botón roto
 
 «El botón de quitar miembros no funciona.» No estaba roto: el servidor
