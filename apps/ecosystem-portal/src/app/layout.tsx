@@ -21,10 +21,17 @@ const mono = IBM_Plex_Mono({
   variable: '--font-mono',
 });
 
+/**
+ * La descripción es lo que se lee en Google y en WhatsApp antes de entrar, así
+ * que se somete a la misma regla que la portada: solo lo que el software hace
+ * hoy. La anterior prometía «historial deportivo inmutable», que es de Academy
+ * —una app que existe pero todavía no se ofrece—, y «todo el deporte», que son
+ * tres apps cuando hoy se venden dos.
+ */
 export const metadata: Metadata = {
   title: 'DINAMYT — El ecosistema digital del Hapkido',
   description:
-    'Una sola cuenta para todo el deporte: campeonatos con puntuación en vivo, mensualidades y asistencia del club, e historial deportivo inmutable.',
+    'Una sola cuenta para el club y el campeonato: mensualidades y asistencia con Membresías, y torneos con puntuación en vivo desde el tatami con Campeonatos.',
 };
 
 export default function RootLayout({

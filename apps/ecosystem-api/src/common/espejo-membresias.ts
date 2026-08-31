@@ -99,9 +99,15 @@ async function avisar(ruta: string, cuerpo: Record<string, unknown>): Promise<vo
     // miraba el cuerpo, así que el log quedaba limpio y desde el portal se veía
     // un cambio de rol que había funcionado. **Un aviso que no se aplica tiene
     // que dejar rastro**, o se depura mirando la base a mano.
-    if (datos.encontrada === false) {
+    //
+    // Y el mismo agujero tenía una segunda boca: aquí se miraba `encontrada`, en
+    // femenino, que es lo que contesta `/sync/persona`. `/sync/club` contesta
+    // `encontrado` — es un club, no una ficha—, así que un club sin enlazar
+    // (`orgs.eco_org_id` vacío allí) se tragaba el escudo sin una sola línea en
+    // el registro. Se miran las dos.
+    if (datos.encontrada === false || datos.encontrado === false) {
       log.warn(
-        `${ruta}: Membresías no tiene ninguna ficha para esa persona; la copia no llegó a nadie.`,
+        `${ruta}: Membresías no encontró a quién copiarle esto —ficha o club sin enlazar—; la copia no llegó a nadie.`,
       );
     } else if (datos.aplicado === false && datos.motivo) {
       log.warn(`${ruta}: Membresías no lo aplicó — ${datos.motivo}`);
