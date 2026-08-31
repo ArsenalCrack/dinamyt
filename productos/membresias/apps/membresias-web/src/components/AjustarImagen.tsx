@@ -37,6 +37,11 @@ import { CARNET_FOTO, type Encuadre, type ImagenAbierta } from '@/lib/imagen';
  *   alejar: a un escudo con el nombre del club escrito alrededor le hace falta
  *   aire, y recortarlo le corta el nombre.
  *
+ * El damero de la transparencia aparece detrás de lo que NO tiene fondo, sea
+ * escudo o foto (`imagen.alfa`, ver `lib/imagen.ts`). Antes lo enseñaba el
+ * escudo y solo el escudo: una foto en PNG sin fondo se veía sobre el gris casi
+ * negro del visor y parecía tener el fondo negro puesto.
+ *
  * El botón de centrar devuelve al encuadre de partida, que es el que hacía la
  * app sola: quien no quiera tocar nada solo tiene que darle a guardar.
  *
@@ -321,7 +326,7 @@ export function AjustarImagen({
         <div
           ref={visorRef}
           className="encuadre-visor"
-          data-logo={esLogo}
+          data-alfa={imagen.alfa}
           style={{ width: visor, height: visor }}
           onPointerDown={alBajar}
           onPointerMove={alMover}

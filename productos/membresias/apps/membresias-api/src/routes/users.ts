@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, ilike, ne, or, sql } from 'drizzle-orm';
+import { and, eq, ilike, ne, or, sql } from 'drizzle-orm';
 import { clubGroups, memberships, orgs, users, type Db } from '@dinamyt/membresias-db';
 import { esStaff, orgDelRequest, requireAuth, requireRole } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
@@ -29,6 +29,7 @@ import {
   mensajeSoloEnElPortal,
 } from '../lib/ecosistema';
 import { leerPagina, patron } from '../lib/paginacion';
+import { ACCESOS, ORDENES, opcion, ordenDeGente } from '../lib/filtros';
 import { todayStr } from '../lib/billing';
 import {
   altaEnDinamyt,
@@ -229,12 +230,20 @@ export async function usersRoutes(app: FastifyInstance) {
   // navegador. Es la parte que no se puede omitir: filtrando en el cliente,
   // buscar solo encontraría a quien ya estuviera descargado, así que el alumno
   // de la página tres sería inencontrable — que es peor que no paginar.
+  //
+  // Y por lo mismo, el resto de los filtros —`role`, `belt`, `acceso`— y el
+  // `orden` viajan también hasta aquí: son lo que la pantalla ofrece para
+  // acomodar la lista, y aplicarlos sobre la página ya recortada acomodaría
+  // veinticinco personas de doscientas. Ver `lib/filtros.ts`.
   app.get('/users', { preHandler: requireRole(['owner', 'staff']) }, async (req, reply) => {
     const orgId = orgDelRequest(req);
     if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
-    const { role, includeInactive } = req.query as {
+    const { role, includeInactive, belt, acceso, orden } = req.query as {
       role?: string;
       includeInactive?: string;
+      belt?: string;
+      acceso?: string;
+      orden?: string;
     };
     const { limit, offset, q } = leerPagina(req.query);
 
@@ -255,7 +264,26 @@ export async function usersRoutes(app: FastifyInstance) {
       // con `?role=owner`.
       conds.push(ne(users.role, 'owner'));
     }
-    if (includeInactive !== '1') conds.push(eq(users.isActive, true));
+    /**
+     * Quién sale según su acceso a la app.
+     *
+     * `includeInactive=1` se sigue entendiendo, y no por nostalgia: es lo que
+     * manda quien ya tenga la pantalla vieja cargada en el navegador cuando se
+     * despliega esto. Da el mismo resultado que `acceso=todos`.
+     *
+     * «Inactivos» a secas es un filtro de verdad y no un descuido: es como el
+     * maestro repasa a quién cortó el acceso y a quién le toca reactivar.
+     */
+    const quienes = opcion(acceso, ACCESOS, includeInactive === '1' ? 'todos' : 'activos');
+    if (quienes === 'activos') conds.push(eq(users.isActive, true));
+    else if (quienes === 'inactivos') conds.push(eq(users.isActive, false));
+
+    // El cinturón se filtra por el nombre EXACTO del catálogo. Uno que no esté
+    // en él no filtra nada: una lista vacía se lee como «este club no tiene
+    // alumnos», y el fallo sería de quien escribió la dirección a mano.
+    const grado = cinturon(belt);
+    if (belt && grado.ok && grado.valor) conds.push(eq(users.belt, grado.valor));
+
     if (q) {
       const p = patron(q);
       conds.push(or(ilike(users.fullName, p), ilike(users.email, p))!);
@@ -267,7 +295,7 @@ export async function usersRoutes(app: FastifyInstance) {
         .select(COLUMNAS_VISTA)
         .from(users)
         .where(donde)
-        .orderBy(asc(users.fullName))
+        .orderBy(...ordenDeGente(opcion(orden, ORDENES, 'nombre')))
         .limit(limit)
         .offset(offset),
       req.db.select({ n: sql<number>`count(*)::int` }).from(users).where(donde),

@@ -31,6 +31,16 @@ import { orgDelRequest, requireClub, requireRole } from '../plugins/auth';
 import { ensureMembership } from '../lib/memberships';
 import { diasDeClase, esDiaClase, lunesDe } from '../lib/schedule';
 import { leerPagina, patron } from '../lib/paginacion';
+import { cinturon } from '../lib/cinturones';
+import {
+  ESTADOS_COBRO,
+  ORDENES_ROSTER,
+  enLista,
+  fueraDeLista,
+  opcion,
+  opcionOpcional,
+  ordenDeGente,
+} from '../lib/filtros';
 import { columnaImagenLigera, direccionFoto } from '../lib/imagenes';
 import {
   LIMITES,
@@ -247,7 +257,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
   // ── GET /memberships — roster del club, por páginas (owner/staff) ─────────
   //
   // Responde `{ items, total }`. Acepta `q` (nombre o correo), `limit`,
-  // `offset` y `userId`.
+  // `offset`, `userId`, `groupId`, `belt`, `estado` (de cobro) y `orden`.
   //
   // Dos avisos sobre el filtrado, porque los dos eran errores de verdad:
   //
@@ -270,7 +280,20 @@ export async function membershipsRoutes(app: FastifyInstance) {
 
       const db = req.db;
       const { limit, offset, q } = leerPagina(req.query);
-      const { userId, groupId } = req.query as { userId?: string; groupId?: string };
+      const {
+        userId,
+        groupId,
+        belt,
+        estado: cobro,
+        orden,
+      } = req.query as {
+        userId?: string;
+        groupId?: string;
+        belt?: string;
+        estado?: string;
+        orden?: string;
+      };
+      const today = todayStr();
 
       const conds = [
         eq(users.orgId, orgId),
@@ -278,6 +301,10 @@ export async function membershipsRoutes(app: FastifyInstance) {
         eq(users.role, 'student' as const),
       ];
       if (userId) conds.push(eq(users.id, userId));
+      // El cinturón, por el nombre exacto del catálogo. Uno inventado no filtra
+      // nada: una lista vacía se leería como «este club no tiene alumnos».
+      const grado = cinturon(belt);
+      if (belt && grado.ok && grado.valor) conds.push(eq(users.belt, grado.valor));
       if (q) {
         const p = patron(q);
         conds.push(or(ilike(users.fullName, p), ilike(users.email, p))!);
@@ -313,7 +340,77 @@ export async function membershipsRoutes(app: FastifyInstance) {
             : inArray(users.id, enGrupo),
         );
       }
+
+      /**
+       * Filtrar por estado de cobro: al día, por vencer, vencido, sin plan.
+       *
+       * **El estado no es una columna.** Sale de mirar la fecha de vencimiento
+       * Y el saldo de clases contra el día de hoy, y de quedarse con la mejor
+       * de las dos coberturas (ver `estado` en `lib/billing.ts`). Escrito otra
+       * vez en SQL estaría en dos sitios, y el día que cambie la ventana de
+       * aviso —hoy, tres días— la etiqueta de la fila y el filtro que la
+       * encuentra dejarían de decir lo mismo.
+       *
+       * Así que se leen las membresías del club —una fila corta por alumno, sin
+       * fotos— y decide la MISMA función que después pinta cada fila. Es una
+       * consulta de más, y solo cuando el filtro está puesto; a cambio, lo que
+       * el filtro promete y lo que la pantalla enseña no pueden discrepar.
+       *
+       * «Sin plan» incluye a quien no tiene NI FILA de membresía: es el alumno
+       * recién inscrito al que todavía no se le ha puesto nada, y es justo a
+       * quien se busca con ese filtro.
+       */
+      const estadoPedido = opcionOpcional(cobro, ESTADOS_COBRO);
+      if (estadoPedido) {
+        const coberturas = await db
+          .select({
+            userId: memberships.userId,
+            venceEl: memberships.venceEl,
+            clasesRestantes: memberships.clasesRestantes,
+          })
+          .from(memberships)
+          .where(eq(memberships.orgId, orgId));
+        const coinciden = coberturas
+          .filter((m) => estado(m, today) === estadoPedido)
+          .map((m) => m.userId);
+        conds.push(
+          estadoPedido === 'sin_plan'
+            ? or(
+                enLista(users.id, coinciden),
+                fueraDeLista(
+                  users.id,
+                  coberturas.map((m) => m.userId),
+                ),
+              )!
+            : enLista(users.id, coinciden),
+        );
+      }
+
       const donde = and(...conds);
+
+      /**
+       * El orden. Por nombre salvo que pidan otro; «vence» es el que más falta
+       * hace, porque es «quién debe primero».
+       *
+       * El vencimiento vive en la membresía y no en `users`, así que se mira
+       * con una subconsulta y no con un JOIN — por lo mismo que el filtro de
+       * clase de aquí arriba: la página se cuenta sobre `users` y un JOIN
+       * obligaría a que la consulta de la cuenta hiciera exactamente lo mismo
+       * para no descuadrar.
+       *
+       * `nulls last`: el alumno sin fecha —el de las clases sueltas, el recién
+       * inscrito— no encabeza la lista de quién debe.
+       */
+      const ordenPedido = opcion(orden, ORDENES_ROSTER, 'nombre');
+      const ordenar =
+        ordenPedido === 'vence'
+          ? [
+              sql`(select ${memberships.venceEl} from ${memberships}
+                   where ${memberships.userId} = ${users.id}
+                     and ${memberships.orgId} = ${orgId}) asc nulls last`,
+              asc(users.fullName),
+            ]
+          : ordenDeGente(ordenPedido);
 
       // Las columnas van explícitas por la foto: con `select()` a secas, un
       // club de 200 alumnos arrastraba su retrato entero —decenas de KB por
@@ -332,7 +429,7 @@ export async function membershipsRoutes(app: FastifyInstance) {
           })
           .from(users)
           .where(donde)
-          .orderBy(asc(users.fullName))
+          .orderBy(...ordenar)
           .limit(limit)
           .offset(offset),
         db.select({ n: sql<number>`count(*)::int` }).from(users).where(donde),
@@ -349,7 +446,6 @@ export async function membershipsRoutes(app: FastifyInstance) {
             .where(and(eq(memberships.orgId, orgId), inArray(memberships.userId, ids)))
         : [];
       const byUser = new Map(local.map((m) => [m.userId, m]));
-      const today = todayStr();
 
       // El NOMBRE de la clase, no solo su id: la lista lo enseña en cada fila, y
       // sin esto la pantalla tendría que pedir las clases por su cuenta para

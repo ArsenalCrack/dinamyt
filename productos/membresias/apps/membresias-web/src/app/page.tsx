@@ -7,12 +7,14 @@ import { api, mensajeError } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda } from '@/lib/formato';
+import { CINTURONES, cinturonPorNombre, fondoCinturon } from '@/lib/cinturones';
+import { useFiltros } from '@/lib/preferencias';
 import { Avatar } from '@/components/Avatar';
 import { CampoImagen } from '@/components/CampoImagen';
 import { Cinturon } from '@/components/Cinturon';
+import { Filtros, type GrupoFiltro } from '@/components/Filtros';
 import { LogoClub } from '@/components/LogoClub';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
-import { SelectMenu } from '@/components/SelectMenu';
 import { avisoError, avisoInfo, avisoOk } from '@/lib/toast';
 
 interface RosterItem {
@@ -63,6 +65,44 @@ interface Attendance {
   total: number;
 }
 
+/**
+ * Cómo se mira el roster cuando nadie ha tocado nada: el club entero, por
+ * nombre. Es también a lo que vuelve «Quitar todos».
+ */
+const FILTROS_INICIALES = { clase: '', estado: '', cinturon: '', orden: 'nombre' };
+
+/** Los órdenes que entiende `GET /memberships` (ver `lib/filtros.ts` en la API). */
+const ORDENES = [
+  'nombre',
+  'nombre_desc',
+  'vence',
+  'cinturon',
+  'cinturon_desc',
+  'reciente',
+  'antiguo',
+];
+const ESTADOS = ['al_dia', 'por_vencer', 'vencido', 'sin_plan'];
+
+/**
+ * Lo guardado, puesto en su sitio.
+ *
+ * Viene de `localStorage`, o sea de una versión anterior de esta pantalla y de
+ * un texto que cualquiera puede editar a mano. Un orden que ya no existe no
+ * puede dejar el desplegable en blanco ni la lista vacía: se vuelve a lo de
+ * siempre y no se le dice nada a nadie, porque no ha pasado nada.
+ *
+ * La CLASE no se comprueba aquí: cuáles existen se sabe cuando llegan las del
+ * club, y de eso se encarga un efecto más abajo.
+ */
+function normalizar(f: typeof FILTROS_INICIALES): typeof FILTROS_INICIALES {
+  return {
+    clase: f.clase,
+    estado: ESTADOS.includes(f.estado) ? f.estado : '',
+    cinturon: cinturonPorNombre(f.cinturon) ? f.cinturon : '',
+    orden: ORDENES.includes(f.orden) ? f.orden : 'nombre',
+  };
+}
+
 export default function Panel() {
   const router = useRouter();
   const { t, idioma } = useI18n();
@@ -81,8 +121,19 @@ export default function Panel() {
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [cumples, setCumples] = useState<Cumple[]>([]);
   const [clases, setClases] = useState<Clase[]>([]);
-  /** Qué clase se está mirando. '' = todas. */
-  const [clase, setClase] = useState('');
+  /**
+   * Con qué se está mirando el roster: clase, estado de cobro, cinturón y
+   * orden. Se recuerda de una visita a la siguiente, por persona y por
+   * pantalla (ver `lib/preferencias.ts`); `listo` avisa de cuándo se acabó de
+   * leer lo guardado, para no pedirle a la API una lista con los filtros de
+   * nadie y otra medio segundo después con los de verdad.
+   */
+  const { filtros, cambiar, limpiar, listo } = useFiltros(
+    'panel',
+    FILTROS_INICIALES,
+    user?.id,
+    normalizar,
+  );
   /** Solo para fallos al CARGAR el panel; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -90,12 +141,18 @@ export default function Panel() {
   const cargar = useCallback(async () => {
     try {
       const [r, rev, ov, at, cum] = await Promise.all([
+        // Todo lo que se elige arriba viaja: el listado va por páginas, así
+        // que filtrar u ordenar aquí acomodaría veinticinco alumnos de
+        // doscientos. Ver `lib/filtros.ts` en la API.
         api.get<{ items: RosterItem[]; total: number }>('/memberships', {
           params: {
             limit: POR_PAGINA,
             offset,
             ...(buscado ? { q: buscado } : {}),
-            ...(clase ? { groupId: clase } : {}),
+            ...(filtros.clase ? { groupId: filtros.clase } : {}),
+            ...(filtros.estado ? { estado: filtros.estado } : {}),
+            ...(filtros.cinturon ? { belt: filtros.cinturon } : {}),
+            orden: filtros.orden,
           },
         }),
         api.get<Revenue>('/reports/revenue'),
@@ -114,11 +171,23 @@ export default function Panel() {
     } finally {
       setCargando(false);
     }
-  }, [offset, buscado, clase, t]);
+  }, [offset, buscado, filtros, t]);
 
   useEffect(() => {
-    setOffset(0); // buscar o cambiar de clase empieza por el principio
-  }, [buscado, clase]);
+    setOffset(0); // buscar o cambiar un filtro empieza por el principio
+  }, [buscado, filtros]);
+
+  /**
+   * La clase guardada que ya no existe.
+   *
+   * El maestro puede borrar una clase, y el filtro se quedaría apuntando a
+   * ella: un roster vacío sin nada que explique por qué. Se quita en cuanto se
+   * sabe cuáles hay de verdad.
+   */
+  useEffect(() => {
+    if (!filtros.clase || filtros.clase === 'ninguna' || clases.length === 0) return;
+    if (!clases.some((c) => c.id === filtros.clase)) cambiar({ clase: '' });
+  }, [clases, filtros.clase, cambiar]);
 
   useEffect(() => {
     const id = setTimeout(() => setBuscado(busqueda.trim()), 300);
@@ -136,6 +205,9 @@ export default function Panel() {
       router.replace(rutaInicio(user));
       return;
     }
+    // Sin los filtros guardados todavía leídos no se pide nada: la primera
+    // lista sería la de nadie, y se vería cambiar sola un instante después.
+    if (!listo) return;
     void cargar();
     // Las clases del club van aparte: no cambian entre búsquedas ni entre
     // páginas, así que no tienen por qué viajar con cada recarga del roster.
@@ -143,7 +215,7 @@ export default function Panel() {
       .get<{ grupos: Clase[] }>('/schedule')
       .then((r) => setClases(r.data.grupos ?? []))
       .catch(() => setClases([]));
-  }, [cargandoSesion, user, esStaff, router, cargar]);
+  }, [cargandoSesion, user, esStaff, router, cargar, listo]);
 
   /**
    * El escudo del club. Se refresca la sesión y no la pantalla: el club viaja
@@ -198,6 +270,81 @@ export default function Panel() {
 
   /** Para marcar la fila con el 🎂 sin recorrer la lista en cada alumno. */
   const cumpleHoy = new Set(cumples.map((c) => c.userId));
+
+  /**
+   * Lo que ofrece la barra de arriba.
+   *
+   * El estado de cobro va como fichas y no como desplegable a propósito: es el
+   * filtro que se usa todos los días —«¿quién debe?»— y verlo abierto ahorra
+   * dos toques cada vez. Los cinturones son once y las clases pueden ser
+   * cuatro: esos sí van plegados.
+   */
+  const grupos: GrupoFiltro[] = [
+    {
+      clave: 'estado',
+      etiqueta: t('filtros.pago'),
+      valor: filtros.estado,
+      onChange: (v) => cambiar({ estado: v }),
+      tipo: 'chips',
+      ancho: true,
+      opciones: [
+        { valor: '', etiqueta: t('filtros.todos') },
+        { valor: 'al_dia', etiqueta: t('estado.al_dia') },
+        { valor: 'por_vencer', etiqueta: t('estado.por_vencer') },
+        { valor: 'vencido', etiqueta: t('estado.vencido') },
+        { valor: 'sin_plan', etiqueta: t('estado.sin_plan') },
+      ],
+    },
+    // El filtro por clase solo se dibuja si hay clases: en un club sin dividir
+    // sería un desplegable con una sola opción.
+    ...(clases.length > 0
+      ? [
+          {
+            clave: 'clase',
+            etiqueta: t('grupos.asignar'),
+            valor: filtros.clase,
+            onChange: (v: string) => cambiar({ clase: v }),
+            tipo: 'menu' as const,
+            opciones: [
+              { valor: '', etiqueta: t('grupos.todas') },
+              ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
+              { valor: 'ninguna', etiqueta: t('grupos.sinAsignar') },
+            ],
+          },
+        ]
+      : []),
+    {
+      clave: 'cinturon',
+      etiqueta: t('comun.cinturon'),
+      valor: filtros.cinturon,
+      onChange: (v) => cambiar({ cinturon: v }),
+      tipo: 'menu',
+      opciones: [
+        { valor: '', etiqueta: t('filtros.todosCinturones') },
+        ...CINTURONES.map((c) => ({
+          valor: c.nombre,
+          etiqueta: c.nombre,
+          punto: fondoCinturon(c),
+        })),
+      ],
+    },
+    {
+      clave: 'orden',
+      etiqueta: t('filtros.orden'),
+      valor: filtros.orden,
+      onChange: (v) => cambiar({ orden: v }),
+      tipo: 'menu',
+      neutro: 'nombre',
+      opciones: [
+        { valor: 'nombre', etiqueta: t('orden.nombre') },
+        { valor: 'nombre_desc', etiqueta: t('orden.nombre_desc') },
+        { valor: 'vence', etiqueta: t('orden.vence') },
+        { valor: 'cinturon_desc', etiqueta: t('orden.cinturon_desc') },
+        { valor: 'cinturon', etiqueta: t('orden.cinturon') },
+        { valor: 'reciente', etiqueta: t('orden.reciente') },
+      ],
+    },
+  ];
 
   return (
     <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}>
@@ -373,41 +520,16 @@ export default function Panel() {
       </div>
 
       {/* El roster va por páginas, así que necesita buscador SÍ o SÍ: sin él,
-          el alumno de la página tres no aparece por ningún lado. Filtra la
-          API, no el navegador. */}
-      {/* El filtro por clase solo se dibuja si hay clases: en un club sin
-          dividir sería un desplegable con una sola opción. */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          marginBottom: '0.75rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          maxLength={80}
-          placeholder={t('pag.buscarAlumno')}
-          aria-label={t('pag.buscarAlumno')}
-          style={{ flex: '1 1 12rem', margin: 0 }}
-        />
-        {clases.length > 0 && (
-          <div style={{ flex: '0 1 12rem', minWidth: '10rem' }}>
-            <SelectMenu
-              valor={clase}
-              onChange={setClase}
-              etiquetaAria={t('grupos.filtrar')}
-              opciones={[
-                { valor: '', etiqueta: t('grupos.todas') },
-                ...clases.map((c) => ({ valor: c.id, etiqueta: c.name })),
-                { valor: 'ninguna', etiqueta: t('grupos.sinAsignar') },
-              ]}
-            />
-          </div>
-        )}
-      </div>
+          el alumno de la página tres no aparece por ningún lado. Todo lo de
+          esta barra lo resuelve la API, no el navegador. */}
+      <Filtros
+        busqueda={busqueda}
+        onBuscar={setBusqueda}
+        placeholder={t('pag.buscarAlumno')}
+        grupos={grupos}
+        total={totalRoster}
+        onLimpiar={limpiar}
+      />
 
       <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <table>

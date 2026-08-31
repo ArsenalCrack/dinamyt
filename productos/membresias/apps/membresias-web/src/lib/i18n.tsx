@@ -249,7 +249,6 @@ const es = {
   'alumnos.activar': 'Reactivar acceso',
   'alumnos.nuevaContrasena': 'Poner contraseña nueva',
   'alumnos.contrasenaCambiada': 'Contraseña actualizada.',
-  'alumnos.incluirInactivos': 'Ver también los inactivos',
   // El maestro ya no sale en su propia lista (ver `GET /users`): su ficha se
   // abre desde aquí y desde su panel.
   'alumnos.miFicha': 'Mi ficha',
@@ -264,6 +263,32 @@ const es = {
   'pag.verMas': 'Ver más',
   'pag.sinResultados': 'Nadie coincide con esa búsqueda.',
   'pag.buscarAlumno': 'Buscar por nombre o correo',
+
+  // Filtros y orden de los listados (components/Filtros.tsx). Lo que se elige
+  // aquí se guarda por persona y por pantalla: ver lib/preferencias.ts.
+  'filtros.titulo': 'Filtros y orden',
+  'filtros.limpiar': 'Quitar todos',
+  'filtros.quitar': 'Quitar este filtro',
+  'filtros.resultados': 'coinciden',
+  'filtros.seGuardan': 'Lo que elijas aquí se queda puesto para la próxima vez.',
+  'filtros.orden': 'Ordenar por',
+  'filtros.pago': 'Estado de pago',
+  'filtros.acceso': 'Acceso a la app',
+  'filtros.todos': 'Todos',
+  'filtros.todosCinturones': 'Todos los cinturones',
+  'filtros.todosRoles': 'Todos los roles',
+  'acceso.activos': 'Con acceso',
+  'acceso.inactivos': 'Sin acceso',
+  'acceso.todos': 'Todos',
+  // El orden se nombra por lo que el maestro quiere ver, no por la columna:
+  // «quién debe primero» es lo que busca; «vence_el ascendente» es cómo se hace.
+  'orden.nombre': 'Nombre (A–Z)',
+  'orden.nombre_desc': 'Nombre (Z–A)',
+  'orden.cinturon': 'Cinturón (de menor a mayor)',
+  'orden.cinturon_desc': 'Cinturón (de mayor a menor)',
+  'orden.reciente': 'Últimos inscritos',
+  'orden.antiguo': 'Los más antiguos',
+  'orden.vence': 'Quién debe primero',
 
   // Foto de perfil (la misma que va al carnet)
   'foto.poner': 'Poner foto',
@@ -866,7 +891,6 @@ const en: Record<ClaveTexto, string> = {
   'alumnos.activar': 'Re-enable access',
   'alumnos.nuevaContrasena': 'Set a new password',
   'alumnos.contrasenaCambiada': 'Password updated.',
-  'alumnos.incluirInactivos': 'Show inactive too',
   'alumnos.miFicha': 'My record',
   'alumnos.miFichaAyuda':
     'You are not on this list: you are not a student of your own club. Your details and card live in your record.',
@@ -877,6 +901,28 @@ const en: Record<ClaveTexto, string> = {
   'pag.verMas': 'Show more',
   'pag.sinResultados': 'Nobody matches that search.',
   'pag.buscarAlumno': 'Search by name or email',
+
+  'filtros.titulo': 'Filters & sorting',
+  'filtros.limpiar': 'Clear all',
+  'filtros.quitar': 'Remove this filter',
+  'filtros.resultados': 'match',
+  'filtros.seGuardan': 'What you pick here stays set for next time.',
+  'filtros.orden': 'Sort by',
+  'filtros.pago': 'Payment status',
+  'filtros.acceso': 'App access',
+  'filtros.todos': 'All',
+  'filtros.todosCinturones': 'All belts',
+  'filtros.todosRoles': 'All roles',
+  'acceso.activos': 'With access',
+  'acceso.inactivos': 'No access',
+  'acceso.todos': 'All',
+  'orden.nombre': 'Name (A–Z)',
+  'orden.nombre_desc': 'Name (Z–A)',
+  'orden.cinturon': 'Belt (lowest first)',
+  'orden.cinturon_desc': 'Belt (highest first)',
+  'orden.reciente': 'Newest members',
+  'orden.antiguo': 'Longest-standing',
+  'orden.vence': 'Who owes first',
 
   'foto.poner': 'Add photo',
   'foto.cambiar': 'Change photo',
