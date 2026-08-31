@@ -109,6 +109,7 @@ const es = {
   'comun.confirmar': '¿Seguro?',
   'comun.volver': '← Volver',
   'comun.cerrar': 'Cerrar',
+  'comun.copiarEnlace': 'Copiar el enlace',
   'comun.imprimir': 'Imprimir',
   'comun.fecha': 'Fecha',
   'comun.opcional': 'opcional',
@@ -236,6 +237,11 @@ const es = {
     'No puedes cortarte el acceso a ti mismo: el club se quedaría sin maestro.',
   'alumnos.contrasenaInicial': 'Contraseña inicial',
   'alumnos.contrasenaAyuda': 'Mínimo 8 caracteres. Se la entregas al alumno.',
+  // El club vive dentro de DINAMYT: aquí no se reparten contraseñas.
+  'alumnos.cuentaEnDinamyt':
+    'Su cuenta se crea en DINAMYT y él mismo pone su contraseña: le llega un enlace a ese correo. Puede ser el de su padre o su madre.',
+  'alumnos.enlaceInvitacion':
+    'Aún no sale correo desde el servidor: pásale este enlace para que ponga su contraseña.',
   'alumnos.rolAyuda': 'Alumno, acudiente o auxiliar del club.',
   'alumnos.creado': 'Alumno creado.',
   'alumnos.actualizado': 'Datos actualizados.',
@@ -739,6 +745,7 @@ const en: Record<ClaveTexto, string> = {
   'comun.confirmar': 'Are you sure?',
   'comun.volver': '← Back',
   'comun.cerrar': 'Close',
+  'comun.copiarEnlace': 'Copy the link',
   'comun.imprimir': 'Print',
   'comun.fecha': 'Date',
   'comun.opcional': 'optional',
@@ -848,6 +855,10 @@ const en: Record<ClaveTexto, string> = {
     "You can't cut off your own access: the club would be left without a master.",
   'alumnos.contrasenaInicial': 'Initial password',
   'alumnos.contrasenaAyuda': 'At least 8 characters. Hand it to the student.',
+  'alumnos.cuentaEnDinamyt':
+    'Their account is created in DINAMYT and they set their own password: a link goes to that address. It can be a parent’s.',
+  'alumnos.enlaceInvitacion':
+    'The server is not sending email yet: pass them this link so they can set their password.',
   'alumnos.rolAyuda': 'Student, guardian or club assistant.',
   'alumnos.creado': 'Student created.',
   'alumnos.actualizado': 'Details updated.',

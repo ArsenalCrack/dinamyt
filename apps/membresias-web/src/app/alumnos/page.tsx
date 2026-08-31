@@ -113,7 +113,18 @@ const VACIO: FormPersona = {
 export default function Alumnos() {
   const router = useRouter();
   const { t } = useI18n();
-  const { user, cargando: cargandoSesion, esStaff, refrescar } = useAuth();
+  const { user, club, cargando: cargandoSesion, esStaff, refrescar } = useAuth();
+  /**
+   * ¿Este club vive dentro de DINAMYT?
+   *
+   * Decide quién crea la CUENTA al dar de alta: estando federado la crea el
+   * portal y la persona pone su propia contraseña con el enlace de invitación;
+   * sola, la crea esta app con la que escriba el maestro. Se mira el club y no
+   * un ajuste global porque es lo que el servidor mira también.
+   */
+  const federado = Boolean(club?.enElEcosistema);
+  /** El enlace de «poner contraseña», cuando el correo no salió. */
+  const [invitacion, setInvitacion] = useState<string | null>(null);
   const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
 
   const [gente, setGente] = useState<Persona[]>([]);
@@ -260,10 +271,15 @@ export default function Alumnos() {
     const alta = editando === 'nuevo';
     try {
       if (editando === 'nuevo') {
-        await api.post('/users', {
+        const { data } = await api.post<{
+          invitacion?: { enviadaPorCorreo: boolean; enlace?: string } | null;
+        }>('/users', {
           fullName: form.fullName,
           email: form.email,
-          password: form.password,
+          // Estando federada, el servidor la rechaza: la contraseña la pone su
+          // dueño en el portal. Mandarla igual sería pedirle al maestro un dato
+          // que no se va a usar.
+          ...(federado ? {} : { password: form.password }),
           phone: form.phone || undefined,
           role: form.role,
           belt: form.belt || undefined,
@@ -272,6 +288,10 @@ export default function Alumnos() {
           ...(form.role === 'student' && form.groupId ? { groupId: form.groupId } : {}),
           ...ficha,
         });
+        // Sin proveedor de correo, el enlace vuelve aquí para que el maestro se
+        // lo pase por WhatsApp. Con el correo funcionando no llega, y quien
+        // inscribe no ve la llave.
+        setInvitacion(data?.invitacion?.enlace ?? null);
       } else {
         // El cinturón y el teléfono viajan aunque estén vacíos: quitarlos es
         // una edición tan válida como ponerlos.
@@ -333,6 +353,37 @@ export default function Alumnos() {
       punto: fondoCinturon(c),
     })),
   ];
+
+  /**
+   * El enlace de «poner contraseña», cuando el correo no ha salido.
+   *
+   * Va fuera del formulario a propósito: el formulario se cierra al crear, y
+   * este enlace es lo único que le queda al maestro para que esa persona pueda
+   * entrar. Perderlo significa volver a invitarla desde el portal.
+   */
+  const avisoInvitacion = invitacion ? (
+    <div
+      className="card"
+      style={{ padding: '0.9rem 1rem', marginBottom: '1.25rem', borderColor: 'var(--acento)' }}
+    >
+      <p style={{ fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+        {t('alumnos.enlaceInvitacion')}
+      </p>
+      <code style={{ fontSize: '0.75rem', wordBreak: 'break-all' }}>{invitacion}</code>
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void navigator.clipboard?.writeText(invitacion)}
+        >
+          {t('comun.copiarEnlace')}
+        </button>
+        <button type="button" className="btn" onClick={() => setInvitacion(null)}>
+          {t('comun.cerrar')}
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   const formulario = (
     <form onSubmit={guardar} className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
@@ -569,7 +620,16 @@ export default function Alumnos() {
           )}
           <Contador valor={form.emergencyPhone} max={LIM.telefono} />
         </label>
-        {editando === 'nuevo' && (
+        {/* La contraseña solo se pide cuando el club va SOLO. Estando dentro de
+            DINAMYT la cuenta nace allí sin contraseña y su dueño pone la suya
+            con el enlace de invitación — el maestro ya no reparte contraseñas,
+            que es la misma regla que rige el cambio de contraseña. */}
+        {editando === 'nuevo' && federado && (
+          <p className="muted" style={{ fontSize: '0.75rem', gridColumn: '1 / -1' }}>
+            {t('alumnos.cuentaEnDinamyt')}
+          </p>
+        )}
+        {editando === 'nuevo' && !federado && (
           <label style={{ display: 'block' }}>
             <Etiqueta obligatorio>{t('alumnos.contrasenaInicial')}</Etiqueta>
             {/* Arranca VISIBLE: el maestro la está fijando y se la tiene que
@@ -651,6 +711,7 @@ export default function Alumnos() {
         </p>
       )}
 
+      {avisoInvitacion}
       {editando && esMaestro && formulario}
 
       <div
