@@ -27,6 +27,14 @@
  *    sin poner — cosa que pasaba de verdad con los escudos, porque un PNG no
  *    tiene calidad que bajar. Ahora se sigue bajando de escalón (y se cambia de
  *    formato) hasta que entra. Ver {@link codificar}.
+ * 3. **La transparencia se conserva, y ya no solo en el escudo.** La foto se
+ *    guardaba SIEMPRE en JPEG, que no tiene canal alfa: a una imagen sin fondo
+ *    —un escudo puesto como foto, un avatar recortado en PNG— se le pintaba un
+ *    relleno por debajo y lo que se guardaba era una foto CON fondo, sin que
+ *    nadie lo hubiera pedido. Ahora se mira si la imagen trae transparencia al
+ *    abrirla ({@link ImagenAbierta.alfa}) y, si la trae, se guarda en PNG o
+ *    WebP sin rellenar nada. Lo demás sigue en JPEG, que para un retrato pesa
+ *    la mitad.
  */
 
 /** Lado del cuadrado final de la foto. 400 px dan ~360 ppp impresos. */
@@ -46,14 +54,18 @@ export const LADO_LOGO = 512;
 export const MAX_CARACTERES = 60_000;
 
 /**
- * El mismo tope para el escudo, pero más holgado.
+ * El mismo tope, más holgado, para todo lo que se guarda CON transparencia.
  *
- * Un escudo se guarda en PNG o WebP para no perder el fondo transparente, y
- * esos formatos pesan más que un JPEG de la misma imagen. Con el tope de la
- * foto, un escudo con degradados o con una foto dentro no entraba ni al tamaño
- * más pequeño y la app lo rechazaba.
+ * Conservar el fondo obliga a PNG o WebP, y esos formatos pesan más que un
+ * JPEG de la misma imagen. Con el tope de la foto, un escudo con degradados o
+ * con una foto dentro no entraba ni al tamaño más pequeño y la app lo
+ * rechazaba.
+ *
+ * Vale para el escudo y también para la foto que llega sin fondo: la API acepta
+ * 90 000 para las dos (`MAX_IMAGEN` en `lib/imagenes.ts`), así que el margen
+ * sigue estando donde estaba.
  */
-export const MAX_CARACTERES_LOGO = 80_000;
+export const MAX_CARACTERES_ALFA = 80_000;
 
 /** Lo más grande que se acepta ABRIR. Por encima, ni se intenta decodificar. */
 export const MAX_ARCHIVO = 20 * 1024 * 1024;
@@ -71,8 +83,8 @@ const TRABAJO = 1600;
 /** Calidades de JPEG que se prueban, de mejor a peor. */
 const CALIDADES = [0.86, 0.78, 0.7, 0.6, 0.5, 0.42];
 
-/** Calidades de WebP para el escudo. Arriba se empieza casi sin pérdida. */
-const CALIDADES_LOGO = [0.94, 0.88, 0.8, 0.7, 0.6, 0.5];
+/** Calidades de WebP cuando hay alfa que conservar. Se empieza casi sin pérdida. */
+const CALIDADES_ALFA = [0.94, 0.88, 0.8, 0.7, 0.6, 0.5];
 
 /**
  * Escalones de tamaño. Se baja de uno en uno hasta que la imagen entra en el
@@ -123,6 +135,12 @@ export interface ImagenAbierta {
   url: string;
   ancho: number;
   alto: number;
+  /**
+   * Si trae fondo transparente. Manda en dos sitios: el editor enseña el damero
+   * en vez de un fondo inventado, y al guardar no se rellena nada por debajo
+   * (ver {@link recortarImagen}).
+   */
+  alfa: boolean;
   cerrar: () => void;
 }
 
@@ -175,6 +193,35 @@ function cargar(url: string): Promise<HTMLImageElement> {
 }
 
 /**
+ * ¿Esta imagen trae fondo transparente?
+ *
+ * Se mira sobre una copia diminuta y no sobre la de trabajo: leer los píxeles
+ * de 1 600 × 1 600 son diez megas de memoria para responder que sí o que no, y
+ * al encoger, un hueco transparente sigue siéndolo —las muestras se promedian,
+ * así que un píxel a medias también cuenta—.
+ *
+ * Ante la duda, opaca: un lienzo «manchado» no se deja leer, y esa excepción no
+ * es motivo para no dejar subir la imagen.
+ */
+function tieneAlfa(fuente: HTMLCanvasElement): boolean {
+  const lado = 96;
+  const f = Math.min(1, lado / Math.max(fuente.width, fuente.height));
+  const sonda = document.createElement('canvas');
+  sonda.width = Math.max(1, Math.round(fuente.width * f));
+  sonda.height = Math.max(1, Math.round(fuente.height * f));
+  const ctx = sonda.getContext('2d');
+  if (!ctx) return false;
+  ctx.drawImage(fuente, 0, 0, sonda.width, sonda.height);
+  try {
+    const { data } = ctx.getImageData(0, 0, sonda.width, sonda.height);
+    for (let i = 3; i < data.length; i += 4) if (data[i] < 250) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Abre el archivo que eligió el usuario y devuelve la copia de trabajo.
  *
  * Aquí NO se recorta nada: eso lo decide después quien esté mirando la imagen.
@@ -206,11 +253,16 @@ export async function abrirImagen(file: File): Promise<ImagenAbierta> {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(fuente, 0, 0, ancho, alto);
 
+    // El alfa se mira AQUÍ, con la copia de trabajo recién dibujada: es el
+    // único momento en que la imagen está en un lienzo y todavía no se ha
+    // decidido en qué formato acabará.
+    const alfa = tieneAlfa(lienzo);
+
     const blob = await new Promise<Blob | null>((r) => lienzo.toBlob(r, 'image/png'));
     if (!blob) throw new ErrorFoto('foto.errorLeer');
     const url = URL.createObjectURL(blob);
     const elemento = await cargar(url);
-    return { elemento, url, ancho, alto, cerrar: () => URL.revokeObjectURL(url) };
+    return { elemento, url, ancho, alto, alfa, cerrar: () => URL.revokeObjectURL(url) };
   } finally {
     if ('close' in fuente) fuente.close();
   }
@@ -221,7 +273,7 @@ function pintar(
   imagen: ImagenAbierta,
   encuadre: Encuadre,
   lado: number,
-  esLogo: boolean,
+  conAlfa: boolean,
 ): HTMLCanvasElement {
   const lienzo = document.createElement('canvas');
   lienzo.width = lado;
@@ -230,10 +282,11 @@ function pintar(
   if (!ctx) throw new ErrorFoto('foto.errorLeer');
   ctx.imageSmoothingQuality = 'high';
 
-  // La foto acaba en JPEG, que no tiene transparencia: sin este fondo, lo que
-  // era transparente saldría negro. El escudo NO se rellena — su fondo
-  // transparente es lo que le deja encajar sobre la cabecera negra del carnet.
-  if (!esLogo) {
+  // Lo que no trae transparencia acaba en JPEG, que no la tiene: sin este
+  // fondo, un hueco del encuadre saldría negro. Lo que SÍ la trae no se rellena
+  // —ni el escudo ni la foto—: ese fondo transparente es lo que les deja
+  // encajar sobre la cabecera negra del carnet y sobre el color de la app.
+  if (!conAlfa) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, lado, lado);
   }
@@ -255,14 +308,15 @@ function pintar(
  * Convierte el lienzo en data-URL, o `null` si a ESE tamaño no hay formato ni
  * calidad que quepa (entonces quien llama baja un escalón).
  *
- * El escudo intenta PNG primero: un escudo plano —dos colores y una silueta—
- * pesa poquísimo en PNG y no pierde ni un píxel. Si no cabe, WebP con alfa, que
- * es lo que salva a los escudos con degradados o con una foto dentro. Si el
- * navegador no sabe WebP, `toDataURL` devuelve un PNG disimulado: por eso se
+ * Con transparencia se intenta PNG primero: un escudo plano —dos colores y una
+ * silueta— pesa poquísimo en PNG y no pierde ni un píxel. Si no cabe, WebP con
+ * alfa, que es lo que salva a los escudos con degradados o con una foto dentro
+ * —y a la foto sin fondo, que es fotografía y en PNG no entra ni de lejos—. Si
+ * el navegador no sabe WebP, `toDataURL` devuelve un PNG disimulado: por eso se
  * comprueba el prefijo en vez de fiarse.
  */
-function codificar(lienzo: HTMLCanvasElement, esLogo: boolean, tope: number): string | null {
-  if (!esLogo) {
+function codificar(lienzo: HTMLCanvasElement, conAlfa: boolean, tope: number): string | null {
+  if (!conAlfa) {
     for (const calidad of CALIDADES) {
       const url = lienzo.toDataURL('image/jpeg', calidad);
       if (url.length <= tope) return url;
@@ -273,7 +327,7 @@ function codificar(lienzo: HTMLCanvasElement, esLogo: boolean, tope: number): st
   const png = lienzo.toDataURL('image/png');
   if (png.length <= tope) return png;
 
-  for (const calidad of CALIDADES_LOGO) {
+  for (const calidad of CALIDADES_ALFA) {
     const url = lienzo.toDataURL('image/webp', calidad);
     if (url.startsWith('data:image/webp') && url.length <= tope) return url;
   }
@@ -293,14 +347,18 @@ export async function recortarImagen(
   variante: 'foto' | 'logo',
 ): Promise<string> {
   const esLogo = variante === 'logo';
+  // La VARIANTE decide el tamaño —el escudo se guarda más grande porque no se
+  // recorta—; la TRANSPARENCIA decide el formato y el peso que se le permite.
+  // Son dos cosas distintas desde que la foto también puede venir sin fondo.
+  const conAlfa = imagen.alfa;
   const escalones = esLogo ? ESCALONES_LOGO : ESCALONES;
-  const tope = esLogo ? MAX_CARACTERES_LOGO : MAX_CARACTERES;
+  const tope = conAlfa ? MAX_CARACTERES_ALFA : MAX_CARACTERES;
 
   for (const lado of escalones) {
-    const url = codificar(pintar(imagen, encuadre, lado, esLogo), esLogo, tope);
+    const url = codificar(pintar(imagen, encuadre, lado, conAlfa), conAlfa, tope);
     if (url) return url;
   }
 
-  const minimo = pintar(imagen, encuadre, escalones[escalones.length - 1], esLogo);
-  return esLogo ? minimo.toDataURL('image/png') : minimo.toDataURL('image/jpeg', 0.4);
+  const minimo = pintar(imagen, encuadre, escalones[escalones.length - 1], conAlfa);
+  return conAlfa ? minimo.toDataURL('image/png') : minimo.toDataURL('image/jpeg', 0.4);
 }

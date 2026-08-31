@@ -16,6 +16,11 @@ necesita ningún otro servicio para funcionar.
   los adultos a las seis— le da a cada clase su horario, su descripción y su
   nota de la semana. El alumno de una no ve la información de la otra. El club
   que no las usa sigue con un solo horario, como siempre.
+- **Filtros que se quedan puestos.** El panel del club y la lista de alumnos
+  se acomodan por estado de pago, clase, cinturón, rol o acceso, y se ordenan
+  por grado, por antigüedad o por quién debe primero. Filtra el servidor —así
+  el alumno de la página tres también aparece— y lo que cada quien elige se
+  recuerda para la próxima vez.
 - **Estadísticas del club.** Recaudo de seis meses, estado de las mensualidades,
   asistencia, planes y cinturones en una sola pantalla.
 - **Cumpleaños.** El panel avisa al maestro el día que alguien cumple años. La

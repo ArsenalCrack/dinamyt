@@ -858,7 +858,12 @@ input[type="password"]::-ms-clear { display: none; }
   max-width: none;
   max-height: none;
 }
-.encuadre-visor[data-logo='true'] {
+/* ── El damero de la transparencia ──
+   Se enseña por lo que TRAE la imagen y no por la variante que se esté
+   subiendo. Antes era del escudo y solo del escudo: una foto en PNG sin fondo
+   se veía sobre el gris casi negro del visor, y quien la subía entendía que la
+   app le había puesto un fondo negro. */
+.encuadre-visor[data-alfa='true'] {
   background-color: #ffffff;
   background-image:
     linear-gradient(45deg, #d8d8e2 25%, transparent 25%),
@@ -1262,6 +1267,204 @@ td.mono, .tabular { font-variant-numeric: tabular-nums; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   BARRA DE FILTROS (<Filtros>)
+   Buscar, filtrar y ordenar un listado. Vive encima de la tabla del panel y
+   de la de alumnos.
+
+   La tarjeta es más clara que la de la tabla a propósito: es un control, no
+   contenido. Y todo lo que se elige aquí se recuerda para la próxima visita
+   (ver lib/preferencias.ts), así que lo puesto tiene que verse SIEMPRE —de ahí
+   las fichas del pie, que se ven con el panel plegado—: una lista corta sin
+   nada que explique por qué es corta se lee como una lista a la que le faltan
+   alumnos.
+   ════════════════════════════════════════════════════════════════════════ */
+.filtros {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: var(--bg-card);
+}
+.filtros-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* La lupa va dentro del campo, no al lado: al lado se lleva una columna de la
+   fila, y en un celular eso es la mitad de lo que se puede escribir. */
+.filtros-buscar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.filtros-buscar svg {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.filtros-buscar input {
+  margin: 0;
+  padding-left: 2.15rem;
+}
+
+.filtros-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.filtros-toggle:hover,
+.filtros-toggle[aria-expanded='true'] {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+/* Cuántos filtros hay puestos. En oro y en mono, como los demás números de la
+   app: se lee de un vistazo desde el otro lado de la mesa. */
+.filtros-cuenta {
+  min-width: 1.15rem;
+  padding: 0 0.32rem;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #14141e;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2rem;
+  text-align: center;
+}
+.filtros-flecha {
+  font-size: 0.7rem;
+  transition: transform 0.18s ease;
+}
+.filtros-flecha[data-abierto='true'] { transform: rotate(180deg); }
+
+.filtros-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+  gap: 0.7rem;
+  padding: 0.7rem 0.15rem 0.1rem;
+  border-top: 1px dashed var(--border);
+  animation: filtros-abre 160ms ease-out;
+}
+.filtros-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+/* Un grupo de chips con cinco opciones no cabe en una columna de 190 px: se
+   queda con la fila entera y las demás se reparten debajo. */
+.filtros-grupo[data-ancho='true'] { grid-column: 1 / -1; }
+.filtros-grupo .eyebrow { margin: 0; }
+
+.filtros-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.filtros-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.33rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.filtros-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.filtros-chip[data-activa='true'] {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+/* El punto del cinturón. El aro oscuro es lo que salva al blanco, que si no
+   desaparece sobre la ficha clara del modo claro. */
+.filtros-punto {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.filtros-nota {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.68rem;
+}
+
+/* ── Lo que hay puesto ──
+   Se ve con el panel plegado, y cada ficha se quita sola al tocarla: quitar un
+   filtro no puede obligar a abrir el panel y buscar cuál era. */
+.filtros-pie {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.1rem;
+}
+.filtros-resumen {
+  margin-right: auto;
+  font-size: 0.72rem;
+}
+.filtros-activo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--gold-dim);
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: var(--text);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.filtros-activo:hover { border-color: var(--gold); }
+.filtros-activo b { font-weight: 700; }
+.filtros-activo span[aria-hidden] { color: var(--gold); font-size: 0.66rem; }
+.filtros-limpiar {
+  padding: 0.25rem 0.35rem;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@keyframes filtros-abre {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════

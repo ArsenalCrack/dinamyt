@@ -23,6 +23,12 @@ import { VisorImagen } from './VisorImagen';
  * hace otra cosa: ahí el anidado no es HTML válido y el toque se reparte entre
  * dos acciones. Por eso el chip de la barra, que ES el botón del menú, lleva su
  * avatar normal y el ampliable está en el panel que se abre.
+ *
+ * **Detrás de la foto no se pinta nada.** Desde que una foto puede guardarse
+ * sin fondo (`lib/imagen.ts`), ese relleno tapaba justo lo que se quería
+ * conservar: un PNG recortado salía metido en un disco oscuro, como si el
+ * fondo negro fuera parte de la foto. El aro dorado sigue, que es borde y no
+ * fondo; el color solo lo llevan las iniciales, que no son una imagen.
  */
 export function Avatar({
   src,
@@ -66,7 +72,6 @@ export function Avatar({
           objectFit: 'cover',
           border: '1.5px solid var(--gold-dim)',
           flexShrink: 0,
-          background: 'var(--bg-elevated, rgba(255,255,255,0.05))',
         }}
       />
     );

@@ -19,6 +19,12 @@ import { VisorImagen } from './VisorImagen';
  * ve si el escudo quedó centrado y si se lee el nombre del club: a 46 píxeles
  * no se distingue. Solo cuando el club tiene el SUYO — ampliar el logo de la
  * aplicación no le enseña nada a nadie.
+ *
+ * **El escudo no lleva recuadro debajo.** Llevaba fondo y borde, y con un
+ * escudo transparente —que es como llega casi siempre— eso se veía como un
+ * cuadrado oscuro pintado alrededor: el fondo que la app se toma el trabajo de
+ * conservar al guardarlo (ver `lib/imagen.ts`) volvía a aparecer al enseñarlo.
+ * Queda el aire de la sangría, para que no se pegue a lo que tiene al lado.
  */
 export function LogoClub({
   src,
@@ -51,8 +57,7 @@ export function LogoClub({
         height: size,
         objectFit: 'contain',
         borderRadius: propio ? '0.6rem' : 0,
-        border: propio ? '1px solid var(--border)' : 0,
-        background: propio ? 'var(--bg-elevated)' : 'transparent',
+        background: 'transparent',
         padding: propio ? '0.25rem' : 0,
         flexShrink: 0,
       }}

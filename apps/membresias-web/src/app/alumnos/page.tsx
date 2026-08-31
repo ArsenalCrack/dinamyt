@@ -17,7 +17,8 @@ import {
   soloTelefono,
   telefonoValido,
 } from '@/lib/campos';
-import { CINTURONES, fondoCinturon } from '@/lib/cinturones';
+import { CINTURONES, cinturonPorNombre, fondoCinturon } from '@/lib/cinturones';
+import { useFiltros } from '@/lib/preferencias';
 import { avisoError, avisoOk } from '@/lib/toast';
 import { Avatar } from '@/components/Avatar';
 import { CampoContrasena } from '@/components/CampoContrasena';
@@ -25,6 +26,7 @@ import { CampoFecha } from '@/components/CampoFecha';
 import { Cinturon } from '@/components/Cinturon';
 import { Contador } from '@/components/Contador';
 import { Etiqueta, LeyendaObligatorios } from '@/components/Etiqueta';
+import { Filtros, type GrupoFiltro } from '@/components/Filtros';
 import { SelectMenu } from '@/components/SelectMenu';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 
@@ -103,6 +105,36 @@ const VACIO: FormPersona = {
 };
 
 /**
+ * Cómo se mira la lista cuando nadie ha tocado nada: quien tiene acceso, por
+ * nombre. Es también a lo que vuelve «Quitar todos».
+ *
+ * Que el punto de partida sea «con acceso» y no «todos» no es un filtro
+ * escondido: la lista es la del club de hoy, y a quien se le cortó el acceso se
+ * le busca a propósito. Por eso está a un toque y se ve puesto cuando lo está.
+ */
+const FILTROS_INICIALES = { rol: '', acceso: 'activos', cinturon: '', orden: 'nombre' };
+
+/** Lo que entiende `GET /users` (ver `lib/filtros.ts` en la API). */
+const ORDENES = ['nombre', 'nombre_desc', 'cinturon', 'cinturon_desc', 'reciente', 'antiguo'];
+const ACCESOS = ['activos', 'inactivos', 'todos'];
+const ROLES_FILTRO = ['student', 'guardian', 'staff'];
+
+/**
+ * Lo guardado, puesto en su sitio: viene de `localStorage`, o sea de una
+ * versión anterior de esta pantalla y de un texto que cualquiera puede editar a
+ * mano. Un valor que ya no existe vuelve al de siempre sin decir nada, en vez
+ * de dejar un desplegable en blanco o una lista vacía.
+ */
+function normalizar(f: typeof FILTROS_INICIALES): typeof FILTROS_INICIALES {
+  return {
+    rol: ROLES_FILTRO.includes(f.rol) ? f.rol : '',
+    acceso: ACCESOS.includes(f.acceso) ? f.acceso : 'activos',
+    cinturon: cinturonPorNombre(f.cinturon) ? f.cinturon : '',
+    orden: ORDENES.includes(f.orden) ? f.orden : 'nombre',
+  };
+}
+
+/**
  * Gente del club, a cargo del maestro. Aquí nacen las cuentas: no hay registro
  * abierto en la app, así que esta pantalla es la puerta de entrada del alumno.
  *
@@ -139,7 +171,18 @@ export default function Alumnos() {
   const [clases, setClases] = useState<Clase[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [incluirInactivos, setIncluirInactivos] = useState(false);
+  /**
+   * Con qué se está mirando la lista: rol, acceso, cinturón y orden. Se
+   * recuerda de una visita a la siguiente, por persona y por pantalla (ver
+   * `lib/preferencias.ts`); `listo` avisa de cuándo se acabó de leer lo
+   * guardado, para no pedir una primera lista con los filtros de nadie.
+   */
+  const { filtros, cambiar, limpiar, listo } = useFiltros(
+    'alumnos',
+    FILTROS_INICIALES,
+    user?.id,
+    normalizar,
+  );
   const [busqueda, setBusqueda] = useState('');
   /**
    * La búsqueda que de verdad viajó a la API.
@@ -160,10 +203,16 @@ export default function Alumnos() {
 
   const cargar = useCallback(async () => {
     try {
+      // Todo lo que se elige arriba viaja: el listado va por páginas, así que
+      // filtrar u ordenar aquí acomodaría veinticinco personas de doscientas.
+      // Ver `lib/filtros.ts` en la API.
       const { data } = await api.get<{ items: Persona[]; total: number }>('/users', {
         params: {
-          ...(incluirInactivos ? { includeInactive: '1' } : {}),
           ...(buscado ? { q: buscado } : {}),
+          ...(filtros.rol ? { role: filtros.rol } : {}),
+          ...(filtros.cinturon ? { belt: filtros.cinturon } : {}),
+          acceso: filtros.acceso,
+          orden: filtros.orden,
           limit: POR_PAGINA,
           offset,
         },
@@ -175,14 +224,14 @@ export default function Alumnos() {
     } finally {
       setCargando(false);
     }
-  }, [incluirInactivos, buscado, offset, t]);
+  }, [filtros, buscado, offset, t]);
 
-  // Al cambiar lo que se busca o el filtro de inactivos se vuelve a la primera
-  // página: quedarse en la página 4 de un resultado de 6 personas deja la
-  // pantalla vacía y parece que la búsqueda no encontró nada.
+  // Al cambiar lo que se busca o un filtro se vuelve a la primera página:
+  // quedarse en la página 4 de un resultado de 6 personas deja la pantalla
+  // vacía y parece que la búsqueda no encontró nada.
   useEffect(() => {
     setOffset(0);
-  }, [buscado, incluirInactivos]);
+  }, [buscado, filtros]);
 
   // Se espera a que deje de escribir antes de preguntarle a la API.
   useEffect(() => {
@@ -200,6 +249,9 @@ export default function Alumnos() {
       router.replace('/mi');
       return;
     }
+    // Sin los filtros guardados todavía leídos no se pide nada: la primera
+    // lista sería la de nadie, y se vería cambiar sola un instante después.
+    if (!listo) return;
     void cargar();
     // Las clases se piden una vez y aparte del listado: cambian de higos a
     // brevas y no tienen por qué viajar en cada búsqueda ni en cada página.
@@ -209,7 +261,7 @@ export default function Alumnos() {
       .get<{ grupos: Clase[] }>('/schedule')
       .then((r) => setClases(r.data.grupos ?? []))
       .catch(() => setClases([]));
-  }, [cargandoSesion, user, esStaff, router, cargar]);
+  }, [cargandoSesion, user, esStaff, router, cargar, listo]);
 
   function abrirAlta() {
     setForm(VACIO);
@@ -345,6 +397,79 @@ export default function Alumnos() {
   // ella, que es justo lo contrario de lo que hace un buscador.
   const visibles = gente;
 
+  /**
+   * Lo que ofrece la barra de arriba.
+   *
+   * El rol y el acceso van como fichas y no como desplegables: son tres o
+   * cuatro opciones cada uno, se leen de un vistazo y se cambian de un toque. El
+   * acceso, además, es de los pocos sitios donde importa VER que está puesto:
+   * la lista de siempre esconde a quien tiene el acceso cortado, y buscar a
+   * alguien que no aparece porque se le desactivó hace tres meses es la clase
+   * de rato perdido que este chip evita.
+   */
+  const grupos: GrupoFiltro[] = [
+    {
+      clave: 'rol',
+      etiqueta: t('comun.rol'),
+      valor: filtros.rol,
+      onChange: (v) => cambiar({ rol: v }),
+      tipo: 'chips',
+      ancho: true,
+      opciones: [
+        { valor: '', etiqueta: t('filtros.todosRoles') },
+        { valor: 'student', etiqueta: t('rol.student') },
+        { valor: 'guardian', etiqueta: t('rol.guardian') },
+        { valor: 'staff', etiqueta: t('rol.staff') },
+      ],
+    },
+    {
+      clave: 'acceso',
+      etiqueta: t('filtros.acceso'),
+      valor: filtros.acceso,
+      onChange: (v) => cambiar({ acceso: v }),
+      tipo: 'chips',
+      ancho: true,
+      neutro: 'activos',
+      opciones: [
+        { valor: 'activos', etiqueta: t('acceso.activos') },
+        { valor: 'inactivos', etiqueta: t('acceso.inactivos') },
+        { valor: 'todos', etiqueta: t('acceso.todos') },
+      ],
+    },
+    {
+      clave: 'cinturon',
+      etiqueta: t('comun.cinturon'),
+      valor: filtros.cinturon,
+      onChange: (v) => cambiar({ cinturon: v }),
+      tipo: 'menu',
+      opciones: [
+        { valor: '', etiqueta: t('filtros.todosCinturones') },
+        ...CINTURONES.map((c) => ({
+          valor: c.nombre,
+          etiqueta: c.nombre,
+          punto: fondoCinturon(c),
+        })),
+      ],
+    },
+    {
+      clave: 'orden',
+      etiqueta: t('filtros.orden'),
+      valor: filtros.orden,
+      onChange: (v) => cambiar({ orden: v }),
+      tipo: 'menu',
+      neutro: 'nombre',
+      opciones: [
+        { valor: 'nombre', etiqueta: t('orden.nombre') },
+        { valor: 'nombre_desc', etiqueta: t('orden.nombre_desc') },
+        { valor: 'cinturon_desc', etiqueta: t('orden.cinturon_desc') },
+        { valor: 'cinturon', etiqueta: t('orden.cinturon') },
+        { valor: 'reciente', etiqueta: t('orden.reciente') },
+        { valor: 'antiguo', etiqueta: t('orden.antiguo') },
+      ],
+    },
+  ];
+
+  /** El desplegable de cinturón DEL FORMULARIO, que no es el del filtro. */
   const opcionesCinturon = [
     { valor: '', etiqueta: t('comun.sinCinturon') },
     ...CINTURONES.map((c) => ({
@@ -714,35 +839,14 @@ export default function Alumnos() {
       {avisoInvitacion}
       {editando && esMaestro && formulario}
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.75rem',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          marginBottom: '0.75rem',
-        }}
-      >
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          maxLength={LIM.busqueda}
-          placeholder={t('pag.buscarAlumno')}
-          aria-label={t('pag.buscarAlumno')}
-          style={{ flex: 1, minWidth: 180 }}
-        />
-        <label
-          className="muted"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
-        >
-          <input
-            type="checkbox"
-            checked={incluirInactivos}
-            onChange={(e) => setIncluirInactivos(e.target.checked)}
-          />
-          {t('alumnos.incluirInactivos')}
-        </label>
-      </div>
+      <Filtros
+        busqueda={busqueda}
+        onBuscar={setBusqueda}
+        placeholder={t('pag.buscarAlumno')}
+        grupos={grupos}
+        total={total}
+        onLimpiar={limpiar}
+      />
 
       <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
         <table>
