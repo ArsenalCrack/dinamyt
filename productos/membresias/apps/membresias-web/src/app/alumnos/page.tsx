@@ -845,6 +845,7 @@ export default function Alumnos() {
         placeholder={t('pag.buscarAlumno')}
         grupos={grupos}
         total={total}
+        plegarCon={offset}
         onLimpiar={limpiar}
       />
 
