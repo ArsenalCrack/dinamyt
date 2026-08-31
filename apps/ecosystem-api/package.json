@@ -30,7 +30,8 @@
     "reconciliar": "node scripts/reconciliar-identidades.mjs",
     "reconciliar:ensayo": "node scripts/probar-reconciliacion.mjs",
     "restaurar:ensayo": "node scripts/probar-restauracion.mjs",
-    "sesion:ensayo": "node scripts/probar-reloj-sesion.mjs"
+    "sesion:ensayo": "node scripts/probar-reloj-sesion.mjs",
+    "zonas:ensayo": "node scripts/probar-zonas.mjs"
   },
   "dependencies": {
     "@dinamyt/shared": "workspace:*",

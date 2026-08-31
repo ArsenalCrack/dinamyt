@@ -17,6 +17,16 @@
  * pasado**. El guard la daba por muerta de inactividad y echaba a quien acababa
  * de escribir su contraseña, diciéndole que llevaba veinte minutos quieto.
  *
+ * ── Qué cambió con la 0012, y por qué esto sigue en pie ────────────────────
+ *
+ * Las columnas de `sessions` ya **no** son `timestamp` sin zona: la migración
+ * `0012_fechas_con_zona` las pasó a `timestamptz` junto con las otras 31 de su
+ * clase, así que el convenio dejó de ser algo que haya que recordar y pasó a
+ * estar en el tipo. Esta prueba se queda igual de necesaria: es la que dice que
+ * el viaje a la base y de vuelta sigue devolviendo el mismo instante **con la
+ * base en una zona que no es UTC**, que es la única condición donde el fallo
+ * aparece. Lo único que se adaptó es cómo se lee el texto (ver `instante`).
+ *
  * ── Por qué es un guion y no una prueba de Jest ────────────────────────────
  *
  * PGlite carga su binario con `import()` dinámico, y Jest lo prohíbe sin
@@ -48,11 +58,31 @@ function comprobar(nombre, condicion, detalle = '') {
   }
 }
 
+/**
+ * El instante que hay detrás de lo que devuelve la base como texto.
+ *
+ * Acepta las dos formas a propósito, porque aquí conviven:
+ *
+ *   · **Con zona** (`…09:12:00-05`) — es lo que devuelven las columnas de
+ *     `sessions` desde la migración 0012, que las pasó a `timestamptz`. El
+ *     desplazamiento viene en dos dígitos y `new Date()` lo exige en cuatro,
+ *     así que se completa; sin eso devuelve `Invalid Date` sin quejarse.
+ *   · **Sin zona** (`…09:12:00`) — el convenio viejo, que es el que sigue
+ *     usando el bloque 3 para reproducir el fallo con `now()::timestamp`.
+ *     Drizzle le pega un `+0000` y la da por UTC.
+ */
+function instante(texto) {
+  const iso = String(texto).replace(' ', 'T');
+  if (/[+-]\d{2}$/.test(iso)) return new Date(`${iso}:00`);
+  if (/([+-]\d{2}:\d{2}|Z)$/.test(iso)) return new Date(iso);
+  return new Date(`${iso}Z`);
+}
+
 /** La misma regla que `juzgarSesion`, en 6 líneas, para no importar TypeScript. */
 function juzgar(s, ahora) {
   if (s.revoked_at) return 'revocada';
-  if (new Date(s.expires_at + 'Z').getTime() <= ahora) return 'caducada';
-  const parado = ahora - new Date(s.last_seen_at + 'Z').getTime();
+  if (instante(s.expires_at).getTime() <= ahora) return 'caducada';
+  const parado = ahora - instante(s.last_seen_at).getTime();
   return parado > INACTIVIDAD_MIN * 60_000 ? 'inactividad' : 'viva';
 }
 
@@ -91,7 +121,7 @@ const { rows: creadas } = await pg.query(
 const s = creadas[0];
 
 const desfaseMin = Math.round(
-  (Date.now() - new Date(s.last_seen_at + 'Z').getTime()) / 60_000,
+  (Date.now() - instante(s.last_seen_at).getTime()) / 60_000,
 );
 comprobar(
   'la fecha que se guarda es la que se lee (desfase de segundos, no de horas)',
@@ -101,7 +131,7 @@ comprobar(
 comprobar('el veredicto es «viva»', juzgar(s, Date.now()) === 'viva', juzgar(s, Date.now()));
 
 const horasRestantes =
-  (new Date(s.expires_at + 'Z').getTime() - Date.now()) / 3600_000;
+  (instante(s.expires_at).getTime() - Date.now()) / 3600_000;
 comprobar(
   `el tope de ${HORAS} h se lee entero, no recortado por la zona`,
   Math.abs(horasRestantes - HORAS) < 0.1,

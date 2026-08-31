@@ -1599,6 +1599,15 @@ que coincide con lo que espera Drizzle. Cuadraba por casualidad.
 **JavaScript**, nunca `DEFAULT now()`. Lo que se escribe desde JS va y vuelve
 en UTC por los dos lados, y la zona de la base deja de importar.
 
+> **Y la regla que la sustituye**, en cuanto se aplique `0012_fechas_con_zona`
+> (escrita y ensayada; §6.1): **la columna lleva zona**. Sobre `timestamptz` lo
+> guardado es un instante, así que `now()` y `new Date()` escriben lo mismo y
+> deja de importar quién la rellene. Recordar un convenio en cada columna es
+> justo lo que falló; el tipo no se olvida.
+>
+> Lo que **no** cambia: una fecha civil —un cumpleaños, el día en que vence una
+> suscripción— no lleva zona ni la quiere. Esas se quedan como están.
+
 En `sessions` las columnas ya **no tienen** `defaultNow()` —ni en el esquema de
 Drizzle ni en la base (migración 0011)—, así que el tipo obliga a dar el valor
 y esto no puede volver por descuido. El ensayo que lo vigila:
@@ -2037,7 +2046,7 @@ de datos o identidad **se hace en septiembre o se hace en noviembre**, y la
 | Cuándo | Qué | Por qué ahí |
 |---|---|---|
 | **Esta semana** | Un **ensayo completo** del camino entero, con datos de verdad | Es lo único que encuentra la siguiente cadena de cuatro eslabones. Ver abajo |
-| **Primera quincena de sept.** | `created_at` → `timestamptz` (§6.1) | Toca ~15 tablas y va con respaldo delante: es exactamente lo que no se hace en octubre |
+| **Primera quincena de sept.** | `created_at` → `timestamptz` (§6.1) — **escrita y ensayada; falta aplicarla** | Toca 16 tablas y va con respaldo delante: es exactamente lo que no se hace en octubre |
 | **Mediados de sept.** | DMARC a `quarantine` (§3.5) | Es una fecha, no una decisión. `reject` **después** del 14 de octubre |
 | **Cuando haya un rato** | El 403 mudo del alumno desactivado (§6.1) · las pruebas del espejo · el `teardown_appcontext` de Flask | Baratos y sueltos: caben entre lo demás |
 | **Desde un celular, hoy** | Instalar la PWA de Membresías y aceptar los avisos (§4.6) | El reloj lleva días disparando a nadie. No se cierra desde el VPS |
@@ -2271,7 +2280,7 @@ mirar.
         Baileys) **no**. Violan los términos y el número acaba bloqueado — el
         del club, que es el que usan para todo.
 
-`[ ]` **Los `created_at` de toda la base van cinco horas desviados en el VPS.**
+`[ ]` **Los `created_at` van cinco horas desviados en el VPS.**
       Es el mismo mecanismo de §5.1-bis, pero en las columnas que solo se
       MUESTRAN: `DEFAULT now()` escribe hora de Bogotá y Drizzle la lee como
       UTC. No rompe ninguna decisión —lo único que comparaba una de estas
@@ -2280,10 +2289,65 @@ mirar.
       registró entre medianoche y las 5 de la mañana aparece con la fecha del
       día anterior en «Miembro desde».
 
-      El arreglo bueno es pasar esas columnas a `timestamptz`, que elimina la
-      clase de fallo entera en vez de taparla. Es una migración que toca ~15
-      tablas, así que va sola y con respaldo delante, no de propina en otro
-      cambio.
+      **La migración está escrita y ensayada; falta aplicarla** *(31 ago 2026)*.
+      Es `0012_fechas_con_zona`, y pasa a `timestamptz` las **35** columnas de
+      instante del esquema `ecosystem`, repartidas en 16 tablas. Eso elimina la
+      clase de fallo entera en vez de taparla: sobre `timestamptz` da igual si
+      el valor lo pone `now()` o un `new Date()`, porque lo guardado es un
+      instante y no una hora de pared. Los `DEFAULT` se quedan — con el tipo
+      bueno vuelven a ser correctos.
+
+      ⚠️ **Lo que a propósito NO convierte: seis columnas.** `birth_date` (en
+      `users` y en `pending_registrations`) y los `starts_at` / `ends_at` de
+      las dos tablas de suscripciones **no son instantes, son días**: se
+      calculan como texto `'YYYY-MM-DD'` en `common/ciclo.ts` y se guardan a
+      medianoche. Un cumpleaños no ocurre a una hora, y una suscripción que
+      vence «el 31» no vence a las 19:00 del 30. Ponerles zona sería cometer el
+      mismo error por el otro lado. Su tipo correcto es `date`, y eso es otra
+      migración con su propio cambio de código.
+
+      **Cada columna lleva su propio `USING`**, y esa es la parte que no se
+      puede improvisar: convertir a secas interpretaría todo con la zona de la
+      sesión, lo que acierta con lo que escribió la base y **estropea lo que
+      escribió la aplicación**, que ya estaba bien. Hubo que auditar quién
+      escribe cada una. Salieron tres grupos —siempre `now()` (Bogotá), siempre
+      `new Date()` (UTC), y los cuatro `updated_at`, que son mixtos porque
+      nacen con el default y se pisan desde la app—. Los mixtos se separan por
+      la distancia a su `created_at`, y funciona porque los dos convenios están
+      cinco horas apartados: dos segundos de umbral deja el corte lejísimos de
+      los dos casos.
+
+      Antes de aplicarla, las tres cosas:
+
+      1. Respaldo delante (`scripts/respaldar-produccion.ps1`) y comprobado
+         (`scripts/verificar-respaldo.ps1`). Reescribe 16 tablas y **no hay
+         vuelta atrás automática**: `timestamptz` → `timestamp` pierde la zona.
+      2. `SHOW timezone;` en la base tiene que decir `America/Bogota`. Todo un
+         grupo depende de eso. Si dijera otra cosa, se cambia el `AT TIME ZONE`
+         del SQL **antes**, no después.
+      3. El ensayo, que levanta PGlite en la zona de Bogotá, fabrica las dos
+         clases de fila, aplica las conversiones y además comprueba que el SQL
+         y el esquema de Drizzle dicen lo mismo columna por columna:
+
+         ```bash
+         cd apps/ecosystem-api && pnpm zonas:ensayo
+         ```
+
+      Y el despliegue es el de §2.3 con su `db:migrar`; no hace falta nada
+      especial más allá del respaldo.
+
+      **Esto cubre `ecosystem` y solo `ecosystem`.** De los otros dos esquemas
+      de la misma base:
+
+      · **Membresías tiene el mismo fallo** y le toca la misma cura, en **su**
+        repositorio (`D:\Repositorios\dinamyt-membresias`): todas sus fechas
+        son `timestamp` sin zona con `defaultNow()`. La que más se nota es
+        `attendances.checked_in_at`, que es la hora que el maestro ve al pasar
+        lista. Va después de esta, con el mismo guion.
+      · **Campeonatos no lo tiene.** Sus modelos usan
+        `default=lambda: datetime.now(timezone.utc)`, que es un default de
+        **Python**, no de la base — no hay un solo `server_default` en el
+        backend—, así que escribe y lee UTC por los dos lados y cuadra.
 
 `[x]` ~~**Campeonatos no lee el `#token=`.**~~ Hecho el 30 de agosto de 2026:
       el salto desde el portal abre sesión sin segunda contraseña, y `dinamyt-combat`

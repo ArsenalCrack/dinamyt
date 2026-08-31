@@ -17,6 +17,35 @@ import {
 // ── Schema de PostgreSQL ───────────────────────────────────────────────────
 const eco = pgSchema('ecosystem');
 
+/**
+ * ── Las fechas de aquí son de DOS clases, y se escriben distinto ───────────
+ *
+ * **Instantes** — cuándo pasó algo: `created_at`, `expires_at`, `paid_at`,
+ * `responded_at`… Llevan `{ withTimezone: true }`, o sea `timestamptz`.
+ * Guardan un punto en el tiempo, no una hora de pared, así que da exactamente
+ * igual si el valor lo pone `DEFAULT now()` (la base, en la zona del VPS) o un
+ * `new Date()` de la aplicación (UTC): los dos escriben el mismo instante y
+ * los dos se leen bien.
+ *
+ * Sin zona no daba igual, y costó un despliegue: la base escribía hora de
+ * Bogotá, Drizzle leía dando por hecho UTC, y toda fila escrita por la base
+ * salía cinco horas en el pasado. En local no se veía porque PGlite arranca en
+ * `GMT` y los dos convenios coincidían de casualidad. El relato entero está en
+ * §5.1-bis de OPERAR; el arreglo, en la migración `0012_fechas_con_zona`.
+ *
+ * **Fechas civiles** — un día del calendario, sin hora: `birth_date`, y los
+ * `starts_at` / `ends_at` de las suscripciones. Se quedan en `timestamp` sin
+ * zona **a propósito**. Un cumpleaños no ocurre a una hora, y una suscripción
+ * que vence «el 31» no vence a las 19:00 del 30; se calculan como texto
+ * 'YYYY-MM-DD' (ver `common/ciclo.ts`) y se guardan a medianoche. Ponerles
+ * zona sería cometer el mismo error por el otro lado. Su tipo correcto es
+ * `date` — pendiente, con su cambio de código, no de propina.
+ *
+ * **La regla para una columna nueva:** ¿se va a comparar con `Date.now()` o a
+ * pintar con una hora? Instante, `withTimezone: true`. ¿Es un día que alguien
+ * escribiría en un formulario? Fecha civil.
+ */
+
 // ── Enums ──────────────────────────────────────────────────────────────────
 export const orgTypeEnum = eco.enum('org_type', [
   'FEDERATION',
@@ -112,8 +141,8 @@ export const organizations = eco.table('organizations', {
    */
   joinCode: varchar('join_code', { length: 12 }).unique(),
   isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: users ───────────────────────────────────────────────────────────
@@ -179,11 +208,11 @@ export const users = eco.table('users', {
    * para saber quién no ha puesto todavía una contraseña propia.
    */
   passwordOrigen: varchar('password_origen', { length: 30 }),
-  dataConsentAt: timestamp('data_consent_at'),
+  dataConsentAt: timestamp('data_consent_at', { withTimezone: true }),
   // ── Anti fuerza-bruta: contador de intentos fallidos y bloqueo temporal ────
   // (el super-admin puede desbloquear desde el panel /admin del portal)
   failedLoginAttempts: integer('failed_login_attempts').default(0),
-  lockedUntil: timestamp('locked_until'),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
   // ── Perfil transversal (lo consume Membresías; §6 PLAN_MEMBRESIAS) ──────────
   emergencyContactName: varchar('emergency_contact_name', { length: 200 }),
   emergencyContactPhone: varchar('emergency_contact_phone', { length: 30 }),
@@ -222,8 +251,8 @@ export const users = eco.table('users', {
    * ha dicho nada.
    */
   timezoneManual: boolean('timezone_manual').default(false),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
 /**
@@ -275,17 +304,17 @@ export const sessions = eco.table(
      * deja de importar. Quitar el default no es cosmética: es lo que impide
      * que el fallo vuelva por descuido.
      */
-    createdAt: timestamp('created_at').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
     /** La última señal de vida. De esto depende el cierre por inactividad. */
-    lastSeenAt: timestamp('last_seen_at').notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
     /**
      * El techo absoluto: pase lo que pase, la sesión muere aquí. Sin él, quien
      * toca la pantalla cada quince minutos no vuelve a escribir su contraseña
      * nunca, y una sesión que no caduca jamás es una contraseña que nadie
      * vuelve a comprobar.
      */
-    expiresAt: timestamp('expires_at').notNull(),
-    revokedAt: timestamp('revoked_at'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
     /**
      * Por qué se cerró. Se guarda para poder DECIRLO —«se cerró porque
      * cambiaste la contraseña»— en vez de devolver a alguien al login sin
@@ -308,9 +337,9 @@ export const otpCodes = eco.table('otp_codes', {
     .references(() => users.id),
   code: varchar('code', { length: 6 }).notNull(),
   type: varchar('type', { length: 30 }).notNull(),
-  expiresAt: timestamp('expires_at').notNull(),
-  usedAt: timestamp('used_at'),
-  createdAt: timestamp('created_at').defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: org_members ─────────────────────────────────────────────────────
@@ -337,7 +366,7 @@ export const orgMembers = eco.table('org_members', {
   roleMembresias: varchar('role_membresias', { length: 50 }),
   roleCampeonatos: varchar('role_campeonatos', { length: 50 }),
   roleAcademy: varchar('role_academy', { length: 50 }),
-  joinedAt: timestamp('joined_at').defaultNow(),
+  joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow(),
   invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
 });
 
@@ -353,8 +382,8 @@ export const userGuardians = eco.table('user_guardians', {
     .notNull()
     .references(() => users.id),
   relationship: varchar('relationship', { length: 50 }),
-  consentAt: timestamp('consent_at'),
-  createdAt: timestamp('created_at').defaultNow(),
+  consentAt: timestamp('consent_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: user_disciplines (grado/cinturón por disciplina) ──────────────────
@@ -369,8 +398,8 @@ export const userDisciplines = eco.table('user_disciplines', {
   discipline: varchar('discipline', { length: 80 }).notNull(),
   currentGrade: varchar('current_grade', { length: 50 }),
   since: date('since'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: subscription_plans ──────────────────────────────────────────────
@@ -383,7 +412,7 @@ export const subscriptionPlans = eco.table('subscription_plans', {
   priceMonthly: decimal('price_monthly', { precision: 10, scale: 2 }),
   priceAnnual: decimal('price_annual', { precision: 10, scale: 2 }),
   isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: subscriptions (organizacionales) ────────────────────────────────
@@ -422,11 +451,11 @@ export const subscriptions = eco.table('subscriptions', {
   // Las dos columnas existen para no repetirse: sin ellas, el disparo diario
   // le manda al maestro el mismo correo cada mañana mientras siga vencido.
   /** Cuándo se le avisó por última vez al maestro. */
-  lastReminderAt: timestamp('last_reminder_at'),
+  lastReminderAt: timestamp('last_reminder_at', { withTimezone: true }),
   /** Qué se le avisó: `POR_VENCER` o `VENCIDA`. */
   lastReminderKind: varchar('last_reminder_kind', { length: 20 }),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: user_subscriptions (personales) ─────────────────────────────────
@@ -444,7 +473,7 @@ export const userSubscriptions = eco.table('user_subscriptions', {
   /** El mismo ciclo que las de organización. Ver `subscriptions`. */
   renewalMonths: integer('renewal_months').default(1),
   anchorDay: integer('anchor_day'),
-  createdAt: timestamp('created_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: subscription_payments (el historial del dinero) ──────────────────
@@ -482,7 +511,7 @@ export const subscriptionPayments = eco.table(
     amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
     /** `efectivo` · `transferencia` · `nequi` · `daviplata` · `otro`. */
     method: varchar('method', { length: 20 }).notNull().default('efectivo'),
-    paidAt: timestamp('paid_at').defaultNow(),
+    paidAt: timestamp('paid_at', { withTimezone: true }).defaultNow(),
     /**
      * Cuántos meses compró este pago. `0` = un abono suelto, que paga deuda
      * pero no mueve la fecha de vencimiento.
@@ -495,7 +524,7 @@ export const subscriptionPayments = eco.table(
       () => users.id,
     ),
     notes: text('notes'),
-    createdAt: timestamp('created_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
   (t) => [
     // Leer el historial de una suscripción es lo único que se hace con esta
@@ -518,8 +547,8 @@ export const orgClubInvitations = eco.table('org_club_invitations', {
     .references(() => organizations.id),
   status: varchar('status', { length: 20 }).notNull().default('PENDIENTE'),
   invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
-  respondedAt: timestamp('responded_at'),
-  createdAt: timestamp('created_at').defaultNow(),
+  respondedAt: timestamp('responded_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: org_join_requests (persona → club, por código) ───────────────────
@@ -547,9 +576,9 @@ export const orgJoinRequests = eco.table(
     status: varchar('status', { length: 20 }).notNull().default('PENDIENTE'),
     /** Lo que escribe quien pide entrar («soy el papá de Ana», «entreno los martes»). */
     note: varchar('note', { length: 300 }),
-    respondedAt: timestamp('responded_at'),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
     respondedByUserId: uuid('responded_by_user_id').references(() => users.id),
-    createdAt: timestamp('created_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
   (t) => [
     // Parcial: una sola solicitud EN ESPERA por persona y club. Sin esto, pulsar
@@ -603,8 +632,8 @@ export const orgInvitations = eco.table(
     /** Lo que le escribe el maestro («eres del grupo de los martes»). */
     note: varchar('note', { length: 300 }),
     invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
-    respondedAt: timestamp('responded_at'),
-    createdAt: timestamp('created_at').defaultNow(),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
   (t) => [
     // Una sola invitación EN ESPERA por correo y club, por lo mismo que en
@@ -626,7 +655,7 @@ export const auditAuth = eco.table('audit_auth', {
   ipAddress: varchar('ip_address', { length: 45 }),
   userAgent: text('user_agent'),
   metadata: text('metadata'),
-  createdAt: timestamp('created_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Tabla: pending_registrations ───────────────────────────────────────────
@@ -663,11 +692,11 @@ export const pendingRegistrations = eco.table('pending_registrations', {
   /** Seis dígitos. El mismo formato que el OTP de recuperar contraseña. */
   code: varchar('code', { length: 6 }).notNull(),
   /** Cuándo caduca el registro entero, no solo el código: son lo mismo. */
-  expiresAt: timestamp('expires_at').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   /** Códigos fallados. Al pasarse del tope, el registro se borra. */
   attempts: integer('attempts').default(0).notNull(),
   /** Veces que se ha mandado el código (el primero cuenta). Anti-abuso. */
   sends: integer('sends').default(1).notNull(),
-  lastSentAt: timestamp('last_sent_at').defaultNow(),
-  createdAt: timestamp('created_at').defaultNow(),
+  lastSentAt: timestamp('last_sent_at', { withTimezone: true }).defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
