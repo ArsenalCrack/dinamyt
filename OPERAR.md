@@ -958,6 +958,63 @@ cambiar el rol desde `/admin` o desde «Mi organización».
 mandando después de la primera vez, que es lo que impide degradar en silencio
 al administrador de un campeonato en marcha. Se cambian en su propia consola.
 
+#### 3 · Y aun avisando, no llegaba a la ficha sin enlazar
+
+*(30 ago, esa misma tarde.)* **Los cuatro avisos del espejo buscan por
+`eco_sub`.** Una ficha creada por su club y nunca enlazada con el ecosistema no
+la encuentra ninguno — ni la foto, ni el escudo, ni la contraseña, ni el rol —
+y como el aviso contestaba `200 {"encontrada": false}` y nadie miraba el
+cuerpo, **el registro quedaba limpio**. Desde el portal se veía un cambio de rol
+que había funcionado.
+
+Dos arreglos, y el segundo importa más que el primero:
+
+| | |
+|---|---|
+| `/sync/rol` busca **también por correo** | Y ata la ficha de paso (`eco_sub`), igual que hace `POST /auth/sso`. Solo sobre una ficha que todavía no tiene enlace, con el `isNull` en el `WHERE` para que dos avisos a la vez no se pisen. **A partir de ahí los otros tres avisos también empiezan a llegarle**: un cambio de rol repara el enlace para todo |
+| Lo que no se aplica **se registra** | `espejo-membresias.ts` mira ahora el cuerpo de la respuesta: si no había ficha, o si Membresías se negó y dijo por qué, sale un `warn` en el log de `dinamyt-id`. Un aviso que no se aplica tiene que dejar rastro |
+
+Y se quitó el veto al superadmin de Membresías: su `role` es lo que se imprime
+en el carnet y se cambia como el de cualquiera. Lo que **nunca** viaja por aquí
+es `is_super_admin`, que se concede a mano y mirando (§1.5).
+
+#### Por qué no llegó: dónde mirar
+
+```bash
+sudo journalctl -u dinamyt-id -n 100 --no-pager | grep -i "sync/rol"
+```
+
+Y la verdad de la base — el enlace y el rol de esa persona a los dos lados:
+
+```bash
+sudo -u postgres psql -d dinamyt -P pager=off -c "select e.email, e.id as eco_id, om.role as rol_portal, om.role_membresias, m.id as ficha, m.eco_sub, m.role as rol_membresias, m.is_super_admin from ecosystem.users e left join ecosystem.org_members om on om.user_id = e.id left join membresias.users m on m.email = e.email where e.email ilike '%CORREO%';"
+```
+
+| Lo que se ve | Qué significa |
+|---|---|
+| `ficha` vacío | Esa persona no existe en Membresías. No hay nada que copiar |
+| `eco_sub` vacío | **La ficha no estaba enlazada.** El siguiente cambio de rol la ata y la aplica |
+| `rol_membresias` distinto de lo traducido | El aviso no llegó: mira el log de arriba |
+
+### Varios maestros en un club, y qué imprime el carnet
+
+**No chocan, y no hay ningún límite.** `membresias.users.role` es una columna
+por persona, sin unicidad: un club puede tener los `owner` que haga falta — de
+hecho la regla del último dueño (§4.7-bis) existe precisamente porque suele
+haber varios.
+
+Dos cosas distintas, que es donde está la confusión:
+
+| En el carnet | De dónde sale |
+|---|---|
+| **El tipo de carnet** («Carnet de maestro», «Carnet de alumno») y la etiqueta del rol | El `role` de **la persona del carnet**. Dos maestros son dos carnets que dicen maestro |
+| **El nombre del maestro** impreso en el carnet de un ALUMNO | `club.ownerName`, y ahí sí se elige **uno**: el `owner` activo más antiguo del club (`order by created_at`, `limit 1`) |
+
+Es decir: el carnet de un alumno nombra al **fundador** del club, no «al que le
+toque». Es estable —no cambia de un día para otro— pero es una elección
+arbitraria: hoy no existe la idea de «maestro principal». Si algún día hace
+falta que sea otro, es un campo en el club, no un accidente de `created_at`.
+
 ## 4.7-bis Nadie se queda sin quien mande, y nadie se echa a sí mismo
 
 `org_members` es lo que decide quién administra una organización: el rol

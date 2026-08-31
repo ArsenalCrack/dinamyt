@@ -54,6 +54,10 @@ interface Respuesta {
   encontrado?: boolean;
   aplicados?: string[];
   rechazados?: { campo: string; motivo: string }[];
+  /** `/sync/rol`: si el cambio llegó a escribirse, y si no, por qué. */
+  aplicado?: boolean;
+  motivo?: string;
+  enlazada?: boolean;
 }
 
 async function avisar(ruta: string, cuerpo: Record<string, unknown>): Promise<void> {
@@ -85,6 +89,25 @@ async function avisar(ruta: string, cuerpo: Record<string, unknown>): Promise<vo
           .map((r) => `${r.campo} (${r.motivo})`)
           .join(', ')}`,
       );
+    }
+
+    // ── El 200 que no hizo nada ──
+    //
+    // Éste es el agujero por el que se cayó el primer intento de copiar el rol:
+    // Membresías no encontraba la ficha —o se negaba a cambiarla— y contestaba
+    // 200 igual, que es lo correcto (no es un error del aviso). Pero aquí no se
+    // miraba el cuerpo, así que el log quedaba limpio y desde el portal se veía
+    // un cambio de rol que había funcionado. **Un aviso que no se aplica tiene
+    // que dejar rastro**, o se depura mirando la base a mano.
+    if (datos.encontrada === false) {
+      log.warn(
+        `${ruta}: Membresías no tiene ninguna ficha para esa persona; la copia no llegó a nadie.`,
+      );
+    } else if (datos.aplicado === false && datos.motivo) {
+      log.warn(`${ruta}: Membresías no lo aplicó — ${datos.motivo}`);
+    }
+    if (datos.enlazada) {
+      log.log(`${ruta}: la ficha de Membresías quedó enlazada con su cuenta del portal.`);
     }
   } catch (e) {
     log.warn(
@@ -212,7 +235,18 @@ export function espejarContrasena(userId: string, passwordHash: string): void {
  * `student` degradaría al azar. Y como todo el espejo, se dispara sin esperarlo
  * y no puede romper el cambio de rol en el portal.
  */
-export function espejarRol(userId: string, rolMembresias: string | null): void {
+export function espejarRol(
+  userId: string,
+  rolMembresias: string | null,
+  email?: string | null,
+): void {
   if (!rolMembresias) return;
-  void avisar('/sync/rol', { ecoSub: userId, role: rolMembresias });
+  // El correo es el plan B: si esa ficha nunca se enlazó con esta cuenta, allá
+  // se la busca por correo y se ata de paso. Sin él, una ficha sin `eco_sub`
+  // es invisible para los cuatro avisos del espejo — y no lo dice nadie.
+  void avisar('/sync/rol', {
+    ecoSub: userId,
+    role: rolMembresias,
+    email: email ?? undefined,
+  });
 }

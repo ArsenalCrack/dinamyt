@@ -621,6 +621,7 @@ export class OrganizationsService {
         espejarRol(
           user.id,
           rolParaApp('membresias', actualizada.roleMembresias, actualizada.role),
+          user.email,
         );
       }
     } else {
@@ -762,9 +763,20 @@ export class OrganizationsService {
     }
     // Y que se entere Membresías, que es donde este cambio no se veía nunca:
     // allí el rol solo se leía al crear la ficha. Ver `espejarRol`.
+    //
+    // El correo cuesta una consulta más en una operación que se hace de vez en
+    // cuando, y es lo que rescata a la ficha que nunca se enlazó: allá se la
+    // busca por él y se ata de paso. Sin eso, esta línea no hacía nada para
+    // toda la gente cuya ficha nació en el club y no en el portal.
+    const [cuenta] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
     espejarRol(
       userId,
       rolParaApp('membresias', result[0].roleMembresias, result[0].role),
+      cuenta?.email,
     );
     return result[0];
   }
