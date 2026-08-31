@@ -528,6 +528,7 @@ export default function Panel() {
         placeholder={t('pag.buscarAlumno')}
         grupos={grupos}
         total={totalRoster}
+        plegarCon={offset}
         onLimpiar={limpiar}
       />
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { LIM } from '@/lib/campos';
 import { SelectMenu } from './SelectMenu';
@@ -52,6 +52,10 @@ export interface GrupoFiltro {
  * - **El panel se abre solo si ya había algo filtrado.** Al volver a la app,
  *   lo primero es ver con qué se está mirando; a partir de ahí se pliega y no
  *   estorba.
+ * - **Y se pliega solo al pasar de página.** Pasar de página es ir a MIRAR la
+ *   lista, y con el panel abierto la mitad de la pantalla son controles y
+ *   debajo caben tres filas. Los filtros no se tocan —siguen puestos, y las
+ *   fichas de abajo los siguen diciendo—: lo que se recoge es el desplegable.
  *
  * El orden va como un grupo más, y cuenta como filtro puesto cuando no es el de
  * siempre: para quien mira la pantalla, «ordenado por quién debe primero» es
@@ -63,6 +67,7 @@ export function Filtros({
   placeholder,
   grupos,
   total,
+  plegarCon,
   onLimpiar,
 }: {
   busqueda: string;
@@ -71,6 +76,13 @@ export function Filtros({
   grupos: GrupoFiltro[];
   /** Cuántas filas hay con estos filtros. Solo se enseña si hay alguno puesto. */
   total?: number;
+  /**
+   * Por dónde va el listado (el `offset` de la paginación). No se dibuja: al
+   * cambiar, el panel se pliega. Es un número y no un aviso de «ciérrate»
+   * porque la pantalla ya lo tiene a mano y así no hay que inventarse una
+   * señal que mantener en dos sitios.
+   */
+  plegarCon?: number;
   onLimpiar: () => void;
 }) {
   const { t } = useI18n();
@@ -80,6 +92,16 @@ export function Filtros({
   // ya están leídos (la pantalla enseña «Cargando…» hasta entonces), así que
   // abrir el panel aquí es abrirlo con lo que de verdad hay puesto.
   const [abierto, setAbierto] = useState(() => puestos.length > 0);
+
+  // Al pasar de página, recoger el panel. Se compara con el valor anterior en
+  // vez de plegar a secas: el efecto también corre al montar, y ahí el panel
+  // acaba de decidir si abrirse por los filtros guardados.
+  const paginaPrevia = useRef(plegarCon);
+  useEffect(() => {
+    if (paginaPrevia.current === plegarCon) return;
+    paginaPrevia.current = plegarCon;
+    setAbierto(false);
+  }, [plegarCon]);
 
   return (
     <section className="filtros">
