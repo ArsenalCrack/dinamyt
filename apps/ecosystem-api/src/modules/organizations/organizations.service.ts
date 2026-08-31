@@ -51,8 +51,27 @@ import { patronBusqueda } from '../../common/busqueda';
 const ROLES_POR_TIPO: Record<string, string[]> = {
   FEDERATION: ['admin', 'judge'],
   LEAGUE: ['admin', 'judge'],
-  CLUB: ['maestro', 'owner', 'staff', 'coach', 'competitor', 'student'],
-  ACADEMY: ['maestro', 'owner', 'staff', 'coach', 'competitor', 'student'],
+  // `guardian` es el acudiente: existe en Membresías desde siempre —es quien
+  // paga y quien recibe los avisos del menor— y aquí faltaba, así que un alta
+  // de acudiente venida de allí se estrellaba contra un 400.
+  CLUB: [
+    'maestro',
+    'owner',
+    'staff',
+    'coach',
+    'competitor',
+    'student',
+    'guardian',
+  ],
+  ACADEMY: [
+    'maestro',
+    'owner',
+    'staff',
+    'coach',
+    'competitor',
+    'student',
+    'guardian',
+  ],
 };
 
 /**
@@ -293,7 +312,10 @@ export class OrganizationsService {
     orgId: string,
     email: string,
     role: string,
-    invitedByUserId: string,
+    // Opcional desde que `POST /sync/alta` la usa: ahí quien invita es el
+    // maestro DESDE MEMBRESÍAS, y puede no tener cuenta en el ecosistema
+    // todavía. La trazabilidad se pierde en ese caso, no la operación.
+    invitedByUserId?: string,
     extra: {
       fullName?: string;
       phone?: string;

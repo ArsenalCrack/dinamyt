@@ -75,8 +75,13 @@ nunca depende de que alguien se acordara de sincronizar.
 
 - **Tocar nada entre el 1 y el 13 de octubre.** Campeonato el 9, 10 y 11.
 - **Desplegar sin respaldo** si la migración toca datos.
-- **Exigir correo para que alguien entre.** Quien no tiene correo usable entra
-  con carnet QR o PIN, y su ficha vive sin cuenta.
+- **Exigir correo para que alguien ENTRE cada día.** El alumno marca asistencia
+  con su carnet QR o su PIN, sin escribir nada. Eso no se toca.
+
+  > **Darse de alta sí pide correo, y es a propósito** *(precisado el 30 ago
+  > 2026)*. El menor usa el de su padre o su madre — es la dirección que se
+  > verifica, y verificarla es el punto: es lo que convierte una fila en una
+  > persona con cuenta. Lo que no se puede es pedirlo para el gesto diario.
 - **Propagar `is_super_admin` automáticamente.** Se concede a mano, mirando.
 - **Dejar a alguien fuera de lo que administra, y menos a sí mismo.** Ya pasó:
   una ✕ en el panel sacó al MAESTRO de su propio club, y el club se quedó sin
@@ -642,14 +647,50 @@ Y solo cambia quién habla primero:
 |---|---|---|
 | **El código del club** (`org_join_requests`) | La persona teclea el código | El maestro, en «Entrada al club» |
 | **La invitación** (`org_invitations`) | El maestro manda un correo | La persona, en su dashboard |
+| **El alta desde Membresías** (`POST /sync/alta`) | El maestro, con el alumno delante | La persona, al poner su contraseña |
 | La reconciliación | — | Nadie: viene de datos que ya existían |
 
-**Ninguno de los dos mete a nadie sin su visto bueno.** La fila de `org_members`
-nace cuando alguien dice que sí, y con ella la ficha de Membresías —que se crea
-sola la primera vez que entre (`lib/aprovisionar.ts` allí)—.
+**Ninguno mete a nadie sin su visto bueno.** La fila de `org_members` nace
+cuando alguien dice que sí, y con ella la ficha de Membresías —que se crea sola
+la primera vez que entre (`lib/aprovisionar.ts` allí)—.
 
 El super-admin sí puede colocar a alguien directo (`POST /organizations/:id/invite`):
 administra el ecosistema entero y a veces tiene que. El maestro no.
+
+### El alta que empieza en Membresías y acaba aquí
+
+*(30 de agosto de 2026.)* El maestro inscribe a su alumno **en su app**, con la
+persona delante, y ese gesto no se le puede quitar: es como se llena un club.
+Lo que sí cambió es qué nace de él.
+
+**Antes:** `POST /users` de Membresías creaba una cuenta **suya** —correo,
+contraseña puesta por el maestro— que no existía en DINAMYT. Dos identidades
+para una persona, y una ficha con `eco_sub` vacío: **la que ninguno de los
+cuatro avisos del espejo alcanza** (§4.7). No le llegaba la foto, ni el
+cinturón, ni la contraseña, ni el rol. Y contradecía la regla que sostiene todo
+esto — las cuentas nacen en el ecosistema.
+
+**Ahora**, con el club federado, ese mismo botón hace dos cosas en orden:
+
+1. Le pide al ecosistema que cree la cuenta y la pertenencia al club
+   (`POST /sync/alta`, con el secreto compartido). Por dentro es **la misma
+   invitación** que manda el maestro desde el portal: misma función, mismas
+   reglas, mismo enlace de «poner contraseña».
+2. Crea la ficha de Membresías **ya enlazada** (`eco_sub` puesto).
+
+| | |
+|---|---|
+| **El orden importa** | Primero allá, después aquí. Al revés, cada vez que el ecosistema no contestara quedaría una ficha suelta — justo lo que se está cerrando. Si el alta de allá falla, aquí no se crea nada y el maestro ve el motivo que dio DINAMYT |
+| **El maestro ya no reparte contraseñas** | La pone su dueño con el enlace de invitación. Es la misma regla que ya regía el cambio de contraseña, aplicada al alta |
+| **Sin correo saliente, el enlace vuelve** | Y la pantalla de alumnos lo enseña para pasarlo por WhatsApp (§3). Con el correo funcionando, quien inscribe no ve la llave |
+| **`owner` no viaja por esa puerta** | El dueño de un club no se da de alta desde el formulario de alumnos, y repartir el mando de un club por una ruta de servidor a servidor no es algo que deba poder pasar |
+| **Se añadió `guardian` al catálogo del club** | El acudiente existía en Membresías desde siempre y aquí faltaba: un alta de acudiente se estrellaba contra un 400 |
+
+> **Membresías sola sigue creando la cuenta ella.** Sin `ECOSYSTEM_JWKS_URL` no
+> hay portal al que pedirle nada: el producto independiente y **el modo del día
+> del campeonato** funcionan exactamente como antes, con la contraseña que ponga
+> el maestro. Es la misma marcha atrás de §4.13, y por eso `POST /users` no se
+> retira: cambia de comportamiento según haya ecosistema o no.
 
 ## 4.5 Las suscripciones se renuevan, no se recrean
 
@@ -1259,6 +1300,12 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 > todos con la cabecera `x-dinamyt-sync`. Viven en
 > `common/espejo-membresias.ts` y los recibe `membresias-api`. Qué lleva cada
 > uno y qué NO: §4.7.
+>
+> **Y una de vuelta:** `POST /sync/alta` es la única ruta de ESTA API que no
+> pide sesión — la abre el mismo secreto compartido, y sin él responde 404. Es
+> Membresías dando de alta a alguien en su club (§4.4). Vive en
+> `modules/sync/`, aparte del controlador de organizaciones, para no dejar una
+> ruta sin sesión en medio de treinta que sí la exigen.
 
 > **Las dos rutas de afiliar, que son distintas a propósito:**
 > `POST /organizations/:id/invitar-club` la usa el `admin` de la federación y

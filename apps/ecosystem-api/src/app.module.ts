@@ -7,6 +7,7 @@ import { UsersModule } from './modules/users/users.module';
 import { UserProfileModule } from './modules/users/user-profile.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { SyncModule } from './modules/sync/sync.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     UserProfileModule,
     OrganizationsModule,
     SubscriptionsModule,
+    SyncModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

@@ -10,7 +10,7 @@
  * Un caso por app y por rol es barato; descubrirlo otra vez en producción, no.
  */
 
-import { rolParaApp } from './roles-por-app';
+import { rolGeneralDesdeMembresias, rolParaApp } from './roles-por-app';
 
 describe('El rol general traducido a Membresías', () => {
   it('el maestro del dojang es el dueño de su club', () => {
@@ -86,5 +86,26 @@ describe('Sin rol general no hay nada que traducir', () => {
 
   it('un rol desconocido tampoco se adivina', () => {
     expect(rolParaApp('membresias', null, 'sensei')).toBeNull();
+  });
+});
+
+describe('El camino de vuelta: Membresías da de alta en un club', () => {
+  it('los tres roles que el maestro reparte existen igual aquí', () => {
+    expect(rolGeneralDesdeMembresias('student')).toBe('student');
+    expect(rolGeneralDesdeMembresias('staff')).toBe('staff');
+    // El acudiente faltaba en el catálogo de CLUB y su alta daba 400.
+    expect(rolGeneralDesdeMembresias('guardian')).toBe('guardian');
+  });
+
+  it('`owner` NO viaja por esa puerta', () => {
+    // El dueño de un club no se da de alta desde el formulario de alumnos, y
+    // repartir el mando de un club por una ruta de servidor a servidor no es
+    // algo que deba poder pasar.
+    expect(rolGeneralDesdeMembresias('owner')).toBeNull();
+  });
+
+  it('lo que no se reconoce se rechaza, no se adivina', () => {
+    expect(rolGeneralDesdeMembresias('sensei')).toBeNull();
+    expect(rolGeneralDesdeMembresias('')).toBeNull();
   });
 });

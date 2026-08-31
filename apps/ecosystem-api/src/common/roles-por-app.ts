@@ -108,3 +108,31 @@ export function rolParaApp(
   if (CATALOGO[app].includes(general)) return general;
   return TRADUCCION[app][general] ?? null;
 }
+
+/** Los roles generales que un CLUB acepta (`ROLES_POR_TIPO` del servicio). */
+const GENERALES_DE_CLUB = [
+  'maestro',
+  'owner',
+  'staff',
+  'coach',
+  'competitor',
+  'student',
+  'guardian',
+];
+
+/**
+ * El camino de vuelta: el rol que manda Membresías → el rol general de aquí.
+ *
+ * Lo necesita `POST /sync/alta`, que es el maestro inscribiendo a alguien desde
+ * su app. Allí los roles se llaman `student`, `staff` y `guardian`, y los tres
+ * existen igual aquí, así que la traducción es casi la identidad — pero se
+ * escribe explícita y **se rechaza lo que no reconoce**: `owner` no viaja por
+ * esta puerta, porque el dueño de un club no se da de alta a sí mismo desde el
+ * formulario de alumnos, y dejarlo pasar sería repartir el mando de un club
+ * por una ruta de servidor a servidor.
+ */
+export function rolGeneralDesdeMembresias(rol: string): string | null {
+  const limpio = (rol || '').trim();
+  if (limpio === 'owner') return null;
+  return GENERALES_DE_CLUB.includes(limpio) ? limpio : null;
+}
