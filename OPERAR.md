@@ -2006,6 +2006,52 @@ está abierto) en el portal y en Campeonatos.
 
 # PARTE 6 · Lo que queda pendiente
 
+## 6.0 El orden recomendado, y el calendario que lo decide
+
+*(escrito el 30 de agosto de 2026)*
+
+**Queda un mes de ventana y después no hay ninguna.** Campeonato el 9, 10 y 11
+de octubre; del 1 al 13 no se toca nada (§1.5). Así que todo lo que toque base
+de datos o identidad **se hace en septiembre o se hace en noviembre**, y la
+última semana de septiembre conviene dejarla solo para lo imprescindible.
+
+| Cuándo | Qué | Por qué ahí |
+|---|---|---|
+| **Esta semana** | Un **ensayo completo** del camino entero, con datos de verdad | Es lo único que encuentra la siguiente cadena de cuatro eslabones. Ver abajo |
+| **Primera quincena de sept.** | `created_at` → `timestamptz` (§6.1) | Toca ~15 tablas y va con respaldo delante: es exactamente lo que no se hace en octubre |
+| **Mediados de sept.** | DMARC a `quarantine` (§3.5) | Es una fecha, no una decisión. `reject` **después** del 14 de octubre |
+| **Cuando haya un rato** | El 403 mudo del alumno desactivado (§6.1) · las pruebas del espejo · el `teardown_appcontext` de Flask | Baratos y sueltos: caben entre lo demás |
+| **Desde un celular, hoy** | Instalar la PWA de Membresías y aceptar los avisos (§4.6) | El reloj lleva días disparando a nadie. No se cierra desde el VPS |
+| **Después del 14 de oct.** | Cobro por usuario · WhatsApp · fotos al disco · el rol hacia Campeonatos y Academy · §6.2 entera | Cambian precios, contratos o el modo local |
+
+### El ensayo, que es lo que de verdad recomiendo primero
+
+El fallo del rol tenía **cuatro eslabones y cada uno tapaba al siguiente**
+(§4.7). Ninguno de los cuatro se veía leyendo el código: se vieron recorriendo
+el camino con una persona real y mirando el log. La única forma de encontrar la
+próxima cadena así es recorrer el camino entero antes de que lo recorra un
+maestro el 9 de octubre.
+
+El guion, de una sentada y con el `journalctl` abierto al lado:
+
+1. Crear una federación desde `/admin`, ponerle su administrador, crearle un
+   club dentro y afiliarle otro que ya exista (§4.5).
+2. Darle plan a la federación y comprobar que el club **hereda** — salir y
+   entrar para renovar el pase (§4.5).
+3. Desde Membresías, dar de alta a un alumno con un correo nuevo: tiene que
+   nacer su cuenta en DINAMYT y volver el enlace de contraseña (§4.4).
+4. Que ese alumno ponga su contraseña, entre al portal, y de ahí a Membresías.
+5. Cobrarle, marcarle asistencia, imprimirle el carnet.
+6. Cambiarle el rol a auxiliar desde el portal y ver que **cambia en
+   Membresías** (§4.7).
+7. Entrar a Campeonatos con un maestro, inscribir a alguien, y **salir**:
+   comprobar que la vuelta al portal ya no te mete dentro (§5.12).
+
+> **Lo que hay que mirar mientras**, que es la mitad del ensayo:
+> `sudo journalctl -u dinamyt-id -f`. Un `WARN [EspejoMembresias]` es un aviso
+> que no se aplicó, y ahora los dice todos (§4.7). Sin esa ventana abierta, el
+> ensayo solo prueba lo que se ve en pantalla.
+
 ## 6.1 Huecos conocidos
 
 `[ ]` **Los planes que hay no son los de verdad: el cobro será POR USUARIO.**
@@ -2136,14 +2182,13 @@ está abierto) en el portal y en Campeonatos.
       ya está clonado en `D:\Repositorios\dinamyt-combat`. Cómo funciona y qué
       decide quién entra: §4.13.
 
-      **Falta desplegarlo.** El comando entero, con el `pip install` que no
-      sobra y las dos variables que hay que poner antes: **§2.4-bis**.
+      **Desplegado el 30 de agosto de 2026.** El comando, con el `pip install`
+      que no sobra y las dos variables que hay que poner antes: **§2.4-bis**.
 
       Y con el salto llegó su reverso: salir de Campeonatos no cerraba la
       sesión de DINAMYT, así que volver al portal metía a la persona dentro
-      otra vez. Arreglado el 30 de agosto con el mismo criterio de Membresías
-      —§5.12—, así que **entra en el mismo despliegue**: toca el backend
-      (`/auth/logout` responde `portal`) y la web (el botón y `/login?salida=`).
+      otra vez. Arreglado el mismo día con el criterio de Membresías (§5.12), y
+      de paso la vuelta atrás y el scroll del diálogo.
 
 `[ ]` **Quedan dos `admin@dinamyt.com` en Campeonatos**, y ese dominio es de
       otra persona. *(revisado el 29 ago 2026)* **El del código ya no está**:
@@ -2159,22 +2204,64 @@ está abierto) en el portal y en Campeonatos.
       §5.1-ter. El `db.session.commit()` suelta el candado y el
       `SET LOCAL lock_timeout = '5s'` hace visible cualquier recaída.
 
-`[ ]` **`POST /sync/rol` no tiene prueba automatizada.** *(30 ago 2026)* La
-      ruta está escrita, compila y es gemela de `/sync/contrasena`, que sí las
-      tiene. Lo que falló fue el arnés: cualquier prueba que escriba en `users`
-      con el `db` del escenario y DESPUÉS llame a una ruta `/sync/*` deja
-      colgada la siguiente transacción de PGlite y se come el tiempo límite —
-      pasa igual con `/sync/persona`, que está probada y verde en su propio
-      archivo, así que no es la ruta nueva.
+`[ ]` **Las dos rutas nuevas del espejo no tienen prueba de punta a punta.**
+      *(30 ago 2026)* `POST /sync/rol` (Membresías) y `POST /sync/alta`
+      (ecosystem) están escritas, compilan y son gemelas de rutas que sí están
+      probadas. Lo que falló fue el arnés: cualquier prueba que escriba en
+      `users` con el `db` del escenario y DESPUÉS llame a una ruta `/sync/*`
+      deja colgada la siguiente transacción de PGlite y se come el tiempo
+      límite — pasa igual con `/sync/persona`, que está verde en su propio
+      archivo, así que no son las rutas nuevas.
 
-      **Lo que sí está cubierto** es el fallo de verdad, que era la traducción
-      del rol: ocho casos en `roles-por-app.spec.ts` (ecosystem-api).
+      **Lo que sí está cubierto** es lo que de verdad falló: la traducción de
+      roles en las dos direcciones, once casos en `roles-por-app.spec.ts`, y el
+      borrado de los roles por app en `cambiar-rol.spec.ts` (ecosystem-api).
 
       **La tarea:** entender por qué esa combinación cuelga —lo más probable es
-      cómo `crearEscenario` deja la conexión única de PGlite— y volver a poner
-      las cinco pruebas: llega el rol, se rechaza el que no existe aquí, la
-      puerta del secreto, el club no se queda sin dueño, y la ficha sin
-      `eco_sub` no se toca.
+      cómo `crearEscenario` deja la conexión única de PGlite— y poner las
+      pruebas: que llega el rol, que se rechaza el que no existe allí, la puerta
+      del secreto, que el club no se queda sin dueño, que la ficha sin `eco_sub`
+      no se toca, y que un alta fallida no deja ficha suelta.
+
+`[ ]` **El cambio de rol solo viaja a Membresías.** *(30 ago 2026)* Campeonatos
+      y Academy siguen leyendo el rol del pase **solo al crear** su fila local;
+      después manda el suyo. Es lo que impide degradar en silencio al
+      administrador de un campeonato en marcha (§4.7), y por eso no se cambió a
+      la vez — pero significa que «cambiar el rol en todas las apps» hoy son
+      dos de tres.
+
+      Para cerrarlo hace falta el equivalente de `/sync/rol` en cada una: en
+      Academy es la misma forma (Nest, mismo monorepo); en Campeonatos es Flask
+      y **no puede depender de la red el 9 de octubre**, así que ahí conviene
+      esperar a después del campeonato.
+
+`[ ]` **Las fichas de Membresías que nacieron sin cuenta de DINAMYT.**
+      *(30 ago 2026)* El `POST /users` viejo creaba una cuenta local por cada
+      alumno inscrito, sin `eco_sub` (§4.4). Las de antes del 29 de agosto las
+      enlazó la reconciliación; las creadas entre esa fecha y el 30 siguen
+      sueltas, y las de quien **nunca tuvo cuenta en el portal** ni siquiera
+      tienen a qué enlazarse.
+
+      **Se cura solo por dos caminos** —al entrar por SSO (`/auth/sso` enlaza
+      por correo) y al cambiarle el rol (`/sync/rol` hace lo mismo)—, así que no
+      es urgente. Lo que no se cura solo es quien no tiene cuenta en DINAMYT:
+      a esa gente hay que invitarla. Para saber de cuántos se habla:
+
+      ```bash
+      sudo -u postgres psql -d dinamyt -P pager=off -c "select count(*) filter (where m.eco_sub is null) as sin_enlazar, count(*) filter (where m.eco_sub is null and e.id is null) as sin_cuenta_en_dinamyt from membresias.users m left join ecosystem.users e on e.email = m.email where m.is_super_admin = false;"
+      ```
+
+`[ ]` **La reconciliación dejó los `role_*` escritos, y ahora estorban.**
+      *(30 ago 2026)* Importó el rol que cada quien tenía en su app a
+      `org_members.role_membresias` y hermanas. Esas columnas **mandan sobre el
+      rol general** (§4.7), así que para las 46 personas que tocó, el rol del
+      portal no decide nada hasta que alguien se lo cambie a mano — que es
+      exactamente el fallo que costó cuatro rondas encontrar.
+
+      Cambiar el rol desde el panel ya las vacía, una por una. Lo que falta es
+      **vaciar de una vez las que solo repiten lo que ya dice el general**, que
+      no cambian nada y sí esconden el siguiente fallo igual que escondieron
+      este. Va con respaldo delante y mirando el `diff` antes.
 
 `[ ]` **Cerrar la sesión en el `teardown_appcontext` de Flask.** Es lo que queda
       del hueco anterior. Sin ello, el DDL ya no se bloquea, pero una petición
