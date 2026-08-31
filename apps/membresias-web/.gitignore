@@ -6,6 +6,11 @@ dist/
 .next/
 .turbo/
 *.tsbuildinfo
+# Lo reescribe `next build` en cada compilación —y su contenido cambia con la
+# versión de Next y con si `.next/` existe—, así que versionarlo garantiza un
+# conflicto en el servidor: `git pull` se planta con «your local changes would
+# be overwritten by merge». No hay nada que conservar: se regenera solo.
+next-env.d.ts
 
 # BD local embebida (PGlite) — datos de desarrollo, nunca versionar
 .localdb/
