@@ -83,9 +83,66 @@ export const PARENTESCOS = [
 ] as const;
 
 /**
- * Reduce una imagen del dispositivo a un avatar cuadrado (JPEG ~320px) y la
- * devuelve como data-URL lista para guardar en el perfil. Así la foto se sube
- * desde el PC o el celular sin necesitar un servicio de archivos.
+ * Tope del data-URL que se produce aquí, en caracteres.
+ *
+ * No lo manda esta app —la suya son 700 000 (`validarAvatar`)— sino el espejo:
+ * el escudo y la foto viajan a Membresías por `/sync/club` y `/sync/persona`,
+ * y allí `MAX_IMAGEN` son 90 000. Lo que pase de ahí se guarda en el portal y
+ * NO llega al carnet, sin un error que lo diga. 80 000 deja margen.
+ */
+const TOPE_IMAGEN = 80_000;
+
+/** Calidades de WebP cuando hay transparencia. De mejor a peor. */
+const CALIDADES_ALFA = [0.92, 0.85, 0.75, 0.65, 0.55];
+
+/** Lados que se prueban si al anterior no cabe. El último siempre entra. */
+const ESCALONES = [1, 0.75, 0.56, 0.42, 0.3];
+
+/**
+ * ¿La imagen trae fondo transparente?
+ *
+ * Se mira sobre una copia diminuta y no sobre el lienzo final: leer los píxeles
+ * uno a uno para responder que sí o que no cuesta memoria de más, y al encoger,
+ * un hueco transparente sigue siéndolo. Ante la duda —un lienzo «manchado» no
+ * se deja leer— se trata como opaca, que es lo que se hacía siempre.
+ */
+function tieneAlfa(fuente: HTMLCanvasElement): boolean {
+  const sonda = document.createElement('canvas');
+  const f = Math.min(1, 96 / Math.max(fuente.width, fuente.height));
+  sonda.width = Math.max(1, Math.round(fuente.width * f));
+  sonda.height = Math.max(1, Math.round(fuente.height * f));
+  const ctx = sonda.getContext('2d');
+  if (!ctx) return false;
+  ctx.drawImage(fuente, 0, 0, sonda.width, sonda.height);
+  try {
+    const { data } = ctx.getImageData(0, 0, sonda.width, sonda.height);
+    for (let i = 3; i < data.length; i += 4) if (data[i] < 250) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reduce una imagen del dispositivo a un cuadrado y la devuelve como data-URL
+ * lista para guardar. Así la foto o el escudo se suben desde el PC o el celular
+ * sin necesitar un servicio de archivos.
+ *
+ * **El fondo transparente se conserva, y ese es el arreglo.** Esto acababa
+ * siempre en `toDataURL('image/jpeg')`, y JPEG no tiene canal alfa: un escudo
+ * en PNG —que es como llega casi siempre— se dibujaba sobre un lienzo vacío, o
+ * sea transparente, y al codificar esos píxeles perdían la transparencia y se
+ * quedaban con su color, que es NEGRO. El club subía su escudo y le salía
+ * dentro de un cuadrado negro, aquí y en el carnet de Membresías, que lee este
+ * mismo archivo por el espejo. No había forma de arreglarlo desde el otro lado:
+ * el negro venía dentro de la imagen.
+ *
+ * Ahora se mira si trae alfa y, si lo trae, se guarda en PNG —un escudo plano
+ * pesa poquísimo y no pierde un píxel— o en WebP si el PNG no cabe, que es lo
+ * que salva al escudo con degradados. Sin alfa se sigue en JPEG, que para un
+ * retrato pesa la mitad: la foto de siempre no engorda.
+ *
+ * Si ni al escalón más pequeño cabe, se devuelve igual y decide quien valida.
  */
 export function comprimirAvatar(file: File, lado = 320): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -100,16 +157,54 @@ export function comprimirAvatar(file: File, lado = 320): Promise<string> {
       const corto = Math.min(img.width, img.height);
       const sx = (img.width - corto) / 2;
       const sy = (img.height - corto) / 2;
-      const canvas = document.createElement('canvas');
-      canvas.width = lado;
-      canvas.height = lado;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
+
+      /** El cuadrado dibujado a `n` píxeles de lado. */
+      const pintar = (n: number): HTMLCanvasElement | null => {
+        const canvas = document.createElement('canvas');
+        canvas.width = n;
+        canvas.height = n;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, sx, sy, corto, corto, 0, 0, n, n);
+        return canvas;
+      };
+
+      const primero = pintar(lado);
+      if (!primero) {
         reject(new Error('No se pudo procesar la imagen.'));
         return;
       }
-      ctx.drawImage(img, sx, sy, corto, corto, 0, 0, lado, lado);
-      resolve(canvas.toDataURL('image/jpeg', 0.82));
+      const conAlfa = tieneAlfa(primero);
+      if (!conAlfa) {
+        resolve(primero.toDataURL('image/jpeg', 0.82));
+        return;
+      }
+
+      // Con transparencia: PNG, y si no cabe, WebP; y si tampoco, más pequeño.
+      // El navegador que no sepa WebP devuelve un PNG disimulado, así que se
+      // comprueba el prefijo en vez de fiarse.
+      let ultimo = '';
+      for (const factor of ESCALONES) {
+        const canvas = factor === 1 ? primero : pintar(Math.round(lado * factor));
+        if (!canvas) break;
+        const png = canvas.toDataURL('image/png');
+        ultimo = png;
+        if (png.length <= TOPE_IMAGEN) {
+          resolve(png);
+          return;
+        }
+        for (const calidad of CALIDADES_ALFA) {
+          const webp = canvas.toDataURL('image/webp', calidad);
+          if (!webp.startsWith('data:image/webp')) break;
+          ultimo = webp;
+          if (webp.length <= TOPE_IMAGEN) {
+            resolve(webp);
+            return;
+          }
+        }
+      }
+      resolve(ultimo);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
