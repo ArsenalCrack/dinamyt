@@ -49,13 +49,11 @@ export interface GrupoFiltro {
  *   activos como fichas, cada una con su ✕. Esto no es decoración: los filtros
  *   se guardan de un día para otro (`lib/preferencias.ts`), y una lista corta
  *   sin nada que explique por qué es corta se lee como que faltan alumnos.
- * - **El panel se abre solo si ya había algo filtrado.** Al volver a la app,
- *   lo primero es ver con qué se está mirando; a partir de ahí se pliega y no
- *   estorba.
- * - **Y se pliega solo al pasar de página.** Pasar de página es ir a MIRAR la
- *   lista, y con el panel abierto la mitad de la pantalla son controles y
- *   debajo caben tres filas. Los filtros no se tocan —siguen puestos, y las
- *   fichas de abajo los siguen diciendo—: lo que se recoge es el desplegable.
+ * - **El panel empieza plegado y se recoge solo al pasar de página.** Abierto
+ *   se come media pantalla; debajo caben tres filas. Y se abre para cambiar
+ *   algo, que es una vez de cada veinte: lo normal es llegar, mirar la lista y
+ *   cobrar. Los filtros no se tocan al recogerlo —siguen puestos, y las fichas
+ *   los siguen diciendo—: lo que se pliega es el desplegable.
  *
  * El orden va como un grupo más, y cuenta como filtro puesto cuando no es el de
  * siempre: para quien mira la pantalla, «ordenado por quién debe primero» es
@@ -88,14 +86,22 @@ export function Filtros({
   const { t } = useI18n();
 
   const puestos = grupos.filter((g) => g.valor !== (g.neutro ?? ''));
-  // Se calcula UNA vez, al montar. Cuando esto se dibuja, los filtros guardados
-  // ya están leídos (la pantalla enseña «Cargando…» hasta entonces), así que
-  // abrir el panel aquí es abrirlo con lo que de verdad hay puesto.
-  const [abierto, setAbierto] = useState(() => puestos.length > 0);
 
-  // Al pasar de página, recoger el panel. Se compara con el valor anterior en
-  // vez de plegar a secas: el efecto también corre al montar, y ahí el panel
-  // acaba de decidir si abrirse por los filtros guardados.
+  /**
+   * El panel empieza SIEMPRE plegado, aunque haya filtros puestos.
+   *
+   * Abierto son cinco centímetros de controles, y con los filtros guardados de
+   * la visita anterior eso pasaba en cada entrada y en cada cambio de pantalla:
+   * quien abre el panel es porque va a cambiar algo, y eso es una vez de cada
+   * veinte. Lo que hace falta saber al llegar no es CON QUÉ se filtra sino QUE
+   * se filtra, y eso lo dicen las fichas de abajo y el número del botón, que se
+   * ven igual con el panel recogido.
+   */
+  const [abierto, setAbierto] = useState(false);
+
+  // Al pasar de página, recoger el panel: pasar de página es ir a mirar la
+  // lista. Se compara con el valor anterior en vez de plegar a secas para no
+  // hacer nada al montar, que es cuando el efecto corre por primera vez.
   const paginaPrevia = useRef(plegarCon);
   useEffect(() => {
     if (paginaPrevia.current === plegarCon) return;
