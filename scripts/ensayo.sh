@@ -223,7 +223,11 @@ paso_rol() {
       join ecosystem.users u on u.id = m.user_id
       join ecosystem.organizations o on o.id = m.org_id
       left join membresias.users mu on mu.eco_sub = u.id
-      left join campeonatos.usuarios cu on cu.eco_sub = u.id::text
+      -- Los dos a texto: `campeonatos.usuarios.eco_sub` es `uuid` en
+      -- PostgreSQL y `varchar` en SQLite (§4.13), y comparar `uuid` con
+      -- texto a secas no es que dé distinto: PostgreSQL se niega con
+      -- «operator does not exist: uuid = text» y se lleva la consulta.
+      left join campeonatos.usuarios cu on cu.eco_sub::text = u.id::text
      where u.email = '$correo';"
 
   cat <<'NOTA'
