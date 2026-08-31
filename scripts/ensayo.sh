@@ -79,8 +79,18 @@ paso_estado() {
   titulo 'El secreto del espejo (tienen que coincidir)'
   for f in /srv/dinamyt/apps/ecosystem-api/.env /srv/membresias/apps/membresias-api/.env; do
     v=$(sudo grep -m1 '^ECOSYSTEM_SYNC_SECRET=' "$f" 2>/dev/null | cut -d= -f2-)
-    printf '  %-52s %s\n' "$f" \
-      "${v:+$(printf '%s' "$v" | sha256sum | cut -c1-12)}${v:-SIN PONER}"
+    # Un `if` y no una expansión con `${v:+…}${v:-…}`: la segunda forma
+    # imprime el VALOR cuando la variable está puesta —`:-` devuelve el
+    # contenido, no el texto alternativo— así que la primera versión de esto
+    # escupió el secreto entero en la terminal, detrás de su propia huella.
+    # Aquí no hay ingenio que valga la pena: lo que no se puede enseñar no se
+    # mete en una expansión con dos ramas.
+    if [ -n "$v" ]; then
+      huella=$(printf '%s' "$v" | sha256sum | cut -c1-12)
+    else
+      huella='SIN PONER'
+    fi
+    printf '  %-52s %s\n' "$f" "$huella"
   done
 
   titulo 'La puerta de entrada (401 = bien · 404 = falta el secreto)'

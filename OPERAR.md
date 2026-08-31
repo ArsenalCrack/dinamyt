@@ -2347,10 +2347,22 @@ mirar.
       portal no decide nada hasta que alguien se lo cambie a mano — que es
       exactamente el fallo que costó cuatro rondas encontrar.
 
-      Cambiar el rol desde el panel ya las vacía, una por una. Lo que falta es
-      **vaciar de una vez las que solo repiten lo que ya dice el general**, que
-      no cambian nada y sí esconden el siguiente fallo igual que escondieron
-      este. Va con respaldo delante y mirando el `diff` antes.
+      **Son 43 de 48** *(medido el 31 ago 2026 con `ensayo.sh estado`)*: para
+      casi todo el mundo, el rol del portal no decide nada.
+
+      Cambiar el rol desde el panel ya las vacía, una por una. Para vaciarlas
+      todas está `scripts/limpiar-roles-de-app.sh`, que toca **solo las que
+      repiten lo que ya dice el general traducido** — vaciar una de esas no
+      cambia nada, porque el pase seguirá llevando el mismo valor; lo que cambia
+      es que el rol del portal vuelve a mandar. Las que dicen algo distinto las
+      lista aparte y no las toca: ésas son decisiones de alguien.
+
+      ```bash
+      cd /srv/dinamyt && bash scripts/limpiar-roles-de-app.sh
+      ```
+
+      Sin `--aplicar` es un ensayo en seco dentro de una transacción que se
+      deshace, igual que la reconciliación (§2.8). Respaldo delante (§2.5).
 
 `[ ]` **Cerrar la sesión en el `teardown_appcontext` de Flask.** Es lo que queda
       del hueco anterior. Sin ello, el DDL ya no se bloquea, pero una petición
