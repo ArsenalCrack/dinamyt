@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { and, asc, eq, ilike, ne, or, sql } from 'drizzle-orm';
-import { clubGroups, memberships, users, type Db } from '@dinamyt/membresias-db';
+import { clubGroups, memberships, orgs, users, type Db } from '@dinamyt/membresias-db';
 import { esStaff, orgDelRequest, requireAuth, requireRole } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
 import {
@@ -30,6 +30,11 @@ import {
 } from '../lib/ecosistema';
 import { leerPagina, patron } from '../lib/paginacion';
 import { todayStr } from '../lib/billing';
+import {
+  altaEnDinamyt,
+  altaEnElEcosistema,
+  type AltaHecha,
+} from '../lib/alta-ecosistema';
 import { ensureMembership } from '../lib/memberships';
 import { firmarTokenAcceso, VIDA_TOKEN_ACCESO } from '../lib/auth/tokens';
 import type { MembresiasRole } from '../types/auth';
@@ -38,11 +43,20 @@ import type { MembresiasRole } from '../types/auth';
  * Gestión de personas DENTRO de un club, a cargo del maestro.
  *
  * Membresías no tiene auto-registro: el maestro da de alta a sus alumnos, sus
- * acudientes y sus auxiliares, y él mismo les cambia la contraseña si la
- * olvidan. Por eso esta app no envía correos.
+ * acudientes y sus auxiliares. Los maestros (`owner`) NO se crean aquí: los
+ * crea el superadmin junto con el club (ver `routes/orgs.ts`).
  *
- * Los maestros (`owner`) NO se crean aquí: los crea el superadmin junto con el
- * club (ver `routes/orgs.ts`).
+ * ── Dónde nace la CUENTA, que no es lo mismo que la ficha ──
+ *
+ * | | |
+ * |---|---|
+ * | **Federada** (con `ECOSYSTEM_JWKS_URL`) | La cuenta nace en **DINAMYT** y la ficha se crea aquí enlazada a ella. El maestro no pone contraseñas: la persona pone la suya con el enlace de invitación |
+ * | **Sola** (producto independiente, y el día del campeonato) | La cuenta nace aquí con la contraseña que ponga el maestro, como siempre |
+ *
+ * Hasta el 30 de agosto de 2026 se hacía lo segundo **siempre**, y eso fabricaba
+ * una identidad paralela por cada alumno: cuenta de aquí, contraseña de aquí, y
+ * `eco_sub` vacío — la ficha que ninguno de los cuatro avisos del espejo
+ * alcanza. Ver `lib/alta-ecosistema.ts`.
  */
 
 /** Roles que un maestro puede repartir en su club. */
@@ -305,19 +319,70 @@ export async function usersRoutes(app: FastifyInstance) {
         error: `Rol inválido. El maestro puede crear: ${ROLES_ASIGNABLES.join(', ')}.`,
       });
     }
-    const errorPass = validarPassword(body.password ?? '');
-    if (errorPass) return reply.code(422).send({ error: errorPass });
+    // La contraseña solo se pide —y solo se acepta— cuando esta instalación va
+    // sola. Estando federada, la pone su dueño en el portal con el enlace de
+    // invitación: es la misma regla que ya impide cambiarla desde aquí
+    // (`lib/ecosistema.ts`), aplicada también al alta.
+    const federada = altaEnElEcosistema();
+    if (!federada) {
+      const errorPass = validarPassword(body.password ?? '');
+      if (errorPass) return reply.code(422).send({ error: errorPass });
+    }
 
     const db = req.db;
     const [ya] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (ya) return reply.code(409).send({ error: `El correo '${email}' ya está registrado.` });
+
+    // ── La cuenta nace en DINAMYT, y solo después la ficha ──
+    //
+    // En este orden a propósito: al revés, cada vez que el ecosistema no
+    // conteste quedaría aquí una ficha suelta —sin `eco_sub`— que es
+    // exactamente el problema que esto viene a cerrar. Si el alta de allá
+    // falla, aquí no se crea nada y el maestro ve el motivo que dio DINAMYT.
+    let ecoSub: string | null = null;
+    let invitacion: AltaHecha['invitacion'] = null;
+    if (federada) {
+      const [club] = await db
+        .select({ ecoOrgId: orgs.ecoOrgId })
+        .from(orgs)
+        .where(eq(orgs.id, orgId))
+        .limit(1);
+      if (!club?.ecoOrgId) {
+        return reply.code(409).send({
+          error:
+            'Este club todavía no está enlazado con DINAMYT, así que no se puede ' +
+            'crear la cuenta allí. Avísale al administrador del ecosistema.',
+        });
+      }
+      try {
+        const alta = await altaEnDinamyt({
+          ecoOrgId: club.ecoOrgId,
+          email,
+          fullName: nombre.valor,
+          phone: tel.valor,
+          role: rol,
+          invitadoPor: req.user!.sub,
+        });
+        ecoSub = alta.ecoSub;
+        invitacion = alta.invitacion;
+      } catch (e) {
+        req.log.warn({ err: e, email }, 'no se pudo crear la cuenta en DINAMYT');
+        return reply.code(502).send({
+          error: `No se pudo crear la cuenta en DINAMYT: ${
+            e instanceof Error ? e.message : 'no contestó'
+          }`,
+        });
+      }
+    }
 
     const [creado] = await db
       .insert(users)
       .values({
         email,
         fullName: nombre.valor,
-        passwordHash: await hashPassword(body.password!),
+        // Sin contraseña propia cuando hay portal: la suya vive allí.
+        passwordHash: federada ? null : await hashPassword(body.password!),
+        ecoSub,
         phone: tel.valor,
         avatarUrl: retrato.valor,
         belt: grado.valor,
@@ -369,7 +434,10 @@ export async function usersRoutes(app: FastifyInstance) {
         // vez que se le ponga plan o se le marque asistencia.
       }
     }
-    return reply.code(201).send(vista(creado));
+    // El enlace viaja de vuelta para que el maestro pueda pasárselo por
+    // WhatsApp cuando el correo no salió. Es la misma muleta que el portal
+    // (§3 de OPERAR): con el correo funcionando, quien inscribe no ve la llave.
+    return reply.code(201).send({ ...vista(creado), invitacion });
   });
 
   // ── GET /users/:id — perfil ───────────────────────────────────────────────
