@@ -398,6 +398,16 @@ export interface Miembro {
   roleMembresias?: string | null;
   roleCampeonatos?: string | null;
   roleAcademy?: string | null;
+  /**
+   * Si Membresías le cortó el acceso a esta persona. `null`/`undefined` = no
+   * consta, que es lo normal para quien no tiene ficha allí.
+   *
+   * Pertenecer al club y tener acceso a una de sus apps son cosas distintas, y
+   * hasta ahora la lista solo enseñaba la primera: al alumno al que el maestro
+   * le había cortado el acceso en Membresías se le veía aquí exactamente igual
+   * que a los demás.
+   */
+  membresiasActivo?: boolean | null;
   userId: string;
   email: string;
   fullName: string;
@@ -759,6 +769,14 @@ export interface MiClub extends Organizacion {
   isPublic: boolean | null;
   isActive: boolean | null;
   myRole: string;
+  /**
+   * Si Membresías me dejó fuera de ESTE club. `null` = no consta.
+   *
+   * El dashboard lo mira antes de ofrecer «Entrar a Membresías»: con el acceso
+   * cortado, ese botón lleva a un 403 sin explicación, y quien lo pulsa cree
+   * que se rompió la aplicación.
+   */
+  membresiasActivo: boolean | null;
   gestores: GestorClub[];
   organizacionPadre: string | null;
 }
@@ -935,6 +953,44 @@ export interface InvitacionClub {
 
 export const miClubAPI = async (): Promise<MiClub[]> =>
   (await api.get('/organizations/mi-club')).data;
+
+/**
+ * ── La campana de quien lleva un club ──
+ *
+ * Un aviso de la organización: quién pidió entrar, quién entró, quién se fue.
+ * `href` viene DEL SERVIDOR: el tipo de aviso y su destino se deciden juntos
+ * (`common/avisos-org.ts` en la API), y así un tipo nuevo no puede salir aquí
+ * sin sitio a donde llevar.
+ */
+export interface AvisoOrg {
+  id: string;
+  kind: string;
+  orgId: string;
+  orgName: string;
+  subjectUserId: string | null;
+  /** Nombre actual de la persona de la que habla, si sigue existiendo. */
+  subjectName: string | null;
+  subjectAvatarUrl: string | null;
+  /** Lo que se copió cuando pasó: nombre, correo, rol, la nota que escribió. */
+  data: {
+    fullName?: string | null;
+    email?: string | null;
+    role?: string | null;
+    note?: string | null;
+    via?: string | null;
+  } | null;
+  readAt: string | null;
+  createdAt: string;
+  href: string;
+}
+
+export const misAvisosOrgAPI = async (): Promise<{
+  items: AvisoOrg[];
+  sinLeer: number;
+}> => (await api.get('/organizations/avisos')).data;
+
+export const marcarAvisosOrgLeidosAPI = async (): Promise<{ marcados: number }> =>
+  (await api.post('/organizations/avisos/leidos')).data;
 export const crearMiClubAPI = async (data: {
   name: string;
   city?: string;

@@ -1,0 +1,42 @@
+-- ── Si esta persona tiene acceso a Membresías, y quién lo sabe ───────────────
+--
+-- ── El hueco que cierra ──
+--
+-- Era un hueco conocido y apuntado: «un alumno con `isActive:false` en
+-- Membresías choca contra un 403 en `abrirSesion` (login Y SSO), pero el portal
+-- no lo sabe —`org_members` no tiene estado— y le sigue enseñando “Entrar a
+-- Membresías”». Dos consecuencias, las dos feas:
+--
+--   · A la PERSONA se le enseña un botón que promete algo que ya no es verdad
+--     y que la deja en un 403 sin explicación. Desde su lado, la aplicación se
+--     rompió.
+--   · Al MAESTRO, que en el portal ve a su gente, no se le dice a quién le
+--     cortó el acceso. Tenía que abrir la otra aplicación para acordarse.
+--
+-- ── Por qué una columna y no una tabla de estados ──
+--
+-- Porque hoy solo hay una app que corte accesos por su cuenta. Campeonatos y
+-- Academy leen el rol del pase y no tienen un interruptor equivalente, así que
+-- una tabla `app_access(user, org, app, activo)` sería una fila por persona
+-- para guardar un booleano que solo escribe un sitio. Cuando la segunda app lo
+-- necesite, esto se convierte en aquello con una migración de cinco líneas.
+--
+-- ── Por qué acepta NULL, y qué significa cada valor ──
+--
+--   · `NULL`  — **no consta.** Es el valor de todo el mundo hasta que
+--     Membresías diga algo, y de quien no tiene ficha allí. El portal se
+--     comporta como se comportaba: enseña la app si el plan la incluye.
+--   · `true`  — Membresías dijo que sí. Lo escribe al reactivar a alguien.
+--   · `false` — Membresías le cortó el acceso. El portal deja de ofrecerle la
+--     app y, a quien gestiona el club, se lo dice en la lista de su gente.
+--
+-- Ese `NULL` es lo que hace que la migración no mienta: un `DEFAULT true`
+-- afirmaría de golpe que las mil personas de la base tienen acceso a una app
+-- que la mayoría ni usa, y con eso el portal no podría distinguir «tiene
+-- acceso» de «nadie ha preguntado».
+--
+-- Lo escribe `POST /sync/acceso`, que llama Membresías cuando el maestro
+-- enciende o apaga el acceso de alguien en su club.
+
+ALTER TABLE "ecosystem"."org_members"
+  ADD COLUMN IF NOT EXISTS "membresias_activo" boolean;

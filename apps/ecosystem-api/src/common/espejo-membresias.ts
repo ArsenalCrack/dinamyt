@@ -256,3 +256,32 @@ export function espejarRol(
     email: email ?? undefined,
   });
 }
+
+/**
+ * Avisa de que alguien **salió del club**. Su ficha allá se queda sin acceso.
+ *
+ * ── Lo que se rompía sin esto ──
+ *
+ * El maestro quitaba a un alumno de su organización aquí y en Membresías no
+ * pasaba nada: seguía en el listado, seguía contando y seguía entrando. Desde
+ * fuera se ve como que la aplicación no obedece —«lo eliminé y sigue ahí»—, y
+ * el apaño (desactivarlo también allá) obliga a hacer el mismo gesto dos veces
+ * y a acordarse de los dos para siempre.
+ *
+ * ── Por qué esto SÍ viaja, si la pertenencia no viajaba ──
+ *
+ * Porque no es lo mismo pisar en silencio que obedecer una orden. La regla de
+ * §4.7 protege lo que Membresías decide por su cuenta —los pagos, la
+ * asistencia, el historial—, y nada de eso se toca: allá se apaga el acceso,
+ * no se borra la ficha. Lo que llega es una decisión deliberada de alguien con
+ * permiso, igual que el cambio de rol.
+ *
+ * ── Y como todo el espejo ──
+ *
+ * Se dispara sin esperarlo. Que Membresías esté caída no puede impedir que un
+ * maestro dé de baja a alguien de su club; lo que se pierde es la copia, y se
+ * recupera repitiendo la baja o desactivándolo allá a mano.
+ */
+export function espejarBaja(userId: string, orgId: string): void {
+  void avisar('/sync/pertenencia', { ecoSub: userId, ecoOrgId: orgId });
+}

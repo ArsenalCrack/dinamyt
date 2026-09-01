@@ -46,9 +46,40 @@ import type { Miembro } from '@/lib/api';
  * el botón de quitar no se dibuja: lo que no se puede hacer no se enseña.
  */
 
-/** Un rol de app, solo si la persona participa en ella. */
-function InsigniaApp({ app, rol }: { app: string; rol?: string | null }) {
-  if (!rol) return null;
+/**
+ * Un rol de app, solo si la persona participa en ella.
+ *
+ * `sinAcceso` la pinta en rojo y lo dice: quien administra el club tiene que
+ * poder ver de un vistazo a quién se le cortó el acceso en Membresías. Antes
+ * esa persona salía en esta lista exactamente igual que las demás —perteneces
+ * al club y punto—, y para enterarse había que abrir la otra aplicación.
+ */
+function InsigniaApp({
+  app,
+  rol,
+  sinAcceso = false,
+}: {
+  app: string;
+  rol?: string | null;
+  sinAcceso?: boolean;
+}) {
+  // `sinAcceso` basta por sí solo, sin rol: esa marca solo la escribe la propia
+  // app al cortarle el acceso a alguien (`POST /sync/acceso`), así que tenerla
+  // ya demuestra que esa persona está allí. Pedir además el rol dejaba mudo
+  // justo el caso que se venía a enseñar — el rol por app se borra al cambiar
+  // el general (ver `cambiar-rol.spec.ts`), y entonces la fila volvía a
+  // parecerse a todas las demás.
+  if (!rol && !sinAcceso) return null;
+  if (sinAcceso) {
+    return (
+      <span
+        className="badge badge-danger"
+        title={`Su maestro le retiró el acceso a ${app}. Sigue siendo del club: su ficha, sus pagos y su asistencia están intactos, y se le devuelve el acceso desde ${app}.`}
+      >
+        {app} · sin acceso
+      </span>
+    );
+  }
   return (
     <span className="badge" title={`Rol en ${app}: ${rol}`}>
       {app} · {NOMBRE_ROL[rol] ?? rol}
@@ -75,7 +106,12 @@ export function FilaMiembro({
   esUnoMismo?: boolean;
 }) {
   const m = miembro;
-  const tieneApps = Boolean(m.roleMembresias || m.roleCampeonatos || m.roleAcademy);
+  const tieneApps = Boolean(
+    m.roleMembresias ||
+      m.roleCampeonatos ||
+      m.roleAcademy ||
+      m.membresiasActivo === false,
+  );
   // Quien manda no se toca a sí mismo. A un alumno mirándose no le estorba
   // nada, pero tampoco tiene nada que cambiarse: se bloquea igual y así la
   // regla es una sola y se entiende de un vistazo.
@@ -113,7 +149,11 @@ export function FilaMiembro({
           </p>
           {tieneApps && (
             <p className="mt-1 flex flex-wrap gap-1">
-              <InsigniaApp app="Membresías" rol={m.roleMembresias} />
+              <InsigniaApp
+                app="Membresías"
+                rol={m.roleMembresias}
+                sinAcceso={m.membresiasActivo === false}
+              />
               <InsigniaApp app="Campeonatos" rol={m.roleCampeonatos} />
               <InsigniaApp app="Academy" rol={m.roleAcademy} />
             </p>

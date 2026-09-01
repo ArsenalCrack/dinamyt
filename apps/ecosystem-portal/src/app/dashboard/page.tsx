@@ -19,6 +19,7 @@ import api, {
 import { nombreRol, operaCampeonatos } from '@/lib/roles';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { Avatar } from '@/components/Avatar';
+import { CampanaOrg } from '@/components/CampanaOrg';
 import { EntrarAClub } from '@/components/EntrarAClub';
 
 const CAMPEONATOS_URL =
@@ -53,6 +54,20 @@ export default function DashboardPage() {
   // ¿Gestiona alguna organización (admin/maestro)? ¿Pertenece a algún club?
   const [gestiona, setGestiona] = useState<boolean | null>(null);
   const [nombreClub, setNombreClub] = useState<string | null>(null);
+  /**
+   * Si el maestro me cortó el acceso a Membresías en mi club.
+   *
+   * Cerraba un hueco que dejaba a la persona sin explicación: `app_scopes` sale
+   * de la SUSCRIPCIÓN del club, no de si yo puedo entrar, así que el portal me
+   * seguía enseñando «Entrar a Membresías» con el acceso retirado y allí me
+   * recibía un 403 pelado. Desde mi lado, la aplicación se rompió. Ahora se
+   * dice lo que pasa y a quién preguntarle.
+   *
+   * Sale de `GET /organizations/mi-club` y no del token porque esto lo cambia
+   * OTRA persona mientras mi sesión sigue abierta — el mismo motivo por el que
+   * este dashboard empieza pidiendo un token fresco.
+   */
+  const [membresiasCortada, setMembresiasCortada] = useState(false);
   const [foto, setFoto] = useState<string | null>(null);
   const [invitaciones, setInvitaciones] = useState<MiInvitacion[]>([]);
   const [ocupado, setOcupado] = useState(false);
@@ -75,6 +90,13 @@ export default function DashboardPage() {
       club.status === 'fulfilled' && club.value.length > 0
         ? club.value[0].name
         : null,
+    );
+    // `=== false` y no `!`: `null` significa «no consta» —nadie ha preguntado
+    // nunca por esta persona—, y eso no puede esconder la app de quien sí
+    // entra. Ver la migración `0013_acceso_por_app`.
+    setMembresiasCortada(
+      club.status === 'fulfilled' &&
+        club.value.some((c) => c.membresiasActivo === false),
     );
     if (perfil.status === 'fulfilled') {
       setFoto((perfil.value.data as { avatarUrl: string | null }).avatarUrl);
@@ -196,6 +218,11 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* La campana solo para quien lleva un club: a un alumno no le llega
+              ninguno de estos avisos, así que se dibujaría siempre vacía — y
+              una campana que nunca suena es un adorno que promete algo que no
+              va a pasar. `=== true` porque `null` es «aún no se sabe». */}
+          {gestiona === true && <CampanaOrg />}
           <Link href="/perfil" className="btn btn-outline">
             Mi perfil
           </Link>
@@ -363,18 +390,43 @@ export default function DashboardPage() {
               </a>
             ))}
           {(payload.is_super_admin ||
-            payload.app_scopes.includes('membresias')) && (
-            // Mismo SSO por fragmento que Campeonatos: membresias-web guarda el
-            // token al aterrizar en /login#token=… sin segundo formulario.
-            <a
-              href={`${MEMBRESIAS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
-              className="rounded-lg px-4 py-3 font-semibold"
-              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
-            >
-              Entrar a Membresías
-              {payload.role_membresias ? ` (${nombreRol(payload.role_membresias)})` : ''}
-            </a>
-          )}
+            payload.app_scopes.includes('membresias')) &&
+            (membresiasCortada && !payload.is_super_admin ? (
+              // ── Tiene el plan, pero su maestro le retiró el acceso ──
+              //
+              // No se esconde la tarjeta: esconderla sería no contestarle, y la
+              // persona lleva meses entrando ahí. Se le dice qué pasó y qué
+              // hacer, que es hablar con su maestro — el único que puede
+              // devolvérselo, desde Membresías. Nada suyo se ha perdido: la
+              // ficha, los pagos y la asistencia siguen enteros.
+              <div
+                className="rounded-lg border px-4 py-3"
+                style={{ borderColor: 'var(--danger)' }}
+              >
+                <span className="block font-semibold">
+                  Tu acceso a Membresías está desactivado
+                </span>
+                <span
+                  className="mt-0.5 block text-xs"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Tu maestro lo retiró desde Membresías. Sigues siendo parte del
+                  club y no se ha perdido nada tuyo —tu ficha, tus pagos y tus
+                  asistencias están ahí—: pídele que te lo devuelva.
+                </span>
+              </div>
+            ) : (
+              // Mismo SSO por fragmento que Campeonatos: membresias-web guarda
+              // el token al aterrizar en /login#token=… sin segundo formulario.
+              <a
+                href={`${MEMBRESIAS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
+                className="rounded-lg px-4 py-3 font-semibold"
+                style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
+              >
+                Entrar a Membresías
+                {payload.role_membresias ? ` (${nombreRol(payload.role_membresias)})` : ''}
+              </a>
+            ))}
           {/* Academy está apagada en el portal: el interruptor y el porqué
               están en `lib/apps.ts` (`ACADEMY_EN_EL_PORTAL`). La app sigue
               viva por su dirección; lo que no se ofrece es la puerta. */}

@@ -8,9 +8,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../../db';
-import { organizations } from '../../db/schema';
+import { orgMembers, organizations } from '../../db/schema';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { rolGeneralDesdeMembresias } from '../../common/roles-por-app';
 
@@ -124,5 +124,74 @@ export class SyncController {
       cuenta: r.cuenta,
       invitacion: r.invitacion,
     };
+  }
+
+  // ── POST /sync/acceso — Membresías cortó (o devolvió) el acceso a alguien ──
+  //
+  // ── El hueco que cierra ──
+  //
+  // Era un hueco conocido: el maestro le quitaba el acceso a un alumno en
+  // Membresías y **el portal no se enteraba**. Le seguía enseñando su tarjeta
+  // de «Entrar a Membresías», que lo dejaba en un 403 sin una palabra de
+  // explicación; y al maestro, que ve a su gente aquí, no se le decía a quién
+  // había apagado. Cada uno de los dos sabía la mitad.
+  //
+  // ── Lo que NO hace ──
+  //
+  // **No lo saca de la organización.** Perder el acceso a una aplicación no es
+  // irse del club: la persona sigue siendo del club para Campeonatos, para
+  // Academy y para su propia cuenta. Lo que se guarda es lo que pasó, ni más ni
+  // menos, y quien quiera darlo de baja de verdad lo hace aquí a propósito —y
+  // eso sí viaja de vuelta (`espejarBaja`).
+  //
+  // ── La puerta ──
+  //
+  // El mismo `ECOSYSTEM_SYNC_SECRET` que `/sync/alta`, y sin él la ruta no
+  // existe.
+  @Post('acceso')
+  async acceso(
+    @Headers('x-dinamyt-sync') secreto: string | undefined,
+    @Body()
+    body: {
+      /** Quién, con su id de AQUÍ (`users.eco_sub` allá). */
+      ecoSub?: string;
+      /** En qué club (`orgs.eco_org_id` allá). El acceso es por club. */
+      ecoOrgId?: string;
+      /** De qué aplicación. Hoy solo `membresias`; ver la migración 0013. */
+      app?: string;
+      activo?: boolean;
+    },
+  ) {
+    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
+    if (!esperado) throw new NotFoundException('No encontrado.');
+    if (!SyncController.valido(secreto, esperado)) {
+      throw new UnauthorizedException('Secreto inválido.');
+    }
+
+    const userId = (body.ecoSub ?? '').trim();
+    const orgId = (body.ecoOrgId ?? '').trim();
+    if (!userId || !orgId) {
+      throw new BadRequestException('Faltan `ecoSub` y `ecoOrgId`.');
+    }
+    // Una app que este portal no conoce se rechaza en vez de guardarse en la
+    // columna de otra: el día que haya dos, un typo escribiría en la que no es.
+    if ((body.app ?? 'membresias') !== 'membresias') {
+      throw new BadRequestException(
+        `El portal no lleva el acceso de '${body.app}'. Hoy solo 'membresias'.`,
+      );
+    }
+    if (typeof body.activo !== 'boolean') {
+      throw new BadRequestException('`activo` tiene que ser true o false.');
+    }
+
+    // Sin pertenencia no hay dónde apuntarlo, y no es un error: esa persona
+    // tiene ficha en un club de Membresías que aquí no la tiene de miembro.
+    const filas = await db
+      .update(orgMembers)
+      .set({ membresiasActivo: body.activo })
+      .where(and(eq(orgMembers.userId, userId), eq(orgMembers.orgId, orgId)))
+      .returning({ id: orgMembers.id });
+
+    return { encontrada: filas.length > 0, aplicado: filas.length > 0 };
   }
 }
