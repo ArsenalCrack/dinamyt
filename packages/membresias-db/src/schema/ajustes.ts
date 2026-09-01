@@ -19,5 +19,5 @@ export const appSettings = mem.table('app_settings', {
   value: jsonb('value'),
   /** Quién lo cambió por última vez (trazabilidad, no una relación fuerte). */
   updatedById: uuid('updated_by_id'),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

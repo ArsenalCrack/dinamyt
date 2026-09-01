@@ -30,8 +30,8 @@ export const plans = mem.table('plans', {
   /** Solo para paquete/clase. */
   nClasses: integer('n_classes'),
   isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Membresía: estado del alumno EN ESTE club ────────────────────────────────
@@ -77,8 +77,8 @@ export const memberships = mem.table(
     checkinPin: varchar('checkin_pin', { length: 12 }),
     /** Check-ins hechos en mora desde el último pago (1=avisado; ≥2 se bloquea). */
     moraCheckins: integer('mora_checkins').default(0),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (t) => [
     uniqueIndex('uq_membership_org_user').on(t.orgId, t.userId),
@@ -99,7 +99,7 @@ export const payments = mem.table('payments', {
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
   method: metodoPagoEnum('method').notNull(),
   status: estadoPagoEnum('status').notNull().default('PAGADO'),
-  paidAt: timestamp('paid_at').defaultNow(),
+  paidAt: timestamp('paid_at', { withTimezone: true }).defaultNow(),
   /**
    * Qué periodo compró este pago. Son las tres columnas que permiten decir
    * cuánto dinero le CORRESPONDE a cada mes, y no solo cuánto entró en caja:
@@ -115,5 +115,5 @@ export const payments = mem.table('payments', {
   /** user_id del ecosistema que registró el pago (maestro o auxiliar). */
   registeredByUserId: uuid('registered_by_user_id').notNull(),
   notes: text('notes'),
-  createdAt: timestamp('created_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

@@ -120,6 +120,13 @@
       "when": 1786001001000,
       "tag": "0016_ficha_sin_contrasena",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786001002000,
+      "tag": "0017_fechas_con_zona",
+      "breakpoints": true
     }
   ]
 }

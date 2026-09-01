@@ -12,7 +12,7 @@ import { orgDelRequest, requireAuth, requireClub, requireRole } from '../plugins
 import { limitarPorIp } from '../lib/auth/rate-limit';
 import { planNotificaciones, textoAviso } from '../lib/notifications';
 import { sinFiltroDeClub } from '../lib/db-contexto';
-import { todayStr } from '../lib/billing';
+import { estado, todayStr } from '../lib/billing';
 import { enviarPush } from '../lib/push';
 import { cronSecret } from '../config';
 
@@ -97,6 +97,51 @@ export async function generarAvisos(
   return { creados: nuevos.length, pushEnviados };
 }
 
+/**
+ * Un aviso, con lo que hace falta para saber si todavía es verdad.
+ *
+ * `venceEl` y `clasesRestantes` son de la membresía **de hoy**, no de cuando se
+ * escribió el aviso: es justamente la comparación entre las dos cosas la que
+ * dice si el aviso sigue en pie.
+ */
+interface AvisoConEstado {
+  type: string;
+  venceEl: string | null;
+  clasesRestantes: number | null;
+}
+
+/**
+ * ── Un aviso deja de existir cuando deja de ser verdad ────────────────────
+ *
+ * La campana enseñaba una foto de un momento pasado. El alumno pagaba, su
+ * mensualidad se iba a fin de mes y el «tu mensualidad venció» seguía ahí,
+ * rojo, hasta que alguien lo abriera para marcarlo leído — y para el maestro
+ * ni eso: los suyos se contaban por fecha, así que la lista del club seguía
+ * diciendo que ocho alumnos debían cuando ya habían pagado los ocho. Un aviso
+ * que no se cae solo obliga a comprobar cada uno a mano, que es exactamente el
+ * trabajo que la campana venía a ahorrar.
+ *
+ * Aquí no se guarda nada ni hace falta: el estado de la membresía ya está en la
+ * misma consulta, así que el aviso se contrasta contra la realidad en el
+ * momento de leerlo. Lo que ya no se cumple no se devuelve.
+ *
+ *   · `venc` y `mora` sobreviven mientras el alumno siga sin cobertura.
+ *   · `pre_venc` sobrevive mientras siga por vencer: si pagó, se cae; y si se
+ *     le pasó del todo, también —lo que le toca ahora es un `venc`, que
+ *     generará el aviso diario, y no un «no olvides renovar» a destiempo.
+ *   · `maestro` es un mensaje escrito por una persona y no lo resuelve ningún
+ *     estado: ése se queda hasta que lo lean.
+ */
+export function vigentes<T extends AvisoConEstado>(avisos: T[], hoy: string): T[] {
+  return avisos.filter((a) => {
+    if (a.type === 'venc' || a.type === 'mora') {
+      return estado(a, hoy) === 'vencido';
+    }
+    if (a.type === 'pre_venc') return estado(a, hoy) === 'por_vencer';
+    return true;
+  });
+}
+
 export async function notificationsRoutes(app: FastifyInstance) {
   // ── POST /notifications/run — el maestro los genera a mano ─────────────────
   // Recorre todas las membresías del club y manda push, así que es de las rutas
@@ -174,28 +219,33 @@ export async function notificationsRoutes(app: FastifyInstance) {
       readAt: notifications.readAt,
       fullName: users.fullName,
       venceEl: memberships.venceEl,
+      // Hacen falta para saber si el aviso todavía es verdad. Ver `vigentes`.
+      clasesRestantes: memberships.clasesRestantes,
     };
 
-    if (all && esStaff) {
-      if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
-      return db
-        .select(columnas)
-        .from(notifications)
-        .innerJoin(memberships, eq(notifications.membershipId, memberships.id))
-        .innerJoin(users, eq(notifications.userId, users.id))
-        .where(eq(memberships.orgId, orgId))
-        .orderBy(desc(notifications.scheduledFor))
-        .limit(100);
-    }
+    const filas =
+      all && esStaff
+        ? orgId
+          ? await db
+              .select(columnas)
+              .from(notifications)
+              .innerJoin(memberships, eq(notifications.membershipId, memberships.id))
+              .innerJoin(users, eq(notifications.userId, users.id))
+              .where(eq(memberships.orgId, orgId))
+              .orderBy(desc(notifications.scheduledFor))
+              .limit(100)
+          : null
+        : await db
+            .select(columnas)
+            .from(notifications)
+            .leftJoin(memberships, eq(notifications.membershipId, memberships.id))
+            .innerJoin(users, eq(notifications.userId, users.id))
+            .where(eq(notifications.userId, req.user!.sub))
+            .orderBy(desc(notifications.scheduledFor))
+            .limit(50);
 
-    return db
-      .select(columnas)
-      .from(notifications)
-      .leftJoin(memberships, eq(notifications.membershipId, memberships.id))
-      .innerJoin(users, eq(notifications.userId, users.id))
-      .where(eq(notifications.userId, req.user!.sub))
-      .orderBy(desc(notifications.scheduledFor))
-      .limit(50);
+    if (filas === null) return reply.code(400).send({ error: 'Sin club seleccionado.' });
+    return vigentes(filas, todayStr());
   });
 
   // ── POST /notifications/leidos — marcar los míos como leídos ───────────────

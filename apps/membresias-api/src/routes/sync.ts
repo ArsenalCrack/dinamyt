@@ -449,4 +449,125 @@ export async function syncRoutes(app: FastifyInstance) {
       return { encontrada: true, aplicado: true, enlazada, de: u.role, a: rol };
     });
   });
+
+  // ── POST /sync/pertenencia — el portal sacó a alguien de su club ──────────
+  //
+  // **La otra mitad de una baja.**
+  //
+  // ── Qué se rompía sin esto ──
+  //
+  // El maestro quitaba a un alumno de su organización en el portal y aquí no
+  // pasaba nada: seguía en el listado, seguía contando en el resumen del club
+  // y seguía pudiendo entrar. Desde fuera se veía como que la aplicación no
+  // hace caso —«lo eliminé y sigue ahí»—, y el remedio a mano (desactivarlo
+  // también aquí) obligaba a hacer el mismo gesto dos veces, en dos sitios, y
+  // a acordarse de los dos para siempre.
+  //
+  // ── Por qué DESACTIVA y no borra ──
+  //
+  // Porque aquí es lo que significa una baja. `DELETE /users/:id` de esta misma
+  // API tampoco borra: apaga el acceso y conserva la ficha, porque de ella
+  // cuelgan los pagos y las asistencias, que son la contabilidad del club y no
+  // se van con la persona. Quien vuelve —y vuelven— recupera su historial
+  // entero en vez de estrenar una ficha en blanco.
+  //
+  // Es exactamente la regla de §4.7 leída en su sentido bueno: el portal no
+  // pisa en silencio lo que decide esta app, pero sacar a alguien de un club es
+  // una decisión deliberada de quien tiene permiso, y ésa manda.
+  //
+  // ── A quién NO toca ──
+  //
+  // A la ficha sin `eco_sub` —el alumno sin correo, que entra por carnet QR o
+  // PIN—, porque no es de nadie del portal. Y al ÚLTIMO maestro con acceso de
+  // un club: sin él nadie puede cobrar ni dar de alta, y un club sin dueño no
+  // se arregla desde ninguna de las dos pantallas. Se contesta con el motivo,
+  // que el portal registra.
+  app.post('/sync/pertenencia', async (req, reply) => {
+    const puerta = abrir(req as never);
+    if (puerta === 404) return reply.code(404).send({ error: 'No encontrado.' });
+    if (puerta === 401) return reply.code(401).send({ error: 'Secreto inválido.' });
+
+    const body = (req.body ?? {}) as { ecoSub?: string; ecoOrgId?: string };
+    const ecoSub =
+      typeof body.ecoSub === 'string' && UUID.test(body.ecoSub) ? body.ecoSub : null;
+    if (!ecoSub) return reply.code(422).send({ error: 'Falta `ecoSub`.' });
+    const ecoOrgId =
+      typeof body.ecoOrgId === 'string' && UUID.test(body.ecoOrgId) ? body.ecoOrgId : null;
+    if (!ecoOrgId) return reply.code(422).send({ error: 'Falta `ecoOrgId`.' });
+
+    // Cruza clubes a propósito, como el resto del espejo: quien llama es el
+    // ecosistema y no pertenece a ninguno.
+    return sinFiltroDeClub(req.server.db, async (db: Db) => {
+      // El club, por su espejo. Sin espejo no hay nada que hacer: esa
+      // organización del portal no usa Membresías.
+      const [club] = await db
+        .select({ id: orgs.id })
+        .from(orgs)
+        .where(eq(orgs.ecoOrgId, ecoOrgId))
+        .limit(1);
+      if (!club) return { encontrada: false, aplicado: false, motivo: 'Club sin espejo.' };
+
+      // La ficha, en ESE club. El filtro por club no sobra: la misma persona
+      // puede tener ficha en dos clubes distintos, y la baja es de uno.
+      const [u] = await db
+        .select({
+          id: users.id,
+          role: users.role,
+          isActive: users.isActive,
+          isSuperAdmin: users.isSuperAdmin,
+        })
+        .from(users)
+        .where(and(eq(users.ecoSub, ecoSub), eq(users.orgId, club.id)))
+        .limit(1);
+      if (!u) return { encontrada: false, aplicado: false };
+
+      if (u.isSuperAdmin) {
+        return {
+          encontrada: true,
+          aplicado: false,
+          motivo: 'Es el superadmin de esta instalación: su acceso no lo decide un club.',
+        };
+      }
+      if (!u.isActive) {
+        return { encontrada: true, aplicado: false, motivo: 'Ya estaba sin acceso.' };
+      }
+
+      // El club no se queda sin dueño. Misma regla que `/sync/rol`, y hace
+      // falta otra vez: allá se mira `org_members`, que es otra tabla.
+      if (u.role === 'owner') {
+        const [otro] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(
+            and(
+              eq(users.orgId, club.id),
+              eq(users.role, 'owner'),
+              eq(users.isActive, true),
+              ne(users.id, u.id),
+            ),
+          )
+          .limit(1);
+        if (!otro) {
+          return {
+            encontrada: true,
+            aplicado: false,
+            motivo:
+              'Es el único maestro con acceso a su club en Membresías: nadie ' +
+              'podría cobrar ni dar de alta. Nombra otro maestro antes de darlo de baja.',
+          };
+        }
+      }
+
+      await db
+        .update(users)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(users.id, u.id));
+
+      req.log.info(
+        { usuario: u.id, club: club.id },
+        'acceso retirado desde el portal: salió del club',
+      );
+      return { encontrada: true, aplicado: true };
+    });
+  });
 }

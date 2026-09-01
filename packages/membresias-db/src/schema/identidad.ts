@@ -47,8 +47,8 @@ export const orgs = mem.table('orgs', {
    * gente ya asociada—. Vacío mientras Membresías corra sola.
    */
   ecoOrgId: uuid('eco_org_id'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Usuarios ─────────────────────────────────────────────────────────────────
@@ -150,8 +150,8 @@ export const users = mem.table(
      * QR o PIN—, que siguen funcionando igual que siempre.
      */
     ecoSub: uuid('eco_sub'),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (t) => [
     index('ix_users_org').on(t.orgId),
