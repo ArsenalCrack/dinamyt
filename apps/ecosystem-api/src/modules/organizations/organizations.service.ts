@@ -33,7 +33,12 @@ import {
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
 import { MailerService } from '../auth/mailer.service';
-import { espejarBaja, espejarClub, espejarRol } from '../../common/espejo-membresias';
+import {
+  espejarAlta,
+  espejarBaja,
+  espejarClub,
+  espejarRol,
+} from '../../common/espejo-membresias';
 import { OrgNotificationsService } from './org-notifications.service';
 import { rolParaApp } from '../../common/roles-por-app';
 import { ROLES_GESTOR, esRolGestor } from '../../common/roles';
@@ -408,6 +413,12 @@ export class OrganizationsService {
           invitedByUserId,
         })
         .returning();
+      // Entrar al club es entrar en Membresías. Ver `espejarAlta`.
+      espejarAlta(userId, orgId, {
+        email: usuario.email,
+        fullName: usuario.fullName,
+        rolMembresias: rolParaApp('membresias', miembro.roleMembresias, miembro.role),
+      });
     }
 
     // ── La invitación ──────────────────────────────────────────────────────
@@ -661,9 +672,15 @@ export class OrganizationsService {
         );
       }
     } else {
-      await db
+      const [nuevo] = await db
         .insert(orgMembers)
-        .values({ orgId, userId: user.id, role, invitedByUserId });
+        .values({ orgId, userId: user.id, role, invitedByUserId })
+        .returning();
+      espejarAlta(user.id, orgId, {
+        email: user.email,
+        fullName: user.fullName,
+        rolMembresias: rolParaApp('membresias', nuevo.roleMembresias, nuevo.role),
+      });
     }
 
     // Suscripción: ¿la org ya tiene una ACTIVA que incluya la app?
@@ -1080,11 +1097,29 @@ export class OrganizationsService {
         socialLinks: data.socialLinks?.filter(Boolean) ?? null,
       })
       .returning();
-    await db.insert(orgMembers).values({
-      orgId: club.id,
-      userId,
-      role: 'maestro',
-    });
+    const [fundador] = await db
+      .insert(orgMembers)
+      .values({
+        orgId: club.id,
+        userId,
+        role: 'maestro',
+      })
+      .returning();
+
+    // Quien funda su club es su maestro también en Membresías. Sin esto tenía
+    // club en el portal y ninguna ficha con la que abrir el suyo.
+    const [quien] = await db
+      .select({ email: users.email, fullName: users.fullName })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (quien) {
+      espejarAlta(userId, club.id, {
+        email: quien.email,
+        fullName: quien.fullName,
+        rolMembresias: rolParaApp('membresias', fundador.roleMembresias, fundador.role),
+      });
+    }
     return club;
   }
 
@@ -1819,6 +1854,22 @@ export class OrganizationsService {
           .returning()
       )[0];
 
+    // Entrar al club es entrar en Membresías: sin esto, el maestro aceptaba a
+    // alguien aquí y allí no aparecía hasta que esa persona abriera la app por
+    // su cuenta. Ver `espejarAlta`.
+    const [entrante] = await db
+      .select({ email: users.email, fullName: users.fullName })
+      .from(users)
+      .where(eq(users.id, solicitud.userId))
+      .limit(1);
+    if (entrante) {
+      espejarAlta(solicitud.userId, solicitud.orgId, {
+        email: entrante.email,
+        fullName: entrante.fullName,
+        rolMembresias: rolParaApp('membresias', miembro.roleMembresias, miembro.role),
+      });
+    }
+
     const [fila] = await db
       .update(orgJoinRequests)
       .set({
@@ -2324,6 +2375,13 @@ export class OrganizationsService {
           })
           .returning()
       )[0];
+
+    // Aceptar la invitación es entrar en Membresías. Ver `espejarAlta`.
+    espejarAlta(userId, inv.orgId, {
+      email: yo?.email ?? inv.email,
+      fullName: yo?.fullName,
+      rolMembresias: rolParaApp('membresias', miembro.roleMembresias, miembro.role),
+    });
 
     const [fila] = await db
       .update(orgInvitations)

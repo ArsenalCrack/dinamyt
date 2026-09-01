@@ -285,3 +285,51 @@ export function espejarRol(
 export function espejarBaja(userId: string, orgId: string): void {
   void avisar('/sync/pertenencia', { ecoSub: userId, ecoOrgId: orgId });
 }
+
+/**
+ * Copia el ALTA: esta persona acaba de entrar en este club.
+ *
+ * ── El hueco que cierra, y por qué se veía tanto ──
+ *
+ * La baja viajaba y el alta no. El maestro aceptaba a diez alumnos aquí,
+ * entraba a Membresías y **no había ninguno**: allí la ficha solo nacía cuando
+ * cada uno abría la app por su cuenta (el canje del SSO), y casi nadie lo hace
+ * el primer día. Mientras tanto no se les podía cobrar, ni pasarles lista, ni
+ * saber si de verdad habían entrado — la misma gente estaba en un sitio y no
+ * en el otro.
+ *
+ * El apaño que quedaba a mano era volver a asignarles el rol, porque `/sync/rol`
+ * sí ata una ficha suelta por correo. Eso arreglaba a quien YA tenía ficha y no
+ * hacía nada por quien no la tenía, así que ni siquiera funcionaba siempre —
+ * y había que acordarse, persona por persona.
+ *
+ * ── Qué NO hace ──
+ *
+ * No manda a quien no tiene rol en Membresías (`judge` de una federación, por
+ * ejemplo): sin rol allí no hay ficha que crear, igual que en `espejarRol`. Y
+ * como todo el espejo, se dispara sin esperarlo: que Membresías esté caída no
+ * puede impedir que alguien entre a un club.
+ *
+ * Al otro lado no se duplica nada: si ya hay ficha se le devuelve el acceso, y
+ * si la hay con ese correo sin enlazar se ata (ver `asegurarFicha`).
+ */
+export function espejarAlta(
+  userId: string,
+  orgId: string,
+  datos: {
+    email: string;
+    fullName?: string | null;
+    /** El rol de Membresías. Sin él no se manda nada. */
+    rolMembresias: string | null;
+  },
+): void {
+  if (!datos.rolMembresias || !datos.email) return;
+  void avisar('/sync/pertenencia', {
+    ecoSub: userId,
+    ecoOrgId: orgId,
+    activo: true,
+    email: datos.email,
+    fullName: datos.fullName ?? undefined,
+    role: datos.rolMembresias,
+  });
+}
