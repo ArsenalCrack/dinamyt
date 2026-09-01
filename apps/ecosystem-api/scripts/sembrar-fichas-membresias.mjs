@@ -186,16 +186,33 @@ console.log(`  Saltados sin acceso   : ${saltados.sinAcceso}  (se lo quitaron a 
 console.log(`  Saltados sin correo   : ${saltados.sinCorreo}`);
 
 if (!APLICAR) {
+  /**
+   * El ensayo enseña la lista ENTERA, agrupada por club.
+   *
+   * Enseñaba los quince primeros y «… y 30 más», y eso vacía de sentido al
+   * ensayo: existe para poder mirar a quién va a tocar ANTES de tocarlo, y no
+   * se puede revisar lo que no se ve. Por club, además, porque la pregunta que
+   * uno se hace mirando esto es «¿está bien mi club?», no «¿está bien la fila
+   * número 31?».
+   */
   console.log(`
 ── Ensayo: no se ha mandado nada ──
-
-  Los primeros que se avisarían:`);
-  for (const c of candidatos.slice(0, 15)) {
-    console.log(`    · ${c.full_name} (${c.email}) → ${c.org_name} como ${c.rol}`);
+`);
+  let clubActual = null;
+  for (const c of candidatos) {
+    if (c.org_name !== clubActual) {
+      clubActual = c.org_name;
+      const cuantos = candidatos.filter((x) => x.org_name === clubActual).length;
+      console.log(`
+  ${clubActual}  (${cuantos})`);
+    }
+    console.log(`    · ${c.full_name} (${c.email}) como ${c.rol}`);
   }
-  if (candidatos.length > 15) console.log(`    … y ${candidatos.length - 15} más`);
   console.log(`
+  ${candidatos.length} en total.
+
   Para mandarlos de verdad:  pnpm espejo:sembrar --aplicar
+  Solo un club:              pnpm espejo:sembrar --aplicar --org <id>
 `);
   await bd.cerrar();
   process.exit(0);
