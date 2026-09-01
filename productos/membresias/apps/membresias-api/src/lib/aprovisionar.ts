@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import type { JwtPayload, MembresiasRole } from '../types/auth';
 import { ROLES_VALIDOS } from '../types/auth';
@@ -49,6 +49,112 @@ import { ROLES_VALIDOS } from '../types/auth';
 /** Un `sub` u `org_id` con forma de UUID; cualquier otra cosa no va a Postgres. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * El nombre en MAYÚSCULAS, como todo el roster (ver la migración 0011).
+ *
+ * Si entrara tal cual viene del portal, el listado del maestro tendría una fila
+ * escrita de otra manera y ordenaría distinto que las demás.
+ */
+export function nombreDeRoster(nombre: string | null | undefined, correo: string): string {
+  return (nombre || correo.split('@')[0])
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleUpperCase('es');
+}
+
+/** Un rol del catálogo, o `student`, que es el que no puede hacer daño. */
+export function rolValido(rol: string | null | undefined): MembresiasRole {
+  return rol && ROLES_VALIDOS.includes(rol as MembresiasRole)
+    ? (rol as MembresiasRole)
+    : 'student';
+}
+
+/**
+ * La ficha de esta persona EN ESTE CLUB, exista ya o haya que crearla.
+ *
+ * ── Por qué está aparte, y por qué la usan DOS caminos ──
+ *
+ * Hasta ahora la ficha nacía en un solo sitio: cuando la persona abría
+ * Membresías por primera vez desde el portal (`POST /auth/sso`). Eso dejaba un
+ * hueco que el maestro veía todos los días — aceptaba a diez alumnos en el
+ * portal, entraba a Membresías y **no había ninguno**, porque ninguno había
+ * abierto la app todavía. No los podía cobrar, ni pasarles lista, ni saber si
+ * de verdad habían entrado al club.
+ *
+ * Ahora entrar al club TAMBIÉN la crea, desde el aviso del portal
+ * (`POST /sync/pertenencia`). Es la misma función, con las mismas reglas, para
+ * que las dos puertas no se separen: el día que una cambie, cambian las dos.
+ *
+ * ── Los tres casos, y por qué son tres ──
+ *
+ *   1. **Ya tiene ficha enlazada aquí** → se le devuelve. Si estaba sin acceso
+ *      se le devuelve el acceso: volver al club ES recuperar el acceso, y su
+ *      historial entero le está esperando.
+ *   2. **Tiene ficha con su correo pero SIN enlazar** → se ata. Es la del
+ *      alumno que su maestro creó a mano aquí antes de que existiera el puente.
+ *      Crear otra sería partir a una persona en dos, con sus pagos en una mitad.
+ *   3. **No tiene ninguna** → nace, sin contraseña propia: la suya vive en el
+ *      portal (ver la migración 0016, que es lo que hace posible esa línea).
+ */
+export async function asegurarFicha(
+  db: Db,
+  datos: {
+    ecoSub: string;
+    clubId: string;
+    email: string;
+    fullName?: string | null;
+    role?: string | null;
+  },
+): Promise<{ ficha: typeof users.$inferSelect; creada: boolean; enlazada: boolean }> {
+  const correo = datos.email.trim().toLowerCase();
+  const role = rolValido(datos.role);
+
+  // 1 · La suya, ya enlazada y en este club.
+  const [mia] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.ecoSub, datos.ecoSub), eq(users.orgId, datos.clubId)))
+    .limit(1);
+  if (mia) {
+    // Volver al club devuelve el acceso. No se toca el ROL: aquí lo puede haber
+    // cambiado el maestro después, y pisarlo con el del portal en cada aviso
+    // convertiría este puente en una máquina de degradar gente en silencio.
+    if (!mia.isActive) {
+      const [viva] = await db
+        .update(users)
+        .set({ isActive: true, updatedAt: new Date() })
+        .where(eq(users.id, mia.id))
+        .returning();
+      return { ficha: viva, creada: false, enlazada: false };
+    }
+    return { ficha: mia, creada: false, enlazada: false };
+  }
+
+  // 2 · La que ya existía con su correo y nunca se ató a una cuenta del portal.
+  //     El `isNull` va en el WHERE y no en un `if`, para que dos avisos a la vez
+  //     no se pisen — mismo criterio que `/sync/rol`.
+  const [suelta] = await db
+    .update(users)
+    .set({ ecoSub: datos.ecoSub, isActive: true, orgId: datos.clubId, updatedAt: new Date() })
+    .where(and(eq(users.email, correo), isNull(users.ecoSub)))
+    .returning();
+  if (suelta) return { ficha: suelta, creada: false, enlazada: true };
+
+  // 3 · No hay ninguna: nace.
+  const [nueva] = await db
+    .insert(users)
+    .values({
+      email: correo,
+      fullName: nombreDeRoster(datos.fullName, correo),
+      passwordHash: null,
+      role,
+      orgId: datos.clubId,
+      ecoSub: datos.ecoSub,
+    })
+    .returning();
+  return { ficha: nueva, creada: true, enlazada: false };
+}
+
 export interface FichaAprovisionada {
   ficha: typeof users.$inferSelect;
   club: { id: string; name: string };
@@ -79,31 +185,15 @@ export async function aprovisionarFicha(
     .limit(1);
   if (!club) return null;
 
-  const rolDelToken = payload.role_membresias as MembresiasRole | null;
-  const role: MembresiasRole =
-    rolDelToken && ROLES_VALIDOS.includes(rolDelToken) ? rolDelToken : 'student';
-
-  // El nombre en MAYÚSCULAS como en todo el roster (ver la migración 0011): si
-  // entrara tal cual viene del portal, el listado del maestro tendría una fila
-  // escrita de otra manera y ordenaría distinto que las demás.
-  const nombre = (payload.fullName ?? correo.split('@')[0])
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLocaleUpperCase('es');
-
-  const [ficha] = await db
-    .insert(users)
-    .values({
-      email: correo,
-      fullName: nombre,
-      // Sin contraseña propia: la suya vive en el portal. Ver la migración
-      // 0016, que es lo que hace posible esta línea.
-      passwordHash: null,
-      role,
-      orgId: club.id,
-      ecoSub: sub,
-    })
-    .returning();
+  // La misma función que usa el aviso del portal: si las dos puertas no
+  // comparten las reglas, se separan a la primera que alguien cambie una.
+  const { ficha } = await asegurarFicha(db, {
+    ecoSub: sub,
+    clubId: club.id,
+    email: correo,
+    fullName: payload.fullName,
+    role: payload.role_membresias,
+  });
 
   return { ficha, club };
 }

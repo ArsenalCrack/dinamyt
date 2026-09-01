@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { sinFiltroDeClub } from '../lib/db-contexto';
+import { asegurarFicha } from '../lib/aprovisionar';
 import { syncSecret } from '../config';
 import { cinturon } from '../lib/cinturones';
 import { imagenGuardada } from '../lib/imagenes';
@@ -450,9 +451,23 @@ export async function syncRoutes(app: FastifyInstance) {
     });
   });
 
-  // ── POST /sync/pertenencia — el portal sacó a alguien de su club ──────────
+  // ── POST /sync/pertenencia — alguien entró o salió de su club ─────────────
   //
-  // **La otra mitad de una baja.**
+  // **La pertenencia al club, en los dos sentidos.**
+  //
+  // ── El hueco que faltaba: el ALTA ──
+  //
+  // La baja viajaba y el alta no, y eso se veía todos los días. El maestro
+  // aceptaba a diez alumnos en el portal, entraba a Membresías y **no había
+  // ninguno**: la ficha solo nacía cuando cada uno de ellos abría esta app por
+  // su cuenta (`POST /auth/sso`), y casi nadie lo hace el primer día. Mientras
+  // tanto el maestro no los podía cobrar, ni pasarles lista, ni saber si de
+  // verdad habían entrado — la gente estaba en un sitio y no en el otro, y el
+  // único remedio a mano era volver a asignarles el rol para forzar el aviso.
+  //
+  // Ahora entrar al club basta. `activo: true` crea la ficha (o ata la que ya
+  // hubiera con ese correo, o le devuelve el acceso a quien vuelve) con las
+  // mismas reglas del SSO — es literalmente la misma función, `asegurarFicha`.
   //
   // ── Qué se rompía sin esto ──
   //
@@ -487,13 +502,23 @@ export async function syncRoutes(app: FastifyInstance) {
     if (puerta === 404) return reply.code(404).send({ error: 'No encontrado.' });
     if (puerta === 401) return reply.code(401).send({ error: 'Secreto inválido.' });
 
-    const body = (req.body ?? {}) as { ecoSub?: string; ecoOrgId?: string };
+    const body = (req.body ?? {}) as {
+      ecoSub?: string;
+      ecoOrgId?: string;
+      /** `true` = entró al club. Ausente = salió, que es como nació esta ruta. */
+      activo?: boolean;
+      /** Solo para el alta: con qué nace la ficha si no existe. */
+      email?: string;
+      fullName?: string;
+      role?: string;
+    };
     const ecoSub =
       typeof body.ecoSub === 'string' && UUID.test(body.ecoSub) ? body.ecoSub : null;
     if (!ecoSub) return reply.code(422).send({ error: 'Falta `ecoSub`.' });
     const ecoOrgId =
       typeof body.ecoOrgId === 'string' && UUID.test(body.ecoOrgId) ? body.ecoOrgId : null;
     if (!ecoOrgId) return reply.code(422).send({ error: 'Falta `ecoOrgId`.' });
+    const esAlta = body.activo === true;
 
     // Cruza clubes a propósito, como el resto del espejo: quien llama es el
     // ecosistema y no pertenece a ninguno.
@@ -506,6 +531,35 @@ export async function syncRoutes(app: FastifyInstance) {
         .where(eq(orgs.ecoOrgId, ecoOrgId))
         .limit(1);
       if (!club) return { encontrada: false, aplicado: false, motivo: 'Club sin espejo.' };
+
+      // ── El ALTA: entró al club ──────────────────────────────────────────
+      //
+      // Sin correo no hay ficha que crear ni que atar: es la clave con la que
+      // se reconoce a quien ya estaba aquí. Se contesta y no se revienta, que
+      // es lo que hace el resto del espejo con lo que no puede aplicar.
+      if (esAlta) {
+        const correo = (body.email ?? '').trim().toLowerCase();
+        if (!correo) {
+          return { encontrada: false, aplicado: false, motivo: 'Falta el correo.' };
+        }
+        const r = await asegurarFicha(db, {
+          ecoSub,
+          clubId: club.id,
+          email: correo,
+          fullName: body.fullName,
+          role: body.role,
+        });
+        req.log.info(
+          { usuario: r.ficha.id, club: club.id, creada: r.creada, enlazada: r.enlazada },
+          'alta desde el portal: entró al club',
+        );
+        return {
+          encontrada: true,
+          aplicado: true,
+          creada: r.creada,
+          enlazada: r.enlazada,
+        };
+      }
 
       // La ficha, en ESE club. El filtro por club no sobra: la misma persona
       // puede tener ficha en dos clubes distintos, y la baja es de uno.
