@@ -34,6 +34,7 @@ import { todayStr } from '../lib/billing';
 import {
   altaEnDinamyt,
   altaEnElEcosistema,
+  avisarAccesoAlEcosistema,
   type AltaHecha,
 } from '../lib/alta-ecosistema';
 import { ensureMembership } from '../lib/memberships';
@@ -219,6 +220,33 @@ async function delClub(db: Db, orgId: string, id: string) {
   return u ?? null;
 }
 
+/**
+ * Le cuenta al portal que a esta persona se le abrió o se le cerró el acceso.
+ *
+ * Va en una función porque se dispara desde dos sitios —`PATCH /users/:id` con
+ * `isActive` y `DELETE /users/:id`— y las dos tienen que decir lo mismo. Ver
+ * `avisarAccesoAlEcosistema`: no espera, no rompe nada si falla, y a la ficha
+ * sin cuenta del portal no la toca.
+ */
+async function avisarAcceso(
+  db: Db,
+  log: { warn: (msg: string) => void },
+  u: { ecoSub: string | null; orgId: string | null },
+  activo: boolean,
+): Promise<void> {
+  if (!u.ecoSub || !u.orgId || !altaEnElEcosistema()) return;
+  const [club] = await db
+    .select({ ecoOrgId: orgs.ecoOrgId })
+    .from(orgs)
+    .where(eq(orgs.id, u.orgId))
+    .limit(1);
+  avisarAccesoAlEcosistema(log, {
+    ecoSub: u.ecoSub,
+    ecoOrgId: club?.ecoOrgId ?? null,
+    activo,
+  });
+}
+
 export async function usersRoutes(app: FastifyInstance) {
   // ── GET /users — gente del club, por páginas ──────────────────────────────
   //
@@ -290,7 +318,30 @@ export async function usersRoutes(app: FastifyInstance) {
     }
     const donde = and(...conds);
 
-    const [filas, [cuenta]] = await Promise.all([
+    /**
+     * ── Cuántos alumnos tiene el club, aunque se esté mirando otra cosa ──
+     *
+     * `total` cuenta lo que casa con los filtros PUESTOS, y por eso no sirve
+     * para contestar «¿cuántos alumnos tengo?»: buscar «ana» lo deja en 1, y
+     * el filtro de cinturón lo baja a los negros. Peor: el paginador —lo único
+     * que enseñaba un número— se esconde cuando todo cabe en una página, así
+     * que un club de doce alumnos no veía la cifra por ningún lado.
+     *
+     * Este resumen va aparte de los filtros a propósito, y son las dos cifras
+     * que significan algo para el maestro:
+     *
+     *   · `alumnos` — los que entrenan y entran: rol `student` y con acceso.
+     *     Es «cuántos alumnos tengo», y es lo que se cobra.
+     *   · `sinAcceso` — a cuántos se les cortó el acceso, del rol que sean.
+     *     Va al lado porque sin él la primera cifra se lee como «el club
+     *     entero», y no lo es: quien no ve el número no sabe que hay gente
+     *     apagada esperando a que alguien se acuerde de ella.
+     *
+     * El maestro no se cuenta en ninguna, igual que no sale en la lista.
+     */
+    const delClubSinElMaestro = and(eq(users.orgId, orgId), ne(users.role, 'owner'));
+
+    const [filas, [cuenta], [resumen]] = await Promise.all([
       req.db
         .select(COLUMNAS_VISTA)
         .from(users)
@@ -299,8 +350,21 @@ export async function usersRoutes(app: FastifyInstance) {
         .limit(limit)
         .offset(offset),
       req.db.select({ n: sql<number>`count(*)::int` }).from(users).where(donde),
+      req.db
+        .select({
+          alumnos: sql<number>`count(*) filter (
+            where ${users.role} = 'student' and ${users.isActive}
+          )::int`,
+          sinAcceso: sql<number>`count(*) filter (where not ${users.isActive})::int`,
+        })
+        .from(users)
+        .where(delClubSinElMaestro),
     ]);
-    return { items: filas.map(vista), total: cuenta?.n ?? 0 };
+    return {
+      items: filas.map(vista),
+      total: cuenta?.n ?? 0,
+      resumen: { alumnos: resumen?.alumnos ?? 0, sinAcceso: resumen?.sinAcceso ?? 0 },
+    };
   });
 
   // ── POST /users — dar de alta a alguien en mi club ────────────────────────
@@ -618,6 +682,12 @@ export async function usersRoutes(app: FastifyInstance) {
       }
 
       const [upd] = await db.update(users).set(cambios).where(eq(users.id, u.id)).returning();
+      // Si lo que cambió fue el acceso, el portal tiene que enterarse: es lo
+      // que decide si le sigue enseñando a esa persona su botón de «Entrar a
+      // Membresías», que hasta ahora la mandaba a un 403 sin explicación.
+      if (body.isActive !== undefined && Boolean(body.isActive) !== u.isActive) {
+        await avisarAcceso(db, req.log, upd, Boolean(body.isActive));
+      }
       return vista(upd);
     },
   );
@@ -779,6 +849,7 @@ export async function usersRoutes(app: FastifyInstance) {
       .update(users)
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(users.id, u.id));
+    await avisarAcceso(db, req.log, u, false);
     return { ok: true };
   });
 }

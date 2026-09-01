@@ -228,6 +228,11 @@ const es = {
 
   // Alumnos (CRUD del maestro)
   'alumnos.titulo': 'Alumnos del club',
+  // Cuánta gente hay, debajo del título. `alumnos` son los del rol `student`
+  // con acceso; `sinAcceso` es cualquiera al que se le cortó, del rol que sea.
+  'alumnos.cuantos': 'alumnos',
+  'alumnos.unAlumno': 'alumno',
+  'alumnos.sinAcceso': 'sin acceso',
   'alumnos.nuevo': 'Nuevo alumno',
   // «Dar de alta» es vocabulario de oficina: el maestro inscribe gente en su
   // club, no da de alta registros. Y dice «a alguien» porque por aquí entran
@@ -383,6 +388,17 @@ const es = {
   'grupos.semanaSiguiente': 'Semana siguiente',
   'grupos.semanaActual': 'Esta semana',
   'grupos.semanaDel': 'Semana del',
+  // El botón que guarda la clase entera —días, horas y nota— y el aviso de que
+  // queda algo sin guardar. Los dos nacen del mismo fallo: había DOS botones
+  // que decían «Guardar» dentro de la misma tarjeta, y el que quedaba justo
+  // debajo de los selectores de hora era el de la nota. Se elegía la hora, se
+  // pulsaba el botón de al lado, salía un «guardado» verde y la hora no se
+  // había mandado a ninguna parte.
+  'grupos.guardarClase': 'Guardar esta clase',
+  'grupos.guardarHorario': 'Guardar el horario',
+  'grupos.sinGuardar': 'Sin guardar',
+  'grupos.guardada': 'Clase guardada: días, horas y nota.',
+  'grupos.horarioGuardado': 'Horario guardado.',
 
   // Carnet QR
   'qr.titulo': 'Carnet del alumno',
@@ -874,6 +890,9 @@ const en: Record<ClaveTexto, string> = {
   'panel.cumpleTitulo': 'Birthday today',
 
   'alumnos.titulo': 'Club students',
+  'alumnos.cuantos': 'students',
+  'alumnos.unAlumno': 'student',
+  'alumnos.sinAcceso': 'without access',
   'alumnos.nuevo': 'New student',
   'alumnos.crearTitulo': 'Enrol someone in the club',
   'alumnos.noTeDesactivas':
@@ -1003,6 +1022,11 @@ const en: Record<ClaveTexto, string> = {
   'grupos.semanaSiguiente': 'Next week',
   'grupos.semanaActual': 'This week',
   'grupos.semanaDel': 'Week of',
+  'grupos.guardarClase': 'Save this class',
+  'grupos.guardarHorario': 'Save the schedule',
+  'grupos.sinGuardar': 'Unsaved',
+  'grupos.guardada': 'Class saved: days, times and note.',
+  'grupos.horarioGuardado': 'Schedule saved.',
 
   'qr.titulo': 'Student card',
   'qr.descripcion':

@@ -170,6 +170,15 @@ export default function Alumnos() {
    */
   const [clases, setClases] = useState<Clase[]>([]);
   const [total, setTotal] = useState(0);
+  /**
+   * Cuánta gente tiene el club, al margen de los filtros.
+   *
+   * `total` cuenta lo que casa con lo que hay puesto arriba —buscar «ana» lo
+   * deja en 1— y el paginador, que era lo único que enseñaba un número, se
+   * esconde cuando todo cabe en una página. Un club de doce alumnos no veía la
+   * cifra por ningún sitio. Ver el resumen que devuelve `GET /users`.
+   */
+  const [resumen, setResumen] = useState({ alumnos: 0, sinAcceso: 0 });
   const [offset, setOffset] = useState(0);
   /**
    * Con qué se está mirando la lista: rol, acceso, cinturón y orden. Se
@@ -206,7 +215,11 @@ export default function Alumnos() {
       // Todo lo que se elige arriba viaja: el listado va por páginas, así que
       // filtrar u ordenar aquí acomodaría veinticinco personas de doscientas.
       // Ver `lib/filtros.ts` en la API.
-      const { data } = await api.get<{ items: Persona[]; total: number }>('/users', {
+      const { data } = await api.get<{
+        items: Persona[];
+        total: number;
+        resumen: { alumnos: number; sinAcceso: number };
+      }>('/users', {
         params: {
           ...(buscado ? { q: buscado } : {}),
           ...(filtros.rol ? { role: filtros.rol } : {}),
@@ -219,6 +232,7 @@ export default function Alumnos() {
       });
       setGente(data.items);
       setTotal(data.total);
+      setResumen(data.resumen ?? { alumnos: 0, sinAcceso: 0 });
     } catch (e) {
       setError(mensajeError(e, t('comun.ninguno')));
     } finally {
@@ -804,9 +818,26 @@ export default function Alumnos() {
           marginBottom: '1.25rem',
         }}
       >
-        <h1 className="display" style={{ fontSize: '1.5rem' }}>
-          {t('alumnos.titulo')}
-        </h1>
+        <div style={{ minWidth: 0 }}>
+          <h1 className="display" style={{ fontSize: '1.5rem' }}>
+            {t('alumnos.titulo')}
+          </h1>
+          {/* Cuántos son. Va pegado al título y no dentro de la barra de
+              filtros porque no depende de ellos: es el club, no el resultado
+              de una búsqueda. El «sin acceso» solo aparece si hay alguien, y
+              entonces importa: es la gente apagada que nadie está mirando. */}
+          <p className="muted" style={{ fontSize: '0.8rem', marginTop: '0.15rem' }}>
+            <span className="mono">{resumen.alumnos}</span>{' '}
+            {resumen.alumnos === 1 ? t('alumnos.unAlumno') : t('alumnos.cuantos')}
+            {resumen.sinAcceso > 0 && (
+              <>
+                {' · '}
+                <span className="mono">{resumen.sinAcceso}</span>{' '}
+                {t('alumnos.sinAcceso')}
+              </>
+            )}
+          </p>
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {/* El maestro ya no se lista entre sus alumnos (ver `GET /users`),
               así que su ficha necesita una puerta: esta. */}

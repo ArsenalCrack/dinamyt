@@ -7,6 +7,33 @@ import { pgSchema } from 'drizzle-orm/pg-core';
  */
 export const mem = pgSchema('membresias');
 
+/**
+ * ── Las fechas de aquí son de DOS clases, y se escriben distinto ───────────
+ *
+ * **Instantes** — cuándo pasó algo: `created_at`, `checked_in_at`, `paid_at`,
+ * `sent_at`… Llevan `{ withTimezone: true }`, o sea `timestamptz`. Guardan un
+ * punto en el tiempo, no una hora de pared, así que da igual si el valor lo
+ * pone `DEFAULT now()` (la base, en SU zona) o un `new Date()` de la
+ * aplicación (UTC): los dos escriben el mismo instante y los dos se leen bien.
+ *
+ * Sin zona no daba igual, y se veía en la pantalla que más se mira: la hora de
+ * la asistencia. La base escribía la hora de pared del servidor
+ * (`TZ=America/Bogota` en el VPS), Drizzle la leía dando por hecho que era UTC
+ * (`mapFromDriverValue` le pega un `+0000`), y el kiosco enseñaba cada marca
+ * **cinco horas en el pasado**. En local no se veía porque PGlite arranca en
+ * `GMT` y los dos convenios coincidían de casualidad. El arreglo es la
+ * migración `0017_fechas_con_zona`.
+ *
+ * **Fechas civiles** — un día del calendario, sin hora: `vence_el`,
+ * `birth_date`, `checkin_date`, `semana`, `periodo_desde`… Son columnas `date`
+ * y **no se tocan**: un cumpleaños no ocurre a una hora, y una mensualidad que
+ * vence «el 31» no vence a las 19:00 del 30.
+ *
+ * **La regla para una columna nueva:** ¿se va a comparar con `Date.now()` o a
+ * pintar con una hora? Instante, `timestamp(..., { withTimezone: true })`.
+ * ¿Es un día que alguien escribiría en un formulario? `date`.
+ */
+
 // ── Enums del dominio ────────────────────────────────────────────────────────
 
 /**

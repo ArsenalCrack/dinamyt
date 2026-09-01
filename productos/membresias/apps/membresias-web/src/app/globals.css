@@ -766,6 +766,18 @@ input[type="password"]::-ms-clear { display: none; }
 }
 .avisos-item:last-child { border-bottom: 0; }
 .avisos-item[data-nuevo='true'] { border-left: 3px solid var(--gold); padding-left: 0.5rem; }
+/* El aviso ENTERO es el enlace, no un «ver» al final: lo que se toca en un
+   celular es el renglón, y un destino al que solo se llega apuntando a dos
+   palabras subrayadas se queda sin usar. Hereda el color para que las tres
+   líneas se sigan viendo como se veían. */
+a.avisos-item {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 0.35rem;
+  transition: background 0.12s ease;
+}
+a.avisos-item:hover,
+a.avisos-item:focus-visible { background: var(--gold-soft); }
 .avisos-titulo { font-size: 0.85rem; font-weight: 700; }
 .avisos-texto { font-size: 0.8rem; color: var(--text-muted); overflow-wrap: anywhere; }
 .avisos-fecha {

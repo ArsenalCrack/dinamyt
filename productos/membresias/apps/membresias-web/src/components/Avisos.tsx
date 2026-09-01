@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { fmtFecha } from '@/lib/formato';
@@ -35,6 +37,12 @@ interface Aviso {
  * 2. **Se ve en el celular.** El panel estaba anclado al borde derecho y en
  *    pantalla estrecha se salía; ahora se centra sobre un velo (ver
  *    `.avisos-panel` en globals.css).
+ * 3. **Se cae sola y lleva a alguna parte.** Un aviso cuyo motivo ya no existe
+ *    —el alumno pagó— no se devuelve (`vigentes` en la API), así que la
+ *    campana dice lo que pasa HOY y no lo que pasaba el martes. Y cada línea
+ *    es un enlace al sitio donde se hace algo con eso: la ficha del alumno con
+ *    el cobro a la vista para el maestro, «Mi estado» para el alumno. Antes se
+ *    leía el aviso, se cerraba el panel y había que ir a buscar a la persona.
  */
 export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
   const { t, idioma } = useI18n();
@@ -44,21 +52,40 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
   const [msgPush, setMsgPush] = useState('');
   const raizRef = useRef<HTMLDivElement | null>(null);
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (): Promise<Aviso[]> => {
     try {
       const r = await api.get<Aviso[]>('/notifications', {
         params: deTodoElClub ? { all: '1' } : undefined,
       });
       setAvisos(r.data);
+      return r.data;
     } catch {
       setAvisos([]); // sin avisos que mostrar; la campana no estorba
+      return [];
     }
   }, [deTodoElClub]);
 
   useEffect(() => {
-    void cargar();
     void estadoPush().then(setPush);
-  }, [cargar]);
+  }, []);
+
+  /**
+   * Se relee al cambiar de pantalla.
+   *
+   * La campana vive en la barra, así que no se vuelve a montar al navegar: sin
+   * esto, el maestro cobraba una mensualidad, volvía al panel y el número
+   * seguía diciendo lo mismo que cuando abrió el navegador. Y lo que se ve mal
+   * en una campana no es un aviso de más: es la sospecha de que ninguno de los
+   * otros vale.
+   *
+   * Cambiar de pantalla es la señal barata que cubre todos los casos —cobrar,
+   * cambiar un plan, dar de baja a alguien— sin que cada uno tenga que
+   * acordarse de avisar.
+   */
+  const ruta = usePathname();
+  useEffect(() => {
+    void cargar();
+  }, [cargar, ruta]);
 
   // Cerrar al tocar fuera o con Escape.
   useEffect(() => {
@@ -81,26 +108,49 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
     };
   }, [abierto]);
 
-  const hoy = new Date().toISOString().slice(0, 10);
-
   /**
    * Qué cuenta el número rojo.
    *
    * Para el alumno, los que no ha abierto. Para el maestro NO puede ser eso:
    * los avisos del club son de sus alumnos, y «sin leer» ahí significa «mis
-   * alumnos no los han abierto», que no es una tarea suya. Para él cuenta los
-   * de hoy: lo que ha pasado en el club desde esta mañana.
+   * alumnos no los han abierto», que no es una tarea suya. Para él cuenta
+   * **todos los que la API devuelve**, que ya son solo los que siguen siendo
+   * verdad (ver `vigentes` en `routes/notifications.ts`).
+   *
+   * Antes contaba los de HOY, y ese filtro por fecha era el que rompía las dos
+   * puntas: el aviso del alumno que pagó esta mañana seguía sumando hasta la
+   * medianoche, y el del que lleva vencido desde el jueves desaparecía del
+   * número sin que nadie hubiera cobrado nada.
    */
   const pendientes = deTodoElClub
-    ? avisos.filter((a) => a.scheduledFor?.slice(0, 10) === hoy).length
+    ? avisos.length
     : avisos.filter((a) => !a.readAt).length;
+
+  /**
+   * A dónde lleva cada aviso.
+   *
+   * Al maestro, a la ficha del alumno con el formulario de cobro ya a la vista
+   * (`#cobrar`, el mismo ancla que usa el botón «Cobrar» del panel): el aviso
+   * dice que alguien debe, y lo siguiente que se hace es cobrarle. Al alumno,
+   * a «Mi estado», que es donde ve su vencimiento y su carnet.
+   */
+  function destino(a: Aviso): string {
+    return deTodoElClub ? `/alumnos/${a.userId}#cobrar` : '/mi';
+  }
 
   async function alternar() {
     const nuevo = !abierto;
     setAbierto(nuevo);
     setMsgPush('');
-    // Abrir la campana ES leerlos. Solo los propios: ver arriba.
-    if (nuevo && !deTodoElClub && avisos.some((a) => !a.readAt)) {
+    if (!nuevo) return;
+
+    // Abrirla es releerla: entre que se pintó la pantalla y ahora, el maestro
+    // pudo haber cobrado en otra pestaña. Lo que se enseña al abrir tiene que
+    // ser lo de este segundo, no lo de hace media hora.
+    const frescos = await cargar();
+
+    // Y abrir la campana ES leerlos. Solo los propios: ver arriba.
+    if (!deTodoElClub && frescos.some((a) => !a.readAt)) {
       try {
         await api.post('/notifications/leidos');
         const ahora = new Date().toISOString();
@@ -181,28 +231,34 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
             ) : (
               <ul>
                 {avisos.map((a) => (
-                  <li
-                    key={a.id}
-                    className="avisos-item"
-                    data-nuevo={!deTodoElClub && !a.readAt}
-                  >
-                    <span
-                      className="avisos-titulo"
-                      style={{
-                        color:
-                          a.type === 'mora' || a.type === 'venc'
-                            ? 'var(--danger)'
-                            : a.type === 'pre_venc'
-                              ? 'var(--gold)'
-                              : 'var(--text)',
-                      }}
+                  <li key={a.id}>
+                    <Link
+                      href={destino(a)}
+                      className="avisos-item"
+                      data-nuevo={!deTodoElClub && !a.readAt}
+                      // El panel se cierra al saltar: dejarlo abierto encima de
+                      // la pantalla a la que se acaba de llegar tapa justo lo
+                      // que se venía a hacer.
+                      onClick={() => setAbierto(false)}
                     >
-                      {t(`aviso.${a.type}` as ClaveTexto)}
-                    </span>
-                    <span className="avisos-texto">{texto(a)}</span>
-                    <span className="avisos-fecha">
-                      {fmtFecha(a.scheduledFor?.slice(0, 10), idioma)}
-                    </span>
+                      <span
+                        className="avisos-titulo"
+                        style={{
+                          color:
+                            a.type === 'mora' || a.type === 'venc'
+                              ? 'var(--danger)'
+                              : a.type === 'pre_venc'
+                                ? 'var(--gold)'
+                                : 'var(--text)',
+                        }}
+                      >
+                        {t(`aviso.${a.type}` as ClaveTexto)}
+                      </span>
+                      <span className="avisos-texto">{texto(a)}</span>
+                      <span className="avisos-fecha">
+                        {fmtFecha(a.scheduledFor?.slice(0, 10), idioma)}
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>

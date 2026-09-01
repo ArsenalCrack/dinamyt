@@ -127,7 +127,21 @@ export default function Calendario() {
   const [semana, setSemana] = useState(() => lunesDe(hoyISO()));
   /** La nota de cada clase para esa semana, indexada por id (o `CLUB`). */
   const [notas, setNotas] = useState<Record<string, string>>({});
-  const [guardando, setGuardando] = useState(false);
+  /**
+   * Lo mismo, pero tal como está EN EL SERVIDOR.
+   *
+   * Es la copia contra la que se compara para saber qué queda por guardar. Sin
+   * ella no hay forma de dibujar el aviso de «sin guardar», y ese aviso es la
+   * mitad del arreglo: la otra mitad —los dos botones que decían «Guardar»—
+   * solo explica por qué se perdían las horas, no evita que se vuelvan a
+   * perder al salir de la pantalla sin pulsar nada.
+   */
+  const [guardado, setGuardado] = useState<{
+    dias: Dia[];
+    notas: Record<string, string>;
+  }>({ dias: [], notas: {} });
+  /** Qué clase se está guardando (su id, o `CLUB`). */
+  const [guardando, setGuardando] = useState<string | null>(null);
   /** Solo para fallos al CARGAR el calendario; lo demás va por la nube flotante. */
   const [error, setError] = useState('');
 
@@ -142,18 +156,18 @@ export default function Calendario() {
           notas: Nota[];
         }>('/schedule', { params: { semana: deLaSemana } });
         setGrupos(data.grupos);
-        setDias(
-          data.dias.map((d) => ({
-            groupId: d.groupId ?? null,
-            weekday: d.weekday,
-            opensAt: d.opensAt ?? null,
-            closesAt: d.closesAt ?? null,
-          })),
-        );
+        const dias = data.dias.map((d) => ({
+          groupId: d.groupId ?? null,
+          weekday: d.weekday,
+          opensAt: d.opensAt ?? null,
+          closesAt: d.closesAt ?? null,
+        }));
+        setDias(dias);
         setExc(data.excepciones);
         const porClase: Record<string, string> = {};
         for (const n of data.notas) porClase[n.groupId ?? CLUB] = n.nota;
         setNotas(porClase);
+        setGuardado({ dias, notas: porClase });
       } catch (e) {
         setError(mensajeError(e, t('comun.ninguno')));
       }
@@ -198,25 +212,62 @@ export default function Calendario() {
     );
   }
 
+  /** Los días de una clase, en un texto comparable (mismo orden siempre). */
+  function huellaDias(lista: Dia[], clase: string): string {
+    const id = clase === CLUB ? null : clase;
+    return lista
+      .filter((d) => d.groupId === id)
+      .map((d) => `${d.weekday}|${d.opensAt ?? ''}|${d.closesAt ?? ''}`)
+      .sort()
+      .join(',');
+  }
+
+  /** ¿Queda algo por guardar en esta clase —días, horas o nota—? */
+  function sinGuardar(clase: string): boolean {
+    return (
+      huellaDias(dias, clase) !== huellaDias(guardado.dias, clase) ||
+      (notas[clase] ?? '') !== (guardado.notas[clase] ?? '')
+    );
+  }
+
   /**
-   * Guarda el horario entero de una vez.
+   * Guarda una clase entera: sus días con sus horas, y su nota de la semana.
    *
-   * Es un reemplazo y no una edición fila a fila porque así lo es la ruta: el
-   * `PUT` borra los días del club y escribe los que van. Con esto, quitar un
-   * martes y añadir un jueves es un solo viaje y un solo estado consistente.
+   * ── Por qué es UN botón y no dos ──
+   *
+   * Porque dos era el fallo. La tarjeta tenía un «Guardar» para la nota, justo
+   * debajo de los selectores de hora, y el del horario vivía al final de la
+   * pantalla, después de todas las clases. El maestro elegía la hora, pulsaba
+   * el botón que tenía al lado, veía un «guardado» verde —cierto: la nota se
+   * había guardado— y las horas no habían salido del navegador. Al recargar
+   * volvían las de antes y parecía que la aplicación no las guardaba.
+   *
+   * ── Por qué el horario se manda entero ──
+   *
+   * Porque así es la ruta: `PUT /schedule` borra los días del club y escribe
+   * los que van, que es lo que permite quitar un martes y poner un jueves en
+   * un solo viaje. Consecuencia buena: guardar una clase arrastra también lo
+   * que estuviera pendiente en otra, así que nada se queda por el camino. El
+   * aviso de «sin guardar» de cada tarjeta desaparece a la vez, y eso es
+   * exactamente lo que ha pasado.
    */
-  async function guardarHorario() {
-    setGuardando(true);
+  async function guardarClaseEntera(clase: string) {
+    setGuardando(clase);
     try {
       await api.put('/schedule', { dias });
+      await api.put('/schedule/notes', {
+        groupId: clase === CLUB ? null : clase,
+        semana,
+        nota: notas[clase] ?? '',
+      });
       // Se relee del servidor: lo que se confirma es lo que quedó guardado, no
       // lo que se acaba de marcar en pantalla.
       await cargar(semana);
-      avisoOk(t('alumnos.actualizado'));
+      avisoOk(clase === CLUB ? t('grupos.horarioGuardado') : t('grupos.guardada'));
     } catch (e) {
       avisoError(mensajeError(e, t('comun.guardar')));
     } finally {
-      setGuardando(false);
+      setGuardando(null);
     }
   }
 
@@ -257,19 +308,6 @@ export default function Calendario() {
       avisoOk(t('grupos.eliminada'));
     } catch (err) {
       avisoError(mensajeError(err, t('grupos.eliminar')));
-    }
-  }
-
-  async function guardarNota(clase: string) {
-    try {
-      await api.put('/schedule/notes', {
-        groupId: clase === CLUB ? null : clase,
-        semana,
-        nota: notas[clase] ?? '',
-      });
-      avisoOk(t('grupos.notaGuardada'));
-    } catch (err) {
-      avisoError(mensajeError(err, t('grupos.nota')));
     }
   }
 
@@ -317,6 +355,10 @@ export default function Calendario() {
               type="button"
               className={marcado(clase, w) ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
               aria-pressed={Boolean(marcado(clase, w))}
+              // El auxiliar mira el calendario, no lo escribe: la ruta que lo
+              // guarda es de `owner`. Sin esto los botones respondían al clic y
+              // no había ningún sitio donde guardar lo que marcara.
+              disabled={!esMaestro}
               onClick={() => alternarDia(clase, w)}
             >
               {nombre}
@@ -347,6 +389,7 @@ export default function Calendario() {
                   etiquetaAria={`${t('grupos.abre')} · ${nombre}`}
                   placeholder={t('grupos.abre')}
                   opciones={opcionesHora}
+                  disabled={!esMaestro}
                 />
               </div>
               <div style={{ width: '7rem' }}>
@@ -356,6 +399,7 @@ export default function Calendario() {
                   etiquetaAria={`${t('grupos.cierra')} · ${nombre}`}
                   placeholder={t('grupos.cierra')}
                   opciones={opcionesHora}
+                  disabled={!esMaestro}
                 />
               </div>
             </div>
@@ -365,7 +409,13 @@ export default function Calendario() {
     );
   }
 
-  /** La nota de la semana, igual para una clase que para el club entero. */
+  /**
+   * La nota de la semana, igual para una clase que para el club entero.
+   *
+   * Ya no lleva botón propio: la guarda el «Guardar esta clase» de abajo, junto
+   * con los días y las horas. Tenerlo era lo que hacía que las horas se
+   * perdieran —dos botones que decían lo mismo y guardaban cosas distintas—.
+   */
   function bloqueNota(clase: string) {
     return (
       <div style={{ marginTop: '0.9rem' }}>
@@ -381,13 +431,47 @@ export default function Calendario() {
           style={{ marginTop: '0.25rem', resize: 'vertical' }}
         />
         <Contador valor={notas[clase] ?? ''} max={LIM.notaClase} />
+      </div>
+    );
+  }
+
+  /**
+   * El botón que guarda una clase entera, con su aviso de pendiente al lado.
+   *
+   * Va dentro de la tarjeta de cada clase, debajo de lo que guarda. Es la
+   * pieza del arreglo: mientras el único botón vivía al final de la pantalla
+   * —detrás de todas las clases— lo que quedaba a mano de las horas era el de
+   * la nota, y ése no las mandaba.
+   */
+  function botonGuardar(clase: string) {
+    const pendiente = sinGuardar(clase);
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          marginTop: '0.9rem',
+          flexWrap: 'wrap',
+        }}
+      >
         <button
           type="button"
-          className="btn btn-outline btn-sm"
-          onClick={() => guardarNota(clase)}
+          className={pendiente ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
+          disabled={guardando !== null}
+          onClick={() => guardarClaseEntera(clase)}
         >
-          {t('comun.guardar')}
+          {guardando === clase
+            ? t('comun.guardando')
+            : clase === CLUB
+              ? t('grupos.guardarHorario')
+              : t('grupos.guardarClase')}
         </button>
+        {pendiente && (
+          <span className="badge badge-gold" role="status">
+            {t('grupos.sinGuardar')}
+          </span>
+        )}
       </div>
     );
   }
@@ -487,6 +571,7 @@ export default function Calendario() {
             </p>
             {bloqueHorario(CLUB)}
             {esMaestro && bloqueNota(CLUB)}
+            {esMaestro && botonGuardar(CLUB)}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -590,20 +675,10 @@ export default function Calendario() {
                 </p>
                 {bloqueHorario(g.id)}
                 {esMaestro && bloqueNota(g.id)}
+                {esMaestro && botonGuardar(g.id)}
               </div>
             ))}
           </div>
-        )}
-
-        {esMaestro && (
-          <button
-            className="btn btn-gold"
-            style={{ marginTop: '1rem' }}
-            disabled={guardando}
-            onClick={guardarHorario}
-          >
-            {guardando ? t('comun.guardando') : t('comun.guardar')}
-          </button>
         )}
       </div>
 

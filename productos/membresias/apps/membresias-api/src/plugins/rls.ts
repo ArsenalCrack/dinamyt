@@ -46,9 +46,21 @@ const SIN_CONTEXTO = new Set([
   // servidor, no pertenece a ningún club y busca por `eco_sub` / `eco_org_id`.
   // Mismo caso que `/auth/sso`, y con el mismo síntoma si se olvida: la ruta se
   // queda colgada en vez de dar un error.
+  //
+  // **La lista se completa entera o no sirve de nada.** `/sync/rol` se quedó
+  // fuera cuando se escribió, y ése es el motivo por el que sus pruebas de
+  // punta a punta no se pudieron montar: contra PGlite —una sola conexión— la
+  // transacción que abre `sinFiltroDeClub` dentro de la que abre este plugin
+  // se bloquea contra sí misma y la petición no vuelve nunca. Contra un
+  // PostgreSQL de verdad no se cuelga, porque el pool le da otra conexión;
+  // simplemente abre una transacción que no hace falta. O sea: un fallo que en
+  // producción no se ve y que deja el código sin poder probarse, que es la
+  // peor combinación de las dos.
   '/sync/persona',
   '/sync/club',
   '/sync/contrasena',
+  '/sync/rol',
+  '/sync/pertenencia',
 ]);
 
 function contextoDe(req: FastifyRequest) {

@@ -110,3 +110,66 @@ export async function altaEnDinamyt(datos: AltaPedida): Promise<AltaHecha> {
 
   return (await res.json()) as AltaHecha;
 }
+
+/**
+ * ── Y el aviso de vuelta: aquí se le cortó el acceso a alguien ─────────────
+ *
+ * **Qué se rompía sin esto.** El maestro le quitaba el acceso a un alumno aquí
+ * y en el portal no cambiaba nada: seguía apareciendo entre la gente de la
+ * organización y —peor— con su tarjeta de «Entrar a Membresías» puesta, que le
+ * llevaba derecho a un 403 sin explicación. La persona veía un botón que
+ * prometía algo que ya no era verdad, y el maestro no tenía forma de saber
+ * desde el portal a quién había apagado.
+ *
+ * ── Lo que este aviso NO hace ──
+ *
+ * **No lo saca de la organización.** Pertenecer al club es del portal —de ahí
+ * cuelgan Campeonatos, Academy y la cuenta entera de la persona—, y quitarle el
+ * acceso a una app no es irse del club: es quedarse fuera de una de ellas. Lo
+ * que viaja es exactamente eso, y allá se pinta como lo que es. Darlo de baja
+ * del club sigue siendo un gesto deliberado en el portal, que desde ahora
+ * también llega hasta aquí (`POST /sync/pertenencia`).
+ *
+ * ── Como todo el espejo ──
+ *
+ * Se dispara sin esperarlo y se traga el fallo. Que el portal esté caído no
+ * puede impedir que un maestro le corte el acceso a alguien en su propio club:
+ * lo que se pierde es una copia, y se recupera al siguiente cambio.
+ */
+export function avisarAccesoAlEcosistema(
+  log: { warn: (msg: string) => void },
+  datos: { ecoSub: string | null; ecoOrgId: string | null; activo: boolean },
+): void {
+  if (!altaEnElEcosistema()) return;
+  // Sin cuenta del portal o sin club espejado no hay a quién avisarle: es la
+  // ficha del alumno sin correo, o un club que solo existe aquí.
+  if (!datos.ecoSub || !datos.ecoOrgId) return;
+
+  void (async () => {
+    try {
+      const res = await fetch(`${raizApi()}/sync/acceso`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-dinamyt-sync': syncSecret(),
+        },
+        body: JSON.stringify({
+          ecoSub: datos.ecoSub,
+          ecoOrgId: datos.ecoOrgId,
+          app: 'membresias',
+          activo: datos.activo,
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        log.warn(`/sync/acceso respondió ${res.status}: el portal quedó desactualizado.`);
+      }
+    } catch (e) {
+      log.warn(
+        `/sync/acceso no llegó al portal (${
+          e instanceof Error ? e.message : 'error'
+        }): el portal quedó desactualizado.`,
+      );
+    }
+  })();
+}

@@ -39,8 +39,8 @@ export const clubGroups = mem.table(
      * club, y un borrado duro se las llevaría por delante.
      */
     isActive: boolean('is_active').notNull().default(true),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (t) => [uniqueIndex('uq_club_group_nombre').on(t.orgId, t.name)],
 );
@@ -88,8 +88,8 @@ export const classNotes = mem.table(
     semana: date('semana').notNull(),
     nota: varchar('nota', { length: 500 }).notNull(),
     createdById: uuid('created_by_id'),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   // Dos índices parciales y no uno de tres columnas: para PostgreSQL dos NULL
   // son DISTINTOS dentro de un índice único, así que el índice de tres columnas
@@ -127,8 +127,8 @@ export const devices = mem.table('devices', {
   name: varchar('name', { length: 120 }).notNull(),
   os: varchar('os', { length: 40 }),
   hasReader: boolean('has_reader').default(false),
-  lastSeenAt: timestamp('last_seen_at'),
-  createdAt: timestamp('created_at').defaultNow(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 // ── Asistencias / check-ins (única por alumno y día) ─────────────────────────
@@ -139,7 +139,7 @@ export const attendances = mem.table(
     membershipId: uuid('membership_id')
       .notNull()
       .references(() => memberships.id),
-    checkedInAt: timestamp('checked_in_at').defaultNow(),
+    checkedInAt: timestamp('checked_in_at', { withTimezone: true }).defaultNow(),
     /** Día local del check-in; garantiza unicidad por día (sin doble marca). */
     checkinDate: date('checkin_date').notNull(),
     method: metodoCheckinEnum('method').notNull(),
