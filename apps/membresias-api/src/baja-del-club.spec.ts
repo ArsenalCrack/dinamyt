@@ -110,9 +110,10 @@ describe('membresias-api — la baja que llega del portal', () => {
     });
     const cuerpo = despues.json();
     expect(cuerpo.items.map((u: { id: string }) => u.id)).not.toContain(e.ids.alumno);
-    // Y aparece donde tiene que aparecer: contado como alguien sin acceso, no
-    // desaparecido del club. Es la diferencia entre una baja y un borrado.
-    expect(cuerpo.resumen.sinAcceso).toBe(1);
+    // Y deja de contarse como alumno del club: ya no entrena. Su ficha sigue
+    // ahí —lo comprueba la prueba de abajo—, pero la cifra que el maestro usa
+    // para saber de qué tamaño es su club no lo incluye.
+    expect(cuerpo.resumen.alumnos).toBe(1);
     await e.app.close();
   });
 

@@ -36,7 +36,10 @@ export default function Planes() {
 
   const cargar = useCallback(async () => {
     try {
-      const { data } = await api.get<Plan[]>('/plans');
+      // `?todos=1`: ésta es la única pantalla donde tiene sentido ver también
+      // los planes apagados. En el resto, un plan borrado no se ofrece —era lo
+      // que llenaba el desplegable de la ficha del alumno de tarifas muertas—.
+      const { data } = await api.get<Plan[]>('/plans', { params: { todos: '1' } });
       setPlans(data);
     } catch (e) {
       setError(mensajeError(e, t('comun.ninguno')));

@@ -474,10 +474,14 @@ export default function Panel() {
           marginBottom: '1.25rem',
         }}
       >
-        {/* Dos números y no uno: lo que entró en caja, y cuánto de eso le toca
-            a ESTE mes. Quien paga tres meses de golpe no recauda el triple en
-            julio; adelanta agosto y septiembre. */}
-        <div className="card" style={{ padding: '0.9rem' }}>
+        {/* ── Tres cifras, y cada una dice lo que es ──
+            Antes la segunda línea era «$880.000 / $1.280.000 de lo esperado
+            este mes» debajo de un número grande que decía $800.000, sin decir
+            qué era ninguno de los tres: quien lo leía intentaba cuadrar los
+            880.000 con los 800.000 de arriba y no podía, porque no salen el
+            uno del otro. Son la CAJA del mes, lo que le CORRESPONDE al mes, y
+            lo que DEBERÍA entrar — tres preguntas distintas. */}
+        <div className="card" style={{ padding: '0.9rem' }} title={t('panel.cajaAyuda')}>
           <div className="muted" style={{ fontSize: '0.75rem' }}>
             {revenue?.month} · {t('panel.enCaja')}
           </div>
@@ -487,9 +491,14 @@ export default function Panel() {
           >
             {fmtMoneda(revenue?.recaudado ?? 0)}
           </div>
-          <div className="muted" style={{ fontSize: '0.72rem' }}>
-            {fmtMoneda(revenue?.devengado ?? 0)} / {fmtMoneda(revenue?.esperadoMensual ?? 0)}{' '}
-            {t('panel.deEsperado')}
+          <div className="muted" style={{ fontSize: '0.72rem', marginTop: '0.25rem' }}>
+            {t('panel.leToca')}:{' '}
+            <span className="mono" style={{ color: 'var(--text)' }}>
+              {fmtMoneda(revenue?.devengado ?? 0)}
+            </span>{' '}
+            {t('panel.deEsperados')}{' '}
+            <span className="mono">{fmtMoneda(revenue?.esperadoMensual ?? 0)}</span>{' '}
+            {t('panel.esperados')}
           </div>
         </div>
         <div className="card" style={{ padding: '0.9rem' }}>

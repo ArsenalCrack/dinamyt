@@ -657,6 +657,40 @@ export async function membershipsRoutes(app: FastifyInstance) {
       const db = req.db;
       const m = await ensureMembership(db, orgId, userId);
 
+      /**
+       * El plan que se asigna tiene que ser de ESTE club y estar vivo.
+       *
+       * No estaba comprobado, y era la mitad de fondo del fallo de los planes
+       * borrados: aunque el desplegable dejara de ofrecerlos, un id copiado de
+       * otra pestaña —o una pantalla vieja que siguiera abierta— dejaba al
+       * alumno cobrando por una tarifa que el club ya no ofrece. Y borrar un
+       * plan es apagarlo (`DELETE /plans/:id`), así que la fila sigue ahí y la
+       * clave foránea no protege de nada.
+       *
+       * `null` sigue valiendo: es «quitarle el plan», que es una acción
+       * legítima del maestro.
+       */
+      if (body.currentPlanId) {
+        const [vivo] = await db
+          .select({ id: plans.id })
+          .from(plans)
+          .where(
+            and(
+              eq(plans.id, body.currentPlanId),
+              eq(plans.orgId, orgId),
+              eq(plans.isActive, true),
+            ),
+          )
+          .limit(1);
+        if (!vivo) {
+          return reply.code(422).send({
+            error:
+              'Ese plan ya no existe en tu club. Elige uno de los que tienes ' +
+              'ahora, o vuelve a crearlo en «Planes».',
+          });
+        }
+      }
+
       // En qué clase entrena. Se comprueba que la clase sea de ESTE club y esté
       // activa: sin eso, un id copiado de otra pestaña metería a un alumno en la
       // clase de otro club, y RLS no lo atraparía porque la escritura es sobre
@@ -815,12 +849,24 @@ export async function membershipsRoutes(app: FastifyInstance) {
       if (!p.ok) return reply.code(422).send({ error: p.error });
       const periodos = Math.max(1, p.valor ?? 1);
 
+      // Del club Y vivo. Sin `isActive`, se podía registrar un pago contra una
+      // tarifa borrada: el dinero entraba con un precio que el club ya no
+      // ofrece, y el panel de recaudo —que sí filtra los planes muertos al
+      // calcular lo esperado— dejaba de cuadrar con lo cobrado.
       const [plan] = await db
         .select()
         .from(plans)
-        .where(and(eq(plans.id, body.planId), eq(plans.orgId, orgId)))
+        .where(
+          and(eq(plans.id, body.planId), eq(plans.orgId, orgId), eq(plans.isActive, true)),
+        )
         .limit(1);
-      if (!plan) return reply.code(404).send({ error: 'Plan no encontrado en este club.' });
+      if (!plan) {
+        return reply.code(404).send({
+          error:
+            'Ese plan ya no existe en tu club. Elige uno de los que tienes ahora, ' +
+            'o vuelve a crearlo en «Planes».',
+        });
+      }
 
       const m = await ensureMembership(db, orgId, userId);
       const planType = plan.type as PlanType;

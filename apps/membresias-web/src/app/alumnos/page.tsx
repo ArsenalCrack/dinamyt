@@ -178,7 +178,7 @@ export default function Alumnos() {
    * esconde cuando todo cabe en una página. Un club de doce alumnos no veía la
    * cifra por ningún sitio. Ver el resumen que devuelve `GET /users`.
    */
-  const [resumen, setResumen] = useState({ alumnos: 0, sinAcceso: 0 });
+  const [resumen, setResumen] = useState({ alumnos: 0 });
   const [offset, setOffset] = useState(0);
   /**
    * Con qué se está mirando la lista: rol, acceso, cinturón y orden. Se
@@ -218,7 +218,7 @@ export default function Alumnos() {
       const { data } = await api.get<{
         items: Persona[];
         total: number;
-        resumen: { alumnos: number; sinAcceso: number };
+        resumen: { alumnos: number };
       }>('/users', {
         params: {
           ...(buscado ? { q: buscado } : {}),
@@ -232,7 +232,7 @@ export default function Alumnos() {
       });
       setGente(data.items);
       setTotal(data.total);
-      setResumen(data.resumen ?? { alumnos: 0, sinAcceso: 0 });
+      setResumen(data.resumen ?? { alumnos: 0 });
     } catch (e) {
       setError(mensajeError(e, t('comun.ninguno')));
     } finally {
@@ -826,16 +826,13 @@ export default function Alumnos() {
               filtros porque no depende de ellos: es el club, no el resultado
               de una búsqueda. El «sin acceso» solo aparece si hay alguien, y
               entonces importa: es la gente apagada que nadie está mirando. */}
+          {/* Cuántos alumnos hay, y solo eso: los que tienen acceso. A quien
+              se le cortó no se cuenta ni se menciona aquí — se le busca a
+              propósito con el filtro «Sin acceso», que es donde ese dato
+              significa algo. */}
           <p className="muted" style={{ fontSize: '0.8rem', marginTop: '0.15rem' }}>
             <span className="mono">{resumen.alumnos}</span>{' '}
             {resumen.alumnos === 1 ? t('alumnos.unAlumno') : t('alumnos.cuantos')}
-            {resumen.sinAcceso > 0 && (
-              <>
-                {' · '}
-                <span className="mono">{resumen.sinAcceso}</span>{' '}
-                {t('alumnos.sinAcceso')}
-              </>
-            )}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

@@ -25,6 +25,9 @@ interface RosterItem {
 interface Asistencia {
   id: string;
   userId: string;
+  fullName: string;
+  /** Si esa persona sigue teniendo acceso al club. Ver `marcaronYNoEstan`. */
+  activo: boolean;
   checkedInAt: string;
   method: string;
 }
@@ -123,6 +126,23 @@ export default function AsistenciaPage() {
 
   const presentes = new Map(asistencias.map((a) => [a.userId, a]));
 
+  /**
+   * Quien marcó hoy y **no está en la lista**.
+   *
+   * Casi siempre es alguien a quien se le retiró el acceso después de haber
+   * marcado. La lista de pasar lista solo enseña a los alumnos con acceso —lo
+   * correcto: a quien ya no entrena no se le ofrece marcar—, pero el contador
+   * de arriba cuenta todas las marcas del día. Sin esto quedaba un «✓ 1
+   * Presentes» encima de una lista sin un solo ✓, y no había forma de saber a
+   * quién correspondía: el número parecía roto cuando lo que estaba roto era
+   * que la fila no se dibujaba en ninguna parte.
+   *
+   * Se mira contra la lista ENTERA del club, no contra la página que se está
+   * viendo: si no, cualquiera que estuviera en la página 2 saldría aquí
+   * repetido.
+   */
+  const marcaronYNoEstan = asistencias.filter((a) => !a.activo);
+
   async function marcar(alumno: RosterItem) {
     setOcupado(alumno.userId);
     try {
@@ -180,6 +200,19 @@ export default function AsistenciaPage() {
           ✓ {asistencias.length} · {t('asistencia.presentes')}
         </span>
       </div>
+
+      {/* Las marcas que el número cuenta y la lista no puede enseñar. Solo
+          aparece cuando pasa, que es raro: alguien que entrenó hoy y perdió el
+          acceso después. */}
+      {marcaronYNoEstan.length > 0 && (
+        <p
+          className="muted"
+          style={{ fontSize: '0.78rem', marginTop: '-0.5rem', marginBottom: '1rem' }}
+        >
+          {t('asistencia.marcaronSinAcceso')}{' '}
+          {marcaronYNoEstan.map((a) => a.fullName).join(' · ')}
+        </p>
+      )}
 
       {/* Solo un fallo al CARGAR la lista se queda escrito aquí; el resultado
           de cada marcaje va por la nube flotante (ver lib/toast.ts). */}

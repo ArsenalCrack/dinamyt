@@ -5,6 +5,7 @@ import {
   attendances,
   clubSchedule,
   scheduleExceptions,
+  users,
 } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireRole } from '../plugins/auth';
 import { estado, diasFaltantes, todayStr } from '../lib/billing';
@@ -293,11 +294,28 @@ export async function checkinRoutes(app: FastifyInstance) {
       if (userId) conds.push(eq(memberships.userId, userId));
       if (date) conds.push(eq(attendances.checkinDate, date));
 
+      /**
+       * Viaja también QUIÉN marcó, y si sigue teniendo acceso.
+       *
+       * La lista de «pasar lista» solo enseña a los alumnos con acceso —lo
+       * correcto: a quien ya no entrena no se le ofrece marcar—, pero el
+       * contador de «Presentes» cuenta TODAS las marcas del día. Al maestro
+       * que desactivaba a alguien que ya había marcado le quedaba un «✓ 1
+       * Presentes» encima de una lista donde no había ni un ✓: el número no
+       * mentía, pero no había forma de saber a quién correspondía.
+       *
+       * Con el nombre aquí, la pantalla puede enseñar esa marca aparte en vez
+       * de dejarla invisible. La asistencia ocurrió, y borrarla del recuento
+       * sería mentir en la otra dirección.
+       */
       return db
         .select({
           id: attendances.id,
           membershipId: attendances.membershipId,
           userId: memberships.userId,
+          fullName: users.fullName,
+          /** Si esa persona sigue teniendo acceso al club. */
+          activo: users.isActive,
           checkedInAt: attendances.checkedInAt,
           checkinDate: attendances.checkinDate,
           method: attendances.method,
@@ -305,6 +323,7 @@ export async function checkinRoutes(app: FastifyInstance) {
         })
         .from(attendances)
         .innerJoin(memberships, eq(attendances.membershipId, memberships.id))
+        .innerJoin(users, eq(memberships.userId, users.id))
         .where(and(...conds))
         .orderBy(desc(attendances.checkedInAt));
     },
