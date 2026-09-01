@@ -31,6 +31,7 @@ import { Avatar } from '@/components/Avatar';
 import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
 import { Aviso, type Mensaje } from '@/components/Aviso';
 import { FilaMiembro } from '@/components/FilaMiembro';
+import { CampanaOrg } from '@/components/CampanaOrg';
 import { CodigoYSolicitudes } from '@/components/CodigoYSolicitudes';
 import { PaisCiudad } from '@/components/PaisCiudad';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
@@ -297,9 +298,15 @@ export default function MiOrganizacionPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6">
-      <Link href="/dashboard" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-        ← Dashboard
-      </Link>
+      <div className="flex items-start justify-between gap-3">
+        <Link href="/dashboard" className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          ← Dashboard
+        </Link>
+        {/* La campana también aquí, y no solo en el dashboard: ésta es la
+            pantalla donde el maestro pasa el rato, y un aviso que solo se ve
+            en la puerta de entrada es un aviso que se ve una vez al día. */}
+        <CampanaOrg />
+      </div>
       <h1 className="mb-1 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
         {soloClubes ? 'Mi club' : 'Mi organización'}
       </h1>

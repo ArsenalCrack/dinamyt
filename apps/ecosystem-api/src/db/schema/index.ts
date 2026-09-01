@@ -366,6 +366,23 @@ export const orgMembers = eco.table('org_members', {
   roleMembresias: varchar('role_membresias', { length: 50 }),
   roleCampeonatos: varchar('role_campeonatos', { length: 50 }),
   roleAcademy: varchar('role_academy', { length: 50 }),
+  /**
+   * Si esta persona tiene acceso a Membresías EN ESTE CLUB. Lo dice Membresías,
+   * no se decide aquí (`POST /sync/acceso`).
+   *
+   * `null` = **no consta**, que es lo que vale para quien no tiene ficha allí y
+   * para todo el mundo hasta que llegue el primer aviso. Cerraba un hueco que
+   * se notaba por los dos lados: al alumno al que su maestro le había cortado
+   * el acceso se le seguía enseñando el botón «Entrar a Membresías», que lo
+   * dejaba en un 403 sin explicación; y el maestro, mirando su gente en el
+   * portal, no tenía forma de ver a quién había apagado.
+   *
+   * **No es la pertenencia al club.** Se puede pertenecer al club y no tener
+   * acceso a una de sus aplicaciones — es el caso de casi todo el mundo con
+   * Campeonatos. Dar de baja del club es borrar esta fila, y eso es otra cosa
+   * (`removeMember`, que además avisa a Membresías).
+   */
+  membresiasActivo: boolean('membresias_activo'),
   joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow(),
   invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
 });
@@ -700,3 +717,85 @@ export const pendingRegistrations = eco.table('pending_registrations', {
   lastSentAt: timestamp('last_sent_at', { withTimezone: true }).defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+// ── Tabla: org_notifications ───────────────────────────────────────────────
+//
+// **La campana de quien lleva un club.**
+//
+// ── Qué problema resuelve ──
+//
+// Un club funciona por cosas que pasan cuando su maestro no está mirando:
+// alguien teclea el código y se queda esperando, alguien acepta la invitación
+// y entra, alguien se va. Hasta ahora nada de eso se contaba en el portal. La
+// bandeja de solicitudes existía, pero había que acordarse de abrirla, y una
+// bandeja que no avisa es una bandeja que se llena: la persona que pidió
+// entrar veía «te avisamos» y esperaba días a que a alguien se le ocurriera
+// entrar a mirar.
+//
+// ── Por qué una fila por PERSONA y no una por evento ──
+//
+// Porque leer es de cada quien. Un club puede tener maestro y dos
+// administradores, y «ya lo vi» de uno no puede borrarle el aviso a los otros.
+// Son dos o tres filas por evento, en clubes que tienen decenas de eventos al
+// mes: la tabla no crece a nada.
+//
+// ── `resolved_at`, que es lo que la distingue de un registro de sucesos ──
+//
+// Hay dos clases de aviso aquí dentro, y la diferencia importa:
+//
+//   · Los que **son una tarea**: «alguien quiere entrar». Ése deja de existir
+//     en cuanto se responde la solicitud — la haya respondido quien la haya
+//     respondido. Sin esto, el maestro que acepta a diez personas se queda con
+//     diez avisos rojos pidiéndole que haga algo que ya hizo, y a la tercera
+//     vez deja de mirar la campana.
+//   · Los que **son una noticia**: «entró alguien nuevo», «se fue alguien».
+//     Ésos no se resuelven porque no piden nada: se leen y se quedan como
+//     historia de lo que ha pasado en el club.
+//
+// `entity_id` es lo que permite resolver sin buscar: la solicitud que motivó
+// el aviso. Ver `OrgNotificationsService.resolverPor`.
+export const orgNotifications = eco.table(
+  'org_notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    /** A quién le llega. Un aviso por cada persona que gestiona el club. */
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    /**
+     * Qué pasó. Los valores están en `common/avisos-org.ts`, no en un enum de
+     * PostgreSQL: añadir una clase de aviso no puede pedir una migración.
+     */
+    kind: varchar('kind', { length: 40 }).notNull(),
+    /**
+     * La fila que lo motivó (la solicitud, la invitación). Es la llave con la
+     * que el aviso se resuelve cuando esa fila se responde.
+     */
+    entityId: uuid('entity_id'),
+    /** De quién habla el aviso: quien pidió entrar, quien se fue. */
+    subjectUserId: uuid('subject_user_id').references(() => users.id),
+    /** Quién lo provocó. No se le avisa a él de lo que acaba de hacer. */
+    actorUserId: uuid('actor_user_id').references(() => users.id),
+    /**
+     * Lo que hace falta para escribir la frase sin volver a la base: el nombre
+     * de la persona, su correo, el rol con el que entra. Se guarda copiado a
+     * propósito — un aviso cuenta lo que pasó ENTONCES, y si luego cambia el
+     * nombre, el aviso viejo sigue diciendo lo que dijo.
+     */
+    data: jsonb('data'),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    /** Cuándo dejó de haber algo que hacer. Ver el comentario de arriba. */
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    // La campana pregunta siempre lo mismo: «lo mío, de este club, lo último
+    // primero». Sin índice, cada apertura del portal recorre la tabla entera.
+    index('ix_org_notifications_destinatario').on(t.userId, t.createdAt),
+    // Y resolver pregunta por la fila que se acaba de responder.
+    index('ix_org_notifications_entidad').on(t.entityId),
+  ],
+);

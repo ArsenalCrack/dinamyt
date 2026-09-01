@@ -17,6 +17,7 @@ jest.mock('../../db', () => ({ db: {} }));
 
 import { BadRequestException } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
+import { OrgNotificationsService } from './org-notifications.service';
 import { db } from '../../db';
 import type { UsersService } from '../users/users.service';
 import type { JwtTokenService } from '../auth/jwt.service';
@@ -59,6 +60,10 @@ function armar(lecturas: unknown[][]) {
     {} as UsersService,
     {} as JwtTokenService,
     {} as MailerService,
+    // La campana del club. Estos tests miden lo que se ESCRIBE en la base, y
+    // un aviso no es una escritura de las que vigilan: se sustituye por uno
+    // que no hace nada para que no cuente ni pida una base de verdad.
+    avisosDeMentira(),
   );
   return { service, cuenta };
 }
@@ -68,6 +73,14 @@ const filas = (org: unknown, club: unknown) => [[org], [club]];
 
 const FEDERACION = { id: FED, type: 'FEDERATION', parentId: null };
 const CLUB_LIBRE = { id: CLUB, type: 'CLUB', parentId: null };
+
+/** Una campana que no hace nada: estos tests no la ejercitan. */
+function avisosDeMentira(): OrgNotificationsService {
+  return {
+    avisar: async () => {},
+    resolverPor: async () => {},
+  } as unknown as OrgNotificationsService;
+}
 
 describe('Afiliar un club a dedo (super-admin)', () => {
   it('un club sin federación entra, y la fila se escribe', async () => {

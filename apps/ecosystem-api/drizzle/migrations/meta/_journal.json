@@ -92,6 +92,20 @@
       "when": 1787700000000,
       "tag": "0012_fechas_con_zona",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787800000000,
+      "tag": "0013_acceso_por_app",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787900000000,
+      "tag": "0014_avisos_de_la_organizacion",
+      "breakpoints": true
     }
   ]
 }

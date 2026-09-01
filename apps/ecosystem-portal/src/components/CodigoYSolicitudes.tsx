@@ -233,6 +233,10 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
   return (
     <section
+      // El ancla al que salta la campana desde «alguien quiere entrar». Sin
+      // ella, el aviso dejaba al maestro arriba de una pantalla larga
+      // buscando dónde estaba lo que le acababan de decir.
+      id="solicitudes"
       className="card p-5"
       style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
     >

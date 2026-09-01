@@ -25,6 +25,7 @@ jest.mock('../../db', () => ({ db: {} }));
 
 import { ConflictException } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
+import { OrgNotificationsService } from './org-notifications.service';
 import { db } from '../../db';
 import type { UsersService } from '../users/users.service';
 import type { JwtTokenService } from '../auth/jwt.service';
@@ -106,8 +107,20 @@ function armar(lecturas: unknown[][], escritura: unknown[] = [{ id: 'fila' }]) {
     {} as UsersService,
     {} as JwtTokenService,
     {} as MailerService,
+    // La campana del club. Estos tests miden lo que se ESCRIBE en la base, y
+    // un aviso no es una escritura de las que vigilan: se sustituye por uno
+    // que no hace nada para que no cuente ni pida una base de verdad.
+    avisosDeMentira(),
   );
   return { service, cuenta };
+}
+
+/** Una campana que no hace nada: estos tests no la ejercitan. */
+function avisosDeMentira(): OrgNotificationsService {
+  return {
+    avisar: async () => {},
+    resolverPor: async () => {},
+  } as unknown as OrgNotificationsService;
 }
 
 describe('Quitar a un miembro', () => {

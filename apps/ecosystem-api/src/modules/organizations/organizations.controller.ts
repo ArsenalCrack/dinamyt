@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
+import { OrgNotificationsService } from './org-notifications.service';
 import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -17,7 +18,35 @@ import type { JwtPayload } from '../auth/jwt.service';
 
 @Controller('organizations')
 export class OrganizationsController {
-  constructor(private readonly orgsService: OrganizationsService) {}
+  constructor(
+    private readonly orgsService: OrganizationsService,
+    private readonly avisos: OrgNotificationsService,
+  ) {}
+
+  // ── GET /organizations/avisos — la campana de quien lleva un club ─────────
+  //
+  // No lleva `:id` a propósito: quien gestiona dos clubes tiene UNA campana,
+  // no dos. La consulta va por destinatario (`user_id`), así que cada quien ve
+  // lo suyo y nada más — no hay nada que comprobar aparte de tener sesión.
+  //
+  // Devuelve además `sinLeer`, que es el número rojo. Va en la misma respuesta
+  // porque se pinta a la vez y pedirlo aparte sería un viaje por un entero.
+  @Get('avisos')
+  @UseGuards(EcosystemJwtGuard)
+  async avisosMios(@CurrentUser() user: JwtPayload) {
+    const [items, sinLeer] = await Promise.all([
+      this.avisos.mios(user.sub),
+      this.avisos.sinLeer(user.sub),
+    ]);
+    return { items, sinLeer };
+  }
+
+  // ── POST /organizations/avisos/leidos — abrir la campana es leerlos ───────
+  @Post('avisos/leidos')
+  @UseGuards(EcosystemJwtGuard)
+  marcarAvisosLeidos(@CurrentUser() user: JwtPayload) {
+    return this.avisos.marcarLeidos(user.sub);
+  }
 
   // ── POST /organizations — crear organización (solo super admin) ───────────
   @Post()

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './organizations.service';
+import { OrgNotificationsService } from './org-notifications.service';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 
@@ -10,7 +11,7 @@ import { UsersModule } from '../users/users.module';
   // cuenta sin contraseña de quien todavía no la tiene.
   imports: [AuthModule, UsersModule],
   controllers: [OrganizationsController],
-  providers: [OrganizationsService],
-  exports: [OrganizationsService],
+  providers: [OrganizationsService, OrgNotificationsService],
+  exports: [OrganizationsService, OrgNotificationsService],
 })
 export class OrganizationsModule {}

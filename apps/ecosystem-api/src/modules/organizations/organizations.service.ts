@@ -33,7 +33,8 @@ import {
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
 import { MailerService } from '../auth/mailer.service';
-import { espejarClub, espejarRol } from '../../common/espejo-membresias';
+import { espejarBaja, espejarClub, espejarRol } from '../../common/espejo-membresias';
+import { OrgNotificationsService } from './org-notifications.service';
 import { rolParaApp } from '../../common/roles-por-app';
 import { ROLES_GESTOR, esRolGestor } from '../../common/roles';
 import { patronBusqueda } from '../../common/busqueda';
@@ -102,6 +103,11 @@ export class OrganizationsService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtTokenService,
     private readonly mailer: MailerService,
+    /**
+     * La campana del club. Escribe los avisos de quién llega y quién se va, y
+     * resuelve los que dejan de pedir algo. Ver `org-notifications.service.ts`.
+     */
+    private readonly avisos: OrgNotificationsService,
   ) {}
 
   /**
@@ -857,6 +863,21 @@ export class OrganizationsService {
       `Baja: ${userId} sale de ${orgId} (era ${result[0].role}; ` +
         `lo hace ${porUserId ?? '?'}).`,
     );
+    // Y que se entere Membresías, o allá sigue en el listado del club como si
+    // no hubiera pasado nada — que es exactamente lo que pasaba: se daba de
+    // baja a un alumno aquí y había que volver a darlo de baja allí. Allá se le
+    // retira el acceso; sus pagos y su asistencia se quedan, que son del club.
+    espejarBaja(userId, orgId);
+    // Y que lo sepan los DEMÁS gestores. Quien la hizo no necesita que se lo
+    // cuenten; los otros dos administradores del club, sí — es gente que se va
+    // de su club y hasta ahora se enteraban por no encontrarla en la lista.
+    await this.avisos.avisar({
+      orgId,
+      kind: 'miembro_baja',
+      subjectUserId: userId,
+      actorUserId: porUserId ?? null,
+      data: { role: result[0].role },
+    });
     return { ok: true };
   }
 
@@ -976,6 +997,15 @@ export class OrganizationsService {
         isPublic: organizations.isPublic,
         isActive: organizations.isActive,
         myRole: orgMembers.role,
+        /**
+         * Si Membresías me dejó fuera. `null` = no consta, que es lo normal.
+         *
+         * Va aquí y no en el token porque el token se firma al entrar y esto lo
+         * cambia otra persona —el maestro, en la otra aplicación— mientras la
+         * sesión sigue abierta. El dashboard lo mira para no ofrecer una app que
+         * va a contestar 403 (ver la migración `0013_acceso_por_app`).
+         */
+        membresiasActivo: orgMembers.membresiasActivo,
       })
       .from(orgMembers)
       .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
@@ -1394,6 +1424,14 @@ export class OrganizationsService {
         roleMembresias: orgMembers.roleMembresias,
         roleCampeonatos: orgMembers.roleCampeonatos,
         roleAcademy: orgMembers.roleAcademy,
+        /**
+         * Si Membresías le cortó el acceso. `null` = no consta.
+         *
+         * Es lo que faltaba para que esta lista dijera la verdad: se le quitaba
+         * el acceso a alguien en la otra aplicación y aquí seguía saliendo
+         * igual que el resto. Lo escribe `POST /sync/acceso`.
+         */
+        membresiasActivo: orgMembers.membresiasActivo,
         joinedAt: orgMembers.joinedAt,
         userId: users.id,
         email: users.email,
@@ -1560,6 +1598,35 @@ export class OrganizationsService {
       })
       .returning();
 
+    /**
+     * Y que su maestro se entere HOY.
+     *
+     * Es el aviso que cerraba el bucle: la persona leía «te avisamos cuando tu
+     * maestro responda» y el maestro no tenía forma de saber que había alguien
+     * esperando —la bandeja existía, pero había que acordarse de abrirla—. Se
+     * han quedado solicitudes días ahí dentro por esto.
+     *
+     * `actorUserId` es quien pide, así que si un maestro tecleara el código de
+     * su propio club no se avisaría a sí mismo.
+     */
+    const [quien] = await db
+      .select({ fullName: users.fullName, email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    await this.avisos.avisar({
+      orgId: org.id,
+      kind: 'solicitud_entrada',
+      entityId: solicitud.id,
+      subjectUserId: userId,
+      actorUserId: userId,
+      data: {
+        fullName: quien?.fullName ?? null,
+        email: quien?.email ?? null,
+        note: solicitud.note,
+      },
+    });
+
     return {
       estado: 'EN_ESPERA' as const,
       org: { id: org.id, name: org.name },
@@ -1659,6 +1726,10 @@ export class OrganizationsService {
         })
         .where(eq(orgJoinRequests.id, solicitudId))
         .returning();
+      // El aviso de la campana pedía UNA cosa: que alguien respondiera. Ya
+      // está respondida, así que se apaga —para todos los gestores, no solo
+      // para el que respondió—. Ver `resolverPor`.
+      await this.avisos.resolverPor(solicitud.id);
       await this.avisarDeLaRespuesta(solicitud.orgId, solicitud.userId, false);
       return { solicitud: fila, miembro: null };
     }
@@ -1712,6 +1783,28 @@ export class OrganizationsService {
       })
       .where(eq(orgJoinRequests.id, solicitudId))
       .returning();
+
+    await this.avisos.resolverPor(solicitud.id);
+    // Y el club se entera de que tiene a alguien nuevo. No es lo mismo que el
+    // anterior ni lo sustituye: aquel pedía una respuesta, éste cuenta lo que
+    // pasó, y quien lo lea va derecho a la ficha de quien acaba de entrar.
+    const [nuevo] = await db
+      .select({ fullName: users.fullName, email: users.email })
+      .from(users)
+      .where(eq(users.id, solicitud.userId))
+      .limit(1);
+    await this.avisos.avisar({
+      orgId: solicitud.orgId,
+      kind: 'miembro_nuevo',
+      subjectUserId: solicitud.userId,
+      actorUserId: gestorUserId,
+      data: {
+        fullName: nuevo?.fullName ?? null,
+        email: nuevo?.email ?? null,
+        role,
+        via: 'solicitud',
+      },
+    });
 
     await this.avisarDeLaRespuesta(solicitud.orgId, solicitud.userId, true);
 
@@ -2118,7 +2211,10 @@ export class OrganizationsService {
     // `user_id` y por correo: las que se escribieron antes de que la cuenta
     // existiera pueden llegar aquí sin enlazar.
     const [yo] = await db
-      .select({ email: users.email })
+      // El nombre viaja además del correo porque el aviso del club lo lleva
+      // dentro: «Ana Pérez aceptó» se lee, «ana@correo.com aceptó» hay que
+      // descifrarlo.
+      .select({ email: users.email, fullName: users.fullName })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
@@ -2136,6 +2232,17 @@ export class OrganizationsService {
         .set({ status: 'RECHAZADA', respondedAt: new Date(), userId })
         .where(eq(orgInvitations.id, invitacionId))
         .returning();
+      // El maestro invitó y se quedó esperando. Un «no» que no llega deja la
+      // invitación en la lista de pendientes para siempre y al maestro
+      // preguntándose si le habrá llegado el correo.
+      await this.avisos.avisar({
+        orgId: inv.orgId,
+        kind: 'invitacion_rechazada',
+        entityId: inv.id,
+        subjectUserId: userId,
+        actorUserId: userId,
+        data: { fullName: yo?.fullName ?? null, email: inv.email },
+      });
       return { invitacion: fila, miembro: null, org: null };
     }
 
@@ -2178,6 +2285,20 @@ export class OrganizationsService {
       .set({ status: 'ACEPTADA', respondedAt: new Date(), userId })
       .where(eq(orgInvitations.id, invitacionId))
       .returning();
+
+    await this.avisos.avisar({
+      orgId: inv.orgId,
+      kind: 'miembro_nuevo',
+      entityId: inv.id,
+      subjectUserId: userId,
+      actorUserId: userId,
+      data: {
+        fullName: yo?.fullName ?? null,
+        email: inv.email,
+        role: inv.role,
+        via: 'invitacion',
+      },
+    });
 
     return { invitacion: fila, miembro, org: { id: org.id, name: org.name } };
   }

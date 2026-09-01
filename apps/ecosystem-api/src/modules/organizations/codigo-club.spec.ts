@@ -18,6 +18,7 @@ jest.mock('../../db', () => ({ db: {} }));
 
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
+import { OrgNotificationsService } from './org-notifications.service';
 import { db } from '../../db';
 import type { UsersService } from '../users/users.service';
 import type { JwtTokenService } from '../auth/jwt.service';
@@ -44,6 +45,14 @@ function encadenar(resultados: unknown[][]) {
   return eslabon;
 }
 
+/** Una campana que no hace nada: estos tests no la ejercitan. */
+function avisosDeMentira(): OrgNotificationsService {
+  return {
+    avisar: async () => {},
+    resolverPor: async () => {},
+  } as unknown as OrgNotificationsService;
+}
+
 function armar(resultados: unknown[][]) {
   const fake = db as unknown as Record<string, unknown>;
   const cadena = encadenar(resultados);
@@ -54,6 +63,9 @@ function armar(resultados: unknown[][]) {
     {} as UsersService,
     {} as JwtTokenService,
     {} as MailerService,
+    // La campana del club. `solicitarEntrada` escribe un aviso al final; aquí
+    // se prueba lo que contesta la ruta, no lo que se le cuenta al maestro.
+    avisosDeMentira(),
   );
 }
 
