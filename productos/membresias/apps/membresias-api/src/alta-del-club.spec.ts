@@ -190,7 +190,23 @@ describe('membresias-api — el alta que llega del portal', () => {
     await enlazarClub(e);
     const r = await darDeAlta(e, { ecoSub: ECO_SUB, role: 'student' });
     expect(r.statusCode).toBe(200);
-    expect(r.json()).toMatchObject({ encontrada: false, aplicado: false });
+    expect(r.json()).toMatchObject({
+      encontrada: false,
+      aplicado: false,
+      motivo: 'Falta el correo.',
+    });
+    await e.app.close();
+  });
+
+  it('ese «falta el correo» llega TAMBIÉN sin espejo: es el cerrojo del repaso', async () => {
+    // El guion `espejo:sembrar` del portal manda justo esta sonda para saber si
+    // esta versión entiende el alta: la vieja no mira `activo` y contestaría sin
+    // motivo. Si la respuesta dependiera de que el club tenga espejo, un club
+    // sin espejo haría saltar el cerrojo contra un despliegue correcto — y el
+    // repaso, que es lo que desatasca a los alumnos, no se podría correr.
+    const e = await crearEscenario(); // SIN `enlazarClub`
+    const r = await darDeAlta(e, { ecoSub: ECO_SUB });
+    expect(r.json().motivo).toBe('Falta el correo.');
     await e.app.close();
   });
 

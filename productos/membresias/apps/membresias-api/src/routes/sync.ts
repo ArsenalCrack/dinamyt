@@ -520,6 +520,27 @@ export async function syncRoutes(app: FastifyInstance) {
     if (!ecoOrgId) return reply.code(422).send({ error: 'Falta `ecoOrgId`.' });
     const esAlta = body.activo === true;
 
+    /**
+     * El correo del alta se exige AQUÍ, antes de mirar el club.
+     *
+     * No es cosmético: es lo que hace que se pueda saber, desde fuera, que esta
+     * versión entiende el alta. El repaso del portal (`espejo:sembrar`) manda
+     * una sonda con `activo: true` y sin correo justo para eso — la versión
+     * vieja no mira `activo`, busca una ficha que no existe y contesta sin
+     * motivo; ésta contesta que falta el correo.
+     *
+     * Esa diferencia es el cerrojo que impide correr el repaso contra un
+     * servidor sin actualizar, donde el mismo aviso significaría lo contrario
+     * («salió del club») y daría de baja a todo el mundo.
+     *
+     * Con la comprobación después del club, la respuesta dependía de si ESE
+     * club tenía espejo, y un club sin espejo hacía saltar el cerrojo contra un
+     * despliegue perfectamente correcto.
+     */
+    if (esAlta && !(body.email ?? '').trim()) {
+      return { encontrada: false, aplicado: false, motivo: 'Falta el correo.' };
+    }
+
     // Cruza clubes a propósito, como el resto del espejo: quien llama es el
     // ecosistema y no pertenece a ninguno.
     return sinFiltroDeClub(req.server.db, async (db: Db) => {
@@ -539,9 +560,6 @@ export async function syncRoutes(app: FastifyInstance) {
       // es lo que hace el resto del espejo con lo que no puede aplicar.
       if (esAlta) {
         const correo = (body.email ?? '').trim().toLowerCase();
-        if (!correo) {
-          return { encontrada: false, aplicado: false, motivo: 'Falta el correo.' };
-        }
         const r = await asegurarFicha(db, {
           ecoSub,
           clubId: club.id,
