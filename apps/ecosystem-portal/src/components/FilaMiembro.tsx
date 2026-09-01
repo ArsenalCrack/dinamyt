@@ -69,7 +69,6 @@ function InsigniaApp({
   // justo el caso que se venía a enseñar — el rol por app se borra al cambiar
   // el general (ver `cambiar-rol.spec.ts`), y entonces la fila volvía a
   // parecerse a todas las demás.
-  if (!rol && !sinAcceso) return null;
   if (sinAcceso) {
     return (
       <span
@@ -80,6 +79,7 @@ function InsigniaApp({
       </span>
     );
   }
+  if (!rol) return null;
   return (
     <span className="badge" title={`Rol en ${app}: ${rol}`}>
       {app} · {NOMBRE_ROL[rol] ?? rol}
