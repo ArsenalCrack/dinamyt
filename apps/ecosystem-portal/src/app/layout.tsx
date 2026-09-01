@@ -1,7 +1,8 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { PieDePagina } from '@/components/PieDePagina';
+import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
 import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
 
 // Tipografía del ecosistema: display deportivo (Archivo, eje de anchura),
@@ -32,6 +33,32 @@ export const metadata: Metadata = {
   title: 'DINAMYT — El ecosistema digital del Hapkido',
   description:
     'Una sola cuenta para el club y el campeonato: mensualidades y asistencia con Membresías, y torneos con puntuación en vivo desde el tatami con Campeonatos.',
+  /**
+   * Lo que convierte el portal en una app instalable, junto con el service
+   * worker de `public/sw.js`. Membresías ya se instalaba; el portal no, y esa
+   * diferencia no respondía a nada — es la misma cuenta y la misma gente.
+   */
+  manifest: '/manifest.json',
+  appleWebApp: {
+    // Safari en iOS no lee el manifest: lo suyo son estas tres etiquetas.
+    // Sin ellas, «Añadir a inicio» abre una pestaña normal con la barra de
+    // direcciones puesta, que es exactamente lo que se venía a quitar.
+    capable: true,
+    title: 'DINAMYT',
+    statusBarStyle: 'black-translucent',
+  },
+};
+
+/**
+ * El color de la barra del sistema cuando la app corre instalada.
+ *
+ * Va en `viewport` y no en `metadata` porque Next 15 lo movió ahí; dejarlo en
+ * `metadata` compila con un aviso y no llega al HTML. Es el `--bg` del tema
+ * (`globals.css`), y la app es de tema oscuro fijo (`color-scheme: dark`), así
+ * que no lleva variante clara.
+ */
+export const viewport: Viewport = {
+  themeColor: '#0e0e15',
 };
 
 export default function RootLayout({
@@ -52,6 +79,9 @@ export default function RootLayout({
             las pantallas: una sesión abandonada no se cierra sola solo en las
             que alguien se acordó de ponerlo. */}
         <VigilanteDeSesion />
+        {/* Y lo que hace que DINAMYT se pueda instalar como app. Ver
+            `RegistrarServiceWorker` y `public/sw.js`. */}
+        <RegistrarServiceWorker />
       </body>
     </html>
   );

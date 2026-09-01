@@ -1,0 +1,37 @@
+{
+  "name": "DINAMYT",
+  "short_name": "DINAMYT",
+  "description": "Tu cuenta del ecosistema DINAMYT: tu club, tus aplicaciones y tu perfil.",
+  "lang": "es",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#0e0e15",
+  "theme_color": "#0e0e15",
+  "categories": ["sports", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mi organización",
+      "short_name": "Mi club",
+      "description": "Tu gente, las solicitudes de entrada y la ficha del club",
+      "url": "/mi-organizacion"
+    },
+    {
+      "name": "Mi perfil",
+      "short_name": "Perfil",
+      "description": "Tus datos, tu foto y tus sesiones abiertas",
+      "url": "/perfil"
+    }
+  ]
+}

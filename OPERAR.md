@@ -863,6 +863,17 @@ Su canal es el **Web Push**: la app es una PWA, el alumno la instala en su
 celular y el aviso le llega ahí, gratis y sin límite mensual. Y queda además en
 la campana de la app, para cuando entre.
 
+> **El portal también se instala, desde el 31 de agosto de 2026.** Manifest,
+> service worker e iconos —incluido el `maskable`, que es el que Android
+> recorta, y el `apple-icon` de 180 px que iOS pide aparte—. Que la app del
+> club se instalara y la del ecosistema no era una diferencia que no respondía
+> a nada: es la misma cuenta y la misma gente.
+>
+> Su service worker **no cachea datos y es deliberado**: aquí se ve quién
+> pertenece a un club y quién pidió entrar, y servir eso de caché enseñaría
+> decisiones viejas como si fueran de ahora. Solo guarda el App Shell, para que
+> abrir desde el icono sin señal no acabe en el dinosaurio del navegador.
+
 > **Ojo con el tope si alguna vez se piensa en correo para alumnos.** Resend
 > gratis da **100 al día** para todo DINAMYT. Con quinientos alumnos, un aviso
 > de vencimiento al mes se come el cupo en tres días — y con él los códigos de
@@ -897,6 +908,46 @@ sudo -u postgres psql -d dinamyt -P pager=off -c "select count(*) as suscripcion
 > equivocado hace parecer que falta la clave pública cuando está puesta. Y
 > `NEXT_PUBLIC_*` se hornea **en el build**: si algún día se cambia, hay que
 > reconstruir la web, no basta con reiniciarla.
+
+## 4.6-bis Las dos campanas, y la regla que las gobierna
+
+Hay **dos**, en dos aplicaciones, para dos personas distintas. Confundirlas
+lleva a buscar un aviso donde no está:
+
+| Campana | Dónde | De quién es | Qué cuenta |
+|---|---|---|---|
+| **Del club** | Portal DINAMYT (`components/CampanaOrg.tsx`) | De quien **gestiona** una organización | Quién pide entrar, quién entró, quién rechazó la invitación, quién se fue |
+| **De la mensualidad** | Membresías (`components/Avisos.tsx`) | Del **alumno** (y el maestro ve las de su club) | Vencimientos, mora, clases agotadas |
+
+### La regla que comparten: un aviso que ya no es verdad no se enseña
+
+Las dos lo hacen, y por caminos distintos porque su naturaleza es distinta:
+
+- En **Membresías** se calcula al leer (`vigentes`, en `routes/notifications.ts`).
+  El alumno paga, su vencimiento se mueve, y el «tu mensualidad venció» deja de
+  devolverse en la siguiente consulta. No se guarda nada: el estado de la
+  membresía ya viaja en la misma consulta.
+- En el **portal** se apaga al responder (`resolverPor`, sobre
+  `org_notifications.resolved_at`). Solo lo hace «alguien quiere entrar», que
+  es el único aviso que **es una tarea**; los demás son noticias y se quedan
+  como historia del club.
+
+**Por qué importa tanto.** Una campana que acumula rojos por cosas ya hechas
+se deja de mirar a la tercera vez, y entonces tampoco se ve la que sí importaba.
+Antes de esto: el maestro de Membresías veía «ocho alumnos deben» con los ocho
+ya pagados, y en el portal la bandeja de solicitudes no avisaba de nada — había
+que acordarse de abrirla, y se han quedado personas días esperando.
+
+### Y las otras dos reglas
+
+- **A quien lo hizo no se le avisa.** El maestro que acepta una solicitud no
+  necesita que le cuenten que acaba de aceptarla. Sin esto, el que más trabaja
+  es el que más ruido tiene en su campana.
+- **Cada aviso lleva a donde se hace algo con él.** El destino lo decide el
+  servidor —`common/avisos-org.ts` en el portal— junto con el tipo de aviso, y
+  no un `switch` en el navegador: así un tipo nuevo no puede salir sin sitio a
+  donde llevar. Una solicitud lleva a su bandeja; un vencido de Membresías, a
+  la ficha del alumno con el cobro ya a la vista (`/alumnos/:id#cobrar`).
 
 ## 4.7 La persona se edita en el portal; la ficha, en su app
 
@@ -1288,6 +1339,7 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 | `POST /invitaciones/:id/responder` | la persona invitada | Acepta o rechaza |
 | `GET` y `POST /:id/invitaciones` · `DELETE /invitaciones/:id` | gestor | Invitar, listar, retirar |
 | `GET`, `POST` y `DELETE /:id/codigo` · `GET /:id/solicitudes` | gestor | El código y su bandeja |
+| `GET /avisos` · `POST /avisos/leidos` | gestor | **La campana del club** (§4.6-bis). Sin `:id`: quien lleva dos clubes tiene UNA campana |
 | `GET /mi-club` · `POST /mi-club` | sesión | Ver mi club · fundar el mío |
 | `GET /mias` · `PATCH /:id` · `GET /:id/members` | gestor | Lo que administro |
 | `POST /:id/invite` | super-admin | Alta directa, sin preguntar (§4.4) |
@@ -1295,17 +1347,25 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 | `GET /clubes` · `POST /:id/invitar-club` · `GET /invitaciones-club/mias` | varios | Federación ↔ club, **por invitación** |
 | `POST /:id/afiliar-club` · `DELETE /:id/clubes/:clubId` | super-admin | Afiliar **a dedo** · sacarlo. Sin preguntarle al maestro (§4.5) |
 
-> **El espejo hacia Membresías** son cuatro avisos salientes, no rutas de
-> aquí: `POST /sync/persona`, `/sync/club`, `/sync/contrasena` y `/sync/rol`,
-> todos con la cabecera `x-dinamyt-sync`. Viven en
+> **El espejo hacia Membresías** son cinco avisos salientes, no rutas de
+> aquí: `POST /sync/persona`, `/sync/club`, `/sync/contrasena`, `/sync/rol` y
+> `/sync/pertenencia`, todos con la cabecera `x-dinamyt-sync`. Viven en
 > `common/espejo-membresias.ts` y los recibe `membresias-api`. Qué lleva cada
 > uno y qué NO: §4.7.
 >
-> **Y una de vuelta:** `POST /sync/alta` es la única ruta de ESTA API que no
-> pide sesión — la abre el mismo secreto compartido, y sin él responde 404. Es
-> Membresías dando de alta a alguien en su club (§4.4). Vive en
-> `modules/sync/`, aparte del controlador de organizaciones, para no dejar una
-> ruta sin sesión en medio de treinta que sí la exigen.
+> El último es la baja: sacar a alguien del club aquí le retira el acceso allá
+> —**sin borrarle la ficha**, que es donde están sus pagos y su asistencia—.
+> Antes no viajaba, y había que dar de baja a la misma persona dos veces, en
+> dos aplicaciones.
+>
+> **Y dos de vuelta**, las únicas rutas de ESTA API que no piden sesión: las
+> abre el mismo secreto compartido, y sin él responden 404.
+> `POST /sync/alta` es Membresías dando de alta a alguien en su club (§4.4);
+> `POST /sync/acceso` es Membresías diciendo que le encendió o le apagó el
+> acceso a alguien, que es lo que hace que el portal deje de ofrecer una app
+> que va a contestar 403. Viven en `modules/sync/`, aparte del controlador de
+> organizaciones, para no dejar rutas sin sesión en medio de treinta que sí la
+> exigen.
 
 > **Las dos rutas de afiliar, que son distintas a propósito:**
 > `POST /organizations/:id/invitar-club` la usa el `admin` de la federación y
@@ -2245,11 +2305,30 @@ mirar.
       mediados de septiembre, y a `reject` **después del 14 de octubre**, nunca
       durante el campeonato. Ver §3.5.
 
-`[ ]` **Un alumno desactivado en Membresías choca contra un 403 sin
-      explicación.** `isActive:false` corta el paso en `abrirSesion` —login y
-      SSO—, pero el portal no lo sabe (`org_members` no tiene estado) y le sigue
-      enseñando «Entrar a Membresías». Cerrarlo exige que el ecosistema lea el
-      estado de Membresías, o que el botón cuente lo que pasó cuando falle.
+`[x]` ~~**Un alumno desactivado en Membresías choca contra un 403 sin
+      explicación.**~~ Hecho el 31 de agosto de 2026, y por el camino que decía
+      la nota: **Membresías avisa**, el portal lo apunta y deja de ofrecer lo
+      que no va a poder abrir.
+
+      · Migración `0013_acceso_por_app`: `org_members.membresias_activo`, que
+        acepta NULL —«no consta», el valor de todo el mundo hasta que llegue el
+        primer aviso— para no afirmar de golpe que mil personas tienen acceso a
+        una app que la mayoría ni usa.
+      · Membresías llama a `POST /sync/acceso` cuando el maestro enciende o
+        apaga el acceso de alguien (`avisarAccesoAlEcosistema`). **Mismo
+        secreto que el resto del espejo: no hay variable nueva que poner.**
+      · El dashboard, con el acceso cortado, cambia la tarjeta por la
+        explicación —«tu maestro lo retiró; sigues siendo del club y no se ha
+        perdido nada tuyo»—, y la lista de gente del club marca a esa persona
+        con una insignia roja «Membresías · sin acceso».
+
+      **Y la baja al revés, que era la otra mitad y no estaba apuntada:** sacar
+      a alguien del club en el portal no llegaba a Membresías, así que seguía
+      en el listado y seguía entrando. `removeMember` llama ahora a
+      `POST /sync/pertenencia` (`espejarBaja`), que allá le retira el acceso
+      **sin borrar la ficha**: los pagos y la asistencia son la contabilidad del
+      club y no se van con la persona. Ese lado tiene once pruebas de punta a
+      punta (`baja-del-club.spec.ts`).
 
 `[ ]` **Al alumno no le llega ningún aviso automático todavía — pero ya no es
       culpa del servidor.** *(comprobado el 29 ago 2026)* Las llaves VAPID están
@@ -2339,11 +2418,24 @@ mirar.
       **Esto cubre `ecosystem` y solo `ecosystem`.** De los otros dos esquemas
       de la misma base:
 
-      · **Membresías tiene el mismo fallo** y le toca la misma cura, en **su**
-        repositorio (`D:\Repositorios\dinamyt-membresias`): todas sus fechas
-        son `timestamp` sin zona con `defaultNow()`. La que más se nota es
-        `attendances.checked_in_at`, que es la hora que el maestro ve al pasar
-        lista. Va después de esta, con el mismo guion.
+      · **Membresías tenía el mismo fallo**, y ya está curado: migración
+        `0017_fechas_con_zona` en **su** repositorio
+        (`D:\Repositorios\dinamyt-membresias`), 24 columnas, hecha el 31 de
+        agosto de 2026. Era exactamente lo que se veía en el kiosco: la hora
+        del check-in salía cinco horas en el pasado.
+
+        **Su SQL no escribe `America/Bogota` a mano y el de aquí sí**, y no es
+        un descuido: Membresías se vende sola, así que su migración también
+        corre en la base de un club que la instaló en Supabase o en Neon, donde
+        `SHOW timezone` dice `UTC`. Usa `current_setting('TimeZone')`, que es
+        con la zona que escribió `now()` sea cual sea, y así no hay nada que
+        comprobar antes de correrla.
+
+        Su ensayo, gemelo del de aquí:
+
+        ```bash
+        pnpm --filter @dinamyt/membresias-db zonas:ensayo
+        ```
       · **Campeonatos no lo tiene.** Sus modelos usan
         `default=lambda: datetime.now(timezone.utc)`, que es un default de
         **Python**, no de la base — no hay un solo `server_default` en el
@@ -2376,24 +2468,29 @@ mirar.
       §5.1-ter. El `db.session.commit()` suelta el candado y el
       `SET LOCAL lock_timeout = '5s'` hace visible cualquier recaída.
 
-`[ ]` **Las dos rutas nuevas del espejo no tienen prueba de punta a punta.**
-      *(30 ago 2026)* `POST /sync/rol` (Membresías) y `POST /sync/alta`
-      (ecosystem) están escritas, compilan y son gemelas de rutas que sí están
-      probadas. Lo que falló fue el arnés: cualquier prueba que escriba en
-      `users` con el `db` del escenario y DESPUÉS llame a una ruta `/sync/*`
-      deja colgada la siguiente transacción de PGlite y se come el tiempo
-      límite — pasa igual con `/sync/persona`, que está verde en su propio
-      archivo, así que no son las rutas nuevas.
+`[~]` **Las rutas del espejo y sus pruebas de punta a punta.**
+      *(31 ago 2026)* **Encontrado por qué colgaban, y no era el arnés: era la
+      ruta.** `/sync/rol` se quedó fuera de la lista `SIN_CONTEXTO` de
+      `plugins/rls.ts` cuando se escribió, así que la transacción que abre su
+      `sinFiltroDeClub` caía DENTRO de la que abre el plugin de RLS. Contra
+      PGlite —una sola conexión— eso se bloquea contra sí mismo y la petición no
+      vuelve nunca; contra un PostgreSQL de verdad no se cuelga porque el pool
+      le da otra conexión, así que **en producción funciona y solo abre una
+      transacción de más**. Un fallo que no se ve donde importa y que deja el
+      código sin poder probarse, que es la peor combinación de las dos.
 
-      **Lo que sí está cubierto** es lo que de verdad falló: la traducción de
-      roles en las dos direcciones, once casos en `roles-por-app.spec.ts`, y el
-      borrado de los roles por app en `cambiar-rol.spec.ts` (ecosystem-api).
+      Arreglado: `/sync/rol` y `/sync/pertenencia` están ya en esa lista.
 
-      **La tarea:** entender por qué esa combinación cuelga —lo más probable es
-      cómo `crearEscenario` deja la conexión única de PGlite— y poner las
-      pruebas: que llega el rol, que se rechaza el que no existe allí, la puerta
-      del secreto, que el club no se queda sin dueño, que la ficha sin `eco_sub`
-      no se toca, y que un alta fallida no deja ficha suelta.
+      **Lo que queda cubierto ahora:** `/sync/pertenencia` tiene once pruebas de
+      punta a punta (`baja-del-club.spec.ts`, Membresías) y `/sync/acceso`
+      nueve (`modules/sync/acceso.spec.ts`, ecosystem). Y la traducción de roles
+      sigue con sus once casos en `roles-por-app.spec.ts`.
+
+      **Lo que falta:** las de `/sync/rol` y `/sync/alta`, que ahora sí se
+      pueden escribir — el bloqueo que lo impedía ya no está. La lista de casos
+      es la de siempre: que llega el rol, que se rechaza el que no existe allí,
+      la puerta del secreto, que el club no se queda sin dueño, que la ficha sin
+      `eco_sub` no se toca, y que un alta fallida no deja ficha suelta.
 
 `[ ]` **El cambio de rol solo viaja a Membresías.** *(30 ago 2026)* Campeonatos
       y Academy siguen leyendo el rol del pase **solo al crear** su fila local;
