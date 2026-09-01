@@ -201,6 +201,59 @@ if (!APLICAR) {
   process.exit(0);
 }
 
+/**
+ * ── El cerrojo: ¿la otra punta entiende el alta? ──────────────────────────
+ *
+ * **Sin esto, correr el repaso contra un Membresías sin actualizar da de BAJA
+ * a todo el mundo.** La ruta vieja lee `{ecoSub, ecoOrgId}` y no mira `activo`:
+ * el mismo cuerpo que aquí significa «entró» allí significa «salió», y el
+ * resultado sería exactamente lo contrario de lo que se venía a hacer, sobre
+ * la gente entera de todos los clubes.
+ *
+ * Es el fallo clásico de desplegar en el orden equivocado, y avisarlo en un
+ * documento no basta: lo comprueba el guion, y se niega a seguir.
+ *
+ * La sonda es un aviso que NO TOCA NADA: un `ecoSub` inventado —que no es de
+ * nadie— con `activo: true` y sin correo. La ruta nueva llega a mirar el correo,
+ * no lo encuentra y lo dice; la vieja ni sabe que hay un alta, busca una ficha
+ * que no existe y se calla. Esa diferencia es la firma.
+ */
+async function entiendeElAlta(ecoOrgId) {
+  const res = await fetch(`${destino}/sync/pertenencia`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-dinamyt-sync': secreto },
+    body: JSON.stringify({
+      ecoSub: '00000000-0000-4000-8000-000000000000',
+      ecoOrgId,
+      activo: true,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return { ok: false, detalle: `HTTP ${res.status}` };
+  const d = await res.json();
+  return {
+    ok: typeof d.motivo === 'string' && d.motivo.includes('correo'),
+    detalle: JSON.stringify(d),
+  };
+}
+
+const sonda = await entiendeElAlta(candidatos[0].org_id);
+if (!sonda.ok) {
+  console.error(`
+✗ ME NIEGO A SEGUIR: Membresías todavía no entiende el alta.
+
+  Contestó: ${sonda.detalle}
+
+  Esa versión lee el aviso SIN mirar \`activo\`, así que el mensaje que dice
+  «entró al club» lo leería como «salió del club» — y este repaso dejaría sin
+  acceso a las ${candidatos.length} personas que iba a dar de alta.
+
+  Despliega Membresías PRIMERO y vuelve a correr esto.
+`);
+  await bd.cerrar();
+  process.exit(1);
+}
+
 console.log(`\n── Avisando a ${destino} ──`);
 
 const cuenta = { creada: 0, enlazada: 0, yaEstaba: 0, sinClub: 0, fallo: 0 };
