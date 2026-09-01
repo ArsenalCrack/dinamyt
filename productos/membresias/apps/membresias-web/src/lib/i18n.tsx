@@ -218,7 +218,15 @@ const es = {
     'Ningún aviso nuevo: hoy nadie está por vencer ni vencido, o ya se le avisó.',
   'panel.cobrar': 'Cobrar',
   'panel.enCaja': 'entró en caja',
-  'panel.deEsperado': 'de lo esperado este mes',
+  // La segunda línea de la tarjeta de caja. Antes decía «$880.000 / $1.280.000
+  // de lo esperado este mes» debajo de un número grande distinto, y no había
+  // forma de saber qué era cada cifra: parecía que 880.000 salía de los
+  // 800.000 de arriba. Son tres cosas distintas y ahora cada una se nombra.
+  'panel.leToca': 'Le toca a este mes',
+  'panel.deEsperados': 'de',
+  'panel.esperados': 'esperados',
+  'panel.cajaAyuda':
+    'Arriba, el dinero que ENTRÓ este mes. Abajo, cuánto de todo lo cobrado le corresponde a este mes —quien paga tres meses de golpe adelanta los dos siguientes— y cuánto debería entrar si pagaran todos tus alumnos con plan mensual.',
   // Cumpleaños. La tarjeta solo sale el día que hay alguno: una tarjeta que
   // dice «hoy nadie cumple años» 360 días al año es ruido, no información.
   'panel.cumpleHoy': 'Hoy cumple años',
@@ -228,11 +236,10 @@ const es = {
 
   // Alumnos (CRUD del maestro)
   'alumnos.titulo': 'Alumnos del club',
-  // Cuánta gente hay, debajo del título. `alumnos` son los del rol `student`
-  // con acceso; `sinAcceso` es cualquiera al que se le cortó, del rol que sea.
+  // Cuántos alumnos hay, debajo del título: los del rol `student` CON acceso.
+  // A quien se le cortó no se cuenta — es gente que ya no entrena.
   'alumnos.cuantos': 'alumnos',
   'alumnos.unAlumno': 'alumno',
-  'alumnos.sinAcceso': 'sin acceso',
   'alumnos.nuevo': 'Nuevo alumno',
   // «Dar de alta» es vocabulario de oficina: el maestro inscribe gente en su
   // club, no da de alta registros. Y dice «a alguien» porque por aquí entran
@@ -497,6 +504,9 @@ const es = {
   // Asistencia
   'asistencia.titulo': 'Asistencia de hoy',
   'asistencia.presentes': 'Presentes',
+  // Cuando alguien marcó hoy y después se le retiró el acceso: el número de
+  // arriba lo cuenta y la lista ya no lo enseña. Aquí se dice quién es.
+  'asistencia.marcaronSinAcceso': 'Marcaron hoy y ya no tienen acceso:',
   'asistencia.marcar': 'Marcar',
   'asistencia.marcado': 'Marcado',
   'asistencia.instruccion':
@@ -883,7 +893,11 @@ const en: Record<ClaveTexto, string> = {
     'No new notices: nobody is due soon or overdue today, or they were told already.',
   'panel.cobrar': 'Charge',
   'panel.enCaja': 'came in',
-  'panel.deEsperado': 'of what this month expects',
+  'panel.leToca': 'Belongs to this month',
+  'panel.deEsperados': 'of',
+  'panel.esperados': 'expected',
+  'panel.cajaAyuda':
+    'Above, the money that CAME IN this month. Below, how much of everything collected belongs to this month —whoever pays three months at once is paying the next two in advance— and how much should come in if every student on a monthly plan paid.',
   'panel.cumpleHoy': 'Birthday today',
   'panel.cumpleHoyVarios': 'Birthdays today',
   'panel.cumpleAnos': 'years old',
@@ -892,7 +906,6 @@ const en: Record<ClaveTexto, string> = {
   'alumnos.titulo': 'Club students',
   'alumnos.cuantos': 'students',
   'alumnos.unAlumno': 'student',
-  'alumnos.sinAcceso': 'without access',
   'alumnos.nuevo': 'New student',
   'alumnos.crearTitulo': 'Enrol someone in the club',
   'alumnos.noTeDesactivas':
@@ -1102,6 +1115,7 @@ const en: Record<ClaveTexto, string> = {
 
   'asistencia.titulo': "Today's attendance",
   'asistencia.presentes': 'Present',
+  'asistencia.marcaronSinAcceso': 'Checked in today and no longer have access:',
   'asistencia.marcar': 'Check in',
   'asistencia.marcado': 'Checked in',
   'asistencia.instruccion':

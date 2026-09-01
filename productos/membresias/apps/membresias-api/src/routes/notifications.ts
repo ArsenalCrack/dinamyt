@@ -240,7 +240,22 @@ export async function notificationsRoutes(app: FastifyInstance) {
             .from(notifications)
             .leftJoin(memberships, eq(notifications.membershipId, memberships.id))
             .innerJoin(users, eq(notifications.userId, users.id))
-            .where(eq(notifications.userId, req.user!.sub))
+            /**
+             * Los MÍOS, y solo los que no he leído.
+             *
+             * La campana es lo que me falta por mirar, no el archivo de todo lo
+             * que me ha pasado: un aviso que ya abrí y sigue ahí me obliga a
+             * volver a leerlo cada vez para reconocerlo, y a la tercera dejo de
+             * abrirla. Lo leído se va.
+             *
+             * En la vista del CLUB (`?all=1`) esto no aplica y sería un error
+             * aplicarlo: allí los avisos son de los alumnos, y «leído»
+             * significa que lo leyó SU dueño — no el maestro. Lo que los quita
+             * de esa lista es `vigentes`: que el motivo deje de ser verdad.
+             */
+            .where(
+              and(eq(notifications.userId, req.user!.sub), isNull(notifications.readAt)),
+            )
             .orderBy(desc(notifications.scheduledFor))
             .limit(50);
 

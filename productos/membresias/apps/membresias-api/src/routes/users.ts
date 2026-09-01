@@ -327,17 +327,16 @@ export async function usersRoutes(app: FastifyInstance) {
      * que enseñaba un número— se esconde cuando todo cabe en una página, así
      * que un club de doce alumnos no veía la cifra por ningún lado.
      *
-     * Este resumen va aparte de los filtros a propósito, y son las dos cifras
-     * que significan algo para el maestro:
+     * Este resumen va aparte de los filtros a propósito, y cuenta UNA cosa:
+     * los alumnos que entrenan y entran — rol `student` y con acceso. Es
+     * «cuántos alumnos tengo», que es lo que se cobra.
      *
-     *   · `alumnos` — los que entrenan y entran: rol `student` y con acceso.
-     *     Es «cuántos alumnos tengo», y es lo que se cobra.
-     *   · `sinAcceso` — a cuántos se les cortó el acceso, del rol que sean.
-     *     Va al lado porque sin él la primera cifra se lee como «el club
-     *     entero», y no lo es: quien no ve el número no sabe que hay gente
-     *     apagada esperando a que alguien se acuerde de ella.
+     * A quien se le cortó el acceso **no se cuenta**: ya no entrena, así que
+     * sumarlo aquí infla la cifra que el maestro usa para saber de qué tamaño
+     * es su club. Para buscarlo está el filtro «Sin acceso», que es donde ese
+     * dato significa algo.
      *
-     * El maestro no se cuenta en ninguna, igual que no sale en la lista.
+     * El maestro no se cuenta, igual que no sale en la lista.
      */
     const delClubSinElMaestro = and(eq(users.orgId, orgId), ne(users.role, 'owner'));
 
@@ -355,7 +354,6 @@ export async function usersRoutes(app: FastifyInstance) {
           alumnos: sql<number>`count(*) filter (
             where ${users.role} = 'student' and ${users.isActive}
           )::int`,
-          sinAcceso: sql<number>`count(*) filter (where not ${users.isActive})::int`,
         })
         .from(users)
         .where(delClubSinElMaestro),
@@ -363,7 +361,7 @@ export async function usersRoutes(app: FastifyInstance) {
     return {
       items: filas.map(vista),
       total: cuenta?.n ?? 0,
-      resumen: { alumnos: resumen?.alumnos ?? 0, sinAcceso: resumen?.sinAcceso ?? 0 },
+      resumen: { alumnos: resumen?.alumnos ?? 0 },
     };
   });
 

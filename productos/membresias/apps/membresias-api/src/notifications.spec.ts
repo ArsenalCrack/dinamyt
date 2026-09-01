@@ -196,6 +196,70 @@ describe('notificaciones', () => {
       await app.close();
     });
 
+    it('lo que el alumno ya leyó desaparece de su campana', async () => {
+      // La campana es lo que te falta por mirar, no el archivo de todo lo que
+      // te ha pasado: un aviso ya abierto que sigue ahí obliga a releerlo cada
+      // vez para reconocerlo, y a la tercera se deja de abrir.
+      const { app, db, auth, ids, orgId } = await crearEscenario();
+      await db
+        .insert(memberships)
+        .values({ orgId, userId: ids.alumno, venceEl: '2000-01-01' });
+      await app.inject({
+        method: 'POST',
+        url: '/notifications/run',
+        headers: auth(ids.owner),
+      });
+
+      const antes = await app.inject({
+        method: 'GET',
+        url: '/notifications',
+        headers: auth(ids.alumno),
+      });
+      expect(antes.json()).toHaveLength(1);
+
+      await app.inject({
+        method: 'POST',
+        url: '/notifications/leidos',
+        headers: auth(ids.alumno),
+      });
+
+      const despues = await app.inject({
+        method: 'GET',
+        url: '/notifications',
+        headers: auth(ids.alumno),
+      });
+      expect(despues.json()).toHaveLength(0);
+      await app.close();
+    });
+
+    it('pero en la campana del CLUB sigue: ahí «leído» es de su dueño, no del maestro', async () => {
+      // Si esto se filtrara por `readAt`, la lista del maestro se vaciaría
+      // cuando sus ALUMNOS abrieran sus avisos — que no es asunto suyo. Lo que
+      // saca un aviso de esta lista es que su motivo deje de ser verdad.
+      const { app, db, auth, ids, orgId } = await crearEscenario();
+      await db
+        .insert(memberships)
+        .values({ orgId, userId: ids.alumno, venceEl: '2000-01-01' });
+      await app.inject({
+        method: 'POST',
+        url: '/notifications/run',
+        headers: auth(ids.owner),
+      });
+      await app.inject({
+        method: 'POST',
+        url: '/notifications/leidos',
+        headers: auth(ids.alumno),
+      });
+
+      const delClub = await app.inject({
+        method: 'GET',
+        url: '/notifications?all=1',
+        headers: auth(ids.owner),
+      });
+      expect(delClub.json()).toHaveLength(1);
+      await app.close();
+    });
+
     it('el alumno solo ve SUS avisos', async () => {
       const { app, db, auth, ids, orgId } = await crearEscenario();
       await db.insert(memberships).values([

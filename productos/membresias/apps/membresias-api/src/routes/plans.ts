@@ -48,13 +48,30 @@ interface PlanBody {
 /** Planes/tarifas del club. Los define el maestro (owner). */
 export async function plansRoutes(app: FastifyInstance) {
   // ── GET /plans — listar los planes del club (owner/staff) ─────────────────
+  //
+  // **Por defecto, solo los que se pueden cobrar.** Borrar un plan es apagarlo
+  // (`DELETE /plans/:id`), y esta ruta los devolvía TODOS: el desplegable de
+  // «asignar plan» de la ficha del alumno se llenaba de tarifas que el maestro
+  // había borrado hacía meses, y elegir una de ellas funcionaba — dejaba al
+  // alumno cobrando por un precio que el club ya no ofrece.
+  //
+  // `?todos=1` los trae todos, y lo usa una sola pantalla: la de planes, que
+  // es donde tiene sentido ver también los apagados.
   app.get(
     '/plans',
     { preHandler: requireRole(['owner', 'staff']) },
     async (req, reply) => {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
-      return req.db.select().from(plans).where(eq(plans.orgId, orgId));
+      const todos = (req.query as { todos?: string }).todos === '1';
+      return req.db
+        .select()
+        .from(plans)
+        .where(
+          todos
+            ? eq(plans.orgId, orgId)
+            : and(eq(plans.orgId, orgId), eq(plans.isActive, true)),
+        );
     },
   );
 

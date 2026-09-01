@@ -229,7 +229,7 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                 {t('aviso.sinAvisos')}
               </p>
             ) : (
-              <ul>
+              <ul className="avisos-lista">
                 {avisos.map((a) => (
                   <li key={a.id}>
                     <Link
