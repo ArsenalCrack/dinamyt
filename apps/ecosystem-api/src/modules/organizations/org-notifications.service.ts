@@ -128,9 +128,15 @@ export class OrgNotificationsService {
   /**
    * La campana de una persona: sus avisos de todos los clubes que gestiona.
    *
-   * Lo que NO devuelve es tan importante como lo que devuelve: los resolubles
-   * que ya están resueltos no salen. Los demás salen siempre, leídos o no,
-   * porque son historia del club y se leen hacia atrás.
+   * Lo que NO devuelve es tan importante como lo que devuelve, y son dos cosas:
+   *
+   *   · **Lo ya leído.** La campana es lo que me falta por mirar, no el archivo
+   *     de todo lo que ha pasado en mi club: un aviso que ya abrí y sigue ahí
+   *     me obliga a volver a leerlo cada vez para reconocerlo, y a la tercera
+   *     dejo de abrirla. Lo que pasó no se pierde — está en su sitio de
+   *     siempre: la bandeja de solicitudes, la lista de gente del club.
+   *   · **Lo resuelto**, de los tipos que se resuelven: una solicitud ya
+   *     respondida no vuelve a pedir nada.
    */
   async mios(userId: string, limite = 40) {
     const filas = await db
@@ -152,6 +158,7 @@ export class OrgNotificationsService {
       .where(
         and(
           eq(orgNotifications.userId, userId),
+          isNull(orgNotifications.readAt),
           // Los resolubles, solo mientras sigan pendientes. Un `OR` y no un
           // `isNull` a secas: los que no se resuelven nunca tienen
           // `resolved_at` en nulo para siempre y saldrían igual, pero el día
@@ -174,7 +181,11 @@ export class OrgNotificationsService {
     }));
   }
 
-  /** Cuántos tiene sin leer. Es el número rojo de la campana. */
+  /**
+   * Cuántos le quedan. Es el número rojo de la campana, y cuenta lo mismo que
+   * `mios` devuelve — si contara otra cosa, el número y la lista se
+   * contradirían, que es la forma más rápida de que nadie se fíe de ninguno.
+   */
   async sinLeer(userId: string): Promise<number> {
     const [fila] = await db
       .select({ n: sql<number>`count(*)::int` })

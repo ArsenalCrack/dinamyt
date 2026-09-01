@@ -502,6 +502,15 @@ export interface PaginaMiembros {
   total: number;
   limit: number;
   offset: number;
+  /**
+   * Cuántos hay ESCONDIDOS por no tener acceso a Membresías.
+   *
+   * No entran en `total` a propósito: el número de la lista es «cuánta gente
+   * tiene el club», y quien su maestro apagó en Membresías ya no entrena. Éste
+   * viaja aparte para que la pantalla pueda ofrecer verlos — una lista corta
+   * sin explicación se lee como que faltan personas.
+   */
+  sinAcceso?: number;
 }
 
 /**
@@ -513,12 +522,19 @@ export interface PaginaMiembros {
  */
 export const listMiembrosAPI = async (
   orgId: string,
-  opciones: { search?: string; limit?: number; offset?: number } = {},
+  opciones: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+    /** Ver también a quien perdió el acceso a Membresías. */
+    incluirSinAcceso?: boolean;
+  } = {},
 ): Promise<PaginaMiembros> =>
   (
     await api.get(`/organizations/${orgId}/members`, {
       params: {
         ...(opciones.search ? { search: opciones.search } : {}),
+        ...(opciones.incluirSinAcceso ? { incluirSinAcceso: '1' } : {}),
         limit: opciones.limit ?? 20,
         offset: opciones.offset ?? 0,
       },

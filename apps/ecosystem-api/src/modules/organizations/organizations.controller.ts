@@ -539,6 +539,8 @@ export class OrganizationsController {
     @Query('search') search?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    /** `1` para ver también a quien perdió el acceso a Membresías. */
+    @Query('incluirSinAcceso') incluirSinAcceso?: string,
   ) {
     await this.orgsService.exigirRelacionCon(
       user.sub,
@@ -555,6 +557,7 @@ export class OrganizationsController {
       search,
       limit: aNumero(limit),
       offset: aNumero(offset),
+      incluirSinAcceso: incluirSinAcceso === '1',
     });
   }
 }

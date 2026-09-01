@@ -64,6 +64,9 @@ export default function MiOrganizacionPage() {
   const [totalMiembros, setTotalMiembros] = useState(0);
   const [busquedaGente, setBusquedaGente] = useState('');
   const [offsetGente, setOffsetGente] = useState(0);
+  /** Ver también a quien perdió el acceso a Membresías. Apagado por defecto. */
+  const [verSinAcceso, setVerSinAcceso] = useState(false);
+  const [sinAcceso, setSinAcceso] = useState(0);
   /** Sube tras cada acción sobre un miembro y hace que la lista se recargue. */
   const [recargaGente, setRecargaGente] = useState(0);
   const [msg, setMsg] = useState<Mensaje | null>(null);
@@ -179,18 +182,36 @@ export default function MiOrganizacionPage() {
         search: busquedaGente,
         limit: POR_PAGINA,
         offset: offsetGente,
+        incluirSinAcceso: verSinAcceso,
       })
         .then((p) => {
           setMiembros(p.items);
           setTotalMiembros(p.total);
+          setSinAcceso(p.sinAcceso ?? 0);
         })
         .catch(() => {
           setMiembros([]);
           setTotalMiembros(0);
+          setSinAcceso(0);
         });
     }, 250);
     return () => clearTimeout(t);
-  }, [sel, busquedaGente, offsetGente, recargaGente]);
+  }, [sel, busquedaGente, offsetGente, recargaGente, verSinAcceso]);
+
+  /**
+   * Elegir un club **vuelve a la página 1**.
+   *
+   * Sin esto: en un club con más gente de la que cabe en una página se pasa a
+   * la 2, se cambia a otro club con cinco miembros, y ese sale VACÍO — porque
+   * se le está pidiendo una página que no tiene. El mismo fallo que tenía el
+   * panel de administración.
+   */
+  function elegirClub(id: string) {
+    setSel(id);
+    setOffsetGente(0);
+    setBusquedaGente('');
+    setVerSinAcceso(false);
+  }
 
   async function accion(fn: () => Promise<unknown>, ok: string, fallback: string) {
     setMsg(null);
@@ -395,7 +416,7 @@ export default function MiOrganizacionPage() {
             {orgs.map((o) => (
               <li key={o.id}>
                 <button
-                  onClick={() => setSel(o.id)}
+                  onClick={() => elegirClub(o.id)}
                   className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm"
                   style={{ borderColor: sel === o.id ? 'var(--gold)' : 'var(--border)' }}
                 >
@@ -414,7 +435,7 @@ export default function MiOrganizacionPage() {
                     {o.hijas.map((h) => (
                       <li key={h.id} className="flex items-center gap-1.5">
                         <button
-                          onClick={() => setSel(h.id)}
+                          onClick={() => elegirClub(h.id)}
                           className="flex min-w-0 flex-1 items-center justify-between rounded-lg border px-3 py-1.5 text-left text-sm"
                           style={{ borderColor: sel === h.id ? 'var(--gold)' : 'var(--border)', opacity: h.isActive === false ? 0.6 : 1 }}
                         >
@@ -767,6 +788,26 @@ export default function MiOrganizacionPage() {
           total={totalMiembros}
           onIr={setOffsetGente}
         />
+
+        {/* Quien perdió el acceso a Membresías no entra en el número de arriba
+            —ya no entrena, y contarlo infla «cuánta gente tiene mi club»—,
+            pero tiene que poder alcanzarse: darlo de baja del club se hace
+            desde esta misma lista. Solo sale cuando hay alguien. */}
+        {(sinAcceso > 0 || verSinAcceso) && (
+          <button
+            type="button"
+            className="mt-2 text-xs underline"
+            style={{ color: 'var(--text-muted)' }}
+            onClick={() => {
+              setVerSinAcceso((v) => !v);
+              setOffsetGente(0);
+            }}
+          >
+            {verSinAcceso
+              ? 'Ocultar a quien no tiene acceso a Membresías'
+              : `Ver también ${sinAcceso} sin acceso a Membresías`}
+          </button>
+        )}
       </section>
 
       {/* ── Ficha del club (la ven los miembros en «Mi club») ──────────────

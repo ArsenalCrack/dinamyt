@@ -702,6 +702,16 @@ main { animation: aparecer 0.3s ease; }
   z-index: 50;
   background: rgba(0, 0, 0, 0.5);
 }
+/* ── El panel, y por qué el scroll NO va aquí ──
+   Iba: el panel entero era el que se desplazaba. Con `border-radius` puesto,
+   eso deja la barra de scroll pegada al borde exterior y las filas asomando
+   por las esquinas redondeadas al llegar arriba y abajo — se veía cortado.
+
+   Ahora el panel es una caja fija que no se desplaza (`overflow: hidden`, que
+   además es lo que hace que el radio recorte de verdad a los hijos) y lo que
+   se desplaza es la LISTA de dentro. Así el encabezado se queda quieto, la
+   barra vive dentro del marco, y el redondeo se respeta por los cuatro lados.
+   Es exactamente lo mismo que hace la campana de Membresías. */
 .avisos-org-panel {
   position: fixed;
   z-index: 51;
@@ -710,13 +720,31 @@ main { animation: aparecer 0.3s ease; }
   transform: translate(-50%, -50%);
   width: min(380px, calc(100vw - 2rem));
   max-height: min(70vh, 32rem);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 0.9rem;
   background: var(--bg-card);
   border: 1px solid var(--gold-dim);
   border-radius: 0.8rem;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
+.avisos-org-lista {
+  /* `min-height: 0` no sobra: sin él, un hijo de flex se niega a encogerse por
+     debajo de su contenido y el scroll no llega a activarse nunca. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Que rebotar al final de la lista no arrastre la página de detrás. */
+  overscroll-behavior: contain;
+  /* El hueco de la barra reservado siempre: si no, la lista salta de ancho en
+     cuanto aparece. */
+  scrollbar-gutter: stable;
+  margin: 0 -0.2rem;
+  padding: 0 0.2rem;
+}
+/* El encabezado no se encoge: es lo que da el botón de cerrar. */
+.avisos-org-cabecera { flex: 0 0 auto; }
 /* El aviso ENTERO es el enlace, no un «ver» al final: lo que se toca en un
    celular es el renglón. */
 .avisos-org-item {

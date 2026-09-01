@@ -31,12 +31,16 @@ import { haceCuanto } from '@/lib/fechas';
  *    con un `switch` aquí, el día que se añada un tipo en la API sale una línea
  *    sin enlace. Una solicitud lleva a la bandeja donde se acepta; alguien
  *    nuevo, a su ficha.
- * 2. **Lo que ya está hecho desaparece.** Responder una solicitud apaga su
- *    aviso —para todos los gestores, no solo para quien respondió—. Sin eso, el
- *    maestro que acepta a diez personas se queda con diez rojos pidiéndole algo
- *    que ya hizo, y a la tercera vez deja de mirar la campana. Eso lo resuelve
- *    la API; aquí lo único que hace falta es **volver a preguntar** cuando algo
- *    pudo cambiar: al cambiar de pantalla y al abrir el panel.
+ * 2. **Lo que ya no hace falta desaparece.** Por dos caminos: responder una
+ *    solicitud apaga su aviso —para todos los gestores, no solo para quien
+ *    respondió—, y **lo que ya se leyó tampoco vuelve**. La campana es lo que
+ *    te falta por mirar, no el archivo de todo lo que ha pasado en tu club:
+ *    un aviso que ya abriste y sigue ahí te obliga a releerlo cada vez para
+ *    reconocerlo, y a la tercera dejas de abrirla. Lo que pasó no se pierde —
+ *    está en la bandeja de solicitudes y en la lista de gente.
+ *
+ *    Eso lo resuelve la API; aquí lo único que hace falta es **volver a
+ *    preguntar** cuando algo pudo cambiar: al cambiar de pantalla y al abrir.
  *
  * ── Quién la ve ──
  *
@@ -175,7 +179,7 @@ export function CampanaOrg() {
             aria-hidden="true"
           />
           <div className="avisos-org-panel" role="dialog" aria-label="Avisos de tu club">
-            <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="avisos-org-cabecera mb-2 flex items-center justify-between gap-2">
               <p className="eyebrow">Tu club</p>
               <button
                 type="button"
@@ -187,12 +191,15 @@ export function CampanaOrg() {
             </div>
 
             {avisos.length === 0 ? (
+              // «Al día» y no «no ha pasado nada»: lo leído se va de aquí, así
+              // que este vacío casi siempre significa que ya lo miraste todo.
+              // Lo que pasó sigue en su sitio, y se dice dónde.
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                No hay novedades. Aquí aparecerán las solicitudes de entrada y
-                los cambios de gente en tu club.
+                Estás al día. Aquí aparecen las solicitudes de entrada y los
+                cambios de gente en tu club, y desaparecen cuando las lees.
               </p>
             ) : (
-              <ul>
+              <ul className="avisos-org-lista">
                 {avisos.map((a) => {
                   const { titulo, detalle, color } = frase(a);
                   return (

@@ -1389,9 +1389,31 @@ export class OrganizationsService {
    * portal una cookie de sesión como la de Membresías; hasta entonces,
    * paginar es lo que evita el problema.
    */
+  /**
+   * La gente de un club.
+   *
+   * ── Por qué NO salen por defecto los que perdieron el acceso a Membresías ──
+   *
+   * Porque el número de esta lista es «cuánta gente tiene el club», y ése es el
+   * número con el que se toman decisiones. Contar a quien su maestro apagó en
+   * Membresías —gente que ya no entrena— lo infla, y el paginador lo enseñaba
+   * en grande: «1–25 de 213» con veinte de esos 213 fuera del club de verdad.
+   *
+   * **No desaparecen**, que sería peor: `incluirSinAcceso` los trae, y la
+   * pantalla ofrece verlos en cuanto hay alguno. Hace falta poder llegar a
+   * ellos — darlos de baja del club es justo lo que se hace después.
+   *
+   * `NULL` es «no consta» y cuenta como presente: es el valor de todo el que
+   * no usa Membresías, que son casi todos.
+   */
   async getMembers(
     orgId: string,
-    opciones: { search?: string; limit?: number; offset?: number } = {},
+    opciones: {
+      search?: string;
+      limit?: number;
+      offset?: number;
+      incluirSinAcceso?: boolean;
+    } = {},
   ) {
     // Verificar que la organización existe
     await this.findById(orgId);
@@ -1404,18 +1426,41 @@ export class OrganizationsService {
 
     // El `eq(orgId)` va SIEMPRE, con búsqueda y sin ella: este buscador ve un
     // club y solo uno. Ver `common/busqueda.ts`.
-    const filtro = termino
-      ? and(
-          eq(orgMembers.orgId, orgId),
-          or(ilike(users.fullName, termino), ilike(users.email, termino)),
-        )
-      : eq(orgMembers.orgId, orgId);
+    const conAcceso = opciones.incluirSinAcceso
+      ? undefined
+      : or(
+          isNull(orgMembers.membresiasActivo),
+          eq(orgMembers.membresiasActivo, true),
+        );
 
-    const [{ total }] = await db
-      .select({ total: count() })
-      .from(orgMembers)
-      .innerJoin(users, eq(orgMembers.userId, users.id))
-      .where(filtro);
+    const filtro = and(
+      eq(orgMembers.orgId, orgId),
+      ...(termino
+        ? [or(ilike(users.fullName, termino), ilike(users.email, termino))!]
+        : []),
+      ...(conAcceso ? [conAcceso] : []),
+    );
+
+    // Cuántos hay escondidos. Va aparte del total para que la pantalla pueda
+    // ofrecer verlos: un filtro que no dice que está puesto es una lista corta
+    // sin explicación, y eso se lee como que faltan personas.
+    const [{ total }, [sinAcceso]] = await Promise.all([
+      db
+        .select({ total: count() })
+        .from(orgMembers)
+        .innerJoin(users, eq(orgMembers.userId, users.id))
+        .where(filtro)
+        .then((r) => r[0]),
+      db
+        .select({ n: count() })
+        .from(orgMembers)
+        .where(
+          and(
+            eq(orgMembers.orgId, orgId),
+            eq(orgMembers.membresiasActivo, false),
+          ),
+        ),
+    ]);
 
     const items = await db
       .select({
@@ -1449,7 +1494,7 @@ export class OrganizationsService {
       .limit(limit)
       .offset(offset);
 
-    return { items, total, limit, offset };
+    return { items, total, limit, offset, sinAcceso: sinAcceso?.n ?? 0 };
   }
 
   // ══════════════════════════════════════════════════════════════════════════

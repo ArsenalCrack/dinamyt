@@ -84,6 +84,9 @@ export default function AdminEcosistemaPage() {
   const [totalMiembros, setTotalMiembros] = useState(0);
   const [busquedaGente, setBusquedaGente] = useState('');
   const [offsetGente, setOffsetGente] = useState(0);
+  /** Ver también a quien perdió el acceso a Membresías. Apagado por defecto. */
+  const [verSinAcceso, setVerSinAcceso] = useState(false);
+  const [sinAcceso, setSinAcceso] = useState(0);
   /** Sube tras cada acción sobre un miembro y hace que la lista se recargue. */
   const [recargaGente, setRecargaGente] = useState(0);
 
@@ -150,18 +153,40 @@ export default function AdminEcosistemaPage() {
         search: busquedaGente,
         limit: POR_PAGINA,
         offset: offsetGente,
+        incluirSinAcceso: verSinAcceso,
       })
         .then((p) => {
           setMiembros(p.items);
           setTotalMiembros(p.total);
+          setSinAcceso(p.sinAcceso ?? 0);
         })
         .catch(() => {
           setMiembros([]);
           setTotalMiembros(0);
+          setSinAcceso(0);
         });
     }, 250);
     return () => clearTimeout(t);
-  }, [orgSel, busquedaGente, offsetGente, recargaGente]);
+  }, [orgSel, busquedaGente, offsetGente, recargaGente, verSinAcceso]);
+
+  /**
+   * Elegir un club **vuelve a la página 1**.
+   *
+   * Sin esto pasaba lo siguiente, y no se entendía: en un club con más gente de
+   * la que cabe en una página se pasa a la 2, se cambia a otro club que tiene
+   * cinco miembros, y ese club sale VACÍO — porque se le está pidiendo la
+   * página 2, que no existe. Volver al primero y pasar a su página 1 «lo
+   * arreglaba», lo que hacía parecer que el fallo iba y venía solo.
+   *
+   * La búsqueda se limpia por lo mismo: un texto escrito para buscar en otro
+   * club deja el nuevo en blanco y nada dice por qué.
+   */
+  function elegirOrg(o: Organizacion | null) {
+    setOrgSel(o);
+    setOffsetGente(0);
+    setBusquedaGente('');
+    setVerSinAcceso(false);
+  }
 
   /** Ejecuta una acción, refresca y reporta el resultado. */
   async function accion(fn: () => Promise<unknown>, ok: string, fallback: string) {
@@ -355,7 +380,7 @@ export default function AdminEcosistemaPage() {
               const clubes = hijasDe(fed.id);
               return (
                 <div key={fed.id}>
-                  <FilaOrg org={fed} sel={orgSel?.id === fed.id} onSel={setOrgSel}>
+                  <FilaOrg org={fed} sel={orgSel?.id === fed.id} onSel={elegirOrg}>
                     <span className="badge">{fed.type}</span>
                     <span className="badge">
                       {clubes.length === 1 ? '1 club' : `${clubes.length} clubes`}
@@ -370,7 +395,7 @@ export default function AdminEcosistemaPage() {
                   >
                     {clubes.map((c) => (
                       <li key={c.id}>
-                        <FilaOrg org={c} sel={orgSel?.id === c.id} onSel={setOrgSel} pequena>
+                        <FilaOrg org={c} sel={orgSel?.id === c.id} onSel={elegirOrg} pequena>
                           <span className="badge">{c.type}</span>
                         </FilaOrg>
                       </li>
@@ -396,7 +421,7 @@ export default function AdminEcosistemaPage() {
                 <ul className="flex flex-col gap-1">
                   {huerfanos.map((c) => (
                     <li key={c.id}>
-                      <FilaOrg org={c} sel={orgSel?.id === c.id} onSel={setOrgSel}>
+                      <FilaOrg org={c} sel={orgSel?.id === c.id} onSel={elegirOrg}>
                         <span className="badge">{c.type}</span>
                       </FilaOrg>
                     </li>
@@ -601,6 +626,27 @@ export default function AdminEcosistemaPage() {
                 total={totalMiembros}
                 onIr={setOffsetGente}
               />
+
+              {/* Quien perdió el acceso a Membresías no entra en el número de
+                  arriba —ya no entrena, y contarlo infla «cuánta gente tiene
+                  este club»—, pero tiene que poder alcanzarse: darlo de baja
+                  del club se hace desde esta misma lista. El enlace solo sale
+                  cuando hay alguien. */}
+              {(sinAcceso > 0 || verSinAcceso) && (
+                <button
+                  type="button"
+                  className="mt-2 text-xs underline"
+                  style={{ color: 'var(--text-muted)' }}
+                  onClick={() => {
+                    setVerSinAcceso((v) => !v);
+                    setOffsetGente(0);
+                  }}
+                >
+                  {verSinAcceso
+                    ? 'Ocultar a quien no tiene acceso a Membresías'
+                    : `Ver también ${sinAcceso} sin acceso a Membresías`}
+                </button>
+              )}
 
               <div className="mb-5 mt-3 flex flex-wrap gap-2">
                 <input
