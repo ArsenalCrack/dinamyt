@@ -24,6 +24,35 @@ const PORTAL_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
 
 /**
+ * El símbolo de encendido de «Salir», dibujado en vez de escrito.
+ *
+ * Antes era el carácter ⏻ (U+23FB): no es un emoji, es un símbolo técnico que
+ * casi ninguna fuente de Android trae, así que en el celular el botón salía
+ * con el cuadrito de «glifo que no tengo» delante del texto. Un SVG se ve
+ * igual en todos lados y hereda el color del botón. Es el mismo trazo que el
+ * de Membresías y el del portal, a propósito.
+ */
+function IconoSalir() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+      style={{ flexShrink: 0 }}
+    >
+      <path d="M12 2.8v9.4" />
+      <path d="M6.3 6.3a8 8 0 1 0 11.4 0" />
+    </svg>
+  );
+}
+
+/**
  * Barra de navegación de Academy: enlaces por rol efectivo (la API decide),
  * «Mis aplicaciones» como salida al ecosistema y «Salir» SIEMPRE diferenciado.
  * En móvil todo vive en el menú de hamburguesa.
@@ -316,7 +345,7 @@ export function NavBar() {
               title="Cerrar sesión"
               style={{ whiteSpace: 'nowrap' }}
             >
-              ⏻ Salir
+              <IconoSalir /> Salir
             </button>
           </div>
 
@@ -351,7 +380,7 @@ export function NavBar() {
             <div style={{ height: 1, background: 'var(--border)', margin: '0.5rem 0' }} />
             {linkApps(true)}
             <button onClick={salir} className="btn btn-danger" style={{ marginTop: '0.25rem' }}>
-              ⏻ Salir
+              <IconoSalir /> Salir
             </button>
           </div>
         </nav>

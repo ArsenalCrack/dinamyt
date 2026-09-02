@@ -31,6 +31,39 @@ const ACADEMY_URL =
   process.env.NEXT_PUBLIC_ACADEMY_URL || 'http://localhost:3008';
 
 /**
+ * El símbolo de encendido de «Salir», dibujado en vez de escrito.
+ *
+ * Antes era el carácter ⏻ (U+23FB). No es un emoji: es un símbolo técnico que
+ * casi ninguna fuente de Android trae, así que en el Chrome del celular el
+ * botón salía con el cuadrito de «glifo que no tengo» delante del texto — y el
+ * botón rojo de cerrar sesión es el peor sitio de la pantalla para que a
+ * alguien le quede la duda de qué hace. Un SVG se ve igual en todos lados y
+ * hereda el color del botón.
+ *
+ * Es el mismo trazo que usa la barra de Membresías (`IconoSalir` en su
+ * `NavBar`), a propósito: la misma acción se dibuja igual en las dos apps.
+ */
+function IconoSalir() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+      style={{ flexShrink: 0 }}
+    >
+      <path d="M12 2.8v9.4" />
+      <path d="M6.3 6.3a8 8 0 1 0 11.4 0" />
+    </svg>
+  );
+}
+
+/**
  * Lo que se le cuenta a quien Campeonatos devolvió para acá.
  *
  * Su consola es para administrar, inscribir y puntuar; quien no hace nada de
@@ -205,25 +238,48 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
+    <main className="mx-auto min-h-screen w-full max-w-2xl px-6 py-10">
       {/* «¿Te avisamos?», una sola vez y solo a quien lleva un club: los avisos
           de aquí no le llegan a un alumno, así que pedirle permiso sería gastar
           la única pregunta que el navegador deja hacer. Se pinta aquí porque
           ésta es la pantalla a la que se llega al entrar. */}
       <PedirAvisos activo={gestiona === true} />
+      {/* ── Por qué esto es tan cuidadoso con el ancho ───────────────────
+          Porque no lo era, y en el celular se notaba como «esta pantalla no
+          es responsiva»: el saludo va en la tipografía display —mayúsculas y
+          ancho 118%—, así que un apellido largo medía más que la pantalla y
+          empujaba la página entera unos píxeles hacia la derecha. Con la
+          página más ancha que el visor, Chrome de Android la deja moverse de
+          lado y a veces la encoge para que quepa; de ahí el «toca recargar o
+          hacer zoom para que se acomode». No era el diseño: era un desborde
+          horizontal de nada que obligaba al navegador a decidir.
+
+          Tres cosas lo cierran, y las tres hacen falta:
+            · `text-2xl` en el teléfono y `text-3xl` a partir de tableta,
+            · `overflowWrap: anywhere`, para que ninguna palabra suelta
+              —un apellido, un correo— pueda ser más ancha que su columna,
+            · `flex-wrap` en los botones, que en `nowrap` se salían del borde
+              en cuanto aparecía la campana del club.
+          Y el `w-full` del <main>, que le fija el ancho al de la pantalla
+          en vez de dejar que crezca con lo que lleve dentro. */}
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-4">
+        {/* `flex: 1 1 14rem` y no `flex-1`: con base 0 —lo que hace `flex-1`—
+            y `overflowWrap: anywhere` debajo, la columna del nombre se dejaba
+            estrujar hasta una letra por línea antes de que la fila se
+            partiera. Con 14rem de base, lo que cede primero es la fila: los
+            botones bajan y el saludo se queda entero. */}
+        <div className="flex min-w-0 items-center gap-4" style={{ flex: '1 1 14rem' }}>
           <Avatar src={foto} nombre={payload.fullName} size={56} />
-          <div className="min-w-0">
+          <div className="min-w-0" style={{ overflowWrap: 'anywhere' }}>
             <p className="eyebrow mb-1">Tu cuenta DINAMYT</p>
-            <h1 className="display text-3xl">Hola, {payload.fullName}</h1>
+            <h1 className="display text-2xl sm:text-3xl">Hola, {payload.fullName}</h1>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
               {payload.email}
               {payload.is_super_admin ? ' · Super administrador' : ''}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* La campana solo para quien lleva un club: a un alumno no le llega
               ninguno de estos avisos, así que se dibujaría siempre vacía — y
               una campana que nunca suena es un adorno que promete algo que no
@@ -234,7 +290,7 @@ export default function DashboardPage() {
           </Link>
           {/* Salir se distingue: es la única acción destructiva */}
           <button onClick={salir} className="btn btn-danger">
-            ⏻ Salir
+            <IconoSalir /> Salir
           </button>
         </div>
       </header>
