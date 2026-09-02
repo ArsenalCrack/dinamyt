@@ -105,18 +105,63 @@ export function CampanaOrg() {
     void estadoPush().then(setPush);
   }, []);
 
+  /**
+   * Lo que se ha marcado y el servidor todavía no ha confirmado.
+   *
+   * Abrir un aviso hace DOS cosas a la vez: manda la marca y navega a donde
+   * lleva el aviso. Y navegar dispara el efecto de más abajo, que vuelve a
+   * pedir la lista. Salían las dos peticiones juntas, así que la lectura solía
+   * llegar antes de que la escritura estuviera guardada: la respuesta traía el
+   * aviso todavía sin leer y pisaba el número que se acababa de bajar. Desde
+   * fuera, la campana no respondía a haberla leído.
+   *
+   * Aquí se guarda la promesa de lo que está en vuelo y `cargar` la espera
+   * antes de preguntar, así que la lista que llega es siempre posterior a la
+   * marca. Es el mismo arreglo que la campana de Membresías.
+   */
+  const guardando = useRef<Promise<unknown>>(Promise.resolve());
+
+  /**
+   * Cuál de las lecturas en curso manda. Dos `cargar()` seguidos pueden
+   * contestar en cualquier orden, y la que llega tarde con datos viejos deja
+   * el número mal otra vez. Solo la última pedida escribe en la pantalla.
+   */
+  const lectura = useRef(0);
+
   const cargar = useCallback(async () => {
+    // Primero lo escrito, después lo leído. Ver `guardando`.
+    await guardando.current;
+    const mia = ++lectura.current;
     try {
       const { items, sinLeer } = await misAvisosOrgAPI();
+      if (mia !== lectura.current) return; // llegó tarde: manda otra
       setAvisos(items);
       setSinLeer(sinLeer);
     } catch {
       // Sin avisos que enseñar, la campana no estorba. Un error aquí no puede
       // llenar de rojo una pantalla que va de otra cosa.
+      if (mia !== lectura.current) return;
       setAvisos([]);
       setSinLeer(0);
     }
   }, []);
+
+  /**
+   * Encadena una marca y deja constancia de que está en vuelo. En fila una
+   * detrás de otra, para que leer tres avisos seguidos no sean tres carreras
+   * contra la misma relectura.
+   */
+  function guardar(hacer: () => Promise<unknown>): void {
+    const escritura = guardando.current.then(hacer, hacer);
+    // El `catch` vacío mantiene viva la cadena: que una marca falle no puede
+    // impedir que salga la siguiente.
+    guardando.current = escritura.catch(() => {});
+    void escritura.catch(() => {
+      // La recuperación va colgada de la promesa CRUDA: dentro de la cadena,
+      // `cargar` se quedaría esperando a la misma promesa que la llamó.
+      void cargar();
+    });
+  }
 
   /**
    * Se relee al cambiar de pantalla.
@@ -172,29 +217,21 @@ export function CampanaOrg() {
    * lista, que es la única forma honesta de deshacerlo — dejar el número bajado
    * mintiendo es peor que el parpadeo de recuperarlo.
    */
-  async function marcarUno(id: string) {
+  function marcarUno(id: string) {
     const ahora = new Date().toISOString();
     setAvisos((lista) =>
       lista.map((a) => (a.id === id ? { ...a, readAt: a.readAt ?? ahora } : a)),
     );
     setSinLeer((n) => Math.max(0, n - 1));
-    try {
-      await marcarAvisoOrgLeidoAPI(id);
-    } catch {
-      void cargar();
-    }
+    guardar(() => marcarAvisoOrgLeidoAPI(id));
   }
 
   /** El atracón: los treinta que se juntaron y no se van a abrir uno a uno. */
-  async function marcarTodos() {
+  function marcarTodos() {
     const ahora = new Date().toISOString();
     setAvisos((lista) => lista.map((a) => ({ ...a, readAt: a.readAt ?? ahora })));
     setSinLeer(0);
-    try {
-      await marcarAvisosOrgLeidosAPI();
-    } catch {
-      void cargar();
-    }
+    guardar(() => marcarAvisosOrgLeidosAPI());
   }
 
   /**
@@ -258,7 +295,7 @@ export function CampanaOrg() {
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
-                    onClick={() => void marcarTodos()}
+                    onClick={marcarTodos}
                   >
                     Marcar todo
                   </button>
@@ -300,7 +337,7 @@ export function CampanaOrg() {
                         // campana parezca un adorno pegado a la barra.
                         onClick={() => {
                           setAbierto(false);
-                          if (!a.readAt) void marcarUno(a.id);
+                          if (!a.readAt) marcarUno(a.id);
                         }}
                       >
                         <Avatar
@@ -329,7 +366,7 @@ export function CampanaOrg() {
                         <button
                           type="button"
                           className="avisos-org-visto"
-                          onClick={() => void marcarUno(a.id)}
+                          onClick={() => marcarUno(a.id)}
                           aria-label="Marcar como leído"
                           title="Marcar como leído"
                         >
