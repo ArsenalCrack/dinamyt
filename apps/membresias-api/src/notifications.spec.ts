@@ -437,6 +437,174 @@ describe('notificaciones', () => {
       await app.close();
     });
 
+    /**
+     * ── La campana del club también se vacía ────────────────────────────────
+     *
+     * Era lo único de la aplicación que no respondía a haberla mirado: el
+     * maestro abría el aviso, lo leía, y ahí seguía — un día y otro. No era un
+     * descuido, era que la fila tiene dos lectores y hasta ahora una sola
+     * marca: `read_at` es del ALUMNO, y dejar que el maestro la escribiera le
+     * borraba el recado a alguien que no lo había visto.
+     */
+    describe('lo que el maestro da por visto', () => {
+      /** Un alumno moroso desde hace tres días: tres filas, una por día. */
+      async function morosoDeTresDias(
+        db: Awaited<ReturnType<typeof crearEscenario>>['db'],
+        orgId: string,
+        userId: string,
+      ) {
+        const [m] = await db
+          .insert(memberships)
+          .values({ orgId, userId, venceEl: '2000-01-01' })
+          .returning();
+        await db.insert(notifications).values(
+          ['2026-08-29', '2026-08-30', '2026-08-31'].map((d) => ({
+            userId,
+            membershipId: m.id,
+            type: 'venc' as const,
+            channel: 'inapp' as const,
+            scheduledFor: new Date(`${d}T00:00:00.000Z`),
+            status: 'ENVIADA' as const,
+          })),
+        );
+        return m;
+      }
+
+      it('un moroso de tres días sale UNA vez, no tres', async () => {
+        // El generador escribe una fila por alumno y por día mientras siga
+        // debiendo. Sin colapsar, un moroso de dos semanas ocupaba catorce
+        // renglones con la misma frase y tapaba a todos los demás.
+        const { app, db, auth, ids, orgId } = await crearEscenario();
+        await morosoDeTresDias(db, orgId, ids.alumno);
+
+        const lista = (
+          await app.inject({
+            method: 'GET',
+            url: '/notifications?all=1',
+            headers: auth(ids.owner),
+          })
+        ).json();
+        expect(lista).toHaveLength(1);
+        // Y el que sale es el más reciente.
+        expect(lista[0].scheduledFor).toContain('2026-08-31');
+        await app.close();
+      });
+
+      it('darlo por visto lo quita de la campana del club, entero', async () => {
+        const { app, db, auth, ids, orgId } = await crearEscenario();
+        await morosoDeTresDias(db, orgId, ids.alumno);
+        const headers = auth(ids.owner);
+
+        const [aviso] = (
+          await app.inject({ method: 'GET', url: '/notifications?all=1', headers })
+        ).json();
+
+        // Marca las TRES filas, no solo la que se estaba mirando: si marcara
+        // una, al recargar aparecería la de ayer diciendo lo mismo y parecería
+        // que el botón no hizo nada.
+        const r = await app.inject({
+          method: 'POST',
+          url: `/notifications/${aviso.id}/visto`,
+          headers,
+        });
+        expect(r.json()).toEqual({ marcados: 3 });
+
+        const despues = await app.inject({
+          method: 'GET',
+          url: '/notifications?all=1',
+          headers,
+        });
+        expect(despues.json()).toHaveLength(0);
+        await app.close();
+      });
+
+      it('y NO le borra el aviso al alumno, que es de quien es', async () => {
+        // La razón de que existan dos columnas. Con una sola, vaciar la campana
+        // del maestro dejaba sin recado a alumnos que no lo habían abierto.
+        const { app, db, auth, ids, orgId } = await crearEscenario();
+        await morosoDeTresDias(db, orgId, ids.alumno);
+
+        const [aviso] = (
+          await app.inject({
+            method: 'GET',
+            url: '/notifications?all=1',
+            headers: auth(ids.owner),
+          })
+        ).json();
+        await app.inject({
+          method: 'POST',
+          url: `/notifications/${aviso.id}/visto`,
+          headers: auth(ids.owner),
+        });
+
+        const suyos = await app.inject({
+          method: 'GET',
+          url: '/notifications',
+          headers: auth(ids.alumno),
+        });
+        expect(suyos.json()).toHaveLength(3);
+        expect(suyos.json()[0].readAt).toBeNull();
+        await app.close();
+      });
+
+      it('«marcar todo» vacía la campana del club de una pasada', async () => {
+        const { app, db, auth, ids, orgId } = await crearEscenario();
+        await morosoDeTresDias(db, orgId, ids.alumno);
+        await morosoDeTresDias(db, orgId, ids.alumno2);
+        const headers = auth(ids.owner);
+
+        expect(
+          (await app.inject({ method: 'GET', url: '/notifications?all=1', headers })).json(),
+        ).toHaveLength(2);
+
+        const r = await app.inject({
+          method: 'POST',
+          url: '/notifications/vistos',
+          headers,
+        });
+        expect(r.json()).toEqual({ marcados: 6 });
+        expect(
+          (await app.inject({ method: 'GET', url: '/notifications?all=1', headers })).json(),
+        ).toHaveLength(0);
+        await app.close();
+      });
+
+      it('un alumno no vacía la campana de su club', async () => {
+        // Puede VER sus propios avisos, no descartar los de los demás. Sin esta
+        // puerta, cualquiera con sesión le limpiaría la lista de cobro al
+        // maestro.
+        const { app, db, auth, ids, orgId } = await crearEscenario();
+        await morosoDeTresDias(db, orgId, ids.alumno);
+        const [aviso] = (
+          await app.inject({
+            method: 'GET',
+            url: '/notifications?all=1',
+            headers: auth(ids.owner),
+          })
+        ).json();
+
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: `/notifications/${aviso.id}/visto`,
+              headers: auth(ids.alumno),
+            })
+          ).statusCode,
+        ).toBe(403);
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/notifications/vistos',
+              headers: auth(ids.alumno),
+            })
+          ).statusCode,
+        ).toBe(403);
+        await app.close();
+      });
+    });
+
     it('el alumno solo ve SUS avisos', async () => {
       const { app, db, auth, ids, orgId } = await crearEscenario();
       await db.insert(memberships).values([

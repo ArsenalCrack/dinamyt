@@ -17,6 +17,8 @@ interface Aviso {
   scheduledFor: string | null;
   status: string;
   readAt: string | null;
+  /** Cuándo lo dio por visto quien lleva el club. Distinto de `readAt`. */
+  staffReadAt: string | null;
   /** Nombre de quien lo recibe (le sirve al maestro, que ve los del club). */
   fullName: string;
   /** Vencimiento que motivó el aviso: es lo que lo hace legible. */
@@ -43,14 +45,20 @@ interface Aviso {
  *    es un enlace al sitio donde se hace algo con eso: la ficha del alumno con
  *    el cobro a la vista para el maestro, «Mi estado» para el alumno. Antes se
  *    leía el aviso, se cerraba el panel y había que ir a buscar a la persona.
- * 4. **Se vacía de uno en uno.** Abrir la campana ya no marca los nueve avisos
- *    como leídos de golpe. Eso hacía dos cosas mal a la vez: los ocho que no se
- *    llegaron a mirar desaparecían para siempre, y el número —que es lo único
- *    que se mira de reojo— saltaba de 9 a 0 sin pasar por el medio, así que
- *    dejaba de informar de nada. Ahora leer uno baja el número en uno, que es
- *    lo que hace cualquier bandeja de entrada del mundo. Para el atracón hay un
- *    «marcar todo como leído», que es una decisión de la persona y no un efecto
- *    secundario de haber abierto el panel.
+ * 4. **Se vacía de uno en uno, en las DOS vistas.** Abrir la campana ya no
+ *    marca los nueve avisos como leídos de golpe: eso borraba para siempre los
+ *    ocho que no se llegaron a mirar, y hacía saltar el número de 9 a 0 sin
+ *    pasar por el medio. Ahora leer uno baja el número en uno, y para el
+ *    atracón hay un «marcar todo», que es una decisión de la persona y no un
+ *    efecto secundario de haber abierto el panel.
+ *
+ *    **Y la lista del club también se vacía**, que es lo que faltaba. Antes no
+ *    podía: la única marca de la fila (`readAt`) es del ALUMNO —dice si abrió
+ *    su recado—, así que dejar que el maestro la escribiera le borraba el aviso
+ *    a alguien que no lo había visto. El resultado era que su campana era lo
+ *    único de la app que no respondía a haberla mirado: leía el aviso y ahí
+ *    seguía, un día y otro. Ahora tiene su propia marca (`staffReadAt`,
+ *    migración 0018) y sus propias rutas — `/visto` y `/vistos`.
  */
 export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
   const { t, idioma } = useI18n();
@@ -161,21 +169,37 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
   }
 
   /**
-   * Este aviso, leído. El número baja en uno.
+   * Este aviso, visto. El número baja en uno.
+   *
+   * **Cada vista escribe SU marca**, y no es un detalle: la del alumno pone
+   * `readAt` —su recado, ya lo abrió— y la del club pone `staffReadAt` —su
+   * tarea, ya la vio—. Compartir una sola marca es lo que tenía atascada la
+   * campana del maestro: no podía descartar nada sin borrarle el aviso a un
+   * alumno que no lo había visto.
+   *
+   * En la vista del club, además, el servidor descarta el ASUNTO entero —ese
+   * alumno, ese tipo de aviso— y no solo el renglón: detrás hay una fila por
+   * cada día que lleva debiendo, y descartar una sola haría reaparecer la de
+   * ayer diciendo lo mismo. Aquí basta con quitarlo de la lista.
    *
    * Se pinta primero y se guarda después, a propósito: el toque tiene que
-   * responder en el mismo instante, y lo que hay al otro lado es una fila que
-   * ya se sabe de quién es. Si la llamada falla se vuelve a leer la lista, que
-   * es la única forma honesta de deshacerlo — dejar el número bajado mintiendo
-   * es peor que el parpadeo de recuperarlo.
+   * responder en el mismo instante. Si la llamada falla se vuelve a leer la
+   * lista, que es la única forma honesta de deshacerlo — dejar el número bajado
+   * mintiendo es peor que el parpadeo de recuperarlo.
    */
   async function marcarUno(id: string) {
     const ahora = new Date().toISOString();
-    setAvisos((lista) =>
-      lista.map((a) => (a.id === id ? { ...a, readAt: a.readAt ?? ahora } : a)),
-    );
+    if (deTodoElClub) {
+      // Fuera de la lista en el acto: lo que el servidor descarta es el asunto
+      // entero, así que este renglón no vuelve hasta mañana.
+      setAvisos((lista) => lista.filter((a) => a.id !== id));
+    } else {
+      setAvisos((lista) =>
+        lista.map((a) => (a.id === id ? { ...a, readAt: a.readAt ?? ahora } : a)),
+      );
+    }
     try {
-      await api.post(`/notifications/${id}/leido`);
+      await api.post(`/notifications/${id}/${deTodoElClub ? 'visto' : 'leido'}`);
     } catch {
       void cargar();
     }
@@ -184,9 +208,10 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
   /** El atracón: los treinta que se juntaron y no se van a abrir uno a uno. */
   async function marcarTodos() {
     const ahora = new Date().toISOString();
-    setAvisos((lista) => lista.map((a) => ({ ...a, readAt: a.readAt ?? ahora })));
+    if (deTodoElClub) setAvisos([]);
+    else setAvisos((lista) => lista.map((a) => ({ ...a, readAt: a.readAt ?? ahora })));
     try {
-      await api.post('/notifications/leidos');
+      await api.post(deTodoElClub ? '/notifications/vistos' : '/notifications/leidos');
     } catch {
       void cargar();
     }
@@ -250,7 +275,7 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                 {/* Solo con DOS o más pendientes. Con uno, «marcar todo» y
                     «marcar éste» son el mismo botón puesto dos veces, y el de
                     la fila ya está donde se está mirando. */}
-                {!deTodoElClub && pendientes > 1 && (
+                {pendientes > 1 && (
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
@@ -290,7 +315,10 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                       // parezca un adorno pegado a la barra.
                       onClick={() => {
                         setAbierto(false);
-                        if (!deTodoElClub && !a.readAt) void marcarUno(a.id);
+                        // Ir a cobrarle ES haberlo visto. Volver del cobro y
+                        // encontrar el mismo aviso rojo esperando es lo que
+                        // hacía que la campana del club pareciera un adorno.
+                        if (deTodoElClub || !a.readAt) void marcarUno(a.id);
                       }}
                     >
                       <span
@@ -311,14 +339,15 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                         {fmtFecha(a.scheduledFor?.slice(0, 10), idioma)}
                       </span>
                     </Link>
-                    {/* «Ya lo leí», sin ir a ninguna parte.
-                        El aviso del alumno lleva siempre a la misma pantalla —«Mi
-                        estado»—, así que sin esto la única manera de bajar el
-                        número era navegar allí y volver, nueve veces. Este botón
-                        es para el caso normal: ya sé lo que dice, quítamelo.
-                        En la lista del club no aparece: esos avisos son de los
-                        alumnos y «leído» lo dice su dueño, no el maestro. */}
-                    {!deTodoElClub && !a.readAt && (
+                    {/* «Ya lo vi», sin ir a ninguna parte.
+                        Al alumno le hace falta porque todos sus avisos llevan a
+                        la misma pantalla: sin esto, la única forma de bajar el
+                        número era navegar allí y volver, nueve veces.
+                        Al maestro le hace falta por otra razón: no todo aviso
+                        acaba en un cobro. Sabe que Juan pagó ayer en efectivo y
+                        lo va a registrar el lunes; lo que quiere es quitárselo
+                        de en medio, no ir a su ficha. */}
+                    {(deTodoElClub || !a.readAt) && (
                       <button
                         type="button"
                         className="avisos-visto"

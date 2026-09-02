@@ -34,6 +34,33 @@ export const notifications = mem.table('notifications', {
    * los hubiera mirado nunca.
    */
   readAt: timestamp('read_at', { withTimezone: true }),
+  /**
+   * Cuándo lo dio por visto QUIEN LLEVA EL CLUB. No es lo mismo que `read_at`.
+   *
+   * ── Por qué hacen falta las dos ──
+   *
+   * La misma fila la miran dos personas distintas y para dos cosas distintas.
+   * Para el alumno es un recado —«tu mensualidad venció»— y `read_at` dice si
+   * ya lo abrió. Para el maestro es una TAREA —«a éste hay que cobrarle»— y su
+   * campana (`?all=1`) lista las de todos sus alumnos.
+   *
+   * Con una sola columna no se podía servir a los dos: si el maestro marcaba
+   * leído, le borraba el recado al alumno sin que lo hubiera visto; y como no
+   * podía marcar nada, su campana se quedaba enseñando lo mismo para siempre —
+   * abría el aviso, lo leía, y ahí seguía. Eso es lo que hace que a la tercera
+   * vez se deje de mirar la campana, y con ella se pierda la que sí importaba.
+   *
+   * ── Lo que esta columna NO distingue ──
+   *
+   * A un gestor de otro. Es una sola marca por fila, así que en un club con
+   * maestro y auxiliar, lo que uno da por visto desaparece para los dos. Es
+   * deliberado: la campana del club es una lista de trabajo compartida, como
+   * una bandeja de entrada de equipo, y lo caro sería que cada uno tuviera que
+   * descartar la misma tarea. Y lo que se pierde es poco: el aviso vuelve
+   * mañana si el alumno sigue debiendo, y entretanto la deuda se ve en la lista
+   * de alumnos, que es de donde se cobra.
+   */
+  staffReadAt: timestamp('staff_read_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 

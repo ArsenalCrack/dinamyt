@@ -127,6 +127,13 @@
       "when": 1786001002000,
       "tag": "0017_fechas_con_zona",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786001003000,
+      "tag": "0018_visto_por_el_maestro",
+      "breakpoints": true
     }
   ]
 }
