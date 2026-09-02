@@ -30,6 +30,7 @@ import {
 // mismo catálogo que decide quién gestiona la organización, no una lista
 // parecida — por eso se importa en vez de repetirse.
 import { ROLES_GESTOR } from '../../common/roles';
+import { normalizarCorreo } from '../../common/validacion';
 
 /** Formas de pago que se pueden registrar. Las mismas que Membresías. */
 export const METODOS_PAGO = [
@@ -80,7 +81,9 @@ export class SubscriptionsService {
     const userResult = await db
       .select()
       .from(users)
-      .where(eq(users.email, data.userEmail))
+      // El correo se busca en minúsculas: es la misma dirección se teclee como
+      // se teclee. Ver `normalizarCorreo` en `common/validacion.ts`.
+      .where(eq(users.email, normalizarCorreo(data.userEmail)))
       .limit(1);
     if (!userResult[0]) {
       throw new NotFoundException('No se encontró un usuario con ese correo.');

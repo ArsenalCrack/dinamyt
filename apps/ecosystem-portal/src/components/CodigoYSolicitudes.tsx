@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PROPS_CORREO } from '@/lib/validacion';
 import {
   verCodigoClubAPI,
   rotarCodigoClubAPI,
@@ -430,7 +431,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <input
           placeholder="correo@persona.com"
-          type="email"
+          {...PROPS_CORREO}
           maxLength={200}
           value={nueva.email}
           onChange={(e) => setNueva({ ...nueva, email: e.target.value })}

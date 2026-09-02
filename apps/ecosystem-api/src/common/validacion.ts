@@ -246,6 +246,39 @@ export function validarCorreo(valor: string | null | undefined): string {
 }
 
 /**
+ * El correo tal y como se guarda y se busca: sin espacios y en minúsculas.
+ *
+ * ── Por qué existe, aparte de `validarCorreo` ──
+ *
+ * `validarCorreo` normaliza, pero además **rechaza**: si la forma no le gusta,
+ * lanza. Eso está bien al dar de alta a alguien y está mal al BUSCARLO — en el
+ * login, en «olvidé mi contraseña», en el reenvío del código. Ahí lo único que
+ * hace falta es la clave con la que la fila está guardada; si el correo es raro
+ * o no existe, la respuesta la da la consulta, no un 400.
+ *
+ * ── Por qué en minúsculas ──
+ *
+ * El buzón de un correo es, en la letra del RFC 5321, sensible a mayúsculas;
+ * en la práctica **ningún proveedor lo trata así**: Gmail, Outlook y todos los
+ * demás entregan `Juan@Gmail.com` y `juan@gmail.com` al mismo sitio. La persona
+ * lo sabe, y por eso escribe su correo como le sale — y el teclado de su
+ * celular le pone la primera en mayúscula sin preguntar.
+ *
+ * El alta ya guardaba en minúsculas (`validarCorreo`), pero el login buscaba
+ * con lo tecleado tal cual. El resultado era el peor posible: la persona se
+ * registraba bien, volvía al día siguiente, el teclado le ponía `Juan@…` y la
+ * app le contestaba **«no existe una cuenta con ese correo»** — que no solo es
+ * falso, sino que la manda a registrarse otra vez con el correo que ya tiene.
+ *
+ * Así que la regla es una y va en los dos lados: **se guarda en minúsculas y se
+ * busca en minúsculas**. Ver la migración `0015_correos_en_minusculas.sql`, que
+ * arregla lo que quedó escrito antes de esto.
+ */
+export function normalizarCorreo(valor: string | null | undefined): string {
+  return (valor ?? '').trim().toLowerCase();
+}
+
+/**
  * El nombre de una persona, COMPLETO.
  *
  * `validarNombre` daba por bueno «A»: una letra suelta pasaba y quedaba impresa

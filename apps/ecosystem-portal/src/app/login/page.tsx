@@ -15,7 +15,7 @@ import {
 } from '@/lib/api';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { Campo } from '@/components/Campo';
-import { validarCorreo } from '@/lib/validacion';
+import { PROPS_CORREO, validarCorreo } from '@/lib/validacion';
 import { destinoSeguro } from '@/lib/apps';
 
 export default function LoginPage() {
@@ -188,7 +188,20 @@ function LoginForm() {
     setError(null);
     setCargando(true);
     try {
-      const { access_token } = await loginAPI(email, password);
+      /**
+       * Se envía el correo NORMALIZADO, no lo que quedó en la caja.
+       *
+       * `validarCorreo` ya lo devuelve sin espacios y en minúsculas, que es la
+       * forma con la que está guardado. El servidor tampoco distingue
+       * mayúsculas desde `normalizarCorreo`, así que esto no es lo que hace
+       * que la cuenta se encuentre — es lo que evita mandar `  Juan@Gmail.com `
+       * con un espacio pegado del portapapeles y que el fallo se explique en
+       * el otro extremo.
+       */
+      const { access_token } = await loginAPI(
+        correo.ok ? correo.valor : email.trim().toLowerCase(),
+        password,
+      );
       guardarToken(access_token, recordar);
       entregarSesion(access_token, soloAlPortal);
     } catch (err) {
@@ -302,7 +315,7 @@ function LoginForm() {
           >
             <input
               id="login-correo"
-              type="email"
+              {...PROPS_CORREO}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onBlur={() => setTocado(true)}

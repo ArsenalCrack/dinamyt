@@ -43,6 +43,7 @@ import { OrgNotificationsService } from './org-notifications.service';
 import { rolParaApp } from '../../common/roles-por-app';
 import { ROLES_GESTOR, esRolGestor } from '../../common/roles';
 import { patronBusqueda } from '../../common/busqueda';
+import { normalizarCorreo } from '../../common/validacion';
 
 // Quién puede GESTIONAR una organización (editar su ficha, invitar gente,
 // responder invitaciones): el admin, el dueño o el maestro del club. El
@@ -352,7 +353,7 @@ export class OrganizationsService {
 
     // El correo, siempre en minúsculas y sin espacios: es la clave con la que
     // se cruza a una persona en todo el ecosistema.
-    const correo = (email ?? '').trim().toLowerCase();
+    const correo = normalizarCorreo(email);
     if (!correo) throw new BadRequestException('Falta el correo.');
 
     const [existente] = await db
@@ -628,7 +629,11 @@ export class OrganizationsService {
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email.toLowerCase()))
+      // `normalizarCorreo` y no `.toLowerCase()`: al pegar un correo del
+      // portapapeles viene con un espacio delante, y ese espacio hacía que no
+      // se encontrara a nadie — con el mensaje «no se encontró un usuario con
+      // ese correo», que manda a buscar el error donde no está.
+      .where(eq(users.email, normalizarCorreo(email)))
       .limit(1);
     if (!user)
       throw new NotFoundException('No se encontró un usuario con ese correo.');
@@ -1964,9 +1969,6 @@ export class OrganizationsService {
   // invitación se ve por los dos lados: el maestro sabe que está en el aire y
   // la persona la encuentra esperando al entrar a DINAMYT.
 
-  private static normalizarCorreo(valor: string): string {
-    return (valor ?? '').trim().toLowerCase();
-  }
 
   /**
    * El maestro invita a alguien a su club por correo.
@@ -2007,7 +2009,7 @@ export class OrganizationsService {
       );
     }
 
-    const correo = OrganizationsService.normalizarCorreo(datos.email);
+    const correo = normalizarCorreo(datos.email);
     if (!correo) throw new BadRequestException('Falta el correo.');
 
     const [existente] = await db

@@ -26,6 +26,7 @@ import {
   validarTelefono,
   validarFechaNacimiento,
   validarGenero,
+  normalizarCorreo,
   validarCorreo,
   validarContrasena,
 } from '../../common/validacion';
@@ -217,7 +218,7 @@ export class AuthService {
 
     // El correo tal y como lo tecleó quien pregunta. Sirve para dos cosas: para
     // buscarlo, y para reconocer sus propios datos más abajo.
-    const correoPedido = datos.email ? datos.email.trim().toLowerCase() : null;
+    const correoPedido = datos.email ? normalizarCorreo(datos.email) : null;
 
     if (correoPedido) {
       let email: string;
@@ -288,7 +289,7 @@ export class AuthService {
 
     await this.usersService.purgarRegistrosPendientes();
 
-    const email = datos.email ? datos.email.trim().toLowerCase() : null;
+    const email = datos.email ? normalizarCorreo(datos.email) : null;
     const pendiente = email
       ? await this.usersService.registroPendientePorCorreo(email)
       : null;
@@ -367,7 +368,7 @@ export class AuthService {
    */
   async reenviarCodigo(correo: string) {
     await this.usersService.purgarRegistrosPendientes();
-    const email = (correo ?? '').trim().toLowerCase();
+    const email = normalizarCorreo(correo);
     const pendiente = email
       ? await this.usersService.registroPendientePorCorreo(email)
       : null;
@@ -633,7 +634,7 @@ export class AuthService {
       codigoDigitos: AuthService.CODIGO_DIGITOS,
     };
 
-    const email = (correo ?? '').trim().toLowerCase();
+    const email = normalizarCorreo(correo);
     if (!email) return respuesta;
 
     const user = await this.usersService.findByEmail(email);
@@ -660,7 +661,7 @@ export class AuthService {
     code: string;
     newPassword: string;
   }) {
-    const email = datos.email ? datos.email.trim().toLowerCase() : null;
+    const email = datos.email ? normalizarCorreo(datos.email) : null;
     const user = email
       ? await this.usersService.findByEmail(email)
       : datos.userId

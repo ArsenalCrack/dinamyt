@@ -13,7 +13,7 @@ import {
   extraerError,
   type RegistroEnEspera,
 } from '@/lib/api';
-import { CODIGO_DIGITOS, validarCorreo } from '@/lib/validacion';
+import { CODIGO_DIGITOS, PROPS_CORREO, validarCorreo } from '@/lib/validacion';
 import { CampoCodigo } from '@/components/CampoCodigo';
 import { Campo } from '@/components/Campo';
 
@@ -204,7 +204,7 @@ export default function VerificarPage() {
             {sinRegistro && (
               <Campo etiqueta="Tu correo">
                 <input
-                  type="email"
+                  {...PROPS_CORREO}
                   value={correoAMano}
                   onChange={(e) => setCorreoAMano(e.target.value)}
                   autoComplete="email"

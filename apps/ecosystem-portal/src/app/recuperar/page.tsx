@@ -10,6 +10,7 @@ import {
 } from '@/lib/api';
 import {
   CODIGO_DIGITOS,
+  PROPS_CORREO,
   validarCorreo,
   validarContrasena,
 } from '@/lib/validacion';
@@ -152,7 +153,7 @@ function Recuperar() {
             >
               <input
                 id="rec-correo"
-                type="email"
+                {...PROPS_CORREO}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => setTocado((t) => ({ ...t, email: true }))}

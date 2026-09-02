@@ -254,6 +254,37 @@ const DOMINIO_ETIQUETA = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
  * imposible es una cuenta que nadie puede usar —y ahora, además, una cuenta que
  * nunca llegará a nacer, porque el código de verificación no tiene a dónde ir.
  */
+/**
+ * Lo que hay que ponerle a TODO campo de correo, en un solo sitio.
+ *
+ * ── Qué arregla ──
+ *
+ * En el teclado de un celular, `type="email"` **no** apaga la mayúscula
+ * automática: Android y iOS ponen en mayúscula la primera letra de cualquier
+ * campo de texto salvo que se les diga que no. Así que la persona que se
+ * registró como `juan@gmail.com` vuelve al día siguiente, el teclado le escribe
+ * `Juan@gmail.com` sin que se dé cuenta —la mayúscula al principio no se ve
+ * rara, así se escriben los nombres— y el login le contesta que no existe.
+ *
+ * El servidor ya no distingue mayúsculas (ver `normalizarCorreo` en la API),
+ * así que esto no es lo que hace que la cuenta se encuentre: es lo que hace que
+ * el campo enseñe lo mismo que se va a buscar. Un correo que se ve con
+ * mayúscula y funciona igual está bien; uno que se ve con mayúscula y falla es
+ * el que gasta media hora de alguien.
+ *
+ *   · `autoCapitalize="none"` — la mayúscula automática, apagada.
+ *   · `autoCorrect="off"` y `spellCheck={false}` — un correo no es una palabra
+ *     del diccionario, y el subrayado rojo debajo asusta sin motivo.
+ *   · `inputMode="email"` — el teclado con la arroba a la vista.
+ */
+export const PROPS_CORREO = {
+  type: 'email',
+  inputMode: 'email',
+  autoCapitalize: 'none',
+  autoCorrect: 'off',
+  spellCheck: false,
+} as const;
+
 export function validarCorreo(valor: string): Campo {
   const limpio = (valor ?? '').trim().toLowerCase();
   if (!limpio) return mal('Escribe tu correo.');

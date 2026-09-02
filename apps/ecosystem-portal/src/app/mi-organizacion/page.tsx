@@ -25,7 +25,7 @@ import {
   type ClubBusqueda,
   type InvitacionClub,
 } from '@/lib/api';
-import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
+import { soloTelefono, comprimirAvatar, PROPS_CORREO } from '@/lib/validacion';
 import { ROLES_CLUB, ROLES_ORG, mandaEnLaOrg, nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
@@ -903,7 +903,7 @@ export default function MiOrganizacionPage() {
               <span style={{ color: 'var(--text-muted)' }}>Correo de contacto</span>
               <input
                 className="mt-1"
-                type="email"
+                {...PROPS_CORREO}
                 maxLength={200}
                 value={ficha.email}
                 onChange={(e) => setFicha({ ...ficha, email: e.target.value })}

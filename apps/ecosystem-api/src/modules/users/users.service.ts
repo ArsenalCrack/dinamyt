@@ -11,6 +11,7 @@ import {
 } from '../../db/schema';
 import { eq, and, gt, lt, inArray, isNull, sql } from 'drizzle-orm';
 import { ROLES_GESTOR } from '../../common/roles';
+import { normalizarCorreo } from '../../common/validacion';
 import { encryptField, decryptField } from '../../common/crypto';
 import { espejarPersona, espejarContrasena } from '../../common/espejo-membresias';
 import * as bcrypt from 'bcryptjs';
@@ -18,12 +19,21 @@ import { randomInt } from 'crypto';
 
 @Injectable()
 export class UsersService {
-  // Buscar usuario por email
+  /**
+   * Buscar usuario por correo, **sin que importen las mayúsculas**.
+   *
+   * La normalización va aquí y no en cada quien llama, y es a propósito: por
+   * esta puerta entran el login, «olvidé mi contraseña», el reenvío del código
+   * y la comprobación de disponibilidad del registro. Dejar que cada uno se
+   * acuerde de bajar el correo a minúsculas es dejar que uno se olvide — que es
+   * exactamente lo que pasaba con el login, el más usado de todos. Ver
+   * `normalizarCorreo` en `common/validacion.ts`.
+   */
   async findByEmail(email: string) {
     const result = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, normalizarCorreo(email)))
       .limit(1);
     return result[0] ?? null;
   }
@@ -73,7 +83,10 @@ export class UsersService {
     const result = await db
       .insert(users)
       .values({
-        email: data.email,
+        // En minúsculas también al escribir: la búsqueda ya normaliza, pero si
+        // la fila naciera con mayúsculas no la encontraría nadie. La regla vive
+        // en los dos lados o no vive.
+        email: normalizarCorreo(data.email),
         passwordHash: passwordHash,
         passwordOrigen: 'propio',
         fullName: data.fullName,
@@ -105,7 +118,7 @@ export class UsersService {
     const [fila] = await db
       .insert(users)
       .values({
-        email: data.email,
+        email: normalizarCorreo(data.email),
         fullName: data.fullName,
         phone: data.phone ?? null,
         passwordHash: null,
@@ -599,11 +612,12 @@ export class UsersService {
       .where(lt(pendingRegistrations.expiresAt, new Date()));
   }
 
+  /** Igual que `findByEmail`: el correo se busca en minúsculas, siempre. */
   async registroPendientePorCorreo(email: string) {
     const filas = await db
       .select()
       .from(pendingRegistrations)
-      .where(eq(pendingRegistrations.email, email))
+      .where(eq(pendingRegistrations.email, normalizarCorreo(email)))
       .limit(1);
     return filas[0] ?? null;
   }
@@ -639,7 +653,7 @@ export class UsersService {
   }) {
     const code = UsersService.nuevoCodigo();
     const values = {
-      email: data.email,
+      email: normalizarCorreo(data.email),
       documentId: data.documentId,
       fullName: data.fullName,
       phone: data.phone ?? null,
@@ -709,7 +723,7 @@ export class UsersService {
     const [usuario] = await db
       .insert(users)
       .values({
-        email: fila.email,
+        email: normalizarCorreo(fila.email),
         passwordHash: fila.passwordHash,
         passwordOrigen: 'propio',
         fullName: fila.fullName,

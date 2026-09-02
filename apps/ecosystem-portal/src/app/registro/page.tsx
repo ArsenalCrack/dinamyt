@@ -15,6 +15,7 @@ import {
   soloTelefono,
   limitesFechaNacimiento,
   validarNombreCompleto,
+  PROPS_CORREO,
   validarCorreo,
   validarDocumento,
   validarTelefono,
@@ -314,7 +315,7 @@ export default function RegistroPage() {
           >
             <input
               id="reg-correo"
-              type="email"
+              {...PROPS_CORREO}
               value={form.email}
               onChange={set('email')}
               onBlur={marcar('email')}
