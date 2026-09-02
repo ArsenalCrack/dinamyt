@@ -1015,9 +1015,42 @@ que acordarse de abrirla, y se han quedado personas días esperando.
   secundario de haber abierto algo.
 
   Rutas: `POST /notifications/:id/leido` (Membresías) y
-  `POST /organizations/avisos/:id/leido` (portal). Las dos comprueban que el
-  aviso es **de quien lo marca**: en Membresías el maestro VE los avisos de su
-  club pero no los puede dar por leídos, porque «leído» ahí lo dice su dueño.
+  `POST /organizations/avisos/:id/leido` (portal), las dos solo sobre avisos de
+  quien las llama.
+
+### La campana del CLUB tiene su propia marca (`staff_read_at`)
+
+En Membresías la misma fila la miran dos personas para dos cosas distintas: para
+el alumno es un recado —«tu mensualidad venció»— y para el maestro es una tarea
+—«a éste hay que cobrarle»—. Con una sola marca no se podía servir a los dos, y
+lo que salía era esto: **la campana del club era lo único de la aplicación que
+no respondía a haberla mirado.** El maestro abría el aviso, lo leía, y ahí
+seguía, un día y otro.
+
+Desde la migración `0018_visto_por_el_maestro` hay dos columnas:
+
+| Columna | De quién | Qué la escribe |
+|---|---|---|
+| `read_at` | Del **alumno** | `POST /notifications/:id/leido` · `/leidos` |
+| `staff_read_at` | De **quien lleva el club** | `POST /notifications/:id/visto` · `/vistos` |
+
+Tres cosas que conviene saber de la de arriba:
+
+- **Descarta el ASUNTO, no el renglón.** El generador escribe una fila por
+  alumno **y por día** mientras siga debiendo, así que detrás del renglón hay
+  otras trece iguales. `/visto` marca todas las de esa (membresía, tipo): si
+  marcara una sola, al recargar aparecería la de ayer diciendo lo mismo y
+  parecería que el botón no hizo nada.
+- **La lista del club sale colapsada** (`DISTINCT ON` por membresía y tipo, el
+  más reciente). Antes un moroso de dos semanas ocupaba catorce renglones con
+  la misma frase y tapaba a todos los demás.
+- **No distingue un gestor de otro**, a propósito: la campana del club es una
+  lista de trabajo compartida, como una bandeja de equipo, y lo caro sería que
+  maestro y auxiliar tuvieran que descartar cada uno la misma tarea. Lo que se
+  pierde es poco — el aviso vuelve mañana si el alumno sigue debiendo, y la
+  deuda se ve igual en la lista de alumnos, que es de donde se cobra. (La
+  campana del portal sí lleva fila por persona: allí los avisos son noticias
+  —quién entró, quién se fue—, no tareas compartidas.)
 
 ## 4.7 La persona se edita en el portal; la ficha, en su app
 
