@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { mensajeError, obtenerConfig } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { LIM } from '@/lib/campos';
+import { LIM, PROPS_CORREO } from '@/lib/campos';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { ControlesApariencia } from '@/components/ControlesApariencia';
 
@@ -285,7 +285,7 @@ export default function Login() {
         </label>
         <input
           id="email"
-          type="email"
+          {...PROPS_CORREO}
           autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}

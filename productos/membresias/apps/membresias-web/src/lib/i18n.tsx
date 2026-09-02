@@ -641,6 +641,19 @@ const es = {
   'aviso.venceEl': 'Vence el',
   'aviso.vencioEl': 'Venció el',
   'aviso.sinFecha': 'Sin fecha de vencimiento.',
+  'aviso.marcarLeido': 'Ya lo leí',
+  'aviso.marcarTodo': 'Marcar todo como leído',
+  // El aviso de la primera vez: se pide el permiso del navegador DESPUÉS de
+  // que la persona diga que sí aquí. Ver `components/PedirAvisos.tsx`.
+  'push.titulo': '¿Te avisamos?',
+  'push.texto':
+    'Te escribimos al celular cuando tu mensualidad esté por vencer y cuando venza. Nada más: ni promociones, ni recordatorios de clase.',
+  'push.textoStaff':
+    'Un aviso al día con lo que hay que cobrar: cuántos alumnos tienen la mensualidad vencida y cuántos están por vencer. Uno solo, no uno por alumno.',
+  'push.activar': 'Sí, avísenme',
+  'push.ahoraNo': 'Ahora no',
+  'push.despues': 'Puedes activarlos cuando quieras desde la campana 🔔.',
+  'push.listo': 'Listo. Te avisaremos.',
 
   // Estadísticas del club
   'stats.titulo': 'Estadísticas del club',
@@ -1238,6 +1251,17 @@ const en: Record<ClaveTexto, string> = {
   'aviso.venceEl': 'Due on',
   'aviso.vencioEl': 'Expired on',
   'aviso.sinFecha': 'No due date.',
+  'aviso.marcarLeido': 'Got it',
+  'aviso.marcarTodo': 'Mark all as read',
+  'push.titulo': 'Want a heads-up?',
+  'push.texto':
+    "We'll ping your phone when your membership is about to expire and when it does. Nothing else: no promos, no class reminders.",
+  'push.textoStaff':
+    "One notice a day with what needs collecting: how many members are overdue and how many are about to expire. Just one, not one per member.",
+  'push.activar': 'Yes, notify me',
+  'push.ahoraNo': 'Not now',
+  'push.despues': 'You can turn them on any time from the bell 🔔.',
+  'push.listo': "Done. We'll let you know.",
 
   'stats.titulo': 'Club statistics',
   'stats.subtitulo': 'How your club is doing: money, people and attendance.',

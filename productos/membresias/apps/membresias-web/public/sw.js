@@ -7,7 +7,7 @@
 
 // La versión sube al cambiar el shell: el `activate` borra las cachés viejas,
 // así que sin subirla los iconos anteriores se seguirían sirviendo de caché.
-var CACHE = 'membresias-shell-v2';
+var CACHE = 'membresias-shell-v3';
 var SHELL = ['/', '/kiosco', '/mi', '/manifest.json', '/logo.png', '/icon-512.png'];
 
 self.addEventListener('install', function (event) {
@@ -83,8 +83,19 @@ self.addEventListener('notificationclick', function (event) {
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then(function (lista) {
         // Si la app ya está abierta se reutiliza esa pestaña, no se abre otra.
+        //
+        // Y se la LLEVA al destino, que antes no se hacía: enfocar a secas
+        // dejaba a la persona en la pantalla que tuviera puesta. Daba igual
+        // mientras todos los avisos iban al mismo sitio; desde que el resumen
+        // del club lleva al panel y el del alumno a «Mi estado», enfocar sin
+        // navegar deja al maestro mirando su propia mensualidad después de
+        // tocar un aviso que hablaba de sus alumnos.
         for (var i = 0; i < lista.length; i++) {
-          if ('focus' in lista[i]) return lista[i].focus();
+          var v = lista[i];
+          if ('focus' in v) {
+            if ('navigate' in v) v.navigate(destino);
+            return v.focus();
+          }
         }
         return self.clients.openWindow(destino);
       }),

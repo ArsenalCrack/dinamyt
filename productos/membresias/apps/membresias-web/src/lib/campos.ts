@@ -155,6 +155,28 @@ export function nombreCompletoValido(valor: string): boolean {
 }
 
 /**
+ * Lo que hay que ponerle a TODO campo de correo, en un solo sitio.
+ *
+ * `type="email"` **no** apaga la mayúscula automática del teclado del celular:
+ * Android y iOS ponen mayúscula la primera letra de cualquier campo de texto
+ * salvo que se les diga que no. La persona se registró como `juan@gmail.com`,
+ * vuelve al día siguiente, el teclado le escribe `Juan@…` sin que se dé cuenta
+ * —una mayúscula al principio no se ve rara— y el correo que se envía no es el
+ * que ella cree que escribió.
+ *
+ * La API ya no distingue mayúsculas, así que esto no es lo que hace que la
+ * cuenta se encuentre: es lo que hace que el campo enseñe lo mismo que se va a
+ * buscar. Es el gemelo de `PROPS_CORREO` del portal.
+ */
+export const PROPS_CORREO = {
+  type: 'email',
+  inputMode: 'email',
+  autoCapitalize: 'none',
+  autoCorrect: 'off',
+  spellCheck: false,
+} as const;
+
+/**
  * ¿Tiene forma de correo, con un dominio que exista de verdad?
  *
  * Mismas reglas que la API: buzón, etiquetas del dominio, TLD de solo letras y
