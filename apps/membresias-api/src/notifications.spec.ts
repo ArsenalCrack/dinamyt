@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { memberships } from '@dinamyt/membresias-db';
+import { memberships, notifications } from '@dinamyt/membresias-db';
 import { crearEscenario } from './testing/escenario';
-import { planNotificaciones } from './lib/notifications';
+import { planNotificaciones, resumenParaElClub } from './lib/notifications';
 import { vigentes } from './routes/notifications';
 import { todayStr } from './lib/billing';
 
@@ -34,6 +34,58 @@ describe('notificaciones', () => {
       3,
     );
     expect(plan[0].type).toBe('pre_venc');
+  });
+
+  /**
+   * ── El aviso que le llega AL MAESTRO ──────────────────────────────────────
+   *
+   * El push de Membresías era solo para el alumno. El maestro tenía la misma
+   * información en su campana pero **solo si abría la app**, y la abre cuando
+   * se acuerda; así que los avisos existían y nadie se enteraba hasta que
+   * alguien preguntaba en clase.
+   *
+   * Lo que se prueba aquí es lo que hace que ese aviso se lea en vez de
+   * barrerse: que sea UNO, que diga cuántos y de qué clase, y que no salga
+   * cuando no hay nada que decir.
+   */
+  describe('el resumen del día para quien lleva el club', () => {
+    it('cuenta vencidos y por vencer, y lo dice en una frase', () => {
+      const r = resumenParaElClub(
+        [
+          { type: 'venc' as const },
+          { type: 'venc' as const },
+          { type: 'mora' as const },
+          { type: 'pre_venc' as const },
+        ],
+        'Club Norte',
+      );
+      expect(r).toEqual({
+        title: 'DINAMYT · Club Norte',
+        body: 'Hoy: 3 alumnos con la mensualidad vencida y 1 por vencer.',
+      });
+    });
+
+    it('el singular se dice en singular', () => {
+      // Un «1 alumnos» es de esas cosas que hacen dudar de todo lo demás.
+      expect(resumenParaElClub([{ type: 'venc' }], 'Club Norte')?.body).toBe(
+        'Hoy: 1 alumno con la mensualidad vencida.',
+      );
+      expect(resumenParaElClub([{ type: 'pre_venc' }], null)?.body).toBe(
+        'Hoy: 1 por vencer.',
+      );
+    });
+
+    it('el club va en el título: quien lleva dos no tiene que adivinar', () => {
+      expect(resumenParaElClub([{ type: 'venc' }], null)?.title).toBe(
+        'DINAMYT · Mi Club',
+      );
+    });
+
+    it('sin nada que decir no se manda nada', () => {
+      // Un push que dice «cero» es ruido puro, y el ruido se paga en que el
+      // siguiente aviso —el que sí importaba— también se barra.
+      expect(resumenParaElClub([], 'Club Norte')).toBeNull();
+    });
   });
 
   /**
@@ -168,7 +220,10 @@ describe('notificaciones', () => {
       await app.close();
     });
 
-    it('abrir la campana marca como leídos los MÍOS y solo los míos', async () => {
+    // `/notifications/leidos` ya no lo dispara abrir la campana: es el botón
+    // «marcar todo como leído». Lo que no ha cambiado —y es lo que prueba este
+    // test— es su alcance: toca los MÍOS y ni uno más.
+    it('«marcar todo» marca los MÍOS y solo los míos', async () => {
       const { app, db, auth, ids, orgId } = await crearEscenario();
       await db.insert(memberships).values([
         { orgId, userId: ids.alumno, venceEl: '2000-01-01' },
@@ -193,6 +248,128 @@ describe('notificaciones', () => {
         headers: auth(ids.alumno2),
       });
       expect(delOtro.json()[0].readAt).toBeNull();
+      await app.close();
+    });
+
+    /**
+     * ── La campana baja de dos a uno, no de dos a cero ──
+     *
+     * Abrir la campana marcaba TODO como leído. Con nueve avisos, el alumno la
+     * abría para mirar uno y los otros ocho desaparecían sin que los hubiera
+     * visto —lo leído no vuelve a esta lista— y el número saltaba de 9 a 0 de
+     * un tirón. Un número que no se puede seguir con los ojos deja de decir
+     * nada, y una campana en la que no se confía no se vuelve a abrir.
+     */
+    it('marcar UN aviso baja la cuenta en uno y deja el otro en pie', async () => {
+      const { app, db, auth, ids, orgId } = await crearEscenario();
+      // Dos avisos del MISMO alumno. Uno no vale: un alumno tiene UNA membresía
+      // por club (`uq_membership_org_user`), así que `run` solo le genera uno.
+      // El segundo es de los que escribe una persona (`maestro`), que es
+      // justamente el caso en el que se juntan varios sin leer.
+      await db
+        .insert(memberships)
+        .values({ orgId, userId: ids.alumno, venceEl: '2000-01-01' });
+      await app.inject({
+        method: 'POST',
+        url: '/notifications/run',
+        headers: auth(ids.owner),
+      });
+      await db.insert(notifications).values({
+        userId: ids.alumno,
+        type: 'maestro',
+        channel: 'inapp',
+        // Más viejo que el de `run`, para que el orden sea el que se espera:
+        // lo último primero.
+        scheduledFor: new Date('2000-01-01T00:00:00.000Z'),
+        status: 'ENVIADA',
+      });
+
+      const mios = auth(ids.alumno);
+      const antes = (
+        await app.inject({ method: 'GET', url: '/notifications', headers: mios })
+      ).json();
+      expect(antes).toHaveLength(2);
+
+      const r = await app.inject({
+        method: 'POST',
+        url: `/notifications/${antes[0].id}/leido`,
+        headers: mios,
+      });
+      expect(r.json()).toEqual({ marcado: true });
+
+      const despues = (
+        await app.inject({ method: 'GET', url: '/notifications', headers: mios })
+      ).json();
+      expect(despues).toHaveLength(1);
+      expect(despues[0].id).toBe(antes[1].id);
+      await app.close();
+    });
+
+    it('marcar el mismo dos veces no es un error: la segunda no hace nada', async () => {
+      // Pasa de verdad: dos toques seguidos, o la misma cuenta abierta en el
+      // celular y en el portátil. Un 404 ahí pintaría de rojo una pantalla por
+      // hacer bien lo que se pedía.
+      const { app, db, auth, ids, orgId } = await crearEscenario();
+      await db
+        .insert(memberships)
+        .values({ orgId, userId: ids.alumno, venceEl: '2000-01-01' });
+      await app.inject({
+        method: 'POST',
+        url: '/notifications/run',
+        headers: auth(ids.owner),
+      });
+      const mios = auth(ids.alumno);
+      const [aviso] = (
+        await app.inject({ method: 'GET', url: '/notifications', headers: mios })
+      ).json();
+
+      const url = `/notifications/${aviso.id}/leido`;
+      expect((await app.inject({ method: 'POST', url, headers: mios })).json()).toEqual(
+        { marcado: true },
+      );
+      expect((await app.inject({ method: 'POST', url, headers: mios })).json()).toEqual(
+        { marcado: false },
+      );
+      await app.close();
+    });
+
+    it('nadie puede dar por leído el aviso de otro', async () => {
+      // El `user_id` de la consulta no es decorativo: sin él, cualquiera con
+      // sesión podría apagarle un aviso a otro pasando su identificador.
+      const { app, db, auth, ids, orgId } = await crearEscenario();
+      await db
+        .insert(memberships)
+        .values({ orgId, userId: ids.alumno, venceEl: '2000-01-01' });
+      await app.inject({
+        method: 'POST',
+        url: '/notifications/run',
+        headers: auth(ids.owner),
+      });
+      const [suyo] = (
+        await app.inject({
+          method: 'GET',
+          url: '/notifications',
+          headers: auth(ids.alumno),
+        })
+      ).json();
+
+      // El maestro lo VE (es de su club) pero no lo puede dar por leído: eso lo
+      // dice su dueño.
+      const intento = await app.inject({
+        method: 'POST',
+        url: `/notifications/${suyo.id}/leido`,
+        headers: auth(ids.owner),
+      });
+      expect(intento.json()).toEqual({ marcado: false });
+
+      const sigue = (
+        await app.inject({
+          method: 'GET',
+          url: '/notifications',
+          headers: auth(ids.alumno),
+        })
+      ).json();
+      expect(sigue).toHaveLength(1);
       await app.close();
     });
 

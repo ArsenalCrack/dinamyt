@@ -64,3 +64,56 @@ export function textoAviso(type: TipoAviso, venceEl: string | null): string {
   }
   return 'Tienes un pago pendiente en el club.';
 }
+
+/**
+ * ── El aviso que le llega AL MAESTRO, y por qué es un resumen ───────────────
+ *
+ * Hasta ahora el push de Membresías se le escribía solo al alumno: el dueño de
+ * la membresía que vence. El maestro tenía la misma información en su campana
+ * —la lista del club— pero **solo si abría la app**, y la abre cuando se
+ * acuerda. El resultado era el de siempre: los avisos existían y nadie se
+ * enteraba hasta que alguien preguntaba en clase.
+ *
+ * ── Por qué UNO y no uno por alumno ──
+ *
+ * Porque un club de treinta alumnos genera doce avisos una mañana de fin de
+ * mes, y doce notificaciones seguidas en el celular no se leen: se barren de un
+ * gesto y de paso se aprende a barrer las del día siguiente. Un solo aviso que
+ * dice **cuántos y de qué clase** cabe en la pantalla bloqueada y basta para
+ * decidir si vale la pena abrir la app ahora o después de clase.
+ *
+ * ── Por qué no crea fila en `notifications` ──
+ *
+ * Porque el maestro ya ve esos avisos en su campana: son los de sus alumnos
+ * (`GET /notifications?all=1`). Una fila suya sería la misma información
+ * contada dos veces en la misma pantalla. Esto es el empujón para ir a mirar,
+ * no un aviso nuevo.
+ *
+ * Devuelve `null` cuando no hay nada que resumir: un push que dice «cero» es
+ * ruido puro.
+ */
+export function resumenParaElClub(
+  avisos: { type: TipoAviso }[],
+  nombreDelClub: string | null,
+): { title: string; body: string } | null {
+  const vencidos = avisos.filter((a) => a.type === 'venc' || a.type === 'mora').length;
+  const porVencer = avisos.filter((a) => a.type === 'pre_venc').length;
+  if (vencidos === 0 && porVencer === 0) return null;
+
+  const partes: string[] = [];
+  if (vencidos > 0) {
+    partes.push(
+      vencidos === 1 ? '1 alumno con la mensualidad vencida' : `${vencidos} alumnos con la mensualidad vencida`,
+    );
+  }
+  if (porVencer > 0) {
+    partes.push(porVencer === 1 ? '1 por vencer' : `${porVencer} por vencer`);
+  }
+
+  return {
+    // El nombre del club en el título: quien lleva dos no puede tener que
+    // adivinar de cuál le están hablando.
+    title: nombreDelClub ? `DINAMYT · ${nombreDelClub}` : 'DINAMYT · Mi Club',
+    body: `Hoy: ${partes.join(' y ')}.`,
+  };
+}

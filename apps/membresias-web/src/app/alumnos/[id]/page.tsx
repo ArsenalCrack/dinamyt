@@ -10,6 +10,7 @@ import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { claseEstado, claveEstado, fmtFecha, fmtMoneda, hoyISO } from '@/lib/formato';
 import {
   LIM,
+  PROPS_CORREO,
   TIPOS_SANGRE,
   correoValido,
   dominioSugerido,
@@ -900,7 +901,7 @@ export default function Ficha() {
                 desde la que el maestro puede arreglar el suyo. */}
             <Etiqueta obligatorio>{t('comun.correo')}</Etiqueta>
             <input
-              type="email"
+              {...PROPS_CORREO}
               value={datos.email}
               onChange={(e) => setDatos({ ...datos, email: e.target.value })}
               maxLength={LIM.correo}

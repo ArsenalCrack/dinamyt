@@ -9,6 +9,7 @@ import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { hoyISO } from '@/lib/formato';
 import {
   LIM,
+  PROPS_CORREO,
   TIPOS_SANGRE,
   correoValido,
   dominioSugerido,
@@ -561,7 +562,7 @@ export default function Alumnos() {
         <label style={{ display: 'block' }}>
           <Etiqueta obligatorio>{t('comun.correo')}</Etiqueta>
           <input
-            type="email"
+            {...PROPS_CORREO}
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             maxLength={LIM.correo}

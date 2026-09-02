@@ -43,6 +43,14 @@ interface Aviso {
  *    es un enlace al sitio donde se hace algo con eso: la ficha del alumno con
  *    el cobro a la vista para el maestro, «Mi estado» para el alumno. Antes se
  *    leía el aviso, se cerraba el panel y había que ir a buscar a la persona.
+ * 4. **Se vacía de uno en uno.** Abrir la campana ya no marca los nueve avisos
+ *    como leídos de golpe. Eso hacía dos cosas mal a la vez: los ocho que no se
+ *    llegaron a mirar desaparecían para siempre, y el número —que es lo único
+ *    que se mira de reojo— saltaba de 9 a 0 sin pasar por el medio, así que
+ *    dejaba de informar de nada. Ahora leer uno baja el número en uno, que es
+ *    lo que hace cualquier bandeja de entrada del mundo. Para el atracón hay un
+ *    «marcar todo como leído», que es una decisión de la persona y no un efecto
+ *    secundario de haber abierto el panel.
  */
 export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
   const { t, idioma } = useI18n();
@@ -147,17 +155,40 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
     // Abrirla es releerla: entre que se pintó la pantalla y ahora, el maestro
     // pudo haber cobrado en otra pestaña. Lo que se enseña al abrir tiene que
     // ser lo de este segundo, no lo de hace media hora.
-    const frescos = await cargar();
+    //
+    // Lo que abrir ya NO hace es marcarlos leídos. Ver la nota 4 de arriba.
+    await cargar();
+  }
 
-    // Y abrir la campana ES leerlos. Solo los propios: ver arriba.
-    if (!deTodoElClub && frescos.some((a) => !a.readAt)) {
-      try {
-        await api.post('/notifications/leidos');
-        const ahora = new Date().toISOString();
-        setAvisos((lista) => lista.map((a) => ({ ...a, readAt: a.readAt ?? ahora })));
-      } catch {
-        /* que falle no impide leerlos en pantalla */
-      }
+  /**
+   * Este aviso, leído. El número baja en uno.
+   *
+   * Se pinta primero y se guarda después, a propósito: el toque tiene que
+   * responder en el mismo instante, y lo que hay al otro lado es una fila que
+   * ya se sabe de quién es. Si la llamada falla se vuelve a leer la lista, que
+   * es la única forma honesta de deshacerlo — dejar el número bajado mintiendo
+   * es peor que el parpadeo de recuperarlo.
+   */
+  async function marcarUno(id: string) {
+    const ahora = new Date().toISOString();
+    setAvisos((lista) =>
+      lista.map((a) => (a.id === id ? { ...a, readAt: a.readAt ?? ahora } : a)),
+    );
+    try {
+      await api.post(`/notifications/${id}/leido`);
+    } catch {
+      void cargar();
+    }
+  }
+
+  /** El atracón: los treinta que se juntaron y no se van a abrir uno a uno. */
+  async function marcarTodos() {
+    const ahora = new Date().toISOString();
+    setAvisos((lista) => lista.map((a) => ({ ...a, readAt: a.readAt ?? ahora })));
+    try {
+      await api.post('/notifications/leidos');
+    } catch {
+      void cargar();
     }
   }
 
@@ -215,13 +246,27 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
               <p className="eyebrow">
                 {deTodoElClub ? t('aviso.delClub') : t('aviso.misAvisos')}
               </p>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setAbierto(false)}
-              >
-                ✕
-              </button>
+              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                {/* Solo con DOS o más pendientes. Con uno, «marcar todo» y
+                    «marcar éste» son el mismo botón puesto dos veces, y el de
+                    la fila ya está donde se está mirando. */}
+                {!deTodoElClub && pendientes > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => void marcarTodos()}
+                  >
+                    {t('aviso.marcarTodo')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setAbierto(false)}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {avisos.length === 0 ? (
@@ -231,7 +276,7 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
             ) : (
               <ul className="avisos-lista">
                 {avisos.map((a) => (
-                  <li key={a.id}>
+                  <li key={a.id} className="avisos-fila">
                     <Link
                       href={destino(a)}
                       className="avisos-item"
@@ -239,7 +284,14 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                       // El panel se cierra al saltar: dejarlo abierto encima de
                       // la pantalla a la que se acaba de llegar tapa justo lo
                       // que se venía a hacer.
-                      onClick={() => setAbierto(false)}
+                      //
+                      // Y abrirlo ES leerlo: ir a mirarlo y que el número siga
+                      // en nueve al volver es lo que hace que la campana
+                      // parezca un adorno pegado a la barra.
+                      onClick={() => {
+                        setAbierto(false);
+                        if (!deTodoElClub && !a.readAt) void marcarUno(a.id);
+                      }}
                     >
                       <span
                         className="avisos-titulo"
@@ -259,6 +311,24 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                         {fmtFecha(a.scheduledFor?.slice(0, 10), idioma)}
                       </span>
                     </Link>
+                    {/* «Ya lo leí», sin ir a ninguna parte.
+                        El aviso del alumno lleva siempre a la misma pantalla —«Mi
+                        estado»—, así que sin esto la única manera de bajar el
+                        número era navegar allí y volver, nueve veces. Este botón
+                        es para el caso normal: ya sé lo que dice, quítamelo.
+                        En la lista del club no aparece: esos avisos son de los
+                        alumnos y «leído» lo dice su dueño, no el maestro. */}
+                    {!deTodoElClub && !a.readAt && (
+                      <button
+                        type="button"
+                        className="avisos-visto"
+                        onClick={() => void marcarUno(a.id)}
+                        aria-label={t('aviso.marcarLeido')}
+                        title={t('aviso.marcarLeido')}
+                      >
+                        ✓
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

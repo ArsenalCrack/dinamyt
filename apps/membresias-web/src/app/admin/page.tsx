@@ -15,7 +15,7 @@ import {
 } from '@/lib/api';
 import { rutaInicio, useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { LIM, enMayusculas, soloTelefono, telefonoValido } from '@/lib/campos';
+import { LIM, PROPS_CORREO, enMayusculas, soloTelefono, telefonoValido } from '@/lib/campos';
 import { avisoError, avisoOk } from '@/lib/toast';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { SelectMenu } from '@/components/SelectMenu';
@@ -610,7 +610,7 @@ export default function Admin() {
                       required
                     />
                     <input
-                      type="email"
+                      {...PROPS_CORREO}
                       placeholder={t('comun.correo')}
                       value={nuevoMaestro.email}
                       onChange={(e) =>

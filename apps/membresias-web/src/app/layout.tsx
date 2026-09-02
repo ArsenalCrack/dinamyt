@@ -3,6 +3,7 @@ import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { NavBar } from '@/components/NavBar';
 import { PieLegal } from '@/components/PieLegal';
+import { PedirAvisos } from '@/components/PedirAvisos';
 import { PorteroMantenimiento } from '@/components/PorteroMantenimiento';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
 import { Toaster } from '@/components/Toaster';
@@ -109,6 +110,11 @@ export default function RootLayout({
                 puede recortarlo. */}
             <Toaster />
             <RegistrarServiceWorker />
+            {/* «¿Te avisamos?», una sola vez por navegador. Va en el layout —y
+                no en una pantalla— porque tiene que salir se entre por donde se
+                entre; él mismo decide cuándo callarse (en /login, en el kiosco,
+                al maestro y a quien ya lo tenga activado). */}
+            <PedirAvisos />
           </AuthProvider>
         </I18nProvider>
       </body>

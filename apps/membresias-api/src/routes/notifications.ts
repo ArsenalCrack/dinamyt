@@ -10,7 +10,7 @@ import {
 } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireAuth, requireClub, requireRole } from '../plugins/auth';
 import { limitarPorIp } from '../lib/auth/rate-limit';
-import { planNotificaciones, textoAviso } from '../lib/notifications';
+import { planNotificaciones, resumenParaElClub, textoAviso } from '../lib/notifications';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { estado, todayStr } from '../lib/billing';
 import { enviarPush } from '../lib/push';
@@ -85,16 +85,101 @@ export async function generarAvisos(
           {
             title: 'DINAMYT · Mi Club',
             body: textoAviso(n.type, venceElPorMembership.get(n.membershipId) ?? null),
+            // El alumno va a su estado, que es donde ve su vencimiento y su
+            // carnet. Es el mismo destino que dentro de la campana.
+            url: '/mi',
           },
         );
         if (ok) pushEnviados++;
       }
     }
+
+    // ── Y UNO al maestro, con el resumen del día ────────────────────────────
+    //
+    // Hasta ahora el push era solo para el alumno. El maestro tenía la misma
+    // información en su campana —la lista de su club— pero **solo si abría la
+    // app**, y la abre cuando se acuerda; así que los avisos existían y nadie
+    // se enteraba hasta que alguien preguntaba en clase.
+    //
+    // Va aquí dentro y no en una ruta aparte a propósito: `generarAvisos` es lo
+    // que dispara el cron diario (y también el botón del maestro), así que el
+    // resumen sale **solo, cada mañana**, sin que nadie pulse nada. Y sale una
+    // vez: si no hubo avisos nuevos, esta función ya se salió arriba, de modo
+    // que pulsar el botón dos veces no manda dos resúmenes.
+    pushEnviados += await avisarAlClub(db, orgId, nuevos);
   } catch {
     /* push best-effort */
   }
 
   return { creados: nuevos.length, pushEnviados };
+}
+
+/**
+ * El resumen del día para quien lleva el club.
+ *
+ * ── Quiénes lo reciben ──
+ *
+ * El maestro (`owner`) y sus auxiliares (`staff`) **activos** del club, que son
+ * los que pueden hacer algo con la información. Un alumno no: él ya recibió el
+ * suyo, que habla de su propia mensualidad.
+ *
+ * El filtro por `orgId` es explícito y no sobra: por aquí pasa también el cron,
+ * que corre **sin contexto de club** (`sinFiltroDeClub`) para poder recorrerlos
+ * todos. Sin esa condición, el resumen de un club se le mandaría a los maestros
+ * de todos los demás.
+ */
+async function avisarAlClub(
+  db: Db,
+  orgId: string,
+  nuevos: { type: 'pre_venc' | 'venc' | 'mora' }[],
+): Promise<number> {
+  const [club] = await db
+    .select({ name: orgs.name })
+    .from(orgs)
+    .where(eq(orgs.id, orgId))
+    .limit(1);
+
+  const resumen = resumenParaElClub(nuevos, club?.name ?? null);
+  if (!resumen) return 0;
+
+  const gestores = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        eq(users.orgId, orgId),
+        inArray(users.role, ['owner', 'staff']),
+        eq(users.isActive, true),
+      ),
+    );
+  if (gestores.length === 0) return 0;
+
+  const subs = await db
+    .select()
+    .from(pushSubscriptions)
+    .where(
+      inArray(
+        pushSubscriptions.userId,
+        gestores.map((g) => g.id),
+      ),
+    );
+
+  let enviados = 0;
+  for (const s of subs) {
+    const ok = await enviarPush(
+      { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth },
+      {
+        ...resumen,
+        // Al panel del club, que es donde está la lista con su filtro por
+        // estado y el botón de cobrar. `/mi` —el destino por defecto del
+        // service worker— le enseñaría SU mensualidad, que no es de lo que
+        // habla el aviso.
+        url: '/',
+      },
+    );
+    if (ok) enviados++;
+  }
+  return enviados;
 }
 
 /**
@@ -263,10 +348,46 @@ export async function notificationsRoutes(app: FastifyInstance) {
     return vigentes(filas, todayStr());
   });
 
-  // ── POST /notifications/leidos — marcar los míos como leídos ───────────────
-  // Lo llama la campana al abrirse. Solo toca los del propio usuario: el
-  // maestro ve los del club, pero marcarlos como leídos por sus alumnos sería
-  // borrarles el aviso de la pantalla sin que lo hayan visto.
+  // ── POST /notifications/:id/leido — este, el que acabo de abrir ────────────
+  //
+  // ── Por qué existe, si ya estaba `/leidos` ──
+  //
+  // Porque abrir la campana no es leerlos todos. Con `/leidos` a secas, el
+  // alumno con nueve avisos abría la campana para mirar UNO y los nueve se
+  // marcaban leídos de golpe: los otros ocho desaparecían sin que los hubiera
+  // visto. Y el número, que es lo que se mira de reojo, saltaba de 9 a 0 de un
+  // tirón — un número que no se puede seguir con los ojos deja de significar
+  // nada. Lo que se espera de una campana es lo de siempre: nueve, abro uno,
+  // ocho.
+  //
+  // Solo toca los del propio usuario. Un aviso de la lista del club es de SU
+  // alumno, y marcarlo leído desde aquí se lo borraría de la pantalla a alguien
+  // que no lo ha visto.
+  app.post('/notifications/:id/leido', { preHandler: requireAuth() }, async (req) => {
+    const { id } = req.params as { id: string };
+    const marcados = await req.db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(notifications.id, id),
+          eq(notifications.userId, req.user!.sub),
+          isNull(notifications.readAt),
+        ),
+      )
+      .returning({ id: notifications.id });
+    // Que no marcara nada no es un error: pasa cuando ya estaba leído —dos
+    // toques seguidos, o la misma cuenta abierta en dos sitios—. Un 404 ahí
+    // pintaría de rojo una pantalla por hacer bien lo que se pedía.
+    return { marcado: marcados.length > 0 };
+  });
+
+  // ── POST /notifications/leidos — marcar TODOS los míos como leídos ─────────
+  // Ya no lo llama la campana al abrirse (ver arriba): ahora es el botón
+  // «marcar todo como leído», que existe para el día en que se acumularon
+  // treinta y no se van a abrir uno por uno. Solo toca los del propio usuario:
+  // el maestro ve los del club, pero marcarlos como leídos por sus alumnos
+  // sería borrarles el aviso de la pantalla sin que lo hayan visto.
   app.post('/notifications/leidos', { preHandler: requireAuth() }, async (req) => {
     const marcados = await req.db
       .update(notifications)
