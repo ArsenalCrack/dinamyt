@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { and, eq, gte, isNull, desc, inArray } from 'drizzle-orm';
 import {
   memberships,
@@ -302,6 +302,7 @@ export async function notificationsRoutes(app: FastifyInstance) {
       scheduledFor: notifications.scheduledFor,
       status: notifications.status,
       readAt: notifications.readAt,
+      staffReadAt: notifications.staffReadAt,
       fullName: users.fullName,
       venceEl: memberships.venceEl,
       // Hacen falta para saber si el aviso todavía es verdad. Ver `vigentes`.
@@ -311,13 +312,43 @@ export async function notificationsRoutes(app: FastifyInstance) {
     const filas =
       all && esStaff
         ? orgId
-          ? await db
-              .select(columnas)
+          ? /**
+             * ── La lista del club: uno por alumno, y solo lo que falta por ver ──
+             *
+             * Dos cosas la hacían crecer sin parar, y las dos se notaban igual:
+             * el maestro abría la campana y seguía viendo lo mismo de siempre.
+             *
+             * 1. **Un aviso por alumno Y POR DÍA.** El generador escribe una
+             *    fila cada mañana mientras el alumno siga debiendo (el dedup es
+             *    por día), así que un moroso de dos semanas salía catorce veces
+             *    seguidas con la misma frase. `DISTINCT ON` se queda con el más
+             *    reciente de cada (membresía, tipo): un renglón por alumno, que
+             *    es como se lee una lista de cobro.
+             * 2. **Nada lo sacaba de ahí salvo que el alumno pagara.** Ahora
+             *    `staff_read_at` (migración 0018): lo que el maestro da por
+             *    visto se va. No toca `read_at`, que es del alumno.
+             *
+             * El `ORDER BY` empieza por las mismas columnas del `DISTINCT ON`
+             * porque Postgres lo exige, así que la lista sale ordenada por
+             * alumno y no por fecha; se reordena por fecha abajo, ya con un
+             * puñado de filas.
+             */
+            await db
+              .selectDistinctOn([notifications.membershipId, notifications.type], columnas)
               .from(notifications)
               .innerJoin(memberships, eq(notifications.membershipId, memberships.id))
               .innerJoin(users, eq(notifications.userId, users.id))
-              .where(eq(memberships.orgId, orgId))
-              .orderBy(desc(notifications.scheduledFor))
+              .where(
+                and(
+                  eq(memberships.orgId, orgId),
+                  isNull(notifications.staffReadAt),
+                ),
+              )
+              .orderBy(
+                notifications.membershipId,
+                notifications.type,
+                desc(notifications.scheduledFor),
+              )
               .limit(100)
           : null
         : await db
@@ -345,7 +376,98 @@ export async function notificationsRoutes(app: FastifyInstance) {
             .limit(50);
 
     if (filas === null) return reply.code(400).send({ error: 'Sin club seleccionado.' });
-    return vigentes(filas, todayStr());
+    // Lo último primero. Hace falta ordenar aquí porque el `DISTINCT ON` de la
+    // vista del club obliga a ordenar por sus propias columnas (ver arriba); en
+    // la vista propia ya viene ordenado y esto no cambia nada.
+    return vigentes(filas, todayStr()).sort((a, b) =>
+      (b.scheduledFor?.toISOString() ?? '').localeCompare(
+        a.scheduledFor?.toISOString() ?? '',
+      ),
+    );
+  });
+
+  /**
+   * Quién puede descartar avisos del CLUB. Es el mismo criterio que usa el
+   * `GET ?all=1` para decidir si enseña la lista del club: si alguien puede
+   * verla, puede vaciarla; y si no, no.
+   */
+  function staffDelClub(req: FastifyRequest) {
+    const rol = req.user?.role_membresias;
+    return Boolean(req.user?.is_super_admin) || rol === 'owner' || rol === 'staff';
+  }
+
+  // ── POST /notifications/:id/visto — el maestro descarta este alumno ────────
+  //
+  // ── Por qué no vale `/leido` ──
+  //
+  // Porque `read_at` es del ALUMNO: dice si abrió su recado. Que lo escribiera
+  // el maestro le borraría el aviso a alguien que no lo ha visto. Por eso su
+  // campana no tenía forma de vaciarse — leía el aviso y ahí seguía, un día y
+  // otro— y por eso hay dos columnas (ver la migración 0018).
+  //
+  // ── Por qué marca el GRUPO y no la fila ──
+  //
+  // Porque el generador escribe una fila por alumno **y por día** mientras siga
+  // debiendo, así que detrás del renglón que el maestro está mirando hay otros
+  // trece iguales. La lista los colapsa con `DISTINCT ON`, pero si esto marcara
+  // solo el más reciente, al recargar aparecería el de ayer diciendo lo mismo:
+  // el aviso «vuelve» y parece que el botón no hizo nada. Se descarta el asunto
+  // —este alumno, este tipo de aviso—, no el renglón.
+  //
+  // Y solo dentro del propio club: `membershipId` sale de una subconsulta
+  // filtrada por `orgId`, así que un identificador de otro club no marca nada.
+  app.post('/notifications/:id/visto', { preHandler: requireClub() }, async (req, reply) => {
+    if (!staffDelClub(req)) return reply.code(403).send({ error: 'No autorizado.' });
+    const orgId = orgDelRequest(req);
+    if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
+
+    const { id } = req.params as { id: string };
+    const [aviso] = await req.db
+      .select({ membershipId: notifications.membershipId, type: notifications.type })
+      .from(notifications)
+      .innerJoin(memberships, eq(notifications.membershipId, memberships.id))
+      .where(and(eq(notifications.id, id), eq(memberships.orgId, orgId)))
+      .limit(1);
+    if (!aviso || !aviso.membershipId) return { marcados: 0 };
+
+    const marcados = await req.db
+      .update(notifications)
+      .set({ staffReadAt: new Date() })
+      .where(
+        and(
+          eq(notifications.membershipId, aviso.membershipId),
+          eq(notifications.type, aviso.type),
+          isNull(notifications.staffReadAt),
+        ),
+      )
+      .returning({ id: notifications.id });
+    return { marcados: marcados.length };
+  });
+
+  // ── POST /notifications/vistos — el maestro vacía su campana entera ────────
+  // El «marcar todo» de la lista del club, para la mañana en que se juntaron
+  // veinte y se van a ir a cobrar de una pasada.
+  app.post('/notifications/vistos', { preHandler: requireClub() }, async (req, reply) => {
+    if (!staffDelClub(req)) return reply.code(403).send({ error: 'No autorizado.' });
+    const orgId = orgDelRequest(req);
+    if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
+
+    const delClub = req.db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(eq(memberships.orgId, orgId));
+
+    const marcados = await req.db
+      .update(notifications)
+      .set({ staffReadAt: new Date() })
+      .where(
+        and(
+          inArray(notifications.membershipId, delClub),
+          isNull(notifications.staffReadAt),
+        ),
+      )
+      .returning({ id: notifications.id });
+    return { marcados: marcados.length };
   });
 
   // ── POST /notifications/:id/leido — este, el que acabo de abrir ────────────
