@@ -1005,8 +1005,30 @@ export const misAvisosOrgAPI = async (): Promise<{
   sinLeer: number;
 }> => (await api.get('/organizations/avisos')).data;
 
+// ── Avisos al celular (Web Push) ────────────────────────────────────────────
+// Una fila por NAVEGADOR, no por persona: el permiso lo da el navegador. Ver
+// `lib/push.ts`, que es quien habla con el navegador, y la tabla
+// `push_subscriptions` de la API.
+
+export const suscribirPushAPI = async (sub: {
+  endpoint?: string;
+  keys?: { p256dh: string; auth: string };
+}): Promise<{ ok: true }> => (await api.post('/push/subscribe', sub)).data;
+
+export const desuscribirPushAPI = async (
+  endpoint: string,
+): Promise<{ quitadas: number }> =>
+  (await api.post('/push/unsubscribe', { endpoint })).data;
+
+/** Todos de golpe: el botón «marcar todo como leído» del panel. */
 export const marcarAvisosOrgLeidosAPI = async (): Promise<{ marcados: number }> =>
   (await api.post('/organizations/avisos/leidos')).data;
+
+/** Éste, el que se acaba de abrir. El número baja en uno, no a cero. */
+export const marcarAvisoOrgLeidoAPI = async (
+  id: string,
+): Promise<{ marcado: boolean }> =>
+  (await api.post(`/organizations/avisos/${id}/leido`)).data;
 export const crearMiClubAPI = async (data: {
   name: string;
   city?: string;

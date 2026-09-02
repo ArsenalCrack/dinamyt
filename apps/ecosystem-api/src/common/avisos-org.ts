@@ -76,3 +76,49 @@ export function destinoDelAviso(
   if (!def) return '/mi-organizacion';
   return def.href.replace('{subjectUserId}', datos.subjectUserId ?? '');
 }
+
+
+/**
+ * La frase que se lee en la pantalla bloqueada del celular.
+ *
+ * ── Por qué se escribe aquí y no en la campana ──
+ *
+ * Porque el mismo aviso sale por dos sitios —la campana del portal y el push—
+ * y tiene que decir lo mismo en los dos. Con la frase escrita solo en el
+ * componente, el push habría acabado diciendo «Novedad en tu club» para todo,
+ * que es la clase de aviso que se aprende a ignorar en dos días.
+ *
+ * ── Las reglas de una notificación que no molesta ──
+ *
+ * 1. **Dice quién.** «Alguien quiere entrar a tu club» no se puede decidir sin
+ *    abrir la app; «Laura Restrepo quiere entrar» sí. Un aviso que obliga a
+ *    abrir la app para saber de qué va es un aviso que no ahorró nada.
+ * 2. **Cabe en una línea.** En Android se corta a unos 40 caracteres visibles
+ *    con la pantalla bloqueada; lo importante va delante.
+ * 3. **No lleva la nota que escribió la persona.** Esa nota es de quien la
+ *    escribió y aparece en pantallas del club, no en la pantalla bloqueada de
+ *    un celular que puede estar sobre una mesa. En la campana sí se lee entera.
+ */
+export function textoDelAviso(
+  kind: string,
+  datos: { quien?: string | null; club?: string | null },
+): { title: string; body: string } {
+  const quien = (datos.quien ?? '').trim() || 'Alguien';
+  // El club en el título: quien lleva dos no puede tener que adivinar cuál es.
+  const title = datos.club ? `DINAMYT · ${datos.club}` : 'DINAMYT';
+
+  switch (kind as TipoAvisoOrg) {
+    case 'solicitud_entrada':
+      return { title, body: `${quien} quiere entrar a tu club.` };
+    case 'miembro_nuevo':
+      return { title, body: `${quien} entró a tu club.` };
+    case 'invitacion_rechazada':
+      return { title, body: `${quien} rechazó tu invitación.` };
+    case 'miembro_baja':
+      return { title, body: `${quien} salió de tu club.` };
+    default:
+      // Un tipo sin frase no se manda mudo, pero tampoco se calla: se dice lo
+      // único que se sabe con certeza y se deja que la campana cuente el resto.
+      return { title, body: 'Hay una novedad en tu club.' };
+  }
+}

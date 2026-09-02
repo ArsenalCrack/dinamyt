@@ -41,11 +41,23 @@ export class OrganizationsController {
     return { items, sinLeer };
   }
 
-  // ── POST /organizations/avisos/leidos — abrir la campana es leerlos ───────
+  // ── POST /organizations/avisos/leidos — marcar TODOS como leídos ──────────
+  // Ya no lo llama la campana al abrirse: es el botón «marcar todo».
   @Post('avisos/leidos')
   @UseGuards(EcosystemJwtGuard)
   marcarAvisosLeidos(@CurrentUser() user: JwtPayload) {
     return this.avisos.marcarLeidos(user.sub);
+  }
+
+  // ── POST /organizations/avisos/:id/leido — éste, el que acabo de abrir ────
+  //
+  // Va DESPUÉS de `avisos/leidos` a propósito: Nest resuelve las rutas en el
+  // orden en que se declaran, y un `:id` declarado antes se tragaría la palabra
+  // «leidos» como si fuera un identificador.
+  @Post('avisos/:id/leido')
+  @UseGuards(EcosystemJwtGuard)
+  marcarAvisoLeido(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.avisos.marcarLeido(user.sub, id);
   }
 
   // ── POST /organizations — crear organización (solo super admin) ───────────

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  marcarAvisoOrgLeidoAPI,
   marcarAvisosOrgLeidosAPI,
   misAvisosOrgAPI,
   type AvisoOrg,
@@ -11,6 +12,7 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { nombreRol } from '@/lib/roles';
 import { haceCuanto } from '@/lib/fechas';
+import { activarPush, desactivarPush, estadoPush, type EstadoPush } from '@/lib/push';
 
 /**
  * La campana de quien lleva un club.
@@ -41,6 +43,14 @@ import { haceCuanto } from '@/lib/fechas';
  *
  *    Eso lo resuelve la API; aquí lo único que hace falta es **volver a
  *    preguntar** cuando algo pudo cambiar: al cambiar de pantalla y al abrir.
+ * 3. **Se vacía de uno en uno.** Abrir la campana ya no marca los nueve avisos
+ *    como leídos de golpe. Eso hacía dos cosas mal a la vez: los ocho que no se
+ *    llegaron a mirar desaparecían para siempre —lo leído no vuelve—, y el
+ *    número, que es lo único que se mira de reojo desde la barra, saltaba de 9
+ *    a 0 sin pasar por el medio. Ahora leer uno baja el número en uno, como
+ *    cualquier bandeja de entrada. Para el atracón hay un «marcar todo como
+ *    leído», que es una decisión de la persona y no un efecto secundario de
+ *    haber abierto el panel.
  *
  * ── Quién la ve ──
  *
@@ -84,7 +94,16 @@ export function CampanaOrg() {
   const [avisos, setAvisos] = useState<AvisoOrg[]>([]);
   const [sinLeer, setSinLeer] = useState(0);
   const [abierto, setAbierto] = useState(false);
+  const [push, setPush] = useState<EstadoPush>('imposible');
+  const [msgPush, setMsgPush] = useState('');
   const raizRef = useRef<HTMLDivElement | null>(null);
+
+  // En qué punto está este navegador con los avisos al celular. Se pregunta una
+  // vez al montar: la respuesta solo cambia por algo que hace la propia persona,
+  // y eso se refleja en `alternarPush`.
+  useEffect(() => {
+    void estadoPush().then(setPush);
+  }, []);
 
   const cargar = useCallback(async () => {
     try {
@@ -140,16 +159,66 @@ export function CampanaOrg() {
 
     // Abrirla es releerla: entre que se pintó la pantalla y ahora, otro
     // administrador pudo haber respondido la solicitud que se iba a mirar.
+    //
+    // Lo que abrir ya NO hace es marcarlos leídos. Ver la regla 3 de arriba.
     await cargar();
+  }
 
-    // Y abrir la campana ES leerlos.
+  /**
+   * Este aviso, leído. El número baja en uno.
+   *
+   * Se pinta primero y se guarda después, a propósito: el toque tiene que
+   * responder en el mismo instante. Si la llamada falla se vuelve a leer la
+   * lista, que es la única forma honesta de deshacerlo — dejar el número bajado
+   * mintiendo es peor que el parpadeo de recuperarlo.
+   */
+  async function marcarUno(id: string) {
+    const ahora = new Date().toISOString();
+    setAvisos((lista) =>
+      lista.map((a) => (a.id === id ? { ...a, readAt: a.readAt ?? ahora } : a)),
+    );
+    setSinLeer((n) => Math.max(0, n - 1));
+    try {
+      await marcarAvisoOrgLeidoAPI(id);
+    } catch {
+      void cargar();
+    }
+  }
+
+  /** El atracón: los treinta que se juntaron y no se van a abrir uno a uno. */
+  async function marcarTodos() {
+    const ahora = new Date().toISOString();
+    setAvisos((lista) => lista.map((a) => ({ ...a, readAt: a.readAt ?? ahora })));
+    setSinLeer(0);
     try {
       await marcarAvisosOrgLeidosAPI();
-      const ahora = new Date().toISOString();
-      setAvisos((lista) => lista.map((a) => ({ ...a, readAt: a.readAt ?? ahora })));
-      setSinLeer(0);
     } catch {
-      /* que falle no impide leerlos en pantalla */
+      void cargar();
+    }
+  }
+
+  /**
+   * Encender o apagar los avisos al celular, desde aquí.
+   *
+   * Éste es el sitio donde se vuelven a encontrar: al entrar por primera vez se
+   * pregunta con una tarjeta (`components/PedirAvisos.tsx`) y quien dijo «ahora
+   * no» no vuelve a verla nunca. Sin este botón, ese «ahora no» sería para
+   * siempre — y era exactamente lo que pasaba antes de que la tarjeta existiera,
+   * con el agravante de que entonces no había ni tarjeta.
+   */
+  async function alternarPush() {
+    setMsgPush('');
+    if (push === 'activo') {
+      const ok = await desactivarPush();
+      if (ok) setPush('inactivo');
+      return;
+    }
+    const r = await activarPush();
+    if (r.ok) {
+      setPush('activo');
+      setMsgPush('Listo. Te avisaremos.');
+    } else {
+      setMsgPush(r.motivo ?? 'No se pudieron activar los avisos.');
     }
   }
 
@@ -181,13 +250,27 @@ export function CampanaOrg() {
           <div className="avisos-org-panel" role="dialog" aria-label="Avisos de tu club">
             <div className="avisos-org-cabecera mb-2 flex items-center justify-between gap-2">
               <p className="eyebrow">Tu club</p>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setAbierto(false)}
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Solo con DOS o más pendientes. Con uno, «marcar todo» y el ✓
+                    de la fila son el mismo botón puesto dos veces, y el de la
+                    fila ya está donde se está mirando. */}
+                {sinLeer > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => void marcarTodos()}
+                  >
+                    Marcar todo
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setAbierto(false)}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {avisos.length === 0 ? (
@@ -203,7 +286,7 @@ export function CampanaOrg() {
                 {avisos.map((a) => {
                   const { titulo, detalle, color } = frase(a);
                   return (
-                    <li key={a.id}>
+                    <li key={a.id} className="avisos-org-fila">
                       <Link
                         href={a.href}
                         className="avisos-org-item"
@@ -211,7 +294,14 @@ export function CampanaOrg() {
                         // El panel se cierra al saltar: dejarlo abierto encima
                         // de la pantalla a la que se acaba de llegar tapa justo
                         // lo que se venía a hacer.
-                        onClick={() => setAbierto(false)}
+                        //
+                        // Y abrirlo ES leerlo: ir a mirar la solicitud y que el
+                        // número siga en nueve al volver es lo que hace que la
+                        // campana parezca un adorno pegado a la barra.
+                        onClick={() => {
+                          setAbierto(false);
+                          if (!a.readAt) void marcarUno(a.id);
+                        }}
                       >
                         <Avatar
                           src={a.subjectAvatarUrl}
@@ -230,10 +320,65 @@ export function CampanaOrg() {
                           </span>
                         </span>
                       </Link>
+                      {/* «Ya lo vi», sin ir a ninguna parte.
+                          Hay avisos que no piden nada —entró alguien nuevo, se
+                          fue alguien—: se leen y ya. Sin este botón, la única
+                          forma de bajar el número era navegar a su pantalla y
+                          volver, una por una. */}
+                      {!a.readAt && (
+                        <button
+                          type="button"
+                          className="avisos-org-visto"
+                          onClick={() => void marcarUno(a.id)}
+                          aria-label="Marcar como leído"
+                          title="Marcar como leído"
+                        >
+                          ✓
+                        </button>
+                      )}
                     </li>
                   );
                 })}
               </ul>
+            )}
+
+            {/* ── Los avisos al celular viven o mueren en este botón ──
+                Sin el permiso del navegador, todo lo de arriba solo existe
+                mientras el portal esté abierto — y quien lleva un club lo abre
+                cuando se acuerda, que es justo el problema.
+
+                Con `imposible` no se dibuja nada: el navegador no sabe hacer
+                push o al servidor le faltan las llaves VAPID, y un botón que no
+                puede cumplir es peor que ninguno. Con `bloqueado` sí se dibuja,
+                pero solo para decir dónde se arregla: el navegador ya no va a
+                volver a preguntar y desde aquí no hay nada que hacer. */}
+            {push !== 'imposible' && (
+              <div className="avisos-org-push">
+                {push === 'bloqueado' ? (
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Los avisos están bloqueados en este navegador. Se vuelven a
+                    permitir desde el candado junto a la dirección.
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm w-full"
+                    onClick={() => void alternarPush()}
+                  >
+                    {push === 'activo'
+                      ? '🔕 No avisarme en este aparato'
+                      : '🔔 Avisarme también al celular'}
+                  </button>
+                )}
+                {msgPush && (
+                  <p
+                    className="mt-2 text-xs"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    {msgPush}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </>

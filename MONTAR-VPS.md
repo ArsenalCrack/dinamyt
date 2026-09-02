@@ -1123,6 +1123,11 @@ ADMIN_EMAIL=admin@dinamyt.org
 ADMIN_PASSWORD=UNA_CLAVE_FUERTE
 ADMIN_NAME=Super Administrador DINAMYT
 ADMIN_DOCUMENT=1000000000
+# Los avisos del club al celular de quien lo lleva. Son LAS MISMAS TRES que ya
+# tiene Membresías —ver 6.6—, copiadas tal cual. Ver el recuadro de abajo.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:soporte@dinamyt.org
 ```
 
 > **`SMTP_HOST` vacía es un estado válido, no una configuración a medias.** Sin
@@ -1173,7 +1178,33 @@ NEXT_PUBLIC_ECOSYSTEM_API_URL=https://id.dinamyt.org
 NEXT_PUBLIC_CAMPEONATOS_URL=https://campeonatos.dinamyt.org
 NEXT_PUBLIC_MEMBRESIAS_URL=https://club.dinamyt.org
 NEXT_PUBLIC_ACADEMY_URL=https://academy.dinamyt.org
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=LA_MISMA_PUBLICA_DE_LA_API
 ```
+
+> **Las llaves VAPID del portal: son LAS MISMAS de Membresías, y no es un
+> atajo.**
+>
+> VAPID identifica a **quien envía** —DINAMYT— y no a la aplicación que envía.
+> Un solo par sirve para las dos apps; un segundo par solo añadiría otra cosa
+> que rotar el día que haya que rotarlas. Así que las tres líneas `VAPID_*` del
+> `.env` de `ecosystem-api` se copian **tal cual** del `.env` de
+> `membresias-api` (6.6), y `NEXT_PUBLIC_VAPID_PUBLIC_KEY` del portal es la
+> misma pública que la de `membresias-web`.
+>
+> **Qué apagan si las dejas vacías.** Nada se rompe: los avisos del club siguen
+> escribiéndose y se leen en la campana 🔔 del portal. Lo que no pasa es que
+> lleguen al celular con el portal cerrado — que es justamente el caso que
+> importa, porque quien lleva un club abre el portal cuando se acuerda, y
+> mientras tanto la persona que tecleó el código del club sigue esperando.
+>
+> ⚠️ `NEXT_PUBLIC_VAPID_PUBLIC_KEY` **vive dentro del build**: después de
+> ponerla hay que recompilar `ecosystem-portal`. Reiniciar no basta.
+>
+> Y falta un paso que no es del servidor: **quien lleva el club tiene que decir
+> que sí una vez**. La primera vez que entra al panel le sale la tarjeta
+> «¿Te avisamos cuando pase algo en tu club?»; si dijo «ahora no», el
+> interruptor sigue al pie del panel de la campana. En iPhone, además, solo
+> funciona si el portal está **añadido a la pantalla de inicio**.
 
 ## 6.9 Compilar el ecosystem y crear sus tablas
 

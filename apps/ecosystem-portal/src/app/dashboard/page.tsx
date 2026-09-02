@@ -20,6 +20,7 @@ import { nombreRol, operaCampeonatos } from '@/lib/roles';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { Avatar } from '@/components/Avatar';
 import { CampanaOrg } from '@/components/CampanaOrg';
+import { PedirAvisos } from '@/components/PedirAvisos';
 import { EntrarAClub } from '@/components/EntrarAClub';
 
 const CAMPEONATOS_URL =
@@ -205,6 +206,11 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
+      {/* «¿Te avisamos?», una sola vez y solo a quien lleva un club: los avisos
+          de aquí no le llegan a un alumno, así que pedirle permiso sería gastar
+          la única pregunta que el navegador deja hacer. Se pinta aquí porque
+          ésta es la pantalla a la que se llega al entrar. */}
+      <PedirAvisos activo={gestiona === true} />
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <Avatar src={foto} nombre={payload.fullName} size={56} />

@@ -16,12 +16,20 @@
 // honesto.
 //
 // Es el mismo criterio que el service worker de Membresías, escrito allí por
-// la misma razón. Lo que aquí no hay es push: los avisos del club se leen en
-// la campana del portal (ver `components/CampanaOrg.tsx`).
+// la misma razón.
+//
+// ── Lo segundo: recibir los avisos del club ──
+//
+// Esto antes no estaba, y la frase que había aquí decía que no hacía falta
+// porque los avisos se leen en la campana del portal. Era verdad a medias: una
+// campana solo suena si estás dentro de la casa. Quien lleva un club abre el
+// portal cuando se acuerda, y mientras tanto la persona que tecleó el código
+// del club se queda esperando días. El aviso existía; lo que no existía era la
+// forma de enterarse sin ir a mirar.
 
 // La versión sube al cambiar el shell: el `activate` borra las cachés viejas,
 // así que sin subirla los iconos anteriores se seguirían sirviendo de caché.
-var CACHE = 'dinamyt-portal-shell-v1';
+var CACHE = 'dinamyt-portal-shell-v2';
 var SHELL = ['/', '/dashboard', '/login', '/manifest.json', '/logo.png', '/icon-512.png'];
 
 self.addEventListener('install', function (event) {
@@ -71,5 +79,57 @@ self.addEventListener('fetch', function (event) {
         return r || caches.match('/');
       });
     }),
+  );
+});
+
+// ── Los avisos del club, en la pantalla del celular ─────────────────────────
+//
+// El cuerpo lo escribe el servidor (`common/avisos-org.ts`, `textoDelAviso`) y
+// no este archivo: el mismo aviso sale por dos sitios —la campana y el push— y
+// tiene que decir lo mismo en los dos.
+//
+// El `try` no sobra. `event.data.json()` revienta si algún día llega un push
+// sin cuerpo o con algo que no es JSON, y una excepción aquí dentro deja al
+// navegador enseñando su notificación genérica de «este sitio se actualizó en
+// segundo plano», que es peor que no avisar.
+self.addEventListener('push', function (event) {
+  var data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = {};
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'DINAMYT', {
+      body: data.body || '',
+      icon: '/logo.png',
+      badge: '/logo.png',
+      data: { url: data.url || '/dashboard' },
+    }),
+  );
+});
+
+// ── Y el toque lleva a donde se hace algo con el aviso ──────────────────────
+//
+// Antes de abrir una pestaña nueva se busca una del portal que ya esté abierta
+// y se la lleva al destino. Sin esto, quien tiene el portal abierto en el
+// celular acaba con dos —o cinco— copias de la misma app tras una tarde de
+// avisos, cada una tirando de la misma cuenta.
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+  var destino = (event.notification.data && event.notification.data.url) || '/dashboard';
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then(function (ventanas) {
+        for (var i = 0; i < ventanas.length; i++) {
+          var v = ventanas[i];
+          if (v.url.indexOf(self.location.origin) === 0 && 'focus' in v) {
+            if ('navigate' in v) v.navigate(destino);
+            return v.focus();
+          }
+        }
+        return self.clients.openWindow(destino);
+      }),
   );
 });

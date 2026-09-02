@@ -648,6 +648,14 @@ main { animation: aparecer 0.3s ease; }
   line-height: 1.45;
   color: var(--text-muted);
 }
+/* El emoji grande del «¿te avisamos?». Es lo único de esa tarjeta que se ve
+   antes de leer nada, y hace el trabajo de decir de qué va sin una palabra. */
+.pedir-avisos-icono {
+  margin: 0 0 0.5rem;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
 /* Los dos botones invertidos, y no por gusto: en el HTML «Cancelar» va PRIMERO
    —para que el foco y el tabulador lleguen antes a lo seguro— y en pantalla
    tiene que verse donde se espera. `row-reverse` lo deja a la izquierda en el
@@ -747,18 +755,68 @@ main { animation: aparecer 0.3s ease; }
 .avisos-org-cabecera { flex: 0 0 auto; }
 /* El aviso ENTERO es el enlace, no un «ver» al final: lo que se toca en un
    celular es el renglón. */
+/* ── La fila: el aviso, y el ✓ que lo da por leído sin salir de aquí ──
+   La raya de separación vive AQUÍ y no en el enlace: si estuviera en el enlace,
+   el ✓ quedaría fuera de la línea y la fila se vería partida en dos. */
+.avisos-org-fila {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.avisos-org-fila:last-child { border-bottom: 0; }
 .avisos-org-item {
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
   padding: 0.6rem 0.4rem;
-  border-bottom: 1px solid var(--border);
   border-radius: 0.4rem;
   color: inherit;
   text-decoration: none;
   transition: background 0.12s ease;
+  /* Que el enlace se coma el ancho que sobra y el ✓ se quede en su esquina.
+     `min-width: 0` no sobra: sin él un nombre largo estira la fila y empuja el
+     botón fuera del panel. */
+  flex: 1 1 auto;
+  min-width: 0;
 }
-.avisos-org-item:last-child { border-bottom: 0; }
+/* El ✓ es pequeño a propósito: la acción principal de la fila es abrir el
+   aviso, no descartarlo. Lo que no puede es ser tan pequeño que se falle al
+   tocarlo con el pulgar — de ahí los 32 px, el mínimo cómodo en celular. */
+.avisos-org-visto {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+.avisos-org-visto:hover,
+.avisos-org-visto:focus-visible {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+  color: var(--text);
+}
+/* El interruptor de los avisos al celular, al pie del panel. Separado por una
+   raya: no es un aviso más, es un ajuste — y va abajo porque se toca una vez y
+   no se vuelve a tocar. */
+.avisos-org-push {
+  flex: 0 0 auto;
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+}
 .avisos-org-item:hover,
 .avisos-org-item:focus-visible { background: var(--gold-soft); }
 .avisos-org-item[data-nuevo='true'] {

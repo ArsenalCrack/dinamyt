@@ -31,7 +31,11 @@
 jest.mock('../../db', () => ({ db: {} }));
 
 import { OrgNotificationsService } from './org-notifications.service';
-import { destinoDelAviso, AVISOS_RESOLUBLES } from '../../common/avisos-org';
+import {
+  destinoDelAviso,
+  textoDelAviso,
+  AVISOS_RESOLUBLES,
+} from '../../common/avisos-org';
 import { db } from '../../db';
 
 const CLUB = '33333333-3333-4333-8333-333333333333';
@@ -39,6 +43,7 @@ const MAESTRO = '11111111-1111-4111-8111-111111111111';
 const ADMIN = '22222222-2222-4222-8222-222222222222';
 const ALUMNO = '44444444-4444-4444-8444-444444444444';
 const SOLICITUD = '55555555-5555-4555-8555-555555555555';
+const AVISO = '66666666-6666-4666-8666-666666666666';
 
 /**
  * Los UUID que hay dentro de un filtro de Drizzle.
@@ -72,7 +77,15 @@ function idsEn(filtro: unknown): string[] {
  * `escritas`, las filas de cada `.values()`: entre las dos está todo lo que
  * este servicio decide.
  */
-function armar(gestores: { userId: string }[]) {
+function armar(
+  gestores: { userId: string }[],
+  /**
+   * Lo que devuelve un `UPDATE … RETURNING`. Es lo que separa «marcado» de «ya
+   * estaba leído», así que las pruebas de marcar necesitan decidirlo: con la
+   * lista vacía, la fila no existía o ya tenía fecha.
+   */
+  actualizadas: { id: string }[] = [],
+) {
   const filtros: unknown[] = [];
   const escritas: Record<string, unknown>[][] = [];
   const puestos: Record<string, unknown>[] = [];
@@ -102,7 +115,7 @@ function armar(gestores: { userId: string }[]) {
   const fake = db as unknown as Record<string, unknown>;
   fake.select = () => encadenar(() => gestores);
   fake.insert = () => encadenar(() => []);
-  fake.update = () => encadenar(() => []);
+  fake.update = () => encadenar(() => actualizadas);
 
   return { servicio: new OrgNotificationsService(), filtros, escritas, puestos };
 }
@@ -203,6 +216,76 @@ describe('La campana del club · lo que ya está hecho desaparece', () => {
     // se leen y se quedan. Si algún día otro tipo se vuelve resoluble, esto
     // obliga a decidirlo a propósito en vez de por descuido.
     expect(AVISOS_RESOLUBLES).toEqual(['solicitud_entrada']);
+  });
+});
+
+/**
+ * ── El número baja de uno en uno ────────────────────────────────────────────
+ *
+ * Abrir la campana marcaba TODO como leído. Quien tenía nueve avisos la abría
+ * para mirar UNO —la solicitud que estaba esperando— y los otros ocho se iban
+ * de la lista sin haberlos visto: `mios` no devuelve lo leído, así que no había
+ * forma de recuperarlos. Y el número saltaba de 9 a 0 de un tirón.
+ */
+describe('La campana del club · se vacía de uno en uno', () => {
+  it('marcar UNO filtra por el aviso Y por su dueño', async () => {
+    const { servicio, puestos, filtros } = armar([], [{ id: AVISO }]);
+
+    const r = await servicio.marcarLeido(MAESTRO, AVISO);
+
+    expect(r).toEqual({ marcado: true });
+    expect(puestos[0].readAt).toBeInstanceOf(Date);
+    // Los DOS dentro del filtro. Sin el dueño, cualquiera con sesión podría
+    // apagarle un aviso a otro gestor pasando un identificador que no es suyo.
+    const dentro = idsEn(filtros[0]);
+    expect(dentro).toContain(AVISO);
+    expect(dentro).toContain(MAESTRO);
+  });
+
+  it('marcar algo que ya estaba leído devuelve false, no un error', async () => {
+    // Pasa de verdad: dos toques seguidos, o la misma cuenta abierta en el
+    // celular y en el portátil del club.
+    const { servicio } = armar([]);
+    await expect(servicio.marcarLeido(MAESTRO, AVISO)).resolves.toEqual({
+      marcado: false,
+    });
+  });
+
+  it('«marcar todo» sigue tocando solo los del propio usuario', async () => {
+    const { servicio, filtros } = armar([], [{ id: AVISO }]);
+    await servicio.marcarLeidos(MAESTRO);
+    expect(idsEn(filtros[0])).toEqual([MAESTRO]);
+  });
+});
+
+/**
+ * ── Lo que se lee en la pantalla bloqueada ──────────────────────────────────
+ *
+ * El mismo aviso sale por dos sitios —la campana y el push— y tiene que decir
+ * lo mismo en los dos. Lo que se prueba aquí es lo que separa un aviso útil de
+ * uno que se aprende a ignorar: que diga QUIÉN, y de qué club.
+ */
+describe('La campana del club · la frase del aviso al celular', () => {
+  it('dice quién y de qué club, sin tener que abrir la app', () => {
+    expect(
+      textoDelAviso('solicitud_entrada', { quien: 'Ana Pérez', club: 'Club Norte' }),
+    ).toEqual({
+      title: 'DINAMYT · Club Norte',
+      body: 'Ana Pérez quiere entrar a tu club.',
+    });
+  });
+
+  it('sin nombre no se queda mudo: dice «Alguien»', () => {
+    const { body } = textoDelAviso('miembro_baja', { quien: null, club: 'Club Norte' });
+    expect(body).toBe('Alguien salió de tu club.');
+  });
+
+  it('un tipo que no conoce tampoco se queda mudo', () => {
+    // El día que se añada una clase de aviso y nadie toque esto, sale una frase
+    // pobre pero cierta — no una notificación vacía.
+    expect(textoDelAviso('lo_que_venga', { quien: 'Ana' }).body).toBe(
+      'Hay una novedad en tu club.',
+    );
   });
 });
 

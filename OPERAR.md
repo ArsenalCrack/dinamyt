@@ -879,7 +879,32 @@ la campana de la app, para cuando entre.
 > de vencimiento al mes se come el cupo en tres días — y con él los códigos de
 > verificación de las cuentas nuevas, que son los que no pueden fallar.
 
-### Qué hace falta para que los avisos del alumno funcionen
+### Quién recibe qué (desde el 1 sep 2026 son DOS avisos, no uno)
+
+El reloj diario (§2.7) llama a `generarAvisos` para cada club, y de ahí salen
+**dos** clases de push, automáticos los dos — nadie pulsa nada:
+
+| A quién | Qué dice | A dónde lleva |
+|---|---|---|
+| **Al alumno / acudiente** | «Tu mensualidad venció el …» — uno por su propia membresía | `/mi` |
+| **Al maestro / auxiliar** | «Hoy: 3 alumnos con la mensualidad vencida y 1 por vencer» — **uno solo por club** | `/` (el panel) |
+
+**Por qué el del maestro es un resumen y no uno por alumno.** Un club de treinta
+genera doce avisos una mañana de fin de mes, y doce notificaciones seguidas no
+se leen: se barren de un gesto, y de paso se aprende a barrer las del día
+siguiente. Uno que dice cuántos y de qué clase cabe en la pantalla bloqueada y
+basta para decidir si se abre la app ahora o después de clase.
+
+**No crea fila en `notifications`.** El maestro ya ve esos avisos en su campana
+—son los de sus alumnos, `GET /notifications?all=1`—; una fila suya sería la
+misma información contada dos veces en la misma pantalla. El push es el empujón
+para ir a mirar, no un aviso nuevo.
+
+**Sale una sola vez al día.** `generarAvisos` se sale arriba si no hubo avisos
+nuevos (el dedup por membresía y tipo), así que el botón «Generar avisos» del
+panel no manda un segundo resumen por pulsarlo otra vez.
+
+### Qué hace falta para que los avisos funcionen
 
 `[x]` **Las llaves VAPID.** *(comprobado el 29 ago 2026)* Están las tres en
       `membresias-api/.env` y la pública coincide con la de la web.
@@ -896,12 +921,40 @@ la campana de la app, para cuando entre.
       la PWA y aceptado las notificaciones**, así que no hay destinatarios.
 
 ```bash
-sudo -u postgres psql -d dinamyt -P pager=off -c "select count(*) as suscripciones from membresias.push_subscriptions;"
+sudo -u postgres psql -d dinamyt -P pager=off -c "select 'membresias' app, count(*) suscripciones from membresias.push_subscriptions union all select 'ecosystem', count(*) from ecosystem.push_subscriptions;"
 ```
 
       Si sale 0, es eso. Se cierra desde el celular, no desde el servidor:
       instalar Membresías («Añadir a pantalla de inicio»), entrar y activar los
       avisos. Al día siguiente `pushEnviados` deja de ser 0.
+
+      **Desde 1 sep 2026 esto se pide solo.** La primera vez que alguien entra
+      le sale una tarjeta —«¿Te avisamos?»— explicando qué avisos son, y solo si
+      dice que sí se dispara el permiso del navegador. Antes el botón estaba
+      escondido al final del panel de la campana, que se abre cuando ya hay algo
+      que mirar: previsiblemente, casi nadie lo encontraba.
+
+      Se pregunta **una sola vez por navegador** (`localStorage`,
+      `dinamyt.avisos.preguntado`). En Membresías se le pregunta a todo el mundo
+      —alumno y maestro reciben cosas distintas, ver la tabla de arriba— y la
+      frase de la tarjeta cambia según quién sea, porque prometerle al maestro
+      avisos «de tu mensualidad» sería falso. En el portal se le pregunta solo a
+      quien **gestiona** un club: a un alumno no le llega ninguno de esos avisos.
+      Quien dijo «ahora no» lo tiene en el interruptor al pie del panel de la
+      campana.
+
+      El orden importa y es deliberado: **la tarjeta va ANTES del cuadro del
+      navegador**. El permiso del navegador se pide una sola vez en la vida —si
+      se dice que no, Chrome no vuelve a preguntar y desde la app ya no hay nada
+      que hacer—, así que gastarlo en un cuadro gris que aparece sin contexto es
+      perder el canal para siempre por un toque de dos segundos.
+
+> **Y sí, el portal también manda push desde el 1 sep 2026.** `ecosystem-api`
+> escribe el aviso del club y, detrás, lo empuja al celular de sus gestores
+> (`common/push.ts`, tabla `ecosystem.push_subscriptions`). Usa **las mismas
+> llaves VAPID** que Membresías — VAPID identifica a quien envía, DINAMYT, no a
+> la app que envía. Si a `ecosystem-api` le faltan las `VAPID_*`, no se envía
+> nada y **no se rompe nada**: los avisos siguen en la campana del portal.
 
 > ⚠️ **Dónde mirar, que cuesta una confusión.** `membresias-web` **no tiene
 > `.env`**: sus variables viven en **`.env.production`**. Buscar en el archivo
@@ -938,7 +991,7 @@ Antes de esto: el maestro de Membresías veía «ocho alumnos deben» con los oc
 ya pagados, y en el portal la bandeja de solicitudes no avisaba de nada — había
 que acordarse de abrirla, y se han quedado personas días esperando.
 
-### Y las otras dos reglas
+### Y las otras tres reglas
 
 - **A quien lo hizo no se le avisa.** El maestro que acepta una solicitud no
   necesita que le cuenten que acaba de aceptarla. Sin esto, el que más trabaja
@@ -948,6 +1001,23 @@ que acordarse de abrirla, y se han quedado personas días esperando.
   no un `switch` en el navegador: así un tipo nuevo no puede salir sin sitio a
   donde llevar. Una solicitud lleva a su bandeja; un vencido de Membresías, a
   la ficha del alumno con el cobro ya a la vista (`/alumnos/:id#cobrar`).
+- **Se vacía de una en una.** Abrir la campana ya **no** marca todo como leído.
+  Antes lo hacía, y eso rompía dos cosas a la vez: quien tenía nueve avisos la
+  abría para mirar UNO y los otros ocho desaparecían sin haberlos visto —lo
+  leído no vuelve a la lista, en ninguna de las dos apps—, y el número saltaba
+  de 9 a 0 de un tirón. Un número que no se puede seguir con los ojos deja de
+  informar de nada.
+
+  Ahora leer uno baja el número en uno. Cada renglón tiene además un **✓** para
+  darlo por leído sin ir a ninguna parte —hay avisos que no piden nada, «entró
+  alguien nuevo»— y con dos o más pendientes sale un **«marcar todo»** en la
+  cabecera del panel, que es una decisión de la persona y no un efecto
+  secundario de haber abierto algo.
+
+  Rutas: `POST /notifications/:id/leido` (Membresías) y
+  `POST /organizations/avisos/:id/leido` (portal). Las dos comprueban que el
+  aviso es **de quien lo marca**: en Membresías el maestro VE los avisos de su
+  club pero no los puede dar por leídos, porque «leído» ahí lo dice su dueño.
 
 ## 4.7 La persona se edita en el portal; la ficha, en su app
 

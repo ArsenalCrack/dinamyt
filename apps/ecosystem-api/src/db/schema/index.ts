@@ -799,3 +799,65 @@ export const orgNotifications = eco.table(
     index('ix_org_notifications_entidad').on(t.entityId),
   ],
 );
+
+
+// ── Tabla: push_subscriptions ──────────────────────────────────────────────
+//
+// **Los avisos que llegan cuando el portal está cerrado.**
+//
+// ── Qué problema resuelve ──
+//
+// `org_notifications` es una campana, y una campana solo suena si estás dentro
+// de la casa. Quien lleva un club abre el portal cuando se acuerda; mientras
+// tanto, la persona que tecleó el código del club sigue esperando. El aviso
+// existía, pero llegaba cuando alguien iba a buscarlo — que es justo lo que la
+// campana venía a arreglar, un piso más abajo.
+//
+// Esta tabla es el permiso que dio un navegador concreto para que le escriban.
+// Es lo mismo que hace Membresías con su `push_subscriptions`, y a propósito:
+// las dos apps mandan con las MISMAS llaves VAPID (`VAPID_PUBLIC_KEY` /
+// `VAPID_PRIVATE_KEY`), porque VAPID identifica a quien envía —DINAMYT— y no a
+// la aplicación que envía.
+//
+// ── Por qué una fila por NAVEGADOR y no por persona ──
+//
+// Porque el permiso lo da el navegador, no la cuenta. La misma maestra tiene el
+// portal instalado en el celular y abierto en el portátil del club, y quiere el
+// aviso en los dos. Cada uno tiene su `endpoint` —una dirección que le da su
+// propio fabricante, Google o Apple o Mozilla— y sus llaves de cifrado.
+//
+// ── Por qué `endpoint` es único, y por qué se borra solo ──
+//
+// El navegador puede volver a suscribirse con el mismo `endpoint` —al reinstalar
+// la app, al limpiar el sitio, al reactivar el permiso— y sin `unique` se
+// acumularían filas que mandan el MISMO aviso dos y tres veces al mismo
+// teléfono. Con `unique`, volver a suscribirse actualiza la fila que ya estaba.
+//
+// Y al revés: un `endpoint` muere cuando la persona desinstala la app o revoca
+// el permiso. El servidor de push contesta 404/410 —«esto ya no existe»— y ahí
+// la fila se borra sola (ver `common/push.ts`). Sin eso, la tabla se llena de
+// direcciones muertas a las que se les sigue escribiendo para siempre.
+export const pushSubscriptions = eco.table(
+  'push_subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** La dirección que le da al navegador SU fabricante. Es la llave. */
+    endpoint: text('endpoint').notNull().unique(),
+    /** Las dos llaves con las que se cifra el aviso para ESE navegador. */
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    /**
+     * Para qué sirve saber de dónde vino: el día que un aviso no llega, lo
+     * primero que se pregunta es «¿desde qué aparato lo activaste?».
+     */
+    userAgent: varchar('user_agent', { length: 300 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    // Enviar pregunta siempre lo mismo: «los navegadores de estas personas».
+    index('ix_push_subscriptions_persona').on(t.userId),
+  ],
+);

@@ -8,6 +8,7 @@ import { UserProfileModule } from './modules/users/user-profile.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { PushModule } from './modules/push/push.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { SyncModule } from './modules/sync/sync.module';
     OrganizationsModule,
     SubscriptionsModule,
     SyncModule,
+    PushModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

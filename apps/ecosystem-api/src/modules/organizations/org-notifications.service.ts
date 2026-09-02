@@ -5,8 +5,10 @@ import { orgMembers, orgNotifications, organizations, users } from '../../db/sch
 import {
   AVISOS_RESOLUBLES,
   destinoDelAviso,
+  textoDelAviso,
   type TipoAvisoOrg,
 } from '../../common/avisos-org';
+import { enviarPushA } from '../../common/push';
 
 /** Quién manda en un club: son los que reciben sus avisos. */
 const ROLES_GESTOR = ['admin', 'owner', 'maestro'];
@@ -90,12 +92,75 @@ export class OrgNotificationsService {
           data: entrada.data ?? null,
         })),
       );
+
+      /**
+       * ── Y el mismo aviso, al celular ──
+       *
+       * La campana solo suena si estás dentro de la casa. Quien lleva un club
+       * abre el portal cuando se acuerda, y mientras tanto la persona que
+       * tecleó el código sigue esperando: se han quedado personas días así.
+       *
+       * Va DESPUÉS de escribir la fila, y esto no es casual — la campana es la
+       * fuente de verdad y el push es una copia que se manda por si acaso. Si
+       * el push falla no se pierde nada; si fallara la fila, no habría nada que
+       * mandar.
+       *
+       * `enviarPushA` se traga sus propios errores y devuelve 0 cuando no hay
+       * llaves VAPID, así que en local y en cualquier despliegue sin configurar
+       * esto no hace absolutamente nada. Aun así va dentro del `try` de
+       * `avisar`, que existe para lo mismo: un aviso perdido es infinitamente
+       * mejor que un 500 al maestro que estaba aceptando a un alumno.
+       */
+      await this.empujar(entrada, gestores.map((g) => g.userId));
     } catch (e) {
       this.log.warn(
         `No se pudo escribir el aviso '${entrada.kind}' de ${entrada.orgId}: ` +
           `${e instanceof Error ? e.message : 'error'}`,
       );
     }
+  }
+
+  /**
+   * El aviso, en la pantalla bloqueada del celular.
+   *
+   * Necesita el nombre del club, que no viene en la entrada: se lee de una,
+   * porque el título de la notificación tiene que decir de qué club habla — a
+   * quien lleva dos, «hay una novedad» no le sirve de nada.
+   *
+   * `data.fullName` es el nombre copiado cuando pasó (ver la tabla), así que la
+   * frase no depende de que la persona siga existiendo.
+   */
+  private async empujar(
+    entrada: {
+      orgId: string;
+      kind: TipoAvisoOrg;
+      subjectUserId?: string | null;
+      data?: Record<string, unknown>;
+    },
+    destinatarios: string[],
+  ): Promise<void> {
+    const [club] = await db
+      .select({ name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.id, entrada.orgId))
+      .limit(1);
+
+    const quien =
+      typeof entrada.data?.fullName === 'string' ? entrada.data.fullName : null;
+    const { title, body } = textoDelAviso(entrada.kind, {
+      quien,
+      club: club?.name ?? null,
+    });
+
+    await enviarPushA(destinatarios, {
+      title,
+      body,
+      // El mismo destino que dentro de la campana: da igual por dónde se entere
+      // la persona, el toque la deja en el sitio donde se hace algo con esto.
+      url: destinoDelAviso(entrada.kind, {
+        subjectUserId: entrada.subjectUserId,
+      }),
+    });
   }
 
   /**
@@ -201,7 +266,47 @@ export class OrgNotificationsService {
     return fila?.n ?? 0;
   }
 
-  /** Abrir la campana es leerlos. Solo los propios, claro. */
+  /**
+   * Este aviso, leído. El número baja en uno.
+   *
+   * ── Por qué no basta con `marcarLeidos` ──
+   *
+   * Porque abrir la campana no es leerlos todos. Con el «todos» a secas, quien
+   * tenía nueve avisos la abría para mirar UNO —la solicitud de entrada que
+   * estaba esperando— y los otros ocho se marcaban leídos de camino: se iban de
+   * la lista sin que los hubiera visto, y como `mios` no devuelve lo leído, no
+   * había forma de recuperarlos. Y el número, que es lo único que se mira de
+   * reojo desde la barra, saltaba de 9 a 0 de un tirón; un número que no se
+   * puede seguir con los ojos deja de significar nada.
+   *
+   * El `eq(userId)` no es decorativo: es lo que impide que alguien apague el
+   * aviso de otro gestor pasando un `id` que no es suyo. Cada fila de esta tabla
+   * tiene dueño (ver la migración 0014, «una fila por PERSONA»).
+   */
+  async marcarLeido(userId: string, id: string): Promise<{ marcado: boolean }> {
+    const filas = await db
+      .update(orgNotifications)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(orgNotifications.id, id),
+          eq(orgNotifications.userId, userId),
+          isNull(orgNotifications.readAt),
+        ),
+      )
+      .returning({ id: orgNotifications.id });
+    // Que no marcara nada no es un error: pasa al tocar dos veces seguidas o
+    // con la misma cuenta abierta en dos sitios. Un 404 ahí pintaría de rojo
+    // una pantalla por hacer bien lo que se pedía.
+    return { marcado: filas.length > 0 };
+  }
+
+  /**
+   * Todos de golpe. Ya no lo llama la campana al abrirse (ver `marcarLeido`):
+   * es el botón «marcar todo como leído», que existe para el día en que se
+   * juntaron treinta y no se van a abrir uno por uno. La diferencia es quién
+   * decide: ahí lo decide la persona, antes lo decidía el gesto de abrir.
+   */
   async marcarLeidos(userId: string): Promise<{ marcados: number }> {
     const filas = await db
       .update(orgNotifications)
