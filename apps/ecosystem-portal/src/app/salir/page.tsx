@@ -74,7 +74,7 @@ function Salir() {
   }, [destino, router]);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 px-6">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 py-10">
       <p className="display text-lg">Cerrando tu sesión de DINAMYT…</p>
       <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
         {destino ? `Volviendo a ${destino.nombre}.` : 'Un momento.'}

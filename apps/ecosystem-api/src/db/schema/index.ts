@@ -314,6 +314,33 @@ export const sessions = eco.table(
      * vuelve a comprobar.
      */
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /**
+     * Marcó «mantener la sesión iniciada en este dispositivo».
+     *
+     * ── Qué cambia, y por qué tenía que estar aquí ────────────────────────
+     *
+     * La casilla existía y no hacía lo que dice: solo decidía si el pase se
+     * guardaba en `localStorage` o en `sessionStorage`, o sea si sobrevivía a
+     * cerrar el navegador. El reloj de inactividad lo aplica el SERVIDOR, y el
+     * servidor no se enteraba de nada — así que a los veinte minutos echaba
+     * igual a quien había pedido explícitamente lo contrario. Una casilla que
+     * promete algo y no lo cumple es peor que no tenerla: enseña que las
+     * opciones de esta aplicación no significan nada.
+     *
+     * Con la marca aquí, la decisión viaja con la sesión y la toma quien la
+     * hace cumplir:
+     *
+     *   · recordada  → sin reloj de inactividad; vive hasta `expires_at`, que
+     *     se pone a treinta días (`RECORDADA_DIAS`).
+     *   · sin marcar → como siempre: veinte minutos parada y se cierra, tope
+     *     absoluto de doce horas. Es lo que resuelve el computador prestado, y
+     *     por eso sigue siendo lo que pasa cuando NO se pide otra cosa.
+     *
+     * Es por sesión y no por cuenta a propósito: la misma persona marca la
+     * casilla en su celular y no la marca en el computador del club, y las dos
+     * decisiones tienen que convivir.
+     */
+    recordada: boolean('recordada').notNull().default(false),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     /**
      * Por qué se cerró. Se guarda para poder DECIRLO —«se cerró porque
@@ -386,6 +413,68 @@ export const orgMembers = eco.table('org_members', {
   joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow(),
   invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
 });
+
+/**
+ * ── Quién salió del club, y con qué ─────────────────────────────────────────
+ *
+ * ── El problema ──
+ *
+ * Dar de baja a alguien BORRA su fila de `org_members`, y con ella todo: su
+ * rol general, sus tres roles por aplicación, desde cuándo pertenecía y quién
+ * lo invitó. La persona desaparecía de la pantalla sin rastro y sin fecha, y
+ * la única constancia de que había existido era una línea en el registro del
+ * servidor y un script suelto para restaurarla a mano. Bastaba un clic mal
+ * dado en el club de treinta alumnos para no saber ya ni a quién le pasó.
+ *
+ * ── Por qué una tabla aparte y no un `removed_at` en `org_members` ──
+ *
+ * Porque `org_members` es lo que decide QUIÉN ES MIEMBRO, y esa pregunta se
+ * hace en casi cien sitios: los roles del token, quién manda en el club, quién
+ * ve qué. Marcar la fila en vez de borrarla obligaría a añadir «y que no esté
+ * dada de baja» a todos y cada uno, y el día que se olvide UNO, alguien a
+ * quien echaron sigue entrando por ahí. El fallo sería silencioso y de
+ * seguridad.
+ *
+ * Con una tabla aparte, la regla de siempre no se toca —fila presente = es
+ * miembro— y lo que se gana es memoria: la baja se copia aquí antes de borrar,
+ * y readmitir es volver a escribir la fila con lo que estaba guardado.
+ *
+ * ── Cuándo desaparece de aquí ──
+ *
+ * Al readmitir desde la bandeja. Y si la persona vuelve a entrar por otro
+ * camino —una invitación, el código del club— la baja se deja de enseñar
+ * porque la consulta descarta a quien ya es miembro otra vez: así ningún alta
+ * tiene que acordarse de limpiar nada.
+ */
+export const orgMemberBajas = eco.table(
+  'org_member_bajas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Lo que era, tal cual, para poder devolvérselo entero. */
+    role: varchar('role', { length: 50 }).notNull(),
+    roleMembresias: varchar('role_membresias', { length: 50 }),
+    roleCampeonatos: varchar('role_campeonatos', { length: 50 }),
+    roleAcademy: varchar('role_academy', { length: 50 }),
+    membresiasActivo: boolean('membresias_activo'),
+    /** Desde cuándo pertenecía. Sin esto, readmitir le borraría la antigüedad. */
+    joinedAt: timestamp('joined_at', { withTimezone: true }),
+    removedAt: timestamp('removed_at', { withTimezone: true }).notNull(),
+    /** Quién la dio de baja. La pregunta que sigue a «¿y éste por qué no está?». */
+    removedByUserId: uuid('removed_by_user_id').references(() => users.id),
+  },
+  (t) => [
+    // Una baja por persona y club: dar de baja dos veces sobrescribe, no
+    // acumula. Es lo que permite el `onConflictDoUpdate` de `removeMember`.
+    uniqueIndex('ux_org_member_bajas').on(t.orgId, t.userId),
+    index('ix_org_member_bajas_org').on(t.orgId, t.removedAt),
+  ],
+);
 
 // ── Tabla: user_guardians (persona ↔ acudiente; §6 PLAN_MEMBRESIAS) ──────────
 // Un acudiente puede tener varios menores; habilita el consentimiento de menores

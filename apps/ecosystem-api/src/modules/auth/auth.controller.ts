@@ -134,13 +134,24 @@ export class AuthController {
   @Throttle({ global: { limit: 10, ttl: 60_000 } })
   @Post('login')
   login(
-    @Body() body: { email?: string; password?: string },
+    @Body() body: { email?: string; password?: string; recordar?: boolean },
     @Req() req: Request,
   ) {
     if (!body || !body.email || !body.password) {
-      throw new BadRequestException('Faltan credenciales (email y password).');
+      // `correo` y `contraseña`, no `email` y `password`: este mensaje se le
+      // enseña tal cual a quien intenta entrar, y los nombres de los campos
+      // del JSON no significan nada para quien está mirando un formulario.
+      throw new BadRequestException('Faltan credenciales (correo y contraseña).');
     }
-    return this.authService.login(body.email, body.password, contextoDe(req));
+    // La casilla «mantener la sesión iniciada en este dispositivo». Sin ella
+    // el servidor no se enteraba de nada y cerraba por inactividad a los
+    // veinte minutos a quien había pedido justo lo contrario.
+    return this.authService.login(
+      body.email,
+      body.password,
+      contextoDe(req),
+      Boolean(body.recordar),
+    );
   }
 
   // ── POST /auth/refresh — volver a firmar el token con lo de AHORA ─────────

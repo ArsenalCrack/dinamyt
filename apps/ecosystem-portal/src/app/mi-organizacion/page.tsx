@@ -13,6 +13,9 @@ import {
   listMiembrosAPI,
   cambiarRolMiembroAPI,
   quitarMiembroAPI,
+  bajasOrgAPI,
+  readmitirMiembroAPI,
+  olvidarBajaAPI,
   actualizarOrgInfoAPI,
   listarClubesAPI,
   invitarClubAPI,
@@ -22,6 +25,7 @@ import {
   extraerError,
   type MiOrganizacion,
   type Miembro,
+  type BajaOrg,
   type ClubBusqueda,
   type InvitacionClub,
 } from '@/lib/api';
@@ -67,6 +71,16 @@ export default function MiOrganizacionPage() {
   /** Ver también a quien perdió el acceso a Membresías. Apagado por defecto. */
   const [verSinAcceso, setVerSinAcceso] = useState(false);
   const [sinAcceso, setSinAcceso] = useState(0);
+  /**
+   * Quién salió del club, y si la bandeja está desplegada.
+   *
+   * Empieza plegada a propósito: la lista de gente es lo que se viene a mirar,
+   * y una segunda lista abierta debajo con los que ya no están la duplica. El
+   * botón lleva el número, que es lo único que hace falta ver para decidir si
+   * abrirla.
+   */
+  const [bajas, setBajas] = useState<BajaOrg[]>([]);
+  const [verBajas, setVerBajas] = useState(false);
   /** Sube tras cada acción sobre un miembro y hace que la lista se recargue. */
   const [recargaGente, setRecargaGente] = useState(0);
   const [msg, setMsg] = useState<Mensaje | null>(null);
@@ -199,6 +213,24 @@ export default function MiOrganizacionPage() {
   }, [sel, busquedaGente, offsetGente, recargaGente, verSinAcceso]);
 
   /**
+   * Las bajas del club. Aparte de la lista de gente porque no se pagina ni se
+   * busca: son pocas y se leen enteras.
+   *
+   * Se recarga con `recargaGente` —el mismo contador que dispara `accion`—,
+   * así que dar de baja a alguien lo hace aparecer aquí sin recargar la
+   * página, y readmitirlo lo devuelve arriba.
+   */
+  useEffect(() => {
+    if (!sel) {
+      setBajas([]);
+      return;
+    }
+    bajasOrgAPI(sel)
+      .then(setBajas)
+      .catch(() => setBajas([]));
+  }, [sel, recargaGente]);
+
+  /**
    * Elegir un club **vuelve a la página 1**.
    *
    * Sin esto: en un club con más gente de la que cabe en una página se pasa a
@@ -211,6 +243,7 @@ export default function MiOrganizacionPage() {
     setOffsetGente(0);
     setBusquedaGente('');
     setVerSinAcceso(false);
+    setVerBajas(false);
   }
 
   async function accion(fn: () => Promise<unknown>, ok: string, fallback: string) {
@@ -685,9 +718,20 @@ export default function MiOrganizacionPage() {
           aria-label="Buscar entre la gente del club"
           className="mb-3"
         />
-        {/* Dos columnas en pantalla ancha. Con veinte alumnos por página, una
-          sola columna era una tira de dos pantallas de alto con la mitad
-          derecha del monitor vacía; en el celular sigue siendo una. */}
+        {/* El paso de páginas también ARRIBA. Al final solo lo encontraba
+            quien ya había bajado la lista entera, que es el trabajo que este
+            control venía a ahorrar; y el contador se lee antes de empezar,
+            así se entra sabiendo cuánta gente hay. */}
+        <Paginacion
+          arriba
+          offset={offsetGente}
+          limit={POR_PAGINA}
+          total={totalMiembros}
+          onIr={setOffsetGente}
+        />
+        {/* Dos columnas en pantalla ancha. Con la lista paginada, una sola
+          columna era una tira de dos pantallas de alto con la mitad derecha
+          del monitor vacía; en el celular sigue siendo una. */}
       <ul className="mb-4 grid gap-2 lg:grid-cols-2">
           {miembros.map((m) => (
             <FilaMiembro
@@ -744,9 +788,14 @@ export default function MiOrganizacionPage() {
                       void confirmarYHacer(
                         {
                           titulo: `¿Quitar a ${m.fullName} de ${orgSel?.name ?? 'el club'}?`,
+                          // Ya no hace falta asustar con «habría que
+                          // invitarla otra vez»: la baja queda guardada y se
+                          // deshace desde «Dados de baja», con los mismos
+                          // roles que tenía. Decir lo contrario haría que
+                          // nadie se atreviera a usar el botón.
                           detalle: mandaEnLaOrg(m.role)
-                            ? 'Es de quienes administran el club: al quitarla pierde su panel y no puede volver a entrar sola. Habría que invitarla otra vez.'
-                            : 'Sale de la lista y pierde el acceso a las aplicaciones del club. Su cuenta y su perfil siguen existiendo; para volver hay que invitarla de nuevo.',
+                            ? 'Es de quienes administran el club: al quitarla pierde su panel y deja de administrarlo. Queda en «Dados de baja», y desde ahí puedes devolvérselo con el mismo rol.'
+                            : 'Sale de la lista y pierde el acceso a las aplicaciones del club. Su cuenta, su perfil y su historial siguen enteros, y queda en «Dados de baja» por si hay que devolverla.',
                           textoOk: 'Quitar del club',
                           tono: 'peligro',
                         },
@@ -807,6 +856,106 @@ export default function MiOrganizacionPage() {
               ? 'Ocultar a quien no tiene acceso a Membresías'
               : `Ver también ${sinAcceso} sin acceso a Membresías`}
           </button>
+        )}
+
+        {/* ── Dados de baja ──────────────────────────────────────────────
+            Antes esto no existía: quitar a alguien borraba su fila y la
+            persona desaparecía de la pantalla sin fecha y sin rastro. No
+            había forma de saber a quién le había pasado, ni cuándo, ni quién
+            lo hizo, ni de deshacerlo — y el botón que lo provoca está a un
+            dedo del que cambia el rol.
+
+            Va plegada y con el número puesto: la lista de gente es lo que se
+            viene a mirar, y una segunda lista abierta debajo con los que ya
+            no están la duplicaría. */}
+        {bajas.length > 0 && (
+          <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
+            <button
+              type="button"
+              className="text-xs underline"
+              style={{ color: 'var(--text-muted)' }}
+              onClick={() => setVerBajas((v) => !v)}
+            >
+              {verBajas
+                ? 'Ocultar quién salió del club'
+                : `Ver ${bajas.length} ${bajas.length === 1 ? 'persona que salió' : 'personas que salieron'} del club`}
+            </button>
+
+            {verBajas && (
+              <ul className="mt-3 flex flex-col gap-2">
+                {bajas.map((b) => (
+                  <li
+                    key={b.userId}
+                    className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <Avatar src={b.avatarUrl} nombre={b.fullName} size={34} />
+                      <div className="min-w-0" style={{ overflowWrap: 'anywhere' }}>
+                        <p className="font-semibold">{b.fullName}</p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {b.email}
+                        </p>
+                        {/* La fecha y el autor son la mitad del valor de esta
+                            lista: «¿y éste por qué no está?» se contesta con
+                            quién lo sacó y cuándo, no con un nombre suelto. */}
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Era {nombreRol(b.role)} · salió el{' '}
+                          {new Date(b.removedAt).toLocaleDateString()}
+                          {b.removedByName ? ` · lo hizo ${b.removedByName}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <button
+                        onClick={() =>
+                          void confirmarYHacer(
+                            {
+                              titulo: `¿Devolver a ${b.fullName} a ${orgSel?.name ?? 'el club'}?`,
+                              detalle: `Vuelve como ${nombreRol(b.role)}, con los mismos roles de aplicación que tenía y sin perder su antigüedad.`,
+                              textoOk: 'Devolverle el club',
+                            },
+                            () => readmitirMiembroAPI(sel!, b.userId),
+                            `${b.fullName} vuelve a estar en el club.`,
+                            'No se pudo readmitir.',
+                          )
+                        }
+                        disabled={ocupado}
+                        className="btn btn-gold btn-sm"
+                      >
+                        Volver a agregar
+                      </button>
+                      {/* Olvidar no saca a nadie de ningún sitio: la persona ya
+                          está fuera. Lo que borra es el recuerdo, y existe
+                          porque una bandeja con las bajas de hace dos años
+                          dentro deja de leerse. */}
+                      <button
+                        onClick={() =>
+                          void confirmarYHacer(
+                            {
+                              titulo: `¿Quitar a ${b.fullName} de esta lista?`,
+                              detalle:
+                                'Solo se borra el recuerdo de la baja. La persona sigue fuera del club igual que ahora, y para devolvérselo habría que invitarla de nuevo.',
+                              textoOk: 'Quitar de la lista',
+                              tono: 'peligro',
+                            },
+                            () => olvidarBajaAPI(sel!, b.userId),
+                            'Baja archivada.',
+                            'No se pudo quitar de la lista.',
+                          )
+                        }
+                        disabled={ocupado}
+                        className="btn btn-outline btn-sm"
+                        title="Quitar esta baja de la lista"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </section>
 

@@ -120,6 +120,20 @@
       "when": 1788100000000,
       "tag": "0016_avisos_al_celular",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788200000000,
+      "tag": "0017_sesion_recordada",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788300000000,
+      "tag": "0018_bajas_reversibles",
+      "breakpoints": true
     }
   ]
 }

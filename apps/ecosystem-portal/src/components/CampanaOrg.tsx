@@ -403,7 +403,7 @@ export function CampanaOrg() {
                     onClick={() => void alternarPush()}
                   >
                     {push === 'activo'
-                      ? '🔕 No avisarme en este aparato'
+                      ? '🔕 No avisarme en este dispositivo'
                       : '🔔 Avisarme también al celular'}
                   </button>
                 )}

@@ -10,6 +10,7 @@ import { db } from '../../db';
 import {
   organizations,
   orgMembers,
+  orgMemberBajas,
   users,
   subscriptions,
   subscriptionPlans,
@@ -29,6 +30,7 @@ import {
   isNull,
   ne,
   or,
+  sql,
 } from 'drizzle-orm';
 import { UsersService } from '../users/users.service';
 import { JwtTokenService } from '../auth/jwt.service';
@@ -878,9 +880,51 @@ export class OrganizationsService {
         'Ese usuario no es miembro de la organización.',
       );
     }
-    // La fila ya no existe: si esto hay que deshacerlo, este renglón es lo
-    // único que dice a quién, de dónde y con qué rol estaba. Ver
-    // `scripts/restaurar-membresia.mjs`.
+    /**
+     * La baja se guarda ANTES de darla por hecha.
+     *
+     * Hasta hoy la fila se borraba y ahí acababa todo: la persona desaparecía
+     * de la pantalla sin fecha y sin rastro, y lo único que quedaba era el
+     * renglón del registro de aquí abajo y un script para rehacerla a mano. Un
+     * clic mal dado en una lista de treinta dejaba de ser reversible en el
+     * momento, y ni siquiera se podía mirar a quién le había pasado.
+     *
+     * Se copia entera —los cuatro roles, el acceso a Membresías y la fecha de
+     * entrada— porque readmitir tiene que devolver a la persona como estaba, no
+     * como «miembro» a secas: alguien que era maestro del club volvía de
+     * alumno, y eso se descubre el día que intenta cobrar.
+     *
+     * `onConflictDoUpdate` y no `insert` a secas: quien entra, sale, vuelve a
+     * entrar y vuelve a salir tiene UNA baja —la de ahora—, que es la que
+     * explica por qué no está hoy.
+     */
+    await db
+      .insert(orgMemberBajas)
+      .values({
+        orgId,
+        userId,
+        role: result[0].role,
+        roleMembresias: result[0].roleMembresias,
+        roleCampeonatos: result[0].roleCampeonatos,
+        roleAcademy: result[0].roleAcademy,
+        membresiasActivo: result[0].membresiasActivo,
+        joinedAt: result[0].joinedAt,
+        removedAt: new Date(),
+        removedByUserId: porUserId ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [orgMemberBajas.orgId, orgMemberBajas.userId],
+        set: {
+          role: result[0].role,
+          roleMembresias: result[0].roleMembresias,
+          roleCampeonatos: result[0].roleCampeonatos,
+          roleAcademy: result[0].roleAcademy,
+          membresiasActivo: result[0].membresiasActivo,
+          joinedAt: result[0].joinedAt,
+          removedAt: new Date(),
+          removedByUserId: porUserId ?? null,
+        },
+      });
     this.log.warn(
       `Baja: ${userId} sale de ${orgId} (era ${result[0].role}; ` +
         `lo hace ${porUserId ?? '?'}).`,
@@ -900,6 +944,164 @@ export class OrganizationsService {
       actorUserId: porUserId ?? null,
       data: { role: result[0].role },
     });
+    return { ok: true };
+  }
+
+  /**
+   * Quién salió de este club, lo último primero.
+   *
+   * ── Por qué descarta a los que ya volvieron ──
+   *
+   * Porque a un club se entra por cinco caminos —invitación, código, alta del
+   * admin, federación— y ninguno de ellos tiene por qué acordarse de limpiar
+   * esta tabla. Si la limpieza dependiera de que los cinco lo hagan, el día que
+   * se añada el sexto la misma persona aparecería a la vez en «la gente del
+   * club» y en «dados de baja», y una pantalla que se contradice a sí misma no
+   * se vuelve a creer. Preguntándolo aquí, la respuesta es correcta por
+   * construcción: baja es quien tiene fila aquí y NO la tiene en `org_members`.
+   */
+  async bajas(orgId: string) {
+    const filas = await db
+      .select({
+        userId: orgMemberBajas.userId,
+        role: orgMemberBajas.role,
+        roleMembresias: orgMemberBajas.roleMembresias,
+        roleCampeonatos: orgMemberBajas.roleCampeonatos,
+        roleAcademy: orgMemberBajas.roleAcademy,
+        joinedAt: orgMemberBajas.joinedAt,
+        removedAt: orgMemberBajas.removedAt,
+        removedByUserId: orgMemberBajas.removedByUserId,
+        fullName: users.fullName,
+        email: users.email,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(orgMemberBajas)
+      .innerJoin(users, eq(orgMemberBajas.userId, users.id))
+      .where(
+        and(
+          eq(orgMemberBajas.orgId, orgId),
+          sql`not exists (
+            select 1 from ${orgMembers}
+            where ${orgMembers.orgId} = ${orgId}
+              and ${orgMembers.userId} = ${orgMemberBajas.userId}
+          )`,
+        ),
+      )
+      .orderBy(desc(orgMemberBajas.removedAt))
+      .limit(200);
+
+    // Quién la dio de baja, por su nombre. Es la pregunta que sigue
+    // inmediatamente a «¿y éste por qué no está?», y un identificador no la
+    // contesta.
+    const autores = filas
+      .map((f) => f.removedByUserId)
+      .filter((x): x is string => Boolean(x));
+    const nombres = new Map<string, string>();
+    if (autores.length > 0) {
+      const gente = await db
+        .select({ id: users.id, fullName: users.fullName })
+        .from(users)
+        .where(inArray(users.id, [...new Set(autores)]));
+      for (const g of gente) nombres.set(g.id, g.fullName);
+    }
+
+    return filas.map((f) => ({
+      ...f,
+      removedByName: f.removedByUserId
+        ? (nombres.get(f.removedByUserId) ?? null)
+        : null,
+    }));
+  }
+
+  /**
+   * Devolverle el club a quien salió, tal y como estaba.
+   *
+   * Se reescribe la fila de `org_members` con lo que guardó la baja: los cuatro
+   * roles y la fecha de entrada. La antigüedad no se pierde y quien era maestro
+   * vuelve de maestro — readmitir «como miembro» a secas es un fallo que no se
+   * ve hasta que la persona intenta hacer su trabajo y no puede.
+   *
+   * Y se avisa a Membresías, igual que hace el alta normal: allá la baja le
+   * había retirado el acceso al club, y sin este aviso volvería a estar dentro
+   * aquí y fuera allí — que es el desajuste que el espejo existe para evitar.
+   */
+  async readmitirMiembro(orgId: string, userId: string, porUserId?: string) {
+    const [baja] = await db
+      .select()
+      .from(orgMemberBajas)
+      .where(
+        and(eq(orgMemberBajas.orgId, orgId), eq(orgMemberBajas.userId, userId)),
+      )
+      .limit(1);
+    if (!baja) {
+      throw new NotFoundException('No hay ninguna baja de esa persona aquí.');
+    }
+
+    const [yaEsta] = await db
+      .select({ id: orgMembers.id })
+      .from(orgMembers)
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+      .limit(1);
+    if (yaEsta) {
+      // Volvió por otro camino mientras la bandeja estaba abierta. No es un
+      // error que merezca pantalla roja: se limpia la baja y ya está dentro.
+      await db.delete(orgMemberBajas).where(eq(orgMemberBajas.id, baja.id));
+      return { ok: true, yaEraMiembro: true };
+    }
+
+    await db.insert(orgMembers).values({
+      orgId,
+      userId,
+      role: baja.role,
+      roleMembresias: baja.roleMembresias,
+      roleCampeonatos: baja.roleCampeonatos,
+      roleAcademy: baja.roleAcademy,
+      membresiasActivo: baja.membresiasActivo,
+      joinedAt: baja.joinedAt ?? new Date(),
+      invitedByUserId: porUserId ?? null,
+    });
+    await db.delete(orgMemberBajas).where(eq(orgMemberBajas.id, baja.id));
+
+    const [cuenta] = await db
+      .select({ email: users.email, fullName: users.fullName })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (cuenta) {
+      espejarAlta(userId, orgId, {
+        email: cuenta.email,
+        fullName: cuenta.fullName,
+        rolMembresias: rolParaApp('membresias', baja.roleMembresias, baja.role),
+      });
+    }
+
+    this.log.warn(
+      `Readmisión: ${userId} vuelve a ${orgId} como ${baja.role}; ` +
+        `lo hace ${porUserId ?? '?'}.`,
+    );
+    await this.avisos.avisar({
+      orgId,
+      kind: 'miembro_nuevo',
+      subjectUserId: userId,
+      actorUserId: porUserId ?? null,
+      data: { role: baja.role },
+    });
+    return { ok: true, yaEraMiembro: false };
+  }
+
+  /**
+   * Olvidar una baja sin readmitir a nadie.
+   *
+   * La bandeja es útil mientras dice algo; con las bajas de hace dos años
+   * dentro deja de leerse. Esto solo borra el recuerdo — la persona sigue
+   * fuera del club exactamente igual que antes.
+   */
+  async olvidarBaja(orgId: string, userId: string) {
+    await db
+      .delete(orgMemberBajas)
+      .where(
+        and(eq(orgMemberBajas.orgId, orgId), eq(orgMemberBajas.userId, userId)),
+      );
     return { ok: true };
   }
 

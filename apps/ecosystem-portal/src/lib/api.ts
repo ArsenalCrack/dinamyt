@@ -190,9 +190,30 @@ export function olvidarRegistroPendiente() {
   if (typeof window !== 'undefined') localStorage.removeItem(PENDING_KEY);
 }
 
-export async function loginAPI(email: string, password: string) {
-  const res = await api.post('/auth/login', { email, password });
-  return res.data as { access_token: string };
+/**
+ * `recordar` es la casilla «mantener la sesión iniciada en este dispositivo», y
+ * ahora viaja hasta el servidor.
+ *
+ * Antes solo decidía en qué almacén del navegador se guardaba el pase —o sea,
+ * si sobrevivía a cerrar la ventana— y nada más. El reloj de inactividad de
+ * veinte minutos lo aplica el servidor, que no se enteraba de nada, así que la
+ * casilla marcada no evitaba nada: a los veinte minutos parado, fuera. Ver
+ * `sessions.recordada` en la API.
+ *
+ * La respuesta trae `sesion.inactividadMinutos`, y viene en `0` cuando la
+ * sesión es recordada: es lo que le dice al vigilante del navegador que aquí
+ * no hay reloj que vigilar.
+ */
+export async function loginAPI(
+  email: string,
+  password: string,
+  recordar = false,
+) {
+  const res = await api.post('/auth/login', { email, password, recordar });
+  return res.data as {
+    access_token: string;
+    sesion?: { expiraEl?: string; inactividadMinutos?: number; recordada?: boolean };
+  };
 }
 
 /**
@@ -552,6 +573,36 @@ export const cambiarRolMiembroAPI = async (
 ) => (await api.patch(`/organizations/${orgId}/members/${userId}`, { role })).data;
 export const quitarMiembroAPI = async (orgId: string, userId: string) =>
   (await api.delete(`/organizations/${orgId}/members/${userId}`)).data;
+
+/**
+ * Quién salió del club.
+ *
+ * Antes la baja borraba la fila y la persona desaparecía sin dejar fecha ni
+ * rastro: no se podía saber a quién le había pasado ni deshacerlo. Ahora la
+ * baja se guarda y esto es lo que la enseña. Ver `org_member_bajas`.
+ */
+export interface BajaOrg {
+  userId: string;
+  fullName: string;
+  email: string;
+  avatarUrl: string | null;
+  role: string;
+  roleMembresias: string | null;
+  roleCampeonatos: string | null;
+  roleAcademy: string | null;
+  joinedAt: string | null;
+  removedAt: string;
+  /** Quién la dio de baja, por su nombre. `null` si la cuenta ya no existe. */
+  removedByName: string | null;
+}
+export const bajasOrgAPI = async (orgId: string): Promise<BajaOrg[]> =>
+  (await api.get(`/organizations/${orgId}/bajas`)).data;
+/** Devuelve a la persona al club con los roles que tenía. */
+export const readmitirMiembroAPI = async (orgId: string, userId: string) =>
+  (await api.post(`/organizations/${orgId}/bajas/${userId}/readmitir`)).data;
+/** Solo borra el recuerdo de la baja: la persona sigue fuera. */
+export const olvidarBajaAPI = async (orgId: string, userId: string) =>
+  (await api.delete(`/organizations/${orgId}/bajas/${userId}`)).data;
 export const listSuscripcionesAPI = async (): Promise<SuscripcionOrg[]> =>
   (await api.get('/subscriptions')).data;
 export const crearSuscripcionOrgAPI = async (data: {

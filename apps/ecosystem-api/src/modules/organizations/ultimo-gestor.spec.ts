@@ -83,6 +83,11 @@ function armar(lecturas: unknown[][], escritura: unknown[] = [{ id: 'fila' }]) {
       'values',
       'returning',
       'set',
+      // `removeMember` copia la baja a `org_member_bajas` antes de borrar la
+      // fila, y lo hace con un upsert. Sin este eslabón la cadena se corta con
+      // «onConflictDoUpdate is not a function» y el fallo parece de la regla
+      // del mando, que es lo único que estos casos miran.
+      'onConflictDoUpdate',
     ]) {
       eslabon[metodo] = () => eslabon;
     }

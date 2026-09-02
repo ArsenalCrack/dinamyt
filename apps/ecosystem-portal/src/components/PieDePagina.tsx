@@ -6,6 +6,21 @@ const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
 
 /**
+ * El aviso de derechos, que hasta ahora solo llevaba Membresías.
+ *
+ * Los dos pies eran distintos en dos aplicaciones que son la misma cuenta: el
+ * de aquí tenía marca, enlaces y soporte pero ningún aviso de derechos; el del
+ * club tenía el aviso y nada más. Ahora los dos dicen lo mismo en el mismo
+ * orden —arriba quién es y dónde pedir ayuda, abajo de quién es esto— y solo
+ * cambia el nombre de la aplicación y sus enlaces.
+ *
+ * El año va desde el de creación hasta el actual y se calcula al vuelo: un
+ * aviso que dice 2026 en 2030 se lee como un proyecto abandonado.
+ */
+const AÑO_INICIAL = 2026;
+const AUTOR = 'Amir Sarmiento';
+
+/**
  * El pie del portal. Va en el `layout`, así que sale en TODAS las pantallas
  * —incluidas login, registro, recuperar y poner-contraseña—, y esa es la
  * razón de que exista: hasta hoy las dos únicas direcciones del portal
@@ -29,6 +44,9 @@ const CAMPEONATOS_URL =
  * ni leer ni copiar.
  */
 export function PieDePagina() {
+  const ahora = new Date().getFullYear();
+  const años = ahora > AÑO_INICIAL ? `${AÑO_INICIAL}–${ahora}` : String(AÑO_INICIAL);
+
   return (
     <footer className="border-t py-8" style={{ borderColor: 'var(--border)' }}>
       <div
@@ -55,6 +73,21 @@ export function PieDePagina() {
             <span className="break-all">{CORREO_SOPORTE}</span>
           </a>
         </nav>
+      </div>
+
+      {/* La franja de derechos, separada por una raya: no es navegación, es un
+          aviso legal, y va debajo de todo lo que sí se toca. */}
+      <div
+        className="mx-auto mt-6 max-w-6xl border-t px-4 pt-4 text-center sm:px-6"
+        style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+      >
+        <p className="text-xs">
+          © {años} <strong style={{ color: 'var(--text)' }}>{AUTOR}</strong> · Todos
+          los derechos reservados.
+        </p>
+        <p className="mt-0.5 text-xs opacity-75">
+          DINAMYT Ecosystem es una obra protegida por el derecho de autor.
+        </p>
       </div>
     </footer>
   );

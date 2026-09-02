@@ -15,19 +15,37 @@
  * una lista de cuatro personas es ruido.
  */
 
-/** Cuántos por página. Veinte caben en una pantalla de celular sin agobiar. */
-export const POR_PAGINA = 20;
+/**
+ * Cuántos por página.
+ *
+ * Eran veinte, y en el celular veinte filas con foto son un rato largo de
+ * pulgar para llegar al final — donde estaba el único paso de páginas. Quince
+ * se recorre de un gesto y cabe en un portátil sin desplazarse. Es el mismo
+ * número que usa Membresías, a propósito: la misma gente pasa de una lista a
+ * la otra y «página 3» tiene que querer decir lo mismo en las dos.
+ */
+export const POR_PAGINA = 15;
 
 export function Paginacion({
   offset,
   limit,
   total,
   onIr,
+  arriba = false,
 }: {
   offset: number;
   limit: number;
   total: number;
   onIr: (offset: number) => void;
+  /**
+   * Encima de la lista: separa por abajo en vez de por arriba.
+   *
+   * Va en los dos sitios porque al final solo lo encuentra quien ya bajó la
+   * lista entera, o sea después de haber hecho el trabajo que este control
+   * venía a ahorrar. Y arriba el contador se lee ANTES: se entra sabiendo
+   * cuánta gente hay.
+   */
+  arriba?: boolean;
 }) {
   if (total <= limit) return null;
 
@@ -37,7 +55,11 @@ export function Paginacion({
   const haySiguiente = hasta < total;
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 text-sm ${
+        arriba ? 'mb-3' : 'mt-3'
+      }`}
+    >
       <span style={{ color: 'var(--text-muted)' }}>
         {desde}–{hasta} de {total}
       </span>

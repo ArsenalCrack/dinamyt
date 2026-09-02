@@ -51,6 +51,23 @@ export class SessionsService {
   static readonly MAXIMO_HORAS = 12;
 
   /**
+   * El techo de una sesión RECORDADA, en días.
+   *
+   * Quien marca «mantener la sesión iniciada en este dispositivo» está diciendo
+   * dos cosas: que el dispositivo es suyo y que no quiere volver a escribir la
+   * contraseña cada mañana. Se le quita el reloj de inactividad —ver
+   * `juzgarSesion`— pero NO el techo: una sesión que no caduca nunca es una
+   * contraseña que nadie vuelve a comprobar, y eso sigue siendo verdad aunque
+   * el teléfono sea de uno.
+   *
+   * Treinta días es el plazo habitual de un «recuérdame» y sigue siendo
+   * revocable por todos los caminos de siempre: salir, salir de todos lados,
+   * cambiar la contraseña, recuperarla, o cerrarla desde «dispositivos
+   * conectados» — que es la salida de emergencia si el teléfono se pierde.
+   */
+  static readonly RECORDADA_DIAS = 30;
+
+  /**
    * Cada cuánto se escribe `lastSeenAt` como mucho.
    *
    * Sin este freno, cada petición de cada pantalla sería un `UPDATE`: una
@@ -89,7 +106,9 @@ export class SessionsService {
     userId: string;
     userAgent?: string | null;
     ip?: string | null;
-  }): Promise<{ id: string; expiresAt: Date }> {
+    /** Marcó «mantener la sesión iniciada en este dispositivo». */
+    recordada?: boolean;
+  }): Promise<{ id: string; expiresAt: Date; recordada: boolean }> {
     // ── Las tres fechas las pone JavaScript, NUNCA la base ─────────────────
     //
     // Y no es preferencia de estilo: dejar `now()` aquí rompía el inicio de
@@ -112,8 +131,14 @@ export class SessionsService {
     // `defaultNow()` en el esquema **a propósito**: así el compilador obliga a
     // dar el valor y esto no puede volver por descuido.
     const ahora = new Date();
+    const recordada = Boolean(datos.recordada);
+    // El techo depende de lo que pidió la persona; el reloj de inactividad,
+    // también (ver `juzgarSesion`). Sin marcar, todo queda como estaba.
     const expiresAt = new Date(
-      ahora.getTime() + SessionsService.MAXIMO_HORAS * 60 * 60 * 1000,
+      ahora.getTime() +
+        (recordada
+          ? SessionsService.RECORDADA_DIAS * 24 * 60 * 60 * 1000
+          : SessionsService.MAXIMO_HORAS * 60 * 60 * 1000),
     );
     const [fila] = await db
       .insert(sessions)
@@ -127,9 +152,14 @@ export class SessionsService {
         userAgent: datos.userAgent ? datos.userAgent.slice(0, 400) : null,
         ip: datos.ip ? datos.ip.slice(0, 60) : null,
         expiresAt,
+        recordada,
       })
-      .returning({ id: sessions.id, expiresAt: sessions.expiresAt });
-    return { id: fila.id, expiresAt: fila.expiresAt };
+      .returning({
+        id: sessions.id,
+        expiresAt: sessions.expiresAt,
+        recordada: sessions.recordada,
+      });
+    return { id: fila.id, expiresAt: fila.expiresAt, recordada: fila.recordada };
   }
 
   // ── Comprobar ────────────────────────────────────────────────────────────
@@ -156,6 +186,9 @@ export class SessionsService {
         expiresAt: sessions.expiresAt,
         revokedAt: sessions.revokedAt,
         revokedReason: sessions.revokedReason,
+        // Sin esto el veredicto la juzgaría como no recordada y la cerraría a
+        // los veinte minutos, que es justo el fallo que se venía a arreglar.
+        recordada: sessions.recordada,
       })
       .from(sessions)
       .where(eq(sessions.id, jti))
@@ -249,6 +282,7 @@ export class SessionsService {
         createdAt: sessions.createdAt,
         lastSeenAt: sessions.lastSeenAt,
         expiresAt: sessions.expiresAt,
+        recordada: sessions.recordada,
       })
       .from(sessions)
       .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)))
@@ -261,9 +295,14 @@ export class SessionsService {
         // pasado nadie a comprobarlas no se enseñan: una sesión muerta en la
         // lista de «conectados» es una alarma falsa, y las alarmas falsas son
         // lo que enseña a la gente a ignorar la lista.
+        //
+        // Una recordada lleva horas quieta por definición —para eso se marcó—,
+        // así que el corte de inactividad no la juzga: esconderla sería quitar
+        // de «dispositivos conectados» justamente la sesión que más falta hace
+        // poder cerrar desde otro sitio.
         .filter(
           (f) =>
-            f.lastSeenAt.getTime() > corte &&
+            (f.recordada || f.lastSeenAt.getTime() > corte) &&
             f.expiresAt.getTime() > Date.now(),
         )
         .map((f) => ({
@@ -274,6 +313,22 @@ export class SessionsService {
           lastSeenAt: f.lastSeenAt,
         }))
     );
+  }
+
+  /**
+   * ¿Esta sesión pidió que no se le cerrara sola?
+   *
+   * Lo usa `refrescarSesion` para no seguir contestando «te quedan 20 minutos»
+   * a una sesión que ya no tiene reloj de inactividad. Es una búsqueda por
+   * clave primaria y ocurre una vez cada media hora por sesión.
+   */
+  async esRecordada(jti: string): Promise<boolean> {
+    const [s] = await db
+      .select({ recordada: sessions.recordada })
+      .from(sessions)
+      .where(eq(sessions.id, jti))
+      .limit(1);
+    return Boolean(s?.recordada);
   }
 
   /** ¿Es de esta persona? Para no dejar que nadie cierre la sesión de otro. */
@@ -331,6 +386,11 @@ export interface SesionJuzgable {
   expiresAt: Date;
   revokedAt: Date | null;
   revokedReason: string | null;
+  /**
+   * Pidió que no se le cerrara sola. Opcional para que las sesiones que ya
+   * existían —y las pruebas viejas— se juzguen como siempre.
+   */
+  recordada?: boolean | null;
 }
 
 export type Veredicto = { viva: true } | { viva: false; motivo: MotivoCierre };
@@ -358,9 +418,23 @@ export function juzgarSesion(s: SesionJuzgable, ahora: number): Veredicto {
   if (s.expiresAt.getTime() <= ahora) {
     return { viva: false, motivo: 'caducada' };
   }
+  /**
+   * El reloj de inactividad NO corre para quien pidió que no corriera.
+   *
+   * Es lo único que hace distinta a una sesión recordada, y es exactamente lo
+   * que la casilla del login prometía y no cumplía. Los otros dos relojes
+   * siguen en pie para ella: caduca a los treinta días (`RECORDADA_DIAS`, que
+   * es el `expires_at` de arriba) y se cierra en cuanto alguien la revoque —
+   * salir, cambiar la contraseña, o cerrarla desde «dispositivos conectados»
+   * cuando el teléfono se pierde.
+   *
+   * Va DESPUÉS de `expiresAt` a propósito: si las dos condiciones se cumplen,
+   * el motivo honesto es «caducada», no «inactividad».
+   */
   if (
+    !s.recordada &&
     ahora - s.lastSeenAt.getTime() >
-    SessionsService.INACTIVIDAD_MINUTOS * 60 * 1000
+      SessionsService.INACTIVIDAD_MINUTOS * 60 * 1000
   ) {
     return { viva: false, motivo: 'inactividad' };
   }

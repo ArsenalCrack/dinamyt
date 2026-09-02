@@ -201,6 +201,9 @@ function LoginForm() {
       const { access_token } = await loginAPI(
         correo.ok ? correo.valor : email.trim().toLowerCase(),
         password,
+        // La casilla, hasta el servidor: es él quien lleva el reloj de
+        // inactividad, y sin esto lo aplicaba igual.
+        recordar,
       );
       guardarToken(access_token, recordar);
       entregarSesion(access_token, soloAlPortal);
@@ -225,8 +228,14 @@ function LoginForm() {
     await entrar(false);
   }
 
+  // `py-10` no es cosmética: sin relleno vertical la tarjeta queda pegada a la
+  // raya del pie, y cuando el contenido crece —el aviso de por qué se cerró la
+  // sesión, el error, la línea de «puedes desbloquearla ahora mismo»— la caja
+  // llega justo al borde y se lee como si chocara con él. Las otras pantallas
+  // de esta familia (registro, recuperar, verificar) ya lo tenían; ésta,
+  // `poner-contrasena` y `salir` se habían quedado sin él.
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 py-10">
       <Link href="/" className="flex flex-col items-center gap-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="DINAMYT" width={72} height={72} />
@@ -378,7 +387,7 @@ function LoginForm() {
               onChange={(e) => setRecordar(e.target.checked)}
               style={{ accentColor: 'var(--gold)' }}
             />
-            <span>Mantener la sesión iniciada en este equipo</span>
+            <span>Mantener la sesión iniciada en este dispositivo</span>
           </label>
           <button
             type="submit"

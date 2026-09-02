@@ -65,6 +65,63 @@ describe('Sesiones · los tres relojes', () => {
     });
   });
 
+  // ── El reloj 1 tiene una excepción: «mantener la sesión iniciada» ────────
+  //
+  // La casilla del login existía y no hacía lo que dice: solo decidía en qué
+  // almacén del navegador vivía el pase. El reloj de inactividad lo aplica el
+  // servidor, y el servidor no se enteraba de nada — así que a los veinte
+  // minutos echaba igual a quien había pedido por escrito lo contrario. Estas
+  // tres pruebas son la diferencia entre una opción y un adorno.
+
+  it('la recordada NO se cierra por estar horas quieta', () => {
+    const guardada = sana({
+      recordada: true,
+      lastSeenAt: new Date(AHORA - horas(8)),
+      expiresAt: new Date(AHORA + horas(24 * 20)),
+    });
+    expect(juzgarSesion(guardada, AHORA)).toEqual({ viva: true });
+  });
+
+  it('pero la recordada SÍ caduca: no vive para siempre', () => {
+    const vieja = sana({
+      recordada: true,
+      lastSeenAt: new Date(AHORA - horas(8)),
+      expiresAt: new Date(AHORA - 1000),
+    });
+    expect(juzgarSesion(vieja, AHORA)).toEqual({
+      viva: false,
+      motivo: 'caducada',
+    });
+  });
+
+  it('y la recordada se puede cerrar: es la salida si se pierde el teléfono', () => {
+    const cerrada = sana({
+      recordada: true,
+      lastSeenAt: new Date(AHORA - horas(8)),
+      revokedAt: new Date(AHORA - minutos(1)),
+      revokedReason: 'salir-todas',
+    });
+    expect(juzgarSesion(cerrada, AHORA)).toEqual({
+      viva: false,
+      motivo: 'salir-todas',
+    });
+  });
+
+  it('sin la marca, todo sigue exactamente igual que antes', () => {
+    // El valor por defecto de la columna es `false`, así que esto es lo que
+    // les pasa a todas las sesiones que ya existían cuando llegó la migración.
+    const normal = sana({
+      recordada: false,
+      lastSeenAt: new Date(
+        AHORA - minutos(SessionsService.INACTIVIDAD_MINUTOS + 1),
+      ),
+    });
+    expect(juzgarSesion(normal, AHORA)).toEqual({
+      viva: false,
+      motivo: 'inactividad',
+    });
+  });
+
   // ── Reloj 2: el máximo absoluto ──────────────────────────────────────────
   // Sin él, quien toca la pantalla cada cuarto de hora no vuelve a escribir su
   // contraseña jamás.

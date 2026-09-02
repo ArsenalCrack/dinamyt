@@ -540,6 +540,47 @@ export class OrganizationsController {
     return this.orgsService.removeMember(orgId, userId, user.sub);
   }
 
+  // ── GET /organizations/:id/bajas — quién salió del club ───────────────────
+  //
+  // Hasta ahora la baja borraba la fila y la persona desaparecía sin fecha y
+  // sin rastro: no había forma de saber a quién le pasó ni de deshacerlo. Esto
+  // es la memoria de esas bajas, y solo la ve quien gestiona el club — dice
+  // nombres, correos y quién dio de baja a quién.
+  @Get(':id/bajas')
+  @UseGuards(EcosystemJwtGuard)
+  async bajas(@Param('id') orgId: string, @CurrentUser() user: JwtPayload) {
+    await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
+    return this.orgsService.bajas(orgId);
+  }
+
+  // ── POST /organizations/:id/bajas/:userId/readmitir — devolverle el club ──
+  // Vuelve con lo que tenía: sus cuatro roles y su fecha de entrada. Ver
+  // `readmitirMiembro`.
+  @Post(':id/bajas/:userId/readmitir')
+  @UseGuards(EcosystemJwtGuard)
+  async readmitir(
+    @Param('id') orgId: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
+    return this.orgsService.readmitirMiembro(orgId, userId, user.sub);
+  }
+
+  // ── DELETE /organizations/:id/bajas/:userId — olvidar la baja ─────────────
+  // Solo borra el recuerdo: la persona sigue fuera del club igual que antes.
+  // Existe porque una bandeja con las bajas de hace dos años deja de leerse.
+  @Delete(':id/bajas/:userId')
+  @UseGuards(EcosystemJwtGuard)
+  async olvidarBaja(
+    @Param('id') orgId: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
+    return this.orgsService.olvidarBaja(orgId, userId);
+  }
+
   // ── GET /organizations/:id/members — listar miembros ──────────────────────
   // Datos personales (correo/teléfono): solo miembros de la org, sus admins
   // (o de la federación padre) o el super admin.

@@ -54,7 +54,7 @@ function PonerContrasena() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
+    <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <div
         className="w-full max-w-sm rounded-xl border p-6"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}

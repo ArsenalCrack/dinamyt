@@ -1,0 +1,36 @@
+-- ── «Mantener la sesión iniciada en este dispositivo», de verdad ────────────
+--
+-- ── El problema ──
+--
+-- La casilla del login existía desde el principio y no hacía lo que dice.
+-- Decidía UNA cosa: si el pase se guardaba en `localStorage` o en
+-- `sessionStorage` —o sea, si sobrevivía a cerrar el navegador— y nada más. El
+-- reloj de inactividad de veinte minutos lo aplica el servidor (`sessions`), y
+-- al servidor no le llegaba la decisión: a los veinte minutos parada cerraba la
+-- sesión de todo el mundo, incluida la de quien acababa de pedir por escrito lo
+-- contrario.
+--
+-- Visto desde fuera es una opción que no sirve para nada, y eso es peor que no
+-- ofrecerla: enseña que las casillas de esta aplicación son de adorno.
+--
+-- ── Lo que hace esta columna ──
+--
+-- Que la decisión viaje con la sesión y la aplique quien la hace cumplir:
+--
+--   · recordada = true  → sin reloj de inactividad. La sesión vive hasta
+--     `expires_at`, que al abrirla se pone a treinta días
+--     (`SessionsService.RECORDADA_DIAS`) en vez de a doce horas.
+--   · recordada = false → exactamente como hasta hoy: veinte minutos sin
+--     señales de vida y se cierra, con tope absoluto de doce horas.
+--
+-- El segundo caso sigue siendo el que resuelve el computador prestado, y por
+-- eso es el que pasa cuando NADIE pide otra cosa: el valor por defecto es
+-- `false`, así que todas las sesiones que ya existen se comportan igual que
+-- ayer. Nadie se queda dentro por sorpresa por culpa de esta migración.
+--
+-- Es por sesión y no por cuenta a propósito: la misma persona marca la casilla
+-- en su celular y no la marca en el computador del club, y las dos decisiones
+-- tienen que convivir. Por eso vive aquí y no en `users`.
+
+ALTER TABLE "ecosystem"."sessions"
+  ADD COLUMN IF NOT EXISTS "recordada" boolean DEFAULT false NOT NULL;

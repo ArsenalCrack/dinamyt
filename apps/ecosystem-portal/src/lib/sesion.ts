@@ -18,7 +18,11 @@
  *      hay que hacer en un equipo prestado, y ahora se puede hacer.
  *   2. **El reloj de inactividad.** Veinte minutos sin tocar nada y se cierra
  *      sola, con un aviso un minuto antes para que nadie pierda lo que estaba
- *      escribiendo.
+ *      escribiendo. **Salvo que la casilla esté marcada**: entonces no hay
+ *      reloj de inactividad ni aquí ni en el servidor, y la sesión vive hasta
+ *      su tope de treinta días o hasta que alguien la cierre. Durante mucho
+ *      tiempo la casilla solo hacía lo del punto 1 y este reloj corría igual,
+ *      así que prometía algo que no cumplía.
  *   3. **La renovación.** El pase dura media hora y se renueva **solo si ha
  *      habido actividad**. Esa condición no es un detalle: sin ella, una
  *      pestaña olvidada renovaría el pase para siempre y el reloj de
@@ -244,6 +248,21 @@ export function vigilarSesion(v: Vigilancia): () => void {
 
   const limite = INACTIVIDAD_MINUTOS * 60 * 1000;
 
+  /**
+   * Esta sesión pidió que no se le cerrara sola.
+   *
+   * Se lee de la misma preferencia que decidió dónde se guardó el pase
+   * (`guardarToken(token, recordar)` la escribe al entrar), así que es un
+   * espejo exacto de lo que se mandó al servidor en ese inicio de sesión —y no
+   * un ajuste suelto que pudiera decir otra cosa.
+   *
+   * Hace falta comprobarlo AQUÍ además de en el servidor: los dos relojes son
+   * independientes, y con solo el del servidor arreglado el navegador seguía
+   * echando a la persona por su cuenta a los veinte minutos, con el pase
+   * todavía válido. Desde fuera, la casilla seguiría sin servir para nada.
+   */
+  const recordada = seRecuerda();
+
   async function latido() {
     if (cerrando) return;
     const token = obtenerToken();
@@ -257,7 +276,7 @@ export function vigilarSesion(v: Vigilancia): () => void {
 
     const parado = inactividadMs();
 
-    if (parado >= limite) {
+    if (!recordada && parado >= limite) {
       cerrando = true;
       v.alCerrar(
         `Tu sesión se cerró tras ${INACTIVIDAD_MINUTOS} minutos sin actividad.`,
@@ -265,7 +284,7 @@ export function vigilarSesion(v: Vigilancia): () => void {
       return;
     }
 
-    if (parado >= limite - AVISO_SEGUNDOS * 1000) {
+    if (!recordada && parado >= limite - AVISO_SEGUNDOS * 1000) {
       avisado = true;
       v.alAvisar(Math.ceil((limite - parado) / 1000));
       // No se renueva mientras se avisa: renovar aquí sería alargar la sesión
@@ -279,8 +298,19 @@ export function vigilarSesion(v: Vigilancia): () => void {
       v.alAvisar(0); // La persona volvió: se retira el aviso.
     }
 
-    // Renovar solo si hay actividad reciente. La condición es la que impide
-    // que una pestaña abierta y olvidada mantenga la sesión viva para siempre.
+    /**
+     * Renovar el pase.
+     *
+     * Sin recordar, solo con actividad reciente: es la condición que impide
+     * que una pestaña abierta y olvidada mantenga la sesión viva para siempre.
+     *
+     * Recordada, se renueva sin condición, y no es una excepción caprichosa:
+     * el pase dura media hora y la sesión treinta días, así que si no se
+     * renovara al volver —el celular guardado en el bolsillo toda la tarde—,
+     * la persona encontraría la aplicación cerrada de todos modos. El techo
+     * sigue existiendo: lo pone `expires_at` en el servidor, que no se mueve
+     * por renovar.
+     */
     if (!renovando && segundosDePase(token) < RENOVAR_SI_QUEDAN_SEG) {
       renovando = true;
       try {

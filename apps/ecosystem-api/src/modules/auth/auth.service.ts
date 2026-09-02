@@ -422,7 +422,19 @@ export class AuthService {
   static readonly MAX_INTENTOS = 5;
   static readonly BLOQUEO_MINUTOS = 15;
 
-  async login(email: string, password: string, contexto?: ContextoPeticion) {
+  /**
+   * `recordar` es la casilla del login, y viaja hasta la fila de la sesión.
+   *
+   * Solo entra por aquí: el registro y el canje de invitación abren sesión sin
+   * que nadie haya podido marcar nada, así que nacen sin recordar — que es el
+   * lado seguro. Ver `sessions.recordada` en el esquema.
+   */
+  async login(
+    email: string,
+    password: string,
+    contexto?: ContextoPeticion,
+    recordar = false,
+  ) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException(
@@ -502,7 +514,7 @@ export class AuthService {
       });
     }
 
-    return this.abrirSesion(user, contexto);
+    return this.abrirSesion(user, contexto, recordar);
   }
 
   /**
@@ -547,9 +559,15 @@ export class AuthService {
       throw new UnauthorizedException('Tu cuenta está suspendida.');
     }
     const alDia = await this.anotarZona(user, contexto);
+    // `0` en una sesión recordada: no tiene reloj de inactividad, y seguir
+    // contestando «20» aquí sería mentirle al navegador sobre su propia sesión.
+    const recordada = await this.sessions.esRecordada(jti);
     return {
       access_token: await this.buildToken(alDia, jti),
-      sesion: { inactividadMinutos: SessionsService.INACTIVIDAD_MINUTOS },
+      sesion: {
+        inactividadMinutos: recordada ? 0 : SessionsService.INACTIVIDAD_MINUTOS,
+        recordada,
+      },
     };
   }
 
@@ -1027,7 +1045,11 @@ export class AuthService {
    * pase por esta función y la sesión quedará registrada —y por tanto se podrá
    * cerrar— sin que nadie tenga que acordarse.
    */
-  private async abrirSesion(user: User, contexto?: ContextoPeticion) {
+  private async abrirSesion(
+    user: User,
+    contexto?: ContextoPeticion,
+    recordar = false,
+  ) {
     // La zona se aplica al usuario que se va a firmar, no solo a la base.
     //
     // Antes se guardaba y se firmaba el `user` de antes, así que el token del
@@ -1039,12 +1061,20 @@ export class AuthService {
       userId: user.id,
       userAgent: contexto?.userAgent,
       ip: contexto?.ip,
+      recordada: recordar,
     });
     return {
       access_token: await this.buildToken(alDia, sesion.id),
       sesion: {
         expiraEl: sesion.expiresAt.toISOString(),
-        inactividadMinutos: SessionsService.INACTIVIDAD_MINUTOS,
+        // Recordada no tiene reloj de inactividad, y decirle al navegador que
+        // sí lo tiene es lo que haría que el vigilante la cerrara por su
+        // cuenta a los veinte minutos aunque el servidor la aceptara. `0`
+        // significa «no lo vigiles»: ver `vigilarSesion` en el portal.
+        inactividadMinutos: sesion.recordada
+          ? 0
+          : SessionsService.INACTIVIDAD_MINUTOS,
+        recordada: sesion.recordada,
       },
     };
   }

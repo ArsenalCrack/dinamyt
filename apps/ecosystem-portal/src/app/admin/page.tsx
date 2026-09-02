@@ -533,6 +533,13 @@ export default function AdminEcosistemaPage() {
                   los roles por app en la misma línea que los controles.
                   Partirla en dos devolvería el problema que se acaba de
                   arreglar: filas de 400 px con un desplegable de 152 dentro. */}
+              <Paginacion
+                arriba
+                offset={offsetGente}
+                limit={POR_PAGINA}
+                total={totalMiembros}
+                onIr={setOffsetGente}
+              />
               <ul className="mb-4 flex flex-col gap-2">
                 {miembros.map((m) => (
                   <FilaMiembro
