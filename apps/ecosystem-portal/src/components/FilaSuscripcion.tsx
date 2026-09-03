@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ESTADOS_SUSCRIPCION,
   METODOS_PAGO,
@@ -8,10 +8,13 @@ import {
   editarSuscripcionAPI,
   abonarSuscripcionAPI,
   eliminarSuscripcionAPI,
+  cotizarSuscripcionAPI,
+  recalcularSuscripcionAPI,
   renovarSuscripcionAPI,
   historialSuscripcionAPI,
   nombreMetodo,
   extraerError,
+  type Cotizacion,
   type SuscripcionOrg,
   type Plan,
   type PagoSuscripcion,
@@ -97,7 +100,29 @@ export function FilaSuscripcion({
   const [metodoAbono, setMetodoAbono] = useState('efectivo');
 
   /** Lo que se va a cobrar. El precio sale del plan y casi nunca se toca. */
-  const precioMes = planes.find((p) => p.id === sub.planId)?.priceMonthly ?? null;
+  // ── Por qué esto ya no es `priceMonthly` ──
+  //
+  // El cobro es por persona (§4.18): el precio de un mes sale de multiplicar la
+  // tarifa por el padrón del club, no de un número guardado en el plan. Con
+  // `priceMonthly` el campo se rellenaba con el importe fijo viejo —60.000 para
+  // todos— y quien no lo mirara registraba ese pago.
+  //
+  // Se le pregunta al servidor, que es quien factura: una segunda
+  // implementación de la misma cuenta es como se consigue que la pantalla diga
+  // una cifra y el recibo otra.
+  const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    cotizarSuscripcionAPI(sub.orgId, sub.planId)
+      .then((c) => vigente && setCotizacion(c))
+      .catch(() => vigente && setCotizacion(null));
+    return () => {
+      vigente = false;
+    };
+  }, [sub.orgId, sub.planId, sub.totalAmount]);
+
+  /** Lo que costaría un mes hoy. `null` si todavía no se sabe. */
+  const precioMes = cotizacion ? String(cotizacion.importe) : null;
   const [renovacion, setRenovacion] = useState({
     meses: '1',
     precio: '',
@@ -214,10 +239,42 @@ export function FilaSuscripcion({
             onClick={() => setRenovando(!renovando)}
             disabled={ocupado}
             className="btn btn-gold btn-sm"
-            title="Extiende la fecha y deja el pago escrito en el historial"
+            title="Registra lo que entró a caja y extiende la fecha del periodo"
           >
-            {renovando ? 'Cerrar' : '↻ Renovar'}
+            {/* ── Por qué dejó de decir «Renovar» ──
+                Porque lo que se hace aquí es REGISTRAR UN PAGO: entró plata a
+                caja y se apunta. Que además extienda la fecha es la
+                consecuencia, no la acción — y llamarlo «renovar» hacía pensar
+                que era un trámite del sistema y no un movimiento de dinero. */}
+            {renovando ? 'Cerrar' : '$ Registrar pago'}
           </button>
+          {/* ── Actualizar el monto ──
+              El caso que resuelve pasa SIEMPRE la primera vez: se le crea la
+              suscripción a un club que todavía no subió a su gente —cero
+              personas, se cobra el mínimo—, y al día siguiente tiene ochenta
+              alumnos y sigue diciendo el mínimo.
+
+              El barrido diario ya lo corrige solo mientras nadie haya pagado.
+              Esto es para no esperar a mañana. Sale SOLO si no hay pagos: con
+              un pago encima el importe está congelado, y ofrecer un botón que
+              va a contestar «no puedo» es peor que no ofrecerlo. */}
+          {Number(sub.paidAmount ?? 0) === 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                void onAccion(
+                  () => recalcularSuscripcionAPI(sub.id),
+                  'Monto actualizado con la gente de hoy.',
+                  'No se pudo actualizar el monto.',
+                )
+              }
+              disabled={ocupado}
+              className="btn btn-outline btn-sm"
+              title="Vuelve a calcular el importe con la gente que tiene el club hoy"
+            >
+              ↻ Actualizar monto
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void verHistorial()}
@@ -289,6 +346,18 @@ export function FilaSuscripcion({
               ? 'Está vencida: el periodo nuevo empieza hoy.'
               : `Le quedan días: el periodo nuevo empieza el ${fechaCivil(sub.endsAt)} y no pierde ninguno.`}
           </p>
+          {/* De dónde sale el número que ya viene puesto. Sin esto, «cuánto
+              costó» es una cifra que aparece sola y que nadie sabe si revisar. */}
+          {cotizacion?.porPersona && (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Hoy son <strong>{cotizacion.personas}</strong>{' '}
+              {cotizacion.personas === 1 ? 'persona activa' : 'personas activas'}
+              {cotizacion.facturadas !== cotizacion.personas && (
+                <> · se cobran <strong>{cotizacion.facturadas}</strong> por el mínimo</>
+              )}{' '}
+              × {cotizacion.pricePerUser} = <strong>{cotizacion.importe}</strong> al mes.
+            </p>
+          )}
           <div className="grid gap-2 sm:grid-cols-4">
             <label className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Meses</span>
@@ -396,7 +465,7 @@ export function FilaSuscripcion({
               disabled={ocupado}
               className="btn btn-gold btn-sm"
             >
-              Renovar y registrar el pago
+              Registrar el pago
             </button>
           </div>
         </div>

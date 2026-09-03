@@ -36,6 +36,8 @@ export class SubscriptionsController {
       planId: string;
       startsAt: string;
       endsAt: string;
+      /** Meses que compra el ciclo: 1, 3, 6 o 12. Lo hereda la renovación. */
+      renewalMonths?: number;
       totalAmount?: string;
     },
   ) {
@@ -163,7 +165,36 @@ export class SubscriptionsController {
       planes = { error: e instanceof Error ? e.message : 'falló el barrido' };
     }
 
-    return { ...(await this.subsService.avisarVencimientos()), limpiadas, planes };
+    // Y los importes que todavía nadie ha pagado, que siguen al padrón hasta
+    // que entre el primer peso. Es lo que corrige al club que estrenó su
+    // suscripción sin haber subido a su gente todavía.
+    let importes: unknown = null;
+    try {
+      importes = await this.subsService.recalcularNoPagadas();
+    } catch (e) {
+      importes = { error: e instanceof Error ? e.message : 'falló el recálculo' };
+    }
+
+    return {
+      ...(await this.subsService.avisarVencimientos()),
+      limpiadas,
+      planes,
+      importes,
+    };
+  }
+
+  // ── POST /subscriptions/:id/recalcular — el importe, con el padrón de hoy ─
+  //
+  // Existe porque el caso pasa SIEMPRE la primera vez: se le crea la
+  // suscripción a un club que aún no subió a su gente, se cobra el mínimo, y al
+  // día siguiente tiene ochenta alumnos y sigue diciendo el mínimo.
+  //
+  // El barrido diario ya lo hace solo mientras nadie haya pagado; esto es para
+  // no esperar a mañana.
+  @Post(':id/recalcular')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  recalcular(@Param('id') id: string, @Body() body?: { forzar?: boolean }) {
+    return this.subsService.recalcularImporte(id, { forzar: body?.forzar });
   }
 
   // ── GET /subscriptions/cotizar — cuánto costaría, sin crear nada ──────────

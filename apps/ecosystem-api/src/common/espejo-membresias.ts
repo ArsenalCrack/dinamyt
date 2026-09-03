@@ -58,10 +58,37 @@ interface Respuesta {
   aplicado?: boolean;
   motivo?: string;
   enlazada?: boolean;
+  /** `/sync/plan`: el club no existía allí y se acaba de crear. */
+  creado?: boolean;
+  bloqueado?: boolean;
 }
 
-async function avisar(ruta: string, cuerpo: Record<string, unknown>): Promise<void> {
-  if (!espejoConfigurado()) return;
+/**
+ * Manda un aviso al espejo y **devuelve lo que contestó**, o `null`.
+ *
+ * ── Por qué devuelve algo, si casi nadie lo mira ──
+ *
+ * Porque el barrido de planes sí lo necesita. Disparar y olvidar está bien
+ * cuando el aviso acompaña a una acción que ya ocurrió —el rol ya cambió, la
+ * baja ya se dio—, pero el barrido no acompaña a nada: **es el aviso**. Sin
+ * respuesta, informaba de lo que INTENTÓ y no de lo que llegó, así que se
+ * corría el cron, salía «8 al día» y en Membresías seguían viéndose tres. El
+ * numero decía que todo fue bien y la pantalla decía que no.
+ *
+ * `null` = no salió (sin espejo configurado, o la red falló). Distinto de un
+ * `{ encontrado: false }`, que sí llegó y contestó que no había a quién.
+ */
+async function avisar(
+  ruta: string,
+  cuerpo: Record<string, unknown>,
+): Promise<Respuesta | null> {
+  if (!espejoConfigurado()) {
+    log.warn(
+      `${ruta} no se mandó: falta MEMBRESIAS_SYNC_URL o ECOSYSTEM_SYNC_SECRET. ` +
+        'Este despliegue no tiene Membresías al otro lado.',
+    );
+    return null;
+  }
 
   try {
     const res = await fetch(`${destino()}${ruta}`, {
@@ -75,8 +102,13 @@ async function avisar(ruta: string, cuerpo: Record<string, unknown>): Promise<vo
     });
 
     if (!res.ok) {
-      log.warn(`${ruta} respondió ${res.status}: la copia de Membresías quedó vieja.`);
-      return;
+      log.warn(
+        `${ruta} respondió ${res.status}: la copia de Membresías quedó vieja.` +
+          (res.status === 404
+            ? ' Un 404 aquí es que Membresías todavía no tiene esa ruta: se desplegó el ecosystem y no ella.'
+            : ''),
+      );
+      return null;
     }
 
     // Un campo rechazado no es un fallo del aviso: es que los catálogos de las
@@ -115,10 +147,12 @@ async function avisar(ruta: string, cuerpo: Record<string, unknown>): Promise<vo
     if (datos.enlazada) {
       log.log(`${ruta}: la ficha de Membresías quedó enlazada con su cuenta del portal.`);
     }
+    return datos;
   } catch (e) {
     log.warn(
       `${ruta} no llegó a Membresías (${e instanceof Error ? e.message : 'error'}): la copia quedó vieja.`,
     );
+    return null;
   }
 }
 
@@ -376,8 +410,8 @@ export function espejarPlan(
    * necesita nacer bloqueado, necesita no nacer.
    */
   datos?: { name?: string | null; city?: string | null; country?: string | null },
-): void {
-  void avisar('/sync/plan', {
+): Promise<Respuesta | null> {
+  return avisar('/sync/plan', {
     ecoOrgId: orgId,
     alDia,
     ...(alDia && datos?.name

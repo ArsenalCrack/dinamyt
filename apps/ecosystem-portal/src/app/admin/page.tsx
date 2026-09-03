@@ -69,6 +69,8 @@ import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
 import {
   LIM,
   PROPS_CORREO,
+  hoyISO,
+  sumarMeses,
   validarCorreo,
   validarNombreOrganizacion,
 } from '@/lib/validacion';
@@ -120,7 +122,13 @@ export default function AdminEcosistemaPage() {
   const errorNombreOrg =
     nuevaOrg.name.trim() && !revisionNombreOrg.ok ? revisionNombreOrg.error : '';
   const [invitacion, setInvitacion] = useState({ email: '', role: 'competitor' });
-  const [nuevaSub, setNuevaSub] = useState({ planId: '', startsAt: '', endsAt: '', totalAmount: '' });
+  const [nuevaSub, setNuevaSub] = useState({
+    planId: '',
+    meses: '1',
+    startsAt: '',
+    endsAt: '',
+    totalAmount: '',
+  });
   /**
    * Lo que costaría el plan elegido para el club elegido, hoy.
    *
@@ -876,14 +884,55 @@ export default function AdminEcosistemaPage() {
                   </li>
                 )}
               </ul>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <SelectMenu
-                  valor={nuevaSub.planId}
-                  onChange={(v) => setNuevaSub({ ...nuevaSub, planId: v })}
-                  opciones={planes.map((p) => ({ valor: p.id, etiqueta: p.name }))}
-                  etiquetaAria="Plan de la suscripción"
-                  placeholder="Plan…"
-                />
+              {/* ── Por qué cada campo lleva su etiqueta ──
+                  El desplegable del plan no tenía y el monto sí, así que los dos
+                  quedaban a distinta altura: el `<span>` de «Monto» empujaba su
+                  campo una línea hacia abajo y la fila se veía torcida. Con
+                  etiqueta en los cuatro, todos empiezan donde mismo — y de paso
+                  el desplegable deja de ser un control sin nombre. */}
+              <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Plan *</span>
+                  <div className="mt-1">
+                    <SelectMenu
+                      valor={nuevaSub.planId}
+                      onChange={(v) => setNuevaSub({ ...nuevaSub, planId: v })}
+                      opciones={planes.map((p) => ({ valor: p.id, etiqueta: p.name }))}
+                      etiquetaAria="Plan de la suscripción"
+                      placeholder="Plan…"
+                    />
+                  </div>
+                </label>
+                {/* ── El tipo de suscripción, que calcula las fechas ──
+                    Antes había que teclear las dos: «desde» y «hasta». Es la
+                    misma cuenta cada vez —hoy, más N meses— y hacerla a mano es
+                    como se cuela un club con un periodo de once meses porque
+                    alguien se equivocó de casilla. Sigue habiendo fechas
+                    editables debajo para el caso raro. */}
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Tipo *</span>
+                  <div className="mt-1">
+                    <SelectMenu
+                      valor={nuevaSub.meses}
+                      onChange={(v) => {
+                        const desde = nuevaSub.startsAt || hoyISO();
+                        setNuevaSub({
+                          ...nuevaSub,
+                          meses: v,
+                          startsAt: desde,
+                          endsAt: sumarMeses(desde, Number(v)),
+                        });
+                      }}
+                      opciones={[
+                        { valor: '1', etiqueta: 'Mensual (1 mes)' },
+                        { valor: '3', etiqueta: 'Trimestral (3 meses)' },
+                        { valor: '6', etiqueta: 'Semestral (6 meses)' },
+                        { valor: '12', etiqueta: 'Anual (12 meses)' },
+                      ]}
+                      etiquetaAria="Tipo de suscripción"
+                    />
+                  </div>
+                </label>
                 {/* ── Por qué esto ya no es «escribe un monto» ──
                     El cobro es por persona (§4.18): la cifra sale de
                     multiplicar la tarifa del plan por el padrón del club, y
@@ -917,18 +966,36 @@ export default function AdminEcosistemaPage() {
                     }
                   />
                 </label>
-                <CampoFecha
-                  valor={nuevaSub.startsAt}
-                  onChange={(v) => setNuevaSub({ ...nuevaSub, startsAt: v })}
-                  etiquetaAria="Inicio de la suscripción"
-                  placeholder="Desde"
-                />
-                <CampoFecha
-                  valor={nuevaSub.endsAt}
-                  onChange={(v) => setNuevaSub({ ...nuevaSub, endsAt: v })}
-                  etiquetaAria="Fin de la suscripción"
-                  placeholder="Hasta"
-                />
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Desde</span>
+                  <div className="mt-1">
+                    <CampoFecha
+                      valor={nuevaSub.startsAt}
+                      // Mover el inicio arrastra el fin: si no, cambiar «desde»
+                      // deja un periodo de otra duración sin que nadie lo pida.
+                      onChange={(v) =>
+                        setNuevaSub({
+                          ...nuevaSub,
+                          startsAt: v,
+                          endsAt: v ? sumarMeses(v, Number(nuevaSub.meses) || 1) : '',
+                        })
+                      }
+                      etiquetaAria="Inicio de la suscripción"
+                      placeholder="Desde"
+                    />
+                  </div>
+                </label>
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Hasta (calculado)</span>
+                  <div className="mt-1">
+                    <CampoFecha
+                      valor={nuevaSub.endsAt}
+                      onChange={(v) => setNuevaSub({ ...nuevaSub, endsAt: v })}
+                      etiquetaAria="Fin de la suscripción"
+                      placeholder="Hasta"
+                    />
+                  </div>
+                </label>
               </div>
               {/* El desglose. `personas` y `facturadas` van por separado
                   porque no son lo mismo cuando hay mínimo, y verlo es lo que
@@ -970,6 +1037,9 @@ export default function AdminEcosistemaPage() {
                         planId: nuevaSub.planId,
                         startsAt: nuevaSub.startsAt,
                         endsAt: nuevaSub.endsAt,
+                        // El ciclo que compró, para que la renovación siguiente
+                        // sepa de cuántos meses es sin que nadie lo repita.
+                        renewalMonths: Number(nuevaSub.meses) || 1,
                         totalAmount: nuevaSub.totalAmount || undefined,
                       }),
                     'Suscripción creada (queda PENDING_REVIEW: actívala).',

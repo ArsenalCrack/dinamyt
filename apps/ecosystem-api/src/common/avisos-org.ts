@@ -50,6 +50,38 @@ export const AVISOS_ORG = {
     resoluble: false,
     href: '/mi-organizacion',
   },
+
+  // ── El plan del club, que hasta ahora solo se avisaba por correo ──────────
+  //
+  // `avisarVencimientos` manda un correo a los gestores, y eso está bien para
+  // el que lo lee. Pero **el maestro vive en la campana**: es donde ve que
+  // alguien quiere entrar y que alguien se fue, y es lo que mira cada mañana.
+  // Su propia suscripción era lo único que no aparecía ahí — o sea que la única
+  // cosa que le puede cerrar la aplicación entera era la que menos se veía.
+  //
+  // Es el mismo trato que Membresías le da al alumno con su mensualidad: se le
+  // avisa antes de que venza, y se le dice cuando ya venció.
+  //
+  // ── Por qué son RESOLUBLES ──
+  //
+  // Porque son trabajo pendiente y dejan de ser verdad al pagar, sin que nadie
+  // los marque. Un «tu plan vence en 5 días» que sigue ahí una semana después
+  // de haber pagado es exactamente lo que enseña a ignorar la campana.
+  /** Su plan está por vencer. Se resuelve al renovar. */
+  plan_por_vencer: {
+    resoluble: true,
+    href: '/mi-organizacion#plan',
+  },
+  /** Su plan venció y la aplicación puede quedarse cerrada. */
+  plan_vencido: {
+    resoluble: true,
+    href: '/mi-organizacion#plan',
+  },
+  /** Se registró un pago suyo. Noticia, no tarea: ya está hecho. */
+  plan_pagado: {
+    resoluble: false,
+    href: '/mi-organizacion#plan',
+  },
 } as const;
 
 export type TipoAvisoOrg = keyof typeof AVISOS_ORG;
@@ -101,7 +133,13 @@ export function destinoDelAviso(
  */
 export function textoDelAviso(
   kind: string,
-  datos: { quien?: string | null; club?: string | null },
+  datos: {
+    quien?: string | null;
+    club?: string | null;
+    /** Los avisos del plan: cuántos días faltan, y cuánto se debe. */
+    dias?: number | null;
+    importe?: string | null;
+  },
 ): { title: string; body: string } {
   const quien = (datos.quien ?? '').trim() || 'Alguien';
   // El club en el título: quien lleva dos no puede tener que adivinar cuál es.
@@ -116,6 +154,29 @@ export function textoDelAviso(
       return { title, body: `${quien} rechazó tu invitación.` };
     case 'miembro_baja':
       return { title, body: `${quien} salió de tu club.` };
+
+    // Los del plan no dicen «quién»: el sujeto es el club, no una persona. Lo
+    // que va delante es el DATO que decide si hay que hacer algo hoy —cuántos
+    // días quedan— porque es lo único que se lee con la pantalla bloqueada.
+    case 'plan_por_vencer': {
+      const d = datos.dias ?? 0;
+      const cuando =
+        d <= 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`;
+      return {
+        title,
+        body: `Tu plan vence ${cuando}${datos.importe ? ` · ${datos.importe}` : ''}.`,
+      };
+    }
+    case 'plan_vencido':
+      return {
+        title,
+        body: 'Tu plan venció. Renuévalo para no perder el acceso.',
+      };
+    case 'plan_pagado':
+      return {
+        title,
+        body: `Recibimos tu pago${datos.importe ? ` de ${datos.importe}` : ''}. Gracias.`,
+      };
     default:
       // Un tipo sin frase no se manda mudo, pero tampoco se calla: se dice lo
       // único que se sabe con certeza y se deja que la campana cuente el resto.

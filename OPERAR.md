@@ -2329,6 +2329,111 @@ vuelva a crear: los `app_scopes` salen de ahí, y el barrido siguiente pondrá
 Membresías en pausa para todos. **Se corre cuando se vayan a recrear enseguida,
 no un viernes.** En seco por defecto, como la reconciliación (§2.8).
 
+## 4.19 El importe que todavía nadie ha pagado no es una factura
+
+*(3 de septiembre de 2026)*
+
+### El caso que pasa SIEMPRE la primera vez
+
+Se le crea la suscripción a un club que **todavía no ha subido a su gente**:
+cero personas, así que se cobra el mínimo. Al día siguiente el maestro sube a
+sus ochenta alumnos… y la suscripción sigue diciendo el mínimo, porque el
+importe se fijó al crearla.
+
+Se le cobra por diez a un club de ochenta, y **nadie se entera hasta que alguien
+mira**.
+
+### La regla, y por qué hacen falta sus dos mitades
+
+**Un importe que nadie ha pagado todavía no es una factura: es un presupuesto.**
+
+| Mientras… | El importe… |
+|---|---|
+| `paid_amount = 0` | **sigue al padrón**, y se corrige solo cada mañana |
+| entró el primer peso | **se congela** |
+
+· Sin la primera mitad, el caso de arriba se repite con cada club nuevo y hay
+  que acordarse a mano — que es como se olvida.
+· Sin la segunda, el importe cambiaría **después** de que el club pagó, y eso
+  rompe lo único que este modelo prometía: que sabes cuánto pagas antes de
+  pagar. **Una factura que se mueve sola no es una factura.**
+
+Lo hace el barrido diario (`recalcularNoPagadas`), y hay un botón **«↻
+Actualizar monto»** para no esperar a mañana. El botón **solo sale si no hay
+pagos**: ofrecer uno que va a contestar «no puedo» es peor que no ofrecerlo.
+`forzar` existe para el caso raro, y asume lo que significa.
+
+### «Renovar» pasó a ser «Registrar pago»
+
+Porque es lo que se hace: **entró plata a caja y se apunta**. Que además
+extienda la fecha es la consecuencia, no la acción — y llamarlo «renovar» hacía
+pensar en un trámite del sistema en vez de en un movimiento de dinero.
+
+Los dos campos siguen separados —«cuánto costó» y «cuánto entregó»— porque son
+dos hechos distintos: con uno solo, quien recibe la mitad tiene que elegir entre
+mentir en el precio o mentir en lo pagado. Lo que cambia es que **el precio ya
+viene puesto con la cuenta de verdad** (padrón × tarifa) en vez de con el
+importe fijo viejo, y debajo se enseña de dónde sale.
+
+### El tipo de suscripción calcula las fechas
+
+Antes había que teclear «desde» y «hasta». Es la misma cuenta cada vez y hacerla
+a mano es como se cuela un club con un periodo de once meses. Ahora se elige
+**mensual, trimestral, semestral o anual**, y las fechas salen solas — editables
+debajo para el caso raro. Mover «desde» arrastra «hasta», o cambiar el inicio
+dejaría un periodo de otra duración sin que nadie lo pidiera.
+
+`renewalMonths` se guarda al crear, así que **la renovación hereda el ciclo**: un
+club trimestral no se renueva por un mes porque alguien no se acordó.
+
+> ⚠️ **`sumarMeses` no usa `setMonth`**, y no es purismo: `new Date('2026-01-31')`
+> con `setMonth(+1)` da **el 3 de marzo**, porque el 31 de febrero no existe y
+> JavaScript desborda al mes siguiente. Un club que contrata el 31 de enero
+> acabaría con el periodo terminando en marzo. Aquí el día se **recorta al
+> último del mes destino**, que es lo que espera cualquiera.
+
+### Y el plan del club, por fin, en la campana
+
+`avisarVencimientos` mandaba un correo a los gestores. Está bien para quien lo
+lee — pero **el maestro vive en la campana**: es donde ve que alguien quiere
+entrar y que alguien se fue. Su propia suscripción era lo único que no aparecía
+ahí, o sea que **la única cosa que puede cerrarle la aplicación entera era la
+que menos se veía**.
+
+Tres tipos nuevos en `AVISOS_ORG`, y es el mismo trato que Membresías le da al
+alumno con su mensualidad:
+
+| Aviso | ¿Tarea? |
+|---|---|
+| `plan_por_vencer` | **Sí** — deja de ser verdad al pagar |
+| `plan_vencido` | **Sí** — igual |
+| `plan_pagado` | No: es una noticia, ya está hecho |
+
+Los dos primeros se resuelven **solos** al registrar el pago (`resolverPor`), sin
+que nadie los marque. Un «tu plan vence en 5 días» que sigue ahí una semana
+después de haber pagado es exactamente lo que enseña a ignorar la campana.
+
+> El aviso a la campana va **fuera** del `try` del correo: que no haya SMTP
+> configurado no puede dejar al maestro sin saber que su plan vence.
+
+### Lo que el barrido informa ahora
+
+`barrerPlanes` disparaba los avisos sin esperarlos, así que informaba de lo que
+**intentó** y no de lo que llegó: se corría el cron, salía `alDia: 8`, y en
+Membresías seguían viéndose tres. **El número decía que todo fue bien y la
+pantalla decía que no**, que es la peor combinación para diagnosticar.
+
+Ahora espera a cada uno y devuelve:
+
+| Campo | Qué mirar |
+|---|---|
+| `creados` | Clubes que tenían plan y **no existían** allí: nacieron ahora |
+| `sinEspejo` | Contestaron «no lo tengo» y no se pudo crear: sin plan, o sin nombre |
+| `noLlego` | **Si no es cero, el problema no es de datos**: falta `MEMBRESIAS_SYNC_URL` o el secreto, o Membresías no responde |
+
+Y el espejo dice en el log cuándo no salió siquiera, con el motivo — antes se
+callaba si faltaba la configuración.
+
 ---
 
 # PARTE 5 · Las trampas que ya costaron una tarde

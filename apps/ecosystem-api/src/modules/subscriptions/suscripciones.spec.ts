@@ -18,6 +18,7 @@ jest.mock('../../db', () => ({ db: {} }));
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
+import { OrgNotificationsService } from '../organizations/org-notifications.service';
 import { MailerService } from '../auth/mailer.service';
 import { db } from '../../db';
 
@@ -70,11 +71,19 @@ function armar(resultados: unknown[][]) {
   fake.insert = () => cadena;
   fake.update = () => cadena;
   fake.delete = () => cadena;
-  const service = new SubscriptionsService({
-    // El correo no entra en estas pruebas: aquí se juzgan las cuentas.
-    habilitado: () => false,
-    avisarVencimientoSuscripcion: jest.fn().mockResolvedValue(false),
-  } as unknown as MailerService);
+  const service = new SubscriptionsService(
+    {
+      // El correo no entra en estas pruebas: aquí se juzgan las cuentas.
+      habilitado: () => false,
+      avisarVencimientoSuscripcion: jest.fn().mockResolvedValue(false),
+    } as unknown as MailerService,
+    // Ni la campana: el aviso de que el plan vence se prueba donde se decide a
+    // quién le llega, no aquí, donde se juzga cuánto se cobra.
+    {
+      avisar: jest.fn().mockResolvedValue(undefined),
+      resolverPor: jest.fn().mockResolvedValue(undefined),
+    } as unknown as OrgNotificationsService,
+  );
   return Object.assign(service, { escrito });
 }
 

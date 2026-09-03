@@ -421,6 +421,19 @@ export async function cotizarSuscripcionAPI(
   return res.data as Cotizacion;
 }
 
+/**
+ * Vuelve a calcular lo que se debe, con el padrón de hoy.
+ *
+ * Solo hace algo si nadie ha pagado todavía: un importe pagado está congelado,
+ * y una factura que se mueve después de pagarla no es una factura.
+ */
+export async function recalcularSuscripcionAPI(
+  id: string,
+): Promise<{ recalculado: boolean; motivo?: string; totalAmount: string | null }> {
+  const res = await api.post(`/subscriptions/${id}/recalcular`, {});
+  return res.data;
+}
+
 /** Cambia la tarifa de un plan. Solo super-admin. */
 export async function actualizarPlanAPI(
   id: string,
@@ -651,6 +664,8 @@ export const crearSuscripcionOrgAPI = async (data: {
   planId: string;
   startsAt: string;
   endsAt: string;
+  /** El ciclo que compra: 1, 3, 6 o 12. Lo hereda cada renovación. */
+  renewalMonths?: number;
   totalAmount?: string;
 }) => (await api.post('/subscriptions', data)).data;
 /** Estados que puede tener una suscripción, con su nombre en español. */

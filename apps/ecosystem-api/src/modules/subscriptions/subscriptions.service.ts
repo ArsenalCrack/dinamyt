@@ -17,6 +17,7 @@ import {
 } from '../../db/schema';
 import { and, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { MailerService } from '../auth/mailer.service';
+import { OrgNotificationsService } from '../organizations/org-notifications.service';
 import { appsPorOrganizacion } from '../../common/apps-de-la-org';
 import {
   esPorPersona,
@@ -54,7 +55,10 @@ export const METODOS_PAGO = [
 export class SubscriptionsService {
   // MailerService llega de `AuthModule`, que ya lo exporta para las
   // invitaciones del maestro. El aviso de vencimiento es un correo más.
-  constructor(private readonly mailer: MailerService) {}
+  constructor(
+    private readonly mailer: MailerService,
+    private readonly avisos: OrgNotificationsService,
+  ) {}
   // ── Crear suscripción organizacional ──────────────────────────────────────
   /**
    * Recalcula si el club puede operar en Membresías y se lo dice.
@@ -102,6 +106,109 @@ export class SubscriptionsService {
   }
 
   /**
+   * Vuelve a calcular lo que se debe, con el padrón de HOY.
+   *
+   * ── El caso que esto resuelve, y que pasa SIEMPRE la primera vez ──
+   *
+   * Se le crea la suscripción a un club que todavía no ha subido a su gente:
+   * cero personas, así que se cobra el mínimo. Al día siguiente el maestro sube
+   * a sus ochenta alumnos… y la suscripción sigue diciendo el mínimo, porque el
+   * importe se fijó al crearla. Se le cobra por diez a un club de ochenta, y
+   * nadie se entera hasta que alguien mira.
+   *
+   * ── La regla: un importe que nadie ha pagado no es una factura ──
+   *
+   * Es un presupuesto. Mientras `paid_amount` sea cero, el importe **sigue al
+   * padrón**; en cuanto entra el primer peso, **se congela**.
+   *
+   * Las dos mitades hacen falta:
+   *
+   * · Sin la primera, el caso de arriba se repite con cada club nuevo y hay que
+   *   acordarse a mano, que es como se olvida.
+   * · Sin la segunda, el importe cambiaría DESPUÉS de que el club pagó, y eso
+   *   rompe lo único que este modelo prometía: que sabes cuánto pagas antes de
+   *   pagar. Una factura que se mueve sola no es una factura.
+   *
+   * `forzar` es la salida para el super-admin: corrige a mano un caso raro
+   * —cobró de menos, hubo un error— asumiendo lo que eso significa.
+   */
+  async recalcularImporte(id: string, opciones: { forzar?: boolean } = {}) {
+    const [sub] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, id))
+      .limit(1);
+    if (!sub) throw new NotFoundException('Suscripción no encontrada.');
+
+    const pagado = SubscriptionsService.aNumero(sub.paidAmount);
+    if (pagado > 0 && !opciones.forzar) {
+      return {
+        recalculado: false,
+        motivo:
+          'Ya tiene pagos registrados: el importe está congelado. Lo que cambie ' +
+          'el padrón se cobrará en la próxima renovación.',
+        totalAmount: sub.totalAmount,
+        billedUsers: sub.billedUsers,
+      };
+    }
+
+    const [plan] = await db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, sub.planId))
+      .limit(1);
+    if (!plan) throw new NotFoundException('Ese plan ya no existe.');
+
+    const personas = await personasDe(sub.orgId);
+    const meses = sub.renewalMonths ?? 1;
+    const { importe, facturadas } = importeDelPeriodo(plan, personas, meses);
+
+    const [fila] = await db
+      .update(subscriptions)
+      .set({
+        totalAmount: importe.toFixed(2),
+        billedUsers: facturadas > 0 ? facturadas : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, id))
+      .returning();
+
+    return {
+      recalculado: true,
+      antes: sub.totalAmount,
+      totalAmount: fila.totalAmount,
+      billedUsers: fila.billedUsers,
+      personas,
+    };
+  }
+
+  /**
+   * Recalcula todas las que nadie ha pagado. La llama el barrido diario.
+   *
+   * Es la mitad automática de la regla de arriba: el club sube a su gente
+   * cuando puede, y a la mañana siguiente su importe ya es el correcto sin que
+   * nadie se acuerde de pulsar nada.
+   */
+  async recalcularNoPagadas(): Promise<{ revisadas: number; cambiadas: number }> {
+    const pendientes = await db
+      .select({ id: subscriptions.id, totalAmount: subscriptions.totalAmount })
+      .from(subscriptions)
+      .where(eq(subscriptions.paidAmount, '0'));
+
+    let cambiadas = 0;
+    for (const p of pendientes) {
+      try {
+        const r = await this.recalcularImporte(p.id);
+        if (r.recalculado && r.antes !== r.totalAmount) cambiadas += 1;
+      } catch {
+        // Una suscripción con el plan borrado no puede tumbar el barrido de las
+        // demás. Se queda con su importe y se ve en el panel.
+      }
+    }
+    return { revisadas: pendientes.length, cambiadas };
+  }
+
+  /**
    * Lo que costaría hoy ese plan para ese club, sin crear nada.
    *
    * ── Por qué hace falta ──
@@ -144,6 +251,12 @@ export class SubscriptionsService {
     planId: string;
     startsAt: string; // ISO date string desde el body
     endsAt: string;
+    /**
+     * Cuántos meses compra este ciclo. Lo hereda cada renovación, así que
+     * ponerlo al crear evita que haya que repetirlo cada mes — y que un club
+     * trimestral se renueve por uno porque alguien no se acordó.
+     */
+    renewalMonths?: number;
     totalAmount?: string;
   }) {
     // ── El importe se CALCULA, no se teclea ──
@@ -163,8 +276,9 @@ export class SubscriptionsService {
       .limit(1);
     if (!plan) throw new NotFoundException('Ese plan no existe.');
 
+    const meses = Math.min(Math.max(Math.trunc(data.renewalMonths ?? 1), 1), 24);
     const personas = await personasDe(data.orgId);
-    const calculado = importeDelPeriodo(plan, personas, 1);
+    const calculado = importeDelPeriodo(plan, personas, meses);
 
     // `totalAmount` explícito sigue mandando: hay cobros que se pactan (un
     // descuento del primer mes, una cortesía). Lo que cambia es que ya no hace
@@ -182,6 +296,7 @@ export class SubscriptionsService {
         startsAt: aInstante(data.startsAt),
         endsAt: aInstante(data.endsAt),
         totalAmount: importe,
+        renewalMonths: meses,
         billedUsers: calculado.facturadas > 0 ? calculado.facturadas : null,
         // status y paymentStatus toman sus defaults del schema
       })
@@ -710,6 +825,19 @@ export class SubscriptionsService {
     // mañana siguiente — con el maestro delante, habiendo pagado, y sin poder
     // pasar lista.
     await this.revisarPlanDelClub(fila?.orgId);
+
+    // Se acabó lo pendiente: los avisos de «vence» y «venció» dejan de ser
+    // verdad, y un aviso que ya no es verdad no se enseña. Se resuelven por el
+    // id de la suscripción, que es con el que se escribieron.
+    void this.avisos.resolverPor(id);
+    if (fila?.orgId) {
+      void this.avisos.avisar({
+        orgId: fila.orgId,
+        kind: 'plan_pagado',
+        entityId: id,
+        data: { importe: abonado.toFixed(0) },
+      });
+    }
     return { suscripcion: fila, pago, venceEl: hasta };
   }
 
@@ -919,7 +1047,14 @@ export class SubscriptionsService {
    *
    * Son unas decenas de clubes y una llamada por cada uno, una vez al día.
    */
-  async barrerPlanes(): Promise<{ clubes: number; alDia: number; enPausa: number }> {
+  async barrerPlanes(): Promise<{
+    clubes: number;
+    alDia: number;
+    enPausa: number;
+    creados: number;
+    sinEspejo: number;
+    noLlego: number;
+  }> {
     const orgs = await db
       .select({
         id: organizations.id,
@@ -930,7 +1065,8 @@ export class SubscriptionsService {
       .from(organizations)
       .where(eq(organizations.isActive, true));
 
-    if (orgs.length === 0) return { clubes: 0, alDia: 0, enPausa: 0 };
+    if (orgs.length === 0)
+      return { clubes: 0, alDia: 0, enPausa: 0, creados: 0, sinEspejo: 0, noLlego: 0 };
 
     const apps = await appsPorOrganizacion(orgs.map((o) => o.id));
 
@@ -972,7 +1108,19 @@ export class SubscriptionsService {
 
     let alDia = 0;
     let enPausa = 0;
+    let creados = 0;
+    let sinEspejo = 0;
+    let noLlego = 0;
 
+    // ── Se ESPERA a cada aviso, y esa es la diferencia ──
+    //
+    // Antes se disparaban y se olvidaban, así que este método informaba de lo
+    // que INTENTÓ y no de lo que llegó: se corría el cron, salía «8 al día» y en
+    // Membresías seguían viéndose tres. El número decía que todo fue bien y la
+    // pantalla decía que no, que es la peor combinación para diagnosticar.
+    //
+    // Son unas decenas de clubes una vez al día: esperar cuesta segundos y
+    // convierte «no pasa nada» en un número que dice dónde se rompe.
     for (const o of orgs) {
       const abre = (apps.get(o.id) ?? []).includes('membresias');
       if (abre) alDia += 1;
@@ -980,10 +1128,27 @@ export class SubscriptionsService {
       // Con el nombre: el barrido es además la red que recoge a los clubes que
       // tienen plan y nunca llegaron a existir allá —los que se contrataron
       // antes de que esto existiera—, sin que nadie tenga que tocarlos.
-      espejarPlan(o.id, abre, o);
+      const r = await espejarPlan(o.id, abre, o);
+      if (r === null) noLlego += 1;
+      else if (r.creado) creados += 1;
+      else if (r.encontrado === false) sinEspejo += 1;
     }
 
-    return { clubes: orgs.length, alDia, enPausa };
+    return {
+      clubes: orgs.length,
+      alDia,
+      enPausa,
+      /** Clubes que tenían plan y no existían en Membresías: nacieron ahora. */
+      creados,
+      /** Contestaron «no lo tengo» y no se pudo crear: sin plan, o sin nombre. */
+      sinEspejo,
+      /**
+       * Avisos que NO salieron. **Si este número no es cero, el problema no es
+       * de datos**: falta `MEMBRESIAS_SYNC_URL` o el secreto, o Membresías no
+       * responde. Está en el log del ecosystem, línea por línea.
+       */
+      noLlego,
+    };
   }
 
   async avisarVencimientos(opciones: { soloId?: string; forzar?: boolean } = {}) {
@@ -1009,6 +1174,26 @@ export class SubscriptionsService {
           continue;
         }
       }
+
+      // ── Y a la CAMPANA, que es donde el maestro mira ──
+      //
+      // El correo está bien para quien lo lee. Pero el maestro vive en la
+      // campana del portal: es donde ve que alguien quiere entrar y que alguien
+      // se fue. Su propia suscripción era lo único que NO aparecía ahí — o sea
+      // que la única cosa que puede cerrarle la aplicación entera era la que
+      // menos se veía. Es el mismo trato que Membresías le da al alumno con su
+      // mensualidad.
+      //
+      // Va fuera del `try` del correo a propósito: que no haya SMTP configurado
+      // no puede dejar al maestro sin el aviso de que su plan vence.
+      void this.avisos.avisar({
+        orgId: v.orgId,
+        kind: clase === 'VENCIDA' ? 'plan_vencido' : 'plan_por_vencer',
+        // El id de la suscripción: es lo que hace que el aviso se resuelva solo
+        // al renovar, sin que nadie lo marque como leído.
+        entityId: v.id,
+        data: { dias: v.dias, importe: v.totalAmount },
+      });
 
       // Los gestores del club. Si no hay ninguno con correo, no hay a quién
       // avisar — y eso no es un fallo: es un club sin maestro registrado.

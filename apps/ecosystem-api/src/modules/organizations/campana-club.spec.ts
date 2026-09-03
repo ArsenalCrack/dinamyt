@@ -211,11 +211,23 @@ describe('La campana del club · lo que ya está hecho desaparece', () => {
     expect(idsEn(filtros[0])).toEqual([SOLICITUD]);
   });
 
-  it('«alguien quiere entrar» es el único que se resuelve solo', () => {
-    // Los demás son noticias —entró alguien, se fue alguien— y no piden nada:
-    // se leen y se quedan. Si algún día otro tipo se vuelve resoluble, esto
-    // obliga a decidirlo a propósito en vez de por descuido.
-    expect(AVISOS_RESOLUBLES).toEqual(['solicitud_entrada']);
+  it('los resolubles son los que dejan de ser verdad solos, y ninguno más', () => {
+    // Esta prueba ya hizo su trabajo una vez: al añadir los avisos del plan
+    // (§4.19) saltó, y obligó a decidir a propósito cuáles se resuelven en vez
+    // de que entraran por descuido. La lista se amplía a mano, nunca sola.
+    //
+    // · `solicitud_entrada` deja de ser verdad al responderla.
+    // · `plan_por_vencer` y `plan_vencido`, al pagar — y por eso `renovar`
+    //   llama a `resolverPor`. Un «tu plan vence en 5 días» que sigue ahí una
+    //   semana después de haber pagado es lo que enseña a ignorar la campana.
+    //
+    // Los demás son noticias —entró alguien, se fue alguien, recibimos tu
+    // pago— y no piden nada: se leen y se quedan.
+    expect(AVISOS_RESOLUBLES).toEqual([
+      'solicitud_entrada',
+      'plan_por_vencer',
+      'plan_vencido',
+    ]);
   });
 });
 

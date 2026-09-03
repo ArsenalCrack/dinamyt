@@ -28,6 +28,42 @@ export function hoyISO(): string {
   return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
+/**
+ * Suma meses a una fecha civil `YYYY-MM-DD`, sin pasar por `Date`.
+ *
+ * ── Por qué a mano y no con `setMonth` ──
+ *
+ * Porque `new Date('2026-01-31')` y `setMonth(+1)` da **el 3 de marzo**: el 31
+ * de febrero no existe y JavaScript desborda al mes siguiente en vez de
+ * recortar. Un club que contrata el 31 de enero acabaría con el periodo
+ * empezando en enero y terminando en marzo, y nadie lo miraría.
+ *
+ * Aquí el día se **recorta al último del mes destino**, que es lo que espera
+ * cualquiera: del 31 de enero, un mes es el 28 (o 29) de febrero.
+ *
+ * Es la misma regla que aplica `anclaDe`/`siguienteVencimiento` en la API
+ * (`common/ciclo.ts`). Se repite a propósito y no se importa: el portal no
+ * puede depender del paquete del servidor, y **las dos están probadas**.
+ */
+export function sumarMeses(fecha: string, meses: number): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((fecha ?? '').trim());
+  if (!m) return '';
+  const anio = Number(m[1]);
+  const mes = Number(m[2]);
+  const dia = Number(m[3]);
+  const sumados = Math.max(1, Math.trunc(meses) || 1);
+
+  const total = mes - 1 + sumados;
+  const anioDestino = anio + Math.floor(total / 12);
+  const mesDestino = (total % 12) + 1;
+  // Día 0 del mes SIGUIENTE es el último del destino: así se sabe cuánto mide
+  // sin tabla de meses ni casos de año bisiesto escritos a mano.
+  const ultimo = new Date(Date.UTC(anioDestino, mesDestino, 0)).getUTCDate();
+  const diaDestino = Math.min(dia, ultimo);
+
+  return `${anioDestino}-${String(mesDestino).padStart(2, '0')}-${String(diaDestino).padStart(2, '0')}`;
+}
+
 // Límites de fecha de nacimiento: entre 100 y 3 años de edad.
 export function limitesFechaNacimiento(): { min: string; max: string } {
   const hoy = new Date();
