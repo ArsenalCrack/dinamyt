@@ -127,7 +127,10 @@ export function FilaMiembro({
           se niega a encogerse por debajo de su contenido y el recorte no
           llega a aplicarse nunca. */}
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
-        <Avatar src={m.avatarUrl} nombre={m.fullName} size={32} />
+        {/* Ampliable: en una lista de doscientos, treinta y dos píxeles no
+            bastan para reconocer a nadie. La fila no es un enlace ni un botón,
+            así que aquí el anidado no es problema. */}
+        <Avatar src={m.avatarUrl} nombre={m.fullName} size={32} ampliable />
         <div className="min-w-0">
           <p className="truncate font-semibold" title={m.fullName}>
             {m.fullName}

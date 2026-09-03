@@ -149,7 +149,9 @@ function Login() {
         </p>
 
         <label className="muted" style={{ fontSize: '0.8rem' }} htmlFor="email">Correo</label>
-        <input id="email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ margin: '0.3rem 0 0.9rem' }} />
+        {/* 200 es el tope que valida el ecosystem (`validarCorreo`): más
+            largo que eso no es un correo que exista. */}
+        <input id="email" type="email" maxLength={200} autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ margin: '0.3rem 0 0.9rem' }} />
 
         <label className="muted" style={{ fontSize: '0.8rem' }} htmlFor="password">Contraseña</label>
         {/* El ojo: el MISMO componente y el mismo dibujo que el portal,

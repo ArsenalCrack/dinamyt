@@ -1,7 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { PROPS_CORREO } from '@/lib/validacion';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { PROPS_CORREO,
+  LIM,
+  soloLetras,
+} from '@/lib/validacion';
 import {
   verCodigoClubAPI,
   rotarCodigoClubAPI,
@@ -232,6 +235,32 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
   const enElAire = invitaciones.filter((i) => i.status === 'PENDIENTE');
 
+  /**
+   * ── La tarjeta se pliega, y se abre sola cuando hay alguien esperando ──
+   *
+   * Es la sección más alta de la pantalla: dos puertas, cada una con su lista
+   * de espera, un código, un formulario de cuatro campos y el historial de
+   * invitaciones. Todo eso vive encima de la lista de gente del club, que es lo
+   * que el maestro abre a diario, y hay que pasarlo entero con la rueda cada
+   * vez. Pero es que además casi siempre está vacío: el código se reparte una
+   * vez y las invitaciones se mandan de higos a brevas.
+   *
+   * Plegarla y ya sería peor —una bandeja que no se ve es una bandeja que nadie
+   * abre, que es justo lo que este componente vino a arreglar—, así que se abre
+   * SOLA en cuanto hay una solicitud o una invitación en el aire, y el título
+   * dice cuántas aunque esté cerrada. Cerrada por gusto, se queda cerrada:
+   * `yaSeAbrioSola` impide que se vuelva a abrir en cada recarga de la lista.
+   */
+  const esperando = solicitudes.length + enElAire.length;
+  const [abierta, setAbierta] = useState(false);
+  const yaSeAbrioSola = useRef(false);
+  useEffect(() => {
+    if (esperando > 0 && !yaSeAbrioSola.current) {
+      yaSeAbrioSola.current = true;
+      setAbierta(true);
+    }
+  }, [esperando]);
+
   return (
     <section
       // El ancla al que salta la campana desde «alguien quiere entrar». Sin
@@ -241,8 +270,38 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       className="card p-5"
       style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
     >
-      <h2 className="mb-1 text-lg font-semibold">Entrada al club</h2>
-      <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <button
+        type="button"
+        onClick={() => setAbierta((a) => !a)}
+        aria-expanded={abierta}
+        className="flex w-full items-center justify-between gap-3 text-left"
+        style={{ background: 'none', border: 0, padding: 0, color: 'inherit' }}
+      >
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold">Entrada al club</h2>
+          {esperando > 0 && (
+            <span className="badge badge-gold">
+              {esperando} esperando
+            </span>
+          )}
+        </span>
+        <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>
+          {abierta ? '▾' : '▸'}
+        </span>
+      </button>
+
+      {!abierta && (
+        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Tu código y tus invitaciones.{' '}
+          {esperando > 0
+            ? 'Hay gente esperando respuesta.'
+            : 'Ábrelo cuando quieras sumar a alguien.'}
+        </p>
+      )}
+
+      {abierta && (
+        <>
+      <p className="mb-5 mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
         Dos puertas, y las dos las cierra alguien: <b>tú repartes el código</b> y
         aceptas a quien lo teclee, o <b>tú invitas</b> y la persona acepta. En
         cualquiera de las dos, su ficha se crea sola en Membresías al entrar.
@@ -432,7 +491,6 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         <input
           placeholder="correo@persona.com"
           {...PROPS_CORREO}
-          maxLength={200}
           value={nueva.email}
           onChange={(e) => setNueva({ ...nueva, email: e.target.value })}
           aria-label="Correo de quien invitas"
@@ -453,11 +511,22 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           <span style={{ color: 'var(--text-muted)' }}>
             Nombre completo — solo si todavía no tiene cuenta
           </span>
+          {/* `soloLetras` y no texto libre: este nombre nace como el de una
+              PERSONA —crea su cuenta si no la tiene— y el servidor lo rechaza
+              con números (`validarNombre`). Dejarlo teclear para contestar
+              después «solo puede contener letras» es hacer escribir dos veces.
+              Va en mayúsculas por lo mismo que en la ficha: así se guarda, así
+              sale en el carnet, y verlo distinto hace dudar de si quedó bien. */}
           <input
             className="mt-1"
-            maxLength={200}
+            maxLength={LIM.nombrePersona}
             value={nueva.fullName}
-            onChange={(e) => setNueva({ ...nueva, fullName: e.target.value })}
+            onChange={(e) =>
+              setNueva({
+                ...nueva,
+                fullName: soloLetras(e.target.value).toLocaleUpperCase('es'),
+              })
+            }
             placeholder="ANA RESTREPO"
           />
         </label>
@@ -467,7 +536,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           </span>
           <input
             className="mt-1"
-            maxLength={300}
+            maxLength={LIM.nota}
             value={nueva.note}
             onChange={(e) => setNueva({ ...nueva, note: e.target.value })}
             placeholder="«eres del grupo de los martes»"
@@ -569,6 +638,8 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           </li>
         ))}
       </ul>
+        </>
+      )}
 
       {error && <p className="msg-error mt-3 text-sm">{error}</p>}
       {ok && <p className="msg-ok mt-3 text-sm">{ok}</p>}

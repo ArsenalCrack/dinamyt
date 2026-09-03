@@ -14,6 +14,7 @@ import {
   TIPOS_SANGRE,
   CINTURONES_GRADO,
   GENEROS,
+  LIM,
 } from '@/lib/validacion';
 import { Avatar } from '@/components/Avatar';
 import { CampoFecha } from '@/components/CampoFecha';
@@ -223,7 +224,7 @@ export default function EditarMiembroPage() {
       </Link>
 
       <header className="card mt-3 mb-4 flex flex-wrap items-center gap-4 p-5">
-        <Avatar src={perfil.avatarUrl} nombre={perfil.fullName} size={72} />
+        <Avatar src={perfil.avatarUrl} nombre={perfil.fullName} size={72} ampliable />
         <div className="min-w-0 flex-1">
           <p className="eyebrow mb-1">Edición del staff</p>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--gold)' }}>
@@ -282,6 +283,7 @@ export default function EditarMiembroPage() {
             <input
               className="mt-1"
               value={form.fullName}
+              maxLength={LIM.nombrePersona}
               onChange={(e) =>
                 setForm({ ...form, fullName: soloLetras(e.target.value).toLocaleUpperCase('es') })
               }
@@ -363,6 +365,7 @@ export default function EditarMiembroPage() {
               type="tel"
               inputMode="tel"
               value={form.phone}
+              maxLength={LIM.telefono}
               onChange={(e) => setForm({ ...form, phone: soloTelefono(e.target.value) })}
             />
           </label>
@@ -393,6 +396,7 @@ export default function EditarMiembroPage() {
             <input
               className="mt-1"
               value={form.emergencyContactName}
+              maxLength={LIM.nombrePersona}
               onChange={(e) =>
                 setForm({ ...form, emergencyContactName: soloLetras(e.target.value) })
               }
@@ -405,6 +409,7 @@ export default function EditarMiembroPage() {
               type="tel"
               inputMode="tel"
               value={form.emergencyContactPhone}
+              maxLength={LIM.telefono}
               onChange={(e) =>
                 setForm({ ...form, emergencyContactPhone: soloTelefono(e.target.value) })
               }
@@ -434,6 +439,7 @@ export default function EditarMiembroPage() {
             className="mt-1"
             rows={3}
             value={form.medicalNotes}
+            maxLength={LIM.notasMedicas}
             onChange={(e) => setForm({ ...form, medicalNotes: e.target.value })}
           />
         </label>

@@ -10,10 +10,13 @@ import {
   extraerError,
   type MiClub,
 } from '@/lib/api';
-import { soloTelefono, comprimirAvatar } from '@/lib/validacion';
+import { soloTelefono, comprimirAvatar,
+  LIM,
+} from '@/lib/validacion';
 import { nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { PaisCiudad } from '@/components/PaisCiudad';
+import { Ampliable } from '@/components/VisorImagen';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -162,13 +165,15 @@ export default function MiClubPage() {
             {/* Identidad visual: logo + nombre */}
             <div className="flex flex-wrap items-center gap-4">
               {nuevo.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={nuevo.logoUrl}
-                  alt="Logo del club"
-                  className="h-20 w-20 rounded-xl object-cover"
-                  style={{ border: '2px solid var(--gold-dim)' }}
-                />
+                <Ampliable src={nuevo.logoUrl} alt="Logo del club" logo>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={nuevo.logoUrl}
+                    alt="Logo del club"
+                    className="h-20 w-20 rounded-xl object-cover"
+                    style={{ border: '2px solid var(--gold-dim)' }}
+                  />
+                </Ampliable>
               ) : (
                 <div
                   className="flex h-20 w-20 items-center justify-center rounded-xl text-3xl"
@@ -212,7 +217,7 @@ export default function MiClubPage() {
                   value={nuevo.name}
                   onChange={(e) => setNuevo({ ...nuevo, name: e.target.value })}
                   required
-                  maxLength={200}
+                  maxLength={LIM.orgNombre}
                 />
               </label>
               <label className="block text-sm">
@@ -222,6 +227,7 @@ export default function MiClubPage() {
                   type="tel"
                   inputMode="tel"
                   value={nuevo.phone}
+                  maxLength={LIM.telefono}
                   onChange={(e) => setNuevo({ ...nuevo, phone: soloTelefono(e.target.value) })}
                   placeholder="300 123 4567"
                 />
@@ -241,6 +247,7 @@ export default function MiClubPage() {
                   className="mt-1"
                   type="url"
                   value={nuevo.red1}
+                  maxLength={LIM.url}
                   onChange={(e) => setNuevo({ ...nuevo, red1: e.target.value })}
                   placeholder="https://instagram.com/tuclub"
                 />
@@ -251,6 +258,7 @@ export default function MiClubPage() {
                   className="mt-1"
                   type="url"
                   value={nuevo.red2}
+                  maxLength={LIM.url}
                   onChange={(e) => setNuevo({ ...nuevo, red2: e.target.value })}
                   placeholder="https://facebook.com/tuclub"
                 />
@@ -262,6 +270,7 @@ export default function MiClubPage() {
                 className="mt-1"
                 rows={2}
                 value={nuevo.description}
+                maxLength={LIM.descripcion}
                 onChange={(e) => setNuevo({ ...nuevo, description: e.target.value })}
                 placeholder="Qué se entrena, para quién, desde cuándo…"
               />

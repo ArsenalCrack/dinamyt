@@ -402,9 +402,12 @@ export function CampanaOrg() {
                     className="btn btn-outline btn-sm w-full"
                     onClick={() => void alternarPush()}
                   >
+                    {/* «En este dispositivo» y no «al celular»: el botón está
+                        igual en el PC, y llamarlo celular hacía pensar que
+                        desde el computador no era para uno. */}
                     {push === 'activo'
                       ? '🔕 No avisarme en este dispositivo'
-                      : '🔔 Avisarme también al celular'}
+                      : '🔔 Avisarme en este dispositivo'}
                   </button>
                 )}
                 {msgPush && (

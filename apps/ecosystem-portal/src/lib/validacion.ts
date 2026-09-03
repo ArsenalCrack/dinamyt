@@ -234,6 +234,57 @@ export function comprimirAvatar(file: File, lado = 320): Promise<string> {
 // quien lo escribió. Es la misma forma que usa Membresías.
 // ════════════════════════════════════════════════════════════════════════════
 
+// ── Cuánto se puede ESCRIBIR en cada campo ──────────────────────────────────
+//
+// ── Por qué hacía falta ──
+//
+// Las funciones de abajo ya rechazaban un nombre de 300 letras o un documento
+// de 40 cifras… **después** de escribirlos. Se podía teclear sin fin, y el aviso
+// llegaba al enviar: «el nombre es demasiado largo» sobre un campo lleno, sin
+// decir cuánto sobra. Un tope en el propio campo no deja llegar a esa pantalla.
+//
+// Y algunos ni siquiera se rechazaban: la contraseña se podía pegar de mil
+// caracteres —bcrypt solo mira los primeros 72, así que los otros 928 eran
+// decorado—, y las notas médicas o la descripción del club iban a columnas
+// `text`, que aceptan lo que sea hasta que alguien pega un libro.
+//
+// **La regla:** este número nunca es más estricto que el del servidor. Es el
+// mismo, o el de la columna. Un campo que corta antes de lo que el servidor
+// acepta deja a alguien sin poder escribir su propio apellido.
+export const LIM = {
+  /** `validarCorreo` rechaza a partir de aquí. */
+  correo: 200,
+  /** Igual que `validarNombreCompleto`, y que la columna `users.full_name`. */
+  nombrePersona: 200,
+  /** `validarDocumento`: entre 4 y 20 dígitos. */
+  documento: 20,
+  /** La columna es `varchar(30)`; en dígitos, `validarTelefono` pide 7–15. */
+  telefono: 30,
+  /** bcrypt solo mira los primeros 72 bytes; más allá es decorado. */
+  password: 72,
+  /** `organizations.name` es `varchar(200)`. */
+  orgNombre: 200,
+  /** Las dos son `varchar(100)`. */
+  ciudad: 100,
+  pais: 100,
+  /** Dirección de la sede: una línea, no un párrafo. */
+  direccion: 200,
+  /** Un enlace de red social. Las URLs de verdad no pasan de aquí. */
+  url: 300,
+  /** Descripción del club y horarios: párrafos cortos, no un folleto. */
+  descripcion: 1000,
+  /** Lo que alguien necesita que su maestro sepa. Va cifrado. */
+  notasMedicas: 2000,
+  /** El mensaje que acompaña a una invitación o a una solicitud. */
+  nota: 300,
+  /** No viaja a ninguna columna, pero tampoco es infinito. */
+  busqueda: 80,
+  /** Un monto en pesos: nueve cifras son mil millones. */
+  dinero: 9,
+  /** Nadie renueva por más de 99 meses de golpe. */
+  meses: 2,
+} as const;
+
 export type Campo = { ok: true; valor: string } | { ok: false; error: string };
 
 const bien = (valor: string): Campo => ({ ok: true, valor });
@@ -283,6 +334,11 @@ export const PROPS_CORREO = {
   autoCapitalize: 'none',
   autoCorrect: 'off',
   spellCheck: false,
+  // El tope va AQUÍ y no en cada pantalla: `PROPS_CORREO` se reparte por
+  // login, registro, recuperar, verificar, la ficha del club y la invitación,
+  // y un límite que hay que acordarse de copiar en seis sitios es un límite
+  // que falta en tres. Es el mismo número que rechaza `validarCorreo`.
+  maxLength: LIM.correo,
 } as const;
 
 export function validarCorreo(valor: string): Campo {

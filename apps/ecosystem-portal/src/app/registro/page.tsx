@@ -23,6 +23,7 @@ import {
   sugerenciaDeCorreo,
   GENEROS,
   type Campo as Resultado,
+  LIM,
 } from '@/lib/validacion';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
@@ -280,7 +281,7 @@ export default function RegistroPage() {
               onBlur={marcar('fullName')}
               autoComplete="name"
               placeholder="NOMBRE APELLIDO"
-              maxLength={200}
+              maxLength={LIM.nombrePersona}
             />
           </Campo>
         </div>
@@ -321,7 +322,6 @@ export default function RegistroPage() {
               onBlur={marcar('email')}
               autoComplete="email"
               placeholder="tucorreo@gmail.com"
-              maxLength={200}
             />
           </Campo>
         </div>
@@ -335,7 +335,6 @@ export default function RegistroPage() {
               onChange={set('password')}
               onBlur={marcar('password')}
               autoComplete="new-password"
-              maxLength={72}
             />
           </Campo>
           {/* Los mínimos, a la vista mientras se teclea, en vez de un «mín. 8
@@ -371,7 +370,7 @@ export default function RegistroPage() {
                 onChange={set('documentId')}
                 onBlur={marcar('documentId')}
                 inputMode="numeric"
-                maxLength={20}
+                maxLength={LIM.documento}
                 placeholder="1000000000"
               />
             </Campo>
@@ -387,7 +386,7 @@ export default function RegistroPage() {
                 type="tel"
                 inputMode="tel"
                 autoComplete="tel"
-                maxLength={20}
+                maxLength={LIM.telefono}
                 placeholder="3001112233"
               />
             </Campo>

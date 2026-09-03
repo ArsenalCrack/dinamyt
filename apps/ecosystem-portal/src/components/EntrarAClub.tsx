@@ -7,6 +7,7 @@ import {
   extraerError,
   type MiSolicitud,
 } from '@/lib/api';
+import { LIM } from '@/lib/validacion';
 
 /**
  * «Tengo el código de mi club» — el camino C de §2.1 del plan.
@@ -138,7 +139,7 @@ export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
           value={nota}
           onChange={(e) => setNota(e.target.value)}
           placeholder="Opcional: «soy el papá de Ana», «entreno los martes»"
-          maxLength={300}
+          maxLength={LIM.nota}
         />
       </label>
 

@@ -166,10 +166,33 @@ export default function DashboardPage() {
      * Se pinta con el token viejo mientras tanto (`setPayload(p)` de arriba)
      * para que la pantalla no parpadee en blanco, y se repinta con el nuevo.
      */
+    /**
+     * ── Y lo segundo es pedir los datos, SIN esperar al pase nuevo ──
+     *
+     * Esto estaba encadenado: primero el refresco, y solo cuando volvía se
+     * pedían el perfil, el club y las invitaciones. Dos viajes seguidos para
+     * cosas que no dependen una de otra, y se notaba exactamente donde el
+     * usuario lo contó: el nombre, el saludo y los botones salían al instante
+     * —vienen del pase que ya estaba guardado— mientras la FOTO y la CAMPANA
+     * llegaban tarde, porque las dos salen de `cargar`. Parecía que la mitad
+     * del dashboard cargaba a otra velocidad, y era verdad.
+     *
+     * Encadenarlas no hacía falta: `cargar` solo usa `p.sub` —que es el mismo
+     * en el pase viejo y en el nuevo— y las tres consultas las responde el
+     * servidor mirando la base, no el pase. Un pase de hace diez minutos
+     * devuelve exactamente los mismos datos.
+     *
+     * Lo que sí depende del pase nuevo son los botones de aplicaciones
+     * (`app_scopes`) y el club, así que el refresco sigue, en paralelo; y si
+     * vuelve con OTRA organización —alguien aceptó una solicitud mientras
+     * tanto— se vuelve a preguntar, que es el caso que este refresco vino a
+     * arreglar.
+     */
+    void cargar(p);
     void refrescarSesionAPI().then((fresco) => {
-      const vigente = fresco ?? p;
-      if (fresco) setPayload(fresco);
-      void cargar(vigente);
+      if (!fresco) return;
+      setPayload(fresco);
+      if (fresco.org_id !== p.org_id) void cargar(fresco);
     });
   }, [router, cargar]);
 
@@ -269,7 +292,10 @@ export default function DashboardPage() {
             partiera. Con 14rem de base, lo que cede primero es la fila: los
             botones bajan y el saludo se queda entero. */}
         <div className="flex min-w-0 items-center gap-4" style={{ flex: '1 1 14rem' }}>
-          <Avatar src={foto} nombre={payload.fullName} size={56} />
+          {/* La tuya, ampliable: es la que se acaba de subir en «Mi perfil» y
+              la única forma de comprobar cómo quedó el encuadre sin abrir otra
+              aplicación. */}
+          <Avatar src={foto} nombre={payload.fullName} size={56} ampliable />
           <div className="min-w-0" style={{ overflowWrap: 'anywhere' }}>
             <p className="eyebrow mb-1">Tu cuenta DINAMYT</p>
             <h1 className="display text-2xl sm:text-3xl">Hola, {payload.fullName}</h1>

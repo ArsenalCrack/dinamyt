@@ -34,9 +34,16 @@ type Props = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   verInicial?: boolean;
 };
 
+/** bcrypt solo mira los primeros 72 bytes; más allá es decorado. */
+const PASSWORD_MAX = 72;
+
 export function CampoContrasena({
   verInicial = false,
   className = '',
+  // El tope viene de fábrica y no de cada pantalla: lo que se escriba pasados
+  // los 72 bytes no forma parte de la contraseña, así que dejarlo teclear es
+  // enseñar una seguridad que no existe.
+  maxLength = PASSWORD_MAX,
   ...props
 }: Props) {
   const [ver, setVer] = useState(verInicial);
@@ -46,6 +53,7 @@ export function CampoContrasena({
     <span className="campo-pass">
       <input
         {...props}
+        maxLength={maxLength}
         type={ver ? 'text' : 'password'}
         className={`w-full ${className}`.trim()}
       />

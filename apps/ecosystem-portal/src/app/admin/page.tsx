@@ -60,6 +60,7 @@ import { Aviso, type Mensaje } from '@/components/Aviso';
 import { SelectMenu } from '@/components/SelectMenu';
 import { PanelRecaudo } from '@/components/PanelRecaudo';
 import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
+import { LIM } from '@/lib/validacion';
 
 const TIPOS_ORG = ['FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY'] as const;
 
@@ -443,6 +444,7 @@ export default function AdminEcosistemaPage() {
           <div className="grid gap-2 sm:grid-cols-2">
             <input
               placeholder="Nombre *"
+              maxLength={LIM.orgNombre}
               value={nuevaOrg.name}
               onChange={(e) => setNuevaOrg({ ...nuevaOrg, name: e.target.value })}
             />
@@ -456,11 +458,13 @@ export default function AdminEcosistemaPage() {
             />
             <input
               placeholder="Ciudad"
+              maxLength={LIM.ciudad}
               value={nuevaOrg.city}
               onChange={(e) => setNuevaOrg({ ...nuevaOrg, city: e.target.value })}
             />
             <input
               placeholder="País"
+              maxLength={LIM.pais}
               value={nuevaOrg.country}
               onChange={(e) => setNuevaOrg({ ...nuevaOrg, country: e.target.value })}
             />
@@ -520,6 +524,7 @@ export default function AdminEcosistemaPage() {
                   «sin miembros» con los resultados esperando en la 1. */}
               <input
                 value={busquedaGente}
+                maxLength={LIM.busqueda}
                 onChange={(e) => {
                   setBusquedaGente(e.target.value);
                   setOffsetGente(0);
@@ -719,6 +724,7 @@ export default function AdminEcosistemaPage() {
                 />
                 <input
                   placeholder="Monto total"
+                  maxLength={LIM.dinero}
                   value={nuevaSub.totalAmount}
                   onChange={(e) => setNuevaSub({ ...nuevaSub, totalAmount: e.target.value })}
                 />
@@ -1134,6 +1140,7 @@ function ClubesDeLaFederacion({
           <div className="flex flex-wrap gap-2">
             <input
               placeholder="Buscar club por nombre…"
+              maxLength={LIM.busqueda}
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               onKeyDown={(e) => {
@@ -1238,18 +1245,20 @@ function ClubesDeLaFederacion({
           <div className="grid gap-2 sm:grid-cols-2">
             <input
               placeholder="Nombre del club *"
-              maxLength={200}
+              maxLength={LIM.orgNombre}
               value={nuevoClub.name}
               onChange={(e) => setNuevoClub({ ...nuevoClub, name: e.target.value })}
               className="sm:col-span-2"
             />
             <input
               placeholder="Ciudad"
+              maxLength={LIM.ciudad}
               value={nuevoClub.city}
               onChange={(e) => setNuevoClub({ ...nuevoClub, city: e.target.value })}
             />
             <input
               placeholder="País"
+              maxLength={LIM.pais}
               value={nuevoClub.country}
               onChange={(e) => setNuevoClub({ ...nuevoClub, country: e.target.value })}
             />

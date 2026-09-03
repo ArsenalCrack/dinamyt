@@ -202,7 +202,6 @@ function Recuperar() {
                   onChange={(e) => setClave(e.target.value)}
                   onBlur={() => setTocado((t) => ({ ...t, clave: true }))}
                   autoComplete="new-password"
-                  maxLength={72}
                 />
               </Campo>
               <div className="-mt-2 mb-4">
@@ -223,7 +222,6 @@ function Recuperar() {
                   onChange={(e) => setRepetida(e.target.value)}
                   onBlur={() => setTocado((t) => ({ ...t, repetida: true }))}
                   autoComplete="new-password"
-                  maxLength={72}
                 />
               </Campo>
             </div>

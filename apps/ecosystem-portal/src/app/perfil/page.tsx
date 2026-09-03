@@ -14,8 +14,10 @@ import {
   limitesFechaNacimiento,
   PARENTESCOS,
   GENEROS,
+  TIPOS_SANGRE,
   comprimirAvatar,
   validarContrasena,
+  LIM,
 } from '@/lib/validacion';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
@@ -23,6 +25,7 @@ import { SelectMenu } from '@/components/SelectMenu';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
 import { DispositivosConectados } from '@/components/DispositivosConectados';
 import { ZonaHoraria } from '@/components/ZonaHoraria';
+import { Ampliable } from '@/components/VisorImagen';
 
 interface Disciplina {
   id: string;
@@ -70,7 +73,7 @@ function progresoPerfil(p: Perfil, avatarActual: string) {
     { etiqueta: 'Fecha de nacimiento', ok: !!p.birthDate },
     { etiqueta: 'Contacto de emergencia', ok: !!p.emergencyContactName && !!p.emergencyContactPhone },
     { etiqueta: 'Parentesco del contacto', ok: !!p.emergencyContactRelationship },
-    { etiqueta: 'Tipo de sangre (lo registra tu maestro)', ok: !!p.bloodType },
+    { etiqueta: 'Tipo de sangre', ok: !!p.bloodType },
     { etiqueta: 'Disciplina y grado (los asigna tu maestro)', ok: p.disciplines.length > 0 },
   ];
   const hechos = items.filter((i) => i.ok).length;
@@ -96,6 +99,7 @@ export default function PerfilPage() {
     phone: '',
     birthDate: '',
     gender: '',
+    bloodType: '',
     avatarUrl: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
@@ -134,6 +138,7 @@ export default function PerfilPage() {
         phone: p.phone ?? '',
         birthDate: p.birthDate ? p.birthDate.slice(0, 10) : '',
         gender: p.gender ?? '',
+        bloodType: p.bloodType ?? '',
         avatarUrl: p.avatarUrl ?? '',
         emergencyContactName: p.emergencyContactName ?? '',
         emergencyContactPhone: p.emergencyContactPhone ?? '',
@@ -175,6 +180,10 @@ export default function PerfilPage() {
         // El género se manda solo si todavía no estaba: rellenar un hueco sí,
         // cambiarlo no. Las cuentas importadas llegan sin él.
         ...(perfil.gender ? {} : { gender: form.gender || null }),
+        // Y el tipo de sangre igual: se rellena si falta, no se cambia. El
+        // servidor aplica la misma regla, así que mandarlo cuando ya está
+        // registrado sería pedir un error que no hace falta pedir.
+        ...(perfil.bloodType ? {} : { bloodType: form.bloodType || null }),
         phone: form.phone || null,
         avatarUrl: form.avatarUrl || null,
         emergencyContactName: form.emergencyContactName || null,
@@ -309,13 +318,15 @@ export default function PerfilPage() {
       <section className="card mb-4 p-5">
         <div className="flex flex-wrap items-center gap-5">
           {form.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={form.avatarUrl}
-              alt="Tu foto de perfil"
-              className="h-24 w-24 shrink-0 rounded-full object-cover"
-              style={{ border: '2px solid var(--gold)' }}
-            />
+            <Ampliable src={form.avatarUrl} alt="Tu foto de perfil">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={form.avatarUrl}
+                alt="Tu foto de perfil"
+                className="h-24 w-24 shrink-0 rounded-full object-cover"
+                style={{ border: '2px solid var(--gold)' }}
+              />
+            </Ampliable>
           ) : (
             <div
               className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full text-3xl font-extrabold"
@@ -417,7 +428,12 @@ export default function PerfilPage() {
             'Teléfono (solo números)',
             form.phone,
             (v) => setForm({ ...form, phone: soloTelefono(v) }),
-            { type: 'tel', inputMode: 'tel', placeholder: '300 123 4567' },
+            {
+              type: 'tel',
+              inputMode: 'tel',
+              placeholder: '300 123 4567',
+              maxLength: LIM.telefono,
+            },
           )}
           <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Fecha de nacimiento</span>
@@ -465,18 +481,32 @@ export default function PerfilPage() {
                 : 'Con esto Campeonatos te ubica en tu categoría.'}
             </span>
           </div>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Tipo de sangre</span>
-            <input
-              className="mt-1"
-              value={perfil.bloodType ?? 'Por registrar'}
-              readOnly
-              style={{ opacity: 0.7 }}
-            />
+            {/* ── Se puede rellenar si falta; cambiarlo, no ──
+                Era un campo de solo lectura que decía «Por registrar» y no
+                dejaba registrar nada: la única salida era pedírselo al
+                maestro, para un dato que la persona sabe mejor que nadie y que
+                se imprime en su carnet. Ahora sigue la MISMA regla que el
+                género y la fecha de nacimiento —se pone una vez y después lo
+                corrige el maestro—, que es lo que ya esperaba quien miraba
+                esta pantalla. El servidor aplica la misma regla. */}
+            <div className="mt-1">
+              <SelectMenu
+                valor={form.bloodType}
+                etiquetaAria="Tipo de sangre"
+                disabled={!!perfil.bloodType}
+                placeholder="— Por registrar —"
+                onChange={(v) => setForm({ ...form, bloodType: v })}
+                opciones={TIPOS_SANGRE.map((s) => ({ valor: s, etiqueta: s }))}
+              />
+            </div>
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-              Lo registra tu maestro o un administrador.
+              {perfil.bloodType
+                ? 'Ya registrado: lo corrige tu maestro o un administrador.'
+                : 'Regístralo con cuidado: después solo lo corrige tu maestro.'}
             </span>
-          </label>
+          </div>
         </div>
 
         <h2 className="mt-2 text-lg font-semibold">Contacto de emergencia</h2>
@@ -485,12 +515,13 @@ export default function PerfilPage() {
             'Nombre (solo letras)',
             form.emergencyContactName,
             (v) => setForm({ ...form, emergencyContactName: soloLetras(v) }),
+            { maxLength: LIM.nombrePersona },
           )}
           {campo(
             'Teléfono (solo números)',
             form.emergencyContactPhone,
             (v) => setForm({ ...form, emergencyContactPhone: soloTelefono(v) }),
-            { type: 'tel', inputMode: 'tel' },
+            { type: 'tel', inputMode: 'tel', maxLength: LIM.telefono },
           )}
           <div className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Parentesco</span>
@@ -516,6 +547,7 @@ export default function PerfilPage() {
             className="mt-1"
             rows={3}
             value={form.medicalNotes}
+            maxLength={LIM.notasMedicas}
             onChange={(e) => setForm({ ...form, medicalNotes: e.target.value })}
             placeholder="Alergias, condiciones, medicamentos…"
           />
@@ -570,7 +602,7 @@ export default function PerfilPage() {
             {campo('Nueva contraseña', passNueva, setPassNueva, {
               type: 'password',
               required: true,
-              maxLength: 72,
+              maxLength: LIM.password,
               autoComplete: 'new-password',
             })}
             {/* Los mismos mínimos que el registro, a la vista. «(mín. 8)» en la

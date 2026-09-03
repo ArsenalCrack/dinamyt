@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { PAISES, ciudadesDe } from '@/lib/geo';
 import { SelectMenu } from '@/components/SelectMenu';
+import { LIM } from '@/lib/validacion';
 
 /**
  * País y ciudad, los dos como desplegable.
@@ -77,7 +78,7 @@ export function PaisCiudad({
             <input
               className="min-w-0 flex-1"
               value={ciudad}
-              maxLength={100}
+              maxLength={LIM.ciudad}
               placeholder="Escribe la ciudad"
               onChange={(e) => onChange(pais, e.target.value)}
               autoFocus

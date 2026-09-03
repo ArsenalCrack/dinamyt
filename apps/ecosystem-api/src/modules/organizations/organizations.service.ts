@@ -2053,7 +2053,29 @@ export class OrganizationsService {
             orgId: solicitud.orgId,
             userId: solicitud.userId,
             role,
-            roleMembresias: datos.roleMembresias ?? 'student',
+            /**
+             * **Vacío, no `'student'`.** Aquí estaba el «Membresías · Alumno»
+             * que aparecía al entrar y desaparecía al cambiarle el rol.
+             *
+             * Estas tres columnas son EXCEPCIONES: dicen «en esta app, esta
+             * persona es otra cosa de lo que dice su rol general», y mandan
+             * sobre él (`rolParaApp`). Escribir `student` al aceptar ponía una
+             * excepción a todo el mundo sin que nadie la pidiera. Como las
+             * insignias de la lista solo pintan las excepciones, la persona
+             * recién aceptada salía marcada y las demás no; y al cambiarle el
+             * rol se limpiaban las columnas por app —para que el rol nuevo no
+             * quedara pisado— y la insignia se iba. Dos comportamientos raros,
+             * una sola causa.
+             *
+             * Y era peor que cosmético: aceptar a alguien como coach o maestro
+             * le escribía `student` en Membresías igual, así que allí entraba
+             * de alumno con el portal diciendo que era su maestro.
+             *
+             * Vacía, el rol de Membresías sale de traducir el general —que es
+             * lo que hace todo el mundo— y `espejarAlta`, tres líneas más
+             * abajo, ya manda el traducido.
+             */
+            roleMembresias: datos.roleMembresias ?? null,
             roleCampeonatos: datos.roleCampeonatos ?? null,
             roleAcademy: datos.roleAcademy ?? null,
             invitedByUserId: gestorUserId,

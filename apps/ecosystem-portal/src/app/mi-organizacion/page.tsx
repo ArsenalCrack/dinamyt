@@ -29,7 +29,9 @@ import {
   type ClubBusqueda,
   type InvitacionClub,
 } from '@/lib/api';
-import { soloTelefono, comprimirAvatar, PROPS_CORREO } from '@/lib/validacion';
+import { soloTelefono, comprimirAvatar, PROPS_CORREO,
+  LIM,
+} from '@/lib/validacion';
 import { ROLES_CLUB, ROLES_ORG, mandaEnLaOrg, nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
@@ -39,6 +41,7 @@ import { CampanaOrg } from '@/components/CampanaOrg';
 import { CodigoYSolicitudes } from '@/components/CodigoYSolicitudes';
 import { PaisCiudad } from '@/components/PaisCiudad';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
+import { Ampliable } from '@/components/VisorImagen';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -142,6 +145,14 @@ export default function MiOrganizacionPage() {
 
   // La org seleccionada puede ser mía o una hija de una mía.
   const todas = orgs.flatMap((o) => [o, ...o.hijas.map((h) => ({ ...h, hijas: [] }) as unknown as MiOrganizacion)]);
+  /**
+   * ¿Hay algo que elegir en «Estructura»?
+   *
+   * Una sola organización y sin clubes debajo significa que no: la lista sería
+   * un botón que selecciona lo que ya está seleccionado.
+   */
+  const nadaQueElegir = orgs.length === 1 && orgs[0].hijas.length === 0;
+
   const orgSel = todas.find((o) => o.id === sel) ?? null;
   const rolesPermitidos = orgSel
     ? esOrgGrande(orgSel.type)
@@ -441,10 +452,26 @@ export default function MiOrganizacionPage() {
         </section>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        {/* ── Estructura: mis orgs y sus clubes ─────────────────────────── */}
+      {/* ── Estructura: mis orgs y sus clubes ───────────────────────────
+          ── Por qué ya no es una rejilla de dos columnas ──
+
+          Porque tenía UNA sola tarjeta dentro. `lg:grid-cols-2` le daba media
+          pantalla y dejaba la otra media en blanco, así que en un monitor esta
+          sección se comía una franja entera para enseñar, casi siempre, un
+          botón: el del club en el que ya estás. Ahora ocupa el ancho que
+          necesita y nada más.
+
+          ── Y por qué a veces no está ──
+
+          Porque un selector con una sola opción no es un selector. El maestro
+          de un club —que es el caso normal— tenía aquí una lista de un
+          elemento, ya marcado, cuyo nombre estaba además en el título de la
+          página dos líneas más arriba. Con algo que elegir (varias
+          organizaciones, o clubes debajo) vuelve tal cual. */}
+      {(!nadaQueElegir || federaciones.length > 0) && (
         <section className="card p-5">
           <h2 className="mb-3 text-lg font-semibold">Estructura</h2>
+          {!nadaQueElegir && (
           <ul className="flex flex-col gap-2">
             {orgs.map((o) => (
               <li key={o.id}>
@@ -535,6 +562,7 @@ export default function MiOrganizacionPage() {
               </li>
             ))}
           </ul>
+          )}
 
           {/* Federación/liga: crear club propio o invitar uno existente */}
           {/* Se gestionan los clubes de la federación SELECCIONADA. Si hay
@@ -605,6 +633,7 @@ export default function MiOrganizacionPage() {
               <div className="flex flex-wrap gap-2">
                 <input
                   placeholder="Buscar club por nombre…"
+                  maxLength={LIM.busqueda}
                   value={busquedaClub}
                   onChange={(e) => setBusquedaClub(e.target.value)}
                   className="min-w-0 flex-1"
@@ -674,8 +703,7 @@ export default function MiOrganizacionPage() {
             </div>
           )}
         </section>
-
-      </div>
+      )}
 
       {/* ── Entrada al club: el código y las invitaciones ──────────────────
           Va ANTES de la lista de gente y no al final: quien está esperando
@@ -710,6 +738,7 @@ export default function MiOrganizacionPage() {
             miembros» con los resultados esperando en la 1. */}
         <input
           value={busquedaGente}
+          maxLength={LIM.busqueda}
           onChange={(e) => {
             setBusquedaGente(e.target.value);
             setOffsetGente(0);
@@ -890,7 +919,7 @@ export default function MiOrganizacionPage() {
                     style={{ borderColor: 'var(--border)' }}
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                      <Avatar src={b.avatarUrl} nombre={b.fullName} size={34} />
+                      <Avatar src={b.avatarUrl} nombre={b.fullName} size={34} ampliable />
                       <div className="min-w-0" style={{ overflowWrap: 'anywhere' }}>
                         <p className="font-semibold">{b.fullName}</p>
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -979,13 +1008,15 @@ export default function MiOrganizacionPage() {
               qué puerta se entre. */}
           <div className="mb-4 flex flex-wrap items-center gap-3">
             {ficha.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={ficha.logoUrl}
-                alt="Escudo del club"
-                className="h-16 w-16 rounded-xl object-cover"
-                style={{ border: '2px solid var(--gold-dim)' }}
-              />
+              <Ampliable src={ficha.logoUrl} alt={`Escudo de ${orgSel.name}`} logo>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={ficha.logoUrl}
+                  alt="Escudo del club"
+                  className="h-16 w-16 rounded-xl object-cover"
+                  style={{ border: '2px solid var(--gold-dim)' }}
+                />
+              </Ampliable>
             ) : (
               <div
                 className="flex h-16 w-16 items-center justify-center rounded-xl text-2xl"
@@ -1026,7 +1057,7 @@ export default function MiOrganizacionPage() {
               <input
                 className="mt-1"
                 value={ficha.address}
-                maxLength={200}
+                maxLength={LIM.direccion}
                 onChange={(e) => setFicha({ ...ficha, address: e.target.value })}
               />
             </label>
@@ -1037,6 +1068,7 @@ export default function MiOrganizacionPage() {
                 type="tel"
                 inputMode="tel"
                 value={ficha.phone}
+                maxLength={LIM.telefono}
                 onChange={(e) => setFicha({ ...ficha, phone: soloTelefono(e.target.value) })}
               />
             </label>
@@ -1053,7 +1085,6 @@ export default function MiOrganizacionPage() {
               <input
                 className="mt-1"
                 {...PROPS_CORREO}
-                maxLength={200}
                 value={ficha.email}
                 onChange={(e) => setFicha({ ...ficha, email: e.target.value })}
               />
@@ -1064,6 +1095,7 @@ export default function MiOrganizacionPage() {
                 className="mt-1"
                 type="url"
                 value={ficha.red1}
+                maxLength={LIM.url}
                 onChange={(e) => setFicha({ ...ficha, red1: e.target.value })}
                 placeholder="https://instagram.com/tuclub"
               />
@@ -1074,6 +1106,7 @@ export default function MiOrganizacionPage() {
                 className="mt-1"
                 type="url"
                 value={ficha.red2}
+                maxLength={LIM.url}
                 onChange={(e) => setFicha({ ...ficha, red2: e.target.value })}
                 placeholder="https://facebook.com/tuclub"
               />
@@ -1087,6 +1120,7 @@ export default function MiOrganizacionPage() {
                 className="mt-1"
                 rows={3}
                 value={ficha.schedule}
+                maxLength={LIM.descripcion}
                 onChange={(e) => setFicha({ ...ficha, schedule: e.target.value })}
                 placeholder={'Lun-Mié-Vie 6-8pm (infantil)\nMar-Jue 8-10pm (adultos)'}
               />
@@ -1097,6 +1131,7 @@ export default function MiOrganizacionPage() {
                 className="mt-1"
                 rows={3}
                 value={ficha.description}
+                maxLength={LIM.descripcion}
                 onChange={(e) => setFicha({ ...ficha, description: e.target.value })}
                 placeholder="Qué se entrena, para quién, desde cuándo…"
               />

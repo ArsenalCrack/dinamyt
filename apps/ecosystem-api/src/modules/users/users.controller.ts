@@ -124,10 +124,24 @@ export class UsersController {
         }
         delete body.birthDate;
       }
-      if (body.bloodType !== undefined) {
-        throw new ForbiddenException(
-          'El tipo de sangre lo registra el maestro de tu club o un administrador.',
-        );
+      /**
+       * El tipo de sangre: la MISMA regla que la fecha de nacimiento.
+       *
+       * Antes se rechazaba siempre, incluso estando vacío, así que la persona
+       * veía «Por registrar» en su perfil y no tenía forma de registrarlo: la
+       * única salida era pedírselo al maestro, para un dato que ella sabe
+       * mejor que nadie y que va impreso en su propio carnet. Y no es un dato
+       * que dé permisos ni que mueva una categoría: se protege de que lo
+       * CAMBIEN a la ligera, no de que exista.
+       */
+      if (body.bloodType !== undefined && actual?.bloodType) {
+        const nuevo = (body.bloodType ?? '').trim().toUpperCase();
+        if (nuevo !== actual.bloodType) {
+          throw new ForbiddenException(
+            'Tu tipo de sangre ya quedó registrado: solo el maestro de tu club o un administrador puede corregirlo.',
+          );
+        }
+        delete body.bloodType;
       }
     }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { PASSWORD_MAX } from '@/lib/validacion';
 
 /**
  * Campo de contraseña con el «ojo» para verla.
@@ -37,6 +38,11 @@ type Props = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> & {
 export function CampoContrasena({
   verInicial = false,
   className = '',
+  // El tope viene de fábrica y no de cada pantalla. `PASSWORD_MAX` son los 72
+  // bytes que mira bcrypt: lo que se escriba de ahí en adelante no forma parte
+  // de la contraseña, así que dejarlo teclear es enseñar una seguridad que no
+  // existe. Sigue siendo un `prop`, así que quien necesite otro lo pasa.
+  maxLength = PASSWORD_MAX,
   ...props
 }: Props) {
   const [ver, setVer] = useState(verInicial);
@@ -46,6 +52,7 @@ export function CampoContrasena({
     <span className="campo-pass">
       <input
         {...props}
+        maxLength={maxLength}
         type={ver ? 'text' : 'password'}
         className={`w-full ${className}`.trim()}
       />

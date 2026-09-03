@@ -20,6 +20,7 @@ import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
 import { useConfirmar } from '@/components/Confirmar';
 import { fechaCivil, instante } from '@/lib/fechas';
+import { LIM } from '@/lib/validacion';
 
 /**
  * Una suscripción de organización, con todo lo que se le puede hacer.
@@ -294,6 +295,7 @@ export function FilaSuscripcion({
               <input
                 className="mt-1"
                 inputMode="numeric"
+                maxLength={LIM.meses}
                 value={renovacion.meses}
                 onChange={(e) =>
                   setRenovacion({
@@ -313,6 +315,7 @@ export function FilaSuscripcion({
                     ? String(Number(precioMes) * (Number(renovacion.meses) || 1))
                     : 'Precio del plan'
                 }
+                maxLength={LIM.dinero}
                 value={renovacion.precio}
                 onChange={(e) =>
                   setRenovacion({
@@ -328,6 +331,7 @@ export function FilaSuscripcion({
                 className="mt-1"
                 inputMode="numeric"
                 placeholder="Todo"
+                maxLength={LIM.dinero}
                 value={renovacion.amount}
                 onChange={(e) =>
                   setRenovacion({
@@ -476,6 +480,7 @@ export function FilaSuscripcion({
               <input
                 className="mt-1"
                 inputMode="numeric"
+                maxLength={LIM.dinero}
                 value={form.totalAmount}
                 onChange={(e) =>
                   setForm({ ...form, totalAmount: e.target.value.replace(/[^0-9.]/g, '') })
@@ -551,6 +556,7 @@ export function FilaSuscripcion({
                 className="mt-1"
                 inputMode="numeric"
                 placeholder="Lo que entró hoy"
+                maxLength={LIM.dinero}
                 value={abono}
                 onChange={(e) => setAbono(e.target.value.replace(/[^0-9.]/g, ''))}
                 style={{ width: 'auto' }}
