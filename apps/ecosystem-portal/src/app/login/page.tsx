@@ -16,7 +16,14 @@ import {
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { Campo } from '@/components/Campo';
 import { PROPS_CORREO, validarCorreo } from '@/lib/validacion';
-import { destinoSeguro } from '@/lib/apps';
+import {
+  destinoSeguro,
+  fueUnaRecarga,
+  guardarVuelta,
+  laPidioEsaApp,
+  olvidarVuelta,
+  recuperarVuelta,
+} from '@/lib/apps';
 
 export default function LoginPage() {
   return (
@@ -111,7 +118,88 @@ function LoginForm() {
     undefined,
   );
 
-  const destino = destinoSeguro(search.get('redirect'));
+  /**
+   * A dónde hay que volver al terminar, y si ese destino llega FRESCO.
+   *
+   * El `?redirect=` se lee una vez, se borra de la barra y vive aquí — el
+   * porqué, largo, está en `lib/apps.ts`. `fresca` dice si la app lo acaba de
+   * pedir (lo corrobora el referente), y de eso depende **qué hace el botón de
+   * enviar**, que es el único que el gestor de contraseñas de Android puede
+   * disparar sin que nadie lo toque.
+   */
+  const [destino, setDestino] = useState<
+    { url: string; nombre: string; fresca: boolean } | null
+  >(null);
+
+  /**
+   * El `?redirect=` se consume: se lee, se guarda y se BORRA de la barra.
+   *
+   * Mismo gesto que el `?motivo=` de arriba y por la misma razón —lo que queda
+   * en el historial es lo que el navegador te va a ofrecer mañana—, solo que
+   * lo que se quedaba pegado aquí no era una frase: era el destino del botón
+   * principal.
+   *
+   * ── Por qué el destino empieza en `null` y se llena DESPUÉS de montar ──
+   *
+   * Porque esta pantalla se pinta también en el servidor, y allí no hay barra
+   * de direcciones ni referente: calcularlo en el primer render dejaba al
+   * servidor diciendo «Entrar» y al navegador «Entrar y volver a Membresías»,
+   * que es un fallo de hidratación con todas las letras. React lo arreglaba
+   * volviendo a pintar —el resultado que se veía era el bueno—, pero por el
+   * camino tiraba el error a la consola y podía descartar el árbol entero.
+   * Empezando en `null` los dos coinciden, y el efecto cambia el texto del
+   * botón un instante después. Lo que se ve es lo mismo; lo que desaparece es
+   * el error.
+   */
+  useEffect(() => {
+    const enLaBarra = search.get('redirect');
+    if (enLaBarra) {
+      const pedido = destinoSeguro(enLaBarra);
+      if (pedido) {
+        const fresca = laPidioEsaApp(pedido);
+        setDestino({ ...pedido, fresca });
+        guardarVuelta(enLaBarra, fresca);
+      }
+      // Se borra de la barra aunque el destino NO estuviera en la lista
+      // blanca: con más razón, porque entonces es un desvío que además no
+      // lleva a ninguna parte.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('redirect');
+      window.history.replaceState(
+        null,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+      return;
+    }
+
+    // Sin parámetro, solo se rescata lo guardado si esto fue un F5 de esta
+    // misma pantalla. `sessionStorage` dura toda la pestaña, así que sin esa
+    // condición estaríamos resucitando el desvío de un viaje ya terminado.
+    if (!fueUnaRecarga()) {
+      olvidarVuelta();
+      return;
+    }
+    const guardada = recuperarVuelta();
+    const rescatado = guardada && destinoSeguro(guardada.redirect);
+    if (guardada && rescatado) {
+      setDestino({ ...rescatado, fresca: guardada.fresca });
+    }
+    // Solo al llegar: es un billete de un viaje, no un valor que se siga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * ¿El botón de ENVIAR devuelve a la app, o entra al portal?
+   *
+   * Con el enlace fresco devuelve, que es lo que pidió quien pulsó «entrar con
+   * DINAMYT» hace tres segundos. Sin corroborar —un enlace viejo del
+   * historial, un marcador, uno pegado en un chat— enviar entra al portal y la
+   * vuelta a la app baja al segundo botón. El segundo siempre hace lo
+   * contrario que el primero, así que ninguna de las dos puertas desaparece:
+   * lo único que cambia es cuál se puede disparar sola.
+   */
+  const elSubmitVuelve = Boolean(destino?.fresca);
 
   /**
    * **Nunca se entrega la sesión sola.**
@@ -149,6 +237,10 @@ function LoginForm() {
    * con DINAMYT» de la app, así que no es un caso raro: es el normal.
    */
   function entregarSesion(token: string, soloAlPortal = false) {
+    // El billete ya se usó, o se descartó a propósito. Dejarlo vivo haría que
+    // una recarga del login más tarde, en esta misma pestaña, volviera a
+    // ofrecer un viaje que ya terminó.
+    olvidarVuelta();
     if (destino && !soloAlPortal) {
       window.location.href = `${destino.url}#token=${encodeURIComponent(token)}`;
       return;
@@ -225,7 +317,7 @@ function LoginForm() {
       setError(null);
       return;
     }
-    await entrar(false);
+    await entrar(!elSubmitVuelve);
   }
 
   // `py-10` no es cosmética: sin relleno vertical la tarjeta queda pegada a la
@@ -261,7 +353,7 @@ function LoginForm() {
         <section className="card w-full max-w-sm p-6">
           <h1 className="display mb-1 text-2xl">Ya hay una sesión abierta</h1>
           <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {destino
+            {destino && destino.fresca
               ? `${destino.nombre} está pidiendo entrar con tu cuenta DINAMYT.`
               : 'Esta es la cuenta con la que estás dentro ahora mismo.'}
           </p>
@@ -282,23 +374,25 @@ function LoginForm() {
           )}
           <button
             type="button"
-            onClick={() => continuarConLaSesionAbierta()}
+            onClick={() => continuarConLaSesionAbierta(!elSubmitVuelve)}
             className="btn btn-cta w-full"
           >
-            {destino
+            {destino && destino.fresca
               ? `Continuar a ${destino.nombre} como ${primerNombre(abierta.fullName)}`
               : `Continuar como ${primerNombre(abierta.fullName)}`}
           </button>
-          {/* La salida del embudo. Solo aparece cuando una app está pidiendo la
-              sesión: sin `?redirect=` el botón de arriba YA lleva al portal y
-              este sería el mismo botón dos veces. */}
+          {/* La otra puerta, siempre la contraria a la de arriba. Solo aparece
+              cuando hay una app en juego: sin destino, el botón de arriba YA
+              lleva al portal y este sería el mismo botón dos veces. */}
           {destino && (
             <button
               type="button"
-              onClick={() => continuarConLaSesionAbierta(true)}
+              onClick={() => continuarConLaSesionAbierta(elSubmitVuelve)}
               className="btn btn-outline mt-3 w-full"
             >
-              Ir a mi cuenta DINAMYT
+              {destino.fresca
+                ? 'Ir a mi cuenta DINAMYT'
+                : `Ir a ${destino.nombre}`}
             </button>
           )}
           <button
@@ -313,7 +407,7 @@ function LoginForm() {
         <form onSubmit={onSubmit} className="card w-full max-w-sm p-6">
           <h1 className="display mb-1 text-2xl">Iniciar sesión</h1>
           <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {destino
+            {destino && destino.fresca
               ? `Una cuenta para todo el ecosistema. Al entrar, vuelves a ${destino.nombre}.`
               : 'Una cuenta para todo el ecosistema.'}
           </p>
@@ -394,16 +488,27 @@ function LoginForm() {
             disabled={cargando}
             className="btn btn-cta mt-4 w-full"
           >
-            {cargando ? 'Entrando…' : destino ? `Entrar y volver a ${destino.nombre}` : 'Entrar'}
+            {cargando
+              ? 'Entrando…'
+              : destino && destino.fresca
+                ? `Entrar y volver a ${destino.nombre}`
+                : 'Entrar'}
           </button>
+          {/* Es `type="button"` a propósito, y ahí está la mitad del arreglo:
+              el gestor de contraseñas de Android rellena y ENVÍA el formulario
+              él solo, y un envío dispara siempre el de enviar — nunca este.
+              Por eso el destino que puede dispararse solo es el de arriba, y
+              por eso arriba manda la frescura del enlace. */}
           {destino && (
             <button
               type="button"
               disabled={cargando}
-              onClick={() => void entrar(true)}
+              onClick={() => void entrar(elSubmitVuelve)}
               className="btn btn-outline mt-3 w-full"
             >
-              Entrar solo a DINAMYT
+              {destino.fresca
+                ? 'Entrar solo a DINAMYT'
+                : `Entrar y volver a ${destino.nombre}`}
             </button>
           )}
           <p

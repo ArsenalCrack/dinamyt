@@ -53,6 +53,37 @@ function IconoSalir() {
 }
 
 /**
+ * La cuadrícula de aplicaciones, dibujada y no escrita.
+ *
+ * Aquí ponía «⇱ Mis aplicaciones», y ese ⇱ (U+21F1) es exactamente el mismo
+ * error que el ⏻ de arriba: un símbolo técnico que casi ninguna fuente de
+ * Android trae, así que en el celular el botón salía con el cuadrito de
+ * «glifo que no tengo» delante del texto. Un SVG se ve igual en todos lados y
+ * hereda el color.
+ *
+ * Es el MISMO dibujo en Academy, Membresías y Campeonatos: la puerta al
+ * ecosistema se reconoce por su forma antes que por su texto.
+ */
+function IconoEcosistema() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      style={{ flexShrink: 0 }}
+    >
+      <rect x="3" y="3" width="7.5" height="7.5" rx="2" />
+      <rect x="13.5" y="3" width="7.5" height="7.5" rx="2" />
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="2" />
+      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" />
+    </svg>
+  );
+}
+
+/**
  * Barra de navegación de Academy: enlaces por rol efectivo (la API decide),
  * «Mis aplicaciones» como salida al ecosistema y «Salir» SIEMPRE diferenciado.
  * En móvil todo vive en el menú de hamburguesa.
@@ -148,14 +179,25 @@ export function NavBar() {
     </Link>
   );
 
+  /**
+   * La puerta de vuelta al ecosistema. Va al dashboard **sin `?redirect=`** a
+   * propósito: ese parámetro le dice al portal «cuando acabes, devuélvelo
+   * aquí», y es justo el que se quedaba pegado en el historial del navegador y
+   * acababa metiendo en la app equivocada a quien quería el portal. Ir a
+   * DINAMYT significa ir a DINAMYT.
+   *
+   * El texto es el mismo en las tres apps federadas, y en las tres vive en el
+   * mismo sitio del menú: pegado a «Salir», que es la otra cosa que te saca de
+   * aquí.
+   */
   const linkApps = (enMenu = false) => (
     <a
       href={`${PORTAL_URL}/dashboard`}
       className={enMenu ? 'btn btn-outline' : 'btn btn-outline btn-sm'}
-      title="Volver al ecosistema DINAMYT (tus aplicaciones)"
+      title="Tu cuenta, tu club y todas tus aplicaciones"
       style={enMenu ? { marginTop: '0.25rem' } : undefined}
     >
-      ⇱ Mis aplicaciones
+      <IconoEcosistema /> Ir a DINAMYT
     </a>
   );
 
