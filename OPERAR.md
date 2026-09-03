@@ -2248,6 +2248,33 @@ explica la cifra de arriba.
 tarifa de ayer. Es lo correcto, y no es lo que uno espera al pulsar «Guardar»:
 por eso la pantalla lo dice.
 
+### El alta también calcula, y no solo la renovación
+
+Fue el agujero que quedó del primer intento: `renovar` ya contaba el padrón y
+**el alta seguía pidiendo un monto a mano**. O sea que el primer periodo de cada
+club se cobraba con un número inventado y solo a partir del segundo empezaba a
+tener sentido — **justo al revés de lo que hace falta**, porque el alta es la
+que fija la expectativa del club.
+
+Ahora `POST /subscriptions` calcula igual que `renovar`, y el formulario enseña
+la cuenta antes de crear nada:
+
+```
+GET /subscriptions/cotizar?orgId=…&planId=…
+```
+
+Devuelve `personas` y `facturadas` **por separado**, que no son lo mismo cuando
+hay mínimo: ver «40 personas → se cobran 40» junto a «4 personas → se cobran 10»
+es lo que hace que el mínimo se entienda sin que nadie lo explique.
+
+> El campo del monto **sigue siendo editable**, porque hay cobros que se pactan
+> —un descuento del primer mes, una cortesía—. Lo que cambia es que dejarlo
+> vacío ya no significa «sin importe»: significa «el que calculó el servidor».
+
+⚠️ **La cuenta se pide al servidor, no se repite en el navegador.** Es la misma
+regla de siempre: la cuenta que factura tiene que ser una sola, o llega el día
+en que la pantalla dice una cifra y el recibo otra.
+
 ### `billed_users`: por qué se guarda el padrón, y no solo el importe
 
 `subscriptions.billed_users` guarda **por cuánta gente se cobró el periodo

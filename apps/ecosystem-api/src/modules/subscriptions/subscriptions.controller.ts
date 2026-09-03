@@ -166,6 +166,16 @@ export class SubscriptionsController {
     return { ...(await this.subsService.avisarVencimientos()), limpiadas, planes };
   }
 
+  // ── GET /subscriptions/cotizar — cuánto costaría, sin crear nada ──────────
+  //
+  // Va ANTES de `org/:orgId` a propósito: Nest resuelve por orden y `cotizar`
+  // encajaría como un `:orgId` si fuera después.
+  @Get('cotizar')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  cotizar(@Query('orgId') orgId: string, @Query('planId') planId: string) {
+    return this.subsService.cotizar(orgId, planId);
+  }
+
   // ── GET /subscriptions/org/:orgId — suscripciones de una org (autenticado)─
   @Get('org/:orgId')
   @UseGuards(EcosystemJwtGuard)

@@ -15,6 +15,7 @@ import {
   cambiarRolMiembroAPI,
   quitarMiembroAPI,
   actualizarPlanAPI,
+  cotizarSuscripcionAPI,
   listPlanesAPI,
   listSuscripcionesAPI,
   crearSuscripcionOrgAPI,
@@ -38,6 +39,7 @@ import {
   type InvitacionClub,
   type Organizacion,
   type Miembro,
+  type Cotizacion,
   type Plan,
   type UsuarioBusqueda,
   type SuscripcionOrg,
@@ -61,6 +63,7 @@ import { Aviso, type Mensaje } from '@/components/Aviso';
 import { SelectMenu } from '@/components/SelectMenu';
 import { PanelRecaudo } from '@/components/PanelRecaudo';
 import { PaisCiudad } from '@/components/PaisCiudad';
+import { dinero } from '@/lib/formato';
 import { Avatar } from '@/components/Avatar';
 import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
 import {
@@ -118,6 +121,14 @@ export default function AdminEcosistemaPage() {
     nuevaOrg.name.trim() && !revisionNombreOrg.ok ? revisionNombreOrg.error : '';
   const [invitacion, setInvitacion] = useState({ email: '', role: 'competitor' });
   const [nuevaSub, setNuevaSub] = useState({ planId: '', startsAt: '', endsAt: '', totalAmount: '' });
+  /**
+   * Lo que costaría el plan elegido para el club elegido, hoy.
+   *
+   * Se pide al servidor y no se calcula aquí a propósito: **la cuenta que
+   * factura tiene que ser una sola**. Repetirla en el navegador es como se
+   * consigue que la pantalla diga una cifra y el recibo otra.
+   */
+  const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null);
   const [nuevaSubPersonal, setNuevaSubPersonal] = useState({ userEmail: '', planId: '', startsAt: '', endsAt: '' });
 
   const cargar = useCallback(async () => {
@@ -198,6 +209,22 @@ export default function AdminEcosistemaPage() {
    * La búsqueda se limpia por lo mismo: un texto escrito para buscar en otro
    * club deja el nuevo en blanco y nada dice por qué.
    */
+  // Cambia el club o el plan → se vuelve a cotizar. Sin plan elegido no hay
+  // nada que preguntar.
+  useEffect(() => {
+    if (!orgSel || !nuevaSub.planId) {
+      setCotizacion(null);
+      return;
+    }
+    let vigente = true;
+    cotizarSuscripcionAPI(orgSel.id, nuevaSub.planId)
+      .then((c) => vigente && setCotizacion(c))
+      .catch(() => vigente && setCotizacion(null));
+    return () => {
+      vigente = false;
+    };
+  }, [orgSel, nuevaSub.planId]);
+
   function elegirOrg(o: Organizacion | null) {
     setOrgSel(o);
     setOffsetGente(0);
@@ -857,12 +884,39 @@ export default function AdminEcosistemaPage() {
                   etiquetaAria="Plan de la suscripción"
                   placeholder="Plan…"
                 />
-                <input
-                  placeholder="Monto total"
-                  maxLength={LIM.dinero}
-                  value={nuevaSub.totalAmount}
-                  onChange={(e) => setNuevaSub({ ...nuevaSub, totalAmount: e.target.value })}
-                />
+                {/* ── Por qué esto ya no es «escribe un monto» ──
+                    El cobro es por persona (§4.18): la cifra sale de
+                    multiplicar la tarifa del plan por el padrón del club, y
+                    nadie iba a hacer esa cuenta a mano antes de pulsar «crear».
+                    La haría mal, o pondría cualquier cosa — y el alta es
+                    justamente la que fija la expectativa del club.
+
+                    Se deja EDITABLE porque hay cobros que se pactan: un
+                    descuento del primer mes, una cortesía. Lo que cambia es que
+                    vacío ya no significa «sin importe», significa «el que
+                    calculó el servidor». */}
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    Monto {cotizacion?.porPersona ? '(calculado)' : ''}
+                  </span>
+                  <input
+                    className="mt-1"
+                    inputMode="numeric"
+                    placeholder={
+                      cotizacion
+                        ? `${cotizacion.importe} — dejar vacío para usarlo`
+                        : 'Elige un plan'
+                    }
+                    maxLength={LIM.dinero}
+                    value={nuevaSub.totalAmount}
+                    onChange={(e) =>
+                      setNuevaSub({
+                        ...nuevaSub,
+                        totalAmount: e.target.value.replace(/[^0-9.]/g, ''),
+                      })
+                    }
+                  />
+                </label>
                 <CampoFecha
                   valor={nuevaSub.startsAt}
                   onChange={(v) => setNuevaSub({ ...nuevaSub, startsAt: v })}
@@ -876,6 +930,37 @@ export default function AdminEcosistemaPage() {
                   placeholder="Hasta"
                 />
               </div>
+              {/* El desglose. `personas` y `facturadas` van por separado
+                  porque no son lo mismo cuando hay mínimo, y verlo es lo que
+                  hace que el mínimo se entienda sin que nadie lo explique. */}
+              {cotizacion && (
+                <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {cotizacion.porPersona ? (
+                    <>
+                      <strong>{cotizacion.personas}</strong>{' '}
+                      {cotizacion.personas === 1 ? 'persona activa' : 'personas activas'} en{' '}
+                      {orgSel.name}
+                      {cotizacion.facturadas !== cotizacion.personas && (
+                        <>
+                          {' '}
+                          · se cobran <strong>{cotizacion.facturadas}</strong> por el
+                          mínimo del plan
+                        </>
+                      )}{' '}
+                      × {cotizacion.pricePerUser} ={' '}
+                      <strong>{dinero(cotizacion.importe)}</strong> al mes.
+                    </>
+                  ) : (
+                    <>
+                      <strong>{cotizacion.planName}</strong> es de importe fijo:{' '}
+                      <strong>{dinero(cotizacion.importe)}</strong> al mes, cuente la
+                      gente que cuente. Ponle un precio por persona en «Tarifa de cada
+                      plan» si quieres que dependa del padrón.
+                    </>
+                  )}
+                </p>
+              )}
+
               <button
                 onClick={() =>
                   accion(

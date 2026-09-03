@@ -113,3 +113,22 @@ describe('importeDelPeriodo · el cobro por persona', () => {
     expect(r.importe).toBe(0);
   });
 });
+
+describe('el alta y la renovacion cobran IGUAL', () => {
+  // El agujero que esto vigila: `renovar` ya calculaba por padrón y `create`
+  // seguía pidiendo un monto a mano, así que el PRIMER periodo de cada club se
+  // cobraba con un número inventado y solo a partir del segundo tenía sentido.
+  // Justo al revés de lo que hace falta: el alta es la que fija la expectativa.
+  it('un mes de alta cuesta lo mismo que un mes de renovación', () => {
+    const alta = importeDelPeriodo(POR_PERSONA, 37, 1);
+    const renovacion = importeDelPeriodo(POR_PERSONA, 37, 1);
+    expect(alta).toEqual(renovacion);
+  });
+
+  it('y las dos guardan por cuánta gente cobraron', () => {
+    // `facturadas` es lo que va a `billed_users`, y sin ella no se puede
+    // contestar «¿por qué me cobraron esto?» cuando el padrón ya cambió.
+    expect(importeDelPeriodo(POR_PERSONA, 37, 1).facturadas).toBe(37);
+    expect(importeDelPeriodo(POR_PERSONA, 2, 1).facturadas).toBe(10);
+  });
+});

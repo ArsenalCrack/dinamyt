@@ -101,6 +101,44 @@ export class SubscriptionsService {
     }
   }
 
+  /**
+   * Lo que costaría hoy ese plan para ese club, sin crear nada.
+   *
+   * ── Por qué hace falta ──
+   *
+   * Con importe fijo, el alta pedía un número y el número estaba en el plan: se
+   * copiaba y ya. Con cobro por persona, la cifra sale de multiplicar la tarifa
+   * por el padrón, y **nadie va a hacer esa cuenta a mano antes de pulsar
+   * «crear»** — la haría mal, o pondría cualquier cosa.
+   *
+   * Devuelve también `personas` y `facturadas` por separado, que no son lo
+   * mismo cuando hay mínimo: enseñar «40 personas → se cobran 40» y «4 personas
+   * → se cobran 10» es lo que hace que el mínimo se entienda sin explicarlo.
+   */
+  async cotizar(orgId: string, planId: string) {
+    const [plan] = await db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, planId))
+      .limit(1);
+    if (!plan) throw new NotFoundException('Ese plan no existe.');
+
+    const personas = await personasDe(orgId);
+    const { importe, facturadas } = importeDelPeriodo(plan, personas, 1);
+
+    return {
+      planName: plan.name,
+      porPersona: esPorPersona(plan),
+      pricePerUser: plan.pricePerUser,
+      minUsers: plan.minUsers,
+      /** La gente activa que tiene el club hoy. */
+      personas,
+      /** Por cuántas se cobra: `personas`, o el mínimo si no llega. */
+      facturadas,
+      importe,
+    };
+  }
+
   async create(data: {
     orgId: string;
     planId: string;
@@ -108,6 +146,34 @@ export class SubscriptionsService {
     endsAt: string;
     totalAmount?: string;
   }) {
+    // ── El importe se CALCULA, no se teclea ──
+    //
+    // Este era el agujero que quedaba del cobro por persona: `renovar` ya
+    // contaba el padrón, pero el ALTA seguía pidiendo un monto a mano. O sea
+    // que el primer periodo de cada club se cobraba con un número inventado y
+    // solo a partir del segundo empezaba a tener sentido — justo al revés de lo
+    // que hace falta, porque el alta es la que fija la expectativa.
+    //
+    // Se cuenta el padrón de hoy, que es el mismo criterio que al renovar: se
+    // cobra por la gente que hay el día que se contrata.
+    const [plan] = await db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, data.planId))
+      .limit(1);
+    if (!plan) throw new NotFoundException('Ese plan no existe.');
+
+    const personas = await personasDe(data.orgId);
+    const calculado = importeDelPeriodo(plan, personas, 1);
+
+    // `totalAmount` explícito sigue mandando: hay cobros que se pactan (un
+    // descuento del primer mes, una cortesía). Lo que cambia es que ya no hace
+    // falta inventarlo, y que dejarlo vacío da la cifra correcta en vez de NULL.
+    const importe =
+      data.totalAmount !== undefined && data.totalAmount !== ''
+        ? data.totalAmount
+        : calculado.importe.toFixed(2);
+
     const result = await db
       .insert(subscriptions)
       .values({
@@ -115,7 +181,8 @@ export class SubscriptionsService {
         planId: data.planId,
         startsAt: aInstante(data.startsAt),
         endsAt: aInstante(data.endsAt),
-        totalAmount: data.totalAmount ?? null,
+        totalAmount: importe,
+        billedUsers: calculado.facturadas > 0 ? calculado.facturadas : null,
         // status y paymentStatus toman sus defaults del schema
       })
       .returning();

@@ -399,6 +399,28 @@ export async function listPlanesAPI(): Promise<Plan[]> {
   return res.data as Plan[];
 }
 
+/** Lo que costaria hoy ese plan para ese club, sin crear nada. */
+export interface Cotizacion {
+  planName: string;
+  /** `false` = plan de importe fijo; la cifra no depende del padrón. */
+  porPersona: boolean;
+  pricePerUser: string | null;
+  minUsers: number | null;
+  /** Gente activa que tiene el club hoy. */
+  personas: number;
+  /** Por cuántas se cobra: `personas`, o el mínimo si no llega. */
+  facturadas: number;
+  importe: number;
+}
+
+export async function cotizarSuscripcionAPI(
+  orgId: string,
+  planId: string,
+): Promise<Cotizacion> {
+  const res = await api.get('/subscriptions/cotizar', { params: { orgId, planId } });
+  return res.data as Cotizacion;
+}
+
 /** Cambia la tarifa de un plan. Solo super-admin. */
 export async function actualizarPlanAPI(
   id: string,

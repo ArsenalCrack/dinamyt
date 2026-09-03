@@ -7,6 +7,7 @@ import {
   extraerError,
   type ResumenSuscripciones,
 } from '@/lib/api';
+import { dinero } from '@/lib/formato';
 
 /**
  * **Cuánto entró, cuánto falta y cómo están los clubes.**
@@ -33,13 +34,6 @@ import {
  * los que pasan las seis comprobaciones del validador contra este fondo,
  * incluida la separación para daltonismo. Ver `globals.css`.
  */
-
-const dinero = (v: number) =>
-  new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(v);
 
 /** `2026-08` → `ago 26`. En un eje, el mes largo no cabe. */
 const mesCorto = (mes: string) => {
