@@ -148,7 +148,22 @@ export class SubscriptionsController {
       limpiadas = -1; // «se intentó y falló», distinguible de «no había nada»
     }
 
-    return { ...(await this.subsService.avisarVencimientos()), limpiadas };
+    // Y el barrido de planes, que es lo que de verdad cierra a los vencidos.
+    //
+    // Va aquí por el mismo motivo que la limpieza de sesiones: este es el único
+    // disparo diario que existe, y vencer no avisa a nadie. Envuelto en `try`
+    // por la misma razón, pero con la consecuencia INVERTIDA y conviene tenerlo
+    // claro: si esto falla, un club vencido sigue operando un día más. Es el
+    // lado seguro del fallo — lo contrario sería cerrar clubes al día porque un
+    // barrido se cayó a la mitad.
+    let planes: unknown = null;
+    try {
+      planes = await this.subsService.barrerPlanes();
+    } catch (e) {
+      planes = { error: e instanceof Error ? e.message : 'falló el barrido' };
+    }
+
+    return { ...(await this.subsService.avisarVencimientos()), limpiadas, planes };
   }
 
   // ── GET /subscriptions/org/:orgId — suscripciones de una org (autenticado)─

@@ -795,17 +795,26 @@ export default function MiOrganizacionPage() {
                 <>
                   {/* El gestor edita el perfil del miembro (nombre,
                       nacimiento, cinturón, tipo de sangre…) */}
+                  {/* `shrink-0` en los tres: lo que cede el ancho es el
+                      desplegable de rol, no los botones. Sin esto, en un
+                      teléfono el «✎ Perfil» se estrujaba hasta partir su
+                      etiqueta en dos líneas y la fila crecía a lo alto. */}
                   <Link
                     href={`/mi-organizacion/miembro/${m.userId}`}
-                    className="btn btn-outline"
+                    className="btn btn-outline shrink-0 whitespace-nowrap"
                     style={{ padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
                     title={`Editar el perfil de ${m.fullName}`}
                   >
-                    ✎ Perfil
+                    {/* En pantalla estrecha solo el icono: «Perfil» son 44 px
+                        que le hacen falta al nombre de al lado, y el `title` y
+                        el `aria-label` siguen diciendo qué es. */}
+                    <span aria-hidden="true">✎</span>
+                    <span className="ml-1 hidden @xs:inline">Perfil</span>
+                    <span className="sr-only">Editar perfil</span>
                   </Link>
                   {m.userId === yo ? (
                     <span
-                      className="text-xs"
+                      className="shrink-0 px-1 text-xs"
                       style={{ color: 'var(--text-muted)' }}
                       title="No puedes sacarte de tu propio club. Si de verdad quieres salir, que te saque otra persona que lo administre, o el super administrador."
                     >
@@ -834,11 +843,16 @@ export default function MiOrganizacionPage() {
                       )
                     }
                     disabled={ocupado}
-                    className="btn btn-outline"
-                    style={{ color: 'var(--danger)' }}
+                    className="btn btn-outline shrink-0"
+                    style={{
+                      color: 'var(--danger)',
+                      padding: '0.4rem 0.7rem',
+                      fontSize: '0.85rem',
+                    }}
                     title={`Quitar a ${m.fullName} del club`}
                   >
-                    ✕
+                    <span aria-hidden="true">✕</span>
+                    <span className="sr-only">Quitar del club</span>
                   </button>
                   )}
                 </>

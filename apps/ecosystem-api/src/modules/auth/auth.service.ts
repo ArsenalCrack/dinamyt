@@ -18,7 +18,8 @@ import {
   userSubscriptions,
 } from '../../db/schema';
 import { eq, and, gt, inArray, InferSelectModel } from 'drizzle-orm';
-import { cadenasDeMando, MAX_SALTOS_JERARQUIA } from '../../common/jerarquia';
+import { cadenasDeMando } from '../../common/jerarquia';
+import { padresDe } from '../../common/apps-de-la-org';
 import { rolParaApp } from '../../common/roles-por-app';
 import {
   validarNombreCompleto,
@@ -830,41 +831,15 @@ export class AuthService {
   /**
    * De quién cuelga cada organización, subiendo por niveles hasta la raíz.
    *
-   * Se sube por niveles —una consulta por salto— y no con un `WITH RECURSIVE`
-   * porque son dos o tres saltos como mucho y esto se lee sin saber SQL
-   * recursivo; y no una consulta por club porque entonces el coste dependería
-   * de a cuántos clubes pertenece la persona.
-   *
-   * El tope de saltos protege el login: un `parent_id` mal puesto que forme un
-   * ciclo no puede convertir el inicio de sesión en un bucle. La otra mitad de
-   * esa defensa está en `cadenasDeMando`.
+   * **Vive en `common/apps-de-la-org.ts`**, no aquí. Era privado de este
+   * servicio mientras el único que subía la jerarquía era el pase; ahora
+   * también la suben el aviso del plan a Membresías y el listado de qué clubes
+   * abren cada app. Tres copias de esta consulta es como se consigue que una
+   * olvide la herencia y un club afiliado abra Campeonatos sin salir en su
+   * listado.
    */
-  private async padresDe(ids: string[]): Promise<Map<string, string | null>> {
-    const padreDe = new Map<string, string | null>();
-    let frontera = [...new Set(ids)];
-
-    for (
-      let salto = 0;
-      salto < MAX_SALTOS_JERARQUIA && frontera.length;
-      salto++
-    ) {
-      const filas = await db
-        .select({ id: organizations.id, parentId: organizations.parentId })
-        .from(organizations)
-        .where(inArray(organizations.id, frontera));
-
-      for (const fila of filas) padreDe.set(fila.id, fila.parentId);
-
-      frontera = [
-        ...new Set(
-          filas.flatMap((f) =>
-            f.parentId && !padreDe.has(f.parentId) ? [f.parentId] : [],
-          ),
-        ),
-      ];
-    }
-
-    return padreDe;
+  private padresDe(ids: string[]): Promise<Map<string, string | null>> {
+    return padresDe(ids);
   }
 
   private async buildToken(user: User, jti: string): Promise<string> {

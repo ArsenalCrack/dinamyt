@@ -333,3 +333,55 @@ export function espejarAlta(
     role: datos.rolMembresias,
   });
 }
+
+/**
+ * Dice si el club puede operar en Membresías, según su plan.
+ *
+ * ── El agujero que cierra ──
+ *
+ * Aquí los `app_scopes` se filtran por `status = 'ACTIVE' AND ends_at > now()`
+ * al firmar el pase, así que un plan vencido deja de abrir Membresías **desde
+ * el portal**. Pero Membresías tiene login propio: quien ya tiene ficha allí
+ * entra por su formulario y no vuelve a pasar por aquí nunca. El candado
+ * estaba puesto en una puerta y la otra no tenía cerradura — el plan vencía y
+ * el club seguía cobrando, pasando lista e imprimiendo carnets.
+ *
+ * ── Por qué se EMPUJA y no se pregunta ──
+ *
+ * Porque vencer es un no-evento: nadie llama a nadie cuando pasa una fecha. Por
+ * eso hacen falta los dos disparadores y ninguno sobra:
+ *
+ *   · **Al cambiar algo** —crear, renovar, cancelar, borrar una suscripción—,
+ *     que es lo que hace que renovar surta efecto EN EL ACTO y no mañana.
+ *   · **El barrido diario** (`barrerPlanes`), que es lo único que se entera de
+ *     que ayer venció uno y nadie tocó nada.
+ *
+ * Se dispara sin esperarlo, como todo el espejo: que Membresías esté caída no
+ * puede impedir que aquí se registre un pago. Lo que se pierde es la copia, y
+ * el barrido de mañana la repone.
+ */
+export function espejarPlan(
+  orgId: string,
+  alDia: boolean,
+  /**
+   * Datos del club, para que Membresías pueda CREARLO si allí no existe.
+   *
+   * Cierra el otro medio agujero, que se veía todos los días: allí solo
+   * aparecían los clubes creados allí. Una organización nacida en el portal y
+   * con plan de Membresías contratado no llegaba nunca —todos los avisos del
+   * espejo buscan por `eco_org_id` y no encontraban fila—, así que el club
+   * estaba pagado y no existía.
+   *
+   * Solo se usan con `alDia: true`: un club que nunca llegó a existir no
+   * necesita nacer bloqueado, necesita no nacer.
+   */
+  datos?: { name?: string | null; city?: string | null; country?: string | null },
+): void {
+  void avisar('/sync/plan', {
+    ecoOrgId: orgId,
+    alDia,
+    ...(alDia && datos?.name
+      ? { name: datos.name, city: datos.city ?? null, country: datos.country ?? null }
+      : {}),
+  });
+}

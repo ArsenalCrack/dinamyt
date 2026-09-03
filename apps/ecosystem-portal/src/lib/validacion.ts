@@ -432,6 +432,38 @@ export function validarNombreCompleto(valor: string): Campo {
   return bien(limpio);
 }
 
+/**
+ * El nombre de una organización: club, federación o liga.
+ *
+ * ── Qué se podía crear sin esto ──
+ *
+ * Solo había `maxLength`, así que pasaban «   », «a» y «////». Una organización
+ * mal nombrada no se puede arreglar desde ninguna pantalla del super-admin —se
+ * renombra, sí, pero primero hay que ENCONTRARLA en una lista donde no dice
+ * nada— y su nombre viaja lejos: al carnet, al escudo del club, al listado de
+ * federaciones y al selector de «Mi organización» de toda su gente.
+ *
+ * ── La regla, y por qué es distinta de la del nombre de una persona ──
+ *
+ * A una persona se le piden dos palabras (nombre y apellido). A un club no:
+ * «Dinamyt» es un nombre legítimo y de una sola palabra. Lo que se pide es
+ * **tres caracteres y que al menos dos sean letras o dígitos**, que es lo que
+ * descarta la puntuación suelta sin prohibir nombres reales como «AKD» o
+ * «Club 9».
+ */
+export function validarNombreOrganizacion(valor: string): Campo {
+  const limpio = (valor ?? '').trim().replace(/\s+/g, ' ');
+  if (!limpio) return mal('Escribe el nombre de la organización.');
+  if (limpio.length < 3) return mal('El nombre es demasiado corto (mínimo 3).');
+  if (limpio.length > LIM.orgNombre) {
+    return mal(`El nombre es demasiado largo (máximo ${LIM.orgNombre}).`);
+  }
+  if ((limpio.match(/[\p{L}\p{N}]/gu) ?? []).length < 2) {
+    return mal('El nombre necesita al menos dos letras o números.');
+  }
+  return bien(limpio);
+}
+
 export function validarDocumento(valor: string): Campo {
   const limpio = (valor ?? '').trim();
   if (!limpio) return mal('Escribe tu número de documento.');

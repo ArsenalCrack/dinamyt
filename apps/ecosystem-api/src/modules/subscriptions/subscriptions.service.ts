@@ -16,6 +16,8 @@ import {
 } from '../../db/schema';
 import { and, count, desc, eq, inArray, ne } from 'drizzle-orm';
 import { MailerService } from '../auth/mailer.service';
+import { appsPorOrganizacion } from '../../common/apps-de-la-org';
+import { espejarPlan } from '../../common/espejo-membresias';
 import {
   anclaDe,
   comoFecha,
@@ -47,6 +49,51 @@ export class SubscriptionsService {
   // invitaciones del maestro. El aviso de vencimiento es un correo más.
   constructor(private readonly mailer: MailerService) {}
   // ── Crear suscripción organizacional ──────────────────────────────────────
+  /**
+   * Recalcula si el club puede operar en Membresías y se lo dice.
+   *
+   * ── Por qué hace falta esto y no basta con el pase ──
+   *
+   * El pase ya filtra los `app_scopes` por `status = 'ACTIVE' AND ends_at > now()`,
+   * así que un plan vencido deja de abrir Membresías **desde el portal**. Pero
+   * Membresías tiene login propio: quien ya tiene ficha allí entra por su
+   * formulario y no vuelve a pasar por aquí. El candado estaba puesto en una
+   * puerta y la otra no tenía cerradura.
+   *
+   * ── Por qué se RECALCULA en vez de mirar la fila que se acaba de tocar ──
+   *
+   * Porque un club puede abrir Membresías por más de un camino: su propio plan
+   * y el de la federación a la que está afiliado, que se SUMAN (decisión 11).
+   * Cancelar el suyo no lo deja fuera si su federación paga, y mirar solo la
+   * fila cancelada lo cerraría por error. `appsPorOrganizacion` responde la
+   * pregunta entera.
+   *
+   * Se dispara sin esperarlo, como todo el espejo: que Membresías esté caída no
+   * puede impedir que aquí se registre un pago.
+   */
+  private async revisarPlanDelClub(orgId: string | null | undefined): Promise<void> {
+    if (!orgId) return;
+    try {
+      const apps = await appsPorOrganizacion([orgId]);
+      const abre = (apps.get(orgId) ?? []).includes('membresias');
+      // El nombre viaja para que allá pueda CREARSE si no existe: un club con
+      // plan que no aparece en Membresías es la otra mitad de este arreglo.
+      const [org] = await db
+        .select({
+          name: organizations.name,
+          city: organizations.city,
+          country: organizations.country,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, orgId))
+        .limit(1);
+      espejarPlan(orgId, abre, org);
+    } catch {
+      // Ni el cobro ni la corrección de una fecha pueden fallar porque este
+      // aviso no salga. El barrido diario lo repone.
+    }
+  }
+
   async create(data: {
     orgId: string;
     planId: string;
@@ -66,6 +113,8 @@ export class SubscriptionsService {
       })
       .returning();
 
+    // Dar un plan tiene que surtir efecto EN EL ACTO, no mañana con el barrido.
+    await this.revisarPlanDelClub(data.orgId);
     return result[0];
   }
 
@@ -267,6 +316,8 @@ export class SubscriptionsService {
       .where(eq(subscriptions.id, id))
       .returning();
 
+    // Suspender o reactivar cambia lo que abre el club: se dice enseguida.
+    await this.revisarPlanDelClub(result[0]?.orgId ?? current[0]?.orgId);
     return result[0];
   }
 
@@ -340,6 +391,9 @@ export class SubscriptionsService {
       })
       .where(eq(subscriptions.id, id))
       .returning();
+    // Corregir una fecha mal tecleada puede abrir o cerrar el club: es el caso
+    // más fácil de olvidar y el que deja a un club pagando y sin entrar.
+    await this.revisarPlanDelClub(fila?.orgId ?? actual.orgId);
     return fila;
   }
 
@@ -368,6 +422,9 @@ export class SubscriptionsService {
     }
 
     await db.delete(subscriptions).where(eq(subscriptions.id, id));
+    // Borrar la única suscripción de un club lo deja fuera; si su federación
+    // paga, no. Por eso se recalcula en vez de asumir.
+    await this.revisarPlanDelClub(actual.orgId);
     return { ok: true, id };
   }
 
@@ -556,6 +613,11 @@ export class SubscriptionsService {
       })
       .returning();
 
+    // **El más importante de los cinco**: renovar es lo que DESBLOQUEA. Sin
+    // esto, un club que acaba de pagar seguiría en pausa hasta el barrido de la
+    // mañana siguiente — con el maestro delante, habiendo pagado, y sin poder
+    // pasar lista.
+    await this.revisarPlanDelClub(fila?.orgId);
     return { suscripcion: fila, pago, venceEl: hasta };
   }
 
@@ -744,6 +806,57 @@ export class SubscriptionsService {
    * la suscripción del club no es asunto suyo y no puede hacer nada con esa
    * información.
    */
+  /**
+   * Le dice a Membresías, club por club, si puede operar hoy.
+   *
+   * ── Por qué hace falta un barrido y no bastan los avisos al cambiar ──
+   *
+   * Porque **vencer es un no-evento**. Cuando alguien renueva, cancela o
+   * corrige una fecha, hay una llamada que dispara el aviso; pero cuando
+   * simplemente pasa la medianoche del último día de un plan, no ocurre nada en
+   * ninguna parte. Sin esto, un club vencido seguiría operando hasta que
+   * alguien tocara su suscripción — o sea, indefinidamente.
+   *
+   * ── Por qué manda TODOS y no solo los que cambiaron ──
+   *
+   * Porque el aviso viaja por la red y se pierde: si Membresías estuvo caída
+   * justo el día que venció un club, ese club se quedaría abierto para siempre
+   * y nadie se enteraría. Repetirlo cada mañana convierte un aviso perdido en
+   * un retraso de un día. Al otro lado es idempotente a propósito: volver a
+   * decir «bloqueado» no reinicia la fecha desde la que lo está.
+   *
+   * Son unas decenas de clubes y una llamada por cada uno, una vez al día.
+   */
+  async barrerPlanes(): Promise<{ clubes: number; alDia: number; enPausa: number }> {
+    const orgs = await db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        city: organizations.city,
+        country: organizations.country,
+      })
+      .from(organizations)
+      .where(eq(organizations.isActive, true));
+
+    if (orgs.length === 0) return { clubes: 0, alDia: 0, enPausa: 0 };
+
+    const apps = await appsPorOrganizacion(orgs.map((o) => o.id));
+    let alDia = 0;
+    let enPausa = 0;
+
+    for (const o of orgs) {
+      const abre = (apps.get(o.id) ?? []).includes('membresias');
+      if (abre) alDia += 1;
+      else enPausa += 1;
+      // Con el nombre: el barrido es además la red que recoge a los clubes que
+      // tienen plan y nunca llegaron a existir allá —los que se contrataron
+      // antes de que esto existiera—, sin que nadie tenga que tocarlos.
+      espejarPlan(o.id, abre, o);
+    }
+
+    return { clubes: orgs.length, alDia, enPausa };
+  }
+
   async avisarVencimientos(opciones: { soloId?: string; forzar?: boolean } = {}) {
     const DIAS_ENTRE_REPETICIONES = 7;
     const ahora = new Date();

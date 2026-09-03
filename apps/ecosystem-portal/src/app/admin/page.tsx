@@ -59,8 +59,15 @@ import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
 import { Aviso, type Mensaje } from '@/components/Aviso';
 import { SelectMenu } from '@/components/SelectMenu';
 import { PanelRecaudo } from '@/components/PanelRecaudo';
+import { PaisCiudad } from '@/components/PaisCiudad';
+import { Avatar } from '@/components/Avatar';
 import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
-import { LIM } from '@/lib/validacion';
+import {
+  LIM,
+  PROPS_CORREO,
+  validarCorreo,
+  validarNombreOrganizacion,
+} from '@/lib/validacion';
 
 const TIPOS_ORG = ['FEDERATION', 'LEAGUE', 'CLUB', 'ACADEMY'] as const;
 
@@ -79,6 +86,8 @@ export default function AdminEcosistemaPage() {
   const [subs, setSubs] = useState<SuscripcionOrg[]>([]);
   const [subsPersonales, setSubsPersonales] = useState<SuscripcionPersonal[]>([]);
   const [orgSel, setOrgSel] = useState<Organizacion | null>(null);
+  /** Federaciones RECOGIDAS. Guardar las cerradas deja «abierta» por defecto. */
+  const [plegadas, setPlegadas] = useState<Set<string>>(new Set());
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   // Búsqueda y página de la lista de gente. El filtro lo hace el SERVIDOR:
   // buscar solo en lo ya descargado no encontraría a nadie de la página 4.
@@ -100,6 +109,12 @@ export default function AdminEcosistemaPage() {
 
   // Formularios
   const [nuevaOrg, setNuevaOrg] = useState({ name: '', type: 'CLUB' as (typeof TIPOS_ORG)[number], city: '', country: 'Colombia' });
+  // El aviso solo sale con algo escrito: en blanco el campo aún no está mal,
+  // está vacío, y estrenar un formulario en rojo no ayuda a nadie.
+  const revisionNombreOrg = validarNombreOrganizacion(nuevaOrg.name);
+  const nombreOrgValido = revisionNombreOrg.ok;
+  const errorNombreOrg =
+    nuevaOrg.name.trim() && !revisionNombreOrg.ok ? revisionNombreOrg.error : '';
   const [invitacion, setInvitacion] = useState({ email: '', role: 'competitor' });
   const [nuevaSub, setNuevaSub] = useState({ planId: '', startsAt: '', endsAt: '', totalAmount: '' });
   const [nuevaSubPersonal, setNuevaSubPersonal] = useState({ userEmail: '', planId: '', startsAt: '', endsAt: '' });
@@ -379,34 +394,101 @@ export default function AdminEcosistemaPage() {
           <div className="mb-4 flex flex-col gap-3">
             {paraguas.map((fed) => {
               const clubes = hijasDe(fed.id);
+              // ── Por qué la federación se pliega ──
+              //
+              // La lista era siempre entera: con seis federaciones de diez
+              // clubes, llegar a la última eran sesenta filas de desplazamiento
+              // en una columna que además está pegada (`sticky`). No había forma
+              // de recoger lo que no se está mirando.
+              //
+              // El estado vive en `plegadas` —un conjunto de las CERRADAS, no de
+              // las abiertas— para que abierto siga siendo el valor por defecto:
+              // una federación nueva aparece desplegada sin que nadie la añada a
+              // ninguna lista.
+              const cerrada = plegadas.has(fed.id);
+              // Y una excepción que evita el peor momento: si el club
+              // seleccionado cuelga de esta federación, se enseña aunque esté
+              // plegada. Esconder lo que el panel de la derecha está mostrando
+              // deja la pantalla contradiciéndose a sí misma.
+              const tieneAlSeleccionado = clubes.some((c) => c.id === orgSel?.id);
+              const abierta = !cerrada || tieneAlSeleccionado;
               return (
                 <div key={fed.id}>
-                  <FilaOrg org={fed} sel={orgSel?.id === fed.id} onSel={elegirOrg}>
-                    <span className="badge">{fed.type}</span>
-                    <span className="badge">
-                      {clubes.length === 1 ? '1 club' : `${clubes.length} clubes`}
-                    </span>
-                  </FilaOrg>
+                  <div className="flex items-center gap-1">
+                    {/* Botón aparte y no un clic sobre el nombre: el nombre YA
+                        hace algo —seleccionar la federación para ver su gente a
+                        la derecha— y un control que hace dos cosas según dónde
+                        caiga el dedo es el que acaba haciendo la que no era. */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPlegadas((prev) => {
+                          const s = new Set(prev);
+                          if (s.has(fed.id)) s.delete(fed.id);
+                          else s.add(fed.id);
+                          return s;
+                        })
+                      }
+                      disabled={clubes.length === 0}
+                      aria-expanded={abierta}
+                      aria-label={
+                        abierta
+                          ? `Recoger los clubes de ${fed.name}`
+                          : `Desplegar los clubes de ${fed.name}`
+                      }
+                      title={
+                        clubes.length === 0
+                          ? 'No tiene clubes que recoger'
+                          : abierta
+                            ? 'Recoger sus clubes'
+                            : 'Desplegar sus clubes'
+                      }
+                      className="shrink-0 rounded px-1 text-xs transition-transform disabled:opacity-30"
+                      style={{
+                        color: 'var(--text-muted)',
+                        transform: abierta ? 'rotate(90deg)' : 'none',
+                      }}
+                    >
+                      ▶
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <FilaOrg org={fed} sel={orgSel?.id === fed.id} onSel={elegirOrg}>
+                        <span className="badge">{fed.type}</span>
+                        <span className="badge">
+                          {clubes.length === 1 ? '1 club' : `${clubes.length} clubes`}
+                        </span>
+                      </FilaOrg>
+                    </div>
+                  </div>
                   {/* La sangría con línea es lo que dice «cuelga de». Sin ella
                       volvería a ser una lista plana con los nombres en otro
                       orden. */}
-                  <ul
-                    className="ml-3 mt-1 flex flex-col gap-1 border-l pl-3"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    {clubes.map((c) => (
-                      <li key={c.id}>
-                        <FilaOrg org={c} sel={orgSel?.id === c.id} onSel={elegirOrg} pequena>
-                          <span className="badge">{c.type}</span>
-                        </FilaOrg>
-                      </li>
-                    ))}
-                    {clubes.length === 0 && (
-                      <li className="py-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Sin clubes afiliados.
-                      </li>
-                    )}
-                  </ul>
+                  {abierta && (
+                    <ul
+                      className="ml-3 mt-1 flex flex-col gap-1 border-l pl-3"
+                      style={{ borderColor: 'var(--border)' }}
+                    >
+                      {clubes.map((c) => (
+                        <li key={c.id}>
+                          <FilaOrg org={c} sel={orgSel?.id === c.id} onSel={elegirOrg} pequena>
+                            <span className="badge">{c.type}</span>
+                          </FilaOrg>
+                        </li>
+                      ))}
+                      {clubes.length === 0 && (
+                        <li className="py-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Sin clubes afiliados.
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                  {/* Plegada pero con el seleccionado dentro: se dice, para que
+                      no parezca que el botón no hizo nada. */}
+                  {cerrada && tieneAlSeleccionado && (
+                    <p className="ml-6 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Recogida, pero se enseña porque tiene el club seleccionado.
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -441,37 +523,59 @@ export default function AdminEcosistemaPage() {
           <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
             Nueva organización
           </h3>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input
-              placeholder="Nombre *"
-              maxLength={LIM.orgNombre}
-              value={nuevaOrg.name}
-              onChange={(e) => setNuevaOrg({ ...nuevaOrg, name: e.target.value })}
-            />
-            <SelectMenu
-              valor={nuevaOrg.type}
-              onChange={(v) =>
-                setNuevaOrg({ ...nuevaOrg, type: v as (typeof TIPOS_ORG)[number] })
-              }
-              opciones={TIPOS_ORG.map((t) => ({ valor: t, etiqueta: t }))}
-              etiquetaAria="Tipo de organización"
-            />
-            <input
-              placeholder="Ciudad"
-              maxLength={LIM.ciudad}
-              value={nuevaOrg.city}
-              onChange={(e) => setNuevaOrg({ ...nuevaOrg, city: e.target.value })}
-            />
-            <input
-              placeholder="País"
-              maxLength={LIM.pais}
-              value={nuevaOrg.country}
-              onChange={(e) => setNuevaOrg({ ...nuevaOrg, country: e.target.value })}
+          {/* ── Por qué esto dejó de ser cuatro `input` ──
+              La ciudad y el país eran texto libre, que es exactamente lo que
+              `PaisCiudad` vino a arreglar en el resto del portal: la misma
+              ciudad acababa escrita de cuatro maneras y cada variante era un
+              grupo distinto en los reportes. El panel que CREA las
+              organizaciones era el último sitio donde seguían sueltos — o sea
+              el que fabricaba el problema desde el principio.
+
+              Y el nombre no tenía más regla que `maxLength`: se podía crear una
+              organización llamada «   » o «a», que después no hay forma de
+              encontrar en ninguna lista. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Nombre *</span>
+              <input
+                className="mt-1"
+                placeholder="Club Dinamyt"
+                maxLength={LIM.orgNombre}
+                value={nuevaOrg.name}
+                aria-invalid={Boolean(errorNombreOrg) || undefined}
+                onChange={(e) => setNuevaOrg({ ...nuevaOrg, name: e.target.value })}
+              />
+              {/* El aviso sale al escribir y no al enviar: sobre un campo lleno
+                  y con el botón ya pulsado, «el nombre es muy corto» obliga a
+                  adivinar cuánto falta. */}
+              {errorNombreOrg && (
+                <span className="mt-1 block text-xs" style={{ color: 'var(--danger)' }}>
+                  {errorNombreOrg}
+                </span>
+              )}
+            </label>
+            <label className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Tipo *</span>
+              <div className="mt-1">
+                <SelectMenu
+                  valor={nuevaOrg.type}
+                  onChange={(v) =>
+                    setNuevaOrg({ ...nuevaOrg, type: v as (typeof TIPOS_ORG)[number] })
+                  }
+                  opciones={TIPOS_ORG.map((t) => ({ valor: t, etiqueta: t }))}
+                  etiquetaAria="Tipo de organización"
+                />
+              </div>
+            </label>
+            <PaisCiudad
+              pais={nuevaOrg.country}
+              ciudad={nuevaOrg.city}
+              onChange={(country, city) => setNuevaOrg({ ...nuevaOrg, country, city })}
             />
           </div>
           <button
             onClick={() => void crearOrg()}
-            disabled={ocupado || !nuevaOrg.name.trim()}
+            disabled={ocupado || !nombreOrgValido}
             className="btn btn-gold mt-3"
           >
             + Crear organización
@@ -589,7 +693,7 @@ export default function AdminEcosistemaPage() {
                     acciones={
                       m.userId === yo ? (
                         <span
-                          className="text-xs"
+                          className="shrink-0 px-1 text-xs"
                           style={{ color: 'var(--text-muted)' }}
                           title="No puedes sacarte a ti mismo de una organización que administras: perderías su panel y no podrías devolvértelo."
                         >
@@ -613,11 +717,16 @@ export default function AdminEcosistemaPage() {
                           )
                         }
                         disabled={ocupado}
-                        className="btn btn-outline"
-                        style={{ color: 'var(--danger)' }}
+                        className="btn btn-outline shrink-0"
+                        style={{
+                          color: 'var(--danger)',
+                          padding: '0.4rem 0.7rem',
+                          fontSize: '0.85rem',
+                        }}
                         title={`Quitar a ${m.fullName} de la organización`}
                       >
-                        ✕
+                        <span aria-hidden="true">✕</span>
+                        <span className="sr-only">Quitar de la organización</span>
                       </button>
                       )
                     }
@@ -661,7 +770,13 @@ export default function AdminEcosistemaPage() {
               )}
 
               <div className="mb-5 mt-3 flex flex-wrap gap-2">
+                {/* `PROPS_CORREO` trae el tipo, el teclado del móvil, el
+                    autocapitalizado apagado Y el tope de longitud. Estos dos
+                    campos de correo del panel eran los únicos del portal que no
+                    lo usaban: se escribían con mayúscula automática en Android
+                    y admitían texto sin fin. */}
                 <input
+                  {...PROPS_CORREO}
                   placeholder="email@usuario.com"
                   value={invitacion.email}
                   onChange={(e) => setInvitacion({ ...invitacion, email: e.target.value })}
@@ -688,7 +803,10 @@ export default function AdminEcosistemaPage() {
                       'No se pudo añadir (¿existe la cuenta?).',
                     )
                   }
-                  disabled={ocupado || !invitacion.email.trim()}
+                  // No solo «que haya algo escrito»: un correo mal formado
+                  // llega al servidor, vuelve con un 400 y lo que se lee es
+                  // «no se pudo invitar», que no dice qué arreglar.
+                  disabled={ocupado || !validarCorreo(invitacion.email).ok}
                   className="btn btn-gold"
                 >
                   + Añadir
@@ -879,6 +997,7 @@ export default function AdminEcosistemaPage() {
         </ul>
         <div className="grid gap-2 sm:grid-cols-4">
           <input
+            {...PROPS_CORREO}
             placeholder="email@usuario.com"
             value={nuevaSubPersonal.userEmail}
             onChange={(e) =>
@@ -915,7 +1034,7 @@ export default function AdminEcosistemaPage() {
           }
           disabled={
             ocupado ||
-            !nuevaSubPersonal.userEmail.trim() ||
+            !validarCorreo(nuevaSubPersonal.userEmail).ok ||
             !nuevaSubPersonal.planId ||
             !nuevaSubPersonal.startsAt ||
             !nuevaSubPersonal.endsAt
@@ -1031,6 +1150,10 @@ function ClubesDeLaFederacion({
   const [encontrados, setEncontrados] = useState<ClubBusqueda[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: 'Colombia' });
+  const revisionNombreClub = validarNombreOrganizacion(nuevoClub.name);
+  const nombreClubValido = revisionNombreClub.ok;
+  const errorNombreClub =
+    nuevoClub.name.trim() && !revisionNombreClub.ok ? revisionNombreClub.error : '';
   /** Sube tras cada invitación y hace que se relean las enviadas. */
   const [tick, setTick] = useState(0);
 
@@ -1242,25 +1365,30 @@ function ClubesDeLaFederacion({
           <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
             Crear un club nuevo dentro
           </h3>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input
-              placeholder="Nombre del club *"
-              maxLength={LIM.orgNombre}
-              value={nuevoClub.name}
-              onChange={(e) => setNuevoClub({ ...nuevoClub, name: e.target.value })}
-              className="sm:col-span-2"
-            />
-            <input
-              placeholder="Ciudad"
-              maxLength={LIM.ciudad}
-              value={nuevoClub.city}
-              onChange={(e) => setNuevoClub({ ...nuevoClub, city: e.target.value })}
-            />
-            <input
-              placeholder="País"
-              maxLength={LIM.pais}
-              value={nuevoClub.country}
-              onChange={(e) => setNuevoClub({ ...nuevoClub, country: e.target.value })}
+          {/* Mismas reglas que «Nueva organización»: el club que nace aquí es
+              del mismo tipo y acaba en las mismas listas, así que no puede
+              tener una validación más floja. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm sm:col-span-2">
+              <span style={{ color: 'var(--text-muted)' }}>Nombre del club *</span>
+              <input
+                className="mt-1"
+                placeholder="Club Dinamyt"
+                maxLength={LIM.orgNombre}
+                value={nuevoClub.name}
+                aria-invalid={Boolean(errorNombreClub) || undefined}
+                onChange={(e) => setNuevoClub({ ...nuevoClub, name: e.target.value })}
+              />
+              {errorNombreClub && (
+                <span className="mt-1 block text-xs" style={{ color: 'var(--danger)' }}>
+                  {errorNombreClub}
+                </span>
+              )}
+            </label>
+            <PaisCiudad
+              pais={nuevoClub.country}
+              ciudad={nuevoClub.city}
+              onChange={(country, city) => setNuevoClub({ ...nuevoClub, country, city })}
             />
           </div>
           <button
@@ -1277,7 +1405,7 @@ function ClubesDeLaFederacion({
                 'No se pudo crear el club.',
               ).then(() => setNuevoClub({ ...nuevoClub, name: '', city: '' }))
             }
-            disabled={ocupado || !nuevoClub.name.trim()}
+            disabled={ocupado || !nombreClubValido}
             className="btn btn-gold mt-3"
           >
             + Crear club
@@ -1392,18 +1520,51 @@ function AccesosRapidos({
     if (orgs.length > 0 && !orgId) setOrgId(orgs[0].id);
   }, [orgs, orgId]);
 
-  // Búsqueda con un pequeño debounce para no disparar en cada tecla.
+  // ── Por qué esta búsqueda parecía rota ──
+  //
+  // Estaba el `debounce` y estaba la lista, pero entre teclear y ver algo no
+  // pasaba NADA visible: 300 ms de espera más lo que tarde el servidor, sin una
+  // línea que dijera que se está buscando. Y si no había coincidencias tampoco
+  // se decía: la lista simplemente no se dibujaba, igual que antes de escribir.
+  // Tres estados distintos —aún no busco, estoy buscando, no encontré— se veían
+  // los tres como una caja de texto sola.
+  const [buscando, setBuscando] = useState(false);
+  const [buscado, setBuscado] = useState('');
+
   useEffect(() => {
-    if (busqueda.trim().length < 2) {
+    const q = busqueda.trim();
+    if (q.length < 2) {
       setResultados([]);
+      setBuscando(false);
+      setBuscado('');
       return;
     }
+    setBuscando(true);
+    // `vigente` evita que una respuesta lenta de «ju» pise a la de «juan»: el
+    // orden de llegada no es el de salida. Vive FUERA del `setTimeout` porque
+    // lo que lo apaga es la limpieza del efecto, y lo que devuelve la función
+    // del temporizador no lo recoge nadie.
+    let vigente = true;
     const t = setTimeout(() => {
-      buscarUsuariosAPI(busqueda.trim())
-        .then(setResultados)
-        .catch(() => setResultados([]));
+      buscarUsuariosAPI(q)
+        .then((r) => {
+          if (!vigente) return;
+          setResultados(r);
+          setBuscado(q);
+        })
+        .catch(() => {
+          if (!vigente) return;
+          setResultados([]);
+          setBuscado(q);
+        })
+        .finally(() => {
+          if (vigente) setBuscando(false);
+        });
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      vigente = false;
+      clearTimeout(t);
+    };
   }, [busqueda]);
 
   return (
@@ -1434,23 +1595,73 @@ function AccesosRapidos({
           setBusqueda(e.target.value);
           setSel(null);
         }}
-        maxLength={200}
+        maxLength={LIM.busqueda}
+        role="combobox"
+        aria-expanded={resultados.length > 0 && !sel}
+        aria-controls="resultados-accesos-rapidos"
+        autoComplete="off"
       />
+
+      {/* ── Los tres estados que antes no se veían ──
+          Sin ellos la caja se comportaba igual estuviera esperando, buscando o
+          sin nada que enseñar, y lo que parecía es que el buscador no
+          funcionaba. */}
+      {!sel && busqueda.trim().length > 0 && busqueda.trim().length < 2 && (
+        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Escribe una letra más para buscar.
+        </p>
+      )}
+      {!sel && buscando && (
+        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Buscando en todo el ecosistema…
+        </p>
+      )}
+      {!sel && !buscando && buscado.length >= 2 && resultados.length === 0 && (
+        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Nadie coincide con «{buscado}». Si es alguien nuevo, primero necesita
+          una cuenta: se crea desde «Miembros» de su organización.
+        </p>
+      )}
+      {!sel && !buscando && resultados.length > 0 && (
+        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          {resultados.length === 1
+            ? '1 persona encontrada. Púlsala para elegirla.'
+            : `${resultados.length} personas encontradas. Pulsa una para elegirla.`}
+        </p>
+      )}
 
       {/* Resultados de la búsqueda */}
       {resultados.length > 0 && !sel && (
-        <ul className="mt-2 flex max-h-56 flex-col gap-1.5 overflow-y-auto">
+        <ul
+          id="resultados-accesos-rapidos"
+          role="listbox"
+          aria-label="Personas encontradas"
+          className="mt-2 flex max-h-56 flex-col gap-1.5 overflow-y-auto"
+        >
           {resultados.map((u) => (
             <li key={u.id}>
               <button
                 onClick={() => setSel(u)}
+                role="option"
+                aria-selected={false}
                 className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm"
                 style={{ borderColor: 'var(--border)' }}
               >
-                <span className="min-w-0">
-                  <strong>{u.fullName}</strong>
-                  <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
-                    · {u.email}
+                {/* Las iniciales, no la foto: `buscarUsuariosAPI` no devuelve
+                    `avatarUrl` y pedirla obligaría a mover una data-URL de
+                    hasta 66 KB por cada resultado de una búsqueda que se
+                    dispara cada 300 ms. Lo que hace falta aquí es separar
+                    visualmente una fila de la siguiente. */}
+                <span className="flex min-w-0 items-center gap-2">
+                  <Avatar nombre={u.fullName} size={28} />
+                  <span className="min-w-0">
+                    <strong className="block truncate">{u.fullName}</strong>
+                    <span
+                      className="block truncate text-xs"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      {u.email}
+                    </span>
                   </span>
                 </span>
                 <span className="flex flex-wrap gap-1">

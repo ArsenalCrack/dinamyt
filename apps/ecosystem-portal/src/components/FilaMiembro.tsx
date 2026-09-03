@@ -164,7 +164,19 @@ export function FilaMiembro({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 @md:shrink-0">
+      {/* ── Por qué NO lleva `flex-wrap` ──
+          Los tres controles —rol, perfil y quitar— son una sola cosa: lo que
+          se puede hacer con esta persona. Con `flex-wrap`, el desplegable de
+          rol se quedaba con la línea entera y la ✕ caía sola a la de abajo,
+          debajo del nombre, donde parece que quita OTRA fila. Un botón
+          destructivo desalineado de su fila es la peor casilla del panel para
+          una duda.
+
+          Ahora la fila no se parte: lo que cede es el ANCHO del desplegable
+          (`min-w-0` aquí y abajo), que puede recortar la etiqueta del rol
+          porque el rol también está escrito en la insignia de la izquierda.
+          Los dos botones son iconos y no encogen. */}
+      <div className="flex min-w-0 items-center gap-1.5 @md:shrink-0">
         {/* El desplegable del ecosistema y no el `<select>` nativo: este es el
             «tipo de usuario» del panel del maestro, y se pintaba con los
             colores del sistema operativo —gris, distinto en cada navegador, y
@@ -178,7 +190,12 @@ export function FilaMiembro({
         {/* El `title` va en el envoltorio y no en el `SelectMenu`: el
             componente no recibe uno, y un control bloqueado sin explicación es
             justo el que hace pensar que la aplicación está rota. */}
+        {/* `min-w-0` para que pueda encogerse de verdad: un hijo de flex se
+            niega a bajar de su contenido sin él, y entonces la fila se
+            desbordaría en vez de estrecharse. El mínimo de 9.5rem vuelve a
+            partir de `@xs`, donde ya hay sitio. */}
         <span
+          className="min-w-0 flex-1 @xs:min-w-[9.5rem] @xs:flex-none"
           title={
             esUnoMismo
               ? 'Tu propio rol no lo cambias tú: pídeselo a otra persona que administre la organización, o al super administrador.'
@@ -198,7 +215,7 @@ export function FilaMiembro({
                 : `Rol de ${m.fullName} en la organización`
             }
             disabled={bloqueado}
-            style={{ width: 'auto', minWidth: '9.5rem' }}
+            style={{ width: '100%', minWidth: 0 }}
             botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
           />
         </span>

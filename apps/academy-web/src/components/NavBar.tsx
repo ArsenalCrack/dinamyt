@@ -195,7 +195,8 @@ export function NavBar() {
       href={`${PORTAL_URL}/dashboard`}
       className={enMenu ? 'btn btn-outline' : 'btn btn-outline btn-sm'}
       title="Tu cuenta, tu club y todas tus aplicaciones"
-      style={enMenu ? { marginTop: '0.25rem' } : undefined}
+      // El espacio con «Salir» lo pone ahora el contenedor de los dos, para que
+      // sea UNA distancia y no la suma de dos márgenes que hay que calcular.
     >
       <IconoEcosistema /> Ir a DINAMYT
     </a>
@@ -420,10 +421,19 @@ export function NavBar() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {visibles.map((l) => itemNav(l, true))}
             <div style={{ height: 1, background: 'var(--border)', margin: '0.5rem 0' }} />
-            {linkApps(true)}
-            <button onClick={salir} className="btn btn-danger" style={{ marginTop: '0.25rem' }}>
-              <IconoSalir /> Salir
-            </button>
+            {/* ── Los dos que te sacan de aquí, y por qué se separan MÁS ──
+                Van juntos porque hacen lo mismo desde lejos: salir de esta
+                aplicación. Pero uno te lleva a tu portal y el otro te cierra la
+                sesión, y equivocarse cuesta volver a escribir la contraseña.
+                Con los 0,25rem de antes, al pasar el ratón los dos recuadros
+                de foco casi se tocaban y parecían un solo bloque. Medio rem no
+                es decoración: es el margen de un dedo en un teléfono. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {linkApps(true)}
+              <button onClick={salir} className="btn btn-danger">
+                <IconoSalir /> Salir
+              </button>
+            </div>
           </div>
         </nav>
       )}
