@@ -13,6 +13,14 @@ export class PlansService {
     maxUsers?: number;
     priceMonthly?: string;
     priceAnnual?: string;
+    /**
+     * Precio por persona y mes. **Ponerlo cambia el modelo de cobro de este
+     * plan**: pasa a facturarse por padrón en cada renovación en vez de por
+     * `priceMonthly`. Ver `common/cobro-por-persona.ts` y §4.18 de OPERAR.
+     */
+    pricePerUser?: string;
+    /** Mínimo facturable: por debajo se cobra igualmente por esta cifra. */
+    minUsers?: number;
   }) {
     const result = await db
       .insert(subscriptionPlans)
@@ -23,6 +31,8 @@ export class PlansService {
         maxUsers: data.maxUsers ?? null,
         priceMonthly: data.priceMonthly ?? null,
         priceAnnual: data.priceAnnual ?? null,
+        pricePerUser: data.pricePerUser ?? null,
+        minUsers: data.minUsers ?? null,
       })
       .returning();
 
@@ -62,6 +72,10 @@ export class PlansService {
       maxUsers?: number;
       priceMonthly?: string;
       priceAnnual?: string;
+      /** Precio por persona y mes; ver `create`. */
+      pricePerUser?: string | null;
+      /** Mínimo facturable. */
+      minUsers?: number | null;
     },
   ) {
     // Verificar que existe

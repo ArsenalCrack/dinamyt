@@ -13,10 +13,17 @@ import {
   userSubscriptions,
   orgMembers,
   users,
+  orgHeadcount,
 } from '../../db/schema';
-import { and, count, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { MailerService } from '../auth/mailer.service';
 import { appsPorOrganizacion } from '../../common/apps-de-la-org';
+import {
+  esPorPersona,
+  importeDelPeriodo,
+  personasDe,
+  personasFacturables,
+} from '../../common/cobro-por-persona';
 import { espejarPlan } from '../../common/espejo-membresias';
 import {
   anclaDe,
@@ -562,12 +569,26 @@ export class SubscriptionsService {
       anclaGuardada: ancla,
     });
 
-    // El precio del plan es mensual: tres meses cuestan tres veces.
-    const precioMes = SubscriptionsService.aNumero(plan?.priceMonthly);
+    // ── El precio: por persona si el plan lo dice, fijo si no ──
+    //
+    // **Aquí es donde se cuenta la gente**, y por eso el cobro es prepago: se
+    // mira el padrón EL DÍA QUE SE RENUEVA y se cobra por eso. El club sabe la
+    // cifra antes de pagar, encaja con el bloqueo por impago (§4.16), y quitar
+    // gente la víspera no baja la factura porque la víspera no se mira.
+    //
+    // Lo que crezca a mitad de mes se cobra en la renovación siguiente, que es
+    // cuando se vuelve a contar.
+    //
+    // Un plan sin `pricePerUser` sigue con su importe fijo: aplicar la
+    // migración no le cambió el precio a nadie.
+    const personas = plan ? await personasDe(sub.orgId) : 0;
+    const calculado = plan
+      ? importeDelPeriodo(plan, personas, meses)
+      : { importe: 0, facturadas: 0 };
     const precio =
       data.precio !== undefined
         ? SubscriptionsService.aNumero(data.precio)
-        : precioMes * meses;
+        : calculado.importe;
     const abonado =
       data.amount !== undefined ? SubscriptionsService.aNumero(data.amount) : precio;
 
@@ -588,6 +609,10 @@ export class SubscriptionsService {
         renewalMonths: meses,
         anchorDay: ancla,
         totalAmount: totalAmount.toFixed(2),
+        // Por cuánta gente se cobró ESTE periodo. Es lo que contesta «¿por qué
+        // me cobraron esto?» cuando la cifra cambia cada mes: el padrón de hoy
+        // ya no es el del día de corte. `null` con los planes de importe fijo.
+        billedUsers: calculado.facturadas > 0 ? calculado.facturadas : null,
         paidAmount: paidAmount.toFixed(2),
         paymentStatus,
         // Acaba de pagar: el aviso anterior ya no cuenta, y el próximo ciclo
@@ -841,6 +866,43 @@ export class SubscriptionsService {
     if (orgs.length === 0) return { clubes: 0, alDia: 0, enPausa: 0 };
 
     const apps = await appsPorOrganizacion(orgs.map((o) => o.id));
+
+    // ── El censo del día ──
+    //
+    // Va aquí porque esta pasada ya recorre todos los clubes: sale gratis. Y
+    // hace falta aunque el cobro mire el padrón del día de corte, porque es el
+    // único dato que NO se recupera hacia atrás — sin él no se puede proyectar
+    // el mes que viene, ni ver si un club crece, ni evaluar algún día el cobro
+    // por el máximo del periodo.
+    //
+    // Idempotente por la clave (org, día): correrlo dos veces actualiza la fila
+    // en vez de duplicarla.
+    try {
+      const censo = await personasFacturables(orgs.map((o) => o.id));
+      const dia = hoyStr();
+      const filas = orgs.map((o) => ({
+        orgId: o.id,
+        dia,
+        personas: censo.get(o.id) ?? 0,
+        medidoEn: new Date(),
+      }));
+      if (filas.length > 0) {
+        await db
+          .insert(orgHeadcount)
+          .values(filas)
+          .onConflictDoUpdate({
+            target: [orgHeadcount.orgId, orgHeadcount.dia],
+            set: {
+              personas: sql`excluded.personas`,
+              medidoEn: sql`excluded.medido_en`,
+            },
+          });
+      }
+    } catch {
+      // Un censo que falla no puede impedir que se cierren los clubes vencidos,
+      // que es lo que este barrido vino a hacer. Se pierde el punto de ese día.
+    }
+
     let alDia = 0;
     let enPausa = 0;
 
@@ -1015,6 +1077,9 @@ export class SubscriptionsService {
         planId: subscriptionPlans.id,
         planName: subscriptionPlans.name,
         priceMonthly: subscriptionPlans.priceMonthly,
+        pricePerUser: subscriptionPlans.pricePerUser,
+        minUsers: subscriptionPlans.minUsers,
+        billedUsers: subscriptions.billedUsers,
       })
       .from(subscriptions)
       .innerJoin(organizations, eq(subscriptions.orgId, organizations.id))
@@ -1060,6 +1125,10 @@ export class SubscriptionsService {
       }
     }
 
+    // Una sola consulta para todos: el padrón de cada club, que es con lo que
+    // se proyecta lo que pagará en su próxima renovación.
+    const censo = await personasFacturables(subs.map((x) => x.orgId));
+
     // ── Estado de cada club ───────────────────────────────────────────────
     const estados = { al_dia: 0, por_vencer: 0, vencida: 0, suspendida: 0 };
     /** Lo que está facturado y sin cobrar. */
@@ -1092,7 +1161,14 @@ export class SubscriptionsService {
       // Solo cuenta como ingreso recurrente lo que está vivo: una suspendida no
       // va a pagar el mes que viene, y meterla en la previsión la infla.
       const viva = s.status === 'ACTIVE' && est !== 'vencida';
-      const precio = SubscriptionsService.aNumero(s.priceMonthly);
+      // ── Por qué esto dejó de ser `priceMonthly` ──
+      //
+      // Sumar el precio fijo del plan era una cifra que dejaba de significar
+      // algo en cuanto un club crecía: decía lo mismo para uno de 15 alumnos y
+      // uno de 300. Ahora se proyecta lo que ESE club pagará en su próxima
+      // renovación con el padrón de hoy — que es la mejor estimación posible,
+      // porque es exactamente lo que se le cobrará si no cambia.
+      const precio = importeDelPeriodo(s, censo.get(s.orgId) ?? 0, 1).importe;
       if (viva) esperadoMensual += precio;
 
       const p = porPlan.get(s.planId) ?? {

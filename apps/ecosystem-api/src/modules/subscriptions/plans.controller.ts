@@ -28,6 +28,10 @@ export class PlansController {
       maxUsers?: number;
       priceMonthly?: string;
       priceAnnual?: string;
+      /** Precio por persona y mes: pone el plan en cobro por padrón. */
+      pricePerUser?: string;
+      /** Mínimo facturable. */
+      minUsers?: number;
     },
   ) {
     return this.plansService.create(body);
@@ -52,6 +56,8 @@ export class PlansController {
       maxUsers?: number;
       priceMonthly?: string;
       priceAnnual?: string;
+      pricePerUser?: string | null;
+      minUsers?: number | null;
     },
   ) {
     return this.plansService.update(id, body);

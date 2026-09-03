@@ -14,6 +14,7 @@ import {
   invitarMiembroAPI,
   cambiarRolMiembroAPI,
   quitarMiembroAPI,
+  actualizarPlanAPI,
   listPlanesAPI,
   listSuscripcionesAPI,
   crearSuscripcionOrgAPI,
@@ -353,6 +354,22 @@ export default function AdminEcosistemaPage() {
 
       {/* ── RECAUDO: cuánto entró, cuánto falta y cómo están los clubes ─── */}
       <PanelRecaudo />
+
+      {/* ── LA TARIFA DE CADA PLAN ─────────────────────────────────────────
+          Va justo debajo del recaudo porque es lo que lo explica: la cifra de
+          arriba sale de multiplicar esto por el padrón de cada club. */}
+      <TarifasDeLosPlanes
+        planes={planes}
+        ocupado={ocupado}
+        onGuardar={async (id, cambios) => {
+          await accion(
+            () => actualizarPlanAPI(id, cambios),
+            'Tarifa actualizada. Se aplica en la PRÓXIMA renovación de cada club.',
+            'No se pudo guardar la tarifa.',
+          );
+          setPlanes(await listPlanesAPI());
+        }}
+      />
 
       {/* ── ACCESOS RÁPIDOS: correo → app + rol → un clic ───────────────── */}
       <AccesosRapidos
@@ -1957,6 +1974,167 @@ function Vencimientos({
         ))}
       </ul>
       {dialogo}
+    </section>
+  );
+}
+
+/**
+ * La tarifa de cada plan: precio por persona y mínimo facturable.
+ *
+ * ── Por qué esta pantalla tenía que existir ──
+ *
+ * El cobro pasó a ser por persona (§4.18 de OPERAR), pero los dos números que
+ * lo gobiernan solo se podían poner con un `PATCH` a mano. Un modelo de cobro
+ * que hay que editar por consola es un modelo que nadie ajusta: se queda con el
+ * número del primer día para siempre.
+ *
+ * ── Los dos números, y qué pasa si se dejan vacíos ──
+ *
+ * · **Sin precio por persona**, el plan sigue cobrándose por su importe fijo,
+ *   como antes del 3 de septiembre. Vaciarlo es la marcha atrás, y por eso se
+ *   permite: es la única forma de volver sin tocar la base.
+ * · **Sin mínimo**, se cobra por lo que haya, aunque sean dos personas.
+ *
+ * ── Y por qué avisa de «la próxima renovación» ──
+ *
+ * Porque cambiar la tarifa NO recalcula lo ya cobrado. Un club que pagó ayer
+ * pagó con la tarifa de ayer, y su factura no se reescribe sola — que es lo
+ * correcto, pero no lo que uno espera al pulsar «Guardar».
+ */
+function TarifasDeLosPlanes({
+  planes,
+  ocupado,
+  onGuardar,
+}: {
+  planes: Plan[];
+  ocupado: boolean;
+  onGuardar: (
+    id: string,
+    cambios: { pricePerUser: string | null; minUsers: number | null },
+  ) => Promise<void>;
+}) {
+  const [borrador, setBorrador] = useState<Record<string, { precio: string; min: string }>>(
+    {},
+  );
+
+  const campos = (p: Plan) =>
+    borrador[p.id] ?? {
+      precio: p.pricePerUser ?? '',
+      min: p.minUsers != null ? String(p.minUsers) : '',
+    };
+
+  return (
+    <section className="card mb-5 p-5">
+      <h2 className="mb-1 text-lg font-semibold">Tarifa de cada plan</h2>
+      <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+        El cobro es <strong>por persona activa del club</strong>, y se cuenta{' '}
+        <strong>el día que el club renueva</strong>: sabe cuánto paga antes de
+        pagar, y quitar gente la víspera no le baja la factura. Lo que crezca a
+        mitad de mes se cobra en la renovación siguiente.
+      </p>
+
+      <ul className="flex flex-col gap-3">
+        {planes.map((p) => {
+          const c = campos(p);
+          const porPersona = c.precio.trim() !== '' && Number(c.precio) > 0;
+          const cambiado =
+            c.precio !== (p.pricePerUser ?? '') ||
+            c.min !== (p.minUsers != null ? String(p.minUsers) : '');
+          return (
+            <li
+              key={p.id}
+              className="rounded-lg border p-3"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <strong className="min-w-0 flex-1 truncate">{p.name}</strong>
+                {p.appsIncluded.map((a) => (
+                  <span key={a} className="badge">
+                    {a}
+                  </span>
+                ))}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3 sm:items-end">
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Por persona/mes</span>
+                  <input
+                    className="mt-1"
+                    inputMode="numeric"
+                    maxLength={LIM.dinero}
+                    placeholder="vacío = importe fijo"
+                    value={c.precio}
+                    onChange={(e) =>
+                      setBorrador({
+                        ...borrador,
+                        [p.id]: { ...c, precio: e.target.value.replace(/[^0-9.]/g, '') },
+                      })
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>Mínimo facturable</span>
+                  <input
+                    className="mt-1"
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="p. ej. 10"
+                    value={c.min}
+                    onChange={(e) =>
+                      setBorrador({
+                        ...borrador,
+                        [p.id]: { ...c, min: e.target.value.replace(/[^0-9]/g, '') },
+                      })
+                    }
+                  />
+                </label>
+                <button
+                  className="btn btn-outline"
+                  disabled={ocupado || !cambiado}
+                  onClick={() =>
+                    void onGuardar(p.id, {
+                      // Vaciar el campo es la marcha atrás: `null` devuelve el
+                      // plan al importe fijo.
+                      pricePerUser: c.precio.trim() === '' ? null : c.precio.trim(),
+                      minUsers: c.min.trim() === '' ? null : Number(c.min),
+                    }).then(() => {
+                      const { [p.id]: _, ...resto } = borrador;
+                      setBorrador(resto);
+                    })
+                  }
+                >
+                  Guardar
+                </button>
+              </div>
+              <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                {porPersona ? (
+                  <>
+                    Un club de 40 personas pagaría{' '}
+                    <strong>
+                      {new Intl.NumberFormat('es-CO', {
+                        style: 'currency',
+                        currency: 'COP',
+                        maximumFractionDigits: 0,
+                      }).format(Math.max(40, Number(c.min) || 0) * Number(c.precio))}
+                    </strong>{' '}
+                    al mes. Se aplica en la <strong>próxima</strong> renovación:
+                    lo ya cobrado no se reescribe.
+                  </>
+                ) : (
+                  <>
+                    Sin precio por persona: este plan sigue cobrándose por su
+                    importe fijo ({p.priceMonthly ?? '—'} al mes).
+                  </>
+                )}
+              </p>
+            </li>
+          );
+        })}
+        {planes.length === 0 && (
+          <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            No hay planes todavía.
+          </li>
+        )}
+      </ul>
     </section>
   );
 }

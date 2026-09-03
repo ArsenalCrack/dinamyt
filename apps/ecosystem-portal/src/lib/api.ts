@@ -382,11 +382,30 @@ export interface Plan {
   priceMonthly: string | null;
   priceAnnual: string | null;
   maxUsers: number | null;
+  /**
+   * Precio por persona y mes. **`null` = este plan se cobra por
+   * `priceMonthly`**, el modelo viejo de importe fijo.
+   *
+   * Ponerlo cambia cómo se factura este plan: pasa a cobrarse por el padrón del
+   * club en cada renovación. Ver §4.18 de OPERAR.
+   */
+  pricePerUser: string | null;
+  /** Mínimo facturable: por debajo se cobra igualmente por esta cifra. */
+  minUsers: number | null;
 }
 
 export async function listPlanesAPI(): Promise<Plan[]> {
   const res = await api.get('/subscription-plans');
   return res.data as Plan[];
+}
+
+/** Cambia la tarifa de un plan. Solo super-admin. */
+export async function actualizarPlanAPI(
+  id: string,
+  cambios: { pricePerUser?: string | null; minUsers?: number | null },
+): Promise<Plan> {
+  const res = await api.patch(`/subscription-plans/${id}`, cambios);
+  return res.data as Plan;
 }
 
 // ── Administración del ecosistema (solo super admin) ────────────────────────

@@ -2184,6 +2184,124 @@ equivocarse cuesta volver a escribir la contraseña. Pegados, al pasar el ratón
 los dos fondos se tocaban y parecían un solo bloque. Medio rem no es decoración:
 es el margen de un dedo en un teléfono.
 
+## 4.18 El cobro es por persona, y se cuenta al renovar
+
+*(3 de septiembre de 2026 · migración `0019_cobro_por_persona`)*
+
+Los planes tenían un importe **fijo** —y los que había en la base eran de
+relleno: `Plan Membresías` a 60.000, `Academy` a 50.000—. Un club de 15 alumnos
+y uno de 300 no pueden pagar lo mismo: con precio fijo, **o el pequeño no entra
+o el grande está regalado**.
+
+Y había una consecuencia menos obvia: `subscriptions.total_amount` se fijaba al
+crear la fila, así que el importe era una **constante**. El panel de recaudo
+sumaba números que dejaban de significar algo en cuanto un club crecía.
+
+### La decisión: prepago, sobre el padrón del día que renueva
+
+De las tres formas razonables de contar, se eligió ésta y las razones se
+sostienen entre sí:
+
+| Cuándo se cuenta | Por qué no |
+|---|---|
+| **Al renovar** ✅ | — |
+| Al vencer (postpago) | El club acaba el mes debiendo una cifra que nadie le anunció. Y es la más fácil de bajar: quitas cuarenta alumnos la víspera, pagas, y los devuelves |
+| El máximo del periodo | Es lo más justo, pero necesita un año de censo que nadie guardaba — y una carga masiva mal hecha infla la factura |
+
+**Lo decisivo es que el resto del sistema ya era prepago**: se paga y se activa
+un mes, y desde el 3 de septiembre el impago además **bloquea** (§4.16). Cobrar
+por detrás significaría bloquear a alguien por una deuda que se generó sola.
+
+Lo que crezca a mitad de mes se cobra **en la renovación siguiente**, que es
+cuando se vuelve a contar.
+
+### Qué cuenta como persona facturable
+
+**Toda persona activa del club**: fila en `org_members` de esa organización y
+`users.is_active`. Alumnos, auxiliares y el maestro.
+
+Es una **definición y no una preferencia**: sin ella la cifra depende de la
+consulta que se escriba ese día. Se eligió porque es una sola consulta, no
+admite interpretación y **se audita contra la pantalla** — el número que factura
+es el mismo que el maestro ve en su lista de gente.
+
+> ⚠️ **Cada club cuenta a los suyos.** Quien pertenece a dos clubes cuenta en
+> los dos, y es lo correcto: son dos clubes usando el servicio para la misma
+> persona. Repartirla haría que la factura de un club dependiera de a qué otros
+> clubes se apuntó su gente, y eso no se le puede explicar a nadie.
+
+### Los dos números, y dónde se ponen
+
+`subscription_plans` estrena `price_per_user` y `min_users`, y se editan en
+**«Tarifa de cada plan»**, en `/admin`, debajo del recaudo — que es donde se
+explica la cifra de arriba.
+
+· **Sin `price_per_user`, el plan sigue cobrándose por `price_monthly`.** Es lo
+  que hace que aplicar la migración **no le cambie el precio a nadie**: el
+  precio cambia cuando alguien escribe el número. Y vaciar el campo es la
+  marcha atrás, sin tocar la base.
+· **`min_users` es el mínimo facturable.** Nadie factura tres alumnos: un club
+  que arranca con cuatro paga una cifra que no cubre ni el soporte. Un club
+  vacío paga el mínimo, no cero — si no, quedaría abierto gratis.
+
+⚠️ **Cambiar la tarifa NO recalcula lo ya cobrado.** Quien pagó ayer pagó con la
+tarifa de ayer. Es lo correcto, y no es lo que uno espera al pulsar «Guardar»:
+por eso la pantalla lo dice.
+
+### `billed_users`: por qué se guarda el padrón, y no solo el importe
+
+`subscriptions.billed_users` guarda **por cuánta gente se cobró el periodo
+vigente**. Solo con el importe no se puede contestar a «¿por qué me cobraron
+esto?», que es la primera pregunta cuando la cifra cambia cada mes — y para
+entonces el padrón de hoy ya no es el del día de corte. `null` = se cobró con el
+modelo viejo.
+
+### El censo diario, que es lo único que no se recupera
+
+`ecosystem.org_headcount` guarda una fila por club y día con su padrón. Lo
+escribe el barrido diario (§4.16), que ya recorre todos los clubes: sale gratis.
+
+**Hace falta aunque el cobro no lo use**, y ésa es la parte que se olvida:
+
+· El panel proyecta lo que entrará el mes que viene sin recontar en cada carga.
+· Es lo único que dice si un club **crece o se está vaciando**.
+· Y el día que se quiera evaluar el cobro por el máximo del periodo, hará falta
+  un año de datos que hoy no guardaba nadie.
+
+Idempotente por la clave `(org_id, dia)`: correr el barrido dos veces el mismo
+día actualiza la fila en vez de duplicarla.
+
+### Empezar limpio: `scripts/resetear-cobros.sh`
+
+Mezclar importes fijos viejos con importes por padrón nuevos deja un histórico
+con dos criterios, y el panel sumaría peras con manzanas. Con tres clubes y un
+puñado de filas, empezar limpio cuesta menos que explicar para siempre por qué
+enero se cobró de otra manera.
+
+> ⚠️ **Qué pagos son estos, que es lo primero que hay que tener claro.** Los del
+> **super-admin cobrándole a los clubes su plan**. NO son las mensualidades que
+> el maestro le cobra a sus alumnos. Son dos cobros en dos esquemas distintos:
+>
+> | Se borra | No se toca |
+> |---|---|
+> | `ecosystem.subscriptions` | `membresias.plans` — las tarifas del club |
+> | `ecosystem.subscription_payments` | `membresias.payments` — lo que el ALUMNO le paga a su maestro |
+> | | `membresias.memberships`, `membresias.attendances` |
+>
+> **La regla, por si algún día se edita ese guion: si la tabla empieza por
+> `membresias.`, no se toca ahí.** Esa es la caja del club y no es nuestra. El
+> guion lo comprueba al final imprimiendo `pagos_de_alumnos_INTACTOS`, que tiene
+> que salir igual antes y después.
+
+Las personales (`user_subscriptions`) **no se borran** salvo que se pidan con
+`--tambien-personales`: son otra cosa —alguien comprándose Academy para sí
+mismo— y no están en el cambio de modelo.
+
+⚠️ **Al borrar las suscripciones, ningún club abre nada** hasta que se las
+vuelva a crear: los `app_scopes` salen de ahí, y el barrido siguiente pondrá
+Membresías en pausa para todos. **Se corre cuando se vayan a recrear enseguida,
+no un viernes.** En seco por defecto, como la reconciliación (§2.8).
+
 ---
 
 # PARTE 5 · Las trampas que ya costaron una tarde
@@ -3024,21 +3142,28 @@ mirar.
 
 ## 6.1 Huecos conocidos
 
-`[ ]` **Los planes que hay no son los de verdad: el cobro será POR USUARIO.**
-      *(escrito el 29 ago 2026)* Los de la base son precios fijos al mes
-      —`Plan Membresías` 60.000, `Academy` 50.000, los de Campeonatos «a
-      cotizar»— y **la intención siempre fue tarifa por usuario**: un club de 15
-      alumnos y uno de 300 no pagan lo mismo.
+`[x]` ~~**Los planes que hay no son los de verdad: el cobro será POR USUARIO.**~~
+      **Hecho el 3 de septiembre de 2026** — se adelantó a la Fase 2 porque el
+      modelo viejo ya estaba estorbando: el panel de recaudo sumaba importes
+      fijos que no significaban nada. El mecanismo entero, las tres formas de
+      contar que se compararon y por qué se eligió el prepago: **§4.18**.
 
-      **No se toca antes del campeonato**, y va con la portada y los planes de
-      la Fase 2 porque es la misma conversación. Lo que hay que resolver
-      —dónde vive el precio unitario y el mínimo facturable, **qué cuenta como
-      usuario** (que es lo que decide la factura), y que `total_amount` deja de
-      ser una constante, lo que cambia el «esperado al mes» del panel de
-      recaudo— está escrito en **§10.1 del plan maestro**, que es su sitio.
+      Lo que queda de esta conversación es lo que de verdad era de la Fase 2: la
+      portada y los precios públicos. **`/planes` sigue enseñando los de
+      relleno**, así que el aviso de abajo sigue en pie hasta que se pongan los
+      de verdad en «Tarifa de cada plan».
 
-      ⚠️ Mientras tanto: **no publiques esos precios**. `/planes` los enseña, y
-      hoy solo lo abre quien tiene el enlace.
+      **Lo que decía esta nota el 29 de agosto**, y que se cumplió entero:
+      los de la base eran precios fijos al mes —`Plan Membresías` 60.000,
+      `Academy` 50.000, los de Campeonatos «a cotizar»— y la intención siempre
+      fue tarifa por usuario. Las tres cosas que dejaba por resolver —dónde vive
+      el precio unitario y el mínimo, **qué cuenta como usuario**, y que
+      `total_amount` deja de ser una constante— están las tres contestadas en
+      §4.18.
+
+      ⚠️ **Mientras tanto: no publiques los precios de `/planes`.** Los que
+      enseña siguen siendo los de relleno, y hoy solo lo abre quien tiene el
+      enlace.
 
 `[x]` ~~**Una federación creada desde `/admin` nace sin nadie que la
       gestione.**~~ Hecho el 30 de agosto de 2026. `/admin` enseña ahora la

@@ -63,6 +63,7 @@ Uso: bash scripts/ensayo.sh <paso> [argumento]
   espejo                     Los avisos del espejo que NO se aplicaron
   sueltas                    Fichas de Membresías sin cuenta de DINAMYT
   resumen                    Todo lo anterior en números
+  planes                     Quién debería abrir Membresías, y quién está allí
 AYUDA
 }
 
@@ -305,6 +306,69 @@ paso_resumen() {
 NOTA
 }
 
+paso_planes() {
+  titulo 'Quien deberia abrir Membresias, y quien esta alli de verdad'
+  # ── Por que hace falta esta consulta ──
+  #
+  # «Tiene plan de Membresias» NO es «tiene una fila en subscriptions»: un club
+  # afiliado a una federacion que paga abre la app sin tener ninguna fila propia
+  # (la herencia de §4.5). Preguntarlo por la tabla de suscripciones deja fuera
+  # justo a esos clubes, que es el error facil.
+  #
+  # La columna que importa es la ultima: un club que DEBERIA abrir y no tiene
+  # fila en membresias.orgs es uno que esta pagado y no existe alli (§4.16).
+  "${PSQL[@]}" -c "
+    with recursive cadena as (
+      select id as club, id as eslabon, 0 as salto
+        from ecosystem.organizations where is_active = true
+      union all
+      select c.club, o.parent_id, c.salto + 1
+        from cadena c
+        join ecosystem.organizations o on o.id = c.eslabon
+       where o.parent_id is not null and c.salto < 10
+    ), abre as (
+      select distinct c.club
+        from cadena c
+        join ecosystem.subscriptions s on s.org_id = c.eslabon
+        join ecosystem.subscription_plans p on p.id = s.plan_id
+       where s.status = 'ACTIVE'
+         and s.ends_at > now()
+         and 'membresias' = any(p.apps_included)
+    )
+    select o.name                              as club,
+           (a.club is not null)                as deberia_abrir_membresias,
+           (m.id is not null)                  as existe_en_membresias,
+           (m.plan_bloqueado_desde is not null) as en_pausa_por_plan,
+           case
+             when a.club is not null and m.id is null
+               then 'PAGADO Y NO EXISTE ALLI -> lo crea el barrido'
+             when a.club is null and m.id is not null
+               then 'existe alli sin plan vivo -> deberia estar en pausa'
+             else 'ok'
+           end                                 as diagnostico
+      from ecosystem.organizations o
+      left join abre a         on a.club = o.id
+      left join membresias.orgs m on m.eco_org_id = o.id
+     where o.is_active = true
+     order by (a.club is not null and m.id is null) desc, o.name;"
+
+  cat <<'NOTA'
+
+  Si hay filas en «PAGADO Y NO EXISTE ALLI», el barrido todavia no ha corrido
+  desde que Membresias tiene la ruta `/sync/plan`. Se dispara a mano:
+
+    curl -s -X POST -H "x-cron-secret: $CRON_SECRET"       http://127.0.0.1:3001/subscriptions/avisos/cron
+
+  y despues se vuelve a correr `ensayo.sh planes`. Si SIGUEN ahi, el motivo
+  esta en el log del ecosystem:
+
+    sudo journalctl -u dinamyt-id -n 80 --no-pager | grep sync/plan
+
+  Un 404 ahi significa que Membresias no tiene la ruta todavia: se desplego el
+  ecosystem y no Membresias, o al reves y sin recompilar.
+NOTA
+}
+
 # ── ─────────────────────────────────────────────────────────────────────────
 paso=${1:-}
 case "$paso" in
@@ -320,5 +384,6 @@ case "$paso" in
   espejo)     paso_espejo ;;
   sueltas)    paso_sueltas ;;
   resumen)    paso_resumen ;;
+  planes)     paso_planes ;;
   *)          uso; exit 2 ;;
 esac

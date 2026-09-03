@@ -33,7 +33,18 @@ interface Escrituras {
 function encadenar(resultados: unknown[][], escrito: Escrituras) {
   const cola = [...resultados];
   const eslabon: Record<string, unknown> = {};
-  for (const metodo of ['from', 'where', 'limit', 'orderBy', 'innerJoin', 'returning']) {
+  // `groupBy` entró con el cobro por persona: `personasFacturables` cuenta el
+  // padrón del club agrupando, y sin este eslabón la cadena se corta con un
+  // «no es una función» que no menciona ni suscripciones ni renovar.
+  for (const metodo of [
+    'from',
+    'where',
+    'limit',
+    'orderBy',
+    'innerJoin',
+    'groupBy',
+    'returning',
+  ]) {
     eslabon[metodo] = () => eslabon;
   }
   // Estos dos SÍ se miran: `renovar` no se juzga por lo que devuelve —eso lo

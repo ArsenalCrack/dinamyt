@@ -517,6 +517,17 @@ export const subscriptionPlans = eco.table('subscription_plans', {
   maxUsers: integer('max_users'),
   priceMonthly: decimal('price_monthly', { precision: 10, scale: 2 }),
   priceAnnual: decimal('price_annual', { precision: 10, scale: 2 }),
+  /**
+   * Precio por persona y mes. **`null` = este plan se cobra por
+   * `priceMonthly`**, como hasta el 3 de septiembre de 2026.
+   *
+   * Un club de 15 alumnos y uno de 300 no pueden pagar lo mismo: con precio
+   * fijo, o el pequeño no entra o el grande está regalado. Ver la migración
+   * `0019_cobro_por_persona` y §4.18 de OPERAR.
+   */
+  pricePerUser: decimal('price_per_user', { precision: 10, scale: 2 }),
+  /** Mínimo facturable: por debajo se cobra igualmente por esta cifra. */
+  minUsers: integer('min_users'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
@@ -534,6 +545,14 @@ export const subscriptions = eco.table('subscriptions', {
   startsAt: timestamp('starts_at').notNull(),
   endsAt: timestamp('ends_at').notNull(),
   totalAmount: decimal('total_amount', { precision: 10, scale: 2 }),
+  /**
+   * Por cuánta gente se cobró el periodo vigente. `null` = con el modelo viejo.
+   *
+   * Solo con el importe no se puede responder a «¿por qué me cobraron esto?»,
+   * que es la primera pregunta cuando la cifra cambia cada mes — y el padrón de
+   * hoy ya no es el del día de corte.
+   */
+  billedUsers: integer('billed_users'),
   paidAmount: decimal('paid_amount', { precision: 10, scale: 2 }).default('0'),
   paymentStatus: paymentStatusEnum('payment_status').default('PENDING'),
   notes: text('notes'),
@@ -948,5 +967,42 @@ export const pushSubscriptions = eco.table(
   (t) => [
     // Enviar pregunta siempre lo mismo: «los navegadores de estas personas».
     index('ix_push_subscriptions_persona').on(t.userId),
+  ],
+);
+
+// ── Tabla: org_headcount — el censo diario de cada club ────────────────────
+//
+// Una fila por club y día con cuánta gente activa tenía.
+//
+// ── Por qué existe si el cobro mira el padrón del día de corte ──
+//
+// Porque es el único dato que NO se puede recuperar hacia atrás. El cobro no
+// necesita historia; todo lo demás sí:
+//
+//   · proyectar lo que entrará el mes que viene, sin recontar cada club en
+//     cada carga del panel;
+//   · ver si un club crece o se está vaciando, que es lo que de verdad dice si
+//     el negocio va bien;
+//   · y poder cambiar algún día al cobro por el MÁXIMO del periodo, que sin un
+//     año de censo no se puede ni evaluar.
+//
+// Lo escribe el barrido diario, que ya recorre todos los clubes por lo del plan
+// vencido: sale gratis, es la misma pasada.
+export const orgHeadcount = eco.table(
+  'org_headcount',
+  {
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    /** Fecha CIVIL: es «el padrón del día 3», no «el de las 08:00:14». */
+    dia: date('dia').notNull(),
+    personas: integer('personas').notNull(),
+    medidoEn: timestamp('medido_en', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // La clave compuesta es lo que hace el barrido idempotente: correrlo dos
+    // veces el mismo día actualiza la fila en vez de duplicarla.
+    uniqueIndex('org_headcount_pk').on(t.orgId, t.dia),
+    index('org_headcount_dia_idx').on(t.dia),
   ],
 );
