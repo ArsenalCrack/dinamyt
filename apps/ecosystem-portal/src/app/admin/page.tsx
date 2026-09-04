@@ -49,6 +49,7 @@ import {
   type Vencimiento,
   type BarridoDePlanes,
 } from '@/lib/api';
+import { CampoDinero } from '@/components/CampoDinero';
 import { CampoFecha } from '@/components/CampoFecha';
 import { FilaSuscripcion } from '@/components/FilaSuscripcion';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
@@ -953,23 +954,14 @@ export default function AdminEcosistemaPage() {
                   <span style={{ color: 'var(--text-muted)' }}>
                     Monto {cotizacion?.porPersona ? '(calculado)' : ''}
                   </span>
-                  <input
-                    className="mt-1"
-                    inputMode="numeric"
-                    placeholder={
-                      cotizacion
-                        ? `${cotizacion.importe} — dejar vacío para usarlo`
-                        : 'Elige un plan'
-                    }
-                    maxLength={LIM.dinero}
-                    value={nuevaSub.totalAmount}
-                    onChange={(e) =>
-                      setNuevaSub({
-                        ...nuevaSub,
-                        totalAmount: e.target.value.replace(/[^0-9.]/g, ''),
-                      })
-                    }
-                  />
+                  <div className="mt-1">
+                    <CampoDinero
+                      valor={nuevaSub.totalAmount}
+                      onChange={(v) => setNuevaSub({ ...nuevaSub, totalAmount: v })}
+                      placeholder={cotizacion ? 'Vacío = el calculado' : 'Elige un plan'}
+                      ariaLabel="Importe de la suscripción"
+                    />
+                  </div>
                 </label>
                 <label className="block text-sm">
                   <span style={{ color: 'var(--text-muted)' }}>Desde</span>
@@ -2332,6 +2324,21 @@ function TarifasDeLosPlanes({
   const [borrador, setBorrador] = useState<Record<string, { precio: string; min: string }>>(
     {},
   );
+  /**
+   * Plegado, y ésta es la razón.
+   *
+   * Era una tarjeta por plan con dos campos, un botón y un párrafo de ejemplo:
+   * con siete planes, media pantalla del panel para algo que se toca **una vez
+   * al trimestre**. Y lo que empujaba hacia abajo era justo lo que se mira a
+   * diario —los vencimientos, el recaudo, los clubes—, así que el precio de un
+   * plan escondía el aviso de un club que no puede entrar.
+   *
+   * El resumen de la cabecera dice lo único que hace falta saber sin abrirlo:
+   * cuántos planes cobran por persona y cuántos siguen con importe fijo.
+   * Cerrado por defecto y sin recordar el estado: la postura normal de esta
+   * tarjeta es cerrada.
+   */
+  const [abierto, setAbierto] = useState(false);
 
   const campos = (p: Plan) =>
     borrador[p.id] ?? {
@@ -2339,118 +2346,150 @@ function TarifasDeLosPlanes({
       min: p.minUsers != null ? String(p.minUsers) : '',
     };
 
+  const porPersonaHoy = planes.filter(
+    (p) => p.pricePerUser != null && Number(p.pricePerUser) > 0,
+  ).length;
+
   return (
     <section className="card mb-5 p-5">
-      <h2 className="mb-1 text-lg font-semibold">Tarifa de cada plan</h2>
-      <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-        El cobro es <strong>por persona activa del club</strong>, y se cuenta{' '}
-        <strong>el día que el club renueva</strong>: sabe cuánto paga antes de
-        pagar, y quitar gente la víspera no le baja la factura. Lo que crezca a
-        mitad de mes se cobra en la renovación siguiente.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold">Tarifa de cada plan</h2>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            {planes.length} {planes.length === 1 ? 'plan' : 'planes'} ·{' '}
+            <strong>{porPersonaHoy}</strong> por persona ·{' '}
+            {planes.length - porPersonaHoy} de importe fijo
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={() => setAbierto((v) => !v)}
+          aria-expanded={abierto}
+        >
+          {abierto ? 'Ocultar' : 'Ver y editar'}
+        </button>
+      </div>
 
-      <ul className="flex flex-col gap-3">
-        {planes.map((p) => {
-          const c = campos(p);
-          const porPersona = c.precio.trim() !== '' && Number(c.precio) > 0;
-          const cambiado =
-            c.precio !== (p.pricePerUser ?? '') ||
-            c.min !== (p.minUsers != null ? String(p.minUsers) : '');
-          return (
-            <li
-              key={p.id}
-              className="rounded-lg border p-3"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <strong className="min-w-0 flex-1 truncate">{p.name}</strong>
-                {p.appsIncluded.map((a) => (
-                  <span key={a} className="badge">
-                    {a}
-                  </span>
-                ))}
-              </div>
-              <div className="grid gap-2 sm:grid-cols-3 sm:items-end">
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Por persona/mes</span>
-                  <input
-                    className="mt-1"
-                    inputMode="numeric"
-                    maxLength={LIM.dinero}
-                    placeholder="vacío = importe fijo"
-                    value={c.precio}
-                    onChange={(e) =>
-                      setBorrador({
-                        ...borrador,
-                        [p.id]: { ...c, precio: e.target.value.replace(/[^0-9.]/g, '') },
-                      })
-                    }
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Mínimo facturable</span>
-                  <input
-                    className="mt-1"
-                    inputMode="numeric"
-                    maxLength={4}
-                    placeholder="p. ej. 10"
-                    value={c.min}
-                    onChange={(e) =>
-                      setBorrador({
-                        ...borrador,
-                        [p.id]: { ...c, min: e.target.value.replace(/[^0-9]/g, '') },
-                      })
-                    }
-                  />
-                </label>
-                <button
-                  className="btn btn-outline"
-                  disabled={ocupado || !cambiado}
-                  onClick={() =>
-                    void onGuardar(p.id, {
-                      // Vaciar el campo es la marcha atrás: `null` devuelve el
-                      // plan al importe fijo.
-                      pricePerUser: c.precio.trim() === '' ? null : c.precio.trim(),
-                      minUsers: c.min.trim() === '' ? null : Number(c.min),
-                    }).then(() => {
-                      const { [p.id]: _, ...resto } = borrador;
-                      setBorrador(resto);
-                    })
-                  }
+      {abierto && (
+        <>
+          <p className="mt-3 mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            El cobro es <strong>por persona activa del club</strong>, y se cuenta{' '}
+            <strong>el día que el club renueva</strong>: sabe cuánto paga antes de
+            pagar, y quitar gente la víspera no le baja la factura. Se aplica en la{' '}
+            <strong>próxima</strong> renovación — lo ya cobrado no se reescribe.
+            Vaciar el precio devuelve el plan a su importe fijo.
+          </p>
+
+          {/* Una LÍNEA por plan, no una tarjeta. Y el ejemplo de «un club de 40
+              pagaría…» solo sale del plan que se está tocando: es una ayuda
+              para decidir un número, y repetida siete veces es una pared. */}
+          <ul className="flex flex-col gap-2">
+            {planes.map((p) => {
+              const c = campos(p);
+              const cambiado =
+                c.precio !== (p.pricePerUser ?? '') ||
+                c.min !== (p.minUsers != null ? String(p.minUsers) : '');
+              const porPersona = c.precio.trim() !== '' && Number(c.precio) > 0;
+              return (
+                <li
+                  key={p.id}
+                  className="rounded-lg border px-3 py-2"
+                  style={{ borderColor: 'var(--border)' }}
                 >
-                  Guardar
-                </button>
-              </div>
-              <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                {porPersona ? (
-                  <>
-                    Un club de 40 personas pagaría{' '}
-                    <strong>
-                      {new Intl.NumberFormat('es-CO', {
-                        style: 'currency',
-                        currency: 'COP',
-                        maximumFractionDigits: 0,
-                      }).format(Math.max(40, Number(c.min) || 0) * Number(c.precio))}
-                    </strong>{' '}
-                    al mes. Se aplica en la <strong>próxima</strong> renovación:
-                    lo ya cobrado no se reescribe.
-                  </>
-                ) : (
-                  <>
-                    Sin precio por persona: este plan sigue cobrándose por su
-                    importe fijo ({p.priceMonthly ?? '—'} al mes).
-                  </>
-                )}
-              </p>
-            </li>
-          );
-        })}
-        {planes.length === 0 && (
-          <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            No hay planes todavía.
-          </li>
-        )}
-      </ul>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold" title={p.name}>
+                        {p.name}
+                      </p>
+                      <p className="flex flex-wrap gap-1 text-xs">
+                        {p.appsIncluded.map((a) => (
+                          <span key={a} className="badge">
+                            {a}
+                          </span>
+                        ))}
+                      </p>
+                    </div>
+                    <label className="block text-xs" style={{ width: '9.5rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Por persona/mes</span>
+                      <div className="mt-1">
+                        <CampoDinero
+                          valor={c.precio}
+                          onChange={(v) =>
+                            setBorrador({ ...borrador, [p.id]: { ...c, precio: v } })
+                          }
+                          placeholder="fijo"
+                          ariaLabel={`Precio por persona de ${p.name}`}
+                        />
+                      </div>
+                    </label>
+                    <label className="block text-xs" style={{ width: '6rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Mínimo</span>
+                      <input
+                        className="mt-1"
+                        inputMode="numeric"
+                        maxLength={4}
+                        placeholder="10"
+                        aria-label={`Mínimo facturable de ${p.name}`}
+                        value={c.min}
+                        onChange={(e) =>
+                          setBorrador({
+                            ...borrador,
+                            [p.id]: { ...c, min: e.target.value.replace(/[^0-9]/g, '') },
+                          })
+                        }
+                      />
+                    </label>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      disabled={ocupado || !cambiado}
+                      onClick={() =>
+                        void onGuardar(p.id, {
+                          // Vaciar el campo es la marcha atrás: `null` devuelve
+                          // el plan a su importe fijo.
+                          pricePerUser: c.precio.trim() === '' ? null : c.precio.trim(),
+                          minUsers: c.min.trim() === '' ? null : Number(c.min),
+                        }).then(() => {
+                          const { [p.id]: _, ...resto } = borrador;
+                          setBorrador(resto);
+                        })
+                      }
+                    >
+                      Guardar
+                    </button>
+                  </div>
+
+                  {/* Solo mientras se edita: es la cifra que contesta «¿me
+                      pasé?» en el momento de teclearla. */}
+                  {cambiado && (
+                    <p className="mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {porPersona ? (
+                        <>
+                          Un club de 40 personas pagaría{' '}
+                          <strong>
+                            {dinero(Math.max(40, Number(c.min) || 0) * Number(c.precio))}
+                          </strong>{' '}
+                          al mes.
+                        </>
+                      ) : (
+                        <>
+                          Sin precio por persona: vuelve a su importe fijo (
+                          {p.priceMonthly ?? '—'} al mes).
+                        </>
+                      )}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+            {planes.length === 0 && (
+              <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                No hay planes todavía.
+              </li>
+            )}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

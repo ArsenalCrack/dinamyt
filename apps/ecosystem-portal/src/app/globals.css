@@ -419,6 +419,27 @@ main { animation: aparecer 0.3s ease; }
   border-top: 1px solid var(--border);
 }
 
+/* ── Campo de dinero (components/CampoDinero.tsx) ─────────────────────────
+   FUERA de `@layer components`, como los dos de abajo: si viviera dentro, el
+   `padding-left` que le hace sitio al símbolo lo pisaría cualquier utilidad de
+   Tailwind aplicada al input. El mismo campo que Membresías, con los tokens de
+   aquí. */
+.campo-dinero { position: relative; width: 100%; }
+.campo-dinero-simbolo {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.campo-dinero input {
+  /* Sitio para el símbolo. `ch` y no `rem`: un `S/` ocupa más que un `$`. */
+  padding-left: calc(1rem + 1.6ch);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Desplegables propios (components/SelectMenu.tsx) ─────────────────────
    FUERA de `@layer components`, por lo mismo que el calendario de arriba.
 

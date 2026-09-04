@@ -19,6 +19,7 @@ import {
   type Plan,
   type PagoSuscripcion,
 } from '@/lib/api';
+import { CampoDinero } from '@/components/CampoDinero';
 import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
 import { useConfirmar } from '@/components/Confirmar';
@@ -130,6 +131,29 @@ export function FilaSuscripcion({
     method: 'efectivo',
     notes: '',
   });
+
+  /**
+   * El precio del periodo, ya calculado y **escrito en el campo**.
+   *
+   * Antes vivía en el `placeholder`, y un placeholder no es un valor: se ve
+   * gris, se parece a una ayuda y **se manda vacío**. Quien no lo copiaba a
+   * mano registraba el pago sin precio, así que la cifra que el servidor
+   * calculaba por su cuenta era la única que quedaba escrita — y en pantalla
+   * no había forma de saber si lo que se iba a cobrar era eso o cero.
+   *
+   * `tocado` es lo que impide que esto pise una corrección: en cuanto alguien
+   * escribe en el campo, deja de seguir al cálculo. Y mientras no lo toque,
+   * cambiar los meses vuelve a ponerlo al día — que es el gesto normal:
+   * «cobrar tres meses» no debería obligar a multiplicar de cabeza.
+   */
+  const [precioTocado, setPrecioTocado] = useState(false);
+  const totalSugerido = precioMes
+    ? String(Number(precioMes) * (Number(renovacion.meses) || 1))
+    : '';
+  useEffect(() => {
+    if (precioTocado) return;
+    setRenovacion((r) => (r.precio === totalSugerido ? r : { ...r, precio: totalSugerido }));
+  }, [totalSugerido, precioTocado]);
 
   // ── El historial ──
   // Se pide al abrirlo y no con la fila: son veinte suscripciones en pantalla y
@@ -376,39 +400,32 @@ export function FilaSuscripcion({
             </label>
             <label className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Cuánto costó</span>
-              <input
-                className="mt-1"
-                inputMode="numeric"
-                placeholder={
-                  precioMes
-                    ? String(Number(precioMes) * (Number(renovacion.meses) || 1))
-                    : 'Precio del plan'
-                }
-                maxLength={LIM.dinero}
-                value={renovacion.precio}
-                onChange={(e) =>
-                  setRenovacion({
-                    ...renovacion,
-                    precio: e.target.value.replace(/[^0-9.]/g, ''),
-                  })
-                }
-              />
+              <div className="mt-1">
+                <CampoDinero
+                  valor={renovacion.precio}
+                  onChange={(v) => {
+                    setPrecioTocado(true);
+                    setRenovacion((r) => ({ ...r, precio: v }));
+                  }}
+                  placeholder={precioMes ? undefined : 'Precio del plan'}
+                  ariaLabel="Cuánto costó el periodo"
+                />
+              </div>
             </label>
             <label className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Cuánto entregó</span>
-              <input
-                className="mt-1"
-                inputMode="numeric"
-                placeholder="Todo"
-                maxLength={LIM.dinero}
-                value={renovacion.amount}
-                onChange={(e) =>
-                  setRenovacion({
-                    ...renovacion,
-                    amount: e.target.value.replace(/[^0-9.]/g, ''),
-                  })
-                }
-              />
+              {/* Éste sí va VACÍO, y es lo contrario del de al lado: el precio
+                  lo sabe el sistema y la entrega no. Vacío significa «pagó
+                  todo», que es el 95 %, y una cifra menor deja la suscripción
+                  en abono parcial con la deuda escrita. */}
+              <div className="mt-1">
+                <CampoDinero
+                  valor={renovacion.amount}
+                  onChange={(v) => setRenovacion((r) => ({ ...r, amount: v }))}
+                  placeholder="Pagó todo"
+                  ariaLabel="Cuánto entregó"
+                />
+              </div>
             </label>
             <div className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Cómo pagó</span>
@@ -425,6 +442,11 @@ export function FilaSuscripcion({
               </div>
             </div>
           </div>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            «Cuánto costó» viene calculado y se puede corregir. Deja{' '}
+            <strong>«cuánto entregó» vacío si pagó completo</strong>; escribe una
+            cifra menor para registrar un abono y que quede la deuda.
+          </p>
           <label className="block text-xs">
             <span style={{ color: 'var(--text-muted)' }}>Nota (opcional)</span>
             <input
@@ -452,6 +474,10 @@ export function FilaSuscripcion({
                   'No se pudo renovar.',
                 ).then(() => {
                   setRenovando(false);
+                  // Y el precio vuelve a seguir al cálculo: el periodo
+                  // siguiente se cobra con el padrón del día que se cobre, no
+                  // con la corrección de éste.
+                  setPrecioTocado(false);
                   setRenovacion({
                     meses: '1',
                     precio: '',
@@ -546,15 +572,13 @@ export function FilaSuscripcion({
             </div>
             <label className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Monto total</span>
-              <input
-                className="mt-1"
-                inputMode="numeric"
-                maxLength={LIM.dinero}
-                value={form.totalAmount}
-                onChange={(e) =>
-                  setForm({ ...form, totalAmount: e.target.value.replace(/[^0-9.]/g, '') })
-                }
-              />
+              <div className="mt-1">
+                <CampoDinero
+                  valor={form.totalAmount}
+                  onChange={(v) => setForm({ ...form, totalAmount: v })}
+                  ariaLabel="Monto total de la suscripción"
+                />
+              </div>
             </label>
             <div className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Desde</span>
@@ -621,15 +645,14 @@ export function FilaSuscripcion({
           >
             <label className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Registrar un abono</span>
-              <input
-                className="mt-1"
-                inputMode="numeric"
-                placeholder="Lo que entró hoy"
-                maxLength={LIM.dinero}
-                value={abono}
-                onChange={(e) => setAbono(e.target.value.replace(/[^0-9.]/g, ''))}
-                style={{ width: 'auto' }}
-              />
+              <div className="mt-1" style={{ width: '11rem' }}>
+                <CampoDinero
+                  valor={abono}
+                  onChange={setAbono}
+                  placeholder="Lo que entró hoy"
+                  ariaLabel="Abono"
+                />
+              </div>
             </label>
             <div className="block text-xs">
               <span style={{ color: 'var(--text-muted)' }}>Cómo pagó</span>

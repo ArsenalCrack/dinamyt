@@ -142,7 +142,7 @@ export function PanelRecaudo() {
   }
   if (!datos) return null;
 
-  const { dinero: d, clubes, porCobrar, porPlan, personas } = datos;
+  const { dinero: d, clubes, porCobrar, porPlan, personas, apps } = datos;
   const hayDinero = d.porMes.some((m) => m.recaudado > 0 || m.devengado > 0);
 
   // ── Geometría del gráfico ──
@@ -173,11 +173,34 @@ export function PanelRecaudo() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">📊 Recaudo y estado</h2>
+          {/* Lo que el panel no decía: cuánta gente hay, si CRECE, y para qué
+              entra. Un plan que nadie abre y uno que abren treinta clubes se
+              veían igual, así que no había forma de saber qué producto
+              sostiene el negocio. Las cifras por app cuentan la herencia: un
+              club afiliado abre con el plan de su federación. */}
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             {clubes.total} club{clubes.total === 1 ? '' : 'es'} ·{' '}
-            {personas.total} cuenta{personas.total === 1 ? '' : 's'} en el
-            ecosistema
+            {personas.total} cuenta{personas.total === 1 ? '' : 's'}
+            {personas.nuevasEsteMes > 0 && (
+              <span style={{ color: 'var(--ok)' }}>
+                {' '}
+                (+{personas.nuevasEsteMes} este mes)
+              </span>
+            )}
           </p>
+          {apps && (
+            <p className="mt-1 flex flex-wrap gap-1.5 text-xs">
+              <span className="badge" title="Clubes que abren Membresías hoy">
+                membresías · {apps.membresias}
+              </span>
+              <span className="badge" title="Clubes que abren Campeonatos hoy">
+                campeonatos · {apps.campeonatos}
+              </span>
+              <span className="badge" title="Clubes que abren Academy hoy">
+                academy · {apps.academy}
+              </span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <button

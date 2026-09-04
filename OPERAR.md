@@ -1961,6 +1961,35 @@ traducir el general, como todo el mundo. Es la misma lección de la limpieza de
 `role_*` de §6.1: **una excepción que nadie pidió es un rol que el portal ya no
 manda.**
 
+#### Y seguía pasando, por la puerta de al lado *(4 de septiembre de 2026)*
+
+Se arregló el servidor y **el fallo siguió viéndose igual**, que es exactamente
+la trampa que avisa la cabecera de este documento: el nombre sigue ahí y lo que
+hace ha cambiado. `responderSolicitud` dejó de escribir la columna por su
+cuenta… pero **el portal se la seguía mandando**, así que el servidor la
+escribía obedeciendo. Y `invitarPersona` conservaba su propio valor por
+defecto. Tres sitios, y solo se cerró uno.
+
+· **`CodigoYSolicitudes.tsx`** llevaba una tabla con una segunda columna —«y
+  con qué entra a Membresías»— que viajaba en las dos llamadas. Ya no existe.
+· **`invitarPersona`** ponía `'student'` cuando el rol era alumno «para que no
+  se quedara sin rol». Falso: vacía, `rolParaApp` traduce el general y da lo
+  mismo. Lo prueba `roles-por-app.spec.ts`.
+· **La migración `0020_rol_sin_excepciones`** limpia lo ya escrito. Vacía las
+  tres columnas **solo cuando repiten la traducción** —una excepción de verdad,
+  como el alumno que es `judge` en su federación, dice algo distinto y no se
+  toca— en `org_members`, en las invitaciones sin aceptar (si no, la excepción
+  vuelve a nacer al aceptarlas) y en las bajas, que es de donde se restaura.
+
+> ⚠️ **Y de propina, un permiso que sobraba.** «Acudiente» se guardaba como
+> `coach` y se corregía con `role_membresias = 'guardian'` — ése era el motivo
+> real de mandar el rol de app. Pero **`coach` abre la consola de Campeonatos**
+> (`ROLES_CONSOLA_CAMPEONATOS`), así que el acudiente de un menor podía entrar a
+> la mesa de control de un torneo. Ahora entra como `guardian`, que es un rol
+> general de verdad —los clubes lo aceptan desde el primer alta venida de
+> Membresías— y no se traduce a nada allí. La migración convierte a los que ya
+> estaban.
+
 ### Los topes de cada campo, en un solo sitio
 
 Las reglas de longitud existían y rechazaban **después** de escribir: el aviso
@@ -2190,6 +2219,56 @@ clubes que se crean en otro sitio.**
   hizo aquí y es justo lo contrario — sin ella, la reacción es buscar el
   interruptor que no existe. Solo sale si hay alguno: explicar algo que no está
   pasando es ruido.
+
+### Lo que se añadió el 4 de septiembre
+
+*(Las cuatro salieron de mirar el panel con el trabajo del día delante.)*
+
+· **El super-admin ya tiene estadísticas en Membresías.** El maestro abre
+  `/estadisticas` y ve su club; el super-admin no tenía nada equivalente, así
+  que para saber cómo fue el mes había que entrar club por club con `?orgId=` y
+  sumar a mano. Ahora, en su panel: **«📈 Cómo va el negocio»** —personas
+  activas, al día, por vencer, vencidos, nuevos del mes, asistencias de hoy;
+  cobrado del mes contra lo esperado con el padrón de hoy; seis meses de caja; y
+  **una línea por club** ordenada por gente activa. `GET /reports/superadmin`,
+  solo super-admin, sin filtro de club (`sinFiltroDeClub`).
+
+  **No es la pantalla del maestro con otro filtro**, y por eso es otra: a él le
+  importa QUIÉN no pagó; aquí importa **qué clubes se están apagando**, así que
+  no sale el nombre de ninguna persona. Si el informe falla, la tarjeta no se
+  dibuja y el panel se sigue usando igual.
+
+· **Y en el portal, las dos cifras que faltaban.** La cabecera del recaudo
+  decía «N clubes · N cuentas» y del ecosistema en sí no contaba nada más.
+  Ahora dice cuánta gente **entró este mes** y **cuántos clubes abren cada
+  app** — contando la herencia, que es la única forma de que un club afiliado
+  no desaparezca de la cuenta. Un plan que nadie abre y uno que abren treinta
+  clubes se veían exactamente igual.
+
+· **El dinero se escribe como se lee.** El panel PINTA «$ 35.000» en todas
+  partes y se ESCRIBÍA en un `<input>` pelado donde `35000` se ve igual que
+  `350000`. En la pantalla donde se registra el dinero de los clubes, un cero de
+  más no lo nota nadie hasta que hay que devolverlo. `<CampoDinero>` —el mismo
+  que Membresías tenía desde el principio— en los seis campos de importe:
+  separa los miles mientras se teclea, pone el símbolo delante y **devuelve
+  siempre el valor crudo**, así que ninguna pantalla tiene que acordarse de
+  limpiarlo.
+
+· **«Cuánto costó» ya viene puesto, y «cuánto entregó» sigue vacío.** El precio
+  calculado vivía en el `placeholder`, y **un placeholder no es un valor**: se
+  ve gris, parece una ayuda y se manda vacío. Quien no lo copiaba a mano
+  registraba el pago sin precio. Ahora el campo nace con la cifra —y se
+  recalcula al cambiar los meses, hasta que alguien lo toque, momento en el que
+  deja de seguir al cálculo—. El de la entrega es el contrario y por eso se
+  queda vacío: **el precio lo sabe el sistema y la entrega no**. Vacío = pagó
+  todo; una cifra menor deja el abono con su deuda escrita.
+
+· **La tarifa de cada plan se pliega.** Era una tarjeta por plan con dos campos,
+  un botón y un párrafo de ejemplo: con siete planes, media pantalla para algo
+  que se toca una vez al trimestre — y lo que empujaba hacia abajo era lo que se
+  mira a diario. Ahora es una línea por plan, plegada, con el resumen a la vista
+  («7 planes · 4 por persona · 3 de importe fijo») y el ejemplo de «un club de
+  40 pagaría…» solo en el plan que se está editando.
 
 ### Y en el panel del portal, cinco cosas del mismo día
 
@@ -3159,7 +3238,7 @@ lateral. Es la única medida que no depende de mirar la pantalla y opinar.
 
 ## 6.0 El orden recomendado, y el calendario que lo decide
 
-*(escrito el 30 de agosto de 2026 · **al día el 3 de septiembre**)*
+*(escrito el 30 de agosto de 2026 · **al día el 4 de septiembre**)*
 
 **Queda un mes de ventana y después no hay ninguna.** Campeonato el 9, 10 y 11
 de octubre; del 1 al 13 no se toca nada (§1.5). Así que todo lo que toque base
@@ -3176,6 +3255,10 @@ toca la base ni la identidad**, así que ya no compite con el campeonato — lo
 `admin@dinamyt.com` están corregidos, las dos pruebas del espejo escritas, y el
 `teardown_appcontext` **resultó estar hecho desde siempre** — lo registra
 Flask-SQLAlchemy, no nosotros (§6.1).
+
+Lo del 4 de septiembre —§4.16, §4.17 y el `role_membresias` de §4.15— fue
+pantalla, una ruta nueva y una migración que solo **limpia** columnas: no toca
+identidad ni mueve datos de nadie, así que no cambia nada de lo de abajo.
 
 **Así que de aquí al 1 de octubre quedan dos cosas, y las dos tienen fecha:**
 
@@ -3195,7 +3278,8 @@ porque cambia precios, contratos o el modo local — no porque falte tiempo.
 | ~~Primera quincena de sept.~~ | ~~`created_at` → `timestamptz`~~ — **aplicada** (§6.1) | Tocaba 16 tablas: era exactamente lo que no se hace en octubre. Ya está fuera del camino |
 | ~~Desde un celular, hoy~~ | ~~Instalar la PWA y aceptar los avisos~~ — **hecho, y llegan** (§4.6) | El reloj ya no dispara a nadie |
 | **Del 12 de sept. en adelante** | DMARC a `quarantine` (§3.5) | La fecha sale de una cuenta: `p=none` se publicó el 29 de agosto y hacen falta **dos semanas de informes**. `reject` **después** del 14 de octubre |
-| **Después del 14 de oct.** | Cobro por usuario · WhatsApp · fotos al disco · el rol hacia Campeonatos y Academy · §6.2 | Cambian precios, contratos o el modo local |
+| ~~Después del 14 de oct.~~ | ~~**Cobro por usuario**~~ — **hecho el 3 de septiembre** (§4.18) | Se adelantó porque no toca identidad ni migra datos de nadie: añade dos columnas al catálogo de planes y cambia una cuenta |
+| **Después del 14 de oct.** | WhatsApp · fotos al disco · el rol hacia Campeonatos y Academy · §6.2 | Cambian contratos o el modo local |
 
 ### El ensayo — corrido el 3 de septiembre de 2026
 

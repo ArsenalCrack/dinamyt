@@ -810,7 +810,13 @@ export interface ResumenSuscripciones {
     vencida: number;
     suspendida: number;
   };
-  personas: { total: number };
+  personas: {
+    total: number;
+    /** Cuentas activas creadas este mes: el crecimiento, en una cifra. */
+    nuevasEsteMes: number;
+  };
+  /** Cuántas organizaciones ABREN hoy cada app, contando lo heredado. */
+  apps?: { membresias: number; campeonatos: number; academy: number };
   porCobrar: {
     subscriptionId: string;
     orgName: string;

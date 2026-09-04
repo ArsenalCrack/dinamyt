@@ -109,3 +109,34 @@ describe('El camino de vuelta: Membresías da de alta en un club', () => {
     expect(rolGeneralDesdeMembresias('')).toBeNull();
   });
 });
+
+/**
+ * Las tres puertas de entrada de un club, sin escribir un solo rol por app.
+ *
+ * El portal ofrecía «Alumno / Auxiliar / Acudiente» y, además del rol general,
+ * mandaba el de Membresías. Eso dejaba una EXCEPCIÓN escrita en `role_membresias`
+ * para todo el que entraba: se le marcaba con una insignia que las demás
+ * personas no tenían, y mientras esa columna estuviera puesta, cambiarle el rol
+ * general después no cambiaba nada.
+ *
+ * Dejó de mandarse porque **no hacía falta**, y esto es lo que lo demuestra:
+ * traducido da lo mismo. Si algún día alguien toca la tabla de traducción, esta
+ * prueba es la que avisa de que la puerta de entrada cambió de significado sin
+ * que nadie lo pidiera.
+ */
+describe('Entrar a un club sin excepciones por app', () => {
+  it('los tres roles de entrada se traducen solos a Membresías', () => {
+    expect(rolParaApp('membresias', null, 'student')).toBe('student');
+    expect(rolParaApp('membresias', null, 'staff')).toBe('staff');
+    expect(rolParaApp('membresias', null, 'guardian')).toBe('guardian');
+  });
+
+  // El acudiente entraba con el general `coach` y se corregía a mano. Aparte de
+  // obligar a mandar el rol de app, `coach` abre la consola de Campeonatos: el
+  // acudiente de un menor podía entrar a la mesa de control de un torneo.
+  it('un acudiente no es un coach, y no toca Campeonatos', () => {
+    expect(rolParaApp('membresias', null, 'coach')).toBe('staff');
+    expect(rolParaApp('campeonatos', null, 'guardian')).toBeNull();
+    expect(rolParaApp('academy', null, 'guardian')).toBeNull();
+  });
+});

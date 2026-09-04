@@ -2276,12 +2276,23 @@ export class OrganizationsService {
     }
 
     const rolesDeApp = {
-      // El alumno del portal es `student` en Membresías; si quien invita no
-      // dice otra cosa, se pone el que corresponde y no un `null` que dejaría
-      // a la persona sin rol en la app a la que su club la está llamando.
-      roleMembresias:
-        datos.roleMembresias ??
-        (role === 'competitor' || role === 'student' ? 'student' : null),
+      /**
+       * **Vacío, no `'student'`.** Era la otra mitad del «Membresías · Alumno»
+       * que aparecía al entrar y se iba al cambiarle el rol: `responderSolicitud`
+       * ya se arregló y esta puerta se quedó escribiéndolo igual.
+       *
+       * El razonamiento de antes —«un `null` dejaría a la persona sin rol en la
+       * app a la que su club la está llamando»— era falso: vacía, el rol de
+       * Membresías sale de TRADUCIR el general (`rolParaApp`), y `student` está
+       * en su catálogo, así que el resultado es exactamente el mismo. Lo único
+       * que cambiaba era dejar escrita una EXCEPCIÓN —«en esta app esta persona
+       * es otra cosa»— a alguien que no la tiene.
+       *
+       * Y las excepciones no son cosméticas: mandan sobre el general, así que
+       * cambiarle después el rol a esa persona no cambiaba nada hasta que algo
+       * las limpiara.
+       */
+      roleMembresias: datos.roleMembresias ?? null,
       roleCampeonatos: datos.roleCampeonatos ?? null,
       roleAcademy: datos.roleAcademy ?? null,
     };

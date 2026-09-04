@@ -15,7 +15,7 @@ import {
   users,
   orgHeadcount,
 } from '../../db/schema';
-import { and, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import { MailerService } from '../auth/mailer.service';
 import { OrgNotificationsService } from '../organizations/org-notifications.service';
 import { appsPorOrganizacion, padresDe } from '../../common/apps-de-la-org';
@@ -1582,15 +1582,46 @@ export class SubscriptionsService {
     porCobrar.sort((a, b) => b.debe - a.debe);
 
     // ── Clubes y cuentas ──────────────────────────────────────────────────
-    const [{ clubes }] = await db
-      .select({ clubes: count() })
+    const activas = await db
+      .select({ id: organizations.id })
       .from(organizations)
       .where(eq(organizations.isActive, true));
+    const clubes = activas.length;
 
     const [{ personas }] = await db
       .select({ personas: count() })
       .from(users)
       .where(eq(users.isActive, true));
+
+    // ── Y las dos cifras que faltaban: cuánta gente ENTRA, y qué se usa ────
+    //
+    // El panel contaba dinero y clubes, y del ecosistema en sí no decía nada:
+    // cuántas cuentas hay, si crecen, y **para qué entra la gente**. Un plan
+    // de Campeonatos que nadie abre y uno de Membresías que abren treinta
+    // clubes se veían igual, así que no había forma de saber qué producto
+    // sostiene el negocio.
+    const [{ nuevas }] = await db
+      .select({ nuevas: count() })
+      .from(users)
+      .where(
+        and(
+          eq(users.isActive, true),
+          gte(users.createdAt, new Date(`${mes}-01T00:00:00.000Z`)),
+        ),
+      );
+
+    // Cuenta la HERENCIA: un club afiliado abre Campeonatos con el plan de su
+    // federación y sin fila propia (decisión 11). Contarlo por la tabla de
+    // suscripciones dejaría fuera justo a esos.
+    const appsDeCada = await appsPorOrganizacion(activas.map((o) => o.id));
+    const porApp: Record<string, number> = {
+      membresias: 0,
+      campeonatos: 0,
+      academy: 0,
+    };
+    for (const apps of appsDeCada.values()) {
+      for (const a of apps) if (a in porApp) porApp[a] += 1;
+    }
 
     const conSuscripcion = new Set(subs.map((s) => s.orgId)).size;
 
@@ -1624,7 +1655,13 @@ export class SubscriptionsService {
         sinSuscripcion: Math.max(clubes - conSuscripcion, 0),
         ...estados,
       },
-      personas: { total: personas },
+      personas: {
+        total: personas,
+        /** Cuentas activas creadas este mes: el crecimiento, en una cifra. */
+        nuevasEsteMes: nuevas,
+      },
+      /** Cuántas organizaciones ABREN hoy cada app, contando lo heredado. */
+      apps: porApp,
       porCobrar: porCobrar.slice(0, 20),
       porPlan: [...porPlan.entries()]
         .map(([planId, v]) => ({

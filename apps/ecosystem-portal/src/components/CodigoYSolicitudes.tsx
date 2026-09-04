@@ -49,26 +49,47 @@ import { useConfirmar } from '@/components/Confirmar';
  */
 
 /**
- * Roles que el maestro puede dar, y con qué entran a Membresías.
+ * Roles que el maestro puede dar al dejar entrar a alguien.
  *
  * La MISMA lista para las dos puertas: aceptar una solicitud y mandar una
  * invitación acaban los dos en una fila de `org_members`, y ofrecer roles
  * distintos según por dónde entre la persona es cómo se acaba con dos alumnos
  * iguales que la app trata distinto.
+ *
+ * ── Aquí ya no se manda el rol de Membresías, y es el arreglo ──
+ *
+ * Esta lista llevaba una segunda columna —«y con qué entra a Membresías»— que
+ * se enviaba en las dos llamadas. Escribía una EXCEPCIÓN en `role_membresias`
+ * para todo el que entraba, y las excepciones se ven: la persona salía marcada
+ * «Membresías · Alumno» en la lista de gente y las demás no. Al cambiarle el
+ * rol, el servidor limpia las columnas por app —para que el rol nuevo no quede
+ * pisado— y la insignia desaparecía. Dos rarezas, una sola causa.
+ *
+ * No hace falta mandarlo: vacío, el rol de cada app sale de traducir el
+ * general (`rolParaApp` en el servidor), y los tres de esta lista existen tal
+ * cual en Membresías. El resultado es el mismo sin dejar escrita una excepción
+ * que nadie pidió.
+ *
+ * ── Y «Acudiente» ya no entra como `coach` ──
+ *
+ * Era el apaño que obligaba a mandar el rol de app: se elegía «Acudiente», se
+ * guardaba el general `coach` y se corregía con `role_membresias: 'guardian'`.
+ * Dos consecuencias, las dos malas: en el portal figuraba como coach del club,
+ * y `coach` **abre la consola de Campeonatos** (ver `ROLES_CONSOLA_CAMPEONATOS`),
+ * así que el acudiente de un menor podía entrar a la mesa de control.
+ * `guardian` es un rol general de verdad —los clubes lo aceptan desde que
+ * Membresías dio de alta al primero— y no se traduce a nada en Campeonatos.
  */
-const ROLES_DE_ENTRADA: { valor: string; etiqueta: string; membresias: string }[] = [
-  { valor: 'student', etiqueta: 'Alumno', membresias: 'student' },
-  { valor: 'staff', etiqueta: 'Auxiliar / recepción', membresias: 'staff' },
-  { valor: 'coach', etiqueta: 'Acudiente', membresias: 'guardian' },
+const ROLES_DE_ENTRADA: { valor: string; etiqueta: string }[] = [
+  { valor: 'student', etiqueta: 'Alumno' },
+  { valor: 'staff', etiqueta: 'Auxiliar / recepción' },
+  { valor: 'guardian', etiqueta: 'Acudiente' },
 ];
 
 const OPCIONES_ROL = ROLES_DE_ENTRADA.map((r) => ({
   valor: r.valor,
   etiqueta: r.etiqueta,
 }));
-
-const paraMembresias = (rol: string) =>
-  ROLES_DE_ENTRADA.find((r) => r.valor === rol)?.membresias ?? 'student';
 
 /** Cómo se ve el estado de una invitación ya respondida. */
 const COLOR_ESTADO: Record<string, { borderColor: string; color: string }> = {
@@ -179,11 +200,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
     if (!ok) return;
     const r = await accion(
       () =>
-        responderSolicitudAPI(s.id, {
-          aceptar,
-          role: elegido,
-          roleMembresias: paraMembresias(elegido),
-        }),
+        responderSolicitudAPI(s.id, { aceptar, role: elegido }),
       aceptar
         ? `${s.fullName} entró al club como ${nombreRol(elegido)}. Le avisamos por correo.`
         : `Se rechazó la solicitud de ${s.fullName}.`,
@@ -200,7 +217,6 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         invitarPersonaAPI(orgId, {
           email: correo,
           role: nueva.role,
-          roleMembresias: paraMembresias(nueva.role),
           fullName: nueva.fullName.trim() || undefined,
           note: nueva.note.trim() || undefined,
         }),

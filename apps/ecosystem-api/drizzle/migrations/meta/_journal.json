@@ -141,6 +141,13 @@
       "when": 1788300100000,
       "tag": "0019_cobro_por_persona",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788300200000,
+      "tag": "0020_rol_sin_excepciones",
+      "breakpoints": true
     }
   ]
 }
