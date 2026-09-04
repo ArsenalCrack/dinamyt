@@ -849,6 +849,45 @@ export const avisarVencimientosAPI = async (opciones?: {
   correoConfigurado: boolean;
 }> => (await api.post('/subscriptions/avisos', opciones ?? {})).data;
 
+/** Una línea del barrido de planes. Ver `ClubDelBarrido` en el ecosystem. */
+export interface ClubDelBarrido {
+  id: string;
+  name: string;
+  /** Si HOY abre Membresías, contando lo que hereda de su federación. */
+  abre: boolean;
+  /**
+   * Por qué NO abre, en una frase. `null` cuando abre — y también cuando no
+   * tiene ningún plan de Membresías, que no es una avería sino un club que no
+   * la usa.
+   */
+  motivo: string | null;
+  resultado: 'creado' | 'al-dia' | 'en-pausa' | 'sin-espejo' | 'no-llego';
+}
+
+export interface BarridoDePlanes {
+  clubes: number;
+  alDia: number;
+  enPausa: number;
+  /** Clubes que tenían plan y no existían en Membresías: nacieron ahora. */
+  creados: number;
+  /** Contestaron «no lo tengo» y no se pudo crear: sin plan, o sin nombre. */
+  sinEspejo: number;
+  /** Avisos que NO salieron. Si no es cero, el problema no es de datos. */
+  noLlego: number;
+  detalle: ClubDelBarrido[];
+}
+
+/**
+ * Le dice a Membresías, club por club, si puede operar hoy — y trae el porqué.
+ *
+ * Es el mismo barrido que corre a las ocho de la mañana, disparado a mano. Se
+ * usa cuando un club acaba de contratar y todavía no aparece allí: sin esto
+ * había que esperar a mañana, y sin el detalle no había forma de saber si el
+ * problema era la suscripción sin activar, el plan equivocado, o el espejo.
+ */
+export const sincronizarMembresiasAPI = async (): Promise<BarridoDePlanes> =>
+  (await api.post('/subscriptions/membresias/sincronizar')).data;
+
 export const eliminarSuscripcionAPI = async (id: string) =>
   (await api.delete(`/subscriptions/${id}`)).data;
 

@@ -183,6 +183,35 @@ export class SubscriptionsController {
     };
   }
 
+  // ── POST /subscriptions/membresias/sincronizar — el barrido, AHORA ────────
+  //
+  // ── Por qué existe, si ya hay un barrido diario ──
+  //
+  // Porque el diario es lo único que había, y eso deja dos agujeros que se
+  // notan el mismo día:
+  //
+  // · **Un club que contrata hoy no aparece en Membresías hasta mañana** si
+  //   nadie tocó su suscripción después de activarla. Los avisos por cambio
+  //   cubren el caso normal, pero cualquier plan contratado ANTES de que el
+  //   espejo existiera —o mientras Membresías estaba caída— se queda esperando
+  //   al barrido de las ocho.
+  // · **Y cuando no aparece, no hay forma de preguntar por qué.** La única
+  //   manera de disparar el barrido era la ruta del cron, que necesita el
+  //   `CRON_SECRET` y se llama desde el servidor: nada que se pueda hacer con
+  //   el maestro delante preguntando.
+  //
+  // Es la MISMA operación del cron, con sesión de super-admin en vez de
+  // secreto, y devolviendo el detalle club por club (ver `ClubDelBarrido`).
+  // Idempotente: repetirla no reinicia ninguna fecha de bloqueo.
+  //
+  // Va declarada antes que `:id/…` por la regla de más abajo: hoy no chocan,
+  // pero el orden es lo que evita que choquen mañana.
+  @Post('membresias/sincronizar')
+  @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
+  sincronizarMembresias() {
+    return this.subsService.barrerPlanes();
+  }
+
   // ── POST /subscriptions/:id/recalcular — el importe, con el padrón de hoy ─
   //
   // Existe porque el caso pasa SIEMPRE la primera vez: se le crea la

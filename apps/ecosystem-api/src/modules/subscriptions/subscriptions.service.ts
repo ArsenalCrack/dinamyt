@@ -18,7 +18,9 @@ import {
 import { and, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { MailerService } from '../auth/mailer.service';
 import { OrgNotificationsService } from '../organizations/org-notifications.service';
-import { appsPorOrganizacion } from '../../common/apps-de-la-org';
+import { appsPorOrganizacion, padresDe } from '../../common/apps-de-la-org';
+import { cadenasDeMando } from '../../common/jerarquia';
+import { porQueNoAbre } from '../../common/porque-no-abre';
 import {
   esPorPersona,
   importeDelPeriodo,
@@ -41,6 +43,41 @@ import {
 // parecida — por eso se importa en vez de repetirse.
 import { ROLES_GESTOR } from '../../common/roles';
 import { normalizarCorreo } from '../../common/validacion';
+
+/**
+ * Una línea del barrido de planes: qué pasó con este club y **por qué**.
+ *
+ * El barrido devolvía solo cifras —«12 clubes, 9 al día, 2 creados»—, y con
+ * eso no se contesta la única pregunta que se hace de verdad delante del
+ * panel: *¿por qué el club de Fulano no aparece en Membresías si acaba de
+ * pagar?*. La respuesta está siempre en una de dos cosas que no se veían: su
+ * suscripción no está `ACTIVE` todavía, o su plan no incluye Membresías.
+ */
+export interface ClubDelBarrido {
+  id: string;
+  name: string;
+  /** Si HOY abre Membresías, contando lo que hereda de su federación. */
+  abre: boolean;
+  /**
+   * Por qué NO abre, en una frase.
+   *
+   * `null` cuando abre — y también cuando **no tiene ningún plan de Membresías**,
+   * que no es una avería sino un club que no la usa. Quien pinta una lista de
+   * problemas se guía por esto: ver `resultado` para distinguir los dos casos.
+   */
+  motivo: string | null;
+  /**
+   * Qué pasó con el aviso:
+   *
+   * · `creado` — tenía plan y allí no existía: acaba de nacer, ya enlazado.
+   * · `al-dia` / `en-pausa` — el club existe allí y quedó abierto o cerrado.
+   * · `sin-espejo` — Membresías contestó «no lo tengo» y no se pudo crear
+   *   (sin plan, o sin nombre). Es lo normal en un club que no usa la app.
+   * · `no-llego` — el aviso NO salió: falta `MEMBRESIAS_SYNC_URL` o el
+   *   secreto, o Membresías no respondió. **Aquí el problema no es de datos.**
+   */
+  resultado: 'creado' | 'al-dia' | 'en-pausa' | 'sin-espejo' | 'no-llego';
+}
 
 /** Formas de pago que se pueden registrar. Las mismas que Membresías. */
 export const METODOS_PAGO = [
@@ -103,6 +140,56 @@ export class SubscriptionsService {
       // Ni el cobro ni la corrección de una fecha pueden fallar porque este
       // aviso no salga. El barrido diario lo repone.
     }
+  }
+
+  /**
+   * Por qué estos clubes NO abren Membresías, dicho en una frase por club.
+   *
+   * Las causas y su redacción viven en `porQueNoAbre`, que se prueba sola.
+   * Aquí queda la consulta: las suscripciones del club **y las de su cadena de
+   * mando**.
+   *
+   * ── Por qué mira también a la federación ──
+   *
+   * Porque la herencia BAJA (decisión 11): un club afiliado abre Membresías con
+   * el plan de su federación y sin fila propia. Decirle «no tienes plan» a un
+   * club que abre por herencia sería mentira, y decírselo al que no abre por
+   * NINGUNO de los dos caminos tiene que nombrar los dos.
+   *
+   * Solo se llama para los que NO abren: el que abre no necesita explicación.
+   */
+  private async motivosDeCierre(orgIds: string[]): Promise<Map<string, string>> {
+    const motivos = new Map<string, string>();
+    if (orgIds.length === 0) return motivos;
+
+    const cadenas = cadenasDeMando(await padresDe(orgIds), orgIds);
+    const conAncestros = [...new Set([...cadenas.values()].flat())];
+
+    const filas = await db
+      .select({
+        orgId: subscriptions.orgId,
+        status: subscriptions.status,
+        endsAt: subscriptions.endsAt,
+        planName: subscriptionPlans.name,
+        appsIncluded: subscriptionPlans.appsIncluded,
+      })
+      .from(subscriptions)
+      .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+      .where(inArray(subscriptions.orgId, conAncestros));
+
+    for (const orgId of orgIds) {
+      // Sin entrada = no tiene ningún plan de Membresías, o sea que no la usa.
+      // Ver `porQueNoAbre`: eso no es una avería y no se cuenta como tal.
+      const motivo = porQueNoAbre(
+        orgId,
+        cadenas.get(orgId) ?? [orgId],
+        filas,
+        'membresias',
+      );
+      if (motivo) motivos.set(orgId, motivo);
+    }
+
+    return motivos;
   }
 
   /**
@@ -1054,6 +1141,7 @@ export class SubscriptionsService {
     creados: number;
     sinEspejo: number;
     noLlego: number;
+    detalle: ClubDelBarrido[];
   }> {
     const orgs = await db
       .select({
@@ -1066,7 +1154,15 @@ export class SubscriptionsService {
       .where(eq(organizations.isActive, true));
 
     if (orgs.length === 0)
-      return { clubes: 0, alDia: 0, enPausa: 0, creados: 0, sinEspejo: 0, noLlego: 0 };
+      return {
+        clubes: 0,
+        alDia: 0,
+        enPausa: 0,
+        creados: 0,
+        sinEspejo: 0,
+        noLlego: 0,
+        detalle: [],
+      };
 
     const apps = await appsPorOrganizacion(orgs.map((o) => o.id));
 
@@ -1112,6 +1208,17 @@ export class SubscriptionsService {
     let sinEspejo = 0;
     let noLlego = 0;
 
+    // ── El porqué de los que no abren ──
+    //
+    // De una sola consulta y antes del bucle: son los que van a hacer que
+    // alguien pregunte, y la cifra sola no contesta. Ver `motivosDeCierre`.
+    const motivos = await this.motivosDeCierre(
+      orgs
+        .filter((o) => !(apps.get(o.id) ?? []).includes('membresias'))
+        .map((o) => o.id),
+    );
+    const detalle: ClubDelBarrido[] = [];
+
     // ── Se ESPERA a cada aviso, y esa es la diferencia ──
     //
     // Antes se disparaban y se olvidaban, así que este método informaba de lo
@@ -1129,9 +1236,28 @@ export class SubscriptionsService {
       // tienen plan y nunca llegaron a existir allá —los que se contrataron
       // antes de que esto existiera—, sin que nadie tenga que tocarlos.
       const r = await espejarPlan(o.id, abre, o);
-      if (r === null) noLlego += 1;
-      else if (r.creado) creados += 1;
-      else if (r.encontrado === false) sinEspejo += 1;
+
+      let resultado: ClubDelBarrido['resultado'];
+      if (r === null) {
+        noLlego += 1;
+        resultado = 'no-llego';
+      } else if (r.creado) {
+        creados += 1;
+        resultado = 'creado';
+      } else if (r.encontrado === false) {
+        sinEspejo += 1;
+        resultado = 'sin-espejo';
+      } else {
+        resultado = abre ? 'al-dia' : 'en-pausa';
+      }
+
+      detalle.push({
+        id: o.id,
+        name: o.name,
+        abre,
+        motivo: abre ? null : (motivos.get(o.id) ?? null),
+        resultado,
+      });
     }
 
     return {
@@ -1148,6 +1274,11 @@ export class SubscriptionsService {
        * responde. Está en el log del ecosystem, línea por línea.
        */
       noLlego,
+      /**
+       * Club por club: si abre, qué pasó con su aviso, y **por qué no abre**
+       * cuando no abre. Es lo que convierte «9 al día» en algo accionable.
+       */
+      detalle,
     };
   }
 

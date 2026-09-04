@@ -22,6 +22,7 @@ import {
   listSuscripcionesPersonalesAPI,
   vencimientosAPI,
   avisarVencimientosAPI,
+  sincronizarMembresiasAPI,
   renovarSuscripcionAPI,
   crearSuscripcionPersonalAPI,
   ESTADOS_SUSCRIPCION,
@@ -46,6 +47,7 @@ import {
   type SuscripcionPersonal,
   type CuentaBloqueada,
   type Vencimiento,
+  type BarridoDePlanes,
 } from '@/lib/api';
 import { CampoFecha } from '@/components/CampoFecha';
 import { FilaSuscripcion } from '@/components/FilaSuscripcion';
@@ -386,6 +388,9 @@ export default function AdminEcosistemaPage() {
 
       {/* ── VENCIMIENTOS: lo único de esta pantalla que caduca ──────────── */}
       <Vencimientos ocupado={ocupado} onAccion={accion} />
+
+      {/* ── EL ESPEJO DE MEMBRESÍAS: qué clubes la abren, y quién no ────── */}
+      <EspejoDeMembresias />
 
       {/* ── RECAUDO: cuánto entró, cuánto falta y cómo están los clubes ─── */}
       <PanelRecaudo />
@@ -1960,6 +1965,162 @@ function AccesosRapidos({
  * repite el mismo aviso antes de una semana, así que pulsarlo dos veces no
  * llena el buzón de nadie: la segunda vez contesta «0 avisadas».
  */
+/**
+ * El espejo de Membresías: qué clubes la abren hoy, y por qué los demás no.
+ *
+ * ── El agujero que tapa ──
+ *
+ * Un club contrata Membresías y **aparece allí solo**: el portal empuja el
+ * aviso y, si el club no existía al otro lado, nace enlazado. Cuando eso no
+ * ocurre —y ocurre— no había forma de mirar. El aviso se dispara al cambiar
+ * una suscripción y en el barrido de las ocho de la mañana; entre medias, un
+ * super-admin con el maestro al teléfono solo podía esperar a mañana.
+ *
+ * Y esperar a mañana casi nunca era la solución, porque la causa más común no
+ * es que el aviso se perdiera: es que **la suscripción se creó y nadie la
+ * activó**. Nace en «En revisión» a propósito, y hasta que no se pone en
+ * «Activa» el club no abre nada. En la fila se lee «En revisión», que no
+ * parece una avería — y el club no aparece en Membresías por eso.
+ *
+ * Por eso el botón no informa de lo que INTENTÓ: informa de lo que llegó, y de
+ * lo que hay que tocar para arreglar cada uno de los que no.
+ */
+function EspejoDeMembresias() {
+  const [ocupado, setOcupado] = useState(false);
+  const [r, setR] = useState<BarridoDePlanes | null>(null);
+  const [error, setError] = useState('');
+
+  async function sincronizar() {
+    setOcupado(true);
+    setError('');
+    try {
+      setR(await sincronizarMembresiasAPI());
+    } catch (e) {
+      setError(extraerError(e, 'No se pudo sincronizar con Membresías.'));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  // ── Qué se lista, que no es «todo el que no abre» ──
+  //
+  // Una federación que solo compró Campeonatos no abre Membresías y no le pasa
+  // nada: listarla, y con ella a las otras nueve, convierte esto en una pared
+  // de texto que nadie lee — que es la forma de esconder los dos clubes que sí
+  // necesitan una llamada. Se enseña quien tiene un plan de Membresías que no
+  // está funcionando (`motivo`), y quien **existe allí y quedó en pausa**
+  // aunque no tenga plan: su gente no puede entrar ahora mismo.
+  //
+  // Los avisos que no salieron no van uno a uno: cuando el espejo está apagado
+  // fallan todos, y eso ya lo dice el renglón rojo de arriba.
+  const problemas = (r?.detalle ?? []).filter(
+    (c) => !c.abre && (c.motivo !== null || c.resultado === 'en-pausa'),
+  );
+
+  return (
+    <section className="card mb-5 p-5">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">🔗 Membresías — quién la abre</h2>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Los clubes con plan aparecen en Membresías solos y enlazados; los que
+            vencen quedan allí <strong>en pausa</strong> hasta que paguen. Pasa cada
+            mañana a las 8 y cada vez que se toca una suscripción. Esto lo hace{' '}
+            <strong>ahora</strong> y dice club por club qué pasó.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void sincronizar()}
+          disabled={ocupado}
+          className="btn btn-outline btn-sm"
+          title="Recalcula el plan de cada club y se lo dice a Membresías. No manda un solo correo y no reinicia ninguna fecha: repetirlo es inofensivo."
+        >
+          {ocupado ? 'Sincronizando…' : '⟳ Sincronizar ahora'}
+        </button>
+      </div>
+
+      {error && (
+        <p className="text-sm" style={{ color: 'var(--danger)' }}>
+          {error}
+        </p>
+      )}
+
+      {r && (
+        <>
+          <p className="mb-3 text-sm">
+            <strong>{r.clubes}</strong> clubes · <strong>{r.alDia}</strong> abren
+            Membresías · <strong>{r.enPausa}</strong> en pausa
+            {r.creados > 0 && (
+              <>
+                {' '}
+                ·{' '}
+                <span style={{ color: 'var(--gold)' }}>
+                  <strong>{r.creados}</strong> creados allí ahora mismo
+                </span>
+              </>
+            )}
+            {/* `noLlego` no es un dato más: es el único que dice que el
+                problema NO está en las suscripciones sino en la conexión. */}
+            {r.noLlego > 0 && (
+              <>
+                {' '}
+                ·{' '}
+                <span style={{ color: 'var(--danger)' }}>
+                  <strong>{r.noLlego}</strong> avisos no salieron
+                </span>
+              </>
+            )}
+          </p>
+
+          {r.noLlego > 0 && (
+            <p className="mb-3 text-xs" style={{ color: 'var(--danger)' }}>
+              Un aviso que no sale no es un problema de datos: falta{' '}
+              <code>MEMBRESIAS_SYNC_URL</code> o <code>ECOSYSTEM_SYNC_SECRET</code> en
+              el ecosystem, o Membresías no respondió. Mientras tanto, allí se ve lo
+              de antes.
+            </p>
+          )}
+
+          {problemas.length === 0 ? (
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Ningún club con plan de Membresías se ha quedado fuera.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {problemas.map((c) => (
+                <li
+                  key={c.id}
+                  className="rounded-lg border px-3 py-2 text-sm"
+                  style={{
+                    borderColor:
+                      c.resultado === 'no-llego' ? 'var(--danger)' : 'var(--border)',
+                  }}
+                >
+                  <p className="truncate font-semibold" title={c.name}>
+                    {c.name}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {/* Sin motivo y en pausa: el club vive en Membresías y no
+                        tiene con qué abrirla. Es el caso del que se fue. */}
+                    {c.motivo ??
+                      'no tiene ningún plan que incluya Membresías, y allí sí existe: su gente queda en pausa hasta que contrate uno.'}
+                  </p>
+                  {c.resultado === 'no-llego' && (
+                    <p className="text-xs" style={{ color: 'var(--danger)' }}>
+                      Y su aviso no llegó: en Membresías sigue como estaba.
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 function Vencimientos({
   ocupado,
   onAccion,

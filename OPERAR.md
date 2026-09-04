@@ -1630,6 +1630,7 @@ Todo del super-admin, salvo `GET /subscriptions/org/:orgId` (autenticado) y
 | `GET /subscriptions/vencimientos` | Lo que vence esta semana y lo que ya venció |
 | `POST /subscriptions/avisos` | Mandar los correos ahora |
 | `POST /subscriptions/avisos/cron` | El disparo diario (`x-cron-secret`) |
+| `POST /subscriptions/membresias/sincronizar` | **El barrido de planes, AHORA**, con el detalle club por club (§4.16) |
 | `PATCH /subscriptions/:id/payment` | Un abono suelto: paga deuda, no mueve la fecha |
 | `PATCH /subscriptions/:id` · `/:id/status` · `DELETE /:id` | Corregir, suspender, borrar |
 
@@ -2093,6 +2094,44 @@ puesto — o sea enlazado desde el primer segundo. Tres detalles:
 > contrataron antes de que esto existiera aparecen solos en la primera pasada,
 > sin que nadie tenga que tocarlos uno a uno.
 
+### 3 · El botón, y por qué el barrido diario no bastaba
+
+*(4 de septiembre de 2026)*
+
+Los dos disparadores de arriba dejaban un hueco que se nota **el mismo día**: un
+club contrata, alguien activa su suscripción y no aparece en Membresías. Y no
+había forma de preguntar por qué. El barrido solo se podía disparar por la ruta
+del cron —que necesita el `CRON_SECRET` y se llama desde el servidor—, así que
+con el maestro al teléfono la única respuesta era «mañana lo miramos».
+
+En el panel del super-admin, arriba: **🔗 Membresías — quién la abre**, con
+`⟳ Sincronizar ahora`. Es la MISMA operación del cron
+(`POST /subscriptions/membresias/sincronizar`, con sesión en vez de secreto), y
+es inofensiva de repetir: no manda un solo correo y no reinicia ninguna fecha de
+bloqueo.
+
+**Lo que de verdad aporta es el detalle**, porque la causa más común **no** es
+que el aviso se perdiera:
+
+| Lo que dice | Qué hacer |
+|---|---|
+| `sigue EN REVISIÓN` | **La causa número uno.** La suscripción nace en `PENDING_REVIEW` a propósito y hasta que no se pone en «Activa» el club **no abre nada** — ni por el portal ni por Membresías. En la fila se lee «En revisión», que no parece una avería |
+| `venció el …` | La fila sigue diciendo «Activa»: lo que caduca es la FECHA, no el `status`. Registrar el pago |
+| `no tiene ningún plan que incluya Membresías` | Se contrató el de otra app, o se le venció y se borró la fila |
+| `su aviso no llegó` | **No es un problema de datos**: falta `MEMBRESIAS_SYNC_URL` o `ECOSYSTEM_SYNC_SECRET`, o Membresías no respondió |
+
+> **La lista no enseña a todo el que no abre**, y es a propósito: una federación
+> que solo compró Campeonatos no abre Membresías y no le pasa nada. Salen los
+> que tienen un plan de Membresías que no está funcionando, y los que **existen
+> allí y quedaron en pausa** aunque ya no tengan plan — ésos sí, porque su gente
+> no puede entrar ahora mismo. Los avisos que no salieron van en la cifra roja
+> de arriba y no fila por fila: cuando el espejo está apagado fallan todos.
+
+La frase la elige `common/porque-no-abre.ts`, que es una función pura y se
+prueba sola: entre varias suscripciones nombra **la que está más cerca de
+abrir** —la que alguien puede tocar hoy—, y si el plan es de la federación lo
+dice, para no mandar al maestro a buscar una fila que no es suya.
+
 ### Y en Campeonatos, por qué NO hay nada equivalente
 
 Porque **Campeonatos no tiene tabla de clubes**. `usuarios.club` es texto libre
@@ -2133,6 +2172,24 @@ clubes que se crean en otro sitio.**
   **solo si no son cero** — un «0» en rojo enseña a ignorar el color, y entonces
   el día que sea 3 tampoco se verá. Son las dos que disparan una llamada: o
   alguien pagó y no le abre, o alguien no ha pagado.
+
+· **Y desde el 4 de septiembre, esas dos cifras se pueden seguir hasta el club.**
+  Decían «2 en pausa por plan» y la lista de abajo se veía **idéntica**: no había
+  manera de saber a cuáles dos. Ahora cada club lleva su etiqueta y son **tres
+  cosas distintas que antes se confundían**:
+
+  | Etiqueta | Quién lo hizo | Cómo se deshace |
+  |---|---|---|
+  | **Suspendido** | El super-admin, aquí | Con «Reactivar», aquí |
+  | **En pausa por plan** | El ecosistema, por `plan_bloqueado_desde` | **Solo pagando en el portal.** «Reactivar» no lo toca |
+  | **Sin enlazar** | Nadie: nació aquí, sin `eco_org_id` | No recibe escudo, ni plan, ni avisos |
+
+  El club en pausa dice además **desde cuándo**, que es el dato que distingue
+  «venció ayer» de «lleva tres semanas y el aviso se perdió». Y sobre el resumen
+  hay una línea que explica qué es la pausa, porque la palabra sugiere que se
+  hizo aquí y es justo lo contrario — sin ella, la reacción es buscar el
+  interruptor que no existe. Solo sale si hay alguno: explicar algo que no está
+  pasando es ruido.
 
 ### Y en el panel del portal, cinco cosas del mismo día
 
