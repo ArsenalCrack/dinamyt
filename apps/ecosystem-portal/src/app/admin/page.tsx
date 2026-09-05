@@ -24,7 +24,6 @@ import {
   avisarVencimientosAPI,
   sincronizarMembresiasAPI,
   renovarSuscripcionAPI,
-  crearSuscripcionPersonalAPI,
   ESTADOS_SUSCRIPCION,
   cambiarEstadoSuscripcionPersonalAPI,
   eliminarSuscripcionPersonalAPI,
@@ -140,7 +139,6 @@ export default function AdminEcosistemaPage() {
    * consigue que la pantalla diga una cifra y el recibo otra.
    */
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null);
-  const [nuevaSubPersonal, setNuevaSubPersonal] = useState({ userEmail: '', planId: '', startsAt: '', endsAt: '' });
 
   const cargar = useCallback(async () => {
     const [o, p, s, sp] = await Promise.all([
@@ -1067,12 +1065,31 @@ export default function AdminEcosistemaPage() {
         />
       )}
 
-      {/* ── Suscripciones personales ─────────────────────────────────────── */}
+      {/* ── Suscripciones personales ──────────────────────────────────────
+          Ya no se crean desde aquí, y la tarjeta solo sale si queda alguna.
+
+          Era una sección entera —lista, cuatro campos y un botón— para un caso
+          que no ocurre: **todo el mundo entra por su club**. Un plan suelto se
+          pensó para vender Academy a alguien sin organización, y nunca se
+          vendió ninguno; mientras tanto ocupaba el pie del panel debajo de lo
+          que sí se usa a diario.
+
+          **Lo que NO se hace es borrarla del todo**, y esa es la parte que
+          importa: `user_subscriptions` sigue dando `app_scopes` al firmar el
+          pase (ver `auth.service`). Si quedara una fila viva sin pantalla que
+          la enseñe, sería un permiso que nadie puede ver ni retirar — y un
+          permiso invisible es peor que una sección de más. Con cero filas
+          desaparece; con una, vuelve, con su botón de borrar.
+
+          Para darle Academy a alguien está «Accesos rápidos», que además le
+          crea la membresía en su organización. */}
+      {subsPersonales.length > 0 && (
       <section className="card mt-5 p-5">
         <h2 className="mb-1 text-lg font-semibold">Suscripciones personales</h2>
         <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Para un usuario que compra un plan solo para él (p. ej. Academy), sin
-          pasar por una organización.
+          Planes sueltos, sin organización detrás. <strong>Ya no se crean desde
+          aquí</strong> —para dar acceso a alguien, «Accesos rápidos»—, pero
+          éstas siguen abriendo aplicaciones y se pueden retirar.
         </p>
         <ul className="mb-4 flex flex-col gap-2">
           {subsPersonales.map((s) => (
@@ -1158,61 +1175,9 @@ export default function AdminEcosistemaPage() {
               </div>
             </li>
           ))}
-          {subsPersonales.length === 0 && (
-            <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Sin suscripciones personales.
-            </li>
-          )}
         </ul>
-        <div className="grid gap-2 sm:grid-cols-4">
-          <input
-            {...PROPS_CORREO}
-            placeholder="email@usuario.com"
-            value={nuevaSubPersonal.userEmail}
-            onChange={(e) =>
-              setNuevaSubPersonal({ ...nuevaSubPersonal, userEmail: e.target.value })
-            }
-          />
-          <SelectMenu
-            valor={nuevaSubPersonal.planId}
-            onChange={(v) => setNuevaSubPersonal({ ...nuevaSubPersonal, planId: v })}
-            opciones={planes.map((p) => ({ valor: p.id, etiqueta: p.name }))}
-            etiquetaAria="Plan de la suscripción personal"
-            placeholder="Plan…"
-          />
-          <CampoFecha
-            valor={nuevaSubPersonal.startsAt}
-            onChange={(v) => setNuevaSubPersonal({ ...nuevaSubPersonal, startsAt: v })}
-            etiquetaAria="Inicio de la suscripción personal"
-            placeholder="Desde"
-          />
-          <CampoFecha
-            valor={nuevaSubPersonal.endsAt}
-            onChange={(v) => setNuevaSubPersonal({ ...nuevaSubPersonal, endsAt: v })}
-            etiquetaAria="Fin de la suscripción personal"
-            placeholder="Hasta"
-          />
-        </div>
-        <button
-          onClick={() =>
-            accion(
-              () => crearSuscripcionPersonalAPI(nuevaSubPersonal),
-              'Suscripción personal creada y activa.',
-              'No se pudo crear (¿existe la cuenta?).',
-            )
-          }
-          disabled={
-            ocupado ||
-            !validarCorreo(nuevaSubPersonal.userEmail).ok ||
-            !nuevaSubPersonal.planId ||
-            !nuevaSubPersonal.startsAt ||
-            !nuevaSubPersonal.endsAt
-          }
-          className="btn btn-gold mt-3"
-        >
-          + Crear suscripción personal
-        </button>
       </section>
+      )}
 
       {/* La pregunta de «¿seguro?». Una sola por pantalla: la dispara quien la
           necesite y se dibuja encima de todo. Ver `components/Confirmar.tsx`. */}

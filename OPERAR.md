@@ -99,7 +99,16 @@ nunca depende de que alguien se acordara de sincronizar.
 
 ## 1.5 Lo que nunca se hace
 
-- **Tocar nada entre el 1 y el 13 de octubre.** Campeonato el 9, 10 y 11.
+- **Desplegar los días 9, 10 y 11 de octubre.** Son los tres del campeonato, con
+  gente delante y una llave en marcha: ahí no se sube nada, y punto.
+
+  > **La regla era de trece días (del 1 al 13) y se recortó a tres el 4 de
+  > septiembre.** Congelar dos semanas para proteger un fin de semana salía
+  > carísimo: paraba las mejoras que se están pidiendo hoy y amontonaba todo lo
+  > aplazado en un solo despliegue del día 14 — que es la forma más segura de
+  > estrenar un fallo justo después del evento, y con todo el mundo mirando.
+  > Se trabaja normal; lo que se cuida es el fin de semana y la víspera:
+  > **el día 8 solo entran arreglos**, nada de estrenos.
 - **Desplegar sin respaldo** si la migración toca datos.
 - **Exigir correo para que alguien ENTRE cada día.** El alumno marca asistencia
   con su carnet QR o su PIN, sin escribir nada. Eso no se toca.
@@ -619,11 +628,12 @@ código de ecosystem-api. Hoy sobra sitio; cuando no sobre, buzón propio.
 Cloudflare (**Email → DMARC Management**), no al correo. Con dos semanas de
 informes limpios se sube a `quarantine`, y más tarde a `reject`.
 
-> ⚠️ **No se sube la política durante el campeonato.** Del 1 al 13 de octubre
-> todo está congelado (§6.2 del plan maestro), y un `reject` mal calibrado justo
-> cuando salen las invitaciones y los códigos a competidores y maestros es el
-> peor momento posible para averiguarlo. El orden: `quarantine` a mediados de
-> septiembre, `reject` desde el 14 de octubre.
+> ⚠️ **No se sube la política durante el campeonato**, aunque lo demás sí se
+> toque: del 8 al 12 de octubre no se cambia el DNS del correo. Un `reject` mal
+> calibrado justo cuando salen las invitaciones y los códigos a competidores y
+> maestros es el peor momento posible para averiguarlo, y el correo no tiene
+> marcha atrás inmediata — la caché del DNS tarda. El orden: `quarantine` a
+> mediados de septiembre, `reject` desde el 13 de octubre.
 
 #### La fecha sale de una cuenta, no de «mediados»
 
@@ -2224,19 +2234,25 @@ clubes que se crean en otro sitio.**
 
 *(Las cuatro salieron de mirar el panel con el trabajo del día delante.)*
 
-· **El super-admin ya tiene estadísticas en Membresías.** El maestro abre
-  `/estadisticas` y ve su club; el super-admin no tenía nada equivalente, así
-  que para saber cómo fue el mes había que entrar club por club con `?orgId=` y
-  sumar a mano. Ahora, en su panel: **«📈 Cómo va el negocio»** —personas
-  activas, al día, por vencer, vencidos, nuevos del mes, asistencias de hoy;
-  cobrado del mes contra lo esperado con el padrón de hoy; seis meses de caja; y
-  **una línea por club** ordenada por gente activa. `GET /reports/superadmin`,
-  solo super-admin, sin filtro de club (`sinFiltroDeClub`).
+· **Las cifras de clubes ahora REPARTEN el total, y antes se solapaban.** El
+  panel decía *5 activos* y *2 en pausa por plan* sobre cinco clubes: los dos en
+  pausa se contaban **también** como activos, así que las dos cifras juntas no
+  cuadraban con nada — y un club en pausa no está operando, su gente no puede
+  entrar. Ahora cada club cae en uno y solo uno: **Operando** (encendido y al
+  día), **En pausa por plan** (encendido, cerrado por el ecosistema) y
+  **Suspendido** (apagado a mano, que manda sobre lo demás porque es lo que el
+  super-admin puede deshacer). Las etiquetas de la lista usan el mismo reparto:
+  una sola por club, o seguir una cifra hasta el club acabaría otra vez en una
+  tarjeta con dos insignias.
 
-  **No es la pantalla del maestro con otro filtro**, y por eso es otra: a él le
-  importa QUIÉN no pagó; aquí importa **qué clubes se están apagando**, así que
-  no sale el nombre de ninguna persona. Si el informe falla, la tarjeta no se
-  dibuja y el panel se sigue usando igual.
+· **«Suscripciones personales» ya no se crean desde el portal.** Era una sección
+  entera —lista, cuatro campos y un botón— para un caso que no ocurre: todo el
+  mundo entra por su club. **Pero no se borró del todo**, y esa es la parte que
+  importa: `user_subscriptions` sigue dando `app_scopes` al firmar el pase, así
+  que una fila viva sin pantalla que la enseñe sería un permiso que nadie puede
+  ver ni retirar. La tarjeta **aparece solo si queda alguna**, con su botón de
+  borrar. Para dar acceso a alguien está «Accesos rápidos», que además le crea
+  la membresía.
 
 · **Y en el portal, las dos cifras que faltaban.** La cabecera del recaudo
   decía «N clubes · N cuentas» y del ecosistema en sí no contaba nada más.
@@ -3236,50 +3252,58 @@ lateral. Es la única medida que no depende de mirar la pantalla y opinar.
 
 # PARTE 6 · Lo que queda pendiente
 
-## 6.0 El orden recomendado, y el calendario que lo decide
+## 6.0 En qué orden se trabaja
 
-*(escrito el 30 de agosto de 2026 · **al día el 4 de septiembre**)*
+*(escrito el 30 de agosto de 2026 · **reescrito el 4 de septiembre**)*
 
-**Queda un mes de ventana y después no hay ninguna.** Campeonato el 9, 10 y 11
-de octubre; del 1 al 13 no se toca nada (§1.5). Así que todo lo que toque base
-de datos o identidad **se hace en septiembre o se hace en noviembre**, y la
-última semana de septiembre conviene dejarla solo para lo imprescindible.
+**Hasta hoy esta sección era un calendario de espera**: campeonato el 9, 10 y 11
+de octubre, del 1 al 13 no se tocaba nada, y todo lo abierto quedaba aparcado
+«para después del 14». Eso se cambió, y conviene saber por qué, porque la regla
+que sustituye no es «ya da igual»:
 
-**De las tres primeras filas ya no queda nada**, y son justamente las que
-tenían fecha de caducidad: el ensayo se corrió, la migración de zonas está
-aplicada y los avisos llegan a un teléfono de verdad. **Lo que sigue vivo no
-toca la base ni la identidad**, así que ya no compite con el campeonato — lo
-único con fecha propia es el DMARC.
+· **Congelar dos semanas para proteger un fin de semana salía carísimo.** Paraba
+  las mejoras que se están pidiendo hoy, y amontonaba lo aplazado en un solo
+  despliegue del día 14 — la forma más segura de estrenar un fallo justo después
+  del evento y con todo el mundo mirando.
+· **Lo que de verdad protege el campeonato son tres días, no trece** (§1.5):
+  los días 9, 10 y 11 no se sube nada, y el 8 solo entran arreglos. El resto del
+  tiempo se trabaja normal.
+· **Y lo que hace que eso sea seguro ya está montado**: cada cambio pasa por
+  `pnpm turbo build test` y por los dos ensayos de §2.1 —uno de ellos aplica las
+  migraciones reales sobre un PostgreSQL de verdad—, hay respaldo antes de tocar
+  datos (§2.5) y Campeonatos arranca sin internet (§1.5). Ésa es la red, no el
+  calendario.
 
-**Y de los tres «sueltos» que había el 30 de agosto no queda ninguno**: los dos
-`admin@dinamyt.com` están corregidos, las dos pruebas del espejo escritas, y el
-`teardown_appcontext` **resultó estar hecho desde siempre** — lo registra
-Flask-SQLAlchemy, no nosotros (§6.1).
+**Lo que sí sigue teniendo fecha propia es el DMARC**, porque su fecha sale de
+una cuenta y no de una preferencia: `p=none` se publicó el 29 de agosto y hacen
+falta dos semanas de informes.
 
-Lo del 4 de septiembre —§4.16, §4.17 y el `role_membresias` de §4.15— fue
-pantalla, una ruta nueva y una migración que solo **limpia** columnas: no toca
-identidad ni mueve datos de nadie, así que no cambia nada de lo de abajo.
-
-**Así que de aquí al 1 de octubre quedan dos cosas, y las dos tienen fecha:**
-
-1. **El 12 de septiembre**, mirar los informes DMARC y —si están limpios— subir
-   la política a `quarantine`. El estado del DNS está comprobado y el cambio
-   escrito palabra por palabra en §3.5: es teclear, no investigar.
-2. **La última semana de septiembre**, repetir el ensayo (§6.0) y **anotar los
-   números**. Es lo único que vigila que los despliegues de septiembre no hayan
-   reabierto un eslabón.
-
-Todo lo demás que sigue abierto es de **después del 14 de octubre**, y está así
-porque cambia precios, contratos o el modo local — no porque falte tiempo.
+### El orden
 
 | Cuándo | Qué | Por qué ahí |
 |---|---|---|
-| ~~Esta semana~~ | ~~Un **ensayo completo** del camino entero~~ — **corrido el 3 de septiembre** | Era lo único que encontraba la siguiente cadena de cuatro eslabones. Ver abajo: **el guion se queda, y conviene repetirlo la última semana de septiembre** |
-| ~~Primera quincena de sept.~~ | ~~`created_at` → `timestamptz`~~ — **aplicada** (§6.1) | Tocaba 16 tablas: era exactamente lo que no se hace en octubre. Ya está fuera del camino |
-| ~~Desde un celular, hoy~~ | ~~Instalar la PWA y aceptar los avisos~~ — **hecho, y llegan** (§4.6) | El reloj ya no dispara a nadie |
-| **Del 12 de sept. en adelante** | DMARC a `quarantine` (§3.5) | La fecha sale de una cuenta: `p=none` se publicó el 29 de agosto y hacen falta **dos semanas de informes**. `reject` **después** del 14 de octubre |
-| ~~Después del 14 de oct.~~ | ~~**Cobro por usuario**~~ — **hecho el 3 de septiembre** (§4.18) | Se adelantó porque no toca identidad ni migra datos de nadie: añade dos columnas al catálogo de planes y cambia una cuenta |
-| **Después del 14 de oct.** | WhatsApp · fotos al disco · el rol hacia Campeonatos y Academy · §6.2 | Cambian contratos o el modo local |
+| **Del 12 de sept. en adelante** | DMARC a `quarantine` (§3.5) | Dos semanas de informes desde el 29 de agosto. El DNS está comprobado y el cambio escrito palabra por palabra: es teclear, no investigar. `reject`, más tarde |
+| **Cuando se pueda, y ya se puede** | **Las mejoras del panel y del producto** — §6.1 y §6.2 | Ya no esperan al 14 de octubre. Se toman de arriba abajo: primero lo que se usa a diario |
+| **Última semana de septiembre** | Repetir el ensayo completo (abajo) y **anotar los números** | Es lo único que vigila que los despliegues de septiembre no hayan reabierto un eslabón. Con más despliegues por delante, ahora hace más falta, no menos |
+| **8 de octubre** | Solo arreglos. Nada que se estrene | La víspera |
+| **9, 10 y 11 de octubre** | Nada (§1.5) | Campeonato, con gente delante |
+| ~~Después del 14 de oct.~~ | ~~**Cobro por usuario**~~ — **hecho el 3 de septiembre** (§4.18) | Se adelantó porque no toca identidad ni migra datos de nadie |
+
+### Y una regla para trabajar así, que antes la ponía el calendario
+
+Con la ventana cerrada, lo que separaba un cambio arriesgado de uno tranquilo
+era la fecha. Ahora lo separa **lo que toca**:
+
+| Si el cambio… | Entonces |
+|---|---|
+| Es de pantalla, texto o una ruta nueva | Se despliega el día que se hace |
+| **Añade** columnas o limpia datos | Respaldo antes (§2.5) y `db:migrar` **antes** de reiniciar (§1.2) |
+| Toca identidad, sesiones o roles | Además, los dos ensayos de §2.1 en verde **antes** de empujar |
+| Cambia precios o lo que se le cobra a alguien | Se avisa a los clubes antes de que lo vean en su factura |
+
+Lo del 4 de septiembre —§4.16, §4.17 y el `role_membresias` de §4.15— entra en
+las dos primeras filas: pantalla, una ruta nueva y una migración que solo
+**limpia** columnas.
 
 ### El ensayo — corrido el 3 de septiembre de 2026
 
@@ -3290,8 +3314,8 @@ próxima cadena así es recorrer el camino entero antes de que lo recorra un
 maestro el 9 de octubre.
 
 **Ya se recorrió**, y el guion de abajo **no se borra por eso**: es lo que se
-vuelve a correr. Dos razones para repetirlo la última semana de septiembre, no
-antes — después del 1 de octubre no se toca nada (§1.5):
+vuelve a correr. Dos razones para repetirlo la última semana de septiembre, y
+las dos pesan más ahora que se trabaja hasta la víspera:
 
 · De aquí al campeonato entra código, y cada despliegue puede reabrir un
   eslabón. Los seis arreglos del 2 y el 3 de septiembre (§4.15) cambiaron el
@@ -3493,7 +3517,7 @@ mirar.
       no publica política DMARC.**~~ Hecho el 29 de agosto de 2026: Email
       Routing con `soporte@` y `admin@`, y `_dmarc` en `p=none` con los informes
       al panel de Cloudflare. Queda **subir la política a `quarantine`** a
-      mediados de septiembre, y a `reject` **después del 14 de octubre**, nunca
+      mediados de septiembre, y a `reject` **desde el 13 de octubre**, nunca
       durante el campeonato. Ver §3.5.
 
 `[x]` ~~**Un alumno desactivado en Membresías choca contra un 403 sin
@@ -3878,7 +3902,15 @@ mirar.
       > da cero por diseño. **Escribir el `teardown` a mano habría sido código
       > redundante**, y de la peor clase: el que parece que arregla algo.
 
-## 6.2 Después del campeonato (desde el 14 de octubre)
+## 6.2 La cola de trabajo
+
+*(Se llamaba «Después del campeonato (desde el 14 de octubre)» hasta el 4 de
+septiembre de 2026. **Ya no espera a ninguna fecha**: se cambió la ventana de
+trece días por tres —§1.5— y esta lista pasó a ser lo que se hace ahora, de
+arriba abajo. Lo que la ordena es §6.0: primero lo que se usa a diario.)*
+
+> Lo único que sigue teniendo su propia fecha es el DMARC (§3.5), porque sale de
+> una cuenta y no de una preferencia. Todo lo de aquí abajo se puede empezar hoy.
 
 `[ ]` **Las fotos, al disco.** Hoy viajan como data-URL dentro de la fila
       (`users.avatar_url`, tope ~66 KB). Estaba bien cuando el disco se borraba
@@ -3914,7 +3946,8 @@ mirar.
       **Lo que sigue pendiente es la otra mitad:** el **selector de apps** dentro
       de cada app, para saltar de Membresías a Campeonatos sin pasar por el
       portal. Eso sí es de después del campeonato — necesita saber qué abre cada
-      quien, que es la pregunta de §4.2, y no es una fila de menú.
+      quien, que es la pregunta de §4.2, y no es una fila de menú — pero ya no
+      espera a octubre: entra en esta misma cola.
 
 `[x]` ~~**Cerrar sesión en una app cierra en el ecosistema.**~~ Hecho el 24 de
       agosto de 2026: `POST /auth/logout` cierra la fila de la sesión y a partir
