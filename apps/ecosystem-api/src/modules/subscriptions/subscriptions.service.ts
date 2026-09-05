@@ -24,6 +24,7 @@ import { porQueNoAbre } from '../../common/porque-no-abre';
 import {
   esPorPersona,
   importeDelPeriodo,
+  mensualComprometido,
   personasDe,
   personasFacturables,
 } from '../../common/cobro-por-persona';
@@ -1463,6 +1464,9 @@ export class SubscriptionsService {
         pricePerUser: subscriptionPlans.pricePerUser,
         minUsers: subscriptionPlans.minUsers,
         billedUsers: subscriptions.billedUsers,
+        // Cuántos meses cubre el ciclo. Sin esto no se puede mensualizar lo
+        // comprometido: un plan pagado por trimestre contaría por tres.
+        renewalMonths: subscriptions.renewalMonths,
       })
       .from(subscriptions)
       .innerJoin(organizations, eq(subscriptions.orgId, organizations.id))
@@ -1508,8 +1512,8 @@ export class SubscriptionsService {
       }
     }
 
-    // Una sola consulta para todos: el padrón de cada club, que es con lo que
-    // se proyecta lo que pagará en su próxima renovación.
+    // Una sola consulta para todos: el padrón de cada club. Ojo con para qué
+    // sirve y para qué NO — ver el bloque de «lo comprometido» más abajo.
     const censo = await personasFacturables(subs.map((x) => x.orgId));
 
     // ── Estado de cada club ───────────────────────────────────────────────
@@ -1523,8 +1527,10 @@ export class SubscriptionsService {
       venceEl: string | null;
       estado: EstadoSuscripcion;
     }[] = [];
-    /** Lo que entraría cada mes si todos renovaran su plan. */
+    /** Lo COMPROMETIDO: lo que cada club paga por su ciclo vigente, al mes. */
     let esperadoMensual = 0;
+    /** Lo que se cobrará en la próxima renovación con el padrón de HOY. */
+    let proyeccionRenovacion = 0;
     const porPlan = new Map<string, { name: string; clubes: number; mensual: number }>();
 
     for (const s of subs) {
@@ -1544,15 +1550,34 @@ export class SubscriptionsService {
       // Solo cuenta como ingreso recurrente lo que está vivo: una suspendida no
       // va a pagar el mes que viene, y meterla en la previsión la infla.
       const viva = s.status === 'ACTIVE' && est !== 'vencida';
-      // ── Por qué esto dejó de ser `priceMonthly` ──
+
+      // ── LO COMPROMETIDO, que es lo que aquí se pregunta ──────────────────
       //
-      // Sumar el precio fijo del plan era una cifra que dejaba de significar
-      // algo en cuanto un club crecía: decía lo mismo para uno de 15 alumnos y
-      // uno de 300. Ahora se proyecta lo que ESE club pagará en su próxima
-      // renovación con el padrón de hoy — que es la mejor estimación posible,
-      // porque es exactamente lo que se le cobrará si no cambia.
-      const precio = importeDelPeriodo(s, censo.get(s.orgId) ?? 0, 1).importe;
-      if (viva) esperadoMensual += precio;
+      // ⚠️ Esto se calculaba con el padrón de HOY —`importeDelPeriodo(s, censo…)`—
+      // y estaba mal. El cobro por persona **cuenta al renovar** y se congela:
+      // ese es el trato entero (ver `cobro-por-persona.ts`), y es lo que le
+      // permite al club saber cuánto paga antes de pagarlo.
+      //
+      // Recalcularlo aquí cada vez que alguien abre el panel rompía justo eso:
+      // cada alumno que entraba a mitad de mes subía la cifra, así que la misma
+      // suscripción, sin haber cambiado de plan ni de precio, valía una cosa el
+      // día 3 y otra el 27. El panel enseñaba una tarifa que **nadie iba a
+      // cobrar y nadie había pactado**, y con ella no se puede cuadrar nada.
+      //
+      // Lo comprometido es `total_amount`, que se fijó al renovar. Se divide
+      // entre los meses del ciclo porque la cifra es MENSUAL: un plan pagado
+      // por trimestre, sumado entero, contaría por tres.
+      const comprometido = mensualComprometido(s.totalAmount, s.renewalMonths);
+      if (viva) esperadoMensual += comprometido;
+
+      // ── Y LA PROYECCIÓN, que sigue haciendo falta pero es otra pregunta ───
+      //
+      // Lo que ESE club pagará en su próxima renovación si el padrón no cambia.
+      // Es útil —dice hacia dónde va el negocio— pero es una estimación, no una
+      // tarifa, y mezclarla con la de arriba era todo el problema. Va aparte y
+      // con su nombre.
+      const proyectado = importeDelPeriodo(s, censo.get(s.orgId) ?? 0, 1).importe;
+      if (viva) proyeccionRenovacion += proyectado;
 
       const p = porPlan.get(s.planId) ?? {
         name: s.planName,
@@ -1560,7 +1585,7 @@ export class SubscriptionsService {
         mensual: 0,
       };
       p.clubes += 1;
-      if (viva) p.mensual += precio;
+      if (viva) p.mensual += comprometido;
       porPlan.set(s.planId, p);
 
       const debe =
@@ -1632,6 +1657,15 @@ export class SubscriptionsService {
         devengadoMes: Math.round(devengado.get(mes) ?? 0),
         pagosMes: caja.get(mes)?.pagos ?? 0,
         esperadoMensual: Math.round(esperadoMensual),
+        /**
+         * Lo que se cobrará en la próxima renovación con el padrón de HOY.
+         *
+         * Va SEPARADA de `esperadoMensual` a propósito: aquella es la tarifa
+         * pactada del ciclo vigente —fija hasta que se renueve— y ésta es una
+         * estimación que se mueve con cada alta. Sumarlas en la misma cifra era
+         * lo que hacía que la tarifa de un club pareciera subir sola cada día.
+         */
+        proyeccionRenovacion: Math.round(proyeccionRenovacion),
         porCobrarTotal: Math.round(porCobrar.reduce((t, c) => t + c.debe, 0)),
         porMes: meses.map((m) => ({
           mes: m,

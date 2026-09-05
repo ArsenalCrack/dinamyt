@@ -124,3 +124,40 @@ export function importeDelPeriodo(
   const importe = facturadas * aNumero(plan.pricePerUser) * ciclos;
   return { importe: Math.round(importe), facturadas };
 }
+
+/**
+ * Lo COMPROMETIDO al mes: lo que ese club paga por su ciclo vigente.
+ *
+ * ── El error que cierra ────────────────────────────────────────────────────
+ *
+ * El panel calculaba esta cifra con el padrón de HOY —volviendo a llamar a
+ * `importeDelPeriodo` con el censo del momento— y eso contradice el trato
+ * entero que describe este archivo: **el cobro por persona cuenta al RENOVAR**,
+ * y desde ahí el importe está fijo.
+ *
+ * El efecto era exacto y se veía: cada alumno que entraba a mitad de mes subía
+ * la cifra, así que la misma suscripción, sin cambiar de plan ni de precio,
+ * valía una cosa el día 3 y otra el 27. El panel enseñaba una tarifa que nadie
+ * había pactado, que nadie iba a cobrar, y con la que no se puede cuadrar nada
+ * — ni saber si un club pagó de más o de menos.
+ *
+ * Lo comprometido es `subscriptions.total_amount`, que se fijó al renovar (y se
+ * congela con el primer pago, ver `recalcularImporte`).
+ *
+ * ── Por qué se divide entre los meses del ciclo ────────────────────────────
+ *
+ * Porque la cifra que se enseña es MENSUAL y `total_amount` es la del ciclo
+ * entero. Un club que paga por trimestre contaría por tres, y bastaba con que
+ * dos o tres clubes pagaran así para que la previsión del mes no significara
+ * nada.
+ *
+ * `renewalMonths` puede venir `null` de filas antiguas: eso es un ciclo de un
+ * mes, que es lo que era antes de que la columna existiera.
+ */
+export function mensualComprometido(
+  totalAmount: string | null | undefined,
+  renewalMonths: number | null | undefined,
+): number {
+  const meses = Math.max(1, Math.trunc(renewalMonths ?? 1));
+  return aNumero(totalAmount) / meses;
+}

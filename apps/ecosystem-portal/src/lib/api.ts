@@ -816,8 +816,17 @@ export interface ResumenSuscripciones {
     /** Lo que le CORRESPONDE a este mes (un pago de tres meses se reparte). */
     devengadoMes: number;
     pagosMes: number;
-    /** Lo que entraría cada mes si todos renovaran su plan. */
+    /**
+     * Lo COMPROMETIDO: lo que los clubes pagan por su ciclo vigente, al mes.
+     *
+     * Es la tarifa PACTADA, fija hasta la próxima renovación. Antes se
+     * recalculaba con el padrón de hoy, así que subía sola cada vez que
+     * entraba un alumno y la misma suscripción valía una cosa el día 3 y otra
+     * el 27 — una cifra con la que no se puede cuadrar nada.
+     */
     esperadoMensual: number;
+    /** Lo que se cobrará en la próxima renovación con el padrón de HOY. */
+    proyeccionRenovacion: number;
     /** Facturado y sin cobrar. */
     porCobrarTotal: number;
     porMes: { mes: string; recaudado: number; devengado: number; pagos: number }[];

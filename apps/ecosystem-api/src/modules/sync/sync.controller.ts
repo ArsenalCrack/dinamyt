@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Headers,
   NotFoundException,
+  Param,
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -195,6 +197,56 @@ export class SyncController {
 
     return { encontrada: filas.length > 0, aplicado: filas.length > 0 };
   }
+  // ── GET /sync/apariencia/:ecoSub — y la vuelta: qué tema tiene hoy ───────
+  //
+  // ── El hueco que quedaba abierto ──
+  //
+  // `POST /sync/apariencia` cerró el sentido de IDA: cambiar el modo claro en
+  // Membresías o en Campeonatos ya se guarda en la cuenta. Pero la VUELTA
+  // seguía dependiendo del pase, y el pase se firma al ENTRAR.
+  //
+  // O sea que quien cambiaba el tema en el portal y saltaba a Membresías —donde
+  // ya tenía la sesión abierta desde ayer— no veía nada: su cookie de allá no
+  // sabe nada de esto, y el pase que trajo el primer día decía otra cosa. Es la
+  // otra mitad exacta de «unas veces se recuerda y otras no».
+  //
+  // Con esto, cada app puede PREGUNTAR al cargar. Sigue pintando primero con lo
+  // que tenga —el pase, la copia local— y corrige después: preguntar no puede
+  // costar el fogonazo que tanto trabajo costó quitar.
+  //
+  // ⚠️ Solo LEE, y solo estas dos columnas. Entra por el mismo secreto
+  // compartido, así que vale el mismo criterio que en el POST: quien lo tenga
+  // podría saber de qué color ve alguien su pantalla —cosmético— y nada más.
+  @Get('apariencia/:ecoSub')
+  async leerApariencia(
+    @Headers('x-dinamyt-sync') secreto: string | undefined,
+    @Param('ecoSub') ecoSub: string,
+  ) {
+    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
+    if (!esperado) throw new NotFoundException('No encontrado.');
+    if (!SyncController.valido(secreto, esperado)) {
+      throw new UnauthorizedException('Secreto inválido.');
+    }
+
+    const id = (ecoSub ?? '').trim();
+    if (!id) throw new BadRequestException('Falta `ecoSub`.');
+
+    const [fila] = await db
+      .select({ theme: users.theme, locale: users.locale })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+
+    // Sin fila se responde lo de por defecto y no un 404: la app que pregunta
+    // solo quiere saber de qué color pintar, y una persona que aquí no existe
+    // —el alumno de carnet QR— pinta como pintaría sin preguntar.
+    return {
+      encontrada: !!fila,
+      theme: fila?.theme ?? 'sistema',
+      locale: fila?.locale ?? null,
+    };
+  }
+
   // ── POST /sync/apariencia — el tema y el idioma, desde CUALQUIER app ──────
   //
   // ── Por qué hacía falta ──

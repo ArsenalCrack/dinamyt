@@ -27,6 +27,7 @@ import { DispositivosConectados } from '@/components/DispositivosConectados';
 import { ZonaHoraria } from '@/components/ZonaHoraria';
 import { Apariencia } from '@/components/Apariencia';
 import { Ampliable } from '@/components/VisorImagen';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
 
 interface Disciplina {
   id: string;
@@ -70,14 +71,18 @@ interface Perfil {
  * Campeonatos exige antes de inscribirse).
  */
 function progresoPerfil(p: Perfil, avatarActual: string) {
-  const items: { etiqueta: string; ok: boolean }[] = [
-    { etiqueta: 'Foto de perfil', ok: !!avatarActual },
-    { etiqueta: 'Teléfono', ok: !!p.phone },
-    { etiqueta: 'Fecha de nacimiento', ok: !!p.birthDate },
-    { etiqueta: 'Contacto de emergencia', ok: !!p.emergencyContactName && !!p.emergencyContactPhone },
-    { etiqueta: 'Parentesco del contacto', ok: !!p.emergencyContactRelationship },
-    { etiqueta: 'Tipo de sangre', ok: !!p.bloodType },
-    { etiqueta: 'Disciplina y grado (los asigna tu maestro)', ok: p.disciplines.length > 0 },
+  // Devuelve CLAVES, no textos: la lista se pinta con `t()` en la pantalla.
+  // Escrita con los textos dentro, esta funcion era la unica parte del perfil
+  // que se quedaba en español al cambiar a ingles — y es justo la que se lee
+  // cuando algo falta.
+  const items: { etiqueta: ClaveTexto; ok: boolean }[] = [
+    { etiqueta: 'perfil.foto', ok: !!avatarActual },
+    { etiqueta: 'perfil.telefono', ok: !!p.phone },
+    { etiqueta: 'perfil.nacimiento', ok: !!p.birthDate },
+    { etiqueta: 'perfil.emergencia', ok: !!p.emergencyContactName && !!p.emergencyContactPhone },
+    { etiqueta: 'perfil.parentescoContacto', ok: !!p.emergencyContactRelationship },
+    { etiqueta: 'perfil.tipoSangre', ok: !!p.bloodType },
+    { etiqueta: 'perfil.disciplinaGrado', ok: p.disciplines.length > 0 },
   ];
   const hechos = items.filter((i) => i.ok).length;
   return { items, pct: Math.round((hechos / items.length) * 100) };
@@ -90,6 +95,7 @@ function progresoPerfil(p: Perfil, avatarActual: string) {
  * La contraseña SOLO se cambia aquí (las apps no tienen su propio formulario).
  */
 export default function PerfilPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [error, setError] = useState('');
@@ -266,14 +272,14 @@ export default function PerfilPage() {
     <main className="mx-auto min-h-screen max-w-2xl px-4 py-10 sm:px-6">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="eyebrow mb-1">Una persona, un perfil</p>
-          <h1 className="display text-3xl">Mi perfil</h1>
+          <p className="eyebrow mb-1">{t('perfil.eyebrow')}</p>
+          <h1 className="display text-3xl">{t('perfil.titulo')}</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {perfil.email} · Documento {perfil.documentId}
+            {perfil.email} · {t('perfil.documento')} {perfil.documentId}
           </p>
         </div>
         <Link href="/dashboard" className="btn btn-outline">
-          ← Mis aplicaciones
+          {t('perfil.misApps')}
         </Link>
       </header>
 
@@ -284,11 +290,15 @@ export default function PerfilPage() {
         return (
           <section className="card mb-4 p-5">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold">Tu perfil está al {prog.pct}%</h2>
+              <h2 className="text-lg font-semibold">
+                {t('perfil.progreso')} {prog.pct}%
+              </h2>
               {prog.pct === 100 ? (
-                <span className="badge badge-ok">✓ Completo</span>
+                <span className="badge badge-ok">{t('perfil.completo')}</span>
               ) : (
-                <span className="badge badge-gold">{faltan.length} pendiente(s)</span>
+                <span className="badge badge-gold">
+                  {faltan.length} {t('perfil.pendientes')}
+                </span>
               )}
             </div>
             <div
@@ -309,8 +319,9 @@ export default function PerfilPage() {
             </div>
             {faltan.length > 0 && (
               <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Te falta: {faltan.map((f) => f.etiqueta).join(' · ')}. Un perfil
-                completo es requisito para inscribirte a campeonatos.
+                {t('perfil.teFalta')}{' '}
+                {faltan.map((f) => t(f.etiqueta)).join(' · ')}.{' '}
+                {t('perfil.requisito')}
               </p>
             )}
           </section>
@@ -321,11 +332,11 @@ export default function PerfilPage() {
       <section className="card mb-4 p-5">
         <div className="flex flex-wrap items-center gap-5">
           {form.avatarUrl ? (
-            <Ampliable src={form.avatarUrl} alt="Tu foto de perfil">
+            <Ampliable src={form.avatarUrl} alt={t('perfil.tuFoto')}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={form.avatarUrl}
-                alt="Tu foto de perfil"
+                alt={t('perfil.tuFoto')}
                 className="h-24 w-24 shrink-0 rounded-full object-cover"
                 style={{ border: '2px solid var(--gold)' }}
               />
@@ -348,10 +359,9 @@ export default function PerfilPage() {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-semibold">Foto de perfil</h2>
+            <h2 className="text-lg font-semibold">{t('perfil.foto')}</h2>
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Sube una foto desde tu computador o celular. Se recorta al centro
-              y se guarda al presionar «Guardar cambios».
+              {t('perfil.fotoDesc')}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <input
@@ -398,7 +408,7 @@ export default function PerfilPage() {
             <dd className="font-semibold">{perfil.documentId}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt style={{ color: 'var(--text-muted)' }}>Correo verificado</dt>
+            <dt style={{ color: 'var(--text-muted)' }}>{t('perfil.correoVerificado')}</dt>
             <dd>
               <span className={`badge ${perfil.isEmailVerified ? 'badge-ok' : ''}`}>
                 {perfil.isEmailVerified ? 'Sí' : 'No'}
@@ -406,7 +416,7 @@ export default function PerfilPage() {
             </dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt style={{ color: 'var(--text-muted)' }}>Miembro desde</dt>
+            <dt style={{ color: 'var(--text-muted)' }}>{t('perfil.miembroDesde')}</dt>
             <dd className="font-semibold">
               {perfil.createdAt
                 ? new Date(perfil.createdAt).toLocaleDateString('es')
@@ -418,17 +428,17 @@ export default function PerfilPage() {
 
       {/* ── Datos de la persona ── */}
       <form onSubmit={guardar} className="card flex flex-col gap-4 p-5">
-        <h2 className="text-lg font-semibold">Datos personales</h2>
+        <h2 className="text-lg font-semibold">{t('perfil.datosPersonales')}</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Nombre completo</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.nombreCompleto')}</span>
             <input className="mt-1" value={form.fullName} readOnly style={{ opacity: 0.7 }} />
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-              Solo tu maestro o un administrador puede corregirlo.
+              {t('perfil.nombreLoCorrigeMaestro')}
             </span>
           </label>
           {campo(
-            'Teléfono (solo números)',
+            t('perfil.telefonoSoloNumeros'),
             form.phone,
             (v) => setForm({ ...form, phone: soloTelefono(v) }),
             {
@@ -439,7 +449,7 @@ export default function PerfilPage() {
             },
           )}
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Fecha de nacimiento</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.nacimiento')}</span>
             {/* El calendario propio, el mismo de Membresías y Campeonatos: el
                 nativo de Android solo avanza mes a mes y un año de nacimiento
                 son trescientos toques. */}
@@ -451,7 +461,7 @@ export default function PerfilPage() {
                 max={fechas.max}
                 disabled={!!perfil.birthDate}
                 borrable={false}
-                etiquetaAria="Fecha de nacimiento"
+                etiquetaAria={t('perfil.nacimiento')}
               />
             </div>
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -461,16 +471,16 @@ export default function PerfilPage() {
             </span>
           </div>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Género</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.genero')}</span>
             {/* Se puede rellenar si falta —las cuentas importadas llegan sin
                 él— pero no cambiar: Campeonatos ya armó categorías con este
                 dato, y moverlo a mitad de temporada mueve la llave. */}
             <div className="mt-1">
               <SelectMenu
                 valor={form.gender}
-                etiquetaAria="Género"
+                etiquetaAria={t('perfil.genero')}
                 disabled={!!perfil.gender}
-                placeholder="— Selecciona —"
+                placeholder={t('perfil.selecciona')}
                 onChange={(v) => setForm({ ...form, gender: v })}
                 opciones={GENEROS.map((g) => ({
                   valor: g.valor,
@@ -485,7 +495,7 @@ export default function PerfilPage() {
             </span>
           </div>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Tipo de sangre</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.tipoSangre')}</span>
             {/* ── Se puede rellenar si falta; cambiarlo, no ──
                 Era un campo de solo lectura que decía «Por registrar» y no
                 dejaba registrar nada: la única salida era pedírselo al
@@ -497,9 +507,9 @@ export default function PerfilPage() {
             <div className="mt-1">
               <SelectMenu
                 valor={form.bloodType}
-                etiquetaAria="Tipo de sangre"
+                etiquetaAria={t('perfil.tipoSangre')}
                 disabled={!!perfil.bloodType}
-                placeholder="— Por registrar —"
+                placeholder={t('perfil.porRegistrar')}
                 onChange={(v) => setForm({ ...form, bloodType: v })}
                 opciones={TIPOS_SANGRE.map((s) => ({ valor: s, etiqueta: s }))}
               />
@@ -512,27 +522,27 @@ export default function PerfilPage() {
           </div>
         </div>
 
-        <h2 className="mt-2 text-lg font-semibold">Contacto de emergencia</h2>
+        <h2 className="mt-2 text-lg font-semibold">{t('perfil.emergencia')}</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           {campo(
-            'Nombre (solo letras)',
+            t('perfil.nombreSoloLetras'),
             form.emergencyContactName,
             (v) => setForm({ ...form, emergencyContactName: soloLetras(v) }),
             { maxLength: LIM.nombrePersona },
           )}
           {campo(
-            'Teléfono (solo números)',
+            t('perfil.telefonoSoloNumeros'),
             form.emergencyContactPhone,
             (v) => setForm({ ...form, emergencyContactPhone: soloTelefono(v) }),
             { type: 'tel', inputMode: 'tel', maxLength: LIM.telefono },
           )}
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Parentesco</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.parentesco')}</span>
             <div className="mt-1">
               <SelectMenu
                 valor={form.emergencyContactRelationship}
-                etiquetaAria="Parentesco"
-                placeholder="— Selecciona —"
+                etiquetaAria={t('perfil.parentesco')}
+                placeholder={t('perfil.selecciona')}
                 onChange={(v) =>
                   setForm({ ...form, emergencyContactRelationship: v })
                 }
@@ -552,20 +562,20 @@ export default function PerfilPage() {
             value={form.medicalNotes}
             maxLength={LIM.notasMedicas}
             onChange={(e) => setForm({ ...form, medicalNotes: e.target.value })}
-            placeholder="Alergias, condiciones, medicamentos…"
+            placeholder={t('perfil.notasMedicas')}
           />
         </label>
 
         {error && <p className="msg-error text-sm">{error}</p>}
         {ok && <p className="msg-ok text-sm">{ok}</p>}
         <button type="submit" disabled={guardando} className="btn btn-gold self-start">
-          {guardando ? 'Guardando…' : 'Guardar cambios'}
+          {guardando ? t('perfil.guardando') : t('perfil.guardarCambios')}
         </button>
       </form>
 
       {/* ── Disciplinas y grado (las promueve el maestro) ── */}
       <section className="card mt-4 p-5">
-        <h2 className="text-lg font-semibold">Mis disciplinas y grado</h2>
+        <h2 className="text-lg font-semibold">{t('perfil.disciplinas')}</h2>
         <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
           El cinturón lo actualiza tu maestro cuando te promueve.
         </p>
@@ -591,7 +601,7 @@ export default function PerfilPage() {
 
       {/* ── Cambiar contraseña (ÚNICO lugar del ecosistema) ── */}
       <form onSubmit={cambiarPassword} className="card mt-4 flex flex-col gap-4 p-5">
-        <h2 className="text-lg font-semibold">Cambiar contraseña</h2>
+        <h2 className="text-lg font-semibold">{t('perfil.cambiarContrasena')}</h2>
         <p className="-mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
           Tu contraseña es una sola para todo DINAMYT y solo se cambia aquí.
         </p>

@@ -1,4 +1,8 @@
-import { esPorPersona, importeDelPeriodo } from './cobro-por-persona';
+import {
+  esPorPersona,
+  importeDelPeriodo,
+  mensualComprometido,
+} from './cobro-por-persona';
 
 /**
  * **El cálculo que decide lo que se cobra.**
@@ -130,5 +134,59 @@ describe('el alta y la renovacion cobran IGUAL', () => {
     // contestar «¿por qué me cobraron esto?» cuando el padrón ya cambió.
     expect(importeDelPeriodo(POR_PERSONA, 37, 1).facturadas).toBe(37);
     expect(importeDelPeriodo(POR_PERSONA, 2, 1).facturadas).toBe(10);
+  });
+});
+
+describe('mensualComprometido · la tarifa pactada no se mueve sola', () => {
+  it('un ciclo de un mes vale lo que dice la suscripción', () => {
+    expect(mensualComprometido('120000', 1)).toBe(120000);
+  });
+
+  it('un ciclo de tres meses se reparte entre los tres', () => {
+    // Sin esto, un club que paga por trimestre contaba por tres en la
+    // previsión mensual, y bastaban dos o tres así para que la cifra del mes
+    // no significara nada.
+    expect(mensualComprometido('360000', 3)).toBe(120000);
+  });
+
+  it('una fila antigua sin `renewal_months` es un ciclo de un mes', () => {
+    // Es lo que era antes de que la columna existiera.
+    expect(mensualComprometido('90000', null)).toBe(90000);
+    expect(mensualComprometido('90000', undefined)).toBe(90000);
+  });
+
+  it('un ciclo de cero o negativo no divide por cero', () => {
+    expect(mensualComprometido('90000', 0)).toBe(90000);
+    expect(mensualComprometido('90000', -2)).toBe(90000);
+  });
+
+  it('sin importe es cero, no `NaN`', () => {
+    // Un `NaN` aquí se propaga a la suma entera del panel y deja la pantalla
+    // enseñando «NaN» en vez de una cifra.
+    expect(mensualComprometido(null, 1)).toBe(0);
+    expect(mensualComprometido('', 1)).toBe(0);
+    expect(mensualComprometido('nada', 1)).toBe(0);
+  });
+
+  it('EL PUNTO: no depende del padrón de hoy', () => {
+    // Es la prueba que faltaba. El panel calculaba esta cifra volviendo a
+    // multiplicar la tarifa por el censo del momento, así que cada alumno que
+    // entraba a mitad de mes la subía: la misma suscripción valía una cosa el
+    // día 3 y otra el 27, sin que nadie hubiera pactado ningún cambio.
+    //
+    // Lo comprometido sale de `total_amount`, que se fijó al renovar. Que esta
+    // función no reciba el censo NO es un descuido: es la regla.
+    const alRenovar = mensualComprometido('120000', 1);
+    // Entran veinte alumnos ese mes. `total_amount` no cambia hasta la
+    // próxima renovación, y por tanto la cifra tampoco.
+    const aFinDeMes = mensualComprometido('120000', 1);
+    expect(aFinDeMes).toBe(alRenovar);
+
+    // Y lo que SÍ sube con el padrón es la proyección, que es otra pregunta y
+    // vive en otra cifra del panel (`proyeccionRenovacion`).
+    const POR_PERSONA = { pricePerUser: '3000', minUsers: 10 };
+    expect(importeDelPeriodo(POR_PERSONA, 40).importe).toBeGreaterThan(
+      importeDelPeriodo(POR_PERSONA, 20).importe,
+    );
   });
 });

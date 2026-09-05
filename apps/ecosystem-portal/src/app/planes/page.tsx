@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { listPlanesAPI, type Plan } from '@/lib/api';
 import { CORREO_ADMIN } from '@/lib/contacto';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
 
 const NOMBRE_APP: Record<string, string> = {
   academy: 'Academy',
@@ -22,25 +23,22 @@ const NOMBRE_APP: Record<string, string> = {
  * no pagó. Es la misma regla que la portada, y por el mismo motivo: el canal
  * y el formato son decisiones de ingeniería y cambian; lo que se promete, no.
  */
-const QUE_INCLUYE: Record<string, string[]> = {
+const QUE_INCLUYE: Record<string, ClaveTexto[]> = {
   membresias: [
-    'Sabes quién está al día y quién debe',
-    'Cobras, y el vencimiento se actualiza solo',
-    'Pasas lista en la puerta, con o sin internet',
-    'Tus alumnos se enteran antes de que se les venza',
-    'Ves el recaudo y la asistencia del mes',
+    'planes.memb1',
+    'planes.memb2',
+    'planes.memb3',
+    'planes.memb4',
+    'planes.memb5',
   ],
   campeonatos: [
-    'Montas el campeonato y armas las llaves',
-    'Los maestros inscriben a su gente y tú apruebas',
-    'Cada juez puntúa desde su tatami',
-    'El público sigue el marcador en vivo',
-    'Al terminar, resultados publicados y reportes listos',
+    'planes.camp1',
+    'planes.camp2',
+    'planes.camp3',
+    'planes.camp4',
+    'planes.camp5',
   ],
-  academy: [
-    'Cada alumno ve qué le falta para el próximo cinturón',
-    'Sus evaluaciones de grado quedan guardadas',
-  ],
+  academy: ['planes.acad1', 'planes.acad2'],
 };
 
 /**
@@ -78,6 +76,7 @@ const QUE_INCLUYE: Record<string, string[]> = {
  * `/admin`; lo que se oculta es el escaparate.
  */
 export default function PlanesPage() {
+  const { t } = useI18n();
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [estado, setEstado] = useState<'cargando' | 'ok' | 'error'>('cargando');
 
@@ -108,11 +107,11 @@ export default function PlanesPage() {
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
       <header className="mb-8 flex items-center justify-between gap-4">
         <div>
-          <p className="eyebrow mb-1">Suscripción por organización</p>
-          <h1 className="display text-3xl">Planes</h1>
+          <p className="eyebrow mb-1">{t('planes.eyebrow')}</p>
+          <h1 className="display text-3xl">{t('planes.titulo')}</h1>
         </div>
         <Link href="/" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          ← Inicio
+          {t('planes.inicio')}
         </Link>
       </header>
 
@@ -122,42 +121,46 @@ export default function PlanesPage() {
           Cuatro líneas, no cuatro párrafos: quien llega a `/planes` quiere una
           respuesta, no un contrato. */}
       <section className="card mb-8 p-5 sm:p-6" style={{ borderColor: 'var(--gold-dim)' }}>
-        <h2 className="text-lg font-bold">Cómo se cobra</h2>
+        <h2 className="text-lg font-bold">{t('planes.comoSeCobra')}</h2>
         <dl className="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-          {[
-            ['Por organización', 'club, liga o federación — no por persona'],
-            ['La cuenta es gratis', 'se paga que el club use las apps'],
-            ['El precio se cotiza', 'depende del tamaño del club'],
-            ['Sin pasarela', 'efectivo, transferencia, Nequi o Daviplata'],
-          ].map(([titulo, detalle]) => (
+          {(
+            [
+              ['planes.porOrg', 'planes.porOrgDetalle'],
+              ['planes.cuentaGratis', 'planes.cuentaGratisDetalle'],
+              ['planes.seCotiza', 'planes.seCotizaDetalle'],
+              ['planes.sinPasarela', 'planes.sinPasarelaDetalle'],
+            ] as [ClaveTexto, ClaveTexto][]
+          ).map(([titulo, detalle]) => (
             <div key={titulo} className="flex flex-wrap items-baseline gap-x-2">
               <dt className="font-bold" style={{ color: 'var(--text)' }}>
-                {titulo}
+                {t(titulo)}
               </dt>
               <dd className="m-0" style={{ color: 'var(--text-muted)' }}>
-                {detalle}
+                {t(detalle)}
               </dd>
             </div>
           ))}
         </dl>
         <a
           className="btn btn-gold mt-5"
-          href={`mailto:${CORREO_ADMIN}?subject=${asunto('quiero una cotización')}`}
+          href={`mailto:${CORREO_ADMIN}?subject=${asunto(t('planes.asuntoGenerico'))}`}
         >
-          Pedir una cotización
+          {t('planes.pedirCotizacion')}
         </a>
       </section>
 
-      <h2 className="display mb-4 text-xl sm:text-2xl">Qué entra en cada plan</h2>
+      <h2 className="display mb-4 text-xl sm:text-2xl">{t('planes.queEntra')}</h2>
 
-      {estado === 'cargando' && <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>}
+      {estado === 'cargando' && (
+        <p style={{ color: 'var(--text-muted)' }}>{t('comun.cargando')}</p>
+      )}
       {estado === 'error' && (
         <p style={{ color: 'var(--danger)' }}>
-          No se pudieron cargar los planes. Escríbenos a{' '}
+          {t('planes.errorCargar')}{' '}
           <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
             {CORREO_ADMIN}
           </a>{' '}
-          y te contamos por correo.
+          {t('planes.errorCargar2')}
         </p>
       )}
 
@@ -180,12 +183,12 @@ export default function PlanesPage() {
 
             <ul className="mt-4 flex-1 space-y-1.5 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
               {plan.appsIncluded.flatMap((app) =>
-                (QUE_INCLUYE[app] ?? []).map((linea) => (
-                  <li key={`${app}-${linea}`} className="flex gap-2">
+                (QUE_INCLUYE[app] ?? []).map((clave) => (
+                  <li key={`${app}-${clave}`} className="flex gap-2">
                     <span aria-hidden="true" style={{ color: 'var(--ok)' }}>
                       ✓
                     </span>
-                    <span>{linea}</span>
+                    <span>{t(clave)}</span>
                   </li>
                 )),
               )}
@@ -201,15 +204,14 @@ export default function PlanesPage() {
               className="btn btn-outline mt-5 w-full"
               href={`mailto:${CORREO_ADMIN}?subject=${asunto(plan.name)}`}
             >
-              Pedir cotización
+              {t('planes.pedirCotizacionCorta')}
             </a>
           </li>
         ))}
       </ul>
 
       <p className="mt-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-        ¿Dudas sobre cuál te conviene, o necesitas algo que no está en esta
-        lista?{' '}
+        {t('planes.dudas')}{' '}
         <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
           {CORREO_ADMIN}
         </a>

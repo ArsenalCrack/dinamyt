@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { aplicarTema, type Tema } from '@/lib/tema';
+import { aplicarTema, escucharTemaDelSistema, type Tema } from '@/lib/tema';
 import { idiomaDeLocale, useI18n } from '@/lib/i18n';
 import { obtenerPaseCrudo } from '@/lib/sesion';
 
@@ -31,6 +31,11 @@ import { obtenerPaseCrudo } from '@/lib/sesion';
  */
 export function AplicarApariencia() {
   const { setIdioma } = useI18n();
+
+  // `sistema` es el valor por defecto, y `prefers-color-scheme` se consultaba
+  // una sola vez al pintar: el teléfono que se oscurece solo al anochecer no
+  // repintaba hasta que alguien recargara. Ver `escucharTemaDelSistema`.
+  useEffect(() => escucharTemaDelSistema(), []);
 
   useEffect(() => {
     let pase: Record<string, unknown> | null = null;

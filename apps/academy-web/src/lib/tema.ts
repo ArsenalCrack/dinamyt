@@ -105,3 +105,49 @@ var claro = t==='claro' || (t==='sistema' && window.matchMedia && window.matchMe
 if(claro){document.documentElement.dataset.theme='light';
 var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','${META_COLOR.claro}');}
 }catch(e){}})();`;
+
+
+/**
+ * Vigila el tema del SISTEMA y repinta mientras la elección sea `sistema`.
+ *
+ * ── El hueco que cierra ──
+ *
+ * `sistema` es el valor POR DEFECTO —lo dice `users.theme` en el esquema—, así
+ * que esto no es un caso raro: es el de casi todo el mundo. Y hasta ahora
+ * `prefers-color-scheme` se consultaba **una sola vez**, al pintar. Con eso,
+ * «como el sistema» significaba en realidad «como estaba el sistema cuando
+ * abrí la página».
+ *
+ * Se nota en el caso más común de todos: el teléfono que pasa a modo oscuro
+ * solo al anochecer. La pantalla se queda clara hasta que alguien recarga, y
+ * lo que se lee no es «la web no escucha al sistema» sino «la web se quedó
+ * pegada».
+ *
+ * ── Por qué no guarda ──
+ *
+ * Porque no ha cambiado nada que sea de la persona: sigue eligiendo `sistema`.
+ * Lo que cambió es el sistema. Escribirlo convertiría una preferencia viva en
+ * un `claro` o un `oscuro` fijo, que es justo lo contrario de lo que se pidió.
+ *
+ * Devuelve la función para dejar de escuchar.
+ */
+export function escucharTemaDelSistema(): () => void {
+  if (typeof window === 'undefined' || !window.matchMedia) {
+    return () => undefined;
+  }
+  const consulta = window.matchMedia('(prefers-color-scheme: light)');
+  const alCambiar = () => {
+    // Solo si la elección sigue siendo `sistema`. Quien pidió claro a mano
+    // quiere claro también de noche.
+    if (getTema() === 'sistema') aplicarTema('sistema', false);
+  };
+
+  // Safari no soportó `addEventListener` aquí hasta la 14, y en iOS todavía se
+  // ve la 13 en teléfonos que la gente usa a diario para esto.
+  if (consulta.addEventListener) {
+    consulta.addEventListener('change', alCambiar);
+    return () => consulta.removeEventListener('change', alCambiar);
+  }
+  consulta.addListener(alCambiar);
+  return () => consulta.removeListener(alCambiar);
+}

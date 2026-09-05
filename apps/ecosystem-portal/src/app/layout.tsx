@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import { AplicarApariencia } from '@/components/AplicarApariencia';
 import { PieDePagina } from '@/components/PieDePagina';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
 import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
@@ -127,6 +128,10 @@ export default function RootLayout({
       </head>
       <body>
         <I18nProvider>
+          {/* El tema y el idioma, en TODAS las pantallas. Estaba solo en el
+              perfil, que es la razón de que cambiarlos en Membresías no se
+              notara aquí hasta entrar justo ahí. Ver el componente. */}
+          <AplicarApariencia />
           {children}
           {/* El pie va aquí por el mismo motivo que el reloj: para que salga
               en todas las pantallas. La de soporte tiene que verse sobre todo

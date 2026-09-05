@@ -39,6 +39,21 @@ import { guardarImagen } from '../../common/almacen-imagenes';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // ── GET /users/me/apariencia — el tema y el idioma, tal como están hoy ────
+  //
+  // La piden las cuatro webs al cargar. Es de UNO MISMO y solo de uno mismo:
+  // no lleva `:id` a propósito, porque el tema no es un dato que el maestro
+  // consulte de su alumno —igual que no le elige el color de la pantalla— y
+  // una ruta con id habría que defenderla de eso.
+  //
+  // Ver `UsersService.aparienciaDe` para por qué hace falta preguntarlo
+  // teniendo el pase.
+  @Get('me/apariencia')
+  @UseGuards(EcosystemJwtGuard)
+  async miApariencia(@CurrentUser() user: JwtPayload) {
+    return this.usersService.aparienciaDe(user.sub);
+  }
+
   // ── GET /users/:id/profile — perfil + disciplinas + acudientes ────────────
   @Get(':id/profile')
   @UseGuards(EcosystemJwtGuard)

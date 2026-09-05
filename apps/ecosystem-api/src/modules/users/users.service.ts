@@ -306,6 +306,38 @@ export class UsersService {
   }
 
   // Perfil completo: datos de la persona + disciplinas (grado) + acudientes.
+  /**
+   * Solo el tema y el idioma, tal como están AHORA en la cuenta.
+   *
+   * ── Por qué una ruta propia y no `getProfile` ──
+   *
+   * Porque la piden las CUATRO webs en cada carga, y `getProfile` trae el
+   * perfil entero: disciplinas, acudientes y las notas médicas, que además hay
+   * que descifrar. Pedir todo eso para saber de qué color pintar la pantalla es
+   * caro y, con los datos sensibles de por medio, además es feo.
+   *
+   * ── Y por qué hace falta preguntarlo ──
+   *
+   * El tema y el idioma viajan dentro del pase (§4.21), y el pase se firma al
+   * ENTRAR. Si alguien cambia a modo claro desde Membresías, el pase que tiene
+   * abierto en el portal sigue diciendo «oscuro» hasta que se renueve —hasta
+   * media hora—. Desde fuera eso es exactamente lo que se veía: «cambio el modo
+   * en una app y en la otra tarda, o no cambia».
+   *
+   * El pase sigue siendo lo que pinta la primera pantalla, porque llega sin
+   * pedir nada. Esto lo CORRIGE en cuanto se puede preguntar.
+   */
+  async aparienciaDe(id: string): Promise<{ theme: string; locale: string | null }> {
+    const [fila] = await db
+      .select({ theme: users.theme, locale: users.locale })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    // Sin fila no es un error que deba romper una pantalla: se responde lo de
+    // por defecto y quien pregunte pinta como pintaría sin saber nada.
+    return { theme: fila?.theme ?? 'sistema', locale: fila?.locale ?? null };
+  }
+
   async getProfile(id: string) {
     const user = await this.findById(id);
     if (!user) return null;

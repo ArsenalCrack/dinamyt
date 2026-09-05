@@ -246,10 +246,23 @@ export function PanelRecaudo() {
           nota="lo que le corresponde a este mes"
           acento="var(--serie-2)"
         />
+        {/* ── «Esperado» es lo PACTADO, y eso hubo que arreglarlo ──────────
+            Esta cifra se calculaba con el padrón de HOY, y el cobro por persona
+            cuenta al RENOVAR: cada alumno que entraba a mitad de mes la subía,
+            así que la misma suscripción valía una cosa el día 3 y otra el 27.
+            Enseñaba una tarifa que nadie había pactado y nadie iba a cobrar.
+
+            Ahora dice lo comprometido —fijo hasta la próxima renovación— y la
+            proyección va en la nota, que es su sitio: informa de hacia dónde va
+            el mes que viene sin contaminar la cifra de este. */}
         <Cifra
           titulo="Esperado al mes"
           valor={dinero(d.esperadoMensual)}
-          nota="si todos renuevan su plan"
+          nota={
+            d.proyeccionRenovacion !== d.esperadoMensual
+              ? `lo pactado · al renovar: ${dinero(d.proyeccionRenovacion)}`
+              : 'lo pactado, fijo hasta renovar'
+          }
         />
         <Cifra
           titulo="Por cobrar"

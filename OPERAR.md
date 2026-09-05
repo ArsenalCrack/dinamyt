@@ -2539,6 +2539,63 @@ vuelva a crear: los `app_scopes` salen de ahí, y el barrido siguiente pondrá
 Membresías en pausa para todos. **Se corre cuando se vayan a recrear enseguida,
 no un viernes.** En seco por defecto, como la reconciliación (§2.8).
 
+### La tarifa del panel se movía sola, y era un fallo
+
+*(5 de septiembre de 2026)*
+
+Todo lo de arriba describe el trato: **se cuenta al renovar y desde ahí el
+importe está fijo**. El panel de recaudo no lo cumplía.
+
+La cifra **«Esperado al mes»** se calculaba volviendo a multiplicar la tarifa
+por el **padrón de ese momento**, en cada carga de la pantalla:
+
+```ts
+// lo que hacía  (subscriptions.service.ts → resumen)
+const precio = importeDelPeriodo(s, censo.get(s.orgId) ?? 0, 1).importe;
+```
+
+O sea que cada alumno que el maestro daba de alta a mitad de mes **subía la
+cifra ese mismo día**. La misma suscripción, sin cambiar de plan ni de precio ni
+de fecha, valía una cosa el día 3 y otra el 27; y ninguna de las dos era la que
+se iba a cobrar, porque lo que se cobra se fijó el día de la renovación.
+
+**Por qué importa y no es un detalle de pantalla:** es la cifra con la que se
+mira si un club pagó de más o de menos. Con un número que cambia solo no se
+puede cuadrar nada, y lo peor es que *parece* correcto —sube cuando el club
+crece, que es lo que uno espera— hasta que se compara con un recibo.
+
+#### Lo que hace ahora: dos cifras, porque son dos preguntas
+
+| Cifra | Qué contesta | De dónde sale |
+|---|---|---|
+| **Esperado al mes** | Lo **pactado** del ciclo vigente. Fijo hasta la próxima renovación | `subscriptions.total_amount ÷ renewal_months` |
+| **Al renovar** *(en la nota de la misma tarjeta)* | Lo que se cobrará en la **próxima** renovación con el padrón de hoy | `importeDelPeriodo(plan, censo)` |
+
+La proyección sigue haciendo falta —dice hacia dónde va el negocio— pero es una
+**estimación**, no una tarifa. Mezclarlas en un solo número era todo el
+problema. Ahora la de arriba no se mueve y la de abajo se mueve a propósito, con
+su nombre puesto.
+
+Se divide entre `renewal_months` porque la cifra que se enseña es **mensual** y
+`total_amount` es la del ciclo entero: un club que paga por trimestre contaba
+por tres, y bastaban dos o tres así para que la previsión del mes no
+significara nada. Ese era un segundo error, más pequeño, que vivía debajo.
+
+> La regla vive ahora en una función sola —`mensualComprometido` en
+> `common/cobro-por-persona.ts`— y **no recibe el censo**. No es un descuido:
+> es la regla. Seis pruebas la protegen, y una de ellas dice exactamente eso.
+
+#### Lo que NO cambió
+
+· El importe se sigue calculando con el padrón **al renovar** y **al dar de
+  alta**. Eso estaba bien y sigue igual.
+· Sigue vivo el recálculo de las suscripciones **que nadie ha pagado**
+  (`recalcularNoPagadas`): mientras `paid_amount` sea cero el importe es un
+  presupuesto y sigue al padrón; con el primer peso se congela.
+· `billed_users` sigue guardando por cuánta gente se cobró.
+
+---
+
 ## 4.19 El importe que todavía nadie ha pagado no es una factura
 
 *(3 de septiembre de 2026)*
@@ -2837,15 +2894,108 @@ que nadie lo «arregle» devolviéndolo.
 
 ### Lo que falta
 
-· **Academy todavía no lee `users.theme` del ecosistema**: su control guarda
-  solo en ese navegador. Cerrarlo es el gemelo del espejo que ya trae la foto
-  (`academy-api/src/lib/users.ts`, `refrescarPerfilEcosystem`), que ya pide el
-  perfil una vez por sesión — hay que añadirle dos campos y una columna.
-· **Campeonatos y Membresías** siguen con su clave propia en su repositorio.
-· **Los textos traducidos son los del armazón** —menús, login, perfil, lo
-  común—, no los de cada pantalla. Es lo caro, y §6.2 ya decía en qué orden
-  conviene: primero que las fechas y los números respeten el `locale`, y solo
-  después traducir todo lo demás.
+· **Academy todavía no PREGUNTA la preferencia al ecosistema.** Escucha el tema
+  del sistema y lee el pase, como las otras tres, pero le falta el `GET` que
+  corrige — es la única de las cuatro que no lo tiene. Cerrarlo es copiar lo que
+  ya hacen Membresías y Campeonatos (ver más abajo). Se dejó fuera a propósito:
+  Academy todavía no se ofrece.
+· **Los textos traducidos van por pantallas, no por app.** Traducido: el
+  armazón (menús, login, perfil, lo común), **Planes** y **Mi perfil** enteros.
+  Pendiente en el portal: `mi-club`, `mi-organizacion`, `/admin`, la portada y
+  `verificar`. Membresías y Campeonatos tienen sus diccionarios mucho más
+  completos (1.388 y 2.503 líneas contra 309 del portal), así que el trabajo
+  gordo que queda es **del portal**.
+· `/admin` es la pantalla más grande de las cuatro (2.460 líneas) y es de
+  **super-admin**: por eso va la última, aunque sea la que más texto tiene.
+
+### La preferencia viaja en los DOS sentidos, y ya no se demora
+
+*(5 de septiembre de 2026, más tarde)*
+
+Lo de arriba resolvía la mitad: elegir una vez y que valiera en las cuatro. En
+la práctica seguía fallando, y la queja era exacta: **«cambio el modo en
+Membresías, paso a DINAMYT y muchas veces no cambia, o se demora»**.
+
+Eran tres cosas distintas debajo, y ninguna era la que parecía.
+
+#### 1 · El portal solo miraba la preferencia en el perfil
+
+`<Apariencia>` recibe el tema guardado y lo aplica — pero vive en `/perfil` y en
+**ninguna otra pantalla**. Así que quien cambiaba el modo en Membresías (que ya
+lo guarda en la cuenta) volvía al portal y lo encontraba como estaba… y al
+entrar en su perfil, de pronto se aclaraba. Eso es lo que se leía como «unas
+veces no cambia y otras se demora»: no era lentitud, **era la única pantalla que
+miraba**.
+
+Ahora hay un `<AplicarApariencia />` en el `layout`, junto al pie y al vigilante
+de sesión, por el mismo motivo que ellos: lo que tiene que valer en todas las
+pantallas no puede depender de que alguien se acordara de ponerlo en cada una.
+
+#### 2 · El pase se firma al ENTRAR, y decía el tema de entonces
+
+El tema y el idioma viajan **dentro del pase**, que es lo correcto para pintar
+sin pedir nada. Pero un pase de hace veinte minutos dice el tema de hace veinte
+minutos: si el cambio se hizo en otra app, aquí no se sabía hasta que el pase se
+renovara — **hasta media hora**. Ésa era la demora, y era literal.
+
+La solución es preguntar, y preguntar **después** de pintar:
+
+```
+GET  /users/me/apariencia        ← el portal, con su pase
+GET  /sync/apariencia/:ecoSub    ← Membresías y Campeonatos, por el secreto compartido
+```
+
+| Momento | Qué pinta |
+|---|---|
+| Antes del primer píxel | La copia local (`localStorage`) — sin esto vuelve el fogonazo |
+| Al montar | Lo que dice el pase — instantáneo, sin red |
+| En cuanto contesta el servidor | **La verdad**, y corrige si difiere |
+| Al volver a la pestaña | Otra vez la verdad — es el momento en que de verdad pasa |
+
+Las tres apps lo hacen igual. Membresías y Campeonatos no pueden pedirlo con el
+pase (lo cambian por su propia cookie al entrar y después ya no lo tienen), así
+que van por el **mismo canal servidor-a-servidor** que ya usaban para escribir:
+`PATCH /me/apariencia` → `POST /sync/apariencia` de ida, y ahora
+`GET /me/apariencia` → `GET /sync/apariencia/:ecoSub` de vuelta.
+
+> ⚠️ **Nadie pregunta sin sesión, y no es una optimización.** Un 401 en
+> Membresías y en Campeonatos hace que el interceptor recargue hacia el login.
+> Las pantallas públicas de Campeonatos —el marcador del tatami, los
+> resultados— se ven sin entrar y a menudo **proyectadas en una pared**:
+> preguntar de qué color pintar no puede mandar el marcador al login en mitad de
+> un combate. Se comprueba antes (`haySesionProbable`, `useAuth().user`).
+
+> Y sigue sin ser obligatorio: sin `ECOSYSTEM_SYNC_SECRET` la lectura devuelve
+> `null` y la pantalla se queda con lo que tenía. Campeonatos tiene que arrancar
+> sin internet el día del evento (§1.5).
+
+#### 3 · «Como el sistema» solo miraba el sistema UNA vez
+
+El tercero no era de sincronización, y es el que afectaba a **más gente**:
+`sistema` es el valor **por defecto** de `users.theme`, así que es el de casi
+todo el mundo. Y `prefers-color-scheme` se consultaba una sola vez, al pintar.
+
+O sea que «como el sistema» significaba en realidad **«como estaba el sistema
+cuando abrí la página»**. Se nota en el caso más común de todos: el teléfono que
+pasa a modo oscuro solo al anochecer. La pantalla se quedaba clara hasta que
+alguien recargara, y eso no se lee como «no escucha al sistema» sino como «se
+quedó pegada».
+
+`escucharTemaDelSistema()` —en el mismo `lib/tema.ts` de las cuatro— se suscribe
+al cambio y repinta **mientras la elección siga siendo `sistema`**. No guarda
+nada: no ha cambiado nada que sea de la persona, sigue eligiendo `sistema`;
+escribirlo convertiría una preferencia viva en un `claro` fijo.
+
+#### Dónde quedó cada pieza
+
+| Pieza | Dónde |
+|---|---|
+| Escuchar el tema del sistema | `escucharTemaDelSistema()` en `lib/tema.ts` / `lib/theme.ts` (las cuatro) |
+| Aplicarlo en todas las pantallas | `components/AplicarApariencia.tsx` (portal, Membresías, Campeonatos, Academy) |
+| Leer la verdad, portal | `GET /users/me/apariencia` → `UsersService.aparienciaDe` |
+| Leer la verdad, las otras dos | `GET /sync/apariencia/:ecoSub` |
+| El puente de Membresías | `leerAparienciaDelEcosistema` (`lib/alta-ecosistema.ts`) |
+| El puente de Campeonatos | `leer_apariencia` (`backend/app/espejo.py`) |
 
 ## 4.22 Un solo diseño para las cuatro webs
 
@@ -2883,8 +3033,10 @@ pantalla de entrar.
   propósito no están en el workspace (§1.1)—, así que se les **copia**:
 
   ```powershell
-  .\scriptsepartir-estilos.ps1            # reparte
-  .\scriptsepartir-estilos.ps1 -Comprobar # solo dice si alguna está desfasada
+  .\scripts
+epartir-estilos.ps1            # reparte
+  .\scripts
+epartir-estilos.ps1 -Comprobar # solo dice si alguna está desfasada
   ```
 
   El archivo llega como `src/app/estilos-ecosistema.css` con una cabecera que
@@ -2941,6 +3093,104 @@ una hoja de estilos —Gmail la tira— ni usar `var(--bg)`, que Outlook no
 entiende. `paleta-correo.spec.ts` compara los dos archivos y falla si se
 separan: **nadie mira su propio correo de verificación dos veces**, así que sin
 esa prueba el correo sería lo último en notarse.
+
+### Por qué Campeonatos SEGUÍA sin parecerse, y no era el backend
+
+*(5 de septiembre de 2026, más tarde)*
+
+Después de repartir el sistema compartido, Campeonatos seguía viéndose «más
+gordo y más apretado» que Membresías mirando la misma pantalla. La pregunta
+natural fue si tenía que ver con que su backend es **Flask** en vez de Node.
+
+**No.** Y conviene dejarlo escrito porque va a volver a preguntarse:
+
+| | Campeonatos | Membresías / Portal |
+|---|---|---|
+| Backend | Flask (Python) | NestJS / Fastify (Node) |
+| **Frontend** | **Next.js + React** | **Next.js + React** |
+
+El backend sirve **JSON**: no pinta ni un píxel. Reescribirlo no cambiaría nada
+de lo que se ve, y tiraría por la borda el marcador en vivo por *websockets*,
+las llaves y el modo sin internet del día del evento. **La causa era del CSS, y
+son estas tres:**
+
+#### 1 · La capa: lo NO capado gana siempre
+
+Es la causa estructural y explica por qué el rediseño «no se aplicaba».
+
+Membresías y el portal usan **Tailwind**, así que el sistema compartido
+—que va dentro de `@layer components`— convive con las utilidades como se
+espera. Campeonatos **no usa Tailwind**, así que sus reglas van **sin capa**, y
+en CSS:
+
+> **Una regla sin capa gana SIEMPRE a una capada**, sin importar el orden del
+> archivo ni la especificidad del selector.
+
+O sea que cualquier `.btn`, `.card` o `.input` propia de Campeonatos no
+«afinaba» la compartida: **la anulaba entera**. No hay aviso, no hay error en
+consola, y desde fuera parece que el archivo compartido no se cargó.
+
+#### 2 · El área táctil se aplicaba a TODOS los botones
+
+```css
+.btn { min-height: var(--touch-min); }   /* 44 px, sin capa → gana */
+```
+
+Puesta así, pisaba también a **`.btn-sm`**, que en esta app se usa unas **130
+veces** (las barras de acciones de cada tabla). Un botón pequeño mide ~26 px en
+las otras tres webs; aquí salía a 44, **casi el doble**. Multiplicado por todas
+esas barras, era la razón principal del «se ve más gordo».
+
+El área táctil sigue existiendo —esto se usa **de pie en un tatami, con prisa**—
+pero ahora dice lo que quería decir: solo con **dedo** (`@media (pointer: coarse)`)
+y **nunca sobre `.btn-sm`**.
+
+#### 3 · La caja de los campos, y el interletrado de una fuente que ya no está
+
+`.input` repetía la caja entera con otras medidas, y ganaba por lo mismo:
+
+| | Campeonatos | Ecosistema |
+|---|---|---|
+| `padding` | `12px 16px` | `0.55rem 0.75rem` (~9 / 12) |
+| `border` | `1.5px` | `1px` |
+| tipografía | `1rem` / peso 500 | la heredada |
+
+Las cajas crecen, el hueco entre ellas no, y el contenido acaba pegado al borde:
+eso es el «se ve al límite».
+
+Y los **títulos de pantalla** iban en **oro** con `letter-spacing: +0.08em`. Los
+dos valores venían de **Bebas Neue**, la condensada que esta app usaba antes: una
+condensada necesita aire entre letras. Archivo es ancha y además se usa estirada
+al 118 %, así que con ese mismo valor la palabra se desparrama hasta el borde.
+En las otras tres el título va del color del **texto** y el oro se reserva para
+el antetítulo y la marca — un oro que sale en cada título deja de ser un acento.
+
+#### 4 · «DINAMYT» se escribía de dos colores
+
+`<span>DINA<em>MYT</em></span>`: «DINA» del color del texto y «MYT» en oro. En
+el portal, Membresías y Academy la palabra va **entera** de un color, con el
+escudo dorado al lado haciendo de acento. Es la pieza que más delataba que esta
+app venía de otro sitio, porque el nombre es lo primero que se lee en las cuatro.
+
+Se queda en dos colores **en un solo sitio**: `/pantalla`, la proyección para el
+público, donde se lee desde la grada y el acento ayuda. Se pide a propósito con
+`.logo-acento`.
+
+#### Y el último token desviado
+
+`--chung` valía `#0055FF` aquí y `#2266ff` en las otras tres. Hong y chung son
+**reglamento, no decoración**: el azul de un competidor no puede ser uno en la
+inscripción del portal y otro en la llave. Ya no se redefine — ni en oscuro ni
+en claro. Lo que sí se queda son los derivados de competición
+(`--chung-vivid` para el marcador, `--chung-light` para escribir sobre blanco),
+que responden a un problema que las otras apps no tienen: **leerse a diez metros
+con luz de polideportivo**.
+
+> **Comprobación de que no vuelve a pasar.** Cruzando los selectores de
+> `estilos-ecosistema.css` con los de `globals.css`, a Campeonatos solo le
+> quedan cinco en común —`:root`, `html`, `body` y las dos de Edge— y todos
+> añaden, no sustituyen. Si algún día vuelve a aparecer un `.btn` o un `.card`
+> en esa lista, es este mismo fallo otra vez.
 
 ## 4.23 Qué versión está corriendo
 
