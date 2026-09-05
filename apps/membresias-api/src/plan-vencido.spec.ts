@@ -34,6 +34,8 @@ import { crearEscenario, type Escenario } from './testing/escenario';
 
 const ECO_ORG = '00000000-0000-4000-8000-0000000000bb';
 const SECRETO = 'secreto-del-espejo-para-las-pruebas';
+/** Un escudo cualquiera, con la forma que `imagenGuardada` acepta. */
+const ESCUDO = 'data:image/png;base64,QUJDRA==';
 
 let secretoOriginal: string | undefined;
 
@@ -220,6 +222,90 @@ describe('membresias-api — el plan vencido cierra el club', () => {
     expect(despues[0].isActive).toBe(true);
     expect(despues[0].planBloqueadoDesde).toBeNull();
     expect(await e.db.select({ id: orgs.id }).from(orgs)).toHaveLength(antes.length + 1);
+    await e.app.close();
+  });
+
+  // ── 3-ter · El escudo, que es lo que se veía roto desde fuera ─────────────
+  //
+  // El maestro pone el escudo en el portal y el panel de aquí sigue enseñando
+  // el logo de la aplicación. Y no era un fallo de la pantalla: el escudo lo
+  // copia `POST /sync/club`, que dispara al GUARDAR la ficha del club — así que
+  // un club fundado con su escudo, cuyo alta llegó por este aviso, no lo
+  // recibía jamás. Y ponerlo desde aquí tampoco se puede: esta app esconde su
+  // botón de escudo cuando el club es del ecosistema, para que no haya dos.
+
+  it('el club que nace desde el ecosistema nace CON su escudo', async () => {
+    const e = await crearEscenario();
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, name: 'Club del Portal', logoUrl: ESCUDO },
+    });
+    expect(r.json()).toMatchObject({ creado: true });
+
+    const [nuevo] = await e.db.select().from(orgs).where(eq(orgs.ecoOrgId, ECO_ORG));
+    expect(nuevo.logoUrl).toBe(ESCUDO);
+    await e.app.close();
+  });
+
+  it('al club que ya existía SIN escudo se le rellena', async () => {
+    // Son los que se crearon con este mismo aviso antes de que llevara el
+    // logo. No hay pantalla desde donde arreglarlos uno a uno: los recoge el
+    // barrido diario del ecosistema, que repite el aviso cada mañana.
+    const e = await crearEscenario();
+    await enlazarClub(e);
+    await e.db.update(orgs).set({ logoUrl: null }).where(eq(orgs.id, e.orgId));
+
+    await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, logoUrl: ESCUDO },
+    });
+
+    const [club] = await e.db.select().from(orgs).where(eq(orgs.id, e.orgId));
+    expect(club.logoUrl).toBe(ESCUDO);
+    await e.app.close();
+  });
+
+  it('el escudo que YA hay aquí no se pisa cada mañana', async () => {
+    // Éste es el aviso de «el plan sigue al día», no el de «cambió el escudo»
+    // —ése es `/sync/club`, y ése sí manda—. Si pisara, un club que llegó con
+    // su escudo y luego se enlazó lo perdería en el primer barrido.
+    const e = await crearEscenario();
+    await enlazarClub(e);
+    const suyo = 'data:image/png;base64,U1VZTw==';
+    await e.db.update(orgs).set({ logoUrl: suyo }).where(eq(orgs.id, e.orgId));
+
+    await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, logoUrl: ESCUDO },
+    });
+
+    const [club] = await e.db.select().from(orgs).where(eq(orgs.id, e.orgId));
+    expect(club.logoUrl).toBe(suyo);
+    await e.app.close();
+  });
+
+  it('un escudo inválido no impide que el club vuelva a operar', async () => {
+    // El aviso vino a decir «este club está al día». Que el logo no pase la
+    // validación no puede dejar cerrado a un club que pagó.
+    const e = await crearEscenario();
+    await enlazarClub(e);
+    await avisarPlan(e, false);
+    expect(await bloqueoDe(e)).not.toBeNull();
+
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, logoUrl: 'esto-no-es-una-imagen' },
+    });
+    expect(r.statusCode).toBe(200);
+    expect(await bloqueoDe(e)).toBeNull();
     await e.app.close();
   });
 

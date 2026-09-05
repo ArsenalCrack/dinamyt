@@ -144,7 +144,25 @@ function aSlug(texto: string): string {
 export async function asegurarClub(
   db: Db,
   ecoOrgId: string,
-  datos: { name: string; city?: string | null; country?: string | null },
+  datos: {
+    name: string;
+    city?: string | null;
+    country?: string | null;
+    /**
+     * El escudo, ya validado por quien llama.
+     *
+     * ── Por qué nace CON él y no llega después ──
+     *
+     * Porque después no llegaba nunca. El escudo lo copia `POST /sync/club`,
+     * que el portal dispara al GUARDAR la ficha del club; si el club se funda
+     * con su escudo puesto y nadie vuelve a abrir esa pantalla, aquí no entra
+     * jamás. Y como esta app esconde su propio botón de escudo cuando el club
+     * es del ecosistema (ver `lib/ecosistema.ts`), el maestro tampoco podía
+     * ponerlo desde este lado: el panel se quedaba con el logo de la
+     * aplicación para siempre.
+     */
+    logoUrl?: string | null;
+  },
 ): Promise<{ id: string; creado: boolean } | null> {
   const [ya] = await db
     .select({ id: orgs.id })
@@ -176,10 +194,42 @@ export async function asegurarClub(
       slug,
       city: datos.city?.trim()?.slice(0, 80) || null,
       country: datos.country?.trim()?.slice(0, 80) || null,
+      logoUrl: datos.logoUrl ?? null,
       ecoOrgId,
       isActive: true,
     })
     .returning({ id: orgs.id });
 
   return creado ? { id: creado.id, creado: true } : null;
+}
+
+/**
+ * Le pone al club el escudo que dice el portal, si aquí todavía no tiene uno.
+ *
+ * ── Por qué solo si NO tiene ──
+ *
+ * Porque este aviso llega **todos los días** con el barrido de planes, y no es
+ * el aviso de «cambió el escudo» —ése es `POST /sync/club`, que sí pisa—. Si
+ * pisara también aquí, un club que llegó desde Membresías con su escudo y luego
+ * se enlazó con el ecosistema perdería el suyo cada madrugada en cuanto la
+ * ficha del portal estuviera vacía o fuera distinta.
+ *
+ * Lo que esto arregla es otro caso, y es el que se ve: el club que nació aquí
+ * SIN escudo porque el alta no lo llevaba. Rellenar un hueco no es pisar nada.
+ *
+ * Devuelve `true` si escribió, que es lo único que merece una línea en el log:
+ * un barrido que no cambia nada es ruido.
+ */
+export async function rellenarEscudo(
+  db: Db,
+  orgId: string,
+  logoUrl: string | null,
+): Promise<boolean> {
+  if (!logoUrl) return false;
+  const tocadas = await db
+    .update(orgs)
+    .set({ logoUrl, updatedAt: new Date() })
+    .where(and(eq(orgs.id, orgId), isNull(orgs.logoUrl)))
+    .returning({ id: orgs.id });
+  return tocadas.length > 0;
 }

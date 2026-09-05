@@ -4,7 +4,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { asegurarFicha } from '../lib/aprovisionar';
-import { asegurarClub, fijarPlan } from '../lib/plan-del-club';
+import { asegurarClub, fijarPlan, rellenarEscudo } from '../lib/plan-del-club';
 import { syncSecret } from '../config';
 import { cinturon } from '../lib/cinturones';
 import { imagenGuardada } from '../lib/imagenes';
@@ -233,11 +233,32 @@ export async function syncRoutes(app: FastifyInstance) {
       name?: string;
       city?: string | null;
       country?: string | null;
+      /**
+       * El escudo del club, tal y como está en el portal.
+       *
+       * Sirve para dos cosas y las dos son la misma queja: que el maestro pone
+       * el escudo en DINAMYT y el panel de aquí sigue enseñando el logo de la
+       * aplicación. Un club creado por este aviso nace CON su escudo, y a uno
+       * que ya existía sin ninguno se le rellena (ver `rellenarEscudo`).
+       * Cambiarlo sigue siendo cosa de `POST /sync/club`.
+       */
+      logoUrl?: string | null;
     };
 
     const ecoOrgId =
       typeof body.ecoOrgId === 'string' && UUID.test(body.ecoOrgId) ? body.ecoOrgId : null;
     if (!ecoOrgId) return reply.code(422).send({ error: 'Falta `ecoOrgId`.' });
+
+    // El escudo pasa por el mismo validador que en `/sync/club`. Lo que no
+    // pase se ignora: un escudo demasiado grande no puede impedir que un club
+    // con el plan al día vuelva a operar, que es lo que este aviso vino a
+    // decir. Queda escrito en el registro, que es donde se busca.
+    let escudo: string | null = null;
+    if (body.logoUrl !== undefined && body.logoUrl !== null) {
+      const r = imagenGuardada(body.logoUrl, 'El escudo');
+      if (r.ok) escudo = r.valor;
+      else req.log.warn({ ecoOrgId, motivo: r.error }, 'escudo rechazado en /sync/plan');
+    }
 
     // `alDia` tiene que venir explícito. Un valor ausente que cayera a `true`
     // desbloquearía clubes por un aviso mal formado, y a `false` los cerraría:
@@ -266,6 +287,7 @@ export async function syncRoutes(app: FastifyInstance) {
           name: body.name,
           city: body.city,
           country: body.country,
+          logoUrl: escudo,
         });
         if (nuevo) {
           req.log.info(
@@ -280,6 +302,13 @@ export async function syncRoutes(app: FastifyInstance) {
       // Membresías. Contestar 404 haría que el otro lado lo registrara como
       // aviso fallido, y no lo es.
       if (!club) return { encontrado: false, aplicado: false };
+
+      // El club que ya estaba y nunca recibió el escudo. Son los que se
+      // crearon con este mismo aviso antes de que llevara el logo: sin esto
+      // habría que tocarlos uno a uno, y no hay pantalla desde donde hacerlo.
+      if (await rellenarEscudo(db, club.id, escudo)) {
+        req.log.info({ club: club.id, ecoOrgId }, 'escudo del club puesto desde el ecosistema');
+      }
 
       const r = await fijarPlan(db, club.id, body.alDia as boolean);
       if (r.cambio) {
