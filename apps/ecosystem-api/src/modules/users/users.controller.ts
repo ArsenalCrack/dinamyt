@@ -25,7 +25,10 @@ import {
   validarAvatar,
   validarTipoSangre,
   validarGenero,
+  validarTema,
+  validarIdioma,
 } from '../../common/validacion';
+import { guardarImagen } from '../../common/almacen-imagenes';
 
 /**
  * Perfil de la persona (transversal). El maestro edita el perfil de sus alumnos
@@ -74,6 +77,10 @@ export class UsersController {
        * preferencia. `null` vuelve a la detección automática.
        */
       timezone?: string | null;
+      /** `sistema` | `claro` | `oscuro`. Ver `users.theme` en el esquema. */
+      theme?: string;
+      /** `es-CO`, `en-US`… `null` devuelve a la detección del navegador. */
+      locale?: string | null;
     },
   ) {
     await this.assertCanManage(user, id);
@@ -89,6 +96,17 @@ export class UsersController {
     if (body.timezone && !zonaValida(body.timezone)) {
       throw new BadRequestException('Esa zona horaria no existe.');
     }
+
+    // El tema y el idioma, la MISMA regla y por el mismo motivo: son «cómo
+    // quiero ver DINAMYT», no datos del club. El maestro corrige la ficha de su
+    // alumno; no le elige el color de la pantalla ni el idioma en que lee.
+    if ((body.theme !== undefined || body.locale !== undefined) && user.sub !== id) {
+      throw new BadRequestException(
+        'El tema y el idioma solo los puede cambiar la propia persona.',
+      );
+    }
+    if (body.theme !== undefined) body.theme = validarTema(body.theme);
+    if (body.locale) body.locale = validarIdioma(body.locale);
 
     // ── Campos PROTEGIDOS: identidad de la persona ─────────────────────────
     // El nombre y la fecha de nacimiento solo los corrige el maestro del club
@@ -169,13 +187,22 @@ export class UsersController {
         'teléfono del contacto de emergencia',
       );
     }
-    if (body.avatarUrl) body.avatarUrl = validarAvatar(body.avatarUrl);
+    // La foto: primero se valida la forma, y solo después va al disco. El
+    // orden importa — `guardarImagen` decodifica y escribe, y no tiene por qué
+    // hacer ninguna de las dos cosas con algo que ya sabemos que no vale.
+    if (body.avatarUrl) {
+      body.avatarUrl = validarAvatar(body.avatarUrl);
+      body.avatarUrl = (await guardarImagen(body.avatarUrl)) ?? null;
+    }
 
     return this.usersService.updateProfile(id, {
       ...body,
       // Elegirla a mano la protege de la detección automática; quitarla
       // devuelve a la persona al comportamiento por defecto.
       ...(body.timezone !== undefined && { timezoneManual: !!body.timezone }),
+      // El idioma, igual: sin esta marca el navegador lo pisa en el siguiente
+      // inicio de sesión y la elección del perfil no dura ni una entrada.
+      ...(body.locale !== undefined && { localeManual: !!body.locale }),
       birthDate:
         body.birthDate === undefined
           ? undefined

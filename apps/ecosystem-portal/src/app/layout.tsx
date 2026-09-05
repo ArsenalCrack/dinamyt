@@ -4,6 +4,8 @@ import './globals.css';
 import { PieDePagina } from '@/components/PieDePagina';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
 import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
+import { I18nProvider } from '@/lib/i18n';
+import { SCRIPT_ANTI_PARPADEO } from '@/lib/tema';
 
 // Tipografía del ecosistema: display deportivo (Archivo, eje de anchura),
 // cuerpo humanista (Instrument Sans) y mono de marcador (IBM Plex Mono).
@@ -54,8 +56,12 @@ export const metadata: Metadata = {
  *
  * Va en `viewport` y no en `metadata` porque Next 15 lo movió ahí; dejarlo en
  * `metadata` compila con un aviso y no llega al HTML. Es el `--bg` del tema
- * (`globals.css`), y la app es de tema oscuro fijo (`color-scheme: dark`), así
- * que no lleva variante clara.
+ * oscuro (`packages/shared/estilos.css`).
+ *
+ * Aquí solo puede ir UN valor, y el modo claro necesita otro: quien abra la app
+ * instalada en claro vería la barra del sistema oscura sobre una pantalla
+ * clara. Por eso `aplicarTema` reescribe esta etiqueta al vuelo, y el script
+ * anti-parpadeo la corrige antes del primer pintado.
  */
 export const viewport: Viewport = {
   themeColor: '#0e0e15',
@@ -69,19 +75,27 @@ export default function RootLayout({
       lang="es"
       className={`${display.variable} ${cuerpo.variable} ${mono.variable}`}
     >
+      <head>
+        {/* ANTES de pintar nada: si esto esperara a React, quien tiene el modo
+            claro vería la pantalla oscura un instante y luego aclararse, y ese
+            fogonazo se lee como un fallo de la aplicación. */}
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_ANTI_PARPADEO }} />
+      </head>
       <body>
-        {children}
-        {/* El pie va aquí por el mismo motivo que el reloj: para que salga en
-            todas las pantallas. La de soporte tiene que verse sobre todo en
-            login y registro, donde no hay menú al que ir. */}
-        <PieDePagina />
-        {/* El reloj de inactividad. Va en el layout para que corra en todas
-            las pantallas: una sesión abandonada no se cierra sola solo en las
-            que alguien se acordó de ponerlo. */}
-        <VigilanteDeSesion />
-        {/* Y lo que hace que DINAMYT se pueda instalar como app. Ver
-            `RegistrarServiceWorker` y `public/sw.js`. */}
-        <RegistrarServiceWorker />
+        <I18nProvider>
+          {children}
+          {/* El pie va aquí por el mismo motivo que el reloj: para que salga
+              en todas las pantallas. La de soporte tiene que verse sobre todo
+              en login y registro, donde no hay menú al que ir. */}
+          <PieDePagina />
+          {/* El reloj de inactividad. Va en el layout para que corra en todas
+              las pantallas: una sesión abandonada no se cierra sola solo en
+              las que alguien se acordó de ponerlo. */}
+          <VigilanteDeSesion />
+          {/* Y lo que hace que DINAMYT se pueda instalar como app. Ver
+              `RegistrarServiceWorker` y `public/sw.js`. */}
+          <RegistrarServiceWorker />
+        </I18nProvider>
       </body>
     </html>
   );

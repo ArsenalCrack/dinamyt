@@ -251,6 +251,19 @@ export const users = eco.table('users', {
    * ha dicho nada.
    */
   timezoneManual: boolean('timezone_manual').default(false),
+  /**
+   * `sistema` | `claro` | `oscuro`. Cómo quiere ver DINAMYT esta persona.
+   *
+   * Vive aquí y no en el navegador porque las cuatro webs están en subdominios
+   * distintos y `localStorage` es por origen: guardarlo solo allí obligaba a
+   * elegir el modo claro una vez por app, y otra vez en cada dispositivo.
+   *
+   * `sistema` hace de «no consta» sin bandera aparte —a diferencia de la zona
+   * horaria—, porque el valor detectado no se guarda: se consulta al pintar.
+   */
+  theme: varchar('theme', { length: 10 }).default('sistema').notNull(),
+  /** ¿El idioma lo eligió a mano? Gemela de `timezoneManual`, y por lo mismo. */
+  localeManual: boolean('locale_manual').default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

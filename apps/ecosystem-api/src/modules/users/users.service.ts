@@ -341,6 +341,12 @@ export class UsersService {
       timezone?: string | null;
       /** ¿La eligió la persona a mano? Ver el esquema de `users`. */
       timezoneManual?: boolean;
+      /** `sistema` | `claro` | `oscuro`. Cómo quiere ver DINAMYT. */
+      theme?: string;
+      /** `es-CO`, `en-US`… El idioma de la interfaz y de sus correos. */
+      locale?: string | null;
+      /** ¿Lo eligió a mano? Sin esto, el navegador lo pisa al entrar. */
+      localeManual?: boolean;
     },
   ) {
     const [row] = await db
@@ -349,6 +355,11 @@ export class UsersService {
         ...(data.timezone !== undefined && { timezone: data.timezone }),
         ...(data.timezoneManual !== undefined && {
           timezoneManual: data.timezoneManual,
+        }),
+        ...(data.theme !== undefined && { theme: data.theme }),
+        ...(data.locale !== undefined && { locale: data.locale }),
+        ...(data.localeManual !== undefined && {
+          localeManual: data.localeManual,
         }),
         ...(data.fullName !== undefined && { fullName: data.fullName }),
         ...(data.phone !== undefined && { phone: data.phone }),

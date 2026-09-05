@@ -8,6 +8,7 @@ import {
   miClubAPI,
   crearMiClubAPI,
   extraerError,
+  urlImagen,
   type MiClub,
 } from '@/lib/api';
 import { soloTelefono, comprimirAvatar,
@@ -168,7 +169,7 @@ export default function MiClubPage() {
                 <Ampliable src={nuevo.logoUrl} alt="Logo del club" logo>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={nuevo.logoUrl}
+                    src={urlImagen(nuevo.logoUrl) ?? undefined}
                     alt="Logo del club"
                     className="h-20 w-20 rounded-xl object-cover"
                     style={{ border: '2px solid var(--gold-dim)' }}
@@ -297,7 +298,7 @@ export default function MiClubPage() {
             {club.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={club.logoUrl}
+                src={urlImagen(club.logoUrl) ?? undefined}
                 alt={`Logo de ${club.name}`}
                 className="h-20 w-20 shrink-0 rounded-xl object-cover"
                 style={{ border: '2px solid var(--gold-dim)' }}

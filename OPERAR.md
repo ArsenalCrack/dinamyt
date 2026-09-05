@@ -96,6 +96,7 @@ nunca depende de que alguien se acordara de sincronizar.
 | `CRON_SECRET` | ecosystem-api | El aviso diario de suscripciones **no existe** (la ruta responde 404). El botón del panel sigue funcionando |
 | `ECOSYSTEM_SYNC_SECRET` | ecosystem-api **y** membresias-api | **El mismo valor en las dos.** Sin él, la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan a Membresías: el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7) |
 | `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
+| `MEDIA_PUBLIC_URL` | ecosystem-api | **El interruptor de las fotos en disco** (§4.20). Sin ella no falla nada: las imágenes se siguen guardando incrustadas en la fila, como siempre. Con ella van al disco **y** el espejo las manda absolutas — las dos cosas a la vez, y por eso es una sola variable. ⚠️ **Tiene que ser `https://`**: Membresías solo acepta `data:` o `https://`, y su rechazo es mudo |
 
 ## 1.5 Lo que nunca se hace
 
@@ -2586,6 +2587,209 @@ Ahora espera a cada uno y devuelve:
 Y el espejo dice en el log cuándo no salió siquiera, con el motivo — antes se
 callaba si faltaba la configuración.
 
+## 4.20 Dónde vive una foto
+
+*(4 de septiembre de 2026)*
+
+La foto de cada persona (`users.avatar_url`) y el escudo de cada club
+(`organizations.logo_url`) **se guardaban dentro de la fila**, como data-URL.
+Fue la decisión correcta mientras el disco se borraba en cada despliegue: ni un
+bucket que contratar, ni credenciales de otro servicio. Ya no lo es.
+
+### Lo que costaba, medido y no supuesto
+
+Sobre `GET /organizations/:id/members`, en local, con la misma imagen de 31 KB:
+
+| | bytes |
+|---|---|
+| Siete miembros, ninguno con foto | **2 394** |
+| Los mismos siete, **una** con foto | **44 014** |
+| Los mismos siete, esa foto ya en disco | **2 435** |
+
+Una sola foto multiplicaba el listado por dieciocho. A los 25 por página que ya
+pagina el código son cerca de **un mega por carga de pantalla**, en el celular
+del maestro y con datos móviles. Y eso es solo lo que se ve: base64 son +33 % de
+peso en la tabla, y las fotos se meten enteras en el volcado diario.
+
+### Las tres formas de una imagen
+
+La columna es `text` y admite tres cosas, cada una de un sitio:
+
+| Forma | De dónde sale |
+|---|---|
+| `data:image/…` | Incrustada. Es lo que manda la web, que la recorta y la recomprime antes (`comprimirAvatar`) |
+| `/media/<hash>.<ext>` | Ya en el disco. La escribe `guardarImagen` y la sirve Caddy |
+| `http(s)://…` | Alojada fuera. Un club puede tener las suyas donde quiera |
+
+**Las viejas siguen valiendo**, y por eso esto se pudo desplegar sin migrar
+nada: quien tenga su foto incrustada la sigue viendo igual.
+
+### Por qué el nombre es el hash del contenido
+
+Porque es lo que permite cachear un año sin servir nunca la vieja: si el
+contenido cambia, cambia el nombre. Y trae un regalo — **escribir es
+idempotente**. Dos personas con la misma imagen acaban en el mismo archivo, y
+volver a guardar la de siempre no escribe nada, que es el caso normal: la
+pantalla de perfil reenvía la foto cada vez que se guarda cualquier otro campo.
+
+### El interruptor es UNO, y es a propósito
+
+`MEDIA_PUBLIC_URL`. Sin ella, la imagen se sigue guardando incrustada. Con ella,
+va al disco **y** el espejo sabe mandarla absoluta.
+
+Que sea la misma variable para las dos cosas no es pereza: es lo que impide
+encenderlo a medias. La foto se copia a Membresías tal cual, y allí
+`imagenGuardada` acepta un `data:` o un `https://` **y nada más**. Un `/media/…`
+relativo lo rechazaría, y **ese rechazo no lo ve nadie**: la foto quedaría bien
+en el portal y dejaría de llegar al carnet. Es el mismo silencio de §4.7.
+
+Por eso `espejarPersona` y `espejarClub` la convierten en
+`https://id.dinamyt.org/media/…` antes de mandarla — que es una de las dos
+formas que el otro lado **ya aceptaba, sin cambiar una línea allí**. Y le sienta
+mejor todavía: al no ser una imagen incrustada, su `direccionImagen` la devuelve
+tal cual y el carnet la carga directa.
+
+> ⚠️ En producción tiene que ser `https://`. En local vale `http://localhost:3001`
+> y el espejo se quejará con un WARN, que es el comportamiento correcto.
+
+### Lo que no se inventó, que es casi todo
+
+Las dos mitades ya estaban escritas en el monorepo, en dos aplicaciones
+distintas, y lo que se hizo fue juntarlas:
+
+· **De Academy** (`academy-api/src/lib/uploads.ts` y su `app.ts`): la allowlist
+  de formatos, la verificación de FIRMA —los primeros bytes tienen que ser del
+  formato que el archivo dice— y servir el resultado como dato inerte
+  (`nosniff` + una CSP que no deja ejecutar nada). **SVG queda fuera a
+  propósito**: puede llevar scripts.
+· **De Membresías** (`membresias-api/src/lib/imagenes.ts`): la forma exacta del
+  data-URL que se acepta, y el hash del contenido como identidad de la imagen.
+
+### Y una cosa que Membresías resolvió y aquí no se podía copiar
+
+Membresías nunca manda la foto en un listado: manda la dirección de una ruta que
+la sirve en binario. Eso aquí **no valía**, y está escrito en el propio código
+(`organizations.service.ts`): el portal autentica con `Bearer` en la cabecera y
+un `<img src="…">` no manda cabeceras, así que esa ruta respondería 401. Hacía
+falta primero darle al portal una cookie de sesión.
+
+**El disco lo resuelve por el otro lado, y por eso este pendiente valía doble:**
+un archivo cuyo nombre es el hash de su contenido no necesita autenticación
+ninguna. El nombre *es* la llave.
+
+### El escudo del club no se validaba. Nada.
+
+`organizations.controller.ts` no llamaba a un solo `validar*`, así que el escudo
+entraba a la fila tal cual llegara. Comprobado mandando
+`logoUrl: "esto-no-es-una-imagen-ni-una-url"`: **200, y guardado**. Lo único que
+paraba algo era el `json({ limit: '5mb' })` de `main.ts`.
+
+El daño no se veía aquí, como siempre: el escudo se copia a Membresías por
+`/sync/club`, donde el tope son 90 000 caracteres. Todo lo que pasara de ahí se
+guardaba en el portal y **no llegaba al carnet**, en silencio. Ahora las tres
+rutas que lo escriben pasan por `validarLogo`.
+
+### Dónde está cada cosa
+
+| Pieza | Archivo |
+|---|---|
+| El almacén | `apps/ecosystem-api/src/common/almacen-imagenes.ts` |
+| Las tres formas, validadas | `common/validacion.ts` (`validarAvatar`, `validarLogo`) |
+| Servirlas en local | `main.ts` (`useStaticAssets`) |
+| La conversión para el espejo | `common/espejo-membresias.ts` (`absolutaMedia`) |
+| Resolver la ruta en el portal | `ecosystem-portal/src/lib/api.ts` (`urlImagen`) |
+| Mover las que ya estaban | `scripts/fotos-al-disco.mjs` (en seco por defecto) |
+| Su ensayo, contra PGlite | `scripts/probar-fotos-al-disco.mjs` |
+
+## 4.21 Cómo quiere ver DINAMYT cada quien
+
+*(5 de septiembre de 2026)*
+
+El tema y el idioma son de la PERSONA, no de la aplicación. Viven en
+`users.theme` y `users.locale`, se eligen en el perfil del portal —donde ya
+estaba «Tu hora»— y valen en las cuatro webs y en cualquier dispositivo.
+
+### Por qué NO basta con el navegador
+
+Porque `localStorage` es **por origen**, y las cuatro apps viven en subdominios
+distintos: `dinamyt.org`, `club.dinamyt.org`, `campeonatos.dinamyt.org`,
+`academy.dinamyt.org`.
+
+Membresías y Campeonatos **ya tenían modo claro** —esto no se construyó de
+cero—, cada una guardándolo en su propio navegador y con su propia clave
+(`membresias_theme`, `dinamyt_theme`). O sea que quien prefiere el claro tenía
+que pedirlo una vez por app, y otra vez en cada teléfono. Eso es exactamente lo
+contrario de §4.9.
+
+Así que la verdad vive en la fila y el navegador se queda una **copia**. La
+copia hace falta y no sobra: es lo que permite pintar el tema bueno **antes de
+saber quién eres**, sin el fogonazo oscuro que se lee como un fallo.
+
+### Los tres valores del tema, y por qué `sistema` es uno de ellos
+
+`sistema` · `claro` · `oscuro`. `sistema` es el de por defecto y hace de «no
+consta» sin necesitar una bandera aparte — que es la diferencia con la zona
+horaria, donde el valor detectado y el elegido son del mismo tipo y hubo que
+inventar `timezone_manual` para distinguirlos.
+
+### El idioma sí necesitaba esa bandera, y le faltaba
+
+`users.locale` existía desde el trabajo de zonas y **ya se llenaba solo**: el
+navegador manda `X-Idioma` en cada login y renovación (§4.12).
+
+Pero `anotarZona` lo escribía **siempre**, sin mirar si alguien lo había
+elegido. O sea que poner «English» a mano duraba hasta el siguiente inicio de
+sesión, porque el navegador dice `es-CO`. Una preferencia que no sobrevive a
+entrar no es una preferencia — la misma lección de `timezoneManual`, que a la
+columna gemela se le había pasado. De ahí `locale_manual` (migración `0021`).
+
+### Los colores, en un solo archivo
+
+`packages/shared/estilos.css`. Antes había **cuatro copias** de la paleta, una
+por web. Tres decían lo mismo token por token; **Campeonatos se había desviado
+en ocho de los diez que comparte** —otro `--bg`, otro `--bg-card`, otro
+`--text`—, así que saltar del portal a Campeonatos era cruzar a un gris
+distinto sin saber por qué.
+
+Los valores que quedaron son **los de Membresías**, enteros. No es una media
+entre las cuatro: es una de ellas, para que el resultado sea un diseño y no un
+promedio.
+
+> ⚠️ Membresías y Campeonatos están en **otros repositorios** (§1.1) y no en
+> este workspace, así que no pueden importarlo por el nombre del paquete. Para
+> ellas se copia con `sync-apps.ps1`. Membresías ya coincide —es el original—;
+> **Campeonatos es la que hay que alinear, en SU repositorio.**
+
+### El único token que no es una traducción directa
+
+El oro. En claro baja de `#f0b800` a `#a37400`: el de la marca sobre blanco da
+**1.9:1** de contraste, que es ilegible. Lleva su motivo escrito al lado para
+que nadie lo «arregle» devolviéndolo.
+
+### Dónde está cada cosa
+
+| Pieza | Archivo |
+|---|---|
+| Los colores, y el modo claro | `packages/shared/estilos.css` |
+| El tema: aplicar, guardar, anti-parpadeo | `lib/tema.ts` (portal y Academy) |
+| Los textos, es/en | `lib/i18n.tsx` (portal y Academy) |
+| Elegirlos | `components/Apariencia.tsx`, en el perfil del portal |
+| El control flotante 🌐 | `components/ControlesApariencia.tsx` (Academy, igual que Membresías) |
+| Validación | `common/validacion.ts` (`validarTema`, `validarIdioma`) |
+| Las columnas | migración `0021_tema_e_idioma` |
+
+### Lo que falta
+
+· **Academy todavía no lee `users.theme` del ecosistema**: su control guarda
+  solo en ese navegador. Cerrarlo es el gemelo del espejo que ya trae la foto
+  (`academy-api/src/lib/users.ts`, `refrescarPerfilEcosystem`), que ya pide el
+  perfil una vez por sesión — hay que añadirle dos campos y una columna.
+· **Campeonatos y Membresías** siguen con su clave propia en su repositorio.
+· **Los textos traducidos son los del armazón** —menús, login, perfil, lo
+  común—, no los de cada pantalla. Es lo caro, y §6.2 ya decía en qué orden
+  conviene: primero que las fechas y los números respeten el `locale`, y solo
+  después traducir todo lo demás.
+
 ---
 
 # PARTE 5 · Las trampas que ya costaron una tarde
@@ -3912,17 +4116,69 @@ arriba abajo. Lo que la ordena es §6.0: primero lo que se usa a diario.)*
 > Lo único que sigue teniendo su propia fecha es el DMARC (§3.5), porque sale de
 > una cuenta y no de una preferencia. Todo lo de aquí abajo se puede empezar hoy.
 
-`[ ]` **Las fotos, al disco.** Hoy viajan como data-URL dentro de la fila
-      (`users.avatar_url`, tope ~66 KB). Estaba bien cuando el disco se borraba
-      en cada despliegue; ahora hay disco propio y un Caddy que sirve archivos
-      sin despertar a Node. Cuesta +33 % de peso (base64), mete todas las fotos
-      en el volcado diario y obliga a recomprimir fuerte para el carnet.
-      Se hace con el nombre = hash del contenido, para poder cachear «para
-      siempre» sin servir la vieja. La columna ya acepta las tres formas
-      (`data:`, `/media/…`, `https://`), así que la migración no rompe nada.
+`[~]` **Las fotos, al disco.** **Construido y probado el 4 de septiembre de
+      2026; falta encenderlo en el VPS.** El mecanismo entero, lo que ya estaba
+      hecho en las otras dos apps y las dos cosas que se encontraron por el
+      camino: **§4.20**.
 
-`[ ]` **Tokens de estilo en un solo archivo** (`packages/shared/estilos.css`) en
-      vez de espejados en tres `globals.css`.
+      Lo que decía esta nota, y que se cumplió: viajaban como data-URL dentro de
+      la fila, lo cual estuvo bien mientras el disco se borraba en cada
+      despliegue; ahora hay disco propio y un Caddy que sirve archivos sin
+      despertar a Node. El nombre es el hash del contenido, que es lo que
+      permite cachear «para siempre» sin servir la vieja.
+
+      ⚠️ **Y una línea de esta nota era falsa, que es justo la clase de error
+      contra la que avisa el encabezado de este documento.** Decía que «la
+      columna ya acepta las tres formas (`data:`, `/media/…`, `https://`), así
+      que la migración no rompe nada». La columna sí —es `text`—, pero
+      `validarAvatar` **no**: un `/media/…` se iba por su primer `if` con «La
+      foto debe subirse desde tu dispositivo». O sea que el pendiente chocaba,
+      en su primer paso, con la única línea que lo tenía que dejar pasar.
+      Comprobado con un `PATCH` de verdad, que contestó 400.
+
+      **Lo que queda son tres cosas, y ninguna es código:**
+
+      1. Poner `MEDIA_PUBLIC_URL=https://id.dinamyt.org` en el `.env` de
+         `ecosystem-api` y reiniciar. **Es el interruptor**: sin ella todo sigue
+         guardándose incrustado, exactamente como hoy.
+      2. Correr el guion que mueve lo que ya estaba guardado, primero en seco:
+         `pnpm --filter @dinamyt/ecosystem-api fotos:al-disco` y, con respaldo
+         delante (§2.5), `--aplicar`.
+      3. Darle a Caddy el atajo, para que el archivo no despierte a Node:
+
+         ```caddyfile
+         id.dinamyt.org {
+         	encode zstd gzip
+
+         	handle /media/* {
+         		root * /srv/dinamyt-media
+         		file_server
+         		header Cache-Control "public, max-age=31536000, immutable"
+         		header X-Content-Type-Options "nosniff"
+         	}
+
+         	handle {
+         		reverse_proxy 127.0.0.1:3001
+         	}
+         }
+         ```
+
+         Con `MEDIA_DIR=/srv/dinamyt-media` en el `.env`, y ese directorio
+         **fuera del clon** para que un despliegue no lo toque. Mientras no se
+         añada, la API los sirve ella misma y funciona igual — solo que
+         despertando a Node.
+
+`[~]` ~~**Tokens de estilo en un solo archivo**~~ (`packages/shared/estilos.css`)
+      en vez de espejados en tres `globals.css`. **Hecho el 5 de septiembre de
+      2026 para el portal y Academy** — ver §4.21.
+
+      Eran **cuatro** copias, no tres. Tres decían lo mismo token por token; la
+      cuarta no: **Campeonatos se había desviado en ocho de los diez que
+      comparte**. Lo que este pendiente existía para evitar ya había pasado.
+
+      Los valores que quedaron son los de **Membresías**, enteros.
+
+      **Falta alinear Campeonatos**, y va en SU repositorio (§1.1).
 
 `[~]` **«Volver a mi ecosistema»** — **hecha el 2 de septiembre de 2026, y se
       adelantó a la fecha porque no cuesta nada y faltaba de verdad.** Desde el
@@ -3953,11 +4209,28 @@ arriba abajo. Lo que la ordena es §6.0: primero lo que se usa a diario.)*
       agosto de 2026: `POST /auth/logout` cierra la fila de la sesión y a partir
       de ahí el pase no vale en ninguna app. Ver §4.11.
 
-`[ ]` **Idioma y tema en el ecosystem, elegidos por la persona.** Hoy el idioma
-      está clavado en el código (`'es-CO'` en cada `toLocaleDateString`, y los
-      textos escritos a mano en español) y el tema es uno solo: los `globals.css`
-      de las tres apps definen la paleta oscura y no hay claro ni preferencia
-      del sistema.
+`[~]` **Idioma y tema en el ecosystem, elegidos por la persona.**
+      **Hecho el 5 de septiembre de 2026 en el portal; a medias en Academy.**
+      El mecanismo entero y lo que falta: **§4.21**.
+
+      ⚠️ **La premisa de esta nota era falsa cuando se escribió, y conviene
+      saberlo porque es la trampa contra la que avisa el encabezado.** Decía que
+      «el tema es uno solo: los `globals.css` de las tres apps definen la paleta
+      oscura y **no hay claro** ni preferencia del sistema».
+
+      **Membresías y Campeonatos ya tenían modo claro completo** —con
+      `data-theme="light"`, su `lib/theme.ts` y el script anti-parpadeo—, desde
+      antes de que se escribiera esto. Los que no lo tenían eran el portal y
+      Academy. O sea que el trabajo no era inventarlo: era copiar un patrón que
+      ya funcionaba, y reconciliar dos implementaciones que se habían separado
+      (distinta clave, distinto fondo claro).
+
+      Lo que sí era cierto: el idioma estaba clavado en el código.
+
+      **Y había un fallo que esta nota no podía ver**: `users.locale` se
+      escribía en CADA inicio de sesión con lo que dijera el navegador, sin
+      mirar si alguien lo había elegido. Poner «English» a mano duraba hasta la
+      siguiente entrada. Cerrado con `locale_manual` (migración `0021`).
 
       **La mitad del camino ya está hecha** por el trabajo de zona horaria del
       24 de agosto, y conviene aprovecharla en vez de empezar de cero:

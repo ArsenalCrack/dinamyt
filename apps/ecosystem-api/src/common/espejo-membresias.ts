@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { absolutaMedia } from './almacen-imagenes';
 
 /**
  * El aviso que mantiene al día la copia de Membresías.
@@ -163,6 +164,19 @@ async function avisar(
  * Solo se manda lo que cambió: `undefined` significa «no lo toques» al otro
  * lado igual que aquí. Las fechas viajan como 'YYYY-MM-DD' porque es lo que
  * espera la validación de allí.
+ *
+ * ── Y la foto viaja ABSOLUTA, que es la mitad que no se ve ──
+ *
+ * Desde que la foto puede vivir en el disco (`/media/<hash>.jpg`), mandarla
+ * tal cual sería mandarle a Membresías una ruta relativa a OTRO servidor. Su
+ * `imagenGuardada` acepta un `data:` o un `https://` y **nada más**, así que la
+ * rechazaría — y el rechazo del espejo no lo ve nadie: la foto quedaría bien en
+ * el portal y dejaría de llegar al carnet, sin un error que lo diga.
+ *
+ * `absolutaMedia` la convierte en `https://id.dinamyt.org/media/…`, que es una
+ * de las dos formas que el otro lado ya aceptaba **sin cambiar una línea allí**.
+ * Y le sienta mejor todavía: al no ser una imagen incrustada, su
+ * `direccionImagen` la devuelve tal cual y el carnet la carga directa.
  */
 export function espejarPersona(
   userId: string,
@@ -185,7 +199,9 @@ export function espejarPersona(
     cuerpo[k] =
       (k === 'birthDate' || k === 'trainsSince') && v instanceof Date
         ? v.toISOString().slice(0, 10)
-        : v;
+        : k === 'avatarUrl'
+          ? absolutaMedia(v as string | null)
+          : v;
   }
   // Solo el `ecoSub`: no hay nada que copiar.
   if (Object.keys(cuerpo).length === 1) return;
@@ -200,7 +216,8 @@ export function espejarClub(
 ): void {
   const cuerpo: Record<string, unknown> = { ecoOrgId: orgId };
   for (const [k, v] of Object.entries(campos)) {
-    if (v !== undefined) cuerpo[k] = v;
+    if (v === undefined) continue;
+    cuerpo[k] = k === 'logoUrl' ? absolutaMedia(v) : v;
   }
   if (Object.keys(cuerpo).length === 1) return;
 

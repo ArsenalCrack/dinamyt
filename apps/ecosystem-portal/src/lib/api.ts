@@ -14,6 +14,28 @@ import {
 const API_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_API_URL || 'http://localhost:3001';
 
+/**
+ * Dirección real de una imagen (foto de perfil o escudo del club).
+ *
+ * Desde que las imágenes van al disco, la API guarda una ruta relativa
+ * (`/media/<hash>.jpg`) y no la imagen entera. Esa ruta es relativa **a la
+ * API**, y un `<img src="/media/…">` la resolvería contra el origen del
+ * portal, que es otro: en el VPS, `dinamyt.org` en vez de `id.dinamyt.org`.
+ * Por eso el prefijo se pone aquí y no en el servidor — quién es la API
+ * depende del despliegue, y la fila no tiene por qué saberlo.
+ *
+ * Lo que ya viene absoluto (`https://…`) o incrustado (`data:…`) pasa tal cual:
+ * un club puede alojar sus imágenes donde quiera, y las fotos de antes siguen
+ * viniendo incrustadas.
+ *
+ * Es la misma función que `urlFoto` en Membresías, con el mismo criterio.
+ */
+export function urlImagen(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  if (/^(https?:|data:|blob:)/i.test(valor)) return valor;
+  return `${API_URL}${valor}`;
+}
+
 const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },

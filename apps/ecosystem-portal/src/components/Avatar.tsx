@@ -1,6 +1,7 @@
 'use client';
 
 import { Ampliable } from '@/components/VisorImagen';
+import { urlImagen } from '@/lib/api';
 
 /**
  * Foto de perfil con respaldo a iniciales (mismo componente en las tres webs
@@ -33,11 +34,15 @@ export function Avatar({
     .join('')
     .toUpperCase();
 
-  if (src) {
+  // La ruta se resuelve AQUÍ, y no en cada pantalla que pinta una foto: es el
+  // único sitio por el que pasan todas. Ver `urlImagen` en `lib/api.ts`.
+  const url = urlImagen(src);
+
+  if (url) {
     const foto = (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={src}
+        src={url}
         alt={nombre}
         width={size}
         height={size}
@@ -47,7 +52,7 @@ export function Avatar({
     );
     if (!ampliable) return foto;
     return (
-      <Ampliable src={src} alt={nombre}>
+      <Ampliable src={url} alt={nombre}>
         {foto}
       </Ampliable>
     );

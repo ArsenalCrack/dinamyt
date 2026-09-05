@@ -15,6 +15,20 @@ import { EcosystemJwtGuard } from '../../common/guards/ecosystem-jwt.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt.service';
+import { validarLogo } from '../../common/validacion';
+import { guardarImagen } from '../../common/almacen-imagenes';
+
+/**
+ * El escudo del club: se comprueba la forma y se manda al disco.
+ *
+ * Las tres rutas que lo escriben —crear una organización, fundar mi club y
+ * editar la información— pasan por aquí. **Ninguna validaba nada** hasta el 4
+ * de septiembre de 2026: este controlador no llamaba a un solo `validar*`, así
+ * que el escudo entraba a la fila tal cual llegara. Ver `validarLogo`.
+ */
+async function prepararLogo(logo: string): Promise<string> {
+  return (await guardarImagen(validarLogo(logo))) as string;
+}
 
 @Controller('organizations')
 export class OrganizationsController {
@@ -63,7 +77,7 @@ export class OrganizationsController {
   // ── POST /organizations — crear organización (solo super admin) ───────────
   @Post()
   @UseGuards(EcosystemJwtGuard, SuperAdminGuard)
-  create(
+  async create(
     @Body()
     body: {
       name: string;
@@ -81,6 +95,7 @@ export class OrganizationsController {
       logoUrl?: string;
     },
   ) {
+    if (body.logoUrl) body.logoUrl = await prepararLogo(body.logoUrl);
     return this.orgsService.create(body);
   }
 
@@ -108,7 +123,7 @@ export class OrganizationsController {
   // ── POST /organizations/mi-club — fundar mi propio club (maestro) ─────────
   @Post('mi-club')
   @UseGuards(EcosystemJwtGuard)
-  crearMiClub(
+  async crearMiClub(
     @CurrentUser() user: JwtPayload,
     @Body()
     body: {
@@ -121,6 +136,7 @@ export class OrganizationsController {
       socialLinks?: string[];
     },
   ) {
+    if (body.logoUrl) body.logoUrl = await prepararLogo(body.logoUrl);
     return this.orgsService.crearMiClub(user.sub, body);
   }
 
@@ -388,6 +404,7 @@ export class OrganizationsController {
     @CurrentUser() user: JwtPayload,
   ) {
     const { isActive, ...info } = body;
+    if (info.logoUrl) info.logoUrl = await prepararLogo(info.logoUrl);
     if (isActive !== undefined) {
       await this.orgsService.exigirAdminDe(user.sub, id, user.is_super_admin);
       await this.orgsService.setActiva(id, isActive === true);
