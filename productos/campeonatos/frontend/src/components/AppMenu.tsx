@@ -3,8 +3,40 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
-import { aplicarTema, getTema, type Tema } from "@/lib/theme";
+import { PORTAL_URL } from "@/lib/portal";
+import { aplicarTema, getTema, temaEfectivo, type Tema } from "@/lib/theme";
+import { guardarAparienciaEnLaCuenta } from "@/lib/api";
 import { IDIOMAS, useI18n } from "@/lib/i18n";
+
+/**
+ * La cuadrícula de aplicaciones, dibujada y no escrita.
+ *
+ * Por lo mismo que el icono de salir: los símbolos técnicos que parecen
+ * iconos (⇱, ⊞, ⏻) no están en las fuentes de Android y salen como el
+ * cuadrito de «glifo que no tengo». Un SVG se ve igual en todos lados y
+ * hereda el color del texto.
+ *
+ * Es el MISMO dibujo en Campeonatos, Membresías y Academy: la puerta al
+ * ecosistema se reconoce por su forma antes que por su texto.
+ */
+function IconoEcosistema() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      style={{ flexShrink: 0 }}
+    >
+      <rect x="3" y="3" width="7.5" height="7.5" rx="2" />
+      <rect x="13.5" y="3" width="7.5" height="7.5" rx="2" />
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="2" />
+      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" />
+    </svg>
+  );
+}
 
 interface SesionUser {
   nombre?: string;
@@ -30,7 +62,7 @@ export default function AppMenu() {
   const [open, setOpen] = useState(false);
   // Arranca en "dark" (igual que el servidor) y se sincroniza al montar:
   // así el HTML del servidor y el primer render del cliente coinciden.
-  const [tema, setTema] = useState<Tema>("dark");
+  const [tema, setTema] = useState<Tema>("sistema");
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -42,9 +74,15 @@ export default function AppMenu() {
   }, []);
 
   function cambiarTema() {
-    const nuevo: Tema = tema === "dark" ? "light" : "dark";
+    // Dos estados en el boton, no tres: `sistema` es un punto de partida, no un
+    // destino al que alguien quiera volver pulsando. Las tres escritas estan en
+    // el perfil del portal, que es donde se elige de verdad.
+    const nuevo: Tema = temaEfectivo(tema) === "claro" ? "oscuro" : "claro";
     aplicarTema(nuevo);
     setTema(nuevo);
+    // Y a la CUENTA, para que valga tambien en el portal, en Membresias y en
+    // Academy: `localStorage` no cruza subdominios.
+    guardarAparienciaEnLaCuenta({ theme: nuevo });
   }
 
   // Releer la sesión en cada cambio de ruta (tras login/logout) y cerrar el panel
@@ -134,7 +172,7 @@ export default function AppMenu() {
             {t("menu.campeonatos")}
           </button>
           <button type="button" role="menuitem" className="appmenu-item" onClick={cambiarTema}>
-            {tema === "dark" ? t("menu.modoClaro") : t("menu.modoOscuro")}
+            {temaEfectivo(tema) === "oscuro" ? t("menu.modoClaro") : t("menu.modoOscuro")}
           </button>
           <div className="appmenu-sep" />
           {/* Selector de idioma: los disponibles, con el activo resaltado */}
@@ -156,6 +194,49 @@ export default function AppMenu() {
             </div>
           </div>
           <div className="appmenu-sep" />
+
+          {/**
+            * La puerta de vuelta al ecosistema.
+            *
+            * ── El agujero que tapa ──
+            *
+            * Desde DINAMYT se entra aquí con un botón, pero de aquí no se
+            * volvía: al portal solo se llegaba por el enlace del aviso de
+            * «este pase no abre esta consola» o cerrando sesión. Salir de una
+            * app no puede ser la forma de llegar a la de al lado.
+            *
+            * ── Por qué NO lleva `?redirect=` ──
+            *
+            * Porque ir a DINAMYT significa ir a DINAMYT. Ese parámetro le dice
+            * al portal «cuando acabes, devuélvelo aquí», y es justo el que se
+            * quedaba pegado en el historial del navegador y acababa metiendo
+            * en la app equivocada a quien quería el portal. El destino es el
+            * dashboard, y punto.
+            *
+            * ── Por qué aquí abajo ──
+            *
+            * Junto a «Salir» están las dos cosas que te sacan de esta app. El
+            * resto del menú son pantallas de aquí dentro.
+            */}
+          <a
+            href={`${PORTAL_URL}/dashboard`}
+            role="menuitem"
+            className="appmenu-item"
+            title={t("menu.ecosistemaTitulo")}
+          >
+            <IconoEcosistema />
+            {t("menu.ecosistema")}
+          </a>
+
+          {/* ── Por qué esta separación ──
+              «Ir a DINAMYT» y «Salir» hacen lo mismo desde lejos —los dos te
+              sacan de esta app— pero uno te lleva a tu portal y el otro te
+              cierra la sesión, y equivocarse cuesta volver a escribir la
+              contraseña. Pegados, al pasar el ratón los dos fondos se tocaban y
+              parecían un solo bloque; el de arriba además ES un `<a>` con
+              `:hover` propio. Ocho píxeles no son decoración: son el margen de
+              un dedo en un teléfono. */}
+          <div style={{ height: 8 }} />
           <LogoutButton />
         </div>
       )}

@@ -14,7 +14,7 @@ from flask_jwt_extended import (
     unset_jwt_cookies,
     verify_jwt_in_request,
 )
-from ..espejo import es_super, resolver_espejo
+from ..espejo import es_super, guardar_apariencia, leer_apariencia, resolver_espejo
 from ..extensions import db
 from ..geo import pais_de_ciudad, pais_valido
 from ..identidad import abre_campeonatos, hay_ecosistema, verificar_pase
@@ -479,6 +479,82 @@ def me():
         data["tatamis_asignados"] = [a.to_dict() for a in asignaciones]
 
     return jsonify(data), 200
+
+
+@auth_bp.route("/me/apariencia", methods=["GET"])
+@jwt_required()
+def leer_mi_apariencia():
+    """
+    GET /api/auth/me/apariencia
+
+    La VUELTA: que tema y que idioma tiene esta persona en su cuenta de DINAMYT.
+
+    ── El hueco que cierra ─────────────────────────────────────────────────
+
+    El PATCH de aqui abajo cerro la IDA. Esto cierra la vuelta, que era la mitad
+    que faltaba: quien cambia el tema en el portal y entra aqui —con la sesion
+    de aqui ya abierta desde ayer— no veia el cambio, porque la preferencia
+    viaja DENTRO DEL PASE y esta app solo ve el pase en un momento, el salto
+    desde el portal.
+
+    La web la llama al cargar y CORRIGE lo que ya pinto. No al reves: pintar
+    esperando a esto devolveria el fogonazo oscuro que costo tanto quitar.
+
+    Sin ecosistema responde `null` y la pantalla se queda con lo que tenia — que
+    es exactamente lo de antes, y lo que hace falta el dia del evento (§1.5).
+    """
+    usuario = Usuario.query.get(int(get_jwt_identity()))
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    eco = leer_apariencia(getattr(usuario, "eco_sub", None))
+    return jsonify({
+        "theme": (eco or {}).get("theme"),
+        "locale": (eco or {}).get("locale"),
+        "delEcosistema": eco is not None,
+    }), 200
+
+
+@auth_bp.route("/me/apariencia", methods=["PATCH"])
+@jwt_required()
+def guardar_mi_apariencia():
+    """
+    PATCH /api/auth/me/apariencia
+
+    El tema o el idioma que la persona acaba de elegir AQUI, guardado en su
+    CUENTA del ecosistema para que valga tambien en el portal, en Membresias y
+    en Academy.
+
+    ── Por que hace falta ──────────────────────────────────────────────────
+
+    `localStorage` es POR ORIGEN y las cuatro webs viven en subdominios
+    distintos. Sin esto, cambiar a modo claro en Campeonatos lo cambiaba solo
+    en Campeonatos, mientras que hacerlo en el portal si llegaba a las cuatro:
+    el mismo boton comportandose de dos maneras segun donde lo pulses.
+
+    ── Que NO hace ─────────────────────────────────────────────────────────
+
+    No valida el contenido: lo hace el ecosistema, que es de quien es la
+    columna. Y no toca la fila LOCAL de `usuarios`: aqui no se guarda ninguna
+    preferencia de apariencia, la unica copia es la del navegador.
+
+    Sin `ECOSYSTEM_SYNC_SECRET` no hace nada y responde que si: la pantalla ya
+    cambio, y esta app tiene que funcionar sin ecosistema (§1.5).
+    """
+    usuario = Usuario.query.get(int(get_jwt_identity()))
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    cuerpo = request.get_json(silent=True) or {}
+    tema = cuerpo.get("theme")
+    idioma = cuerpo.get("locale")
+    if tema is None and idioma is None:
+        return jsonify({"error": "No hay nada que cambiar."}), 400
+
+    viajo = guardar_apariencia(
+        getattr(usuario, "eco_sub", None), tema=tema, idioma=idioma
+    )
+    return jsonify({"ok": True, "enElEcosistema": viajo}), 200
 
 
 @auth_bp.route("/users", methods=["GET"])
