@@ -19,6 +19,7 @@ import api, {
 import { nombreRol, operaCampeonatos } from '@/lib/roles';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { Avatar } from '@/components/Avatar';
+import { useI18n } from '@/lib/i18n';
 import { CampanaOrg } from '@/components/CampanaOrg';
 import { PedirAvisos } from '@/components/PedirAvisos';
 import { EntrarAClub } from '@/components/EntrarAClub';
@@ -83,6 +84,7 @@ const AVISO_CAMPEONATOS: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [payload, setPayload] = useState<TokenPayload | null>(null);
   // ¿Gestiona alguna organización (admin/maestro)? ¿Pertenece a algún club?
@@ -255,7 +257,7 @@ export default function DashboardPage() {
   if (!payload) {
     return (
       <main className="flex min-h-screen items-center justify-center">
-        <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>
+        <p style={{ color: 'var(--text-muted)' }}>{t('comun.cargando')}</p>
       </main>
     );
   }
@@ -297,7 +299,7 @@ export default function DashboardPage() {
               aplicación. */}
           <Avatar src={foto} nombre={payload.fullName} size={56} ampliable />
           <div className="min-w-0" style={{ overflowWrap: 'anywhere' }}>
-            <p className="eyebrow mb-1">Tu cuenta DINAMYT</p>
+            <p className="eyebrow mb-1">{t('login.eyebrow')}</p>
             <h1 className="display text-2xl sm:text-3xl">Hola, {payload.fullName}</h1>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
               {payload.email}
@@ -431,7 +433,7 @@ export default function DashboardPage() {
         className="rounded-xl border p-5"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
       >
-        <h2 className="mb-4 text-lg font-semibold">Tus aplicaciones</h2>
+        <h2 className="mb-4 text-lg font-semibold">{t('panel.tusApps')}</h2>
 
         <div className="flex flex-col gap-3">
           {/* ── Campeonatos: la tarjeta sale SIEMPRE que haya plan ────────
@@ -469,7 +471,7 @@ export default function DashboardPage() {
                 className="rounded-lg border px-4 py-3"
                 style={{ borderColor: 'var(--border)' }}
               >
-                <span className="block font-semibold">Ver campeonatos y resultados</span>
+                <span className="block font-semibold">{t('panel.verCampeonatos')}</span>
                 <span className="mt-0.5 block text-xs" style={{ color: 'var(--text-muted)' }}>
                   Tu club tiene Campeonatos. La consola es para quien organiza,
                   inscribe o juzga; aquí ves los campeonatos abiertos y sus
@@ -587,7 +589,7 @@ export default function DashboardPage() {
           className="mt-4 rounded-xl border p-5"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <h2 className="mb-1 text-lg font-semibold">Mi organización</h2>
+          <h2 className="mb-1 text-lg font-semibold">{t('panel.miOrganizacion')}</h2>
           <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
             Gestiona tus clubes y tu gente, la ficha de tu club y las
             invitaciones entre organización y clubes.
@@ -605,7 +607,7 @@ export default function DashboardPage() {
           className="mt-4 rounded-xl border p-5"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <h2 className="mb-1 text-lg font-semibold">Mi club</h2>
+          <h2 className="mb-1 text-lg font-semibold">{t('panel.miClub')}</h2>
           <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
             {nombreClub
               ? `Perteneces a ${nombreClub}: mira sus horarios, sede y contactos.`
@@ -616,7 +618,7 @@ export default function DashboardPage() {
             className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
             style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
           >
-            {nombreClub ? 'Ver la información de mi club' : 'Mi club'}
+            {nombreClub ? t('panel.verMiClub') : t('panel.miClub')}
           </Link>
         </section>
       ) : null}
@@ -626,7 +628,7 @@ export default function DashboardPage() {
           className="mt-4 rounded-xl border p-5"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <h2 className="mb-1 text-lg font-semibold">Administración del ecosistema</h2>
+          <h2 className="mb-1 text-lg font-semibold">{t('panel.admin')}</h2>
           <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
             Organizaciones, miembros con su rol y suscripciones a planes.
           </p>

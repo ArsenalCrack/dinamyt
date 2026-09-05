@@ -228,8 +228,8 @@ export class MailerService {
     tenue: '#a19db8',
     oro: '#f0b800',
     oroApagado: '#c99a00',
-    accion: '#1f8f63',
-    accionTexto: '#eafff4',
+    accion: '#22b87e',
+    accionTexto: '#0b2b1e',
   };
 
   private static portal(): string {

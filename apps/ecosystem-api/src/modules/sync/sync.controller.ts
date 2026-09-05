@@ -10,9 +10,10 @@ import {
 import { timingSafeEqual } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../db';
-import { orgMembers, organizations } from '../../db/schema';
+import { orgMembers, organizations, users } from '../../db/schema';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { rolGeneralDesdeMembresias } from '../../common/roles-por-app';
+import { validarTema, validarIdioma } from '../../common/validacion';
 
 /**
  * La puerta de ENTRADA del espejo: Membresías llamando al ecosistema.
@@ -191,6 +192,74 @@ export class SyncController {
       .set({ membresiasActivo: body.activo })
       .where(and(eq(orgMembers.userId, userId), eq(orgMembers.orgId, orgId)))
       .returning({ id: orgMembers.id });
+
+    return { encontrada: filas.length > 0, aplicado: filas.length > 0 };
+  }
+  // ── POST /sync/apariencia — el tema y el idioma, desde CUALQUIER app ──────
+  //
+  // ── Por qué hacía falta ──
+  //
+  // El tema y el idioma viajan del portal a las demás dentro del pase (§4.21),
+  // y eso resolvía la mitad del problema: elegir una vez en DINAMYT y verlo en
+  // las cuatro. La otra mitad no estaba. Quien cambiaba a modo claro **dentro
+  // de Membresías o de Campeonatos** lo cambiaba solo ahí: `localStorage` es
+  // por origen, y esas apps no tienen forma de escribir en `users`.
+  //
+  // Visto desde fuera es peor que no tener la función: el mismo botón, en la
+  // misma cuenta, unas veces se recuerda en todas partes y otras no, según en
+  // qué app lo pulsaste. Ahora cualquiera de las cuatro puede guardar la
+  // preferencia, y la siguiente que abras ya la trae.
+  //
+  // ── Por qué por el secreto y no con el pase de la persona ──
+  //
+  // Porque Membresías y Campeonatos cambian el pase del ecosistema por su
+  // propia sesión —una cookie httpOnly— en cuanto entras, y a partir de ahí no
+  // lo tienen. Este es el mismo canal servidor-a-servidor de `/sync/acceso`,
+  // que ya existe y ya está probado.
+  //
+  // ⚠️ Solo escribe estas dos columnas. Es a propósito: una ruta que entra por
+  // un secreto compartido no puede tocar el rol, el correo ni la contraseña.
+  @Post('apariencia')
+  async apariencia(
+    @Headers('x-dinamyt-sync') secreto: string | undefined,
+    @Body()
+    body: {
+      /** El id de la persona AQUÍ (`users.eco_sub` allá). */
+      ecoSub?: string;
+      /** `sistema` | `claro` | `oscuro`. */
+      theme?: string;
+      /** `es-CO`, `en-US`… */
+      locale?: string;
+    },
+  ) {
+    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
+    if (!esperado) throw new NotFoundException('No encontrado.');
+    if (!SyncController.valido(secreto, esperado)) {
+      throw new UnauthorizedException('Secreto inválido.');
+    }
+
+    const id = (body.ecoSub ?? '').trim();
+    if (!id) throw new BadRequestException('Falta `ecoSub`.');
+
+    const cambios: { theme?: string; locale?: string; localeManual?: boolean } =
+      {};
+    if (body.theme !== undefined) cambios.theme = validarTema(body.theme);
+    if (body.locale !== undefined) {
+      cambios.locale = validarIdioma(body.locale);
+      // Elegirlo a mano lo protege de la detección del navegador, igual que
+      // cuando se elige en el portal. Sin esta marca, el siguiente inicio de
+      // sesión lo pisaría con lo que diga `X-Idioma` (§4.21).
+      cambios.localeManual = true;
+    }
+    if (!Object.keys(cambios).length) {
+      throw new BadRequestException('No hay nada que cambiar.');
+    }
+
+    const filas = await db
+      .update(users)
+      .set({ ...cambios, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning({ id: users.id });
 
     return { encontrada: filas.length > 0, aplicado: filas.length > 0 };
   }

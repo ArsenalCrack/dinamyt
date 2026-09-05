@@ -99,6 +99,10 @@ const es = {
   'panel.abrirOrganizacion': 'Abrir mi organización',
   'panel.entrarA': 'Entrar a',
   'panel.sinApps': 'Todavía no tienes ninguna aplicación asignada.',
+  'panel.miClub': 'Mi club',
+  'panel.verMiClub': 'Ver la información de mi club',
+  'panel.admin': 'Administración del ecosistema',
+  'panel.verCampeonatos': 'Ver campeonatos y resultados',
 
   // ── Perfil: la pantalla de «cómo quiero ver DINAMYT» ──
   'perfil.titulo': 'Mi perfil',
@@ -188,6 +192,10 @@ const en: Record<ClaveTexto, string> = {
   'panel.abrirOrganizacion': 'Open my organization',
   'panel.entrarA': 'Go to',
   'panel.sinApps': 'You do not have any apps assigned yet.',
+  'panel.miClub': 'My club',
+  'panel.verMiClub': "See my club's information",
+  'panel.admin': 'Ecosystem administration',
+  'panel.verCampeonatos': 'See championships and results',
 
   'perfil.titulo': 'My profile',
   'perfil.apariencia': 'How I see DINAMYT',
