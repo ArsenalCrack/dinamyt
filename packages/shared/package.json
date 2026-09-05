@@ -9,9 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./estilos.css": "./estilos.css"
   },
-  "files": ["dist"],
+  "files": ["dist", "estilos.css"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",

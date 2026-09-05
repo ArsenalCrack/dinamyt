@@ -63,6 +63,9 @@ importers:
 
   apps/academy-web:
     dependencies:
+      '@dinamyt/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       axios:
         specifier: ^1.17.0
         version: 1.18.1
@@ -257,6 +260,9 @@ importers:
 
   apps/ecosystem-portal:
     dependencies:
+      '@dinamyt/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       axios:
         specifier: ^1.17.0
         version: 1.18.1

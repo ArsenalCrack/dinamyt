@@ -1079,7 +1079,17 @@ export class AuthService {
     if (zona && !user.timezoneManual && user.timezone !== zona) {
       cambios.timezone = zona;
     }
-    if (idioma && user.locale !== idioma) cambios.locale = idioma;
+    // El idioma, con la MISMA protección que la zona.
+    //
+    // Hasta aquí se escribía siempre, y eso convertía la elección del perfil en
+    // una preferencia que se borraba sola: quien pusiera «English» a mano volvía
+    // a español en su siguiente inicio de sesión, porque su navegador manda
+    // `X-Idioma: es-CO`. Una preferencia que no sobrevive a entrar no es una
+    // preferencia — es la misma lección de `timezoneManual`, y se le pasó por
+    // alto a la columna gemela.
+    if (idioma && !user.localeManual && user.locale !== idioma) {
+      cambios.locale = idioma;
+    }
     if (!Object.keys(cambios).length) return user;
 
     // Sin `await` sobre el camino de la respuesta: que el reloj de alguien no

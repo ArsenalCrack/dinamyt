@@ -25,6 +25,7 @@ import { SelectMenu } from '@/components/SelectMenu';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
 import { DispositivosConectados } from '@/components/DispositivosConectados';
 import { ZonaHoraria } from '@/components/ZonaHoraria';
+import { Apariencia } from '@/components/Apariencia';
 import { Ampliable } from '@/components/VisorImagen';
 
 interface Disciplina {
@@ -55,6 +56,8 @@ interface Perfil {
   isEmailVerified: boolean | null;
   /** Zona horaria IANA. Con ella se le escriben los correos y los avisos. */
   timezone: string | null;
+  theme: string | null;
+  locale: string | null;
   /** ¿La eligió a mano? Entonces la detección automática no la pisa. */
   timezoneManual: boolean | null;
   createdAt: string | null;
@@ -632,6 +635,15 @@ export default function PerfilPage() {
           preocupación. Quien viene aquí porque cree que alguien entró en su
           cuenta necesita las dos cosas, y en este orden — cambiar la cerradura
           no sirve de nada si el intruso sigue dentro con su sesión abierta. */}
+      {/* «Cómo veo DINAMYT»: el tema, el idioma y la hora responden la misma
+          pregunta, así que van juntos y en este orden — los dos primeros se
+          ven al instante, la hora explica algo que pasa cuando no estás. */}
+      <Apariencia
+        usuarioId={perfil.id}
+        temaGuardado={perfil.theme}
+        localeGuardado={perfil.locale}
+      />
+
       <ZonaHoraria
         usuarioId={perfil.id}
         zonaGuardada={perfil.timezone}

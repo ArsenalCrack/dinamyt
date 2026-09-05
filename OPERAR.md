@@ -2701,6 +2701,95 @@ rutas que lo escriben pasan por `validarLogo`.
 | Mover las que ya estaban | `scripts/fotos-al-disco.mjs` (en seco por defecto) |
 | Su ensayo, contra PGlite | `scripts/probar-fotos-al-disco.mjs` |
 
+## 4.21 Cómo quiere ver DINAMYT cada quien
+
+*(5 de septiembre de 2026)*
+
+El tema y el idioma son de la PERSONA, no de la aplicación. Viven en
+`users.theme` y `users.locale`, se eligen en el perfil del portal —donde ya
+estaba «Tu hora»— y valen en las cuatro webs y en cualquier dispositivo.
+
+### Por qué NO basta con el navegador
+
+Porque `localStorage` es **por origen**, y las cuatro apps viven en subdominios
+distintos: `dinamyt.org`, `club.dinamyt.org`, `campeonatos.dinamyt.org`,
+`academy.dinamyt.org`.
+
+Membresías y Campeonatos **ya tenían modo claro** —esto no se construyó de
+cero—, cada una guardándolo en su propio navegador y con su propia clave
+(`membresias_theme`, `dinamyt_theme`). O sea que quien prefiere el claro tenía
+que pedirlo una vez por app, y otra vez en cada teléfono. Eso es exactamente lo
+contrario de §4.9.
+
+Así que la verdad vive en la fila y el navegador se queda una **copia**. La
+copia hace falta y no sobra: es lo que permite pintar el tema bueno **antes de
+saber quién eres**, sin el fogonazo oscuro que se lee como un fallo.
+
+### Los tres valores del tema, y por qué `sistema` es uno de ellos
+
+`sistema` · `claro` · `oscuro`. `sistema` es el de por defecto y hace de «no
+consta» sin necesitar una bandera aparte — que es la diferencia con la zona
+horaria, donde el valor detectado y el elegido son del mismo tipo y hubo que
+inventar `timezone_manual` para distinguirlos.
+
+### El idioma sí necesitaba esa bandera, y le faltaba
+
+`users.locale` existía desde el trabajo de zonas y **ya se llenaba solo**: el
+navegador manda `X-Idioma` en cada login y renovación (§4.12).
+
+Pero `anotarZona` lo escribía **siempre**, sin mirar si alguien lo había
+elegido. O sea que poner «English» a mano duraba hasta el siguiente inicio de
+sesión, porque el navegador dice `es-CO`. Una preferencia que no sobrevive a
+entrar no es una preferencia — la misma lección de `timezoneManual`, que a la
+columna gemela se le había pasado. De ahí `locale_manual` (migración `0021`).
+
+### Los colores, en un solo archivo
+
+`packages/shared/estilos.css`. Antes había **cuatro copias** de la paleta, una
+por web. Tres decían lo mismo token por token; **Campeonatos se había desviado
+en ocho de los diez que comparte** —otro `--bg`, otro `--bg-card`, otro
+`--text`—, así que saltar del portal a Campeonatos era cruzar a un gris
+distinto sin saber por qué.
+
+Los valores que quedaron son **los de Membresías**, enteros. No es una media
+entre las cuatro: es una de ellas, para que el resultado sea un diseño y no un
+promedio.
+
+> ⚠️ Membresías y Campeonatos están en **otros repositorios** (§1.1) y no en
+> este workspace, así que no pueden importarlo por el nombre del paquete. Para
+> ellas se copia con `sync-apps.ps1`. Membresías ya coincide —es el original—;
+> **Campeonatos es la que hay que alinear, en SU repositorio.**
+
+### El único token que no es una traducción directa
+
+El oro. En claro baja de `#f0b800` a `#a37400`: el de la marca sobre blanco da
+**1.9:1** de contraste, que es ilegible. Lleva su motivo escrito al lado para
+que nadie lo «arregle» devolviéndolo.
+
+### Dónde está cada cosa
+
+| Pieza | Archivo |
+|---|---|
+| Los colores, y el modo claro | `packages/shared/estilos.css` |
+| El tema: aplicar, guardar, anti-parpadeo | `lib/tema.ts` (portal y Academy) |
+| Los textos, es/en | `lib/i18n.tsx` (portal y Academy) |
+| Elegirlos | `components/Apariencia.tsx`, en el perfil del portal |
+| El control flotante 🌐 | `components/ControlesApariencia.tsx` (Academy, igual que Membresías) |
+| Validación | `common/validacion.ts` (`validarTema`, `validarIdioma`) |
+| Las columnas | migración `0021_tema_e_idioma` |
+
+### Lo que falta
+
+· **Academy todavía no lee `users.theme` del ecosistema**: su control guarda
+  solo en ese navegador. Cerrarlo es el gemelo del espejo que ya trae la foto
+  (`academy-api/src/lib/users.ts`, `refrescarPerfilEcosystem`), que ya pide el
+  perfil una vez por sesión — hay que añadirle dos campos y una columna.
+· **Campeonatos y Membresías** siguen con su clave propia en su repositorio.
+· **Los textos traducidos son los del armazón** —menús, login, perfil, lo
+  común—, no los de cada pantalla. Es lo caro, y §6.2 ya decía en qué orden
+  conviene: primero que las fechas y los números respeten el `locale`, y solo
+  después traducir todo lo demás.
+
 ---
 
 # PARTE 5 · Las trampas que ya costaron una tarde
@@ -4079,8 +4168,17 @@ arriba abajo. Lo que la ordena es §6.0: primero lo que se usa a diario.)*
          añada, la API los sirve ella misma y funciona igual — solo que
          despertando a Node.
 
-`[ ]` **Tokens de estilo en un solo archivo** (`packages/shared/estilos.css`) en
-      vez de espejados en tres `globals.css`.
+`[~]` ~~**Tokens de estilo en un solo archivo**~~ (`packages/shared/estilos.css`)
+      en vez de espejados en tres `globals.css`. **Hecho el 5 de septiembre de
+      2026 para el portal y Academy** — ver §4.21.
+
+      Eran **cuatro** copias, no tres. Tres decían lo mismo token por token; la
+      cuarta no: **Campeonatos se había desviado en ocho de los diez que
+      comparte**. Lo que este pendiente existía para evitar ya había pasado.
+
+      Los valores que quedaron son los de **Membresías**, enteros.
+
+      **Falta alinear Campeonatos**, y va en SU repositorio (§1.1).
 
 `[~]` **«Volver a mi ecosistema»** — **hecha el 2 de septiembre de 2026, y se
       adelantó a la fecha porque no cuesta nada y faltaba de verdad.** Desde el
@@ -4111,11 +4209,28 @@ arriba abajo. Lo que la ordena es §6.0: primero lo que se usa a diario.)*
       agosto de 2026: `POST /auth/logout` cierra la fila de la sesión y a partir
       de ahí el pase no vale en ninguna app. Ver §4.11.
 
-`[ ]` **Idioma y tema en el ecosystem, elegidos por la persona.** Hoy el idioma
-      está clavado en el código (`'es-CO'` en cada `toLocaleDateString`, y los
-      textos escritos a mano en español) y el tema es uno solo: los `globals.css`
-      de las tres apps definen la paleta oscura y no hay claro ni preferencia
-      del sistema.
+`[~]` **Idioma y tema en el ecosystem, elegidos por la persona.**
+      **Hecho el 5 de septiembre de 2026 en el portal; a medias en Academy.**
+      El mecanismo entero y lo que falta: **§4.21**.
+
+      ⚠️ **La premisa de esta nota era falsa cuando se escribió, y conviene
+      saberlo porque es la trampa contra la que avisa el encabezado.** Decía que
+      «el tema es uno solo: los `globals.css` de las tres apps definen la paleta
+      oscura y **no hay claro** ni preferencia del sistema».
+
+      **Membresías y Campeonatos ya tenían modo claro completo** —con
+      `data-theme="light"`, su `lib/theme.ts` y el script anti-parpadeo—, desde
+      antes de que se escribiera esto. Los que no lo tenían eran el portal y
+      Academy. O sea que el trabajo no era inventarlo: era copiar un patrón que
+      ya funcionaba, y reconciliar dos implementaciones que se habían separado
+      (distinta clave, distinto fondo claro).
+
+      Lo que sí era cierto: el idioma estaba clavado en el código.
+
+      **Y había un fallo que esta nota no podía ver**: `users.locale` se
+      escribía en CADA inicio de sesión con lo que dijera el navegador, sin
+      mirar si alguien lo había elegido. Poner «English» a mano duraba hasta la
+      siguiente entrada. Cerrado con `locale_manual` (migración `0021`).
 
       **La mitad del camino ya está hecha** por el trabajo de zona horaria del
       24 de agosto, y conviene aprovecharla en vez de empezar de cero:

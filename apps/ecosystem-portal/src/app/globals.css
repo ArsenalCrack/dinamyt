@@ -7,39 +7,12 @@
    Las clases de componentes viven en @layer components para que las
    utilidades de Tailwind (hidden, w-full, px-*) puedan sobreescribirlas.
    ════════════════════════════════════════════════════════════════════════ */
-:root {
-  color-scheme: dark;
-  --bg: #0e0e15;
-  --bg-card: #15151f;
-  --bg-elevated: #1d1d2a;
-  --bg-input: #0a0a11;
-  --border: #262635;
-  --border-strong: #3a3a4e;
-  --text: #f3f1e8;
-  --text-muted: #a19db8;
-  --gold: #f0b800;
-  /* Accion primaria del dia a dia: jade profundo, legible y sin neon.
-     El oro queda como color de MARCA (acentos, badges y CTA del login). */
-  --accion: #1f8f63;
-  --accion-texto: #eafff4;
-  --gold-dim: #c99a00;
-  --gold-soft: rgba(240, 184, 0, 0.12);
-  --danger: #ff5577;
-  --ok: #3ecf8e;
-  --info: #4d9fff;
-  --hong: #e8002a;
-  --chung: #2266ff;
-  /* ── Series de los graficos ──
-     Dos hues, y estos dos exactos: son los que pasan las seis comprobaciones
-     del validador de paleta contra el fondo de tarjeta (#15151f) —banda de
-     luminosidad, croma minimo, separacion para daltonismo (dE 28 en protan,
-     20 en tritan) y contraste >= 3:1—. El oro de marca (#f0b800) y el azul
-     de aviso (#4d9fff) se salen de la banda por arriba: brillan tanto sobre
-     tinta que las barras se comen la lectura del eje.
-     Se asignan por identidad y en orden fijo, nunca ciclados. */
-  --serie-1: #b88d00;
-  --serie-2: #3f86e8;
-}
+/* Los COLORES ya no viven aquí: están en `packages/shared/estilos.css`, que es
+   el mismo archivo para las cuatro webs del ecosistema. Ahí están también los
+   del modo claro. Lo que sigue en este archivo es lo propio del portal —
+   tipografía, espaciado y sus componentes. Ver §4.9 y §6.2. */
+@import '@dinamyt/shared/estilos.css';
+
 
 body {
   background: var(--bg);

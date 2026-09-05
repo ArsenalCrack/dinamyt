@@ -191,6 +191,48 @@ export function validarLogo(logo: string) {
   return validarImagen(logo, 'El escudo');
 }
 
+// ── Cómo quiere ver DINAMYT cada quien ──────────────────────────────────────
+
+/** Los tres valores de `users.theme`. `sistema` es el de por defecto. */
+export const TEMAS = ['sistema', 'claro', 'oscuro'] as const;
+
+/**
+ * El tema, comprobado contra la lista.
+ *
+ * La base tiene su propio `CHECK` (migración `0021`), así que esto no es la
+ * única defensa — es la que da un mensaje que se puede leer. Sin ella, un valor
+ * raro sale como un error de restricción de PostgreSQL en la pantalla.
+ */
+export function validarTema(tema: string) {
+  const limpio = (tema ?? '').trim().toLowerCase();
+  if (!TEMAS.includes(limpio as (typeof TEMAS)[number])) {
+    throw new BadRequestException(
+      `Tema inválido. Usa: ${TEMAS.join(', ')}.`,
+    );
+  }
+  return limpio;
+}
+
+/**
+ * El idioma, en forma BCP-47 corta: `es`, `en`, `es-CO`, `en-US`.
+ *
+ * No se comprueba contra una lista de idiomas que la interfaz sepa hablar, y es
+ * a propósito: esta columna también decide cómo se escriben las FECHAS y los
+ * NÚMEROS (§4.12), y ahí sirve cualquier locale que entienda `Intl` — aunque
+ * los textos de la pantalla todavía no estén traducidos a ese idioma.
+ *
+ * `users.locale` es `varchar(10)`, así que el tope no es decorativo.
+ */
+export function validarIdioma(locale: string) {
+  const limpio = (locale ?? '').trim();
+  if (!/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(limpio) || limpio.length > 10) {
+    throw new BadRequestException(
+      'Idioma inválido. Usa una forma como «es», «en» o «es-CO».',
+    );
+  }
+  return limpio;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // CORREO, NOMBRE COMPLETO Y CONTRASEÑA
 //
