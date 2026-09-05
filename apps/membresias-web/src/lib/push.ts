@@ -36,7 +36,22 @@ export async function estadoPush(): Promise<'activo' | 'inactivo' | 'imposible'>
   }
 }
 
-/** Registra el service worker, pide permiso y suscribe al usuario a Web Push. */
+/**
+ * Pide permiso, registra el service worker y suscribe a Web Push.
+ *
+ * ── El permiso va PRIMERO ──
+ *
+ * Estaba detrás de `serviceWorker.register()`, y ese `await` se comía la
+ * «activación» que deja el clic —el navegador solo acepta pedir el permiso
+ * durante unos segundos después de que alguien toque algo—. En el celular
+ * llegaba a tiempo porque el service worker ya estaba instalado de la visita
+ * anterior; en un computador, donde muchas veces es la primera vez, la
+ * instalación tarda, el gesto caduca y el navegador ignora la petición sin
+ * decir nada. Se pulsaba el botón y no salía ningún cuadro.
+ *
+ * Pedirlo primero no arriesga nada: lo que «se gasta» es un NO, y un permiso
+ * concedido se puede reutilizar tantas veces como haga falta.
+ */
 export async function activarPush(): Promise<{ ok: boolean; motivo?: string }> {
   if (typeof window === 'undefined') return { ok: false, motivo: 'no-window' };
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -45,10 +60,12 @@ export async function activarPush(): Promise<{ ok: boolean; motivo?: string }> {
   if (!VAPID_PUBLIC) {
     return { ok: false, motivo: 'Falta NEXT_PUBLIC_VAPID_PUBLIC_KEY.' };
   }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return { ok: false, motivo: 'Permiso denegado.' };
+
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') return { ok: false, motivo: 'Permiso denegado.' };
+    await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC) as BufferSource,
@@ -59,7 +76,11 @@ export async function activarPush(): Promise<{ ok: boolean; motivo?: string }> {
     };
     await api.post('/push/subscribe', { endpoint: json.endpoint, keys: json.keys });
     return { ok: true };
-  } catch {
-    return { ok: false, motivo: 'No se pudo activar.' };
+  } catch (e) {
+    // El motivo de verdad: «No se pudo activar» servía igual para un navegador
+    // que rechaza la suscripción, para una llave mal puesta y para la API
+    // caída, y las tres se arreglan de forma distinta.
+    const detalle = e instanceof Error ? e.message : '';
+    return { ok: false, motivo: detalle || 'No se pudo activar.' };
   }
 }

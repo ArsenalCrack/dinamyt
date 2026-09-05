@@ -35,6 +35,8 @@ import {
   altaEnDinamyt,
   altaEnElEcosistema,
   avisarAccesoAlEcosistema,
+  avisarAparienciaAlEcosistema,
+  leerAparienciaDelEcosistema,
   type AltaHecha,
 } from '../lib/alta-ecosistema';
 import { ensureMembership } from '../lib/memberships';
@@ -248,6 +250,74 @@ async function avisarAcceso(
 }
 
 export async function usersRoutes(app: FastifyInstance) {
+
+  // ── GET /me/apariencia — y la vuelta: que tema tengo en mi cuenta ─────────
+  //
+  // El PATCH de aqui abajo cerro la IDA. Esto cierra la VUELTA, que era la
+  // mitad que faltaba: quien cambia el tema en el portal y entra aqui —con la
+  // sesion de aqui ya abierta desde ayer— no veia el cambio, porque el pase que
+  // trajo el primer dia decia otra cosa y esta app no lo vuelve a ver.
+  //
+  // La web la llama al cargar y CORRIGE lo que ya pinto. No al reves: pintar
+  // esperando a esto devolveria el fogonazo oscuro que costo tanto quitar.
+  app.get('/me/apariencia', { preHandler: requireAuth() }, async (req) => {
+    const [yo] = await (app.db as Db)
+      .select({ ecoSub: users.ecoSub })
+      .from(users)
+      .where(eq(users.id, req.user!.sub))
+      .limit(1);
+
+    const eco = await leerAparienciaDelEcosistema(app.log, yo?.ecoSub ?? null);
+
+    // Sin ecosistema —o sin cuenta alli— se responde `null` y no un error: la
+    // pantalla se queda con lo que ya tenia, que es lo correcto. Membresias
+    // sola tiene que seguir funcionando igual (§1.5).
+    return {
+      theme: eco?.theme ?? null,
+      locale: eco?.locale ?? null,
+      delEcosistema: !!eco,
+    };
+  });
+
+  // ── PATCH /me/apariencia — el tema y el idioma que acabo de elegir ────────
+  //
+  // ── Por qué esta ruta existe ──
+  //
+  // Porque la preferencia es de la PERSONA, no de la app, y vive en el portal
+  // (`users.theme` y `users.locale` del ecosistema). Hasta ahora viajaba en un
+  // solo sentido: del portal a las demás, dentro del pase. Quien cambiaba a
+  // modo claro AQUI lo cambiaba solo aqui, porque `localStorage` es por origen.
+  //
+  // Visto desde fuera eso es peor que no tener la funcion: el mismo boton, en
+  // la misma cuenta, unas veces se recuerda en todas partes y otras no.
+  //
+  // No valida el contenido: lo hace el ecosistema, que es de quien es la
+  // columna (`validarTema` y `validarIdioma`). Aqui solo se reenvia lo que la
+  // persona eligio para SI MISMA — de ahi que no lleve `:id`.
+  app.patch('/me/apariencia', { preHandler: requireAuth() }, async (req, reply) => {
+    const { theme, locale } = req.body as { theme?: string; locale?: string };
+    if (theme === undefined && locale === undefined) {
+      return reply.code(400).send({ error: 'No hay nada que cambiar.' });
+    }
+
+    // El `eco_sub` se lee de la FILA, no del pase: el alumno de carnet QR entra
+    // sin cuenta del portal y su preferencia se queda aqui, que es lo correcto.
+    const [yo] = await (app.db as Db)
+      .select({ ecoSub: users.ecoSub })
+      .from(users)
+      .where(eq(users.id, req.user!.sub))
+      .limit(1);
+
+    avisarAparienciaAlEcosistema(app.log, {
+      ecoSub: yo?.ecoSub ?? null,
+      theme,
+      locale,
+    });
+
+    // Se contesta que si aunque el aviso no haya salido todavia: como todo el
+    // espejo, se dispara sin esperarlo. La pantalla de aqui ya cambio.
+    return { ok: true, enElEcosistema: !!yo?.ecoSub };
+  });
   // ── GET /users — gente del club, por páginas ──────────────────────────────
   //
   // Responde `{ items, total }`. `total` es la cuenta de TODO lo que cumple el

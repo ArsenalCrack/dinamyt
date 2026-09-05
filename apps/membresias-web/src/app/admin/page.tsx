@@ -8,6 +8,7 @@ import {
   listarCiudades,
   listarPaises,
   mensajeError,
+  obtenerConfig,
   obtenerMantenimiento,
   type EstadoMantenimiento,
   type Pais,
@@ -29,6 +30,17 @@ interface Club {
   country: string | null;
   isActive: boolean;
   usuariosActivos: number;
+  /**
+   * Desde cuándo su plan NO está al día, según el ecosistema. `null` = al día,
+   * o no consta.
+   *
+   * **Es distinto de `isActive`**, y el resumen del superadmin los cuenta por
+   * separado: aquel es «lo apagué yo» y esto es «venció su plan», que se
+   * arregla pagando y que el club sufre AHORA MISMO sin poder hacer nada.
+   */
+  planBloqueadoDesde: string | null;
+  /** `eco_org_id` puesto: el club existe también en el portal DINAMYT. */
+  ecoOrgId: string | null;
 }
 interface Persona {
   id: string;
@@ -62,6 +74,18 @@ export default function Admin() {
   const [guardandoMant, setGuardandoMant] = useState(false);
 
   const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: '' });
+  /**
+   * ¿Esta instalación está federada con el portal DINAMYT?
+   *
+   * `null` mientras no se sabe. Decide si se enseña «nuevo club»: con portal,
+   * los clubes NO se crean aquí —nacen en el portal y bajan por el espejo—, y
+   * dejar el formulario a la vista fabrica clubes huérfanos: sin `eco_org_id`,
+   * o sea sin escudo, sin plan y sin que le lleguen los avisos del ecosistema.
+   *
+   * Corriendo sola sí se crean aquí, y por eso esto es una condición y no un
+   * borrado: Membresías se vende por su cuenta.
+   */
+  const [federada, setFederada] = useState<boolean | null>(null);
   const [expandido, setExpandido] = useState<string | null>(null);
   const [gente, setGente] = useState<Record<string, Persona[]>>({});
   const [totalGente, setTotalGente] = useState<Record<string, number>>({});
@@ -129,6 +153,12 @@ export default function Admin() {
     listarPaises()
       .then(setPaises)
       .catch(() => setPaises([]));
+    // Decide si se enseña «nuevo club». Si falla, se queda en `null` y el
+    // formulario no se dibuja: el lado seguro es no ofrecer crear clubes que
+    // podrían nacer sin enlazar.
+    obtenerConfig()
+      .then((c) => setFederada(c.sso))
+      .catch(() => setFederada(null));
     // Si falla, el panel sigue cargando igual: la tarjeta de mantenimiento
     // simplemente no se dibuja.
     obtenerMantenimiento()
@@ -285,6 +315,32 @@ export default function Admin() {
     }
   }
 
+  /**
+   * Los tres estados de un club, y **suman exactamente el total**.
+   *
+   * ── Por qué no son tres filtros sueltos ──
+   *
+   * Antes «Activos» era `isActive` a secas, así que el panel decía *5 activos*
+   * y *2 en pausa por plan* sobre cinco clubes: los dos en pausa **también**
+   * se contaban como activos. Un club en pausa no está operando —su gente no
+   * puede entrar—, así que llamarlo activo es decir lo contrario de lo que
+   * pasa, y las dos cifras juntas no cuadraban con nada.
+   *
+   * Ahora cada club cae en uno y solo uno:
+   *
+   * · **Suspendido** — lo apagó el superadmin. Manda sobre lo demás: si el
+   *   club está apagado a mano, que además le venza el plan no cambia nada, y
+   *   es el estado que él puede deshacer.
+   * · **En pausa por plan** — encendido aquí y cerrado por el ecosistema.
+   * · **Operando** — encendido y al día. El único que de verdad trabaja.
+   *
+   * Las etiquetas de la lista usan este mismo reparto, para que seguir una
+   * cifra hasta el club no acabe en una tarjeta con dos insignias.
+   */
+  const suspendidos = clubes.filter((c) => !c.isActive);
+  const enPausa = clubes.filter((c) => c.isActive && c.planBloqueadoDesde);
+  const operando = clubes.filter((c) => c.isActive && !c.planBloqueadoDesde);
+
   if (cargandoSesion || cargando) {
     return (
       <main style={{ padding: '2rem' }} className="muted">
@@ -311,6 +367,67 @@ export default function Admin() {
       {error && (
         <p className="msg-error" style={{ marginBottom: '1rem' }}>
           {error}
+        </p>
+      )}
+
+      {/* ── Lo que el SUPERADMIN necesita ver de un vistazo ──
+          Este panel enseñaba lo mismo que el de un maestro: gente, y la gente
+          de cada club. Pero el superadmin no administra alumnos — administra
+          CLUBES, y la pregunta con la que abre esta pantalla es «¿hay alguno
+          que necesite algo hoy?». Los dos números que la contestan son los que
+          van en rojo. */}
+      {!cargando && clubes.length > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: '1rem 1.25rem',
+            marginBottom: '1.5rem',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(min(140px,100%),1fr))',
+            gap: '0.9rem',
+          }}
+        >
+          <Cifra etiqueta="Clubes" valor={clubes.length} />
+          {/* Los tres de en medio reparten el total, no se solapan. */}
+          <Cifra etiqueta="Operando" valor={operando.length} />
+          {/* El número que dispara una llamada: alguien pagó y no le abre, o
+              alguien no ha pagado y hay que avisarle. */}
+          <Cifra etiqueta="En pausa por plan" valor={enPausa.length} alerta />
+          <Cifra etiqueta="Suspendidos" valor={suspendidos.length} alerta />
+          {/* Un club sin enlazar no recibe escudo, ni plan, ni avisos del
+              portal: existe aquí y no existe allí.
+
+              Solo con portal delante. Corriendo sola —Membresías se vende por
+              su cuenta— NINGÚN club está enlazado y nunca lo estará, así que
+              esta cifra sería el total de clubes pintado en rojo: una alarma
+              permanente de algo que no es un problema. */}
+          {federada === true && (
+            <Cifra
+              etiqueta="Sin enlazar al portal"
+              valor={clubes.filter((c) => !c.ecoOrgId).length}
+              alerta
+            />
+          )}
+          <Cifra
+            etiqueta="Personas"
+            valor={clubes.reduce((n, c) => n + (c.usuariosActivos ?? 0), 0)}
+          />
+        </div>
+      )}
+
+      {/* ── Qué quiere decir «en pausa por plan» ──
+          El número solo no se entiende: «pausa» suena a algo que se hizo aquí,
+          y es justo lo contrario —lo decide el portal y aquí no hay botón que
+          lo arregle—. Sin esta línea, la reacción es buscar el interruptor que
+          no existe. Se enseña únicamente cuando hay alguno: una explicación de
+          algo que no está pasando es ruido. */}
+      {!cargando && enPausa.length > 0 && (
+        <p className="muted" style={{ fontSize: '0.8rem', marginBottom: '1.5rem' }}>
+          <strong>«En pausa por plan»</strong> es un club cuyo plan de Membresías no
+          está al día <strong>en el portal DINAMYT</strong>: su gente no puede entrar
+          hasta que se registre el pago allí, y entonces vuelve a operar sola. No se
+          arregla desde aquí, y «reactivar» no lo toca — eso es otra cosa (ver
+          «Suspendido»). Lleva su etiqueta en la lista de abajo.
         </p>
       )}
 
@@ -376,6 +493,11 @@ export default function Admin() {
         </div>
       )}
 
+      {/* Con portal, esto no se enseña: los clubes se crean allí. Ver
+          `federada`. Mientras no se sabe (`null`) tampoco, que es el lado
+          seguro: enseñarlo de más crea clubes rotos; enseñarlo de menos solo
+          obliga a recargar. */}
+      {federada === false && (
       <form onSubmit={crearClub} className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
         <h2 className="display" style={{ fontSize: '1rem', marginBottom: '0.9rem' }}>
           {t('admin.nuevoClub')}
@@ -462,6 +584,17 @@ export default function Admin() {
           {t('comun.crear')}
         </button>
       </form>
+      )}
+
+      {/* Y con portal se dice DÓNDE se crean, en vez de dejar un hueco: la
+          pregunta «¿y cómo agrego un club?» tiene que tener respuesta en la
+          misma pantalla donde se hace. */}
+      {federada === true && (
+        <p className="muted" style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+          Los clubes se crean en el portal DINAMYT y aparecen aquí solos, con su
+          escudo y su plan. Crearlos aquí los dejaría sin enlazar.
+        </p>
+      )}
 
       {clubes.length === 0 && (
         <p className="muted">{t('admin.sinClubes')}</p>
@@ -480,16 +613,40 @@ export default function Admin() {
               }}
             >
               <div style={{ minWidth: 0 }}>
+                {/* ── Las tres etiquetas, que no son la misma cosa ──
+                    «Suspendido» lo apagó el superadmin y solo él lo enciende;
+                    «En pausa por plan» lo cerró el ecosistema y se abre pagando
+                    allí; «Sin enlazar» es un club que existe aquí y no allá.
+                    El resumen de arriba cuenta las dos últimas por separado, y
+                    hasta ahora no había forma de saber A CUÁL club se refería
+                    cada cifra: la lista se veía idéntica. */}
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>
                   {c.name}{' '}
-                  {!c.isActive && (
+                  {/* Una sola, y en el mismo orden que las cifras de arriba:
+                      apagado a mano manda sobre plan vencido. Dos insignias a
+                      la vez volverían a descuadrar el reparto. */}
+                  {!c.isActive ? (
                     <span className="badge badge-danger">{t('admin.suspendido')}</span>
+                  ) : c.planBloqueadoDesde ? (
+                    <span className="badge badge-danger">En pausa por plan</span>
+                  ) : null}{' '}
+                  {federada === true && !c.ecoOrgId && (
+                    <span className="badge">Sin enlazar</span>
                   )}
                 </h3>
                 <p className="muted" style={{ fontSize: '0.78rem' }}>
                   {[c.city, c.country].filter(Boolean).join(', ') || c.slug} ·{' '}
                   {c.usuariosActivos} {t('admin.usuarios')}
                 </p>
+                {/* Desde cuándo, que es el dato que dice si esto es de hoy o
+                    lleva tres semanas — o sea, si el aviso se perdió. */}
+                {c.planBloqueadoDesde && (
+                  <p style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>
+                    Su plan no está al día desde el{' '}
+                    {new Date(c.planBloqueadoDesde).toLocaleDateString()}. Se
+                    arregla registrando el pago en el portal DINAMYT.
+                  </p>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="btn btn-outline btn-sm" onClick={() => verGente(c.id)}>
@@ -520,6 +677,14 @@ export default function Admin() {
                   aria-label={t('pag.buscarAlumno')}
                   style={{ marginBottom: '0.75rem' }}
                 />
+                <Paginacion
+                  arriba
+                  offset={offset[c.id] ?? 0}
+                  limit={POR_PAGINA}
+                  total={totalGente[c.id] ?? 0}
+                  onIr={(n) => setOffset((o) => ({ ...o, [c.id]: n }))}
+                />
+
                 <div className="tabla-scroll">
                   <table>
                     <thead>
@@ -663,5 +828,40 @@ export default function Admin() {
         ))}
       </div>
     </main>
+  );
+}
+
+/**
+ * Una cifra del resumen del superadmin.
+ *
+ * `alerta` pinta el número en rojo **solo si no es cero**: un «0 en pausa» en
+ * rojo enseña a ignorar el color, y entonces el día que sea 3 tampoco se verá.
+ */
+function Cifra({
+  etiqueta,
+  valor,
+  alerta = false,
+}: {
+  etiqueta: string;
+  valor: number;
+  alerta?: boolean;
+}) {
+  const encendida = alerta && valor > 0;
+  return (
+    <div>
+      <p
+        className="display"
+        style={{
+          fontSize: '1.6rem',
+          lineHeight: 1.1,
+          color: encendida ? 'var(--danger)' : undefined,
+        }}
+      >
+        {valor}
+      </p>
+      <p className="muted" style={{ fontSize: '0.78rem' }}>
+        {etiqueta}
+      </p>
+    </div>
   );
 }

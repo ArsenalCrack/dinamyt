@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { aplicarAparienciaDelPase } from '@/lib/theme';
 import {
   cerrarSesion as limpiar,
   entrarConCodigo as codigoApi,
@@ -140,6 +141,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     generacion.current += 1;
     setUser(data.user);
     setClub(data.club);
+    // El tema y el idioma que eligio esta persona en el portal viajan DENTRO
+    // del pase (ver `JwtPayload` en `packages/shared`), y este es el unico
+    // momento en que Membresias lo ve: la sesion de aqui es una cookie
+    // httpOnly, asi que el JWT no se puede leer despues.
+    //
+    // Por que hace falta: `localStorage` es POR ORIGEN, y el portal vive en
+    // otro subdominio. Sin esto, quien eligio el modo claro en DINAMYT tenia
+    // que volver a elegirlo aqui.
+    aplicarAparienciaDelPase(token);
     return data.user;
   }, []);
 

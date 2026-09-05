@@ -68,18 +68,70 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
   const [msgPush, setMsgPush] = useState('');
   const raizRef = useRef<HTMLDivElement | null>(null);
 
+  /**
+   * Lo que se ha marcado y el servidor todavía no ha confirmado.
+   *
+   * ── El motivo por el que el número no bajaba ──
+   *
+   * Abrir un aviso hace DOS cosas a la vez: manda la marca (`POST .../visto`)
+   * y navega a la ficha del alumno. Y navegar dispara el efecto de abajo, que
+   * vuelve a pedir la lista. Las dos peticiones salían a la vez, así que la
+   * lectura solía llegar al servidor ANTES de que la escritura se hubiera
+   * guardado: la respuesta traía el aviso todavía sin marcar y pisaba el
+   * número que se acababa de bajar. Desde fuera, la campana no respondía a
+   * haberla leído — que es exactamente lo que se venía arreglando.
+   *
+   * No es un problema de la API: es el orden. Aquí se guarda la promesa de lo
+   * que está en vuelo y `cargar` la espera antes de preguntar, así que la
+   * lista que llega siempre es posterior a la marca.
+   */
+  const guardando = useRef<Promise<unknown>>(Promise.resolve());
+
+  /**
+   * Cuál de las lecturas en curso manda.
+   *
+   * Dos `cargar()` seguidos —abrir la campana justo después de navegar— pueden
+   * contestar en cualquier orden, y la que llega tarde con datos viejos deja
+   * el número mal otra vez. Solo la última pedida escribe en la pantalla.
+   */
+  const lectura = useRef(0);
+
   const cargar = useCallback(async (): Promise<Aviso[]> => {
+    // Primero lo escrito, después lo leído. Ver `guardando`.
+    await guardando.current;
+    const mia = ++lectura.current;
     try {
       const r = await api.get<Aviso[]>('/notifications', {
         params: deTodoElClub ? { all: '1' } : undefined,
       });
+      if (mia !== lectura.current) return r.data; // llegó tarde: manda otra
       setAvisos(r.data);
       return r.data;
     } catch {
-      setAvisos([]); // sin avisos que mostrar; la campana no estorba
+      if (mia === lectura.current) setAvisos([]); // la campana no estorba
       return [];
     }
   }, [deTodoElClub]);
+
+  /**
+   * Encadena una marca y deja constancia de que está en vuelo.
+   *
+   * En fila una detrás de otra —y no en paralelo— para que descartar tres
+   * avisos seguidos con el dedo no se convierta en tres carreras contra la
+   * misma relectura.
+   */
+  function guardar(hacer: () => Promise<unknown>): void {
+    const escritura = guardando.current.then(hacer, hacer);
+    // La cadena no se puede envenenar: si una marca falla, la siguiente tiene
+    // que salir igual. El `catch` vacío es lo que la mantiene viva.
+    guardando.current = escritura.catch(() => {});
+    void escritura.catch(() => {
+      // Y la recuperación va aquí, colgada de la promesa CRUDA: si estuviera
+      // dentro de la cadena, `cargar` se quedaría esperando a la misma
+      // promesa desde la que se la llamó.
+      void cargar();
+    });
+  }
 
   useEffect(() => {
     void estadoPush().then(setPush);
@@ -187,7 +239,7 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
    * lista, que es la única forma honesta de deshacerlo — dejar el número bajado
    * mintiendo es peor que el parpadeo de recuperarlo.
    */
-  async function marcarUno(id: string) {
+  function marcarUno(id: string) {
     const ahora = new Date().toISOString();
     if (deTodoElClub) {
       // Fuera de la lista en el acto: lo que el servidor descarta es el asunto
@@ -198,23 +250,17 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
         lista.map((a) => (a.id === id ? { ...a, readAt: a.readAt ?? ahora } : a)),
       );
     }
-    try {
-      await api.post(`/notifications/${id}/${deTodoElClub ? 'visto' : 'leido'}`);
-    } catch {
-      void cargar();
-    }
+    guardar(() => api.post(`/notifications/${id}/${deTodoElClub ? 'visto' : 'leido'}`));
   }
 
   /** El atracón: los treinta que se juntaron y no se van a abrir uno a uno. */
-  async function marcarTodos() {
+  function marcarTodos() {
     const ahora = new Date().toISOString();
     if (deTodoElClub) setAvisos([]);
     else setAvisos((lista) => lista.map((a) => ({ ...a, readAt: a.readAt ?? ahora })));
-    try {
-      await api.post(deTodoElClub ? '/notifications/vistos' : '/notifications/leidos');
-    } catch {
-      void cargar();
-    }
+    guardar(() =>
+      api.post(deTodoElClub ? '/notifications/vistos' : '/notifications/leidos'),
+    );
   }
 
   async function activarNotificaciones() {
@@ -279,7 +325,7 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
-                    onClick={() => void marcarTodos()}
+                    onClick={marcarTodos}
                   >
                     {t('aviso.marcarTodo')}
                   </button>
@@ -318,7 +364,7 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                         // Ir a cobrarle ES haberlo visto. Volver del cobro y
                         // encontrar el mismo aviso rojo esperando es lo que
                         // hacía que la campana del club pareciera un adorno.
-                        if (deTodoElClub || !a.readAt) void marcarUno(a.id);
+                        if (deTodoElClub || !a.readAt) marcarUno(a.id);
                       }}
                     >
                       <span
@@ -351,7 +397,7 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                       <button
                         type="button"
                         className="avisos-visto"
-                        onClick={() => void marcarUno(a.id)}
+                        onClick={() => marcarUno(a.id)}
                         aria-label={t('aviso.marcarLeido')}
                         title={t('aviso.marcarLeido')}
                       >

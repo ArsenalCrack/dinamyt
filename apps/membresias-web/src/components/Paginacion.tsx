@@ -3,14 +3,24 @@
 import { useI18n } from '@/lib/i18n';
 
 /**
- * Filas por página. El mismo número en todas las pantallas: veinticinco caben
- * en un portátil sin desplazarse y en el celular son tres o cuatro pantallazos
- * de pulgar, que es donde la gente deja de bajar.
+ * Filas por página. El mismo número en todas las pantallas.
+ *
+ * Eran veinticinco, elegidos mirando un portátil. En el celular cada fila ya
+ * no es un renglón sino una ficha de seis líneas (ver `.tabla-apilable` en
+ * globals.css), así que veinticinco alumnos son una tira de pantalla y media
+ * de pulgar para llegar al final — y el paginador estaba justo ahí, al final,
+ * donde solo lo encuentra quien tuvo la paciencia de bajar.
+ *
+ * Quince cabe en un portátil sin desplazarse y en el teléfono se recorre de un
+ * gesto. El número sigue siendo uno solo para las dos pantallas a propósito:
+ * dos tamaños distintos harían que «página 3» significara cosas distintas
+ * según desde dónde se mire, y el maestro que busca a alguien lo hace desde
+ * los dos.
  *
  * La API tiene su propio tope (`MAX_POR_PAGINA`), que es otra cosa: aquello es
  * la red de seguridad, esto es la decisión de diseño.
  */
-export const POR_PAGINA = 25;
+export const POR_PAGINA = 15;
 
 /**
  * Paso de páginas de los listados de gente.
@@ -23,18 +33,34 @@ export const POR_PAGINA = 25;
  *
  * No se dibuja nada cuando todo cabe en una página: un paginador para once
  * alumnos es ruido.
+ *
+ * ── Y va DOS veces, arriba y abajo ────────────────────────────────────────
+ *
+ * Estaba solo al final, que es el sitio donde nadie lo ve hasta haber bajado
+ * la lista entera — o sea, después de haber hecho justo el trabajo que el
+ * paginador venía a ahorrar. En el celular era peor todavía: quince fichas son
+ * un buen rato de pulgar, y quien va por la página cuatro tiene que recorrer
+ * la cuatro entera para pedir la cinco.
+ *
+ * Arriba también sirve para otra cosa que no es pasar página: el rótulo del
+ * medio —«16–30 de 213»— se ve ANTES de leer la lista, así que se entra
+ * sabiendo cuánta gente hay y por dónde se anda. `arriba` solo cambia de qué
+ * lado va el margen; el resto es exactamente el mismo control.
  */
 export function Paginacion({
   offset,
   limit,
   total,
   onIr,
+  arriba = false,
 }: {
   offset: number;
   limit: number;
   total: number;
   /** Nuevo `offset`. Quien llama recarga con él. */
   onIr: (offset: number) => void;
+  /** Encima de la lista: separa por abajo en vez de por arriba. */
+  arriba?: boolean;
 }) {
   const { t } = useI18n();
   if (total <= limit) return null;
@@ -45,7 +71,11 @@ export function Paginacion({
   const haySiguiente = hasta < total;
 
   return (
-    <nav className="paginacion" aria-label={t('pag.navegacion')}>
+    <nav
+      className="paginacion"
+      data-arriba={arriba || undefined}
+      aria-label={t('pag.navegacion')}
+    >
       <button
         type="button"
         className="btn btn-outline btn-sm"

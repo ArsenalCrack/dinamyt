@@ -115,6 +115,14 @@ export interface Club {
   isActive: boolean;
   /** Si el escudo del club lo pone el portal DINAMYT. Ver `Usuario`. */
   enElEcosistema: boolean;
+  /** Cuántas cuentas activas tiene. Lo calcula `GET /orgs`. */
+  usuariosActivos?: number;
+  /**
+   * Desde cuándo su plan NO está al día, según el ecosistema. `null` = al día
+   * o no consta. Es DISTINTO de `isActive`: aquel es «lo apagó el superadmin»
+   * y esto es «venció su plan», que se arregla pagando.
+   */
+  planBloqueadoDesde?: string | null;
 }
 
 /**
@@ -202,6 +210,23 @@ api.interceptors.request.use((cfg) => {
 export const EVENTO_MANTENIMIENTO = 'membresias:mantenimiento';
 
 /**
+ * El club tiene el plan vencido y la aplicación queda en pausa para él.
+ *
+ * Es primo del mantenimiento y NO es lo mismo: aquel cierra la aplicación
+ * entera para todo el mundo y dura minutos; esto cierra UN club y dura hasta
+ * que alguien pague. Por eso son dos eventos y dos pantallas — decir «estamos
+ * actualizando» a quien lo que tiene es una factura pendiente lo deja
+ * esperando a que se arregle solo.
+ */
+export const EVENTO_PLAN_VENCIDO = 'membresias:plan-vencido';
+
+/** Lo que viaja en ese evento: desde cuándo está en pausa, si se sabe. */
+export interface AvisoPlanVencido {
+  mensaje: string;
+  desde: string | null;
+}
+
+/**
  * Sesión expirada, cuenta desactivada o club suspendido: se limpia y se vuelve
  * al login. Nunca desde el propio /auth/login ni si ya estamos en /login.
  *
@@ -246,6 +271,29 @@ api.interceptors.response.use(
       typeof window !== 'undefined'
     ) {
       window.dispatchEvent(new CustomEvent(EVENTO_MANTENIMIENTO));
+    }
+    // 402 con la marca de la API = el plan del club no está al día. Como el
+    // mantenimiento, la sesión NO se toca: la persona no ha hecho nada malo y
+    // al renovar tiene que seguir donde estaba. Y como el 401 de arriba, esto
+    // NO redirige: la pantalla la pone el portero, que sabe si la petición
+    // sigue significando algo.
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 402 &&
+      (error.response?.data as { planVencido?: boolean } | undefined)?.planVencido &&
+      typeof window !== 'undefined'
+    ) {
+      const datos = error.response.data as { error?: string; desde?: string | null };
+      window.dispatchEvent(
+        new CustomEvent<AvisoPlanVencido>(EVENTO_PLAN_VENCIDO, {
+          detail: {
+            mensaje:
+              datos.error ??
+              'El plan de tu club no está al día, así que Membresías está en pausa.',
+            desde: datos.desde ?? null,
+          },
+        }),
+      );
     }
     return Promise.reject(error);
   },
@@ -433,4 +481,55 @@ export async function listarPaises(): Promise<Pais[]> {
 export async function listarCiudades(iso2: string): Promise<string[]> {
   const { data } = await api.get<string[]>('/geo/ciudades', { params: { pais: iso2 } });
   return data;
+}
+
+/**
+ * Guarda en la CUENTA el tema o el idioma que se acaba de elegir aquí.
+ *
+ * ── Por qué no basta con `localStorage` ──
+ *
+ * Porque es por origen, y las cuatro webs del ecosistema viven en subdominios
+ * distintos. Sin esto, cambiar a modo claro en Membresías lo cambiaba solo en
+ * Membresías, mientras que hacerlo en el portal sí llegaba a las cuatro — el
+ * mismo botón comportándose de dos maneras según dónde lo pulses, que es peor
+ * que no tenerlo.
+ *
+ * Se dispara sin esperarlo y se traga el fallo, como todo el espejo: la
+ * pantalla de aquí ya cambió antes de llamar a esto, y lo único que se pierde
+ * si el portal no contesta es que la elección viaje a las otras apps.
+ */
+export function guardarAparienciaEnLaCuenta(datos: {
+  theme?: string;
+  locale?: string;
+}): void {
+  void api.patch('/me/apariencia', datos).catch(() => {
+    /* sin portal, la elección se queda en este navegador */
+  });
+}
+
+/**
+ * La VUELTA: que tema y que idioma tiene esta persona en su cuenta de DINAMYT.
+ *
+ * `guardarAparienciaEnLaCuenta` cierra la IDA —lo que se elige aqui llega a las
+ * otras apps—. Esto cierra la vuelta: lo que se eligio en el portal (o en
+ * Campeonatos) llega AQUI, aunque la sesion de aqui lleve abierta desde ayer y
+ * el pase que la abrio dijera otra cosa.
+ *
+ * Devuelve `null` si no se pudo preguntar. La pantalla se queda entonces con lo
+ * que ya pinto, que es exactamente el comportamiento de antes: Membresias sola
+ * —sin ecosistema, el dia del campeonato— tiene que seguir igual.
+ */
+export async function leerAparienciaDeLaCuenta(): Promise<{
+  theme: string | null;
+  locale: string | null;
+} | null> {
+  try {
+    const { data } = await api.get<{
+      theme: string | null;
+      locale: string | null;
+    }>('/me/apariencia');
+    return data;
+  } catch {
+    return null;
+  }
 }

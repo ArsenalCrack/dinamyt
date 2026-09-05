@@ -4,6 +4,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { asegurarFicha } from '../lib/aprovisionar';
+import { asegurarClub, fijarPlan } from '../lib/plan-del-club';
 import { syncSecret } from '../config';
 import { cinturon } from '../lib/cinturones';
 import { imagenGuardada } from '../lib/imagenes';
@@ -184,6 +185,112 @@ export async function syncRoutes(app: FastifyInstance) {
         aplicados: Object.keys(cambios),
         rechazados,
       };
+    });
+  });
+
+  // ── POST /sync/plan — el ecosistema dice si el club puede operar ──────────
+  //
+  // ── El agujero que cierra ──
+  //
+  // El portal filtra los `app_scopes` por `status = 'ACTIVE' AND ends_at > now()`
+  // al firmar el pase, así que un plan vencido deja de abrir Membresías **desde
+  // el portal**. Pero Membresías tiene login propio: quien ya tiene ficha aquí
+  // entra por el formulario de siempre y no pasa por el ecosistema nunca más.
+  //
+  // El resultado era que el plan vencía, la tarjeta de «Entrar a Membresías»
+  // desaparecía del portal, y el club seguía cobrando, pasando lista e
+  // imprimiendo carnets indefinidamente. Esta ruta es la cerradura de la otra
+  // puerta.
+  //
+  // ── Por qué lo EMPUJA el ecosistema y no lo pregunta Membresías ──
+  //
+  // Porque vencer es un no-evento: nadie llama a nadie cuando pasa una fecha.
+  // Preguntar desde aquí obligaría a Membresías a conocer el modelo de
+  // suscripciones del ecosistema y a depender de su red en cada petición — y
+  // Membresías se vende sola, en el servidor de un club que no tiene ecosistema
+  // ninguno. Ahí esta ruta no la llama nadie, la columna se queda en NULL, y
+  // para ese club esto no existe.
+  //
+  // ── Idempotente a propósito ──
+  //
+  // El barrido del ecosistema corre a diario y vuelve a avisar de lo mismo cada
+  // mañana. Bloquear dos veces no reinicia la fecha (ver `fijarPlan`), porque
+  // «desde cuándo» es justo el dato que dice si el aviso se perdió por el
+  // camino.
+  app.post('/sync/plan', async (req, reply) => {
+    const puerta = abrir(req as never);
+    if (puerta === 404) return reply.code(404).send({ error: 'No encontrado.' });
+    if (puerta === 401) return reply.code(401).send({ error: 'Secreto inválido.' });
+
+    const body = (req.body ?? {}) as {
+      ecoOrgId?: string;
+      alDia?: boolean;
+      /**
+       * Datos del club, para CREARLO si aquí todavía no existe. Solo se usan
+       * con `alDia: true`: un club que nunca llegó a existir no necesita nacer
+       * bloqueado, necesita no nacer.
+       */
+      name?: string;
+      city?: string | null;
+      country?: string | null;
+    };
+
+    const ecoOrgId =
+      typeof body.ecoOrgId === 'string' && UUID.test(body.ecoOrgId) ? body.ecoOrgId : null;
+    if (!ecoOrgId) return reply.code(422).send({ error: 'Falta `ecoOrgId`.' });
+
+    // `alDia` tiene que venir explícito. Un valor ausente que cayera a `true`
+    // desbloquearía clubes por un aviso mal formado, y a `false` los cerraría:
+    // los dos silencios son peores que un 422.
+    if (typeof body.alDia !== 'boolean') {
+      return reply.code(422).send({ error: '`alDia` tiene que ser `true` o `false`.' });
+    }
+
+    return sinFiltroDeClub(req.server.db, async (db: Db) => {
+      const [club] = await db
+        .select({ id: orgs.id })
+        .from(orgs)
+        .where(eq(orgs.ecoOrgId, ecoOrgId))
+        .limit(1);
+
+      // ── El club que tiene plan y aquí no existe ──
+      //
+      // Éste era el otro agujero, y se veía todos los días: en Membresías solo
+      // aparecían los clubes CREADOS en Membresías. Una organización nacida en
+      // el portal y con plan contratado no llegaba nunca — todos los avisos del
+      // espejo buscan por `eco_org_id`, no encontraban fila, contestaban «no
+      // encontrado» y se quedaban tan tranquilos. El club estaba pagado y no
+      // existía.
+      if (!club && body.alDia && body.name) {
+        const nuevo = await asegurarClub(db, ecoOrgId, {
+          name: body.name,
+          city: body.city,
+          country: body.country,
+        });
+        if (nuevo) {
+          req.log.info(
+            { club: nuevo.id, ecoOrgId },
+            'club creado desde el ecosistema: tiene plan de Membresías',
+          );
+          return { encontrado: true, aplicado: true, creado: true, bloqueado: false, desde: null };
+        }
+      }
+
+      // Sin club aquí no es un error: esa organización del portal no usa
+      // Membresías. Contestar 404 haría que el otro lado lo registrara como
+      // aviso fallido, y no lo es.
+      if (!club) return { encontrado: false, aplicado: false };
+
+      const r = await fijarPlan(db, club.id, body.alDia as boolean);
+      if (r.cambio) {
+        req.log.info(
+          { club: club.id, alDia: body.alDia },
+          body.alDia
+            ? 'plan al día: el club vuelve a operar'
+            : 'plan vencido: el club queda en pausa',
+        );
+      }
+      return { encontrado: true, aplicado: r.cambio, bloqueado: r.bloqueado, desde: r.desde };
     });
   });
 

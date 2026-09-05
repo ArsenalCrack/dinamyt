@@ -54,11 +54,19 @@ async function enlazar(e: Escenario, userId: string, ecoSub = ECO_SUB) {
   await e.db.update(orgs).set({ ecoOrgId: ECO_ORG }).where(eq(orgs.id, e.orgId));
 }
 
-/** El aviso del portal: «esta persona ya no pertenece a este club». */
+/**
+ * El aviso del portal: «esta persona ya no pertenece a este club».
+ *
+ * `secreto: null` manda la petición SIN la cabecera. Tiene que ser `null` y no
+ * `undefined`: pasar `undefined` a un parámetro con valor por defecto activa el
+ * valor por defecto, así que la prueba de «sin cabecera» mandaría el secreto
+ * bueno y pasaría por el motivo contrario al que dice. Mismo criterio en
+ * `rol-del-portal.spec.ts`.
+ */
 function darDeBaja(
   e: Escenario,
   cuerpo: Record<string, unknown>,
-  secreto: string | undefined = SECRETO,
+  secreto: string | null = SECRETO,
 ) {
   return e.app.inject({
     method: 'POST',
@@ -212,6 +220,20 @@ describe('membresias-api — la baja que llega del portal', () => {
     await enlazar(e, e.ids.alumno);
 
     const r = await darDeBaja(e, { ecoSub: ECO_SUB, ecoOrgId: ECO_ORG }, 'otro-cualquiera');
+    expect(r.statusCode).toBe(401);
+    expect((await ficha(e, e.ids.alumno)).isActive).toBe(true);
+    await e.app.close();
+  });
+
+  it('SIN la cabecera tampoco, que no es el mismo caso', async () => {
+    // El de arriba prueba un secreto equivocado; éste, que no venga ninguno.
+    // Son dos ramas distintas de `secretoValido` —una falla la comparación, la
+    // otra ni llega a compararse— y la segunda es la que deja pasar a quien
+    // encuentra la ruta sin saber que existe una puerta.
+    const e = await crearEscenario();
+    await enlazar(e, e.ids.alumno);
+
+    const r = await darDeBaja(e, { ecoSub: ECO_SUB, ecoOrgId: ECO_ORG }, null);
     expect(r.statusCode).toBe(401);
     expect((await ficha(e, e.ids.alumno)).isActive).toBe(true);
     await e.app.close();

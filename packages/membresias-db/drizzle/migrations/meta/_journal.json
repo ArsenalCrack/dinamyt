@@ -134,6 +134,13 @@
       "when": 1786001003000,
       "tag": "0018_visto_por_el_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786001103000,
+      "tag": "0019_plan_del_club",
+      "breakpoints": true
     }
   ]
 }

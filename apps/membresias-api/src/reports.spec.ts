@@ -43,6 +43,67 @@ describe('membresias-api — estadísticas del maestro', () => {
     await app.close();
   });
 
+  /**
+   * La asistencia que se ENSEÑA es la de quien sigue en el club.
+   *
+   * Contaba a todo el mundo, incluido quien ya no está. Un alumno que entrenó
+   * veintitrés veces y se fue en julio encabezaba el podio en septiembre,
+   * tapando a los que sí vienen — y el maestro leía ese nombre arriba del todo
+   * y creía que seguía apareciendo por el salón. Lo mismo, más callado, con el
+   * promedio por día: salía inflado por gente que no va a volver, así que un
+   * club que venía a menos no lo parecía.
+   *
+   * **No se borra nada.** Las filas de `attendances` siguen enteras y el
+   * historial de cada persona sigue completo en su ficha; lo que cambia es qué
+   * se cuenta en la pantalla que mira el maestro para saber cómo va su club.
+   */
+  it('la asistencia deja de contar a quien ya no está en el club', async () => {
+    const { app, db, auth, ids } = await crearEscenario();
+    const headers = auth(ids.owner);
+
+    await app.inject({
+      method: 'POST',
+      url: '/checkin',
+      headers,
+      payload: { identifier: { type: 'manual', value: ids.alumno } },
+    });
+
+    // Con el alumno activo, encabeza el podio y cuenta como presente.
+    const antes = (
+      await app.inject({ method: 'GET', url: '/reports/estadisticas', headers })
+    ).json();
+    expect(antes.asistencia.masConstantes).toHaveLength(1);
+    expect(antes.asistencia.hoy).toBe(1);
+    expect(antes.asistencia.total30).toBe(1);
+
+    await db
+      .update(users)
+      .set({ isActive: false })
+      .where(eq(users.id, ids.alumno));
+
+    // Todo el bloque de asistencia deja de contarlo, y a la vez: si el total
+    // lo contara y la curva de al lado no, las dos cifras de la misma tarjeta
+    // se contradirían.
+    const s = (
+      await app.inject({ method: 'GET', url: '/reports/estadisticas', headers })
+    ).json();
+    expect(s.asistencia.masConstantes).toEqual([]);
+    expect(s.asistencia.hoy).toBe(0);
+    expect(s.asistencia.total30).toBe(0);
+    expect(s.asistencia.promedioPorDia).toBe(0);
+
+    // Y la tarjeta «presentes hoy» del panel, que sale de OTRA ruta, dice lo
+    // mismo. Con el filtro en una sola de las dos, el panel diría uno y las
+    // estadísticas cero a un metro de distancia.
+    const panel = (
+      await app.inject({ method: 'GET', url: '/reports/attendance', headers })
+    ).json();
+    expect(panel.hoy).toBe(0);
+    expect(panel.total).toBe(0);
+
+    await app.close();
+  });
+
   it('el alumno no ve las estadísticas del club', async () => {
     const { app, auth, ids } = await crearEscenario();
     const r = await app.inject({
