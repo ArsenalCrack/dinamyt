@@ -274,7 +274,7 @@ export default function Login() {
         </p>
         <h1 className="display" style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
           {t('login.titulo')}{' '}
-          <span style={{ color: 'var(--gold)' }}>{t('login.tituloAcento')}</span>
+          <span className="acento">{t('login.tituloAcento')}</span>
         </h1>
         <p className="muted" style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>
           {conCodigo ? t('login.conQr') : t('login.subtitulo')}
