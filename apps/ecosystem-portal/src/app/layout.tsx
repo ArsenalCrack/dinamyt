@@ -74,6 +74,31 @@ export const metadata: Metadata = {
   /** Que los buscadores puedan entrar. Lo fino lo decide `robots.ts`. */
   robots: { index: true, follow: true },
   /**
+   * La etiqueta con la que Google Search Console comprueba que el sitio es
+   * nuestro. **Es el camino alternativo al registro TXT del DNS**, y existe
+   * porque el del DNS falló:
+   *
+   *     «No se ha podido encontrar tu token de verificación en los registros
+   *      TXT de tu dominio. Se han encontrado estos registros TXT: v=spf1 …»
+   *
+   * Ese mensaje dice una cosa muy concreta: Google SÍ leyó el DNS de
+   * `dinamyt.org` y allí solo hay el SPF. O sea que el TXT de verificación no
+   * llegó a existir en la zona — el caso típico es haberlo creado con el nombre
+   * `dinamyt.org` en un panel que ya añade el dominio solo, y que acabara en
+   * `dinamyt.org.dinamyt.org`. En Cloudflare el nombre tiene que ser `@`.
+   *
+   * Con esta etiqueta no hace falta acertar con eso: se verifica por «Etiqueta
+   * HTML», que es el método que no depende del DNS. Ver OPERAR.md §3.6.
+   *
+   * ⚠️ Se lee al COMPILAR (es una constante del build, no una variable viva):
+   * después de ponerla en el `.env` hay que recompilar el portal. Sin ella no
+   * se emite ninguna etiqueta, que es lo correcto — una etiqueta de
+   * verificación vacía confunde a Search Console.
+   */
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
+  /**
    * Lo que convierte el portal en una app instalable, junto con el service
    * worker de `public/sw.js`. Membresías ya se instalaba; el portal no, y esa
    * diferencia no respondía a nada — es la misma cuenta y la misma gente.

@@ -34,7 +34,13 @@ const STORAGE_KEY = 'dinamyt_theme';
  */
 const META_COLOR: Record<'claro' | 'oscuro', string> = {
   oscuro: '#0e0e15',
-  claro: '#f4f4f8',
+  // ⚠️ Era `#f4f4f8`, y el `--bg` del tema claro dejó de serlo hace tiempo:
+  // se bajó a `#eef0f4` para que una tarjeta blanca se distinguiera de la
+  // página. Este archivo no se enteró, así que en Android la barra del
+  // navegador quedaba UN PUNTO más clara que la página y se veía una raya
+  // blanca pegada arriba — que es exactamente como se reportó. Membresías y
+  // Campeonatos ya tenían el valor bueno; el portal era el único desfasado.
+  claro: '#eef0f4',
 };
 
 /** Lo que `sistema` significa AHORA MISMO en este dispositivo. */

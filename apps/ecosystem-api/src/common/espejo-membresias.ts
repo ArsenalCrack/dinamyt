@@ -425,14 +425,50 @@ export function espejarPlan(
    *
    * Solo se usan con `alDia: true`: un club que nunca llegó a existir no
    * necesita nacer bloqueado, necesita no nacer.
+   *
+   * ── Y el ESCUDO viaja aquí, que es lo que faltaba ──
+   *
+   * `espejarClub` copia el escudo cuando alguien GUARDA la ficha del club en el
+   * portal, y solo entonces. Eso deja fuera el caso más normal de todos, que es
+   * el que se reportó el 5 de septiembre de 2026:
+   *
+   *   1. El maestro funda su club en el portal y le pone el escudo. Membresías
+   *      todavía no sabe que ese club existe.
+   *   2. Se contrata el plan → `/sync/plan` lo CREA allí… con nombre, ciudad y
+   *      país. Sin escudo, porque el alta nunca lo llevó.
+   *   3. Nadie vuelve a tocar la ficha, así que `espejarClub` no dispara jamás
+   *      y el panel de Membresías se queda con el logo de la aplicación **para
+   *      siempre**. Desde fuera se lee como «puse el escudo y no se ve».
+   *
+   * Y no había forma de arreglarlo desde el otro lado: Membresías esconde su
+   * propio botón de escudo cuando el club es del ecosistema (§ `lib/ecosistema.ts`),
+   * precisamente para que no haya dos escudos distintos. Así que el club se
+   * quedaba sin ninguno de los dos caminos.
+   *
+   * Mandarlo aquí lo cierra por los dos lados a la vez: en el alta nace con su
+   * escudo, y el barrido diario recoge a todos los que ya nacieron sin él sin
+   * que nadie tenga que tocar club por club.
+   *
+   * Va absoluto por lo mismo que en `espejarPersona`: una ruta `/media/…` es
+   * relativa a ESTE servidor y allí la rechazarían en silencio.
    */
-  datos?: { name?: string | null; city?: string | null; country?: string | null },
+  datos?: {
+    name?: string | null;
+    city?: string | null;
+    country?: string | null;
+    logoUrl?: string | null;
+  },
 ): Promise<Respuesta | null> {
   return avisar('/sync/plan', {
     ecoOrgId: orgId,
     alDia,
     ...(alDia && datos?.name
-      ? { name: datos.name, city: datos.city ?? null, country: datos.country ?? null }
+      ? {
+          name: datos.name,
+          city: datos.city ?? null,
+          country: datos.country ?? null,
+          logoUrl: absolutaMedia(datos.logoUrl) ?? null,
+        }
       : {}),
   });
 }

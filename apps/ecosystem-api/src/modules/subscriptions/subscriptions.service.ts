@@ -127,11 +127,14 @@ export class SubscriptionsService {
       const abre = (apps.get(orgId) ?? []).includes('membresias');
       // El nombre viaja para que allá pueda CREARSE si no existe: un club con
       // plan que no aparece en Membresías es la otra mitad de este arreglo.
+      // Y el ESCUDO con él: si no, el club nace allí con el logo genérico de la
+      // aplicación y nadie vuelve a mandárselo nunca (ver `espejarPlan`).
       const [org] = await db
         .select({
           name: organizations.name,
           city: organizations.city,
           country: organizations.country,
+          logoUrl: organizations.logoUrl,
         })
         .from(organizations)
         .where(eq(organizations.id, orgId))
@@ -1150,6 +1153,10 @@ export class SubscriptionsService {
         name: organizations.name,
         city: organizations.city,
         country: organizations.country,
+        // El escudo va con el resto: el barrido es la red que recoge a los
+        // clubes que nacieron allá sin él (ver `espejarPlan`). Sin esta
+        // columna, la reposición diaria no tendría qué reponer.
+        logoUrl: organizations.logoUrl,
       })
       .from(organizations)
       .where(eq(organizations.isActive, true));

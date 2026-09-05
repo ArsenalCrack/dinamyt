@@ -66,7 +66,10 @@ export function CabeceraAuth({
         {acento ? (
           <>
             {' '}
-            <span style={{ color: 'var(--gold)' }}>{acento}</span>
+            {/* `.acento` y no `var(--gold)`: el título mide 1.5 rem en
+                negrita, o sea texto GRANDE, y ahí le toca el oro de titular.
+                Con el de texto pequeño se veía marrón sobre blanco. */}
+            <span className="acento">{acento}</span>
           </>
         ) : null}
       </h1>

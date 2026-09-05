@@ -36,7 +36,7 @@ export default function Home() {
         <img src="/logo.png" alt="DINAMYT" width={72} height={72} style={{ margin: '0 auto 1rem' }} />
         <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>Ecosistema DINAMYT</p>
         <h1 className="display" style={{ fontSize: 'clamp(2rem, 6vw, 3.2rem)', marginBottom: '0.75rem' }}>
-          DINAMYT <span style={{ color: 'var(--gold)' }}>Academy</span>
+          DINAMYT <span className="acento">Academy</span>
         </h1>
         <hr className="cinturon" style={{ maxWidth: 320, margin: '0 auto 1rem' }} />
         <p className="muted" style={{ fontSize: '1rem', marginBottom: '1.75rem' }}>

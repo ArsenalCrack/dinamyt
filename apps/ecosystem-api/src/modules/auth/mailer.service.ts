@@ -228,8 +228,11 @@ export class MailerService {
     tenue: '#a19db8',
     oro: '#f0b800',
     oroApagado: '#c99a00',
-    accion: '#22b87e',
-    accionTexto: '#0b2b1e',
+    // El botón del correo es el mismo de la app: verde profundo con letra
+    // BLANCA. Era `#22b87e` con letra oscura, que contra el blanco da 2.55:1 —
+    // y en un correo eso no se puede corregir después: ya salió.
+    accion: '#00875a',
+    accionTexto: '#ffffff',
   };
 
   private static portal(): string {

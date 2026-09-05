@@ -735,10 +735,65 @@ Publicar el `robots.txt` **no mete a nadie en Google**. Lo que mete es esto:
 
 1. **Google Search Console** → «Añadir propiedad» → **Dominio** (`dinamyt.org`),
    que cubre todos los subdominios de una vez.
-2. Verificar con un **registro TXT en Cloudflare**, que es donde ya vive el DNS
-   del correo (§3.5). Google da el valor; se añade igual que el SPF.
+2. Verificar. **Hay dos caminos y conviene saber cuál usar** — ver abajo.
 3. **Sitemaps → añadir** `https://dinamyt.org/sitemap.xml`.
 4. **Inspección de URLs** → `https://dinamyt.org` → «Solicitar indexación».
+
+### La verificación, que es donde se atascó
+
+El primer intento fue por DNS y Google contestó esto:
+
+> No se ha podido encontrar tu token de verificación en los registros TXT de tu
+> dominio. Se han encontrado estos registros TXT de DNS: `v=spf1
+> include:_spf.mx.cloudflare.net ~all`
+
+**Ese mensaje no dice «espera a que propague».** Dice que Google leyó la zona de
+`dinamyt.org` **y allí solo estaba el SPF**: el TXT de verificación no llegó a
+existir donde tenía que estar. Las tres formas de que pase eso, en orden de
+frecuencia:
+
+| Lo que pasó | Cómo se ve en Cloudflare | Cómo se arregla |
+|---|---|---|
+| El nombre se escribió `dinamyt.org` | El registro quedó en `dinamyt.org.dinamyt.org` — Cloudflare **añade el dominio solo** | El nombre tiene que ser `@` |
+| Se puso en la propiedad equivocada | El token de una propiedad «Prefijo de URL» no vale para una «Dominio» | Copiar el token de ESA propiedad |
+| El DNS del dominio no lo lleva Cloudflare | Los cambios se hacen donde estén los servidores de nombres | `dig NS dinamyt.org` dice dónde |
+
+Se comprueba desde el PC, sin esperar a Google:
+
+```bash
+dig +short TXT dinamyt.org @1.1.1.1
+```
+
+Tienen que salir **dos** líneas: el `v=spf1…` y el `google-site-verification=…`.
+Si solo sale el SPF, el registro no está puesto — por mucho que el panel lo
+enseñe.
+
+### El otro camino: la etiqueta HTML (no depende del DNS)
+
+En Search Console, **«Etiqueta HTML»** en vez de «Proveedor de nombres de
+dominio». Da un `<meta name="google-site-verification" content="XXXX">`; **solo
+se copia el valor de `content`** y va al `.env` del portal:
+
+```bash
+# en /srv/dinamyt/apps/ecosystem-portal/.env
+GOOGLE_SITE_VERIFICATION=XXXX
+```
+
+Y se **recompila el portal** — el token se lee al compilar, no al arrancar:
+
+```bash
+cd /srv/dinamyt && pnpm --filter @dinamyt/ecosystem-portal build
+sudo systemctl restart dinamyt-portal
+curl -s https://dinamyt.org | grep google-site-verification
+```
+
+Con la etiqueta en el HTML, «Verificar» pasa en el acto.
+
+> ⚠️ **La etiqueta verifica el PREFIJO** (`https://dinamyt.org`), no el dominio
+> entero. Para que la propiedad cubra también `club.`, `campeonatos.` y
+> `academy.` hace falta la de tipo **Dominio**, y ésa **solo** se verifica por
+> DNS. Lo práctico: verificar ya por etiqueta para empezar a indexar, y arreglar
+> el TXT con calma para la propiedad de dominio.
 
 Tarda **de días a un par de semanas**. Que no aparezca al día siguiente no
 significa que esté mal puesto.

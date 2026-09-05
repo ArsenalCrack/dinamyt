@@ -140,7 +140,7 @@ function Login() {
         <p className="eyebrow eco-login-eyebrow">{t('login.eyebrow')}</p>
         <h1 className="display eco-login-titulo">
           {t('login.titulo')}{' '}
-          <span style={{ color: 'var(--gold)' }}>{t('login.tituloAcento')}</span>
+          <span className="acento">{t('login.tituloAcento')}</span>
         </h1>
         <p className="muted eco-login-subtitulo">{t('login.subtitulo')}</p>
 

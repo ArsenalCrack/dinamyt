@@ -83,16 +83,16 @@ export default function HomePage() {
   return (
     <main className="min-h-screen">
       {/* ── Barra superior ─────────────────────────────────────────────── */}
-      <header
-        className="sticky top-0 z-20 border-b backdrop-blur"
-        style={{ background: 'rgba(14,14,21,0.85)', borderColor: 'var(--border)' }}
-      >
+      {/* El fondo, el desenfoque y el borde los pone `.barra-superior`
+          (`packages/shared/estilos.css`). Estaban escritos aquí en línea con
+          la tinta del tema oscuro, así que con el modo claro puesto la barra
+          se quedaba negra sobre una página blanca — y en Android dejaba
+          además una raya pálida arriba. Ver la clase. */}
+      <header className="barra-superior">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <span className="inline-flex items-center gap-2.5">
             <img src="/logo.png" alt="DINAMYT" width={32} height={32} />
-            <span className="display text-lg" style={{ color: 'var(--gold)' }}>
-              DINAMYT
-            </span>
+            <span className="display acento text-lg">DINAMYT</span>
           </span>
           <nav className="flex items-center gap-2">
             <a
@@ -136,7 +136,7 @@ export default function HomePage() {
           <h1 className="display text-[2rem] sm:text-5xl xl:text-6xl">
             Se acabó
             <br />
-            <span style={{ color: 'var(--gold)' }}>el cuaderno</span>
+            <span className="acento">el cuaderno</span>
             <br />
             del club.
           </h1>
@@ -262,8 +262,7 @@ function Cifras() {
             <dt className="sr-only">{etiqueta}</dt>
             <dd className="m-0">
               <span
-                className="mono block text-3xl font-semibold leading-none sm:text-4xl"
-                style={{ color: 'var(--gold)' }}
+                className="mono acento block text-3xl font-semibold leading-none sm:text-4xl"
               >
                 {valor}
               </span>
@@ -390,7 +389,7 @@ function Aplicaciones() {
               className="btn"
               style={
                 seleccionada
-                  ? { background: 'var(--gold-soft)', borderColor: 'var(--gold)', color: 'var(--gold)' }
+                  ? { background: 'var(--gold-soft)', borderColor: 'var(--gold-fill)', color: 'var(--gold)' }
                   : { borderColor: 'var(--border-strong)', color: 'var(--text-muted)' }
               }
             >
@@ -424,7 +423,7 @@ function Aplicaciones() {
               <span
                 aria-hidden="true"
                 className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ background: 'var(--gold)' }}
+                style={{ background: 'var(--gold-fill)' }}
               />
               <span>{linea}</span>
             </li>
@@ -622,7 +621,7 @@ function MarcadorDemo() {
         >
           <span
             aria-hidden="true"
-            style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--gold)' }}
+            style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--gold-fill)' }}
           />
           Membresías · el kiosco
         </figcaption>
