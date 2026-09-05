@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { json, urlencoded } from 'express';
+import { mkdirSync } from 'node:fs';
+import type { ServerResponse } from 'node:http';
+import { directorioMedia, MEDIA_PREFIJO } from './common/almacen-imagenes';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -24,6 +27,34 @@ async function bootstrap() {
 
   app.use(json({ limit: '5mb' }));
   app.use(urlencoded({ extended: true, limit: '5mb' }));
+
+  // ── Las fotos, servidas desde el disco ────────────────────────────────────
+  //
+  // En el VPS esto lo adelanta Caddy, que sirve el mismo directorio sin
+  // despertar a Node (ver OPERAR.md §6.2). Esto de aquí es lo que hace que
+  // funcione igual en local, y la red de seguridad si algún día la petición
+  // llega hasta aquí.
+  //
+  // Dos cabeceras, y ninguna es adorno:
+  //
+  //  · `immutable` con un año se puede poner **porque el nombre es el hash del
+  //    contenido**: si la imagen cambia, cambia el nombre. Sin esa propiedad,
+  //    cachear un año sería servir la foto vieja para siempre.
+  //  · `nosniff` + una CSP que no deja ejecutar nada: aunque algo malicioso
+  //    burlara la comprobación de firma al subir, el navegador jamás lo
+  //    correría desde aquí. Es la misma defensa que ya usa Academy para lo que
+  //    sube su gente (`academy-api/src/app.ts`).
+  mkdirSync(directorioMedia(), { recursive: true });
+  app.useStaticAssets(directorioMedia(), {
+    prefix: MEDIA_PREFIJO,
+    index: false,
+    setHeaders: (res: ServerResponse) => {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  });
   // ValidationPipe global (requiere instalar `class-validator` y
   // `class-transformer`). Hoy los cuerpos se tipan inline, así que se omite.
 

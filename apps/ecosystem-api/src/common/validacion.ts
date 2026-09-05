@@ -131,18 +131,64 @@ export function validarTipoSangre(tipo: string) {
   return limpio;
 }
 
-// La foto se guarda como data-URL (subida desde el dispositivo y comprimida en
-// el cliente) o como URL http(s). Límite ~700 KB para no inflar la fila.
+/**
+ * Las tres formas que puede tener una imagen guardada, y de dónde sale cada
+ * una:
+ *
+ *   · `data:image/…`  — incrustada en la fila. Es lo que manda la web, que la
+ *     recorta y la recomprime antes (`comprimirAvatar` en el portal).
+ *   · `/media/<hash>.<ext>` — ya en el disco. La escribe `guardarImagen`
+ *     (`common/almacen-imagenes.ts`) y la sirve Caddy sin despertar a Node.
+ *   · `http(s)://…` — alojada fuera. Un club puede tener las suyas donde
+ *     quiera, y eso se respeta.
+ *
+ * ⚠️ **El `/media/` no estaba, y esa era la trampa.** OPERAR.md §6.2 daba por
+ * hecho que «la columna ya acepta las tres formas, así que la migración no
+ * rompe nada». La columna sí —es `text`—, pero **esta función no**: un
+ * `/media/…` se iba por el primer `if` con «La foto debe subirse desde tu
+ * dispositivo». O sea que el pendiente entero chocaba, en su primer paso, con
+ * la única línea que lo tenía que dejar pasar.
+ */
+const RE_RUTA_MEDIA = /^\/media\/[a-f0-9]{32}\.(jpg|png|webp)$/;
+
+// Límite ~700 KB para no inflar la fila. Solo aplica a la forma incrustada:
+// una ruta o una dirección son cuatro caracteres.
+function validarImagen(valor: string, cual: 'La foto' | 'El escudo') {
+  const esDataUrl = valor.startsWith('data:image/');
+  const esMedia = RE_RUTA_MEDIA.test(valor);
+  const esHttp = /^https?:\/\//.test(valor);
+  if (!esDataUrl && !esMedia && !esHttp) {
+    throw new BadRequestException(`${cual} debe subirse desde tu dispositivo.`);
+  }
+  if (valor.length > 700_000) {
+    throw new BadRequestException(
+      `${cual} es demasiado grande (máx. ~500 KB).`,
+    );
+  }
+  return valor;
+}
+
 export function validarAvatar(avatar: string) {
-  const esDataUrl = avatar.startsWith('data:image/');
-  const esHttp = /^https?:\/\//.test(avatar);
-  if (!esDataUrl && !esHttp) {
-    throw new BadRequestException('La foto debe subirse desde tu dispositivo.');
-  }
-  if (avatar.length > 700_000) {
-    throw new BadRequestException('La foto es demasiado grande (máx. ~500 KB).');
-  }
-  return avatar;
+  return validarImagen(avatar, 'La foto');
+}
+
+/**
+ * El escudo del club, con la misma regla que la foto.
+ *
+ * **Antes no tenía ninguna**, y no es que fuera más laxa: es que
+ * `organizations.controller.ts` no llamaba a un solo `validar*`. Lo único que
+ * paraba algo era el `json({ limit: '5mb' })` de `main.ts`, así que el escudo
+ * de un club podía ser cinco megas de texto cualquiera — comprobado el 4 de
+ * septiembre de 2026 mandando `logoUrl: "esto-no-es-una-imagen-ni-una-url"`,
+ * que entró con un 200 y se quedó guardado.
+ *
+ * Y el daño no se veía aquí, que es lo de siempre: el escudo se copia a
+ * Membresías por `/sync/club`, donde `MAX_IMAGEN` son 90 000 caracteres. Todo
+ * lo que pasara de ahí se guardaba en el portal y **no llegaba al carnet**, en
+ * silencio.
+ */
+export function validarLogo(logo: string) {
+  return validarImagen(logo, 'El escudo');
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -291,7 +337,9 @@ export function normalizarCorreo(valor: string | null | undefined): string {
  * «J», «Juan» y «A B». No se cuentan las palabras hacia arriba: hay gente con
  * un nombre y cuatro apellidos, y gente con dos de cada.
  */
-export function validarNombreCompleto(valor: string | null | undefined): string {
+export function validarNombreCompleto(
+  valor: string | null | undefined,
+): string {
   const limpio = validarNombre(valor ?? '', 'nombre completo').replace(
     /\s+/g,
     ' ',
@@ -414,7 +462,11 @@ export function validarContrasena(
   // sí su nombre pegado a un año.
   const trozos = contexto
     .filter(Boolean)
-    .flatMap((c) => String(c).toLowerCase().split(/[\s@._-]+/))
+    .flatMap((c) =>
+      String(c)
+        .toLowerCase()
+        .split(/[\s@._-]+/),
+    )
     .filter((t) => t.length >= 4);
   if (trozos.some((t) => minuscula.includes(t))) {
     throw new BadRequestException(

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { urlImagen } from '@/lib/api';
 
 /**
  * Ver una imagen en grande, como en WhatsApp: se toca la foto y se abre encima
@@ -85,7 +86,13 @@ export function Ampliable({
         {children}
       </button>
       {abierta && (
-        <VisorImagen src={src} alt={alt} onCerrar={() => setAbierta(false)} />
+        // `urlImagen` resuelve las rutas del disco (`/media/…`) contra el
+        // origen de la API; lo incrustado y lo absoluto pasan tal cual.
+        <VisorImagen
+          src={urlImagen(src) ?? src}
+          alt={alt}
+          onCerrar={() => setAbierta(false)}
+        />
       )}
     </>
   );

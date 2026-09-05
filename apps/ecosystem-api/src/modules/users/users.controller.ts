@@ -26,6 +26,7 @@ import {
   validarTipoSangre,
   validarGenero,
 } from '../../common/validacion';
+import { guardarImagen } from '../../common/almacen-imagenes';
 
 /**
  * Perfil de la persona (transversal). El maestro edita el perfil de sus alumnos
@@ -169,7 +170,13 @@ export class UsersController {
         'teléfono del contacto de emergencia',
       );
     }
-    if (body.avatarUrl) body.avatarUrl = validarAvatar(body.avatarUrl);
+    // La foto: primero se valida la forma, y solo después va al disco. El
+    // orden importa — `guardarImagen` decodifica y escribe, y no tiene por qué
+    // hacer ninguna de las dos cosas con algo que ya sabemos que no vale.
+    if (body.avatarUrl) {
+      body.avatarUrl = validarAvatar(body.avatarUrl);
+      body.avatarUrl = (await guardarImagen(body.avatarUrl)) ?? null;
+    }
 
     return this.usersService.updateProfile(id, {
       ...body,

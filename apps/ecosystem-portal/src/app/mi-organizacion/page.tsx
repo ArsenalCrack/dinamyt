@@ -23,6 +23,7 @@ import {
   misInvitacionesClubAPI,
   responderInvitacionClubAPI,
   extraerError,
+  urlImagen,
   type MiOrganizacion,
   type Miembro,
   type BajaOrg,
@@ -1025,7 +1026,7 @@ export default function MiOrganizacionPage() {
               <Ampliable src={ficha.logoUrl} alt={`Escudo de ${orgSel.name}`} logo>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={ficha.logoUrl}
+                  src={urlImagen(ficha.logoUrl) ?? undefined}
                   alt="Escudo del club"
                   className="h-16 w-16 rounded-xl object-cover"
                   style={{ border: '2px solid var(--gold-dim)' }}
