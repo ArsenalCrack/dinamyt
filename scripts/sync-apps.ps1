@@ -61,7 +61,16 @@ $espejos = @(
     @{ Nombre = 'campeonatos'
        Prefijo = 'productos/campeonatos'
        Remoto  = 'https://github.com/ArsenalCrack/dinamyt-combat.git'
-       Disco   = 'D:\hapkido\DINAMYT-LOCAL - copia'
+       # OJO: apuntaba a 'D:\hapkido\DINAMYT-LOCAL - copia', que es una copia
+       # VIEJA. Con -Local, el espejo se traia de ahi y RETROCEDIA: un sync del
+       # 5 de septiembre de 2026 borro del espejo espejo.py, identidad.py y las
+       # pruebas del SSO. No rompio produccion —el despliegue clona los tres
+       # repositorios, no este espejo (README)— pero dejaba el monorepo
+       # contando una version de Campeonatos que ya no existia.
+       #
+       # El repositorio DE VERDAD es este, el mismo que clona la VPS en
+       # /srv/campeonatos y el mismo destino que usa repartir-estilos.ps1.
+       Disco   = 'D:\Repositorios\dinamyt-combat'
        Rama    = 'main' }
 
     @{ Nombre = 'membresias'
