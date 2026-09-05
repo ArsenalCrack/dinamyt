@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { aplicarTema, getTema, type Tema } from "@/lib/theme";
+import { aplicarTema, getTema, temaEfectivo, type Tema } from "@/lib/theme";
+import { guardarAparienciaEnLaCuenta } from "@/lib/api";
 import { IDIOMAS, useI18n } from "@/lib/i18n";
 
 /**
@@ -16,7 +17,7 @@ import { IDIOMAS, useI18n } from "@/lib/i18n";
  */
 export default function PublicControls() {
   const { t, idioma, setIdioma } = useI18n();
-  const [tema, setTema] = useState<Tema>("dark");
+  const [tema, setTema] = useState<Tema>("sistema");
   const [open, setOpen] = useState(false);
 
   // Sincronizar con el tema guardado al montar (el servidor renderiza "dark")
@@ -29,9 +30,15 @@ export default function PublicControls() {
   }, []);
 
   function cambiarTema() {
-    const nuevo: Tema = tema === "dark" ? "light" : "dark";
+    // Dos estados en el boton, no tres: `sistema` es un punto de partida, no un
+    // destino al que alguien quiera volver pulsando. Las tres escritas estan en
+    // el perfil del portal, que es donde se elige de verdad.
+    const nuevo: Tema = temaEfectivo(tema) === "claro" ? "oscuro" : "claro";
     aplicarTema(nuevo);
     setTema(nuevo);
+    // Y a la CUENTA, para que valga tambien en el portal, en Membresias y en
+    // Academy: `localStorage` no cruza subdominios.
+    guardarAparienciaEnLaCuenta({ theme: nuevo });
   }
 
   return (
@@ -39,7 +46,7 @@ export default function PublicControls() {
       {open && (
         <div className="pubctl-panel animate-fade" role="group" aria-label={t("pub.controles")}>
           <button type="button" className="pubctl-item" onClick={cambiarTema}>
-            {tema === "dark" ? t("menu.modoClaro") : t("menu.modoOscuro")}
+            {temaEfectivo(tema) === "oscuro" ? t("menu.modoClaro") : t("menu.modoOscuro")}
           </button>
           <div className="pubctl-langs">
             {IDIOMAS.map((l) => (
