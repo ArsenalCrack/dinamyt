@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { claveRol, useAuth } from '@/lib/auth';
 import { IDIOMAS, useI18n, type ClaveTexto } from '@/lib/i18n';
-import { aplicarTema, getTema, type Tema } from '@/lib/theme';
+import { aplicarTema, getTema, temaEfectivo, type Tema } from '@/lib/theme';
+import { guardarAparienciaEnLaCuenta } from '@/lib/api';
 import { Avatar } from './Avatar';
 import { Avisos } from './Avisos';
 
@@ -59,6 +60,35 @@ function IconoSalir() {
   );
 }
 
+/**
+ * La cuadrícula de aplicaciones, dibujada y no escrita.
+ *
+ * Por lo mismo que el de salir: los símbolos técnicos que parecen iconos
+ * (⇱, ⊞, ⏻) no están en las fuentes de Android y salen como el cuadrito de
+ * «glifo que no tengo». Un SVG se ve igual en todos lados y hereda el color.
+ *
+ * Es el MISMO dibujo en Membresías, Campeonatos y Academy: la puerta al
+ * ecosistema se reconoce por su forma antes que por su texto.
+ */
+function IconoEcosistema() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      style={{ flexShrink: 0 }}
+    >
+      <rect x="3" y="3" width="7.5" height="7.5" rx="2" />
+      <rect x="13.5" y="3" width="7.5" height="7.5" rx="2" />
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="2" />
+      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" />
+    </svg>
+  );
+}
+
 interface Enlace {
   href: string;
   clave: ClaveTexto;
@@ -74,7 +104,7 @@ export function NavBar() {
   const [abierto, setAbierto] = useState(false);
   // Se arranca en 'dark', igual que el servidor, y se corrige tras montar: el
   // tema real vive en localStorage y leerlo aquí rompería la hidratación.
-  const [tema, setTema] = useState<Tema>('dark');
+  const [tema, setTema] = useState<Tema>('sistema');
   const raizRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -130,15 +160,32 @@ export function NavBar() {
   // El orden es el de la barra. `principal` marca lo que se abre a diario: el
   // panel, el roster, la asistencia y el kiosco de la puerta. Planes,
   // calendario y estadísticas se tocan al empezar el mes.
+  //
+  // ── Por qué el super-admin NO ve las pantallas de club ──
+  //
+  // `esStaff` lo incluye —maestro, auxiliar o super-admin— y por eso le salían
+  // las siete: panel, alumnos, asistencia, kiosco, estadísticas, planes y
+  // calendario. **Ninguna le sirve**: todas operan sobre `req.user.org_id`, y
+  // el super-admin no pertenece a ningún club, así que las abría vacías.
+  //
+  // La API sí sabe operar un club concreto (`?orgId=`), pero esta web no tiene
+  // selector que lo use. El día que lo tenga, esto vuelve a abrirse **con un
+  // club elegido** y no antes: un menú de siete pantallas que no se pueden
+  // llenar es peor que no tenerlas.
+  //
+  // Se cambia SOLO la navegación. El guardián de cada página sigue mirando
+  // `esStaff`, así que si llega ahí por un enlace directo no se rompe nada — y
+  // el día del selector no hay que volver a tocar siete archivos.
+  const gestionaUnClub = esStaff && !esSuper;
   const links: Enlace[] = [
     { href: '/admin', clave: 'menu.admin', visible: esSuper, principal: true },
-    { href: '/', clave: 'menu.panel', visible: esStaff, principal: true },
-    { href: '/alumnos', clave: 'menu.alumnos', visible: esStaff, principal: true },
-    { href: '/asistencia', clave: 'menu.asistencia', visible: esStaff, principal: true },
-    { href: '/kiosco', clave: 'menu.kiosco', visible: esStaff, principal: true },
-    { href: '/estadisticas', clave: 'menu.estadisticas', visible: esStaff, principal: false },
-    { href: '/planes', clave: 'menu.planes', visible: esStaff, principal: false },
-    { href: '/calendario', clave: 'menu.calendario', visible: esStaff, principal: false },
+    { href: '/', clave: 'menu.panel', visible: gestionaUnClub, principal: true },
+    { href: '/alumnos', clave: 'menu.alumnos', visible: gestionaUnClub, principal: true },
+    { href: '/asistencia', clave: 'menu.asistencia', visible: gestionaUnClub, principal: true },
+    { href: '/kiosco', clave: 'menu.kiosco', visible: gestionaUnClub, principal: true },
+    { href: '/estadisticas', clave: 'menu.estadisticas', visible: gestionaUnClub, principal: false },
+    { href: '/planes', clave: 'menu.planes', visible: gestionaUnClub, principal: false },
+    { href: '/calendario', clave: 'menu.calendario', visible: gestionaUnClub, principal: false },
     { href: '/mi', clave: 'menu.miEstado', visible: !esSuper, principal: true },
   ];
   const visibles = links.filter((l) => l.visible);
@@ -153,9 +200,15 @@ export function NavBar() {
   const rolYClub = `${t(claveRol(user))}${club ? ` · ${club.name}` : ''}`;
 
   function alternarTema() {
-    const nuevo: Tema = tema === 'dark' ? 'light' : 'dark';
+    // Dos estados en el botón, no tres: `sistema` es un punto de partida, no un
+    // destino al que alguien quiera volver pulsando. Las tres opciones escritas
+    // están en el perfil del portal, que es donde se elige de verdad.
+    const nuevo: Tema = temaEfectivo(tema) === 'claro' ? 'oscuro' : 'claro';
     aplicarTema(nuevo);
     setTema(nuevo);
+    // Y a la CUENTA, para que la elección valga también en el portal, en
+    // Campeonatos y en Academy. `localStorage` no cruza subdominios.
+    guardarAparienciaEnLaCuenta({ theme: nuevo });
   }
 
   /**
@@ -323,7 +376,7 @@ export function NavBar() {
           </div>
 
           <button type="button" role="menuitem" className="navbar-item" onClick={alternarTema}>
-            {tema === 'dark' ? t('menu.modoClaro') : t('menu.modoOscuro')}
+            {temaEfectivo(tema) === 'oscuro' ? t('menu.modoClaro') : t('menu.modoOscuro')}
           </button>
 
           <p className="navbar-etiqueta">🌐 {t('menu.idioma')}</p>
@@ -335,7 +388,12 @@ export function NavBar() {
                 className="navbar-idioma"
                 data-activo={idioma === l.codigo}
                 aria-pressed={idioma === l.codigo}
-                onClick={() => setIdioma(l.codigo)}
+                onClick={() => {
+                  setIdioma(l.codigo);
+                  guardarAparienciaEnLaCuenta({
+                    locale: l.codigo === 'en' ? 'en-US' : 'es-CO',
+                  });
+                }}
               >
                 {l.etiqueta}
               </button>
@@ -343,10 +401,57 @@ export function NavBar() {
           </div>
 
           <div className="navbar-sep" />
+
+          {/**
+            * La puerta de vuelta al ecosistema.
+            *
+            * ── El agujero que tapa ──
+            *
+            * Desde DINAMYT se entraba aquí con un botón, pero de aquí no se
+            * volvía: el único enlace al portal era el de editar la ficha
+            * (`/mi` → `PORTAL/perfil`), escondido dentro de una pantalla que
+            * casi nadie abre para eso. Quien quería su cuenta, su club o sus
+            * otras aplicaciones tenía que escribir la dirección a mano, abrir
+            * otra pestaña o —lo que hacía todo el mundo— cerrar sesión. Salir
+            * de una app no puede ser la forma de llegar a la de al lado.
+            *
+            * ── Por qué NO lleva `?redirect=` ──
+            *
+            * Porque ir a DINAMYT significa ir a DINAMYT. Ese parámetro es el
+            * que le dice al portal «cuando acabes, devuélvelo aquí», y es
+            * justo el que se quedaba pegado en el historial del navegador y
+            * acababa metiendo en Membresías a quien quería el portal. Aquí no
+            * pinta nada: el destino es el dashboard, y punto.
+            *
+            * ── Por qué en el menú y no en la barra de arriba ──
+            *
+            * La barra es de las pantallas de ESTA app. Abajo del todo, junto a
+            * «Salir», están las dos cosas que te sacan de aquí — y es donde se
+            * busca lo que se usa una vez al día, no una vez por minuto.
+            */}
+          {PORTAL_URL && (
+            <a
+              href={`${PORTAL_URL}/dashboard`}
+              role="menuitem"
+              className="navbar-item"
+              title={t('menu.ecosistemaTitulo')}
+            >
+              <IconoEcosistema />
+              {t('menu.ecosistema')}
+            </a>
+          )}
+
+          {/* ── Por qué este botón lleva aire por encima ──
+              «Ir a DINAMYT» y «Salir» hacen lo mismo desde lejos —los dos te
+              sacan de aquí— pero uno te lleva a tu portal y el otro te cierra
+              la sesión, y equivocarse cuesta volver a escribir la contraseña.
+              Pegados, al pasar el ratón los dos fondos se tocaban y parecían un
+              solo bloque. Medio rem no es decoración: es el margen de un dedo
+              en un teléfono. */}
           <button
             onClick={salir}
             className="btn btn-danger"
-            style={{ width: '100%', justifyContent: 'flex-start' }}
+            style={{ width: '100%', justifyContent: 'flex-start', marginTop: '0.5rem' }}
           >
             <IconoSalir />
             {t('menu.salir')}

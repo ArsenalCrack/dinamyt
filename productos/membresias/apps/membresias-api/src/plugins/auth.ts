@@ -41,6 +41,11 @@ export function crearVerificador(): (token: string) => Promise<JwtPayload> {
 interface UsuarioVigente {
   payload: JwtPayload;
   orgActiva: boolean;
+  /**
+   * Desde cuándo el ecosistema dice que el plan del club no está al día, o
+   * `null`. Ver `orgs.plan_bloqueado_desde` y la migración `0019`.
+   */
+  planBloqueadoDesde: Date | null;
 }
 
 /** Un `sub` con forma de UUID; cualquier otra cosa no se le pasa a Postgres. */
@@ -66,25 +71,33 @@ async function usuarioVigente(
 
   // Cruza clubes por necesidad: este paso ES el que averigua a cuál pertenece
   // quien llama, así que todavía no hay contexto con el que filtrar.
-  const { fila, orgActiva } = await sinFiltroDeClub(db, async (tx) => {
+  const { fila, orgActiva, planBloqueadoDesde } = await sinFiltroDeClub(db, async (tx) => {
     const buscar = (condicion: SQL | undefined) =>
       tx.select().from(users).where(condicion).limit(1);
 
     let [fila] = sub ? await buscar(eq(users.ecoSub, sub)) : [];
     if (!fila && correo) [fila] = await buscar(eq(users.email, correo));
 
-    if (!fila || !fila.isActive) return { fila: null, orgActiva: true };
+    if (!fila || !fila.isActive) {
+      return { fila: null, orgActiva: true, planBloqueadoDesde: null };
+    }
 
     let orgActiva = true;
+    let planBloqueadoDesde: Date | null = null;
     if (fila.orgId) {
+      // Las dos cosas del club en la MISMA consulta que ya se hacía: son dos
+      // cerrojos distintos —«el superadmin lo apagó» y «su plan venció»— y
+      // preguntar por ellos por separado sería un viaje de más en cada
+      // petición autenticada de la aplicación.
       const [club] = await tx
-        .select({ isActive: orgs.isActive })
+        .select({ isActive: orgs.isActive, planBloqueadoDesde: orgs.planBloqueadoDesde })
         .from(orgs)
         .where(eq(orgs.id, fila.orgId))
         .limit(1);
       orgActiva = Boolean(club?.isActive);
+      planBloqueadoDesde = club?.planBloqueadoDesde ?? null;
     }
-    return { fila, orgActiva };
+    return { fila, orgActiva, planBloqueadoDesde };
   });
 
   if (!fila) return null;
@@ -99,6 +112,7 @@ async function usuarioVigente(
       is_super_admin: fila.isSuperAdmin,
     },
     orgActiva,
+    planBloqueadoDesde,
   };
 }
 
@@ -137,6 +151,35 @@ export function requireAuth() {
     // El superadmin no pertenece a ningún club: esta regla nunca lo alcanza.
     if (!vigente.orgActiva && !vigente.payload.is_super_admin) {
       return reply.code(403).send({ error: 'El acceso de tu club está suspendido.' });
+    }
+
+    // ── El plan vencido, que es el otro cerrojo ──
+    //
+    // Va aquí y no en un hook aparte por dos razones. La primera es que este
+    // es el único punto por el que pasan TODAS las rutas autenticadas: un hook
+    // de `onRequest` corre antes de que se sepa quién llama, así que tendría
+    // que verificar el token por su cuenta y volver a consultar el club.
+    //
+    // La segunda es la que de verdad importa: el agujero que esto tapa era que
+    // Membresías tiene login propio. El portal ya filtra los `app_scopes` por
+    // fecha, pero quien entra por el formulario de aquí no pasa por el portal
+    // nunca. Este es el sitio equivalente de este lado.
+    //
+    // **402 y no 403**: son cosas distintas y la web las distingue para enseñar
+    // pantallas distintas. 403 es «no te dejan»; esto es «hay que pagar», y
+    // termina en cuanto alguien pague.
+    if (vigente.planBloqueadoDesde && !vigente.payload.is_super_admin) {
+      return reply.code(402).send({
+        error:
+          'El plan de tu club no está al día, así que Membresías está en pausa. ' +
+          'Nada se ha perdido: los pagos, la asistencia y las fichas siguen ahí ' +
+          'y vuelven en cuanto se renueve.',
+        // La marca que mira la web para explicar en vez de decir «algo salió
+        // mal», y la fecha para poder decir DESDE CUÁNDO: la diferencia entre
+        // «se me pasó ayer» y «esto lleva tres semanas y nadie me avisó».
+        planVencido: true,
+        desde: vigente.planBloqueadoDesde.toISOString(),
+      });
     }
 
     req.user = vigente.payload;

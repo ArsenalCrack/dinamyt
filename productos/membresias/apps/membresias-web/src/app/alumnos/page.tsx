@@ -408,7 +408,7 @@ export default function Alumnos() {
   }
 
   // Ya no se filtra aquí: lo hace la API (ver `cargar`). Filtrar en el
-  // navegador sobre una página de 25 escondería a todo el que no estuviera en
+  // navegador sobre una sola página escondería a todo el que no estuviera en
   // ella, que es justo lo contrario de lo que hace un buscador.
   const visibles = gente;
 
@@ -878,8 +878,17 @@ export default function Alumnos() {
         onLimpiar={limpiar}
       />
 
-      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
-        <table>
+      {/* Arriba también, y no por simetría: al final de la lista solo lo
+          encuentra quien ya bajó los quince, que es el trabajo que este
+          control venía a ahorrar. Y el rótulo del medio —«16–30 de 213»— se
+          lee antes de empezar, así se entra sabiendo cuánta gente hay. */}
+      <Paginacion arriba offset={offset} limit={POR_PAGINA} total={total} onIr={setOffset} />
+
+      {/* Igual que el panel: en el celular cada persona es una ficha que se
+          lee hacia abajo, no un renglón que hay que arrastrar de lado (ver
+          `.tabla-apilable` en globals.css). */}
+      <div className="card tabla-scroll tabla-apilable-caja">
+        <table className="tabla-apilable">
           <thead>
             <tr>
               <th>{t('comun.nombre')}</th>
@@ -892,7 +901,7 @@ export default function Alumnos() {
           </thead>
           <tbody>
             {visibles.length === 0 && (
-              <tr>
+              <tr data-vacio>
                 <td colSpan={6} className="muted" style={{ padding: '1rem' }}>
                   {buscado ? t('pag.sinResultados') : t('comun.ninguno')}
                 </td>
@@ -900,7 +909,7 @@ export default function Alumnos() {
             )}
             {visibles.map((p) => (
               <tr key={p.id}>
-                <td>
+                <td data-cabecera>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     {/* La foto se amplía aunque la fila lleve su enlace: aquí
                         el avatar es hermano del `<Link>`, no va dentro, así
@@ -920,17 +929,21 @@ export default function Alumnos() {
                     </div>
                   </div>
                 </td>
-                <td>
+                <td data-etq={t('comun.cinturon')}>
                   <Cinturon nombre={p.belt} />
                 </td>
-                <td className="muted">{t(`rol.${p.role}` as ClaveTexto)}</td>
-                <td className="muted">{p.phone || '—'}</td>
-                <td>
+                <td className="muted" data-etq={t('comun.rol')}>
+                  {t(`rol.${p.role}` as ClaveTexto)}
+                </td>
+                <td className="muted" data-etq={t('comun.telefono')}>
+                  {p.phone || '—'}
+                </td>
+                <td data-etq={t('comun.estado')}>
                   <span className={p.isActive ? 'badge badge-ok' : 'badge badge-danger'}>
                     {p.isActive ? t('comun.activo') : t('comun.inactivo')}
                   </span>
                 </td>
-                <td>
+                <td data-acciones>
                   {esMaestro && (
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                       {/* Quien llegó por DINAMYT tiene su ficha allí: aquí el

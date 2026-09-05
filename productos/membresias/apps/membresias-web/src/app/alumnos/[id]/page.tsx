@@ -100,6 +100,27 @@ interface Attendance {
 /** Portal DINAMYT: es donde se editan los datos de la persona. Ver más abajo. */
 const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 
+/**
+ * ── Los topes de los calendarios de esta ficha ──
+ *
+ * El calendario acepta lo que se le ponga como límite, y aquí estaban puestos
+ * al año 2000 y al 2100. Un siglo de margen para una fecha de vencimiento o
+ * para el día de un pago no es libertad: es un dedazo esperando —una cifra de
+ * más en el año— que descuadra el recaudo del mes y no se ve hasta que alguien
+ * mira por qué no cuadran las cuentas.
+ */
+function haceAnos(n: number): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+function dentroDeAnos(n: number): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 const ESTADOS_MEM = ['activo', 'inactivo', 'suspendido', 'retirado'] as const;
 const METODOS = ['efectivo', 'transferencia', 'nequi', 'daviplata'] as const;
 
@@ -292,6 +313,45 @@ export default function Ficha() {
     saltoHecho.current = true;
     form.scrollIntoView({ block: 'start' });
   }, [persona, esMaestro]);
+
+  /**
+   * Esta persona ya no está en el club.
+   *
+   * ── Por qué apaga la ficha entera y no solo el botón de cobrar ──
+   *
+   * Porque desactivar a alguien tenía efecto en un solo sitio —no entra— y en
+   * ningún otro: la ficha seguía dejando corregirle el nombre, cambiarle el
+   * plan, registrarle un pago, reexpedirle el carnet y hasta abrirle la sesión
+   * con un QR. Se podía cobrar la mensualidad de septiembre a alguien que se
+   * fue en julio sin que nada avisara, y el dinero entraba a las estadísticas
+   * del club como si tal cosa.
+   *
+   * Lo que NO se apaga es mirar. Sus pagos y su asistencia son del club y
+   * siguen ahí abajo, enteros y consultables: esa es media razón de que la
+   * baja nunca borre nada. Lo que se apaga es escribir.
+   *
+   * El envoltorio es un `<fieldset disabled>` y no un `if` alrededor de cada
+   * campo a propósito: el navegador desactiva por su cuenta todo control que
+   * lleve dentro —incluidos los de los componentes propios, que por dentro son
+   * `<button>` e `<input>`—, así que un campo nuevo nace bloqueado sin que
+   * nadie se acuerde de nada. Y los datos se siguen VIENDO, que es lo que se
+   * pierde escondiendo el formulario.
+   */
+  const desactivado = persona?.isActive === false;
+
+  /** Devolverle el acceso, desde la misma pantalla que dice que no lo tiene. */
+  async function reactivar() {
+    setGuardando('reactivar');
+    try {
+      await api.patch(`/users/${id}`, { isActive: true });
+      await cargar();
+      avisoOk(t('alumnos.actualizado'));
+    } catch (err) {
+      avisoError(mensajeError(err, t('comun.editar')));
+    } finally {
+      setGuardando('');
+    }
+  }
 
   async function guardarDatos(e: FormEvent) {
     e.preventDefault();
@@ -551,6 +611,39 @@ export default function Ficha() {
         </Link>
       </header>
 
+      {/* Lo primero de la pantalla cuando la cuenta está apagada: todo lo que
+          hay debajo se lee distinto sabiéndolo, y el botón de devolverle el
+          acceso tiene que estar donde se acaba de leer que no lo tiene. */}
+      {desactivado && (
+        <div
+          className="card"
+          role="status"
+          style={{
+            padding: '0.9rem 1rem',
+            marginBottom: '1rem',
+            borderColor: 'var(--danger)',
+          }}
+        >
+          <p style={{ fontWeight: 700, color: 'var(--danger)' }}>
+            ⏻ {t('ficha.desactivada')}
+          </p>
+          <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>
+            {t('ficha.desactivadaAyuda')}
+          </p>
+          {esMaestro && !esMiFicha && (
+            <button
+              type="button"
+              className="btn btn-gold btn-sm"
+              style={{ marginTop: '0.7rem' }}
+              disabled={guardando === 'reactivar'}
+              onClick={() => void reactivar()}
+            >
+              {guardando === 'reactivar' ? t('comun.guardando') : t('alumnos.activar')}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Solo un fallo al CARGAR la ficha se queda escrito aquí: es permanente
           y explica por qué la pantalla está vacía. El resultado de una acción
           se avisa con la nube flotante (ver lib/toast.ts). */}
@@ -601,7 +694,7 @@ export default function Ficha() {
               <p className="muted" style={{ fontSize: '0.72rem', marginTop: '0.2rem' }}>
                 {t('carnet.gradoCambioAyuda')}
               </p>
-              {esMaestro && (
+              {esMaestro && !desactivado && (
                 <button
                   type="button"
                   className="btn btn-gold btn-sm"
@@ -633,7 +726,7 @@ export default function Ficha() {
             desde={persona?.trainsSince}
             // Reexpedir vale para el carnet perdido y para el vencido: es lo
             // único que renueva el año. Solo el maestro, que es quien lo firma.
-            onReexpedir={esMaestro ? reexpedirCarnet : undefined}
+            onReexpedir={esMaestro && !desactivado ? reexpedirCarnet : undefined}
           />
           <p className="muted" style={{ fontSize: '0.7rem', marginTop: '0.6rem' }}>
             {t('carnet.datosAlDia')}
@@ -695,30 +788,31 @@ export default function Ficha() {
               así que van juntas y no una arriba y otra al final de la página.
               Las dos son del ACCESO, no de la ficha: siguen aquí aunque los
               datos de la persona los mantenga el portal. */}
-          {esMaestro && <AccesoQR userId={id} />}
+          {/* Ni QR de acceso para quien no puede entrar: el token que
+              genera abre sesión, y la API además lo rechaza con un 409. */}
+          {esMaestro && !desactivado && <AccesoQR userId={id} />}
 
-          {/* Con cuenta de DINAMYT, la contraseña NO se escribe aquí: es una
-              sola para todo el ecosistema y se fija en el portal, que la copia
-              hasta esta app (`POST /sync/contrasena`). Dejar el formulario
-              puesto sería ofrecer un botón que el servidor rechaza con un 409
-              —y, si no lo rechazara, esa persona acabaría con una contraseña
-              para el club y otra para DINAMYT—. Para lo que el maestro necesita
-              AHORA, en la puerta, está el QR de aquí arriba. */}
-          {esMaestro && persona?.enElEcosistema && (
-            <div className="card" style={{ padding: '1rem' }}>
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
-                {t('alumnos.nuevaContrasena')}
-              </h2>
-              <p className="muted" style={{ fontSize: '0.78rem', margin: 0 }}>
-                Su contraseña es la de DINAMYT y vive en el portal: la cambia
-                ella misma desde su perfil, o la recupera con «¿Olvidaste tu
-                contraseña?». Si necesita entrar ahora, usa el acceso por QR.
-              </p>
-            </div>
-          )}
+          {/* ── La tarjeta de «Nueva contraseña» del club federado: RETIRADA ──
+              Con cuenta de DINAMYT la contraseña no se escribe aquí —es una
+              sola para todo el ecosistema y se fija en el portal—, así que en
+              su lugar quedó una tarjeta con el título «Nueva contraseña» que
+              solo servía para decir que ahí no se podía poner ninguna. Un
+              apartado entero, con su título en negrita, para explicar que no
+              hace nada: ocupaba sitio en la ficha y hacía buscar un formulario
+              que no existe.
 
+              Lo que el maestro necesita AHORA, en la puerta, es el QR de aquí
+              arriba, y ese sigue. Y si la persona quiere cambiar su contraseña,
+              lo hace desde su perfil de DINAMYT o con «¿Olvidaste tu
+              contraseña?», que es donde estaría buscándola de todos modos.
+
+              El formulario de ABAJO se queda: es el del club que usa Membresías
+              por su cuenta, donde las cuentas son locales y esta es la única
+              forma de devolverle la entrada a alguien. */}
           {esMaestro && !persona?.enElEcosistema && (
             <form onSubmit={cambiarPassword} className="card" style={{ padding: '1rem' }}>
+            {/* Con la cuenta apagada, todo esto se ve pero no se toca. Lo hace el navegador: un `<fieldset disabled>` desactiva cuanto lleve dentro. */}
+            <fieldset className="editable" disabled={desactivado}>
               <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>
                 {t('alumnos.nuevaContrasena')}
               </h2>
@@ -742,6 +836,7 @@ export default function Ficha() {
               <button type="submit" className="btn btn-outline btn-sm">
                 {t('comun.guardar')}
               </button>
+            </fieldset>
             </form>
           )}
         </div>
@@ -864,6 +959,8 @@ export default function Ficha() {
         >
           {/* ── Datos del alumno ── */}
           <form onSubmit={guardarDatos} className="card" style={{ padding: '1rem' }}>
+            {/* Con la cuenta apagada, todo esto se ve pero no se toca. Lo hace el navegador: un `<fieldset disabled>` desactiva cuanto lleve dentro. */}
+            <fieldset className="editable" disabled={desactivado}>
             <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.35rem' }}>
               {t(esAlumno ? 'ficha.datos' : 'ficha.datosMiembro')}
             </h2>
@@ -1053,6 +1150,7 @@ export default function Ficha() {
             <button type="submit" className="btn btn-gold btn-sm" disabled={guardando === 'datos'}>
               {guardando === 'datos' ? t('comun.guardando') : t('comun.guardar')}
             </button>
+            </fieldset>
           </form>
         </div>
       )}
@@ -1077,6 +1175,8 @@ export default function Ficha() {
           }}
         >
           <form onSubmit={guardarPlan} className="card" style={{ padding: '1rem' }}>
+            {/* Con la cuenta apagada, todo esto se ve pero no se toca. Lo hace el navegador: un `<fieldset disabled>` desactiva cuanto lleve dentro. */}
+            <fieldset className="editable" disabled={desactivado}>
             <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
               {t('ficha.planYEstado')}
             </h2>
@@ -1142,11 +1242,23 @@ export default function Ficha() {
                   {t('ficha.venceEl')}
                 </label>
                 <div style={{ margin: '0.25rem 0 0.2rem' }}>
+                  {/* ── Por qué el rango es este y no un siglo ──
+                      Era `2000-01-01` a `2100-12-31`. Este campo es el
+                      paracaídas —el alumno que llega de otro sistema o que pagó
+                      por fuera—, así que tiene que aceptar una fecha PASADA:
+                      marcar a alguien como vencido es un uso legítimo. Lo que
+                      no es legítimo es 2003 ni 2087, y el dedazo típico es
+                      justo ese: una cifra de más en el año.
+                      Un año atrás cubre cualquier deuda vieja que se esté
+                      poniendo al día; dos adelante, la matrícula anual más
+                      larga que vende un club. Lo de en medio —lo normal— lo
+                      calcula solo el cobro de abajo, donde no hay dedazo
+                      posible. */}
                   <CampoFecha
                     valor={plan.venceEl}
                     onChange={(v) => setPlan({ ...plan, venceEl: v })}
-                    min="2000-01-01"
-                    max="2100-12-31"
+                    min={haceAnos(1)}
+                    max={dentroDeAnos(2)}
                     ariaLabel={t('ficha.venceEl')}
                   />
                 </div>
@@ -1225,6 +1337,7 @@ export default function Ficha() {
             <button type="submit" className="btn btn-gold btn-sm" disabled={guardando === 'plan'}>
               {guardando === 'plan' ? t('comun.guardando') : t('comun.guardar')}
             </button>
+            </fieldset>
           </form>
 
           {/* ── Registrar un pago ──
@@ -1239,6 +1352,8 @@ export default function Ficha() {
             className="card"
             style={{ padding: '1rem' }}
           >
+            {/* Con la cuenta apagada, todo esto se ve pero no se toca. Lo hace el navegador: un `<fieldset disabled>` desactiva cuanto lleve dentro. */}
+            <fieldset className="editable" disabled={desactivado}>
             <h2 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.7rem' }}>
               {t('pago.titulo')}
             </h2>
@@ -1269,10 +1384,15 @@ export default function Ficha() {
               {t('pago.fecha')}
             </label>
             <div style={{ margin: '0.25rem 0 0.2rem' }}>
+              {/* Hacia adelante ya estaba cerrado —un pago futuro no es un
+                  pago—, pero hacia atrás llegaba al año 2000. Un cobro
+                  registrado con fecha de hace veinte años descuadra el recaudo
+                  del mes sin que nadie lo vea venir. Dos años atrás cubre de
+                  sobra el «se me quedó sin apuntar». */}
               <CampoFecha
                 valor={cobro.paidAt}
                 onChange={(v) => setCobro({ ...cobro, paidAt: v })}
-                min="2000-01-01"
+                min={haceAnos(2)}
                 max={hoyISO()}
                 ariaLabel={t('pago.fecha')}
                 // El día del pago no se deja en blanco: sin él no hay pago
@@ -1376,6 +1496,7 @@ export default function Ficha() {
             >
               {guardando === 'pago' ? t('comun.guardando') : t('pago.registrar')}
             </button>
+            </fieldset>
           </form>
         </div>
       )}

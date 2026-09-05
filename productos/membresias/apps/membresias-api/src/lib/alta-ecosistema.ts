@@ -173,3 +173,125 @@ export function avisarAccesoAlEcosistema(
     }
   })();
 }
+
+/**
+ * El tema y el idioma que la persona acaba de elegir AQUÍ, al portal.
+ *
+ * ── Por qué ──
+ *
+ * La preferencia ya llegaba del portal a esta app dentro del pase: se elegía
+ * una vez en DINAMYT y se veía en las cuatro. Pero solo en ese sentido. Quien
+ * cambiaba a modo claro **dentro de Membresías** lo cambiaba solo aquí, porque
+ * `localStorage` es por origen y esta app no puede escribir en `users`.
+ *
+ * Visto desde fuera eso es peor que no tener la función: el mismo botón, en la
+ * misma cuenta, unas veces se recuerda en todas partes y otras no, según dónde
+ * lo pulsaste.
+ *
+ * ── Como todo el espejo ──
+ *
+ * Se dispara sin esperarlo y se traga el fallo. Que el portal esté caído no
+ * puede impedir que alguien cambie el tema de su propia pantalla: lo que se
+ * pierde es que la elección viaje a las otras apps, y se recupera al siguiente
+ * cambio. La pantalla de aquí ya cambió antes de llamar a esto.
+ */
+export function avisarAparienciaAlEcosistema(
+  log: { warn: (msg: string) => void },
+  datos: { ecoSub: string | null; theme?: string; locale?: string },
+): void {
+  if (!altaEnElEcosistema()) return;
+  // Sin cuenta del portal no hay dónde guardarlo: es el alumno de carnet QR.
+  if (!datos.ecoSub) return;
+  if (datos.theme === undefined && datos.locale === undefined) return;
+
+  void (async () => {
+    try {
+      const res = await fetch(`${raizApi()}/sync/apariencia`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-dinamyt-sync': syncSecret(),
+        },
+        body: JSON.stringify({
+          ecoSub: datos.ecoSub,
+          ...(datos.theme !== undefined && { theme: datos.theme }),
+          ...(datos.locale !== undefined && { locale: datos.locale }),
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        log.warn(
+          `/sync/apariencia respondió ${res.status}: la preferencia no viajó a las otras apps.`,
+        );
+      }
+    } catch (e) {
+      log.warn(
+        `/sync/apariencia no llegó al portal (${
+          e instanceof Error ? e.message : 'error'
+        }): la preferencia no viajó a las otras apps.`,
+      );
+    }
+  })();
+}
+
+/**
+ * La VUELTA: que tema y que idioma tiene esa persona en su cuenta de DINAMYT.
+ *
+ * ── El hueco que cierra ──
+ *
+ * `avisarAparienciaAlEcosistema` cerro la IDA: cambiar el modo claro aqui ya se
+ * guarda en la cuenta. La vuelta seguia dependiendo del PASE, y el pase se
+ * firma al entrar.
+ *
+ * O sea que quien cambiaba el tema en el portal y venia aqui —donde ya tenia
+ * la sesion abierta desde ayer, con su propia cookie— no veia nada: el pase que
+ * trajo el primer dia decia otra cosa, y esta app no lo vuelve a ver nunca. Es
+ * la otra mitad exacta de «unas veces se recuerda y otras no».
+ *
+ * ── Por que SI se espera esta, al reves que el aviso ──
+ *
+ * Porque el resultado es lo que la pantalla va a pintar: dispararla sin
+ * esperarla no serviria de nada. A cambio va con el mismo tope de espera y
+ * devuelve `null` ante cualquier problema — sin portal, la pantalla se queda
+ * con lo que ya tenia, que es exactamente lo de antes.
+ */
+export async function leerAparienciaDelEcosistema(
+  log: { warn: (msg: string) => void },
+  ecoSub: string | null,
+): Promise<{ theme: string; locale: string | null } | null> {
+  if (!altaEnElEcosistema()) return null;
+  // Sin cuenta del portal no hay nada que preguntar: es el alumno de carnet QR,
+  // y su preferencia vive aqui y solo aqui.
+  if (!ecoSub) return null;
+
+  try {
+    const res = await fetch(
+      `${raizApi()}/sync/apariencia/${encodeURIComponent(ecoSub)}`,
+      {
+        headers: { 'x-dinamyt-sync': syncSecret() },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+    );
+    if (!res.ok) {
+      log.warn(
+        `/sync/apariencia respondio ${res.status} al leer: la pantalla se queda con el tema que ya tenia.`,
+      );
+      return null;
+    }
+    const datos = (await res.json()) as {
+      theme?: string;
+      locale?: string | null;
+    };
+    return {
+      theme: datos.theme ?? 'sistema',
+      locale: datos.locale ?? null,
+    };
+  } catch (e) {
+    log.warn(
+      `/sync/apariencia no llego al portal al leer (${
+        e instanceof Error ? e.message : 'error'
+      }): la pantalla se queda con el tema que ya tenia.`,
+    );
+    return null;
+  }
+}

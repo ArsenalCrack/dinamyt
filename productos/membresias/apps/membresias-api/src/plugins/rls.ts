@@ -61,6 +61,7 @@ const SIN_CONTEXTO = new Set([
   '/sync/contrasena',
   '/sync/rol',
   '/sync/pertenencia',
+  '/sync/plan',
 ]);
 
 function contextoDe(req: FastifyRequest) {

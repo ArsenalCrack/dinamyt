@@ -7,8 +7,18 @@
 
 // La versión sube al cambiar el shell: el `activate` borra las cachés viejas,
 // así que sin subirla los iconos anteriores se seguirían sirviendo de caché.
-var CACHE = 'membresias-shell-v3';
-var SHELL = ['/', '/kiosco', '/mi', '/manifest.json', '/logo.png', '/icon-512.png'];
+var CACHE = 'membresias-shell-v4';
+var SHELL = [
+  '/',
+  '/kiosco',
+  '/mi',
+  '/manifest.json',
+  '/logo.png',
+  '/icon-512.png',
+  // El icono de la notificacion se guarda como el resto del shell: un aviso
+  // que llega con la red a medias no deberia perder su icono.
+  '/badge-96.png',
+];
 
 self.addEventListener('install', function (event) {
   event.waitUntil(
@@ -58,6 +68,27 @@ self.addEventListener('fetch', function (event) {
   );
 });
 
+// ── El icono pequeño de la notificación ────────────────────────────────────
+//
+// **`badge` no es una imagen: es una PLANTILLA.** Android le quita todo el
+// color y se queda solo con el canal alfa, pintando de blanco lo que sea
+// opaco. Aquí estaba puesto `/logo.png` —el logo a color, con el oro y el
+// trazo oscuro igual de opacos—, así que lo que salía era la forma EXTERIOR
+// entera: una mancha blanca dentro de un círculo de color donde apenas se
+// adivinaba un trozo de la D y el pie que sobresale. El dibujo de dentro no
+// existía, y no había forma de arreglarlo desde el otro lado.
+//
+// `/badge-96.png` está hecho para esto: el oro es opaco y el trazo oscuro es
+// transparente, así que los huecos del dibujo viajan DENTRO de la silueta y la
+// D se sigue leyendo con su figura. Las separaciones van ensanchadas a
+// propósito —a 24 puntos, las del original desaparecen y todo se funde otra
+// vez— y lleva margen, porque Android lo mete dentro de un círculo.
+//
+// `icon` sigue siendo el logo a color: **ese no se enmascara**, es el que se
+// ve grande al lado del texto.
+//
+// El icono se DERIVA del logo, no se dibuja aparte: `scripts/icono-notificacion.py`
+// en el monorepo. El día que cambie el logo, un comando y vuelve a estar al día.
 self.addEventListener('push', function (event) {
   var data = {};
   try {
@@ -69,7 +100,7 @@ self.addEventListener('push', function (event) {
     self.registration.showNotification(data.title || 'DINAMYT Membresías', {
       body: data.body || '',
       icon: '/logo.png',
-      badge: '/logo.png',
+      badge: '/badge-96.png',
       data: { url: data.url || '/mi' },
     }),
   );

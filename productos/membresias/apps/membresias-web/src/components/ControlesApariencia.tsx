@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { aplicarTema, getTema, type Tema } from '@/lib/theme';
+import { aplicarTema, getTema, temaEfectivo, type Tema } from '@/lib/theme';
+import { guardarAparienciaEnLaCuenta } from '@/lib/api';
 import { IDIOMAS, useI18n } from '@/lib/i18n';
 
 /**
@@ -17,11 +18,11 @@ import { IDIOMAS, useI18n } from '@/lib/i18n';
  */
 export function ControlesApariencia() {
   const { t, idioma, setIdioma } = useI18n();
-  const [tema, setTema] = useState<Tema>('dark');
+  const [tema, setTema] = useState<Tema>('sistema');
   const [abierto, setAbierto] = useState(false);
   const raizRef = useRef<HTMLDivElement | null>(null);
 
-  // El servidor siempre renderiza 'dark'; el tema real se lee tras montar.
+  // El servidor siempre renderiza el oscuro; el real se lee tras montar.
   useEffect(() => {
     setTema(getTema());
   }, []);
@@ -47,9 +48,15 @@ export function ControlesApariencia() {
   }, [abierto]);
 
   function alternarTema() {
-    const nuevo: Tema = tema === 'dark' ? 'light' : 'dark';
+    // Dos estados en el botón, no tres: `sistema` es un punto de partida, no un
+    // destino al que alguien quiera volver pulsando. Las tres opciones escritas
+    // están en el perfil del portal, que es donde se elige de verdad.
+    const nuevo: Tema = temaEfectivo(tema) === 'claro' ? 'oscuro' : 'claro';
     aplicarTema(nuevo);
     setTema(nuevo);
+    // Y a la CUENTA, para que la elección valga también en el portal, en
+    // Campeonatos y en Academy. `localStorage` no cruza subdominios.
+    guardarAparienciaEnLaCuenta({ theme: nuevo });
   }
 
   return (
@@ -57,7 +64,7 @@ export function ControlesApariencia() {
       {abierto && (
         <div className="apar-panel" role="group" aria-label={t('menu.apariencia')}>
           <button type="button" className="apar-item" onClick={alternarTema}>
-            {tema === 'dark' ? t('menu.modoClaro') : t('menu.modoOscuro')}
+            {temaEfectivo(tema) === 'oscuro' ? t('menu.modoClaro') : t('menu.modoOscuro')}
           </button>
           <div className="apar-langs">
             {IDIOMAS.map((l) => (
@@ -67,7 +74,12 @@ export function ControlesApariencia() {
                 className="apar-lang"
                 data-activo={idioma === l.codigo}
                 aria-pressed={idioma === l.codigo}
-                onClick={() => setIdioma(l.codigo)}
+                onClick={() => {
+                  setIdioma(l.codigo);
+                  guardarAparienciaEnLaCuenta({
+                    locale: l.codigo === 'en' ? 'en-US' : 'es-CO',
+                  });
+                }}
               >
                 {l.etiqueta}
               </button>

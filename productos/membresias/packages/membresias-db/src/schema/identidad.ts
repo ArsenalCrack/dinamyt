@@ -47,6 +47,18 @@ export const orgs = mem.table('orgs', {
    * gente ya asociada—. Vacío mientras Membresías corra sola.
    */
   ecoOrgId: uuid('eco_org_id'),
+  /**
+   * Desde cuándo el ecosistema dice que el plan de este club NO está al día.
+   *
+   * `null` = al día, o no consta — que es lo mismo para efectos de dejar pasar,
+   * y es el estado de una instalación independiente, que nunca recibe el aviso.
+   * Lo escribe `POST /sync/plan` y no lo toca nadie más.
+   *
+   * **Es distinto de `isActive`, y hacen falta los dos**: aquel es «el
+   * superadmin apagó este club» y este es «su plan venció». Ver la migración
+   * `0019_plan_del_club`.
+   */
+  planBloqueadoDesde: timestamp('plan_bloqueado_desde', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

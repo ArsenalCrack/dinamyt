@@ -302,9 +302,33 @@ export async function reportsRoutes(app: FastifyInstance) {
       }, 0);
 
       // ── Asistencia de los últimos 30 días ───────────────────────────────
+      /**
+       * ── La asistencia que se ENSEÑA es la de quien sigue en el club ──────
+       *
+       * Nada se borra: las filas de `attendances` siguen enteras, y la ficha de
+       * cada persona sigue teniendo su historial completo. Lo que cambia es qué
+       * se cuenta en esta pantalla, que es la que el maestro mira para saber
+       * cómo va su club HOY.
+       *
+       * Un alumno que entrenó veintitrés veces y se fue en julio encabezaba el
+       * podio en septiembre, tapando a los que sí vienen — y el maestro leía ese
+       * nombre arriba del todo y creía que seguía apareciendo por el salón. Lo
+       * mismo, más callado, con el promedio por día: la media salía inflada por
+       * gente que ya no va a volver, así que «venimos a menos» no se notaba.
+       *
+       * El filtro es por persona ACTIVA y no por alumno activo: el maestro y sus
+       * auxiliares también pasan lista de sí mismos, y sacarlos del recuento
+       * sería otro cambio distinto que nadie pidió. Lo único que sale de aquí es
+       * quien ya no está.
+       */
+      const enElClub = new Set(
+        gente.filter((u) => u.isActive).map((u) => u.id),
+      );
+      const asistenciasVigentes = checkins.filter((c) => enElClub.has(c.userId));
+
       const porDia = new Map<string, number>();
       const porAlumno = new Map<string, number>();
-      for (const c of checkins) {
+      for (const c of asistenciasVigentes) {
         const d = c.checkinDate as string;
         porDia.set(d, (porDia.get(d) ?? 0) + 1);
         porAlumno.set(c.userId, (porAlumno.get(c.userId) ?? 0) + 1);
@@ -349,12 +373,16 @@ export async function reportsRoutes(app: FastifyInstance) {
         },
         asistencia: {
           hoy: porDia.get(today) ?? 0,
-          total30: checkins.length,
+          // `asistenciasVigentes` y no `checkins`: si el total contara a los
+          // que ya no están y la curva de al lado no, las dos cifras de la
+          // misma tarjeta se contradirían — y de ahí sale la sospecha de que
+          // ninguna de las dos vale.
+          total30: asistenciasVigentes.length,
           diasConClase,
           // Promedio POR DÍA CON CLASE, no por día del mes: dividir entre 30
           // castigaría a un club que abre tres veces por semana.
           promedioPorDia: diasConClase
-            ? Math.round((checkins.length / diasConClase) * 10) / 10
+            ? Math.round((asistenciasVigentes.length / diasConClase) * 10) / 10
             : 0,
           porDia: [...porDia.entries()]
             .map(([date, count]) => ({ date, count }))
@@ -397,13 +425,28 @@ export async function reportsRoutes(app: FastifyInstance) {
       const from = q.from ?? `${today.slice(0, 7)}-01`;
       const to = q.to ?? today;
 
+      /**
+       * Solo la asistencia de quien sigue en el club, igual que en
+       * `/reports/estadisticas`.
+       *
+       * No es un adorno de consistencia: esta ruta es la que llena la tarjeta
+       * «presentes hoy» del panel, y la otra la misma cifra de la pantalla de
+       * estadísticas. Con el filtro en una sola de las dos, el panel diría
+       * nueve y las estadísticas ocho a un metro de distancia, y de ahí sale la
+       * sospecha de que ninguna de las dos cuenta bien.
+       *
+       * Aquí el filtro va en la consulta y no en memoria porque el rango puede
+       * ser de meses: no hay motivo para traerse filas que no se van a contar.
+       */
       const rows = await req.db
         .select({ checkinDate: attendances.checkinDate })
         .from(attendances)
         .innerJoin(memberships, eq(attendances.membershipId, memberships.id))
+        .innerJoin(users, eq(memberships.userId, users.id))
         .where(
           and(
             eq(memberships.orgId, orgId),
+            eq(users.isActive, true),
             gte(attendances.checkinDate, from),
             lte(attendances.checkinDate, to),
           ),

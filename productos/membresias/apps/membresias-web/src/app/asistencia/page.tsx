@@ -252,6 +252,18 @@ export default function AsistenciaPage() {
         )}
       </div>
 
+      {/* Arriba también, y no por simetría: al final de la lista solo lo
+          encuentra quien ya bajó los quince, que es el trabajo que este
+          control venía a ahorrar. Y el rótulo del medio —«16–30 de 213»— se
+          lee antes de empezar, así se entra sabiendo cuánta gente hay. */}
+      <Paginacion
+        arriba
+        offset={offset}
+        limit={POR_PAGINA}
+        total={totalRoster}
+        onIr={setOffset}
+      />
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {visibles.length === 0 && (
           <p className="muted">{buscado ? t('pag.sinResultados') : t('comun.ninguno')}</p>

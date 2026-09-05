@@ -44,6 +44,8 @@ const es = {
   'menu.abrir': 'Abrir menú',
   'menu.cerrar': 'Cerrar menú',
   'menu.salir': 'Salir',
+  'menu.ecosistema': 'Ir a DINAMYT',
+  'menu.ecosistemaTitulo': 'Tu cuenta, tu club y todas tus aplicaciones',
   'menu.modoClaro': '☀️ Modo claro',
   'menu.modoOscuro': '🌙 Modo oscuro',
   'menu.idioma': 'Idioma',
@@ -259,6 +261,12 @@ const es = {
   'alumnos.actualizado': 'Datos actualizados.',
   'alumnos.desactivar': 'Desactivar acceso',
   'alumnos.activar': 'Reactivar acceso',
+  // El aviso de la ficha de quien ya no está. Dice las tres cosas que hay que
+  // saber ahí: que está desactivada, qué se puede seguir haciendo (mirar) y
+  // qué hay que hacer para volver a poder tocar nada.
+  'ficha.desactivada': 'Esta cuenta está desactivada',
+  'ficha.desactivadaAyuda':
+    'No entra al club y no se le puede cambiar nada: ni datos, ni plan, ni cobros, ni carnet. Lo suyo sigue entero —sus pagos y su asistencia están abajo— y se puede consultar. Para volver a editarla hay que reactivarla.',
   'alumnos.nuevaContrasena': 'Poner contraseña nueva',
   'alumnos.contrasenaCambiada': 'Contraseña actualizada.',
   // El maestro ya no sale en su propia lista (ver `GET /users`): su ficha se
@@ -560,6 +568,11 @@ const es = {
   // Pie legal
   'legal.derechos': 'Todos los derechos reservados.',
   'legal.nota': 'DINAMYT Membresías es una obra protegida por el derecho de autor.',
+  // El pie es el mismo que el del portal: la misma cuenta, la misma ayuda y el
+  // mismo aviso de derechos, se entre por donde se entre.
+  'legal.ayuda': '¿Necesitas ayuda?',
+  'legal.privacidad': 'Privacidad',
+  'legal.portal': 'Mi cuenta DINAMYT',
 
   // Mi estado
   'mi.titulo': 'Mi estado',
@@ -755,6 +768,8 @@ const en: Record<ClaveTexto, string> = {
   'menu.abrir': 'Open menu',
   'menu.cerrar': 'Close menu',
   'menu.salir': 'Sign out',
+  'menu.ecosistema': 'Go to DINAMYT',
+  'menu.ecosistemaTitulo': 'Your account, your club and all your apps',
   'menu.modoClaro': '☀️ Light mode',
   'menu.modoOscuro': '🌙 Dark mode',
   'menu.idioma': 'Language',
@@ -934,6 +949,9 @@ const en: Record<ClaveTexto, string> = {
   'alumnos.actualizado': 'Details updated.',
   'alumnos.desactivar': 'Disable access',
   'alumnos.activar': 'Re-enable access',
+  'ficha.desactivada': 'This account is disabled',
+  'ficha.desactivadaAyuda':
+    'They cannot enter the club and nothing can be changed: no details, no plan, no payments, no card. Everything of theirs is intact —their payments and attendance are below— and can be read. To edit it again, re-enable the account.',
   'alumnos.nuevaContrasena': 'Set a new password',
   'alumnos.contrasenaCambiada': 'Password updated.',
   'alumnos.miFicha': 'My record',
@@ -1176,6 +1194,9 @@ const en: Record<ClaveTexto, string> = {
 
   'legal.derechos': 'All rights reserved.',
   'legal.nota': 'DINAMYT Membresías is a work protected by copyright.',
+  'legal.ayuda': 'Need help?',
+  'legal.privacidad': 'Privacy',
+  'legal.portal': 'My DINAMYT account',
 
   'mi.titulo': 'My status',
   'mi.estado': 'Status',

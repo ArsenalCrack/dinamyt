@@ -541,8 +541,24 @@ export default function Panel() {
         onLimpiar={limpiar}
       />
 
-      <div className="card tabla-scroll" style={{ padding: '0.5rem 1rem' }}>
-        <table>
+      {/* Arriba también, y no por simetría: al final de la lista solo lo
+          encuentra quien ya bajó los quince, que es el trabajo que este
+          control venía a ahorrar. Y el rótulo del medio —«16–30 de 213»— se
+          lee antes de empezar, así se entra sabiendo cuánta gente hay. */}
+      <Paginacion
+        arriba
+        offset={offset}
+        limit={POR_PAGINA}
+        total={totalRoster}
+        onIr={setOffset}
+      />
+
+      {/* En el celular esta tabla deja de ser tabla: cada alumno pasa a ser
+          una ficha que se lee hacia abajo, con la etiqueta de cada columna al
+          lado del dato (ver `.tabla-apilable` en globals.css). Arrastrar de
+          lado para enterarse de si alguien debe no es leer una lista. */}
+      <div className="card tabla-scroll tabla-apilable-caja">
+        <table className="tabla-apilable">
           <thead>
             <tr>
               <th>{t('panel.alumnos')}</th>
@@ -556,7 +572,7 @@ export default function Panel() {
           </thead>
           <tbody>
             {roster.length === 0 && (
-              <tr>
+              <tr data-vacio>
                 <td colSpan={5} className="muted" style={{ padding: '1rem' }}>
                   {buscado ? t('pag.sinResultados') : t('panel.sinAlumnos')}
                 </td>
@@ -564,7 +580,7 @@ export default function Panel() {
             )}
             {roster.map((a) => (
               <tr key={a.userId}>
-                <td>
+                <td data-cabecera>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <Avatar src={a.avatarUrl} nombre={a.fullName} size={36} ampliable />
                     <div style={{ minWidth: 0 }}>
@@ -587,13 +603,13 @@ export default function Panel() {
                     </div>
                   </div>
                 </td>
-                <td>
+                <td data-etq={t('comun.cinturon')}>
                   <Cinturon nombre={a.belt} />
                 </td>
-                <td>
+                <td data-etq={t('comun.estado')}>
                   <span className={claseEstado(a.estado)}>{t(claveEstado(a.estado))}</span>
                 </td>
-                <td className="muted">
+                <td className="muted" data-etq={`${t('panel.vence')} / ${t('panel.clases')}`}>
                   {a.venceEl
                     ? `${fmtFecha(a.venceEl, idioma)}${
                         a.diasFaltantes != null ? ` (${a.diasFaltantes} d)` : ''
@@ -602,7 +618,7 @@ export default function Panel() {
                       ? `${a.clasesRestantes} · ${t('panel.clases')}`
                       : '—'}
                 </td>
-                <td>
+                <td data-acciones>
                   {/* Cobrar es una acción con consecuencias —mueve fechas y
                       dinero—, así que vive en la ficha del alumno y en ningún
                       otro sitio. Tenerla también aquí era lo que hacía tan

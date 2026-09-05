@@ -20,6 +20,27 @@ interface Exc {
   note: string | null;
 }
 
+/**
+ * ── Los topes de los calendarios de esta pantalla ──
+ *
+ * Un `<input type="date">` —y el calendario propio que lo sustituye— acepta lo
+ * que se le ponga como límite, así que sin topes razonables la fecha de un
+ * festivo podía caer en 2003 o en 2087. No es maldad: es que el año se teclea
+ * o se pasa con una flecha, y una cifra de más no se nota hasta que la lista
+ * sale desordenada.
+ */
+function haceUnMes(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function dentroDeAnos(n: number): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Una clase del club. `null` como id no existe: eso es «todo el club». */
 interface Grupo {
   id: string;
@@ -50,9 +71,9 @@ interface Nota {
 const CLUB = '';
 
 /** Nombres de los días en el idioma activo, sin diccionario propio. */
-function nombresDias(idioma: string): string[] {
+function nombresDias(idioma: string, largo = true): string[] {
   const fmt = new Intl.DateTimeFormat(idioma === 'en' ? 'en-GB' : 'es-CO', {
-    weekday: 'long',
+    weekday: largo ? 'long' : 'short',
   });
   // 2024-01-07 fue domingo: la semana arranca ahí para que el índice 0..6
   // coincida con el `weekday` que guarda la API.
@@ -139,7 +160,9 @@ export default function Calendario() {
   const [guardado, setGuardado] = useState<{
     dias: Dia[];
     notas: Record<string, string>;
-  }>({ dias: [], notas: {} });
+    /** El nombre y la descripción de cada clase, tal como están guardados. */
+    grupos: Grupo[];
+  }>({ dias: [], notas: {}, grupos: [] });
   /** Qué clase se está guardando (su id, o `CLUB`). */
   const [guardando, setGuardando] = useState<string | null>(null);
   /** Solo para fallos al CARGAR el calendario; lo demás va por la nube flotante. */
@@ -167,7 +190,7 @@ export default function Calendario() {
         const porClase: Record<string, string> = {};
         for (const n of data.notas) porClase[n.groupId ?? CLUB] = n.nota;
         setNotas(porClase);
-        setGuardado({ dias, notas: porClase });
+        setGuardado({ dias, notas: porClase, grupos: data.grupos });
       } catch (e) {
         setError(mensajeError(e, t('comun.ninguno')));
       }
@@ -222,9 +245,22 @@ export default function Calendario() {
       .join(',');
   }
 
-  /** ¿Queda algo por guardar en esta clase —días, horas o nota—? */
+  /** ¿Cambió el nombre o la descripción de esta clase? */
+  function textoCambiado(clase: string): boolean {
+    if (clase === CLUB) return false;
+    const ahora = grupos.find((g) => g.id === clase);
+    const antes = guardado.grupos.find((g) => g.id === clase);
+    if (!ahora || !antes) return false;
+    return (
+      ahora.name !== antes.name ||
+      (ahora.descripcion ?? '') !== (antes.descripcion ?? '')
+    );
+  }
+
+  /** ¿Queda algo por guardar en esta clase —nombre, días, horas o nota—? */
   function sinGuardar(clase: string): boolean {
     return (
+      textoCambiado(clase) ||
       huellaDias(dias, clase) !== huellaDias(guardado.dias, clase) ||
       (notas[clase] ?? '') !== (guardado.notas[clase] ?? '')
     );
@@ -254,6 +290,17 @@ export default function Calendario() {
   async function guardarClaseEntera(clase: string) {
     setGuardando(clase);
     try {
+      // El nombre y la descripción, PRIMERO y solo si cambiaron. Antes esto no
+      // estaba aquí: se mandaba solo al salir del campo (ver el comentario de
+      // `guardarClase`), que es lo que guardaba cosas que nadie había mandado
+      // guardar.
+      const g = grupos.find((x) => x.id === clase);
+      if (g && textoCambiado(clase)) {
+        await api.patch(`/schedule/groups/${g.id}`, {
+          name: g.name,
+          descripcion: g.descripcion,
+        });
+      }
       await api.put('/schedule', { dias });
       await api.put('/schedule/notes', {
         groupId: clase === CLUB ? null : clase,
@@ -287,18 +334,25 @@ export default function Calendario() {
     }
   }
 
-  /** Renombrar o redescribir una clase. Va en su propio viaje, al perder el foco. */
-  async function guardarClase(g: Grupo) {
-    try {
-      await api.patch(`/schedule/groups/${g.id}`, {
-        name: g.name,
-        descripcion: g.descripcion,
-      });
-    } catch (err) {
-      avisoError(mensajeError(err, t('comun.guardar')));
-      await cargar(semana);
-    }
-  }
+/*
+   * ── El renombrado al perder el foco: BORRADO a propósito ──
+   *
+   * Aquí había un `guardarClase(g)` que mandaba el nombre y la descripción en
+   * cuanto el campo perdía el foco. Guardaba cosas que nadie había mandado
+   * guardar: se tocaba el nombre para ver cómo quedaba, se pulsaba en
+   * cualquier otro sitio de la pantalla —o simplemente se pasaba al campo de
+   * al lado— y el cambio ya estaba en el servidor. Sin haber pulsado nada, sin
+   * poder deshacerlo y sin que ninguna pantalla lo dijera.
+   *
+   * Peor: el aviso de «sin guardar» de cada tarjeta miraba los días y la nota,
+   * pero no el nombre. Así que el único campo que se guardaba solo era también
+   * el único que no aparecía como pendiente.
+   *
+   * Ahora el nombre y la descripción van con los días y la nota, en el botón
+   * de guardar de la tarjeta, que es lo que este archivo ya defendía en el
+   * comentario de `guardarClaseEntera`: **un botón por clase, y guarda todo lo
+   * de esa clase.**
+   */
 
   async function borrarClase(id: string) {
     try {
@@ -335,6 +389,18 @@ export default function Calendario() {
   }
 
   const DIAS = nombresDias(idioma);
+  /**
+   * Los mismos días, abreviados, para los siete botones de marcar.
+   *
+   * Iban con el nombre completo, y siete botones que dicen «Miércoles» con el
+   * relleno de un `.btn` miden más de mil píxeles: se partían en tres o cuatro
+   * renglones desiguales y el bloque de una clase ocupaba media pantalla antes
+   * de llegar a las horas. Abreviados caben en una fila en un portátil y en dos
+   * en el teléfono, y el nombre entero sigue estando donde hace falta leerlo
+   * —el renglón de la hora— y en el `aria-label` del botón, que es lo que oye
+   * quien no lo ve.
+   */
+  const DIAS_CORTOS = nombresDias(idioma, false);
   const opcionesHora = [
     { valor: '', etiqueta: '—' },
     ...HORAS.map((h) => ({ valor: h, etiqueta: h })),
@@ -348,20 +414,24 @@ export default function Calendario() {
   function bloqueHorario(clase: string) {
     return (
       <>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+        <div className="horario-dias">
           {DIAS.map((nombre, w) => (
             <button
               key={w}
               type="button"
               className={marcado(clase, w) ? 'btn btn-gold btn-sm' : 'btn btn-outline btn-sm'}
               aria-pressed={Boolean(marcado(clase, w))}
+              // Abreviado en pantalla, entero para quien lo oye: «mié» leído en
+              // voz alta no es una palabra.
+              aria-label={nombre}
+              title={nombre}
               // El auxiliar mira el calendario, no lo escribe: la ruta que lo
               // guarda es de `owner`. Sin esto los botones respondían al clic y
               // no había ningún sitio donde guardar lo que marcara.
               disabled={!esMaestro}
               onClick={() => alternarDia(clase, w)}
             >
-              {nombre}
+              {DIAS_CORTOS[w]}
             </button>
           ))}
         </div>
@@ -371,37 +441,24 @@ export default function Calendario() {
           const d = marcado(clase, w);
           if (!d) return null;
           return (
-            <div
-              key={w}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginTop: '0.5rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <span style={{ fontSize: '0.8rem', minWidth: '5.5rem' }}>{nombre}</span>
-              <div style={{ width: '7rem' }}>
-                <SelectMenu
-                  valor={d.opensAt ?? ''}
-                  onChange={(v) => ponerHora(clase, w, 'opensAt', v)}
-                  etiquetaAria={`${t('grupos.abre')} · ${nombre}`}
-                  placeholder={t('grupos.abre')}
-                  opciones={opcionesHora}
-                  disabled={!esMaestro}
-                />
-              </div>
-              <div style={{ width: '7rem' }}>
-                <SelectMenu
-                  valor={d.closesAt ?? ''}
-                  onChange={(v) => ponerHora(clase, w, 'closesAt', v)}
-                  etiquetaAria={`${t('grupos.cierra')} · ${nombre}`}
-                  placeholder={t('grupos.cierra')}
-                  opciones={opcionesHora}
-                  disabled={!esMaestro}
-                />
-              </div>
+            <div key={w} className="horario-dia">
+              <span className="horario-dia-nombre">{nombre}</span>
+              <SelectMenu
+                valor={d.opensAt ?? ''}
+                onChange={(v) => ponerHora(clase, w, 'opensAt', v)}
+                etiquetaAria={`${t('grupos.abre')} · ${nombre}`}
+                placeholder={t('grupos.abre')}
+                opciones={opcionesHora}
+                disabled={!esMaestro}
+              />
+              <SelectMenu
+                valor={d.closesAt ?? ''}
+                onChange={(v) => ponerHora(clase, w, 'closesAt', v)}
+                etiquetaAria={`${t('grupos.cierra')} · ${nombre}`}
+                placeholder={t('grupos.cierra')}
+                opciones={opcionesHora}
+                disabled={!esMaestro}
+              />
             </div>
           );
         })}
@@ -507,47 +564,50 @@ export default function Calendario() {
       {/* ── La semana que se está mirando ──
           Manda sobre las notas de abajo, y por eso está arriba del todo: es el
           contexto de todo lo que sigue, no un control más. */}
-      <div
-        className="card"
-        style={{
-          padding: '0.7rem 1rem',
-          marginBottom: '1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '0.5rem',
-          flexWrap: 'wrap',
-        }}
-      >
+      {/* Tres columnas fijas —flecha, fecha, flecha— en vez de una fila que se
+          parte. Con `flex-wrap`, «‹ Semana anterior» y «Semana siguiente ›»
+          sumaban más que la tarjeta y el bloque se desarmaba en tres renglones
+          con la fecha bailando de sitio según el largo del mes. En el teléfono
+          las dos etiquetas se esconden y quedan las flechas, que es lo que se
+          toca; el nombre entero sigue en el `aria-label`. */}
+      <div className="card semana-nav" style={{ padding: '0.7rem 1rem', marginBottom: '1.25rem' }}>
         <button
           type="button"
           className="btn btn-outline btn-sm"
+          aria-label={t('grupos.semanaAnterior')}
+          title={t('grupos.semanaAnterior')}
           onClick={() => setSemana((s) => masSemanas(s, -1))}
         >
-          ‹ {t('grupos.semanaAnterior')}
+          ‹<span className="semana-nav-texto"> {t('grupos.semanaAnterior')}</span>
         </button>
-        <div style={{ textAlign: 'center' }}>
+        <div className="semana-nav-centro">
           <span className="muted" style={{ fontSize: '0.72rem' }}>
             {t('grupos.semanaDel')}{' '}
           </span>
           <strong className="mono">{fmtFecha(semana, idioma)}</strong>
+          {/* «Semana actual» en su propio renglón: al lado de la fecha era el
+              tercer elemento de una columna que ya iba justa, y era el que
+              empujaba las flechas fuera. */}
           {semana !== lunesDe(hoyISO()) && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              style={{ marginLeft: '0.5rem' }}
-              onClick={() => setSemana(lunesDe(hoyISO()))}
-            >
-              {t('grupos.semanaActual')}
-            </button>
+            <div className="semana-nav-hoy">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setSemana(lunesDe(hoyISO()))}
+              >
+                {t('grupos.semanaActual')}
+              </button>
+            </div>
           )}
         </div>
         <button
           type="button"
           className="btn btn-outline btn-sm"
+          aria-label={t('grupos.semanaSiguiente')}
+          title={t('grupos.semanaSiguiente')}
           onClick={() => setSemana((s) => masSemanas(s, 1))}
         >
-          {t('grupos.semanaSiguiente')} ›
+          <span className="semana-nav-texto">{t('grupos.semanaSiguiente')} </span>›
         </button>
       </div>
 
@@ -606,7 +666,6 @@ export default function Calendario() {
                           ),
                         )
                       }
-                      onBlur={() => esMaestro && guardarClase(g)}
                       maxLength={LIM.claseNombre}
                       style={{ marginTop: '0.2rem' }}
                     />
@@ -664,7 +723,6 @@ export default function Calendario() {
                       ),
                     )
                   }
-                  onBlur={() => esMaestro && guardarClase(g)}
                   maxLength={LIM.claseDescripcion}
                   placeholder={t('grupos.descripcionEjemplo')}
                   style={{ marginTop: '0.2rem', resize: 'vertical' }}
@@ -739,11 +797,20 @@ export default function Calendario() {
                 {/* Calendario propio, acotado: la columna es `date` y no acepta
                     años de cinco cifras (que el `type="date"` nativo sí dejaba
                     teclear). Ver `components/CampoFecha.tsx`. */}
+                {/* ── Por qué el rango es este y no el siglo entero ──
+                    Era `2000-01-01` a `2100-12-31`: cien años para decir qué
+                    día cierra el club. Un festivo que se marca en 2003 o en
+                    2087 no es una decisión, es un dedazo — y encima uno que no
+                    se ve, porque la lista de excepciones va ordenada y esa
+                    fecha se va al principio o al final, donde nadie mira.
+                    Un mes atrás cubre el «se me olvidó apuntar el puente
+                    pasado»; dos años adelante, cualquier calendario que un club
+                    planifique de verdad. */}
                 <CampoFecha
                   valor={nueva.date}
                   onChange={(v) => setNueva((n) => ({ ...n, date: v }))}
-                  min="2000-01-01"
-                  max="2100-12-31"
+                  min={haceUnMes()}
+                  max={dentroDeAnos(2)}
                   ariaLabel={t('comun.fecha')}
                   borrable={false}
                 />
@@ -799,9 +866,11 @@ export default function Calendario() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 gap: '0.5rem',
+                // Una nota larga empujaba «Eliminar» fuera de la tarjeta.
+                flexWrap: 'wrap',
               }}
             >
-              <span>
+              <span style={{ minWidth: 0, flex: '1 1 12rem' }}>
                 <strong className="mono">{fmtFecha(x.date, idioma)}</strong>{' '}
                 <span className={x.isClosed ? 'badge badge-danger' : 'badge badge-ok'}>
                   {x.isClosed ? t('calendario.cerrado') : t('calendario.abierto')}

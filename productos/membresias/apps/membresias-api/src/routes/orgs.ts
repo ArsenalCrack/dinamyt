@@ -146,6 +146,12 @@ export async function orgsRoutes(app: FastifyInstance) {
       .groupBy(users.orgId);
     const porClub = new Map(conteos.map((c) => [c.orgId, c.total]));
 
+    // La forma se queda en ARRAY a propósito, aunque el panel del superadmin
+    // ahora pinte un resumen encima: cambiarla a `{ clubes, resumen }` rompería
+    // a todo el que ya la consume por un total que se saca de la misma lista
+    // con un `filter`. El dato que sí hacía falta traer es
+    // `planBloqueadoDesde`, que ya viene en el `select()` de arriba y es lo que
+    // distingue un club en pausa por su plan de uno apagado a mano.
     return clubes.map((c) => ({ ...c, usuariosActivos: porClub.get(c.id) ?? 0 }));
   });
 

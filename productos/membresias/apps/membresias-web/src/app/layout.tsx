@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import { AplicarApariencia } from '@/components/AplicarApariencia';
 import { NavBar } from '@/components/NavBar';
 import { PieLegal } from '@/components/PieLegal';
 import { PedirAvisos } from '@/components/PedirAvisos';
 import { PorteroMantenimiento } from '@/components/PorteroMantenimiento';
+import { PorteroPlan } from '@/components/PorteroPlan';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
 import { Toaster } from '@/components/Toaster';
 import { AuthProvider } from '@/lib/auth';
@@ -94,14 +96,24 @@ export default function RootLayout({
       <body>
         <I18nProvider>
           <AuthProvider>
+            {/* El tema y el idioma, al dia: escucha el modo claro del sistema y
+                pregunta a la cuenta lo que se eligio en las otras apps. Va
+                DENTRO de AuthProvider porque solo pregunta con sesion. */}
+            <AplicarApariencia />
             {/* Con el mantenimiento puesto, todo esto se sustituye por el
                 aviso — la barra incluida: ofrecer navegación a pantallas que
                 no responden solo lleva a errores. */}
             <PorteroMantenimiento>
-              {/* Barra global: enlaces por rol + tema e idioma. Se oculta sola
-                  en /login y /kiosco. */}
-              <NavBar />
-              {children}
+              {/* Y dentro, el plan del club. Va DEBAJO del mantenimiento a
+                  propósito: si las dos cosas pasan a la vez, lo que importa es
+                  que la aplicación está cerrada para todos, no la factura de un
+                  club — y esa sí se arregla sola en cinco minutos. */}
+              <PorteroPlan>
+                {/* Barra global: enlaces por rol + tema e idioma. Se oculta
+                    sola en /login y /kiosco. */}
+                <NavBar />
+                {children}
+              </PorteroPlan>
             </PorteroMantenimiento>
             {/* Al pie de TODA la app, incluido el panel del alumno. */}
             <PieLegal />
