@@ -28,6 +28,8 @@ import {
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
 import { Campo } from '@/components/Campo';
+import { CabeceraAuth } from '@/components/CabeceraAuth';
+import { useI18n } from '@/lib/i18n';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
 import { SelectMenu } from '@/components/SelectMenu';
 
@@ -71,6 +73,7 @@ import { SelectMenu } from '@/components/SelectMenu';
  *    solo sirve para enviarlo dos veces.
  */
 export default function RegistroPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({
     fullName: '',
@@ -242,27 +245,23 @@ export default function RegistroPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 py-10">
-      <Link href="/" className="flex flex-col items-center gap-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="DINAMYT" width={72} height={72} />
-        <span className="text-xl font-extrabold tracking-wide" style={{ color: 'var(--gold)' }}>
-          DINAMYT
-        </span>
-      </Link>
+    <main className="eco-login flex-col gap-6">
+      {/* La caja del registro es más ancha que la del login —son doce campos,
+          no dos—, pero la CABECERA es la misma que la de las otras cinco
+          pantallas de esta familia. Antes esta usaba `font-extrabold` y un
+          `text-2xl` dorado en vez de la tipografía de rol. */}
       <form
         ref={formRef}
         onSubmit={onSubmit}
         noValidate
-        className="w-full max-w-md rounded-xl border p-6"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        className="card w-full max-w-md p-7"
       >
-        <h1 className="mb-1 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-          Crear cuenta
-        </h1>
-        <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Una sola cuenta para Membresías, Campeonatos y Academy.
-        </p>
+        <CabeceraAuth
+          antetitulo={t('registro.eyebrow')}
+          titulo={t('registro.titulo')}
+          acento={t('registro.tituloAcento')}
+          subtitulo={t('registro.subtitulo')}
+        />
 
         {/* ── Tu cuenta ─────────────────────────────────────────────────── */}
         <h2 className="eyebrow mb-2">Tu cuenta</h2>

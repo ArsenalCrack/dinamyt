@@ -703,6 +703,63 @@ de octubre. Si algo se rompe, volver a `p=none` es editar la misma palabra: la
 vuelta atrás es inmediata y sin pérdida, que es lo que hace que este paso sea
 barato de intentar.
 
+## 3.6 Que DINAMYT salga en Google
+
+*(5 de septiembre de 2026)*
+
+**No salía, y el motivo era que no había nada.** El sitio llevaba en línea desde
+el 20 de agosto sin `robots.txt`, sin `sitemap.xml` y sin `metadataBase`: ningún
+buscador tenía forma de saber qué páginas existen ni cuál es la dirección buena
+de cada una. No era un problema de posicionamiento — era que nadie había puesto
+el cartel.
+
+### Lo que ya está hecho (y se despliega con el código)
+
+| Archivo | Qué hace |
+|---|---|
+| `src/app/robots.ts` | Deja entrar a la portada y cierra lo que hay detrás de una sesión |
+| `src/app/sitemap.ts` | Las tres páginas públicas: `/`, `/planes`, `/privacidad` |
+| `src/app/layout.tsx` | `metadataBase`, canónica, Open Graph y Twitter Card |
+
+`metadataBase` es la que sostiene el resto: sin ella Next emite el Open Graph
+con rutas relativas (`/logo.png`) y ni Google ni WhatsApp saben de qué dominio
+son. Se comprueba con:
+
+```bash
+curl -s https://dinamyt.org/robots.txt && curl -s https://dinamyt.org/sitemap.xml | head -20
+```
+
+### Lo que hay que hacer A MANO, una vez
+
+Publicar el `robots.txt` **no mete a nadie en Google**. Lo que mete es esto:
+
+1. **Google Search Console** → «Añadir propiedad» → **Dominio** (`dinamyt.org`),
+   que cubre todos los subdominios de una vez.
+2. Verificar con un **registro TXT en Cloudflare**, que es donde ya vive el DNS
+   del correo (§3.5). Google da el valor; se añade igual que el SPF.
+3. **Sitemaps → añadir** `https://dinamyt.org/sitemap.xml`.
+4. **Inspección de URLs** → `https://dinamyt.org` → «Solicitar indexación».
+
+Tarda **de días a un par de semanas**. Que no aparezca al día siguiente no
+significa que esté mal puesto.
+
+> ⚠️ **Antes del paso 4, poner los precios de verdad en `/planes`** (§6.1). Lo
+> que Google guarde el primer día es lo que enseñará durante semanas, y un
+> precio de relleno en un resultado de búsqueda es peor que no aparecer.
+
+### Por qué la portada se indexa aunque sea `'use client'`
+
+Porque Google ejecuta JavaScript. Pero lo hace en una segunda pasada y con
+retraso, así que **el `<title>` y la `description` del `layout` son lo que de
+verdad cuenta**: esos sí van en el HTML desde el primer byte. Es el motivo de
+cuidarlos y de que digan solo lo que el software hace hoy.
+
+### Buscar «dinamyt» no es lo mismo que buscar «software para club de hapkido»
+
+Lo primero llegará solo en cuanto el dominio esté verificado: es un nombre
+propio y no compite con nadie. Lo segundo es posicionamiento de verdad —
+contenido, enlaces, tiempo— y no lo arregla ningún archivo de configuración.
+
 ---
 
 # PARTE 4 · Cómo funciona esto por dentro
@@ -2789,6 +2846,135 @@ que nadie lo «arregle» devolviéndolo.
   común—, no los de cada pantalla. Es lo caro, y §6.2 ya decía en qué orden
   conviene: primero que las fechas y los números respeten el `locale`, y solo
   después traducir todo lo demás.
+
+## 4.22 Un solo diseño para las cuatro webs
+
+*(5 de septiembre de 2026)*
+
+Las cuatro se veían distintas, y no por gusto: cada una tenía **su copia** del
+sistema visual y las copias se habían separado. La auditoría, app por app:
+
+| Lo que se comparaba | Lo que se encontró |
+|---|---|
+| **Tipografía** | Campeonatos usaba **Bebas Neue + Barlow Condensed + Share Tech Mono**; las otras tres, Archivo + Instrument Sans + IBM Plex Mono. La letra es lo primero que se lee, y era lo primero que cambiaba |
+| **Paleta** | Campeonatos se había desviado en **8 de los 10** tokens compartidos |
+| **Botones** | El del portal era más gordo: `0.55rem 1.2rem` y `0.9rem` de letra, contra `0.5rem 1rem` y `0.875rem` |
+| **Campos** | El portal, `0.6rem 0.8rem`; Membresías, `0.55rem 0.75rem` |
+| **Login** | El portal ponía el logo a **72 px y FUERA** de la tarjeta; Academy y Membresías a **56 px y dentro**; Campeonatos usaba otro componente entero |
+| **Dentro del propio portal** | `login`, `registro` y `recuperar` tenían **tres cabeceras distintas**: una con `.display`, otra con `font-extrabold`, y `verificar`/`salir` sin logo |
+
+Nadie lo hizo mal. Se copiaba la pantalla de al lado y se retocaba, que es como
+se separan siempre las cosas que no tienen un solo sitio.
+
+### El modelo es Membresías
+
+No es una media entre las cuatro: es **una de ellas, entera**. Un promedio no es
+un diseño — es lo que queda cuando nadie decide.
+
+Todo vive en `packages/shared/estilos.css`: los colores, el modo claro, la
+tipografía de rol, los botones, las tarjetas, las insignias, los campos y la
+pantalla de entrar.
+
+### Cómo llega a cada app
+
+· **Portal y Academy** lo importan por el nombre del paquete:
+  `@import '@dinamyt/shared/estilos.css'`.
+· **Membresías y Campeonatos** no pueden —viven en otros repositorios y a
+  propósito no están en el workspace (§1.1)—, así que se les **copia**:
+
+  ```powershell
+  .\scriptsepartir-estilos.ps1            # reparte
+  .\scriptsepartir-estilos.ps1 -Comprobar # solo dice si alguna está desfasada
+  ```
+
+  El archivo llega como `src/app/estilos-ecosistema.css` con una cabecera que
+  avisa de que es generado. **Después hay que commitear en cada repositorio.**
+
+### Las clases del login llevan prefijo `eco-`, y no es manía
+
+Campeonatos ya tenía `.login-logo`, `.login-card` y `.login-wrapper` definidas
+en un `<style>` dentro de su propia página — y **su `.login-logo` es un
+contenedor, no la imagen**. Sin el prefijo, la regla compartida lo habría
+encogido a 56×56 y le habría roto la portada. Cuatro apps compartiendo hoja de
+estilos es exactamente donde un nombre genérico se convierte en un fallo a
+distancia.
+
+### El modo claro, rehecho con números
+
+El que había venía de Membresías y tenía **un fallo de accesibilidad que nadie
+había medido**: `--gold: #a37400` sobre blanco da **4.15:1**, por debajo del
+4.5:1 que exige WCAG AA. El antetítulo de cada pantalla se leía mal.
+
+Y al corregirlo aparece el segundo problema: un oro que pasa como TEXTO es
+oscuro, y de fondo se ve embarrado. El botón «Entrar» lleva texto oscuro
+**encima** del oro, y con el oro oscuro eso daba 3.86:1 — el botón de marca,
+ilegible.
+
+**Por eso el oro son dos tokens y no uno:**
+
+| Token | Para qué | En claro |
+|---|---|---|
+| `--gold` | La LETRA | `#9a6a00` — 4.73:1, pasa AA |
+| `--gold-fill` | El RELLENO (el CTA) | `#f0b800` — se queda vivo, y con texto oscuro da 10:1 |
+
+Es la solución de siempre para una marca luminosa en tema claro: **el color no
+se apaga, se cambia de sitio.**
+
+Los acentos también subieron de croma sin perder contraste — se veían apagados
+porque estaban oscurecidos para que pasaran, en vez de elegidos para que ya
+pasaran:
+
+| | Antes | Ahora | Croma | Contraste |
+|---|---|---|---|---|
+| acción | `#17784f` | `#0a7d52` | 81 % → 92 % | 5.16:1 |
+| peligro | `#c4213f` | `#d61f3f` | 83 % → 86 % | 5.09:1 |
+| bien | `#167a4d` | `#00875a` | 82 % → 100 % | 4.55:1 |
+| aviso | `#1b5fbf` | `#0b62d6` | 86 % → 95 % | 5.63:1 |
+
+Y el fondo bajó de `#f4f4f8` a `#eef0f4`: con el fondo casi blanco, una tarjeta
+blanca no se distinguía de la página y todo se veía plano.
+
+### La paleta del correo es la única copia que queda, y tiene guardián
+
+`mailer.service.ts` repite los colores a mano porque un correo no puede importar
+una hoja de estilos —Gmail la tira— ni usar `var(--bg)`, que Outlook no
+entiende. `paleta-correo.spec.ts` compara los dos archivos y falla si se
+separan: **nadie mira su propio correo de verificación dos veces**, así que sin
+esa prueba el correo sería lo último en notarse.
+
+## 4.23 Qué versión está corriendo
+
+*(5 de septiembre de 2026)*
+
+Ahora se ve, en el pie de cada web: `v2026.09.05`.
+
+### Por qué CalVer y no SemVer
+
+Porque aquí no se publican «versiones»: se despliega cuando algo está listo, a
+veces varias veces al día, y las cuatro webs y las tres APIs salen del mismo
+git. En ese mundo un `1.4.7` no responde la única pregunta que se hace de
+verdad delante de un problema:
+
+> «¿esto que estoy viendo es de antes o de después del arreglo?»
+
+Una fecha sí. Y como en un día puede haber tres despliegues, la fecha sola
+tampoco basta: el hash del commit lo cierra. En pantalla va `v2026.09.05`; al
+dejar el cursor encima, `2026.09.05+8cacddf` — que es lo que hay que pegar en un
+reporte.
+
+### Qué cuenta como una actualización
+
+**Cualquier despliegue.** No hay una lista de cambios que merezcan número y
+otros que no: si el código que corre cambió, la versión cambia. El propósito de
+este dato no es celebrar novedades, es poder decir qué está corriendo — y el
+arreglo de una línea que nadie nota es justo el que más falta hace identificar
+cuando alguien escribe «me sigue pasando».
+
+### De dónde sale
+
+Del **commit**, no del reloj de quien compila (`next.config.ts` de cada web):
+dos personas compilando el mismo código tienen que obtener la misma versión.
+Sin git —un tarball, un contenedor sin `.git`— dice `dev`, que es lo honesto.
 
 ---
 

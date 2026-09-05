@@ -4,6 +4,8 @@ import './globals.css';
 import { NavBar } from '@/components/NavBar';
 import { PwaRegister } from '@/components/PwaRegister';
 import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
+import { AplicarApariencia } from '@/components/AplicarApariencia';
+import { Version } from '@/components/Version';
 import { ControlesApariencia } from '@/components/ControlesApariencia';
 import { I18nProvider } from '@/lib/i18n';
 import { SCRIPT_ANTI_PARPADEO } from '@/lib/tema';
@@ -35,8 +37,15 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // `suppressHydrationWarning` va por el script anti-parpadeo, y solo por él:
+  // ese script escribe `data-theme="light"` en <html> ANTES de que React
+  // hidrate, así que el HTML del servidor y el del cliente no coinciden a
+  // propósito — es justo lo que evita el fogonazo oscuro. Sin esto, React avisa
+  // en cada carga de una diferencia que causamos queriendo. Silencia solo ESE
+  // elemento, no el árbol.
   return (
     <html
+      suppressHydrationWarning
       lang="es"
       className={`${display.variable} ${cuerpo.variable} ${mono.variable}`}
     >
@@ -48,6 +57,10 @@ export default function RootLayout({
       </head>
       <body>
         <I18nProvider>
+          {/* El tema y el idioma que eligió esta persona en el portal. Vienen
+              dentro del pase, así que no hace falta preguntarle nada al
+              ecosystem para pintar bien. */}
+          <AplicarApariencia />
           {/* Barra global: enlaces por rol + hamburguesa en móvil (se oculta
               sola en /login). */}
           <PwaRegister />
@@ -59,6 +72,15 @@ export default function RootLayout({
           <VigilanteDeSesion />
           {/* Tema e idioma, con el mismo dibujo que en Membresías. */}
           <ControlesApariencia />
+          {/* La versión que está corriendo. Academy no tenía pie; esta línea lo
+              es, y sirve para lo mismo que en el portal: saber de un vistazo si
+              lo que alguien está viendo trae ya el arreglo. */}
+          <footer
+            className="border-t py-5 text-center"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <Version />
+          </footer>
         </I18nProvider>
       </body>
     </html>

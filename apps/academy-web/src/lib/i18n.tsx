@@ -61,7 +61,11 @@ const es = {
   'menu.idioma': 'Idioma',
 
   // ── Login ──
-  'login.titulo': 'Iniciar sesión',
+  'login.eyebrow': 'Ecosistema DINAMYT',
+  // Partido en dos: la segunda mitad va en oro, como en las otras tres.
+  'login.titulo': 'Academy',
+  'login.tituloAcento': 'del practicante',
+  'login.subtitulo': 'Ingresa con tu cuenta del ecosistema.',
   'login.correo': 'Correo',
   'login.contrasena': 'Contraseña',
   'login.entrar': 'Entrar',
@@ -127,7 +131,10 @@ const en: Record<ClaveTexto, string> = {
   'menu.modoSistema': '🖥️ Match system',
   'menu.idioma': 'Language',
 
-  'login.titulo': 'Sign in',
+  'login.eyebrow': 'DINAMYT ecosystem',
+  'login.titulo': 'Academy',
+  'login.tituloAcento': "for the practitioner",
+  'login.subtitulo': 'Sign in with your ecosystem account.',
   'login.correo': 'Email',
   'login.contrasena': 'Password',
   'login.entrar': 'Sign in',
@@ -171,16 +178,41 @@ interface I18nContexto {
 
 const Ctx = createContext<I18nContexto | null>(null);
 
+/**
+ * El idioma del NAVEGADOR, reducido a los que hablamos. Es lo que se usa
+ * mientras la persona no haya elegido: quien abre DINAMYT con el teléfono en
+ * inglés no tiene por qué encontrarse la pantalla en español. Es lo mismo que
+ * ya hace la zona horaria, que se detecta sola (§4.12).
+ */
+function idiomaDelNavegador(): Idioma {
+  if (typeof navigator === 'undefined') return 'es';
+  const lista = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language];
+  for (const l of lista) {
+    const corto = (l ?? '').toLowerCase().slice(0, 2);
+    if (corto === 'en') return 'en';
+    if (corto === 'es') return 'es';
+  }
+  return 'es';
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [idioma, setIdiomaEstado] = useState<Idioma>('es');
 
   useEffect(() => {
+    // Lo ELEGIDO manda sobre lo detectado, como con la zona horaria: sin esto,
+    // quien puso español a mano en un teléfono en inglés volvería al inglés.
     try {
       const guardado = localStorage.getItem(STORAGE_KEY);
-      if (guardado === 'es' || guardado === 'en') setIdiomaEstado(guardado);
+      if (guardado === 'es' || guardado === 'en') {
+        setIdiomaEstado(guardado);
+        return;
+      }
     } catch {
-      /* modo incógnito: se queda en español */
+      /* modo incógnito: se sigue con la detección */
     }
+    setIdiomaEstado(idiomaDelNavegador());
   }, []);
 
   const setIdioma = useCallback((i: Idioma) => {

@@ -17,6 +17,8 @@ import {
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoCodigo } from '@/components/CampoCodigo';
 import { Campo } from '@/components/Campo';
+import { CabeceraAuth } from '@/components/CabeceraAuth';
+import { useI18n } from '@/lib/i18n';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
 
 /**
@@ -50,6 +52,7 @@ export default function RecuperarPage() {
 }
 
 function Recuperar() {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
 
@@ -128,16 +131,13 @@ function Recuperar() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 py-10">
-      <Link href="/" className="flex flex-col items-center gap-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="DINAMYT" width={72} height={72} />
-        <span className="display text-xl" style={{ color: 'var(--gold)' }}>
-          DINAMYT
-        </span>
-      </Link>
-
-      <div className="card w-full max-w-sm p-6">
+    <main className="eco-login flex-col gap-6">
+      <div className="card eco-login-caja">
+        <CabeceraAuth
+          antetitulo={t('recuperar.eyebrow')}
+          titulo={t('recuperar.titulo')}
+          acento={t('recuperar.tituloAcento')}
+        />
         {paso === 'correo' && (
           <form onSubmit={pedirCodigo} noValidate>
             <h1 className="display mb-1 text-2xl">¿Olvidaste tu contraseña?</h1>

@@ -1003,6 +1003,11 @@ export class AuthService {
       // falta —él ya sabe dónde está—, pero sí en cualquier cosa que se
       // genere fuera de él.
       timezone: user.timezone ?? null,
+      // Y por el mismo motivo, cómo quiere ver DINAMYT. Es lo que hace que
+      // elegir el modo claro en el portal lo aplique también Membresías,
+      // Campeonatos y Academy — cuatro orígenes distintos, un solo pase.
+      theme: user.theme ?? 'sistema',
+      locale: user.locale ?? null,
     };
 
     return this.jwtService.signToken({ ...payload, jti });

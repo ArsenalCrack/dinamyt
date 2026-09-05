@@ -31,10 +31,47 @@ const mono = IBM_Plex_Mono({
  * —una app que existe pero todavía no se ofrece—, y «todo el deporte», que son
  * tres apps cuando hoy se venden dos.
  */
+const PORTAL = (
+  process.env.NEXT_PUBLIC_PORTAL_URL ?? 'https://dinamyt.org'
+).replace(/\/+$/, '');
+
 export const metadata: Metadata = {
+  /**
+   * ⚠️ **Sin esto, nada de lo de abajo sirve.** `metadataBase` es lo que
+   * convierte las rutas relativas en direcciones absolutas; sin ella, Next
+   * emite el Open Graph con `/logo.png` a secas y ni Google ni WhatsApp saben
+   * de qué dominio es. Era una de las razones por las que el sitio no salía en
+   * el buscador — ver `robots.ts` y OPERAR.md §3.6.
+   */
+  metadataBase: new URL(PORTAL),
   title: 'DINAMYT — El ecosistema digital del Hapkido',
   description:
     'Una sola cuenta para el club y el campeonato: mensualidades y asistencia con Membresías, y torneos con puntuación en vivo desde el tatami con Campeonatos.',
+  /** La dirección buena de esta página. Evita que se indexe dos veces. */
+  alternates: { canonical: '/' },
+  /**
+   * Lo que se ve cuando alguien pega el enlace en WhatsApp, que es por donde se
+   * comparte todo aquí. Sin esto sale la URL pelada y no la abre nadie.
+   */
+  openGraph: {
+    type: 'website',
+    siteName: 'DINAMYT',
+    locale: 'es_CO',
+    url: PORTAL,
+    title: 'DINAMYT — El ecosistema digital del Hapkido',
+    description:
+      'Una sola cuenta para el club y el campeonato: mensualidades y asistencia, y torneos con puntuación en vivo desde el tatami.',
+    images: [{ url: '/icon-512.png', width: 512, height: 512, alt: 'DINAMYT' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'DINAMYT — El ecosistema digital del Hapkido',
+    description:
+      'Una sola cuenta para el club y el campeonato: mensualidades, asistencia y torneos en vivo.',
+    images: ['/icon-512.png'],
+  },
+  /** Que los buscadores puedan entrar. Lo fino lo decide `robots.ts`. */
+  robots: { index: true, follow: true },
   /**
    * Lo que convierte el portal en una app instalable, junto con el service
    * worker de `public/sw.js`. Membresías ya se instalaba; el portal no, y esa
@@ -70,8 +107,15 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // `suppressHydrationWarning` va por el script anti-parpadeo, y solo por él:
+  // ese script escribe `data-theme="light"` en <html> ANTES de que React
+  // hidrate, así que el HTML del servidor y el del cliente no coinciden a
+  // propósito — es justo lo que evita el fogonazo oscuro. Sin esto, React avisa
+  // en cada carga de una diferencia que causamos queriendo. Silencia solo ESE
+  // elemento, no el árbol.
   return (
     <html
+      suppressHydrationWarning
       lang="es"
       className={`${display.variable} ${cuerpo.variable} ${mono.variable}`}
     >

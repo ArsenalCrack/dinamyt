@@ -12,32 +12,11 @@
 @import '@dinamyt/shared/estilos.css';
 
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  margin: 0;
-  min-height: 100vh;
-}
-a { color: inherit; text-decoration: none; }
-::selection { background: var(--gold); color: #14141e; }
+/* El `body` base lo pone `packages/shared/estilos.css`. */
+
 
 /* ── Formularios (base por elemento) ────────────────────────────────────── */
-input, select, textarea {
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 0.55rem 0.75rem;
-  color: var(--text);
-  width: 100%;
-  transition: border-color 0.15s ease;
-}
-input:focus, select:focus, textarea:focus {
-  outline: none;
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px var(--gold-soft);
-}
-input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--gold); }
+
 
 /* ── Contraseñas: un solo ojo, el nuestro ──
    Edge dibuja el suyo (`::-ms-reveal`) y ningún otro navegador lo hace, así que
@@ -45,133 +24,12 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--g
    Edge —y solo Edge— enseñaría los dos, uno encima del otro. `::-ms-clear` es
    la «x» de borrar del mismo navegador, que además tapa el ojo.
    La misma regla está en el portal, en Membresías y en Campeonatos. */
-input[type="password"]::-ms-reveal,
-input[type="password"]::-ms-clear { display: none; }
 
-:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-  border-radius: 0.25rem;
-}
 
-@layer components {
-  /* ── Tipografía de rol ──────────────────────────────────────────────── */
-  .display {
-    font-family: var(--font-display), system-ui, sans-serif;
-    font-weight: 800;
-    font-stretch: 118%;
-    text-transform: uppercase;
-    letter-spacing: -0.015em;
-    line-height: 0.98;
-  }
-  .eyebrow {
-    font-family: var(--font-mono), ui-monospace, monospace;
-    font-size: 0.72rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.22em;
-    color: var(--gold);
-  }
-  .mono {
-    font-family: var(--font-mono), ui-monospace, monospace;
-    font-variant-numeric: tabular-nums;
-  }
 
-  /* ── Franja de cinturones (firma del ecosistema) ────────────────────── */
-  .cinturon {
-    height: 4px;
-    border: 0;
-    background: linear-gradient(
-      90deg,
-      #f3f1e8 0 16.66%,
-      #f0b800 16.66% 33.33%,
-      #3ecf8e 33.33% 50%,
-      #2266ff 50% 66.66%,
-      #e8002a 66.66% 83.33%,
-      #454545 83.33% 100%
-    );
-  }
 
-  /* ── Botones ────────────────────────────────────────────────────────── */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    border-radius: 0.5rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: filter 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
-    white-space: nowrap;
-  }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn:hover:not(:disabled) { filter: brightness(1.12); }
-  .btn:active:not(:disabled) { transform: translateY(1px); }
-  /* Accion primaria (antes oro neon): jade profundo legible. La clase
-     conserva su nombre historico para no tocar cada pagina. */
-  .btn-gold {
-    background: var(--accion);
-    color: var(--accion-texto);
-    border-color: rgba(234, 255, 244, 0.12);
-  }
-  /* CTA de marca (login "Ingresar" y portadas): el oro original. */
-  .btn-cta {
-    background: var(--gold);
-    color: #14141e;
-    box-shadow: 0 2px 14px rgba(240, 184, 0, 0.25);
-  }
-  .btn-outline { background: transparent; border-color: var(--border-strong); color: var(--text); }
-  .btn-outline:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
-  /* Acción destructiva (cerrar sesión, eliminar): SIEMPRE distinta del resto */
-  .btn-danger {
-    background: transparent;
-    border-color: var(--danger);
-    color: var(--danger);
-  }
-  .btn-danger:hover:not(:disabled) {
-    background: rgba(255, 85, 119, 0.12);
-    filter: none;
-  }
-  .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.75rem; }
-
-  /* ── Tarjetas ───────────────────────────────────────────────────────── */
-  .card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  }
-  a.card:hover, button.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    border-color: var(--gold-dim);
-  }
-
-  /* ── Badges ─────────────────────────────────────────────────────────── */
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    border-radius: 999px;
-    padding: 0.15rem 0.6rem;
-    font-family: var(--font-mono), ui-monospace, monospace;
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-  }
-  .badge-ok { background: rgba(62, 207, 142, 0.1); border-color: var(--ok); color: var(--ok); }
-  .badge-gold { background: var(--gold-soft); border-color: var(--gold-dim); color: var(--gold); }
-  .badge-danger { background: rgba(255, 85, 119, 0.12); border-color: var(--danger); color: var(--danger); }
-
-  .msg-error { color: var(--danger); }
-  .msg-ok { color: var(--ok); }
-  .muted { color: var(--text-muted); }
+@layer components {/* ── Tipografía de rol ──────────────────────────────────────────────── *//* ── Franja de cinturones (firma del ecosistema) ────────────────────── *//* ── Botones ────────────────────────────────────────────────────────── *//* Accion primaria (antes oro neon): jade profundo legible. La clase
+     conserva su nombre historico para no tocar cada pagina. *//* CTA de marca (login "Ingresar" y portadas): el oro original. *//* Acción destructiva (cerrar sesión, eliminar): SIEMPRE distinta del resto *//* ── Tarjetas ───────────────────────────────────────────────────────── *//* ── Badges ─────────────────────────────────────────────────────────── */
 }
 
 /* En móvil, las tablas del panel se deslizan horizontalmente dentro de su

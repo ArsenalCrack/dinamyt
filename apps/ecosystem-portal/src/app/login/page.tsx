@@ -16,6 +16,8 @@ import {
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { Campo } from '@/components/Campo';
 import { PROPS_CORREO, validarCorreo } from '@/lib/validacion';
+import { useI18n } from '@/lib/i18n';
+import { CabeceraAuth } from '@/components/CabeceraAuth';
 import {
   destinoSeguro,
   fueUnaRecarga,
@@ -34,6 +36,7 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
+  const { t } = useI18n();
   const router = useRouter();
   const search = useSearchParams();
   const [email, setEmail] = useState(search.get('email') ?? '');
@@ -327,14 +330,7 @@ function LoginForm() {
   // de esta familia (registro, recuperar, verificar) ya lo tenían; ésta,
   // `poner-contrasena` y `salir` se habían quedado sin él.
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 py-10">
-      <Link href="/" className="flex flex-col items-center gap-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="DINAMYT" width={72} height={72} />
-        <span className="display text-xl" style={{ color: 'var(--gold)' }}>
-          DINAMYT
-        </span>
-      </Link>
+    <main className="eco-login flex-col gap-6">
 
       {motivoDelCierre && !abierta && (
         <p
@@ -404,13 +400,22 @@ function LoginForm() {
           </button>
         </section>
       ) : (
-        <form onSubmit={onSubmit} className="card w-full max-w-sm p-6">
-          <h1 className="display mb-1 text-2xl">Iniciar sesión</h1>
-          <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {destino && destino.fresca
-              ? `Una cuenta para todo el ecosistema. Al entrar, vuelves a ${destino.nombre}.`
-              : 'Una cuenta para todo el ecosistema.'}
-          </p>
+        <form onSubmit={onSubmit} className="card eco-login-caja">
+          {/* La cabecera es la MISMA que la de Membresías, Academy y
+              Campeonatos: logo de 56 px dentro de la tarjeta, antetítulo en
+              mono y título con la segunda palabra en oro. Antes el portal
+              ponía el logo a 72 px FUERA de la caja, con la palabra «DINAMYT»
+              debajo — la única de las cuatro que lo hacía así. */}
+          <CabeceraAuth
+            antetitulo={t('login.eyebrow')}
+            titulo={t('login.titulo')}
+            acento={t('login.tituloAcento')}
+            subtitulo={
+              destino && destino.fresca
+                ? `${t('login.subtitulo')} ${t('login.yVuelvesA')} ${destino.nombre}.`
+                : t('login.subtitulo')
+            }
+          />
           <Campo
             etiqueta="Correo"
             htmlFor="login-correo"

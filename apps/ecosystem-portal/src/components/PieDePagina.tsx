@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
+import { Version } from '@/components/Version';
 import { CORREO_SOPORTE } from '@/lib/contacto';
 
 const CAMPEONATOS_URL =
@@ -87,6 +88,12 @@ export function PieDePagina() {
         </p>
         <p className="mt-0.5 text-xs opacity-75">
           DINAMYT Ecosystem es una obra protegida por el derecho de autor.
+        </p>
+        {/* La versión que está corriendo. Va aquí, al final del todo, porque no
+            es algo que nadie venga a buscar — es algo que hace falta tener a
+            mano el día que alguien dice «me sigue pasando». */}
+        <p className="mt-1.5">
+          <Version />
         </p>
       </div>
     </footer>

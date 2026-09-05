@@ -206,7 +206,19 @@ export class MailerService {
     ];
   }
 
-  /** La paleta, la misma de `globals.css` de las tres webs. */
+  /**
+   * La paleta del correo.
+   *
+   * ⚠️ **Son los mismos valores que `packages/shared/estilos.css`**, escritos
+   * aquí a mano y a propósito: un correo no puede importar una hoja de estilos
+   * —Gmail la tira— ni usar `var(--bg)`, porque Outlook no entiende variables
+   * CSS. Todo va en `style=` en línea, y por eso los colores se repiten.
+   *
+   * Al tocar los tokens del ecosistema hay que tocarlos también aquí. Es la
+   * única copia que queda, y queda por una limitación del medio, no por
+   * descuido. El día que se separen, el correo será lo último en notarse: nadie
+   * mira su propio correo de verificación dos veces.
+   */
   private static readonly C = {
     fondo: '#0e0e15',
     tarjeta: '#15151f',
@@ -313,8 +325,15 @@ export class MailerService {
             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td style="padding-right:12px;">${escudo}</td>
-                <td style="font-size:26px; font-weight:800; letter-spacing:3px;
-                           color:${C.oro}; text-transform:uppercase;">DINAMYT</td>
+                <!-- La marca, con el mismo tratamiento que la clase .display
+                     de las cuatro webs: mayusculas, peso 800 y el oro de marca.
+                     El interletrado es NEGATIVO en pantalla (-0.015em) porque
+                     Archivo ya viene ancha; aqui, con una fuente de sistema, un
+                     poco de aire la acerca mas a como se ve la de verdad que
+                     copiar el valor sin la fuente que lo justifica. -->
+                <td style="font-size:26px; font-weight:800; letter-spacing:1px;
+                           color:${C.oro}; text-transform:uppercase;
+                           font-family:'Archivo','Segoe UI',Roboto,Helvetica,Arial,sans-serif;">DINAMYT</td>
               </tr>
             </table>
           </td>

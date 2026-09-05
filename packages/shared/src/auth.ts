@@ -43,4 +43,22 @@ export interface JwtPayload {
   jti?: string;
   /** Zona horaria IANA de la persona, para las apps que pintan horas. */
   timezone?: string | null;
+  /**
+   * Cómo quiere ver DINAMYT esta persona: `sistema` | `claro` | `oscuro`.
+   *
+   * ── Por qué viaja en el PASE y no se pregunta ──
+   *
+   * Porque `localStorage` es por origen, y las cuatro webs viven en
+   * subdominios distintos (`dinamyt.org`, `club.dinamyt.org`,
+   * `campeonatos.dinamyt.org`, `academy.dinamyt.org`). Guardarlo solo en el
+   * navegador obligaba a elegir el modo claro una vez por app, y otra vez en
+   * cada dispositivo.
+   *
+   * Mandarlo aquí es lo mismo que ya se hacía con `timezone`, y por lo mismo:
+   * la app no tiene que preguntarle nada al ecosystem para pintar bien la
+   * primera pantalla. Se elige en el perfil del portal y llega a las cuatro.
+   */
+  theme?: string | null;
+  /** `es-CO`, `en-US`… El idioma de la interfaz. Viaja por lo mismo que `theme`. */
+  locale?: string | null;
 }

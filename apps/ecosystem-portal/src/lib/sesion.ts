@@ -184,6 +184,10 @@ export interface TokenPayload {
   /** La sesión a la que pertenece este pase. Lo que permite cerrarla. */
   jti?: string;
   timezone?: string | null;
+  /** `sistema` | `claro` | `oscuro`. Viaja en el pase para las cuatro apps. */
+  theme?: string | null;
+  /** `es-CO`, `en-US`… El idioma elegido en el perfil. */
+  locale?: string | null;
   exp?: number;
 }
 

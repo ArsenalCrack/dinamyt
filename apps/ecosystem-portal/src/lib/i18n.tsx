@@ -63,8 +63,13 @@ const es = {
 
   // ── Login ──
   'login.eyebrow': 'Tu cuenta DINAMYT',
-  'login.titulo': 'Iniciar sesión',
+  // El título va partido en dos: la segunda mitad se pinta en oro, igual que
+  // en Membresías («Mi Club»), Academy y Campeonatos. Es la firma de la
+  // pantalla de entrar en todo el ecosistema.
+  'login.titulo': 'Iniciar',
+  'login.tituloAcento': 'sesión',
   'login.subtitulo': 'Una cuenta para todo el ecosistema.',
+  'login.yVuelvesA': 'Al entrar, vuelves a',
   'login.correo': 'Correo',
   'login.contrasena': 'Contraseña',
   'login.entrar': 'Entrar',
@@ -75,6 +80,15 @@ const es = {
   'login.sinCuenta': '¿No tienes cuenta?',
   'login.registrate': 'Regístrate',
   'login.error': 'No se pudo iniciar sesión.',
+
+  // ── Registro y recuperar: la misma familia que el login ──
+  'registro.eyebrow': 'Tu cuenta DINAMYT',
+  'registro.titulo': 'Crear',
+  'registro.tituloAcento': 'cuenta',
+  'registro.subtitulo': 'Una sola cuenta para Membresías, Campeonatos y Academy.',
+  'recuperar.eyebrow': 'Tu cuenta DINAMYT',
+  'recuperar.titulo': 'Recuperar',
+  'recuperar.tituloAcento': 'contraseña',
 
   // ── Panel ──
   'panel.saludo': 'Hola,',
@@ -143,8 +157,10 @@ const en: Record<ClaveTexto, string> = {
   'menu.idioma': 'Language',
 
   'login.eyebrow': 'Your DINAMYT account',
-  'login.titulo': 'Sign in',
+  'login.titulo': 'Sign',
+  'login.tituloAcento': 'in',
   'login.subtitulo': 'One account for the whole ecosystem.',
+  'login.yVuelvesA': 'When you sign in, you go back to',
   'login.correo': 'Email',
   'login.contrasena': 'Password',
   'login.entrar': 'Sign in',
@@ -155,6 +171,14 @@ const en: Record<ClaveTexto, string> = {
   'login.sinCuenta': "Don't have an account?",
   'login.registrate': 'Sign up',
   'login.error': 'Could not sign in.',
+
+  'registro.eyebrow': 'Your DINAMYT account',
+  'registro.titulo': 'Create',
+  'registro.tituloAcento': 'account',
+  'registro.subtitulo': 'One account for Membresías, Campeonatos and Academy.',
+  'recuperar.eyebrow': 'Your DINAMYT account',
+  'recuperar.titulo': 'Reset',
+  'recuperar.tituloAcento': 'password',
 
   'panel.saludo': 'Hello,',
   'panel.tusApps': 'Your apps',
@@ -203,18 +227,51 @@ interface I18nContexto {
 
 const Ctx = createContext<I18nContexto | null>(null);
 
+/**
+ * El idioma del NAVEGADOR, reducido a los que hablamos.
+ *
+ * Es lo que se usa cuando la persona todavía no ha elegido. Un alumno que
+ * abre DINAMYT con el teléfono en inglés no tiene por qué encontrarse la
+ * pantalla en español y tener que ir a buscar dónde se cambia: eso es lo
+ * mismo que ya hace la zona horaria (§4.12), que se detecta sola.
+ *
+ * `navigator.languages` antes que `navigator.language`: la lista trae el
+ * orden de preferencia de verdad, y la primera que sepamos hablar es la que
+ * gana. Si no hay ninguna, español, que es donde está todo el uso de hoy.
+ */
+function idiomaDelNavegador(): Idioma {
+  if (typeof navigator === 'undefined') return 'es';
+  const lista = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language];
+  for (const l of lista) {
+    const corto = (l ?? '').toLowerCase().slice(0, 2);
+    if (corto === 'en') return 'en';
+    if (corto === 'es') return 'es';
+  }
+  return 'es';
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   // Se arranca en 'es' y se corrige tras montar: el servidor no puede leer
-  // `localStorage`, y renderizar otro idioma aquí rompería la hidratación.
+  // `localStorage` ni `navigator`, y renderizar otro idioma aquí rompería la
+  // hidratación.
   const [idioma, setIdiomaEstado] = useState<Idioma>('es');
 
   useEffect(() => {
+    // El orden importa, y es el mismo que el de la zona horaria: lo que la
+    // persona ELIGIÓ manda sobre lo que se detecta. Sin esto, quien puso
+    // español a mano en un teléfono en inglés volvería al inglés cada vez.
     try {
       const guardado = localStorage.getItem(STORAGE_KEY);
-      if (guardado === 'es' || guardado === 'en') setIdiomaEstado(guardado);
+      if (guardado === 'es' || guardado === 'en') {
+        setIdiomaEstado(guardado);
+        return;
+      }
     } catch {
-      /* modo incógnito: se queda en español */
+      /* modo incógnito: se sigue con la detección */
     }
+    setIdiomaEstado(idiomaDelNavegador());
   }, []);
 
   const setIdioma = useCallback((i: Idioma) => {

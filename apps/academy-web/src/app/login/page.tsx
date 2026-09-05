@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { getRolEfectivo, limpiarRolCache, rutaInicio } from '@/lib/session';
 import { CampoContrasena } from '@/components/CampoContrasena';
+import { useI18n } from '@/lib/i18n';
 
 const PORTAL_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || 'http://localhost:3000';
@@ -25,6 +26,7 @@ export default function LoginPage() {
 }
 
 function Login() {
+  const { t } = useI18n();
   const router = useRouter();
   const search = useSearchParams();
   const [email, setEmail] = useState('');
@@ -128,25 +130,19 @@ function Login() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1.5rem',
-      }}
-    >
-      <form onSubmit={submit} className="card" style={{ padding: '1.75rem', width: '100%', maxWidth: 380 }}>
+    <main className="eco-login">
+      {/* Las medidas ya no van escritas aquí: las pone
+          `packages/shared/estilos.css`, que es el mismo archivo para las cuatro
+          webs. Así el login no se puede desalinear en una sola de ellas. */}
+      <form onSubmit={submit} className="card eco-login-caja">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="DINAMYT" width={56} height={56} style={{ marginBottom: '0.75rem' }} />
-        <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>Ecosistema DINAMYT</p>
-        <h1 className="display" style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
-          Academy <span style={{ color: 'var(--gold)' }}>del practicante</span>
+        <img src="/logo.png" alt="DINAMYT" className="eco-login-logo" />
+        <p className="eyebrow eco-login-eyebrow">{t('login.eyebrow')}</p>
+        <h1 className="display eco-login-titulo">
+          {t('login.titulo')}{' '}
+          <span style={{ color: 'var(--gold)' }}>{t('login.tituloAcento')}</span>
         </h1>
-        <p className="muted" style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-          Ingresa con tu cuenta del ecosistema.
-        </p>
+        <p className="muted eco-login-subtitulo">{t('login.subtitulo')}</p>
 
         <label className="muted" style={{ fontSize: '0.8rem' }} htmlFor="email">Correo</label>
         {/* 200 es el tope que valida el ecosystem (`validarCorreo`): más
