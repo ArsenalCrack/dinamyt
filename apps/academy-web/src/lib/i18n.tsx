@@ -30,6 +30,53 @@ export const IDIOMAS: { codigo: Idioma; etiqueta: string }[] = [
 
 const STORAGE_KEY = 'dinamyt_lang';
 
+/**
+ * ── LA COOKIE DEL IDIOMA, que cruza las cuatro webs ──────────────────────────
+ *
+ * El mismo problema que el tema, y la misma solucion: `localStorage` es POR
+ * ORIGEN y las apps viven en subdominios distintos, asi que elegir ingles aqui
+ * no se notaba en las otras tres. La copia en `users.locale` solo llega cuando
+ * hay sesion y cuando contesta el servidor.
+ *
+ * Una cookie en el dominio padre (`.dinamyt.org`) la leen las cuatro, y viaja
+ * en el acto. Ver el bloque equivalente en el modulo del tema.
+ */
+const COOKIE_IDIOMA = 'dinamyt_idioma';
+
+function dominioDeLaCookie(): string {
+  if (typeof location === 'undefined') return '';
+  const host = location.hostname;
+  if (host === 'localhost' || /^[\d.]+$/.test(host)) return '';
+  const partes = host.split('.');
+  return partes.length > 2 ? `; domain=.${partes.slice(-2).join('.')}` : '';
+}
+
+/** Lo que eligio esta persona en CUALQUIERA de las cuatro webs, o `null`. */
+export function idiomaDeLaCookie(): Idioma | null {
+  if (typeof document === 'undefined') return null;
+  const m = new RegExp(`(?:^|; )${COOKIE_IDIOMA}=([^;]*)`).exec(document.cookie);
+  const v = m ? decodeURIComponent(m[1]) : null;
+  return v === 'es' || v === 'en' ? v : null;
+}
+
+function guardarIdiomaEnCookie(i: Idioma) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${COOKIE_IDIOMA}=${i}; path=/; max-age=31536000; samesite=lax${dominioDeLaCookie()}`;
+}
+
+/**
+ * `true` si esta persona ya eligio idioma EN ESTE navegador.
+ *
+ * Lo mira `AplicarApariencia` antes de imponer el de la cuenta: sin esto, la
+ * respuesta del servidor —que puede ser mas vieja que el clic que se acaba de
+ * dar— revertia la eleccion. En Campeonatos eso se veia clavado: se elegia
+ * ingles y la pantalla volvia a espaniol sola, porque el idioma ni siquiera se
+ * estaba guardando en la cuenta y el servidor contestaba `es-CO` cada vez.
+ */
+export function hayIdiomaElegido(): boolean {
+  return idiomaDeLaCookie() !== null;
+}
+
 /** `es-CO` → `es`. La columna guarda el locale entero; aquí basta el idioma. */
 export function idiomaDeLocale(locale: string | null | undefined): Idioma {
   return (locale ?? '').toLowerCase().startsWith('en') ? 'en' : 'es';
@@ -55,8 +102,9 @@ const es = {
   'menu.abrir': 'Abrir menú',
   'menu.cerrar': 'Cerrar menú',
   'menu.apariencia': 'Tema e idioma',
-  'menu.modoClaro': '☀️ Modo claro',
-  'menu.modoOscuro': '🌙 Modo oscuro',
+  /* Sin emojis, igual que en las otras tres: la palabra ya lo dice. */
+  'menu.modoClaro': 'Modo claro',
+  'menu.modoOscuro': 'Modo oscuro',
   'menu.modoSistema': '🖥️ Como el sistema',
   'menu.idioma': 'Idioma',
 
@@ -126,8 +174,8 @@ const en: Record<ClaveTexto, string> = {
   'menu.abrir': 'Open menu',
   'menu.cerrar': 'Close menu',
   'menu.apariencia': 'Theme and language',
-  'menu.modoClaro': '☀️ Light mode',
-  'menu.modoOscuro': '🌙 Dark mode',
+  'menu.modoClaro': 'Light mode',
+  'menu.modoOscuro': 'Dark mode',
   'menu.modoSistema': '🖥️ Match system',
   'menu.idioma': 'Language',
 
@@ -203,6 +251,17 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Lo ELEGIDO manda sobre lo detectado, como con la zona horaria: sin esto,
     // quien puso español a mano en un teléfono en inglés volvería al inglés.
+    // La cookie primero: trae lo que se acaba de elegir en OTRA de las cuatro
+    // webs, y `localStorage` no puede saberlo.
+    const compartido = idiomaDeLaCookie();
+    if (compartido) {
+      setIdiomaEstado(compartido);
+      // Y el `lang` del documento con él: sin esto la página se quedaba
+      // anunciándose como española con el texto en inglés, que es lo que lee
+      // un lector de pantalla y lo que usa el navegador para partir palabras.
+      document.documentElement.lang = compartido;
+      return;
+    }
     try {
       const guardado = localStorage.getItem(STORAGE_KEY);
       if (guardado === 'es' || guardado === 'en') {
@@ -218,6 +277,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const setIdioma = useCallback((i: Idioma) => {
     setIdiomaEstado(i);
     document.documentElement.lang = i;
+    guardarIdiomaEnCookie(i);
     try {
       localStorage.setItem(STORAGE_KEY, i);
     } catch {

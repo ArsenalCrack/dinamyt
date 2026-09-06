@@ -41,8 +41,17 @@ export function CabeceraAuth({
   enlazar = true,
 }: {
   antetitulo: string;
-  /** La primera mitad del título, en el color del texto. */
-  titulo: string;
+  /**
+   * La primera mitad del título, en el color del texto.
+   *
+   * **Opcional**, y ese es el arreglo: `/recuperar` tiene un título por PASO
+   * («¿Olvidaste tu contraseña?», «Elige tu nueva contraseña», «Listo») y
+   * además ponía aquí un «Recuperar contraseña» fijo encima. Dos títulos y la
+   * misma frase dicha dos veces, en una tarjeta de 380 px donde el sitio es
+   * justo lo que falta. Cuando la pantalla ya trae su propio título, aquí se
+   * manda solo el antetítulo y el logo.
+   */
+  titulo?: string;
   /** La segunda mitad, en oro. Es la firma de la pantalla en las cuatro apps. */
   acento?: string;
   subtitulo?: string;
@@ -61,18 +70,20 @@ export function CabeceraAuth({
         logo
       )}
       <p className="eyebrow eco-login-eyebrow">{antetitulo}</p>
-      <h1 className="display eco-login-titulo">
-        {titulo}
-        {acento ? (
-          <>
-            {' '}
-            {/* `.acento` y no `var(--gold)`: el título mide 1.5 rem en
-                negrita, o sea texto GRANDE, y ahí le toca el oro de titular.
-                Con el de texto pequeño se veía marrón sobre blanco. */}
-            <span className="acento">{acento}</span>
-          </>
-        ) : null}
-      </h1>
+      {titulo ? (
+        <h1 className="display eco-login-titulo">
+          {titulo}
+          {acento ? (
+            <>
+              {' '}
+              {/* `.acento` y no `var(--gold)`: el título mide 1.5 rem en
+                  negrita, o sea texto GRANDE, y ahí le toca el oro de titular.
+                  Con el de texto pequeño se veía marrón sobre blanco. */}
+              <span className="acento">{acento}</span>
+            </>
+          ) : null}
+        </h1>
+      ) : null}
       {subtitulo ? <p className="muted eco-login-subtitulo">{subtitulo}</p> : null}
     </>
   );

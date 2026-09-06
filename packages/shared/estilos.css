@@ -559,26 +559,50 @@ input[type="password"]::-ms-clear { display: none; }
      la palabra ocupa diez veces más. */
   .marca {
     display: inline-flex;
-    align-items: baseline;
-    gap: 0.4em;
+    /* ── En COLUMNA, no en fila ──
+       En fila, «DINAMYT Campeonatos» medía casi el doble que «DINAMYT» solo,
+       así que la barra de cada app empezaba con un bloque de ancho distinto y
+       en el teléfono se comía el sitio de los enlaces. Apilado, la marca ocupa
+       SIEMPRE lo mismo de ancho —lo que mida «DINAMYT»— y el nombre de la app
+       cae debajo, que es además donde se lee como lo que es: una precisión de
+       la marca, no una segunda palabra al mismo nivel. */
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     min-width: 0;
     font-family: var(--font-display), system-ui, sans-serif;
     font-weight: 800;
     font-stretch: 118%;
     text-transform: uppercase;
     letter-spacing: -0.015em;
-    line-height: 1;
+    line-height: 0.98;
     color: var(--gold-grande);
     white-space: nowrap;
   }
-  /* El nombre de la app: más pequeño, en gris y sin el ancho extra de la
-     display — es una aclaración, no una segunda marca. */
+  /* El nombre de la app: debajo, más pequeño, en gris y sin el ancho extra de
+     la display — es una aclaración, no una segunda marca.
+     
+     El interletrado de 0.14em es lo que hace que una palabra pequeña debajo de
+     una grande se lea como un pie y no como un recorte: llena el ancho de la
+     de arriba sin competir con ella. Es el mismo recurso de `.eyebrow`. */
+  /* La marca de una CABECERA DE PAGINA, que solo tiene sentido cuando no hay
+     barra arriba. Con sesión abierta la barra ya dice dónde estás; repetirlo en
+     el título de la pantalla es decirlo dos veces, una encima de la otra.
+     Quien pone `data-barra` en el `<body>` es la barra misma. */
+  /* `!important` a propósito, y es de los pocos que se justifican: el
+     componente `Logo` de Campeonatos lleva su `display` en un `style=` en
+     línea, y un estilo en línea gana a cualquier regla que no lo lleve. */
+  body[data-barra='si'] .solo-sin-barra { display: none !important; }
+
   .marca-app {
-    font-family: var(--font-body), system-ui, sans-serif;
+    display: block;
+    margin-top: 0.18em;
+    font-family: var(--font-mono), ui-monospace, monospace;
     font-stretch: normal;
-    font-size: 0.68em;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    font-size: 0.46em;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    line-height: 1;
     color: var(--text-muted);
   }
 

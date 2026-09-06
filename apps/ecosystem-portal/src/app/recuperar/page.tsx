@@ -133,14 +133,13 @@ function Recuperar() {
   return (
     <main className="eco-login flex-col gap-6">
       <div className="card eco-login-caja">
-        <CabeceraAuth
-          antetitulo={t('recuperar.eyebrow')}
-          titulo={t('recuperar.titulo')}
-          acento={t('recuperar.tituloAcento')}
-        />
+        {/* Sin `titulo`: cada paso pone el suyo, y es el que dice algo. El
+            fijo de aquí repetía «Recuperar contraseña» encima de «¿Olvidaste
+            tu contraseña?» y de «Elige tu nueva contraseña». */}
+        <CabeceraAuth antetitulo={t('recuperar.eyebrow')} />
         {paso === 'correo' && (
           <form onSubmit={pedirCodigo} noValidate>
-            <h1 className="display mb-1 text-2xl">¿Olvidaste tu contraseña?</h1>
+            <h1 className="display eco-login-titulo">¿Olvidaste tu contraseña?</h1>
             <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
               Escribe el correo de tu cuenta y te enviamos un código de{' '}
               {CODIGO_DIGITOS} dígitos para elegir una nueva.
@@ -181,7 +180,7 @@ function Recuperar() {
 
         {paso === 'codigo' && (
           <form onSubmit={cambiar} noValidate>
-            <h1 className="display mb-1 text-2xl">Elige tu nueva contraseña</h1>
+            <h1 className="display eco-login-titulo">Elige tu nueva contraseña</h1>
             <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
               Si <b style={{ color: 'var(--text)' }}>{email}</b> tiene una cuenta
               de DINAMYT, ahí está el código. Vence en 10 minutos.
@@ -272,7 +271,7 @@ function Recuperar() {
 
         {paso === 'listo' && (
           <div>
-            <h1 className="display mb-1 text-2xl">Listo</h1>
+            <h1 className="display eco-login-titulo">Listo</h1>
             <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
               Tu contraseña quedó cambiada. Con ella entras a todo DINAMYT:
               Membresías, Campeonatos y Academy.

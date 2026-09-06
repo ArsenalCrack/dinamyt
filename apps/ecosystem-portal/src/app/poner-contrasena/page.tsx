@@ -59,9 +59,10 @@ function PonerContrasena() {
         className="w-full max-w-sm rounded-xl border p-6"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
       >
-        <h1 className="mb-6 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-          Pon tu contraseña
-        </h1>
+        {/* `.display` + `.acento`: la tipografía de rol y el oro de TITULAR.
+            Iba con `--gold`, que es el de texto pequeño, y a 24 px en negrita
+            eso se lee marrón sobre blanco. */}
+        <h1 className="display acento eco-login-titulo mb-6">Pon tu contraseña</h1>
 
         {!token ? (
           <div>

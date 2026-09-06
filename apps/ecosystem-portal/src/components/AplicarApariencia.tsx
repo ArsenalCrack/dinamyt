@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import api from '@/lib/api';
-import { aplicarTema, escucharTemaDelSistema, type Tema } from '@/lib/tema';
-import { idiomaDeLocale, useI18n } from '@/lib/i18n';
+import { aplicarTema, escucharTemaDelSistema, hayModoElegido, type Tema } from '@/lib/tema';
+import { hayIdiomaElegido, idiomaDeLocale, useI18n } from '@/lib/i18n';
 import { obtenerPaseCrudo, obtenerToken } from '@/lib/sesion';
 
 /**
@@ -60,11 +60,16 @@ export function AplicarApariencia() {
     }
     if (!pase) return;
 
+    // ⚠️ Solo si este navegador NO tiene ya una elección. El pase es una foto
+    // de la cuenta del momento de entrar: es lo más viejo que hay. Sin esta
+    // guarda pisaba el modo que se acababa de elegir en Membresías —y lo
+    // escribía en la cookie compartida, repartiendo el valor viejo a las otras
+    // tres webs. Ver `hayModoElegido`.
     const tema = pase.theme;
-    if (tema === 'claro' || tema === 'oscuro' || tema === 'sistema') {
+    if (!hayModoElegido() && (tema === 'claro' || tema === 'oscuro' || tema === 'sistema')) {
       aplicarTema(tema as Tema);
     }
-    if (typeof pase.locale === 'string' && pase.locale) {
+    if (!hayIdiomaElegido() && typeof pase.locale === 'string' && pase.locale) {
       setIdioma(idiomaDeLocale(pase.locale));
     }
   }, [setIdioma]);
@@ -84,14 +89,17 @@ export function AplicarApariencia() {
           locale: string | null;
         }>('/users/me/apariencia');
         if (!vigente) return;
+        // Y la cuenta, con la misma guarda: sirve para el dispositivo NUEVO,
+        // donde todavía no hay cookie. En uno que ya tiene elección, imponerla
+        // deshacía el clic que se acababa de dar en la app de al lado —la
+        // respuesta del servidor puede ser más vieja que ese clic.
         if (
-          data.theme === 'claro' ||
-          data.theme === 'oscuro' ||
-          data.theme === 'sistema'
+          !hayModoElegido() &&
+          (data.theme === 'claro' || data.theme === 'oscuro' || data.theme === 'sistema')
         ) {
           aplicarTema(data.theme);
         }
-        if (data.locale) setIdioma(idiomaDeLocale(data.locale));
+        if (!hayIdiomaElegido() && data.locale) setIdioma(idiomaDeLocale(data.locale));
       } catch {
         // Si el ecosistema no contesta, la pantalla se queda con lo que ya
         // pintó el pase. Es cosmético: no puede impedir usar el portal.
