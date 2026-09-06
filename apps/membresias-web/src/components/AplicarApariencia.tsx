@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { aplicarTema, escucharTemaDelSistema, type Tema } from '@/lib/theme';
+import { aplicarTema, escucharTemaDelSistema, hayModoElegido, type Tema } from '@/lib/theme';
 import { leerAparienciaDeLaCuenta } from '@/lib/api';
-import { useI18n } from '@/lib/i18n';
+import { hayIdiomaElegido, useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 
 /**
@@ -52,14 +52,17 @@ export function AplicarApariencia() {
       const eco = await leerAparienciaDeLaCuenta();
       if (!vigente || !eco) return;
 
+      // ⚠️ Solo si este navegador NO tiene ya una elección. La respuesta del
+      // servidor puede ser más vieja que el clic que se acaba de dar en la app
+      // de al lado, y sin esta guarda lo deshacía —y de paso escribía el valor
+      // viejo en la cookie compartida. Ver `hayModoElegido`.
       if (
-        eco.theme === 'claro' ||
-        eco.theme === 'oscuro' ||
-        eco.theme === 'sistema'
+        !hayModoElegido() &&
+        (eco.theme === 'claro' || eco.theme === 'oscuro' || eco.theme === 'sistema')
       ) {
         aplicarTema(eco.theme as Tema);
       }
-      if (eco.locale) {
+      if (!hayIdiomaElegido() && eco.locale) {
         setIdioma(eco.locale.toLowerCase().startsWith('en') ? 'en' : 'es');
       }
     }
