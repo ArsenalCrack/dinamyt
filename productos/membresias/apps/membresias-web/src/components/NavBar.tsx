@@ -385,7 +385,7 @@ export function NavBar() {
             {temaEfectivo(tema) === 'oscuro' ? t('menu.modoClaro') : t('menu.modoOscuro')}
           </button>
 
-          <p className="navbar-etiqueta">🌐 {t('menu.idioma')}</p>
+          <p className="navbar-etiqueta">{t('menu.idioma')}</p>
           <div className="navbar-idiomas" role="group" aria-label={t('menu.idioma')}>
             {IDIOMAS.map((l) => (
               <button
