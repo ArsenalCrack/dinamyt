@@ -1491,7 +1491,7 @@ export default function Ficha() {
 
             <button
               type="submit"
-              className="btn btn-cta btn-sm"
+              className="btn btn-gold btn-sm"
               disabled={!cobro.planId || guardando === 'pago'}
             >
               {guardando === 'pago' ? t('comun.guardando') : t('pago.registrar')}

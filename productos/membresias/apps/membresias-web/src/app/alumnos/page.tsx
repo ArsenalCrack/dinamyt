@@ -793,7 +793,7 @@ export default function Alumnos() {
         )}
       </div>
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-        <button type="submit" className="btn btn-cta" disabled={enviando}>
+        <button type="submit" className="btn btn-gold" disabled={enviando}>
           {enviando
             ? t('comun.guardando')
             : editando === 'nuevo'
@@ -849,7 +849,7 @@ export default function Alumnos() {
             </Link>
           )}
           {esMaestro && (
-            <button className="btn btn-cta btn-sm" onClick={abrirAlta}>
+            <button className="btn btn-gold btn-sm" onClick={abrirAlta}>
               {editando === 'nuevo' ? t('comun.cancelar') : `+ ${t('alumnos.nuevo')}`}
             </button>
           )}

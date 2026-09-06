@@ -300,7 +300,7 @@ export default function Kiosco() {
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
         <button
           type="button"
-          className="btn btn-cta"
+          className="btn btn-gold"
           onClick={() => setEscaneando(true)}
           style={{ width: '100%', fontSize: '1.05rem', padding: '0.9rem' }}
         >
