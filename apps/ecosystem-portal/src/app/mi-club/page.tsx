@@ -288,8 +288,11 @@ export default function MiClubPage() {
         </>
       )}
 
+      {/* `p-0` a proposito: la cabecera de estas tarjetas va a ras del borde,
+          con su propio fondo. Desde que `.card` trae relleno por defecto, sin
+          esto quedaria un marco de 1rem alrededor de esa franja de color. */}
       {clubes.map((club) => (
-        <section key={club.id} className="card mb-4 overflow-hidden">
+        <section key={club.id} className="card mb-4 overflow-hidden p-0">
           {/* Cabecera con el escudo/logo del club como identidad */}
           <div
             className="flex flex-wrap items-center gap-4 border-b p-5"

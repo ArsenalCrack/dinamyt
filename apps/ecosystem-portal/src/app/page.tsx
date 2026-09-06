@@ -91,8 +91,10 @@ export default function HomePage() {
       <header className="barra-superior">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <span className="inline-flex items-center gap-2.5">
-            <img src="/logo.png" alt="DINAMYT" width={32} height={32} />
-            <span className="display acento text-lg">DINAMYT</span>
+            <img src="/logo.png" alt="DINAMYT" width={30} height={30} />
+            {/* La marca del ecosistema, con la clase compartida. El portal no
+                lleva sufijo de aplicación: él ES DINAMYT. */}
+            <span className="marca text-lg">DINAMYT</span>
           </span>
           <nav className="flex items-center gap-2">
             <a

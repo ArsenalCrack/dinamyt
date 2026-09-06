@@ -240,8 +240,11 @@ export function NavBar() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="DINAMYT" width={30} height={30} />
-          <span className="display" style={{ fontSize: '1rem', whiteSpace: 'nowrap' }}>
-            Academy
+          {/* La marca del ecosistema: DINAMYT en oro + el nombre de la app.
+              Antes decía solo «Academy», así que el salto entre apps no tenía
+              ninguna palabra en común. Ver `.marca` en el archivo compartido. */}
+          <span className="marca" style={{ fontSize: '1.125rem' }}>
+            DINAMYT<span className="marca-app">Academy</span>
           </span>
         </Link>
 
