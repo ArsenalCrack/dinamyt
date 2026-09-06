@@ -580,7 +580,7 @@ export default function Admin() {
             </datalist>
           </label>
         </div>
-        <button type="submit" className="btn btn-cta" style={{ marginTop: '1rem' }}>
+        <button type="submit" className="btn btn-gold" style={{ marginTop: '1rem' }}>
           {t('comun.crear')}
         </button>
       </form>

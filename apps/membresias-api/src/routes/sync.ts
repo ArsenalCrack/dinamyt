@@ -4,7 +4,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { asegurarFicha } from '../lib/aprovisionar';
-import { asegurarClub, fijarPlan, rellenarEscudo } from '../lib/plan-del-club';
+import { adoptarClub, asegurarClub, fijarPlan, rellenarEscudo } from '../lib/plan-del-club';
 import { syncSecret } from '../config';
 import { cinturon } from '../lib/cinturones';
 import { imagenGuardada } from '../lib/imagenes';
@@ -268,11 +268,44 @@ export async function syncRoutes(app: FastifyInstance) {
     }
 
     return sinFiltroDeClub(req.server.db, async (db: Db) => {
-      const [club] = await db
+      let [club] = await db
         .select({ id: orgs.id })
         .from(orgs)
         .where(eq(orgs.ecoOrgId, ecoOrgId))
         .limit(1);
+
+      /** Qué acabó pasando con el escudo. Lo lee el panel del portal. */
+      let escudoDicho: 'sin-escudo' | 'rechazado' | 'puesto' | 'ya-tenia' =
+        body.logoUrl === undefined || body.logoUrl === null
+          ? 'sin-escudo'
+          : escudo === null
+            ? 'rechazado'
+            : 'ya-tenia';
+
+      // ── El club que SÍ existe aquí, pero sin atar ──
+      //
+      // Es el caso que mas se ve y el que menos se nota: un club creado en
+      // Membresias antes de que existiera el ecosistema no tiene `eco_org_id`,
+      // y la reconciliacion de agosto ato las CUENTAS, no los CLUBES. Todos los
+      // avisos del espejo buscan por ese campo, asi que ese club esta sordo
+      // desde siempre: el maestro sube el escudo en el portal y aqui no llega
+      // nunca, sin un error que lo diga. Ver `adoptarClub`.
+      //
+      // Va ANTES de crear, y ese orden es todo el punto: crear sin mirar deja
+      // DOS clubes con el mismo nombre — el que tiene los pagos y el que recibe
+      // los avisos —, que es peor que el problema.
+      let enlazado = false;
+      if (!club && body.alDia && body.name) {
+        const atado = await adoptarClub(db, ecoOrgId, body.name);
+        if (atado) {
+          club = { id: atado.id };
+          enlazado = true;
+          req.log.info(
+            { club: atado.id, ecoOrgId, nombre: atado.nombre },
+            'club enlazado con su organización del portal: ya recibe los avisos del espejo',
+          );
+        }
+      }
 
       // ── El club que tiene plan y aquí no existe ──
       //
@@ -294,19 +327,28 @@ export async function syncRoutes(app: FastifyInstance) {
             { club: nuevo.id, ecoOrgId },
             'club creado desde el ecosistema: tiene plan de Membresías',
           );
-          return { encontrado: true, aplicado: true, creado: true, bloqueado: false, desde: null };
+          return {
+            encontrado: true,
+            aplicado: true,
+            creado: true,
+            bloqueado: false,
+            desde: null,
+            escudo: escudo ? 'puesto' : escudoDicho,
+          };
         }
       }
 
       // Sin club aquí no es un error: esa organización del portal no usa
       // Membresías. Contestar 404 haría que el otro lado lo registrara como
       // aviso fallido, y no lo es.
-      if (!club) return { encontrado: false, aplicado: false };
+      if (!club) return { encontrado: false, aplicado: false, escudo: escudoDicho };
 
       // El club que ya estaba y nunca recibió el escudo. Son los que se
-      // crearon con este mismo aviso antes de que llevara el logo: sin esto
-      // habría que tocarlos uno a uno, y no hay pantalla desde donde hacerlo.
+      // crearon con este mismo aviso antes de que llevara el logo, y los que
+      // acaba de adoptar el bloque de arriba: sin esto habría que tocarlos uno
+      // a uno, y no hay pantalla desde donde hacerlo.
       if (await rellenarEscudo(db, club.id, escudo)) {
+        escudoDicho = 'puesto';
         req.log.info({ club: club.id, ecoOrgId }, 'escudo del club puesto desde el ecosistema');
       }
 
@@ -319,7 +361,14 @@ export async function syncRoutes(app: FastifyInstance) {
             : 'plan vencido: el club queda en pausa',
         );
       }
-      return { encontrado: true, aplicado: r.cambio, bloqueado: r.bloqueado, desde: r.desde };
+      return {
+        encontrado: true,
+        aplicado: r.cambio,
+        bloqueado: r.bloqueado,
+        desde: r.desde,
+        escudo: escudoDicho,
+        ...(enlazado ? { enlazado: true } : {}),
+      };
     });
   });
 

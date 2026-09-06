@@ -114,6 +114,62 @@ function aSlug(texto: string): string {
 }
 
 /**
+ * Ata un club que YA existe aquí con su organización del portal.
+ *
+ * ── El agujero que cierra, y por qué es el que mas se ve ──
+ *
+ * Todos los avisos del espejo —la foto, el cinturon, el rol, la baja, el
+ * escudo— buscan por `orgs.eco_org_id`. Un club creado en Membresias ANTES de
+ * que existiera el ecosistema no tiene ese campo, y la reconciliacion de agosto
+ * ato las CUENTAS (`users.eco_sub`) pero no los CLUBES. Resultado: ese club
+ * queda sordo para siempre y ninguna pantalla lo dice — el maestro sube el
+ * escudo en el portal, aqui no llega, y el registro solo guarda un
+ * «no encontro a quien copiarle esto».
+ *
+ * Sin esto, el unico arreglo era crear el club otra vez desde el portal, y
+ * entonces hay DOS clubes con el mismo nombre: el que tiene los pagos y el que
+ * recibe los avisos. Peor que el problema.
+ *
+ * ── Por que por NOMBRE, y por que es seguro ──
+ *
+ * Porque no hay otra cosa en comun: son dos bases distintas y este club nacio
+ * sin ninguna referencia al portal. Se compara el nombre normalizado (el mismo
+ * `aSlug` que genera las direcciones), y se exige que **haya exactamente uno**
+ * sin enlazar con ese nombre. Con dos candidatos no se elige: se deja sin atar
+ * y se registra, porque atar el equivocado le daria los datos de un club a otro.
+ *
+ * Y solo lo llama `/sync/plan`, que es el aviso que dice «esta organizacion
+ * tiene plan de Membresias»: esa es la autoridad para enlazar. `/sync/club`
+ * —que copia el escudo— no ata nada; una vez atado aqui, ya funciona solo.
+ */
+export async function adoptarClub(
+  db: Db,
+  ecoOrgId: string,
+  nombre: string,
+): Promise<{ id: string; nombre: string } | null> {
+  const buscado = aSlug((nombre ?? '').trim());
+  if (!buscado) return null;
+
+  const sueltos = await db
+    .select({ id: orgs.id, name: orgs.name, slug: orgs.slug })
+    .from(orgs)
+    .where(isNull(orgs.ecoOrgId));
+
+  const candidatos = sueltos.filter(
+    (o) => o.slug === buscado || aSlug(o.name) === buscado,
+  );
+  if (candidatos.length !== 1) return null;
+
+  const [atado] = await db
+    .update(orgs)
+    .set({ ecoOrgId, updatedAt: new Date() })
+    .where(and(eq(orgs.id, candidatos[0].id), isNull(orgs.ecoOrgId)))
+    .returning({ id: orgs.id, name: orgs.name });
+
+  return atado ? { id: atado.id, nombre: atado.name } : null;
+}
+
+/**
  * Crea aquí el club que el ecosistema dice que tiene plan de Membresías.
  *
  * ── El agujero que cierra ──

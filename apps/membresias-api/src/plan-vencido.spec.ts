@@ -309,6 +309,106 @@ describe('membresias-api — el plan vencido cierra el club', () => {
     await e.app.close();
   });
 
+  // ── 3-quater · El club que YA estaba aquí, pero sordo ─────────────────────
+
+  it('un club sin enlazar se ADOPTA en vez de duplicarse', async () => {
+    // Es el caso que mas se ve y el que menos se nota: un club creado aqui
+    // antes de que existiera el ecosistema no tiene `eco_org_id`, y la
+    // reconciliacion ato las CUENTAS, no los CLUBES. Todos los avisos del
+    // espejo buscan por ese campo, asi que ese club lleva sordo desde siempre.
+    const e = await crearEscenario();
+    const [suyo] = await e.db.select({ name: orgs.name }).from(orgs).where(eq(orgs.id, e.orgId));
+    const antes = (await e.db.select({ id: orgs.id }).from(orgs)).length;
+
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, name: suyo.name, logoUrl: ESCUDO },
+    });
+    expect(r.json()).toMatchObject({ encontrado: true, enlazado: true });
+    // No nace un gemelo: se ata el que ya tenia los pagos.
+    expect(r.json().creado).toBeUndefined();
+    expect((await e.db.select({ id: orgs.id }).from(orgs)).length).toBe(antes);
+
+    const [club] = await e.db.select().from(orgs).where(eq(orgs.id, e.orgId));
+    expect(club.ecoOrgId).toBe(ECO_ORG);
+    // Y de paso le llega el escudo, que es por lo que se noto el problema.
+    expect(club.logoUrl).toBe(ESCUDO);
+    await e.app.close();
+  });
+
+  it('con el nombre cambiado no adopta nada: crea', async () => {
+    // La adopcion se guia por el nombre normalizado. Si no coincide, no hay
+    // forma de saber que son el mismo club, y atar el equivocado le daria los
+    // datos de un club a otro.
+    const e = await crearEscenario();
+    const antes = (await e.db.select({ id: orgs.id }).from(orgs)).length;
+
+    const r = await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, name: 'Un Nombre Que No Existe Aqui' },
+    });
+    expect(r.json()).toMatchObject({ creado: true });
+    expect((await e.db.select({ id: orgs.id }).from(orgs)).length).toBe(antes + 1);
+    await e.app.close();
+  });
+
+  it('un club YA enlazado con otra organizacion no se adopta', async () => {
+    // La adopcion solo mira los que tienen `eco_org_id` vacio. Si no, el
+    // segundo aviso le robaria el club al primero.
+    const e = await crearEscenario();
+    const otra = '00000000-0000-4000-8000-0000000000cc';
+    await e.db.update(orgs).set({ ecoOrgId: otra }).where(eq(orgs.id, e.orgId));
+    const [suyo] = await e.db.select({ name: orgs.name }).from(orgs).where(eq(orgs.id, e.orgId));
+
+    await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, name: suyo.name },
+    });
+
+    const [club] = await e.db.select({ eco: orgs.ecoOrgId }).from(orgs).where(eq(orgs.id, e.orgId));
+    expect(club.eco).toBe(otra);
+    await e.app.close();
+  });
+
+  it('dice QUE paso con el escudo, que es lo que se pregunta por telefono', async () => {
+    const e = await crearEscenario();
+    await enlazarClub(e);
+    await e.db.update(orgs).set({ logoUrl: null }).where(eq(orgs.id, e.orgId));
+
+    const puesto = await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, logoUrl: ESCUDO },
+    });
+    expect(puesto.json().escudo).toBe('puesto');
+
+    // La segunda vez ya lo tiene: no es noticia, y no se pisa.
+    const otra = await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, logoUrl: ESCUDO },
+    });
+    expect(otra.json().escudo).toBe('ya-tenia');
+
+    // Y uno que no pasa la validacion se dice, en vez de perderse.
+    const malo = await e.app.inject({
+      method: 'POST',
+      url: '/sync/plan',
+      headers: { 'x-dinamyt-sync': SECRETO },
+      payload: { ecoOrgId: ECO_ORG, alDia: true, logoUrl: '/media/relativa.jpg' },
+    });
+    expect(malo.json().escudo).toBe('rechazado');
+    await e.app.close();
+  });
+
   it('el mismo aviso dos veces no crea dos clubes', async () => {
     const e = await crearEscenario();
     const crear = () =>
@@ -353,7 +453,17 @@ describe('membresias-api — el plan vencido cierra el club', () => {
   it('un nombre que choca en el slug no tumba el alta', async () => {
     // Dos clubes «Dinamyt» en dos ciudades es un caso normal, y un alta que se
     // cae por eso deja al club pagado y sin existir — justo lo que se arregla.
+    //
+    // ⚠️ El club de al lado va ATADO a otra organizacion a proposito. Sin eso,
+    // hoy lo que pasa es que se ADOPTA (ver el bloque 3-quater) en vez de
+    // crearse un gemelo, que es lo correcto y lo que esta prueba media antes.
+    // Lo que aqui se defiende es lo otro: cuando adoptar NO se puede, el alta
+    // tiene que salir igual con un slug distinto.
     const e = await crearEscenario();
+    await e.db
+      .update(orgs)
+      .set({ ecoOrgId: '00000000-0000-4000-8000-0000000000dd' })
+      .where(eq(orgs.id, e.orgId));
     const [existente] = await e.db
       .select({ name: orgs.name, slug: orgs.slug })
       .from(orgs)
