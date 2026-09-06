@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { claveRol, useAuth } from '@/lib/auth';
 import { IDIOMAS, useI18n, type ClaveTexto } from '@/lib/i18n';
-import { aplicarTema, getTema, temaEfectivo, type Tema } from '@/lib/theme';
+import { alternarModo, aplicarTema, getTema, temaEfectivo, type Tema } from '@/lib/theme';
 import { guardarAparienciaEnLaCuenta } from '@/lib/api';
 import { Avatar } from './Avatar';
 import { Avisos } from './Avisos';
@@ -200,11 +200,11 @@ export function NavBar() {
   const rolYClub = `${t(claveRol(user))}${club ? ` · ${club.name}` : ''}`;
 
   function alternarTema() {
-    // Dos estados en el botón, no tres: `sistema` es un punto de partida, no un
-    // destino al que alguien quiera volver pulsando. Las tres opciones escritas
-    // están en el perfil del portal, que es donde se elige de verdad.
-    const nuevo: Tema = temaEfectivo(tema) === 'claro' ? 'oscuro' : 'claro';
-    aplicarTema(nuevo);
+    // La cuenta la hace `alternarModo` mirando el DOM, no este `tema`: el
+    // estado arranca en `'sistema'` y se sincroniza en un efecto, así que una
+    // pulsación temprana calculaba sobre un valor viejo y aplicaba **el modo
+    // que ya estaba**. Se veía como «tuve que darle dos veces».
+    const nuevo = alternarModo();
     setTema(nuevo);
     // Y a la CUENTA, para que la elección valga también en el portal, en
     // Campeonatos y en Academy. `localStorage` no cruza subdominios.
@@ -292,7 +292,13 @@ export function NavBar() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="DINAMYT" width={30} height={30} />
-          <span className="display">{t('app.nombre')}</span>
+          {/* La marca del ecosistema: DINAMYT en oro + el nombre de la app.
+              Antes decía solo «Mi Club», así que esta era la única de las
+              cuatro webs donde la palabra DINAMYT no aparecía por ninguna
+              parte. Ver `.marca` en `estilos-ecosistema.css`. */}
+          <span className="marca">
+            DINAMYT<span className="marca-app">{t('app.nombre')}</span>
+          </span>
         </Link>
 
         <nav className="navbar-links" aria-label={t('menu.navegacion')}>

@@ -28,7 +28,9 @@ const es = {
   // Nombre visible de la app. El alumno no entra a «gestionar su membresía»:
   // entra a su club. El vocabulario de cobro (mensualidad, plan, pago) se queda
   // dentro del panel del maestro, que es de quien sí es el asunto.
-  'app.nombre': 'Mi Club',
+  /** El nombre de la APP, que va detrás de DINAMYT en la barra (`.marca`).
+      Era «Mi Club», que es el nombre de una PANTALLA, no del producto. */
+  'app.nombre': 'Membresías',
 
   // Navegación
   'menu.panel': 'Panel del club',
@@ -753,7 +755,7 @@ const es = {
 export type ClaveTexto = keyof typeof es;
 
 const en: Record<ClaveTexto, string> = {
-  'app.nombre': 'My Club',
+  'app.nombre': 'Memberships',
 
   'menu.panel': 'Club dashboard',
   'menu.alumnos': 'Students',

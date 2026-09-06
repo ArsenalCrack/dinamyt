@@ -205,7 +205,11 @@ export function Carnet({
       // app y abajo también — que es mejor que un hueco.
       logoClub: urlFoto(logoClub) ?? '/logo.png',
       logoApp: '/logo.png',
-      marca: `${t('app.nombre')} · DINAMYT`,
+      // La firma del pie: DINAMYT primero y la app detrás, en ese orden y con
+      // el mismo reparto que la barra de arriba (`.marca` / `.marca-app`).
+      // Antes salía «Mi Club · DINAMYT», que ponía delante el nombre de una
+      // pantalla y dejaba la marca de segunda.
+      marca: `DINAMYT · ${t('app.nombre')}`,
     };
     return documentoCarnet(
       datos,
