@@ -78,6 +78,24 @@ export interface ClubDelBarrido {
    *   secreto, o Membresías no respondió. **Aquí el problema no es de datos.**
    */
   resultado: 'creado' | 'al-dia' | 'en-pausa' | 'sin-espejo' | 'no-llego';
+  /**
+   * Qué pasó con el ESCUDO, que es la pregunta que llega por teléfono: «lo
+   * puse en el portal y en Membresías no se ve».
+   *
+   * Hasta ahora no había forma de contestarla sin mirar la base a mano: el
+   * aviso se mandaba y se olvidaba. Estos cuatro estados dicen dónde se paró:
+   *
+   *   · `sin-escudo` — **este club no tiene logo AQUÍ**. Es la respuesta al
+   *     caso más común de todos: el escudo se guardó en la ficha de OTRA
+   *     organización (la federación, o el otro club que gestiona la misma
+   *     persona). No hay nada roto; hay que ponerlo en la ficha correcta.
+   *   · `rechazado`  — se mandó y allí no lo aceptaron. Casi siempre viajó
+   *     como ruta relativa: falta `MEDIA_PUBLIC_URL` en este despliegue.
+   *   · `puesto`     — acaba de escribirse en Membresías.
+   *   · `ya-tenia`   — allí ya había uno y no se pisa.
+   *   · `null`       — el aviso no llegó, así que no hay nada que decir.
+   */
+  escudo: 'sin-escudo' | 'rechazado' | 'puesto' | 'ya-tenia' | null;
 }
 
 /** Formas de pago que se pueden registrar. Las mismas que Membresías. */
@@ -1265,6 +1283,12 @@ export class SubscriptionsService {
         abre,
         motivo: abre ? null : (motivos.get(o.id) ?? null),
         resultado,
+        // Lo que dijo Membresías, con una excepción que se decide aquí: si el
+        // club NO tiene logo en esta base, el escudo ni se manda, así que
+        // aquello contestaría `sin-escudo` igual que si lo hubiéramos mandado
+        // vacío. Decirlo desde este lado es lo que convierte «no se ve» en «no
+        // está puesto aquí», que es lo que hay que leer.
+        escudo: r === null ? null : !o.logoUrl ? 'sin-escudo' : (r.escudo ?? null),
       });
     }
 

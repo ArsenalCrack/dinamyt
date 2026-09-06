@@ -59,9 +59,25 @@ interface Respuesta {
   aplicado?: boolean;
   motivo?: string;
   enlazada?: boolean;
+  /** `/sync/plan`: un club que existía allí sin atar acaba de enlazarse. */
+  enlazado?: boolean;
   /** `/sync/plan`: el club no existía allí y se acaba de crear. */
   creado?: boolean;
   bloqueado?: boolean;
+  /**
+   * `/sync/plan`: qué pasó con el escudo, que es la pregunta que llega por
+   * teléfono («lo puse en el portal y allí no se ve»).
+   *
+   *   · `sin-escudo` — no se mandó ninguno: esta organización no tiene logo
+   *     AQUÍ. Es la respuesta al caso más común de todos, que es haberlo
+   *     puesto en la ficha de OTRA organización (la federación, por ejemplo).
+   *   · `rechazado`  — se mandó y allí no lo aceptaron. Casi siempre porque
+   *     viajó como ruta relativa: falta `MEDIA_PUBLIC_URL`.
+   *   · `puesto`     — acaba de escribirse allí.
+   *   · `ya-tenia`   — allí ya había uno y no se pisa (esto no es el aviso de
+   *     «cambió el escudo»; ése es `/sync/club`).
+   */
+  escudo?: 'sin-escudo' | 'rechazado' | 'puesto' | 'ya-tenia';
 }
 
 /**
@@ -147,6 +163,21 @@ async function avisar(
     }
     if (datos.enlazada) {
       log.log(`${ruta}: la ficha de Membresías quedó enlazada con su cuenta del portal.`);
+    }
+    // El club que llevaba desde siempre sordo. Merece una línea de las que se
+    // buscan: a partir de ahora le llegan la foto, el cinturón, el rol y el
+    // escudo, y hasta hoy no le llegaba ninguno.
+    if (datos.enlazado) {
+      log.log(
+        `${ruta}: un club de Membresías que estaba SIN ENLAZAR acaba de atarse a esta ` +
+          'organización. Desde ahora sí recibe los avisos del espejo.',
+      );
+    }
+    if (datos.escudo === 'rechazado') {
+      log.warn(
+        `${ruta}: Membresías rechazó el escudo. Si en la base es una ruta '/media/…', ` +
+          'falta MEDIA_PUBLIC_URL en este despliegue: viajó relativa y allí no vale.',
+      );
     }
     return datos;
   } catch (e) {

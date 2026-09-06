@@ -899,6 +899,11 @@ export interface ClubDelBarrido {
    */
   motivo: string | null;
   resultado: 'creado' | 'al-dia' | 'en-pausa' | 'sin-espejo' | 'no-llego';
+  /**
+   * Qué pasó con el ESCUDO del club. `sin-escudo` casi siempre quiere decir
+   * que se guardó en la ficha de OTRA organización. Ver el ecosystem.
+   */
+  escudo: 'sin-escudo' | 'rechazado' | 'puesto' | 'ya-tenia' | null;
 }
 
 export interface BarridoDePlanes {

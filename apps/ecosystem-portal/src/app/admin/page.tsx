@@ -1974,6 +1974,19 @@ function EspejoDeMembresias() {
     (c) => !c.abre && (c.motivo !== null || c.resultado === 'en-pausa'),
   );
 
+  // ── Los escudos que no llegaron ────────────────────────────────────────────
+  //
+  // Lista aparte, y hace falta que lo sea: estos clubes ABREN Membresías —o
+  // sea, no salen en la lista de problemas de arriba— y aun así allí se ve el
+  // logo de la aplicación en vez del suyo. Sin esto, la única forma de
+  // contestar «puse el escudo y no se ve» era mirar la base a mano.
+  //
+  // `ya-tenia` y `puesto` no entran: en los dos casos el escudo está donde
+  // tiene que estar.
+  const escudos = (r?.detalle ?? []).filter(
+    (c) => c.abre && (c.escudo === 'sin-escudo' || c.escudo === 'rechazado'),
+  );
+
   return (
     <section className="card mb-5 p-5">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
@@ -2037,6 +2050,40 @@ function EspejoDeMembresias() {
               el ecosystem, o Membresías no respondió. Mientras tanto, allí se ve lo
               de antes.
             </p>
+          )}
+
+          {escudos.length > 0 && (
+            <div
+              className="mb-3 rounded-lg border p-3"
+              style={{ borderColor: 'var(--warn)', background: 'rgba(255, 140, 0, 0.08)' }}
+            >
+              <p className="mb-1 text-sm font-semibold">
+                🛡 {escudos.length} club{escudos.length === 1 ? '' : 'es'} sin escudo en
+                Membresías
+              </p>
+              <ul className="flex flex-col gap-1">
+                {escudos.map((c) => (
+                  <li key={c.id} className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <strong style={{ color: 'var(--text)' }}>{c.name}</strong>{' '}
+                    {c.escudo === 'sin-escudo' ? (
+                      <>
+                        — <strong>no tiene escudo en esta ficha</strong>. Si lo subiste y
+                        no se ve, está guardado en la ficha de otra organización: ábrela
+                        en «Mi organización», elige ESTE club en el selector de arriba y
+                        súbelo ahí.
+                      </>
+                    ) : (
+                      <>
+                        — Membresías rechazó el escudo. Si en la base está como ruta
+                        <code> /media/…</code>, falta <code>MEDIA_PUBLIC_URL</code> en el
+                        ecosystem: viajó relativa y allí solo valen <code>data:</code> y
+                        <code> https://</code>.
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {problemas.length === 0 ? (
