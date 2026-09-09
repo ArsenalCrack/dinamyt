@@ -100,9 +100,50 @@ export default function Login() {
   /** Dos remates y se para: cerrar en bucle sería peor que no cerrar. */
   const remates = useRef(0);
 
+  /**
+   * El aviso se enseña… y se va.
+   *
+   * ── Qué pasaba ──
+   *
+   * Se ponía al montar y solo lo quitaba enviar el formulario. Quien salía y se
+   * quedaba mirando la pantalla tenía «Cerraste tu sesión» clavado encima del
+   * botón de entrar indefinidamente: al minuto ya no es un aviso, es parte del
+   * diseño — y encima contradice lo que la persona está haciendo, que es volver
+   * a entrar. Recargando volvía a salir, porque el `?salida=` seguía en la
+   * barra.
+   *
+   * ── Las tres cosas que lo cierran ──
+   *
+   *   · Un reloj: a los nueve segundos ya se leyó.
+   *   · La dirección, que se limpia **navegando** y no con
+   *     `history.replaceState` — ver el comentario largo del principio de este
+   *     archivo, que es la historia de los dos fallos que costó aprenderlo.
+   *   · Y teclear (`alTeclear`): quien escribe su contraseña ya no está
+   *     saliendo.
+   *
+   * El remate de abajo no se entera de nada de esto: mira `enSalida.current`,
+   * que es un `ref` y no la barra de direcciones.
+   */
   useEffect(() => {
+    if (!enSalida.current) return;
     setAvisoSalida(enSalida.current);
-  }, []);
+    const reloj = setTimeout(() => setAvisoSalida(null), 9000);
+    router.replace('/login');
+    return () => clearTimeout(reloj);
+  }, [router]);
+
+  /**
+   * Teclear es entrar, y entrar no es salir.
+   *
+   * Levanta la marca en cuanto alguien toca un campo: sin esto el remate
+   * cerraría la sesión que este formulario está a punto de abrir, y el aviso
+   * seguiría encima de la contraseña que se está escribiendo.
+   */
+  function alTeclear() {
+    if (!enSalida.current && !avisoSalida) return;
+    enSalida.current = null;
+    setAvisoSalida(null);
+  }
 
   // Quien ya tiene sesión no debería quedarse mirando el formulario… salvo
   // cuando acaba de pulsar Salir, que es justo cuando el formulario es lo
@@ -216,8 +257,7 @@ export default function Login() {
     e.preventDefault();
     // Quien teclea su contraseña aquí ya no está saliendo: está entrando. Sin
     // levantar la marca, el remate de arriba cerraría la sesión recién abierta.
-    enSalida.current = null;
-    setAvisoSalida(null);
+    alTeclear();
     setError('');
     setEnviando(true);
     try {
@@ -288,7 +328,10 @@ export default function Login() {
           {...PROPS_CORREO}
           autoComplete="username"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            alTeclear();
+            setEmail(e.target.value);
+          }}
           maxLength={LIM.correo}
           required
           style={{ margin: '0.3rem 0 0.9rem' }}
@@ -305,7 +348,10 @@ export default function Login() {
           id="password"
           autoComplete="current-password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            alTeclear();
+            setPassword(e.target.value);
+          }}
           required
           style={{ margin: '0.3rem 0 1.1rem' }}
         />

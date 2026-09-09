@@ -466,14 +466,11 @@ export default function Panel() {
         </div>
       )}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(min(160px, 100%), 1fr))',
-          gap: '0.75rem',
-          marginBottom: '1.25rem',
-        }}
-      >
+      {/* El reparto vive en `globals.css` (`.panel-cifras`) y no aquí en línea:
+          son tres anchos distintos con dos medias-consultas, y eso no cabe en
+          un `style`. Ahí está contado por qué «en caja» se lleva la fila entera
+          cuando solo caben dos columnas. */}
+      <div className="panel-cifras">
         {/* ── Tres cifras, y cada una dice lo que es ──
             Antes la segunda línea era «$880.000 / $1.280.000 de lo esperado
             este mes» debajo de un número grande que decía $800.000, sin decir

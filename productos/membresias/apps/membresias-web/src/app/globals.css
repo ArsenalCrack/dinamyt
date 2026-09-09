@@ -23,6 +23,48 @@
    dentro de la capa las clases que no reconoce en el contenido escaneado.) */
 .tabla-scroll { overflow-x: auto; }
 
+/* ── LAS TRES CIFRAS DEL PANEL: en caja · vencidos · presentes ─────────────
+
+   ── El hueco que se veía ──
+
+   Era `repeat(auto-fit, minmax(160px, 1fr))`, o sea «mete las que quepan». Con
+   tres tarjetas eso da tres resultados según el ancho, y el del medio es el
+   malo: en la franja donde caben DOS por fila, «presentes» se quedaba sola
+   abajo a la izquierda con media pantalla en blanco a su derecha. Un hueco
+   así no se lee como una rejilla que respira; se lee como que falta algo.
+
+   ── Lo que se hace ──
+
+   Se dejan de contar columnas y se reparten a mano, que son tres y no van a
+   cambiar:
+
+     · **Una columna** (teléfono): las tres apiladas, sin huecos posibles.
+     · **Dos columnas**: «en caja» se lleva la fila entera y las otras dos se
+       parten la de abajo. Y le toca a ella por lo que lleva dentro — la caja
+       del mes, lo devengado y lo esperado, tres cifras en dos renglones—
+       mientras las otras dos son un número y su nombre. Es exactamente el
+       reparto que pedía el reporte: aprovechar el hueco con la tarjeta que más
+       información abarca.
+     · **Tres columnas** (a partir de 900 px): la fila de siempre, que ahí ya
+       se veía bien.
+
+   Las tarjetas siguen estirándose a la misma altura (`stretch` por defecto),
+   así que la fila de abajo queda pareja sin tener que fijar alturas. */
+.panel-cifras {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+@media (min-width: 560px) {
+  .panel-cifras { grid-template-columns: 1fr 1fr; }
+  .panel-cifras > :first-child { grid-column: 1 / -1; }
+}
+@media (min-width: 900px) {
+  .panel-cifras { grid-template-columns: repeat(3, 1fr); }
+  .panel-cifras > :first-child { grid-column: auto; }
+}
+
 /* ── «Esto se puede editar, o no» ──────────────────────────────────────────
    Un `<fieldset disabled>` desactiva por su cuenta cualquier control que lleve
    dentro, incluidos los de los componentes propios —que por dentro son
