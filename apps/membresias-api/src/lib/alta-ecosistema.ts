@@ -199,9 +199,35 @@ export function avisarAparienciaAlEcosistema(
   log: { warn: (msg: string) => void },
   datos: { ecoSub: string | null; theme?: string; locale?: string },
 ): void {
-  if (!altaEnElEcosistema()) return;
-  // Sin cuenta del portal no hay dónde guardarlo: es el alumno de carnet QR.
-  if (!datos.ecoSub) return;
+  // ── Las dos rendiciones, que ya NO son mudas ─────────────────────────────
+  //
+  // Las dos son estados válidos —una instalación sin ecosistema, y una ficha
+  // sin cuenta del portal— y por eso esto avisa y no falla. Lo que no puede
+  // seguir siendo válido es que no se note: mudas, dejaron el modo y el idioma
+  // sin viajar durante semanas sin una sola línea en el registro, y quien lo
+  // reportó no tenía forma de saber cuál de las dos era. Es la misma lección
+  // que Campeonatos pagó con `ECOSYSTEM_SYNC_SECRET`.
+  //
+  // Desde la migración 0020 esto ya no es «se pierde»: la elección **ya quedó
+  // guardada** en la fila de aquí antes de llamarnos. Lo que se pierde es que
+  // viaje a las otras tres webs.
+  if (!altaEnElEcosistema()) {
+    log.warn(
+      'apariencia: el puente con el ecosistema está apagado (falta ' +
+        'ECOSYSTEM_SYNC_SECRET o ECOSYSTEM_JWKS_URL). La elección queda ' +
+        'guardada en esta cuenta, pero no llega al portal ni a las otras apps.',
+    );
+    return;
+  }
+  // Sin cuenta del portal no hay a quién avisar: es el alumno de carnet QR, y
+  // para él la cuenta de aquí es la única que hay. No es una avería.
+  if (!datos.ecoSub) {
+    log.warn(
+      'apariencia: esta ficha no tiene cuenta del portal (eco_sub vacío). ' +
+        'La elección queda guardada aquí y no viaja: es el caso del carnet QR.',
+    );
+    return;
+  }
   if (datos.theme === undefined && datos.locale === undefined) return;
 
   void (async () => {

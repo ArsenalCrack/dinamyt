@@ -260,21 +260,44 @@ export async function usersRoutes(app: FastifyInstance) {
   //
   // La web la llama al cargar y CORRIGE lo que ya pinto. No al reves: pintar
   // esperando a esto devolveria el fogonazo oscuro que costo tanto quitar.
+  // Y desde la migracion 0020 hay ademas una COPIA local, que es la que
+  // contesta cuando el portal no responde — y la UNICA cuenta que tiene quien
+  // no esta en el portal. Ver `users.theme` en el esquema.
+  //
+  // ── `req.db` y no `app.db`, y esto colgaba las pruebas ────────────────────
+  //
+  // Las dos rutas de apariencia eran las UNICAS de este archivo que consultaban
+  // por `app.db`; las demas usan `req.db`. `app.db` es el pool pelado, y el
+  // plugin de RLS ya envolvio este handler en una transaccion sobre una
+  // conexion (`plugins/rls.ts`). Contra PGlite —una sola conexion— la consulta
+  // por fuera espera a que termine la transaccion que la contiene, y **la
+  // peticion no vuelve nunca**. Es exactamente el sintoma que ese mismo archivo
+  // ya documento para `/sync/rol`, y es la razon por la que estas dos rutas
+  // nunca tuvieron pruebas de punta a punta: no habia forma de escribirlas.
+  //
+  // Contra un PostgreSQL de verdad no cuelga —el pool da otra conexion— pero
+  // corre FUERA del contexto de RLS. Aqui no filtraba nada (la consulta ya va
+  // por `users.id`), pero es la clase de descuido que en la siguiente ruta si
+  // filtra. Con `req.db` las dos cosas quedan bien.
   app.get('/me/apariencia', { preHandler: requireAuth() }, async (req) => {
-    const [yo] = await (app.db as Db)
-      .select({ ecoSub: users.ecoSub })
+    const [yo] = await req.db
+      .select({ ecoSub: users.ecoSub, theme: users.theme, locale: users.locale })
       .from(users)
       .where(eq(users.id, req.user!.sub))
       .limit(1);
 
     const eco = await leerAparienciaDelEcosistema(app.log, yo?.ecoSub ?? null);
 
-    // Sin ecosistema —o sin cuenta alli— se responde `null` y no un error: la
-    // pantalla se queda con lo que ya tenia, que es lo correcto. Membresias
-    // sola tiene que seguir funcionando igual (§1.5).
+    // El ecosistema manda cuando contesta: es la verdad compartida por las
+    // cuatro webs. La copia local es el respaldo, no la competencia — asi que
+    // solo se usa campo a campo, cuando el de alla no vino.
+    //
+    // Sin ecosistema NI copia se responde `null` y no un error: la pantalla se
+    // queda con lo que ya tenia, que es lo correcto. Membresias sola tiene que
+    // seguir funcionando igual (§1.5).
     return {
-      theme: eco?.theme ?? null,
-      locale: eco?.locale ?? null,
+      theme: eco?.theme ?? yo?.theme ?? null,
+      locale: eco?.locale ?? yo?.locale ?? null,
       delEcosistema: !!eco,
     };
   });
@@ -302,12 +325,33 @@ export async function usersRoutes(app: FastifyInstance) {
 
     // El `eco_sub` se lee de la FILA, no del pase: el alumno de carnet QR entra
     // sin cuenta del portal y su preferencia se queda aqui, que es lo correcto.
-    const [yo] = await (app.db as Db)
+    const [yo] = await req.db
       .select({ ecoSub: users.ecoSub })
       .from(users)
       .where(eq(users.id, req.user!.sub))
       .limit(1);
 
+    // ── PRIMERO se guarda AQUI, y esto es lo que faltaba ────────────────────
+    //
+    // Hasta la migracion 0020 esta ruta no guardaba nada: leia el `eco_sub` y
+    // reenviaba, nada mas. Y el reenvio se rinde en silencio dos veces —sin
+    // secreto compartido, y sin `eco_sub`—, asi que para el alumno de carnet QR
+    // la eleccion no se guardaba EN NINGUN SITIO: vivia en la cookie del
+    // navegador y se perdia al cambiar de telefono. Se reporto como «esta
+    // informacion no queda guardada por cuentas», y era literal.
+    //
+    // Se escribe siempre, tambien cuando hay `eco_sub`: es la copia que
+    // contesta cuando el portal no responde, y no cuesta nada.
+    await req.db
+      .update(users)
+      .set({
+        ...(theme !== undefined && { theme }),
+        ...(locale !== undefined && { locale }),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, req.user!.sub));
+
+    // ── Y DESPUES se le cuenta al ecosistema, si lo hay ─────────────────────
     avisarAparienciaAlEcosistema(app.log, {
       ecoSub: yo?.ecoSub ?? null,
       theme,
@@ -315,8 +359,22 @@ export async function usersRoutes(app: FastifyInstance) {
     });
 
     // Se contesta que si aunque el aviso no haya salido todavia: como todo el
-    // espejo, se dispara sin esperarlo. La pantalla de aqui ya cambio.
-    return { ok: true, enElEcosistema: !!yo?.ecoSub };
+    // espejo, se dispara sin esperarlo. La pantalla de aqui ya cambio, y desde
+    // ahora la cuenta de aqui tambien lo sabe.
+    //
+    // `enElEcosistema` dice si esto ademas viajo a las otras tres webs. Llevaba
+    // aqui desde el principio y **nadie lo miraba**: `guardarAparienciaEnLaCuenta`
+    // hacia `void api.patch(...)` y tiraba la respuesta. Ahora la web lo usa
+    // para no prometer lo que no puede cumplir.
+    //
+    // `altaEnElEcosistema()` es EXACTAMENTE la guarda que usa el emisor, y por
+    // eso se repite aqui en vez de contestar `!!eco_sub` a secas: con la ficha
+    // enlazada pero el puente apagado, lo de antes prometia que habia viajado.
+    return {
+      ok: true,
+      guardadoEnLaCuenta: true,
+      enElEcosistema: !!yo?.ecoSub && altaEnElEcosistema(),
+    };
   });
   // ── GET /users — gente del club, por páginas ──────────────────────────────
   //
