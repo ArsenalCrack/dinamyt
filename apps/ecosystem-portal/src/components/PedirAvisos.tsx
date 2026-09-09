@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { activarPush, estadoPush } from '@/lib/push';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * ── «¿Te avisamos?», la primera vez ─────────────────────────────────────────
@@ -54,6 +55,7 @@ const CLAVE = 'dinamyt.avisos.preguntado';
 const ESPERA_MS = 4000;
 
 export function PedirAvisos({ activo }: { activo: boolean }) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   const [estado, setEstado] = useState<'preguntando' | 'yendo' | 'listo' | 'falló'>(
     'preguntando',
@@ -133,17 +135,17 @@ export function PedirAvisos({ activo }: { activo: boolean }) {
         className="confirmar-caja"
         role="dialog"
         aria-modal="true"
-        aria-label="Avisos de tu club"
+        aria-label={t('avisos.deTuClub')}
         onClick={(e) => e.stopPropagation()}
       >
         <p className="pedir-avisos-icono" aria-hidden="true">
           🔔
         </p>
-        <p className="confirmar-titulo">¿Te avisamos cuando pase algo en tu club?</p>
+        <p className="confirmar-titulo">{t('avisos.pedir')}</p>
         <div className="confirmar-detalle">
           {estado === 'listo' ? (
             <p style={{ color: 'var(--ok)' }}>
-              Listo. Te escribiremos cuando alguien quiera entrar a tu club.
+              {t('avisos.listo')}
             </p>
           ) : estado === 'falló' ? (
             <p style={{ color: 'var(--danger)' }}>{motivo}</p>
@@ -158,7 +160,7 @@ export function PedirAvisos({ activo }: { activo: boolean }) {
                   diferencia entre un permiso que se concede y uno que se niega
                   por si acaso. */}
               <p className="mt-2" style={{ fontSize: '0.8rem' }}>
-                Puedes apagarlos cuando quieras desde la campana 🔔.
+                {t('avisos.apagar')}
               </p>
             </>
           )}

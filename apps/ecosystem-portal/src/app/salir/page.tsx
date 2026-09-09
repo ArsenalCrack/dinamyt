@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cerrarSesion } from '@/lib/api';
 import { destinoSeguro } from '@/lib/apps';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Cerrar la sesión del portal desde fuera.
@@ -39,6 +40,7 @@ export default function SalirPage() {
 }
 
 function Salir() {
+  const { t } = useI18n();
   const router = useRouter();
   const search = useSearchParams();
   const [destino] = useState(() => destinoSeguro(search.get('redirect')));
@@ -75,7 +77,7 @@ function Salir() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 py-10">
-      <p className="display text-lg">Cerrando tu sesión de DINAMYT…</p>
+      <p className="display text-lg">{t('salir.cerrando')}</p>
       <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
         {destino ? `Volviendo a ${destino.nombre}.` : 'Un momento.'}
       </p>

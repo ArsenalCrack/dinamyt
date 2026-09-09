@@ -19,6 +19,7 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
+import { useI18n } from '@/lib/i18n';
 
 interface PerfilMiembro {
   id: string;
@@ -61,6 +62,7 @@ interface PerfilMiembro {
  * Ver la cabecera de `app/perfil/page.tsx`.
  */
 export default function EditarMiembroPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const userId = params.id;
@@ -244,7 +246,7 @@ export default function EditarMiembroPage() {
       <header className="card mt-3 mb-4 flex flex-wrap items-center gap-4 p-5">
         <Avatar src={perfil.avatarUrl} nombre={perfil.fullName} size={72} ampliable />
         <div className="min-w-0 flex-1">
-          <p className="eyebrow mb-1">Edición del staff</p>
+          <p className="eyebrow mb-1">{t('miembro.edicionStaff')}</p>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--gold)' }}>
             {perfil.fullName}
           </h1>
@@ -309,7 +311,7 @@ export default function EditarMiembroPage() {
             />
           </label>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Fecha de nacimiento</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.nacimiento')}</span>
             <div className="mt-1">
               <CampoFecha
                 valor={form.birthDate}
@@ -327,7 +329,7 @@ export default function EditarMiembroPage() {
               navegador, y en Android con su propia hoja a pantalla completa—
               dentro de una ficha que no es nada de eso. */}
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Género</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.genero')}</span>
             {/* Aquí SÍ se puede corregir: es el maestro. En el perfil de la
                 persona el campo se cierra una vez puesto. */}
             <div className="mt-1">
@@ -344,7 +346,7 @@ export default function EditarMiembroPage() {
             </div>
           </div>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Tipo de sangre</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.tipoSangre')}</span>
             <div className="mt-1">
               <SelectMenu
                 valor={form.bloodType}
@@ -356,7 +358,7 @@ export default function EditarMiembroPage() {
             </div>
           </div>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Cinturón (promoción)</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.cinturonPromocion')}</span>
             <div className="mt-1">
               {/* El grado que ya lleva la persona va SIEMPRE en la lista,
                   aunque no esté en el catálogo: un desplegable cuyo valor no
@@ -377,7 +379,7 @@ export default function EditarMiembroPage() {
             </div>
           </div>
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Teléfono</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.telefono')}</span>
             <input
               className="mt-1"
               type="tel"
@@ -407,7 +409,7 @@ export default function EditarMiembroPage() {
           </div>
         </div>
 
-        <h2 className="mt-2 text-lg font-semibold">Contacto de emergencia</h2>
+        <h2 className="mt-2 text-lg font-semibold">{t('miembro.emergencia')}</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>Nombre</span>
@@ -451,7 +453,7 @@ export default function EditarMiembroPage() {
 
         <label className="block text-sm">
           <span style={{ color: 'var(--text-muted)' }}>
-            Notas médicas (se guardan cifradas)
+            {t('miembro.notasMedicas')}
           </span>
           <textarea
             className="mt-1"

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import api, { extraerError } from '@/lib/api';
 import { nombreDeZona, zonaDelNavegador, instante } from '@/lib/fechas';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * A qué hora se te escribe.
@@ -37,6 +38,7 @@ export function ZonaHoraria({
   zonaGuardada: string | null;
   manual: boolean;
 }) {
+  const { t } = useI18n();
   const [zona, setZona] = useState(zonaGuardada);
   const [aMano, setAMano] = useState(manual);
   const [detectada, setDetectada] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export function ZonaHoraria({
         </div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <dt style={{ color: 'var(--text-muted)' }}>
-            Zona de este dispositivo
+            {t('zona.deEsteDispositivo')}
           </dt>
           <dd>{nombreDeZona(detectada)}</dd>
         </div>
@@ -126,7 +128,7 @@ export function ZonaHoraria({
             className="btn btn-outline"
             onClick={() => void guardar(detectada)}
           >
-            Usar la de este dispositivo
+            {t('zona.usarLaDeAqui')}
           </button>
         )}
         {!aMano && zona && (

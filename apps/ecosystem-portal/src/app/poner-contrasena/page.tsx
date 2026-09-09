@@ -8,6 +8,7 @@ import { CampoContrasena } from '@/components/CampoContrasena';
 import { Campo } from '@/components/Campo';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
 import { validarContrasena } from '@/lib/validacion';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Donde aterriza el enlace de invitación del maestro (camino B, §2.1).
@@ -17,6 +18,7 @@ import { validarContrasena } from '@/lib/validacion';
  * el correo verificado: no hay un segundo código que pedir.
  */
 function PonerContrasena() {
+  const { t } = useI18n();
   const params = useSearchParams();
   const token = params.get('token') ?? '';
 
@@ -62,15 +64,15 @@ function PonerContrasena() {
         {/* `.display` + `.acento`: la tipografía de rol y el oro de TITULAR.
             Iba con `--gold`, que es el de texto pequeño, y a 24 px en negrita
             eso se lee marrón sobre blanco. */}
-        <h1 className="display acento eco-login-titulo mb-6">Pon tu contraseña</h1>
+        <h1 className="display acento eco-login-titulo mb-6">{t('poner.titulo')}</h1>
 
         {!token ? (
           <div>
             <p className="mb-4 text-sm">
-              Este enlace está incompleto. Ábrelo tal cual te llegó, sin recortarlo.
+              {t('poner.enlaceIncompleto')}
             </p>
             <Link href="/login" className="text-sm underline">
-              Ir a iniciar sesión
+              {t('poner.irAlLogin')}
             </Link>
           </div>
         ) : listo ? (
@@ -84,7 +86,7 @@ function PonerContrasena() {
               className="inline-block rounded-lg px-4 py-2 font-semibold"
               style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
             >
-              Iniciar sesión
+              {t('comun.iniciarSesion2')}
             </Link>
           </div>
         ) : (

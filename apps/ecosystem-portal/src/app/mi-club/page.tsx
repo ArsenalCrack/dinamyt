@@ -18,6 +18,8 @@ import { nombreRol } from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { PaisCiudad } from '@/components/PaisCiudad';
 import { Ampliable } from '@/components/VisorImagen';
+import { useI18n } from '@/lib/i18n';
+import { Cargando } from '@/components/Cargando';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -48,6 +50,7 @@ function etiquetaRed(url: string): string {
  * club desde «Mi organización»; aquí todos sus miembros la consultan.
  */
 export default function MiClubPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [clubes, setClubes] = useState<MiClub[] | null>(null);
   const [error, setError] = useState('');
@@ -123,8 +126,8 @@ export default function MiClubPage() {
 
   if (clubes === null) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>
+      <main className="mx-auto min-h-screen max-w-3xl px-4 py-8">
+        <Cargando mensaje={t('club.cargando')} />
       </main>
     );
   }
@@ -146,7 +149,7 @@ export default function MiClubPage() {
       {clubes.length === 0 && (
         <>
           <div className="card p-8 text-center" style={{ color: 'var(--text-muted)' }}>
-            <p className="mb-2 font-bold">Aún no perteneces a un club.</p>
+            <p className="mb-2 font-bold">{t('club.sinClub')}</p>
             <p className="text-sm">
               Pide a tu maestro que te agregue con tu correo, o si eres maestro,
               funda tu club aquí mismo.
@@ -166,11 +169,11 @@ export default function MiClubPage() {
             {/* Identidad visual: logo + nombre */}
             <div className="flex flex-wrap items-center gap-4">
               {nuevo.logoUrl ? (
-                <Ampliable src={nuevo.logoUrl} alt="Logo del club" logo>
+                <Ampliable src={nuevo.logoUrl} alt={t('club.logo')} logo>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={urlImagen(nuevo.logoUrl) ?? undefined}
-                    alt="Logo del club"
+                    alt={t('club.logo2')}
                     className="h-20 w-20 rounded-xl object-cover"
                     style={{ border: '2px solid var(--gold-dim)' }}
                   />
@@ -212,7 +215,7 @@ export default function MiClubPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>Nombre del club *</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t('club.nombre')}</span>
                 <input
                   className="mt-1"
                   value={nuevo.name}
@@ -222,7 +225,7 @@ export default function MiClubPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>Teléfono de contacto</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t('club.telefonoContacto')}</span>
                 <input
                   className="mt-1"
                   type="tel"
@@ -266,14 +269,14 @@ export default function MiClubPage() {
               </label>
             </div>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Descripción</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('club.descripcion')}</span>
               <textarea
                 className="mt-1"
                 rows={2}
                 value={nuevo.description}
                 maxLength={LIM.descripcion}
                 onChange={(e) => setNuevo({ ...nuevo, description: e.target.value })}
-                placeholder="Qué se entrena, para quién, desde cuándo…"
+                placeholder={t('club.descripcionPh')}
               />
             </label>
             {msg && <p className="text-sm" style={{ color: 'var(--gold)' }}>{msg}</p>}
@@ -339,17 +342,17 @@ export default function MiClubPage() {
               className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2"
             >
               <div>
-                <dt style={{ color: 'var(--text-muted)' }}>Sede / dirección</dt>
+                <dt style={{ color: 'var(--text-muted)' }}>{t('club.sede')}</dt>
                 <dd className="font-semibold">{club.address ?? 'Por definir'}</dd>
               </div>
               <div>
-                <dt style={{ color: 'var(--text-muted)' }}>Horarios de clase</dt>
+                <dt style={{ color: 'var(--text-muted)' }}>{t('club.horarios')}</dt>
                 <dd className="whitespace-pre-line font-semibold">
                   {club.schedule ?? 'Por definir'}
                 </dd>
               </div>
               <div>
-                <dt style={{ color: 'var(--text-muted)' }}>Teléfono</dt>
+                <dt style={{ color: 'var(--text-muted)' }}>{t('club.telefono')}</dt>
                 <dd className="font-semibold">{club.phone ?? '—'}</dd>
               </div>
               <div>
@@ -378,7 +381,7 @@ export default function MiClubPage() {
             {club.gestores.length > 0 && (
               <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
                 <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-                  Maestros y administradores
+                  {t('club.maestros')}
                 </h3>
                 <ul className="flex flex-col gap-1.5 text-sm">
                   {club.gestores.map((g, i) => (
@@ -409,7 +412,7 @@ export default function MiClubPage() {
 
             {['maestro', 'owner', 'admin'].includes(club.myRole) && (
               <Link href="/mi-organizacion" className="btn btn-gold mt-4 inline-block">
-                Editar la información del club
+                {t('club.editarFicha')}
               </Link>
             )}
           </div>

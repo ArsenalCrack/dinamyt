@@ -25,6 +25,7 @@ import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
 import { Avatar } from '@/components/Avatar';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { Cargando } from '@/components/Cargando';
 
 interface Disciplina {
   id: string;
@@ -325,9 +326,13 @@ export default function PerfilPage() {
   if (!perfil) {
     return (
       <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
-        <p style={{ color: error ? 'var(--danger)' : 'var(--text-muted)' }}>
-          {error || 'Cargando tu perfil…'}
-        </p>
+        {/* Con error se enseña el error, no la espera: seguir «cargando» algo
+            que ya falló hace esperar de balde. */}
+        {error ? (
+          <p style={{ color: 'var(--danger)' }}>{error}</p>
+        ) : (
+          <Cargando mensaje={t('perfil.cargando')} />
+        )}
       </main>
     );
   }

@@ -11,6 +11,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Selector de fecha propio, con año y mes a un toque.
@@ -119,6 +120,7 @@ export function CampoFecha({
   style?: CSSProperties;
   borrable?: boolean;
 }) {
+  const { t } = useI18n();
   const [abierto, setAbierto] = useState(false);
   const [vista, setVista] = useState<Vista>('dias');
   const [caja, setCaja] = useState<{
@@ -336,7 +338,7 @@ export function CampoFecha({
               <button
                 type="button"
                 className="fecha-titulo"
-                aria-label="Cambiar entre días y años"
+                aria-label={t('fecha.cambiarVista')}
                 onClick={() => setVista(vista === 'dias' ? 'anos' : 'dias')}
               >
                 {vista === 'dias'

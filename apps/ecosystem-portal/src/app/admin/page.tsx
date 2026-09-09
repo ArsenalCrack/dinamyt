@@ -68,6 +68,7 @@ import { PaisCiudad } from '@/components/PaisCiudad';
 import { dinero } from '@/lib/formato';
 import { Avatar } from '@/components/Avatar';
 import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
+import { Cargando } from '@/components/Cargando';
 import {
   LIM,
   PROPS_CORREO,
@@ -318,8 +319,8 @@ export default function AdminEcosistemaPage() {
 
   if (!autorizado) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>
+      <main className="mx-auto min-h-screen max-w-6xl px-4 py-8">
+        <Cargando mensaje="Comprobando tu acceso…" />
       </main>
     );
   }

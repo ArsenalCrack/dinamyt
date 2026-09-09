@@ -11,6 +11,7 @@ import { DispositivosConectados } from '@/components/DispositivosConectados';
 import { ZonaHoraria } from '@/components/ZonaHoraria';
 import { Apariencia } from '@/components/Apariencia';
 import { useI18n } from '@/lib/i18n';
+import { Cargando } from '@/components/Cargando';
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -112,9 +113,11 @@ export default function ConfiguracionPage() {
   if (!cuenta) {
     return (
       <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
-        <p style={{ color: error ? 'var(--danger)' : 'var(--text-muted)' }}>
-          {error || t('config.cargando')}
-        </p>
+        {error ? (
+          <p style={{ color: 'var(--danger)' }}>{error}</p>
+        ) : (
+          <Cargando />
+        )}
       </main>
     );
   }

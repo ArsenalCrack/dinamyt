@@ -5,6 +5,7 @@ import { Avatar } from '@/components/Avatar';
 import { SelectMenu } from '@/components/SelectMenu';
 import { NOMBRE_ROL, nombreRol, opcionesDeRol } from '@/lib/roles';
 import type { Miembro } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Una persona dentro de una organización, en las listas del portal.
@@ -105,6 +106,7 @@ export function FilaMiembro({
   /** ¿Esta fila es la de quien está mirando la pantalla? */
   esUnoMismo?: boolean;
 }) {
+  const { t } = useI18n();
   const m = miembro;
   const tieneApps = Boolean(
     m.roleMembresias ||
@@ -137,7 +139,7 @@ export function FilaMiembro({
             {esUnoMismo && (
               <span
                 className="badge badge-gold ml-1.5 align-middle"
-                title="Eres tú: tu propio rol no lo cambias desde aquí"
+                title={t('org.eresTu')}
               >
                 Tú
               </span>

@@ -22,6 +22,7 @@ import { Avatar } from '@/components/Avatar';
 import { SelectMenu } from '@/components/SelectMenu';
 import { nombreRol } from '@/lib/roles';
 import { useConfirmar } from '@/components/Confirmar';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * **Entrada al club: las dos puertas, juntas.**
@@ -99,6 +100,7 @@ const COLOR_ESTADO: Record<string, { borderColor: string; color: string }> = {
 };
 
 export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
+  const { t } = useI18n();
   const [codigo, setCodigo] = useState<string | null>(null);
   const [pedido, setPedido] = useState(false);
   const [solicitudes, setSolicitudes] = useState<SolicitudDeEntrada[]>([]);
@@ -318,7 +320,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       {abierta && (
         <>
       <p className="mb-5 mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Dos puertas, y las dos las cierra alguien: <b>tú repartes el código</b> y
+        {t('codigo.dosPuertas')} <b>tú repartes el código</b> y
         aceptas a quien lo teclee, o <b>tú invitas</b> y la persona acepta. En
         cualquiera de las dos, su ficha se crea sola en Membresías al entrar.
       </p>
@@ -337,7 +339,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           disabled={ocupado}
           className="btn btn-outline"
         >
-          Ver el código de mi club
+          {t('codigo.verElMio')}
         </button>
       ) : codigo ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -368,7 +370,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
             disabled={ocupado}
             className="btn btn-outline btn-sm"
             // Rotar no expulsa a nadie: quien ya entró, entró.
-            title="Genera uno nuevo. Quien ya entró sigue dentro."
+            title={t('codigo.regenerar')}
           >
             Cambiar
           </button>
@@ -400,7 +402,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Tu club no admite entradas por código.
+            {t('codigo.sinCodigo')}
           </p>
           <button
             onClick={() =>
@@ -413,7 +415,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
             disabled={ocupado}
             className="btn btn-gold btn-sm"
           >
-            Generar un código
+            {t('codigo.generar')}
           </button>
         </div>
       )}
@@ -425,7 +427,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
       {solicitudes.length === 0 && (
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          Nadie está esperando.
+          {t('codigo.nadieEspera')}
         </p>
       )}
 
@@ -506,7 +508,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         2 · Invitar por correo
       </h3>
       <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Le llega un correo y le aparece en su DINAMYT. <b>No entra hasta que
+        {t('codigo.leLlega')} <b>No entra hasta que
         acepte</b>: aquí se pregunta, no se agrega. Si todavía no tiene cuenta,
         se la creamos y le mandamos el enlace para que ponga su contraseña.
       </p>
@@ -517,7 +519,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           {...PROPS_CORREO}
           value={nueva.email}
           onChange={(e) => setNueva({ ...nueva, email: e.target.value })}
-          aria-label="Correo de quien invitas"
+          aria-label={t('codigo.correoInvitado')}
           className="min-w-0"
         />
         <SelectMenu
@@ -533,7 +535,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <label className="block text-xs">
           <span style={{ color: 'var(--text-muted)' }}>
-            Nombre completo — solo si todavía no tiene cuenta
+            {t('codigo.nombreSiNoTiene')}
           </span>
           {/* `soloLetras` y no texto libre: este nombre nace como el de una
               PERSONA —crea su cuenta si no la tiene— y el servidor lo rechaza
@@ -556,14 +558,14 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         </label>
         <label className="block text-xs">
           <span style={{ color: 'var(--text-muted)' }}>
-            Un mensaje para ella (opcional)
+            {t('codigo.mensajeOpcional')}
           </span>
           <input
             className="mt-1"
             maxLength={LIM.nota}
             value={nueva.note}
             onChange={(e) => setNueva({ ...nueva, note: e.target.value })}
-            placeholder="«eres del grupo de los martes»"
+            placeholder={t('codigo.ejemploMensaje')}
           />
         </label>
       </div>
@@ -581,7 +583,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           className="mt-3 rounded-lg border p-3 text-xs"
           style={{ borderColor: 'var(--gold-dim)', background: 'var(--bg-elevated)' }}
         >
-          <p className="mb-1 font-semibold">Pásale este enlace:</p>
+          <p className="mb-1 font-semibold">{t('codigo.pasaEnlace')}</p>
           <p className="break-all" style={{ color: 'var(--gold)' }}>
             {enlaceSuelto}
           </p>
@@ -623,7 +625,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                     tiene dónde aceptar nada. */}
                 {!i.cuentaLista && (
                   <span className="badge mt-1 inline-block">
-                    Aún no ha puesto su contraseña
+                    {t('codigo.sinContrasena')}
                   </span>
                 )}
               </div>

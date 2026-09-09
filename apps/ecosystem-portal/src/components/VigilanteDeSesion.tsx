@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useI18n } from '@/lib/i18n';
 import {
   obtenerToken,
   olvidarToken,
@@ -39,6 +40,7 @@ import {
  * salvo mandar al login si alguien llega con una sesión ya muerta.
  */
 export function VigilanteDeSesion() {
+  const { t } = useI18n();
   const router = useRouter();
   const ruta = usePathname();
   const [restan, setRestan] = useState(0);
@@ -95,7 +97,7 @@ export function VigilanteDeSesion() {
         style={{ borderColor: 'var(--gold)' }}
       >
         <div>
-          <p className="display text-lg">Tu sesión está a punto de cerrarse</p>
+          <p className="display text-lg">{t('sesion.porCerrarse')}</p>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
             Llevas un rato sin actividad. Se cerrará en{' '}
             <strong>{restan}</strong> segundo{restan === 1 ? '' : 's'} para que
@@ -114,7 +116,7 @@ export function VigilanteDeSesion() {
               setRestan(0);
             }}
           >
-            Sigo aquí
+            {t('sesion.sigoAqui')}
           </button>
           <button
             type="button"

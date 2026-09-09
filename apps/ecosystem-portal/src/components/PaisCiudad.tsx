@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { PAISES, ciudadesDe } from '@/lib/geo';
 import { SelectMenu } from '@/components/SelectMenu';
 import { LIM } from '@/lib/validacion';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * País y ciudad, los dos como desplegable.
@@ -36,6 +37,7 @@ export function PaisCiudad({
   onChange: (pais: string, ciudad: string) => void;
   requerido?: boolean;
 }) {
+  const { t } = useI18n();
   const ciudades = ciudadesDe(pais);
   // Arranca a mano si lo guardado no está en el catálogo (y no está vacío).
   const [aMano, setAMano] = useState(Boolean(ciudad) && !ciudades.includes(ciudad));
@@ -53,7 +55,7 @@ export function PaisCiudad({
           <SelectMenu
             valor={pais}
             etiquetaAria="País"
-            placeholder="— Elige el país —"
+            placeholder={t('geo.eligePais')}
             // Cambiar de país vacía la ciudad: dejar «Medellín» debajo de
             // «México» es peor que dejarlo en blanco.
             onChange={(v) => {
@@ -79,7 +81,7 @@ export function PaisCiudad({
               className="min-w-0 flex-1"
               value={ciudad}
               maxLength={LIM.ciudad}
-              placeholder="Escribe la ciudad"
+              placeholder={t('geo.escribeCiudad')}
               onChange={(e) => onChange(pais, e.target.value)}
               autoFocus
             />
@@ -90,7 +92,7 @@ export function PaisCiudad({
                 setAMano(false);
                 onChange(pais, '');
               }}
-              title="Volver a la lista de ciudades"
+              title={t('geo.volverLista')}
             >
               ↺
             </button>

@@ -13,6 +13,7 @@ import { Avatar } from '@/components/Avatar';
 import { nombreRol } from '@/lib/roles';
 import { haceCuanto } from '@/lib/fechas';
 import { activarPush, desactivarPush, estadoPush, type EstadoPush } from '@/lib/push';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * La campana de quien lleva un club.
@@ -91,6 +92,7 @@ function frase(a: AvisoOrg): { titulo: string; detalle: string; color?: string }
 }
 
 export function CampanaOrg() {
+  const { t } = useI18n();
   const [avisos, setAvisos] = useState<AvisoOrg[]>([]);
   const [sinLeer, setSinLeer] = useState(0);
   const [abierto, setAbierto] = useState(false);
@@ -269,7 +271,7 @@ export function CampanaOrg() {
         aria-label={
           sinLeer > 0 ? `Avisos de tu club (${sinLeer} sin leer)` : 'Avisos de tu club'
         }
-        title="Avisos de tu club"
+        title={t('avisos.deTuClub2')}
       >
         🔔
         {sinLeer > 0 && <span className="avisos-org-badge">{sinLeer}</span>}
@@ -367,8 +369,8 @@ export function CampanaOrg() {
                           type="button"
                           className="avisos-org-visto"
                           onClick={() => marcarUno(a.id)}
-                          aria-label="Marcar como leído"
-                          title="Marcar como leído"
+                          aria-label={t('avisos.marcarLeido')}
+                          title={t('avisos.marcarLeido2')}
                         >
                           ✓
                         </button>

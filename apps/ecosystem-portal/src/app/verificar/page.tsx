@@ -16,6 +16,7 @@ import {
 import { CODIGO_DIGITOS, PROPS_CORREO, validarCorreo } from '@/lib/validacion';
 import { CampoCodigo } from '@/components/CampoCodigo';
 import { Campo } from '@/components/Campo';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Confirmar el correo. **Aquí es donde nace la cuenta.**
@@ -47,6 +48,7 @@ import { Campo } from '@/components/Campo';
  * «ese código no es» sobre una cuenta que se acaba de crear bien.
  */
 export default function VerificarPage() {
+  const { t } = useI18n();
   const router = useRouter();
 
   /** El registro que espera. `undefined` mientras no se ha mirado. */
@@ -166,7 +168,7 @@ export default function VerificarPage() {
         style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
       >
         <h1 className="mb-1 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-          Confirma tu correo
+          {t('verificar.titulo')}
         </h1>
 
         {pendiente === undefined ? (
@@ -213,7 +215,7 @@ export default function VerificarPage() {
               </Campo>
             )}
 
-            <label className="mb-2 block text-sm">Código</label>
+            <label className="mb-2 block text-sm">{t('comun.codigo2')}</label>
             <CampoCodigo
               valor={code}
               onChange={setCode}

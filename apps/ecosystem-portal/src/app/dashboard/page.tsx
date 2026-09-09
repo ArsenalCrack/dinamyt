@@ -22,6 +22,7 @@ import { Avatar } from '@/components/Avatar';
 import { useI18n } from '@/lib/i18n';
 import { PedirAvisos } from '@/components/PedirAvisos';
 import { EntrarAClub } from '@/components/EntrarAClub';
+import { Cargando } from '@/components/Cargando';
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
@@ -218,8 +219,8 @@ export default function DashboardPage() {
 
   if (!payload) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p style={{ color: 'var(--text-muted)' }}>{t('comun.cargando')}</p>
+      <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
+        <Cargando />
       </main>
     );
   }
@@ -580,7 +581,7 @@ export default function DashboardPage() {
             className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
             style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
           >
-            Abrir mi organización
+            {t('panel.abrirOrganizacion2')}
           </Link>
         </section>
       ) : gestiona === false ? (

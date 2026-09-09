@@ -38,11 +38,12 @@ import { Avatar } from '@/components/Avatar';
 import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
 import { Aviso, type Mensaje } from '@/components/Aviso';
 import { FilaMiembro } from '@/components/FilaMiembro';
-import { CampanaOrg } from '@/components/CampanaOrg';
 import { CodigoYSolicitudes } from '@/components/CodigoYSolicitudes';
 import { PaisCiudad } from '@/components/PaisCiudad';
 import { Paginacion, usePorPagina } from '@/components/Paginacion';
 import { Ampliable } from '@/components/VisorImagen';
+import { useI18n } from '@/lib/i18n';
+import { Cargando } from '@/components/Cargando';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -63,6 +64,7 @@ function esOrgGrande(type: string) {
  *   ficha (sede, horarios, contacto) que ven todos sus miembros en «Mi club».
  */
 export default function MiOrganizacionPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [orgs, setOrgs] = useState<MiOrganizacion[]>([]);
   const [sel, setSel] = useState<string | null>(null);
@@ -327,8 +329,8 @@ export default function MiOrganizacionPage() {
 
   if (cargando) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p style={{ color: 'var(--text-muted)' }}>Cargando…</p>
+      <main className="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6">
+        <Cargando mensaje={t('org.cargando')} />
       </main>
     );
   }
@@ -340,7 +342,7 @@ export default function MiOrganizacionPage() {
           ← Dashboard
         </Link>
         <div className="card mt-4 p-8 text-center" style={{ color: 'var(--text-muted)' }}>
-          <p className="mb-2 font-bold">No gestionas ninguna organización.</p>
+          <p className="mb-2 font-bold">{t('org.sinOrganizacion')}</p>
           <p className="mb-4 text-sm">
             ¿Eres maestro? Funda tu propio club y adminístralo desde aquí.
             ¿Diriges una federación? Pide al super administrador que te agregue
@@ -385,14 +387,15 @@ export default function MiOrganizacionPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6">
+      {/* ── Por qué aquí ya no hay campana ───────────────────────────────────
+          Porque ahora vive en la BARRA, que sale en todas las pantallas — que
+          era justo lo que esta copia venía a resolver cuando la barra no
+          existía. Con las dos puestas salían dos campanas a la vez en esta
+          pantalla, una encima de la otra. Ver `BarraPortal`. */}
       <div className="flex items-start justify-between gap-3">
         <Link href="/dashboard" className="text-sm" style={{ color: 'var(--text-muted)' }}>
           ← Dashboard
         </Link>
-        {/* La campana también aquí, y no solo en el dashboard: ésta es la
-            pantalla donde el maestro pasa el rato, y un aviso que solo se ve
-            en la puerta de entrada es un aviso que se ve una vez al día. */}
-        <CampanaOrg />
       </div>
       <h1 className="mb-1 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
         {soloClubes ? 'Mi club' : 'Mi organización'}
@@ -573,7 +576,7 @@ export default function MiOrganizacionPage() {
                           disabled={ocupado}
                           className="btn btn-outline"
                           style={{ color: 'var(--danger)' }}
-                          title="Eliminar club (solo si no tiene miembros ni suscripciones)"
+                          title={t('org.eliminarClub')}
                         >
                           ✕
                         </button>
@@ -650,7 +653,7 @@ export default function MiOrganizacionPage() {
 
               {/* Invitar un club existente (el maestro acepta o rechaza) */}
               <h3 className="mb-2 mt-5 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-                Invitar un club existente
+                {t('org.invitarClub')}
               </h3>
               <div className="flex flex-wrap gap-2">
                 <input
@@ -765,8 +768,8 @@ export default function MiOrganizacionPage() {
             setBusquedaGente(e.target.value);
             setOffsetGente(0);
           }}
-          placeholder="Buscar por nombre o correo…"
-          aria-label="Buscar entre la gente del club"
+          placeholder={t('org.buscarPh')}
+          aria-label={t('org.buscarGente')}
           className="mb-3"
         />
         {/* El paso de páginas también ARRIBA. Al final solo lo encontraba
@@ -858,7 +861,7 @@ export default function MiOrganizacionPage() {
                     <span
                       className="shrink-0 px-1 text-xs"
                       style={{ color: 'var(--text-muted)' }}
-                      title="No puedes sacarte de tu propio club. Si de verdad quieres salir, que te saque otra persona que lo administre, o el super administrador."
+                      title={t('org.noTeSacas')}
                     >
                       —
                     </span>
@@ -894,7 +897,7 @@ export default function MiOrganizacionPage() {
                     title={`Quitar a ${m.fullName} del club`}
                   >
                     <span aria-hidden="true">✕</span>
-                    <span className="sr-only">Quitar del club</span>
+                    <span className="sr-only">{t('org.quitarDelClub')}</span>
                   </button>
                   )}
                 </>
@@ -1031,7 +1034,7 @@ export default function MiOrganizacionPage() {
                         }
                         disabled={ocupado}
                         className="btn btn-outline btn-sm"
-                        title="Quitar esta baja de la lista"
+                        title={t('org.quitarBaja')}
                       >
                         ✕
                       </button>
@@ -1068,7 +1071,7 @@ export default function MiOrganizacionPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={urlImagen(ficha.logoUrl) ?? undefined}
-                  alt="Escudo del club"
+                  alt={t('org.escudo')}
                   className="h-16 w-16 rounded-xl object-cover"
                   style={{ border: '2px solid var(--gold-dim)' }}
                 />
@@ -1109,7 +1112,7 @@ export default function MiOrganizacionPage() {
 
           <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Dirección / sede</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('org.direccion')}</span>
               <input
                 className="mt-1"
                 value={ficha.address}
@@ -1118,7 +1121,7 @@ export default function MiOrganizacionPage() {
               />
             </label>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Teléfono (solo números)</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('org.telefonoDigitos')}</span>
               <input
                 className="mt-1"
                 type="tel"
@@ -1137,7 +1140,7 @@ export default function MiOrganizacionPage() {
               onChange={(country, city) => setFicha({ ...ficha, country, city })}
             />
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Correo de contacto</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('org.correoContacto')}</span>
               <input
                 className="mt-1"
                 {...PROPS_CORREO}
@@ -1209,7 +1212,7 @@ export default function MiOrganizacionPage() {
               onChange={(e) => setFicha({ ...ficha, isPublic: e.target.checked })}
             />
             <span>
-              Mostrar este club en el directorio público de DINAMYT
+              {t('org.enDirectorio')}
               <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
                 Se publican el nombre, la ciudad, el contacto y el escudo. Tus
                 alumnos no aparecen nunca.

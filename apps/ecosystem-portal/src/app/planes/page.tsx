@@ -6,6 +6,7 @@ import { listPlanesAPI, type Plan } from '@/lib/api';
 import { CORREO_ADMIN } from '@/lib/contacto';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { Cargando } from '@/components/Cargando';
 
 const NOMBRE_APP: Record<string, string> = {
   academy: 'Academy',
@@ -151,9 +152,7 @@ export default function PlanesPage() {
 
       <h2 className="display mb-4 text-xl sm:text-2xl">{t('planes.queEntra')}</h2>
 
-      {estado === 'cargando' && (
-        <p style={{ color: 'var(--text-muted)' }}>{t('comun.cargando')}</p>
-      )}
+      {estado === 'cargando' && <Cargando encajado />}
       {estado === 'error' && (
         <p style={{ color: 'var(--danger)' }}>
           {t('planes.errorCargar')}{' '}

@@ -139,7 +139,7 @@ function Recuperar() {
         <CabeceraAuth antetitulo={t('recuperar.eyebrow')} />
         {paso === 'correo' && (
           <form onSubmit={pedirCodigo} noValidate>
-            <h1 className="display eco-login-titulo">¿Olvidaste tu contraseña?</h1>
+            <h1 className="display eco-login-titulo">{t('login.olvidada2')}</h1>
             <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
               Escribe el correo de tu cuenta y te enviamos un código de{' '}
               {CODIGO_DIGITOS} dígitos para elegir una nueva.
@@ -172,7 +172,7 @@ function Recuperar() {
             </button>
             <p className="mt-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
               <Link href="/login" style={{ color: 'var(--gold)' }}>
-                Volver a iniciar sesión
+                {t('recuperar.volverAlLogin')}
               </Link>
             </p>
           </form>
@@ -180,13 +180,13 @@ function Recuperar() {
 
         {paso === 'codigo' && (
           <form onSubmit={cambiar} noValidate>
-            <h1 className="display eco-login-titulo">Elige tu nueva contraseña</h1>
+            <h1 className="display eco-login-titulo">{t('recuperar.nuevaContrasena')}</h1>
             <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
               Si <b style={{ color: 'var(--text)' }}>{email}</b> tiene una cuenta
               de DINAMYT, ahí está el código. Vence en 10 minutos.
             </p>
 
-            <label className="mb-2 block text-sm">Código</label>
+            <label className="mb-2 block text-sm">{t('comun.codigo')}</label>
             <CampoCodigo valor={code} onChange={setCode} autoFocus />
 
             <div className="mt-5">
@@ -281,7 +281,7 @@ function Recuperar() {
               onClick={() => router.replace(`/login?email=${encodeURIComponent(email)}`)}
               className="btn btn-cta w-full"
             >
-              Iniciar sesión
+              {t('comun.iniciarSesion')}
             </button>
           </div>
         )}

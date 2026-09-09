@@ -405,7 +405,7 @@ export default function RegistroPage() {
                 min={fechas.min}
                 max={fechas.max}
                 borrable={false}
-                placeholder="Elige tu fecha"
+                placeholder={t('registro.eligeFecha')}
                 etiquetaAria="Fecha de nacimiento"
               />
             </Campo>
@@ -481,7 +481,7 @@ export default function RegistroPage() {
         <p className="mt-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
           ¿Ya tienes cuenta?{' '}
           <Link href="/login" style={{ color: 'var(--gold)' }}>
-            Inicia sesión
+            {t('registro.iniciaSesion')}
           </Link>
         </p>
       </form>

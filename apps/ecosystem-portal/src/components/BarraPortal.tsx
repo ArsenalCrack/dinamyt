@@ -18,6 +18,7 @@ import {
 import { IDIOMAS, useI18n, type ClaveTexto } from '@/lib/i18n';
 import { alternarModo, getTema, temaEfectivo, type Tema } from '@/lib/tema';
 import { esPublica } from '@/lib/rutas';
+import { nombreRol } from '@/lib/roles';
 
 /**
  * El símbolo de encendido de «Salir», dibujado en vez de escrito.
@@ -110,6 +111,18 @@ export function BarraPortal() {
   /** ¿Gestiona alguna organización? ¿Pertenece a algún club? `null` = aún no se sabe. */
   const [gestiona, setGestiona] = useState<boolean | null>(null);
   const [enClub, setEnClub] = useState<boolean | null>(null);
+  /**
+   * Quién es esta persona AQUÍ: su rol y su club.
+   *
+   * Debajo del nombre iba el CORREO, y un correo es una línea larga sin
+   * espacios: en un panel de 250 px se comía dos renglones y empujaba todo lo
+   * demás. Y además no dice nada que la persona no sepa. «Maestro · Club
+   * Heredero Prueba» ocupa lo mismo que una línea y contesta la pregunta que
+   * de verdad se hace al abrir el menú: en calidad de qué estoy entrando.
+   *
+   * Es lo que hace Membresías (`rolYClub` en su `NavBar`).
+   */
+  const [quien, setQuien] = useState<string | null>(null);
   // Arranca en `sistema` —igual que el servidor— y se sincroniza al montar: leer
   // la cookie en el render rompería la hidratación.
   const [tema, setTema] = useState<Tema>('sistema');
@@ -144,6 +157,19 @@ export function BarraPortal() {
     ]);
     setGestiona(orgs.status === 'fulfilled' && orgs.value.length > 0);
     setEnClub(club.status === 'fulfilled' && club.value.length > 0);
+
+    // El rol sale de la organización que gestiona; si no gestiona ninguna, de
+    // su club. El nombre del club es lo segundo, y solo si hay sitio: quien
+    // pertenece a uno lo tiene delante todo el día, pero verlo confirma en cuál
+    // de los dos clubes está la sesión.
+    const rol =
+      orgs.status === 'fulfilled' && orgs.value.length > 0
+        ? orgs.value[0].myRole
+        : null;
+    const nombreClub =
+      club.status === 'fulfilled' && club.value.length > 0 ? club.value[0].name : null;
+    const partes = [rol ? nombreRol(rol) : null, nombreClub].filter(Boolean);
+    setQuien(partes.length ? partes.join(' · ') : null);
   }, []);
 
   useEffect(() => {
@@ -317,7 +343,15 @@ export function BarraPortal() {
             <Avatar src={foto} nombre={nombre} size={38} ampliable />
             <span className="navbar-panel-datos">
               <b>{nombre}</b>
-              <span>{pase.is_super_admin ? 'Super administrador' : pase.email}</span>
+              {/* El super administrador manda sobre todo lo demás: no tiene
+                  club y su rol no sale de ninguna organización. Y si todavía no
+                  se sabe el rol —o la persona no tiene ni club ni organización—
+                  se cae al correo, que es lo único que siempre hay. */}
+              <span>
+                {pase.is_super_admin
+                  ? t('menu.superAdmin')
+                  : (quien ?? pase.email)}
+              </span>
             </span>
           </div>
 

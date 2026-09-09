@@ -1,7 +1,10 @@
+'use client';
+
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
 import { Version } from '@/components/Version';
 import { CORREO_SOPORTE } from '@/lib/contacto';
+import { useI18n } from '@/lib/i18n';
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
@@ -28,8 +31,16 @@ const AUTOR = 'Amir Sarmiento';
  * estaban en la página de planes y en la política de privacidad, que no es
  * donde busca ayuda quien no consigue entrar a su cuenta.
  *
- * Es un componente de servidor (no lleva estado ni hooks): no pesa ni un byte
- * en el paquete del navegador.
+ * ── Por qué dejó de ser de servidor ──
+ *
+ * Lo era, y era una ventaja de verdad: no pesaba ni un byte en el paquete del
+ * navegador. Pero el pie sale en TODAS las pantallas y estaba escrito solo en
+ * castellano, así que era la línea sin traducir que más veces se lee de toda la
+ * aplicación — y `useI18n` es un hook, que en un componente de servidor no
+ * existe.
+ *
+ * El cambio cuesta unos cientos de bytes; el pie no tiene estado ni efectos,
+ * solo lee el idioma. Es lo mismo que ya hacía `PieLegal` en Membresías.
  *
  * ── Cómo se reparte, y por qué cambia en el celular ───────────────────────
  *
@@ -45,6 +56,7 @@ const AUTOR = 'Amir Sarmiento';
  * ni leer ni copiar.
  */
 export function PieDePagina() {
+  const { t } = useI18n();
   const ahora = new Date().getFullYear();
   const años = ahora > AÑO_INICIAL ? `${AÑO_INICIAL}–${ahora}` : String(AÑO_INICIAL);
 
@@ -70,7 +82,7 @@ export function PieDePagina() {
             className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
           >
             <span aria-hidden="true">✉</span>
-            <span style={{ color: 'var(--text-muted)' }}>¿Necesitas ayuda?</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('pie.ayuda')}</span>
             <span className="break-all">{CORREO_SOPORTE}</span>
           </a>
         </nav>
@@ -87,7 +99,7 @@ export function PieDePagina() {
           los derechos reservados.
         </p>
         <p className="mt-0.5 text-xs opacity-75">
-          DINAMYT Ecosystem es una obra protegida por el derecho de autor.
+          {t('pie.obra')}
         </p>
         {/* La versión que está corriendo. Va aquí, al final del todo, porque no
             es algo que nadie venga a buscar — es algo que hace falta tener a

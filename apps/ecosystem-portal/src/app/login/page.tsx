@@ -347,7 +347,7 @@ function LoginForm() {
 
       {abierta ? (
         <section className="card w-full max-w-sm p-6">
-          <h1 className="display mb-1 text-2xl">Ya hay una sesión abierta</h1>
+          <h1 className="display mb-1 text-2xl">{t('login.yaHaySesion')}</h1>
           <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
             {destino && destino.fresca
               ? `${destino.nombre} está pidiendo entrar con tu cuenta DINAMYT.`
@@ -396,7 +396,7 @@ function LoginForm() {
             onClick={entrarConOtraCuenta}
             className="btn btn-outline mt-3 w-full"
           >
-            Entrar con otra cuenta
+            {t('login.otraCuenta')}
           </button>
         </section>
       ) : (
@@ -454,7 +454,7 @@ function LoginForm() {
               href={`/recuperar${email ? `?email=${encodeURIComponent(email)}` : ''}`}
               style={{ color: 'var(--gold)' }}
             >
-              ¿Olvidaste tu contraseña?
+              {t('login.olvidada')}
             </Link>
           </p>
           {error && (
@@ -486,7 +486,7 @@ function LoginForm() {
               onChange={(e) => setRecordar(e.target.checked)}
               style={{ accentColor: 'var(--gold)' }}
             />
-            <span>Mantener la sesión iniciada en este dispositivo</span>
+            <span>{t('login.recordarme')}</span>
           </label>
           <button
             type="submit"
@@ -522,7 +522,7 @@ function LoginForm() {
           >
             ¿No tienes cuenta?{' '}
             <Link href="/registro" style={{ color: 'var(--gold)' }}>
-              Regístrate
+              {t('login.registrate')}
             </Link>
           </p>
         </form>

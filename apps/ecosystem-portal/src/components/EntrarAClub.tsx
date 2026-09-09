@@ -8,6 +8,7 @@ import {
   type MiSolicitud,
 } from '@/lib/api';
 import { LIM } from '@/lib/validacion';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * «Tengo el código de mi club» — el camino C de §2.1 del plan.
@@ -34,6 +35,7 @@ import { LIM } from '@/lib/validacion';
  * confundan (ni `I`, ni `O`, ni `0`, ni `1`).
  */
 export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
+  const { t } = useI18n();
   const [codigo, setCodigo] = useState('');
   const [nota, setNota] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -87,7 +89,7 @@ export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
       className="rounded-xl border p-5"
       style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
     >
-      <h2 className="mb-1 text-lg font-semibold">Entrar a un club</h2>
+      <h2 className="mb-1 text-lg font-semibold">{t('club.entrarTitulo')}</h2>
       <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
         Si tu maestro te dio un código, escríbelo aquí. Él lo aprueba y tu club
         aparece solo en Membresías y en Campeonatos.
@@ -102,7 +104,7 @@ export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
               style={{ borderColor: 'var(--border)' }}
             >
               <span className="min-w-0 truncate font-semibold">{s.orgName}</span>
-              <span className="badge">Esperando al maestro</span>
+              <span className="badge">{t('club.esperando')}</span>
             </li>
           ))}
         </ul>
@@ -110,13 +112,13 @@ export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <label className="min-w-0 flex-1 text-sm">
-          <span className="sr-only">Código del club</span>
+          <span className="sr-only">{t('club.codigo')}</span>
           <input
             value={codigo}
             // Mayúsculas mientras se escribe: el código se guarda así y ver
             // otra cosa en pantalla hace dudar de si se tecleó bien.
             onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-            placeholder="Código del club (p. ej. K7QM3XPD)"
+            placeholder={t('club.codigoPh')}
             maxLength={14}
             autoCapitalize="characters"
             autoCorrect="off"
@@ -134,11 +136,11 @@ export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
       </div>
 
       <label className="mt-2 block text-sm">
-        <span className="sr-only">Mensaje para el maestro</span>
+        <span className="sr-only">{t('club.mensajeMaestro')}</span>
         <input
           value={nota}
           onChange={(e) => setNota(e.target.value)}
-          placeholder="Opcional: «soy el papá de Ana», «entreno los martes»"
+          placeholder={t('club.mensajePh')}
           maxLength={LIM.nota}
         />
       </label>
