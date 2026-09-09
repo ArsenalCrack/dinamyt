@@ -41,7 +41,15 @@ function dominioDeLaCookie(): string {
   const host = location.hostname;
   if (host === 'localhost' || /^[\d.]+$/.test(host)) return '';
   const partes = host.split('.');
-  return partes.length > 2 ? `; domain=.${partes.slice(-2).join('.')}` : '';
+  // ⚠️ `>= 2` y no `> 2`. Aquí estaba el fallo de «el tema y el idioma no se
+  // sincronizan»: el portal vive en `dinamyt.org` —DOS etiquetas—, así que era
+  // la única de las cuatro webs que escribía esta cookie SIN dominio, y una
+  // cookie sin dominio es de ese host y de nadie más. Elegir el modo claro o el
+  // inglés EN EL PORTAL —que es justo donde está Configuración, o sea donde se
+  // elige de verdad— no llegaba a Membresías ni a Campeonatos. Al revés sí
+  // funcionaba, porque los subdominios tienen tres etiquetas: de ahí el «unas
+  // veces cruza y otras no».
+  return partes.length >= 2 ? `; domain=.${partes.slice(-2).join('.')}` : '';
 }
 
 /** Lo que eligio esta persona en CUALQUIERA de las cuatro webs, o `null`. */
@@ -54,7 +62,15 @@ export function idiomaDeLaCookie(): Idioma | null {
 
 function guardarIdiomaEnCookie(i: Idioma) {
   if (typeof document === 'undefined') return;
-  document.cookie = `${COOKIE_IDIOMA}=${i}; path=/; max-age=31536000; samesite=lax${dominioDeLaCookie()}`;
+  const dominio = dominioDeLaCookie();
+  // Y antes de escribir, se borra la copia SIN dominio que dejó la versión
+  // anterior en `dinamyt.org`. Si no, quedan DOS cookies con este nombre —la
+  // de host y la de dominio— y `document.cookie` devuelve las dos: el portal
+  // seguiría leyendo la vieja para siempre, que es el fallo de arriba con otro
+  // disfraz. Borrar sin dominio solo afecta a la de host: la identidad de una
+  // cookie es (nombre, dominio, ruta).
+  if (dominio) document.cookie = `${COOKIE_IDIOMA}=; path=/; max-age=0`;
+  document.cookie = `${COOKIE_IDIOMA}=${i}; path=/; max-age=31536000; samesite=lax${dominio}`;
 }
 
 /**
