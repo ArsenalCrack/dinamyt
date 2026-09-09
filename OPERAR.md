@@ -94,7 +94,7 @@ nunca depende de que alguien se acordara de sincronizar.
 | `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe, y el pie de los correos apunta a ninguna parte |
 | `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: ver §3 |
 | `CRON_SECRET` | ecosystem-api | El aviso diario de suscripciones **no existe** (la ruta responde 404). El botón del panel sigue funcionando |
-| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api **y** membresias-api | **El mismo valor en las dos.** Sin él, la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan a Membresías: el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7) |
+| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api, membresias-api **y campeonatos-api** | **El mismo valor en las tres.** En Membresías: la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan — el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7). En **Campeonatos**: el tema y el idioma **no viajan en ninguna de las dos direcciones** (§4.21) |
 | `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
 | `MEDIA_PUBLIC_URL` | ecosystem-api | **El interruptor de las fotos en disco** (§4.20). Sin ella no falla nada: las imágenes se siguen guardando incrustadas en la fila, como siempre. Con ella van al disco **y** el espejo las manda absolutas — las dos cosas a la vez, y por eso es una sola variable. ⚠️ **Tiene que ser `https://`**: Membresías solo acepta `data:` o `https://`, y su rechazo es mudo |
 
@@ -3023,6 +3023,51 @@ que van por el **mismo canal servidor-a-servidor** que ya usaban para escribir:
 > Y sigue sin ser obligatorio: sin `ECOSYSTEM_SYNC_SECRET` la lectura devuelve
 > `null` y la pantalla se queda con lo que tenía. Campeonatos tiene que arrancar
 > sin internet el día del evento (§1.5).
+
+#### ⚠️ «Lo cambio en el portal y Campeonatos sigue igual» — las DOS causas, las dos mudas
+
+*(9 de septiembre de 2026)*
+
+Se reportó así: el modo claro elegido en DINAMYT llega a Membresías y **no** a
+Campeonatos. El idioma, igual — es la misma función y la misma guarda.
+
+**Causa 1 · La tabla de §1.4 no nombraba a `campeonatos-api`.** Decía
+«`ecosystem-api` **y** `membresias-api`», y quien configuró el VPS siguiendo la
+tabla no puso la variable en la tercera. Las dos funciones de
+`backend/app/espejo.py` —`guardar_apariencia` (ida) y `leer_apariencia`
+(vuelta)— empiezan las dos con `if not secreto: return`, **sin escribir nada en
+el registro**. El `log.warning` que hay solo salta si falla la RED; un secreto
+que falta no es un fallo de red, es un silencio. Ya está corregida la tabla, y
+**ahora la app lo dice al arrancar**:
+
+```
+[ecosistema] EL ESPEJO DE APARIENCIA ESTÁ APAGADO: falta ECOSYSTEM_SYNC_SECRET…
+```
+
+**Causa 2 · `usuarios.eco_sub` en `NULL`.** La misma guarda incluye
+`or not eco_sub`. Toda fila de Campeonatos nacida antes de la identidad única
+—y cuyo dueño no haya vuelto a entrar DESDE EL PORTAL— la tiene vacía, así que
+para esa persona las dos direcciones siguen apagadas aunque el secreto esté
+puesto. Se llena sola la primera vez que entra por el salto de DINAMYT
+(`resolver_espejo`), no hace falta tocar nada.
+
+**Cómo se comprueba, en este orden:**
+
+```bash
+sudo journalctl -u campeonatos-api --since "10 min ago" | grep ecosistema
+```
+
+```bash
+sudo -u postgres psql -d dinamyt -c "select count(*) filter (where eco_sub is null) as sin_enlazar, count(*) as total from usuarios;"
+```
+
+> **Lo que este arreglo NO explica.** La cookie compartida `.dinamyt.org`
+> (`dinamyt_tema`, `dinamyt_idioma`) reparte la elección entre las cuatro webs
+> **en el acto y sin servidor**, y esa sí funcionaba. Por eso el síntoma era
+> intermitente y costó verlo: en el mismo navegador y con las pestañas abiertas,
+> el tema cruzaba por la cookie; en otro dispositivo, o tras borrar cookies, no
+> cruzaba nada — que es justo el «unas veces se recuerda y otras no» que esta
+> sección lleva arrastrando.
 
 #### 3 · «Como el sistema» solo miraba el sistema UNA vez
 
