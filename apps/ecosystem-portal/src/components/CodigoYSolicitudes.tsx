@@ -460,7 +460,12 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {/* `min-w-0` junto a `shrink-0`: lo segundo impide que la fila de
+                acciones ceda ancho a costa del nombre, y lo primero impide que
+                se plante en su ancho mínimo y ensanche la tarjeta. Los dos
+                hacen falta, y sin el primero esta fila es la única de la
+                sección que puede empujar hacia los lados. */}
+            <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-1.5">
               {/* El desplegable del ecosistema, no el gris del sistema
                   operativo: ver `SelectMenu.tsx`. */}
               <SelectMenu
@@ -469,7 +474,10 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                 opciones={OPCIONES_ROL}
                 etiquetaAria={`Rol de ${s.fullName} al entrar`}
                 disabled={ocupado}
-                style={{ width: 'auto', minWidth: '10.5rem' }}
+                /* `min()` y no un mínimo fijo: en una columna estrecha, 10.5 rem
+                   dejan de ser un mínimo cómodo y pasan a ser un suelo que
+                   ensancha lo que hay alrededor. */
+                style={{ width: 'auto', minWidth: 'min(10.5rem, 100%)' }}
                 botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
               />
               <button
@@ -518,7 +526,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           opciones={OPCIONES_ROL}
           etiquetaAria="Rol con el que entraría"
           disabled={ocupado}
-          style={{ minWidth: '11rem' }}
+          style={{ minWidth: 'min(11rem, 100%)' }}
         />
       </div>
 

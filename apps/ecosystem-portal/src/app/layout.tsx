@@ -180,7 +180,12 @@ export default function RootLayout({
               perfil, que es la razón de que cambiarlos en Membresías no se
               notara aquí hasta entrar justo ahí. Ver el componente. */}
           <AplicarApariencia />
-          {children}
+          {/* El envoltorio no es decorativo: es el que hace que el `mx-auto`
+              del `<main>` de cada pantalla siga significando «céntrate» en vez
+              de «mide lo que lleves dentro». Sin él, un correo largo en una
+              lista ensanchaba la página entera. La cuenta completa está en
+              `globals.css`, junto a `body > .pagina`. */}
+          <div className="pagina">{children}</div>
           {/* El globo de tema e idioma, solo donde NO hay navegación: la
               portada, el login, el registro. Dentro ya está el botón de
               Configuración en la cabecera. Ver el componente. */}

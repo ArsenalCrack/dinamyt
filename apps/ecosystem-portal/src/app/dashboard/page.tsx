@@ -23,6 +23,7 @@ import { useI18n } from '@/lib/i18n';
 import { CampanaOrg } from '@/components/CampanaOrg';
 import { PedirAvisos } from '@/components/PedirAvisos';
 import { EntrarAClub } from '@/components/EntrarAClub';
+import { MenuCuenta } from '@/components/MenuCuenta';
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
@@ -30,39 +31,6 @@ const MEMBRESIAS_URL =
   process.env.NEXT_PUBLIC_MEMBRESIAS_URL || 'http://localhost:3006';
 const ACADEMY_URL =
   process.env.NEXT_PUBLIC_ACADEMY_URL || 'http://localhost:3008';
-
-/**
- * El símbolo de encendido de «Salir», dibujado en vez de escrito.
- *
- * Antes era el carácter ⏻ (U+23FB). No es un emoji: es un símbolo técnico que
- * casi ninguna fuente de Android trae, así que en el Chrome del celular el
- * botón salía con el cuadrito de «glifo que no tengo» delante del texto — y el
- * botón rojo de cerrar sesión es el peor sitio de la pantalla para que a
- * alguien le quede la duda de qué hace. Un SVG se ve igual en todos lados y
- * hereda el color del botón.
- *
- * Es el mismo trazo que usa la barra de Membresías (`IconoSalir` en su
- * `NavBar`), a propósito: la misma acción se dibuja igual en las dos apps.
- */
-function IconoSalir() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      aria-hidden="true"
-      focusable="false"
-      style={{ flexShrink: 0 }}
-    >
-      <path d="M12 2.8v9.4" />
-      <path d="M6.3 6.3a8 8 0 1 0 11.4 0" />
-    </svg>
-  );
-}
 
 /**
  * Lo que se le cuenta a quien Campeonatos devolvió para acá.
@@ -333,25 +301,29 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* La campana solo para quien lleva un club: a un alumno no le llega
-              ninguno de estos avisos, así que se dibujaría siempre vacía — y
-              una campana que nunca suena es un adorno que promete algo que no
-              va a pasar. `=== true` porque `null` es «aún no se sabe». */}
+        {/* ── Dos controles, no cuatro ──────────────────────────────────
+            Aquí había cuatro sueltos —campana, «Mi perfil», «Configuración» y
+            «Salir»— y los dos fallos que daban eran el mismo fallo visto desde
+            dos pantallas: en el celular no cabían en la fila y quedaban
+            amontonados; en el monitor SÍ cabían, y entonces el que cedía era el
+            saludo, que se partía en renglones cortos uno debajo de otro. Con la
+            cuenta metida en su menú, la columna del nombre recupera unos 200 px
+            y la fila deja de desbordarse. Ver `MenuCuenta`. */}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* La campana se queda FUERA del menú, igual que en Membresías: un
+              aviso que hay que abrir un menú para ver no avisa de nada. Y solo
+              para quien lleva un club: a un alumno no le llega ninguno de
+              estos, así que se dibujaría siempre vacía — una campana que nunca
+              suena es un adorno que promete algo que no va a pasar. `=== true`
+              porque `null` es «aún no se sabe». */}
           {gestiona === true && <CampanaOrg />}
-          <Link href="/perfil" className="btn btn-outline">
-            Mi perfil
-          </Link>
-          {/* Configuración va al lado del perfil y no dentro: el perfil es
-              quién eres —lo que las apps leen de ti— y esto es cómo quieres
-              usar la cuenta. Ver `app/configuracion/page.tsx`. */}
-          <Link href="/configuracion" className="btn btn-outline">
-            {t('config.titulo')}
-          </Link>
-          {/* Salir se distingue: es la única acción destructiva */}
-          <button onClick={salir} className="btn btn-danger">
-            <IconoSalir /> Salir
-          </button>
+          <MenuCuenta
+            nombre={payload.fullName}
+            email={payload.email}
+            foto={foto}
+            esSuperAdmin={payload.is_super_admin}
+            onSalir={salir}
+          />
         </div>
       </header>
 

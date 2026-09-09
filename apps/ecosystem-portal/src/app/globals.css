@@ -28,10 +28,55 @@ body {
    llevan a ninguna parte. El `flex: 1` deja el pie abajo del todo cuando la
    página es corta, y lo empuja hacia el final cuando es larga.
    Va sin capa a propósito: así gana sobre la utilidad de Tailwind, que sí
-   está en una. */
-body > main {
+   está en una.
+
+   ── Y por qué el item flexible es un DIV y no el `<main>` ──────────────────
+
+   Porque mientras lo fue, **la página entera se ensanchaba al abrir una
+   sección**. Vale la pena contarlo entero, porque el culpable es una línea que
+   escriben las catorce pantallas y que parece la más inocente del archivo.
+
+   Todas empiezan igual: `<main class="mx-auto max-w-2xl …">`. En un `body`
+   normal eso quiere decir «ocupa el ancho que haya y céntrate dentro de tu
+   máximo». Pero este `body` es FLEX, y ahí un margen lateral `auto` **apaga el
+   estirado**: el `<main>` deja de medir lo que la pantalla y pasa a medir lo
+   que lleva dentro, con el suelo puesto en el ancho MÍNIMO de su contenido. Y
+   ese mínimo no es pequeño: cualquier texto con `truncate` —el correo de una
+   solicitud, el nombre de un club— va en `white-space: nowrap`, y aunque se
+   vea recortado con puntos suspensivos, para el cálculo del ancho mínimo sigue
+   midiendo la línea ENTERA. El `min-w-0` de al lado deja que se encoja al
+   pintar, pero no le quita ese mínimo al padre.
+
+   Así se veía, y es exactamente como se reportó: se abre «Entrada al club» en
+   Mi organización, aparecen las filas de quien pide entrar, el `<main>` crece
+   hacia los lados, la página se hace más ancha que la ventana y el navegador
+   del teléfono la encoge para que quepa. Desde fuera no parece un
+   desbordamiento: parece que la pantalla «hace zoom» al desplegar algo, y por
+   eso se buscó tanto tiempo en el sitio equivocado.
+
+   Medido con un correo largo de verdad: `<main>` de 1030 px dentro de un
+   `body` de 365. Con el correo corto, 732. O sea que el ancho de la página lo
+   decidía la dirección de correo más larga que hubiera en pantalla.
+
+   ── Por qué así y no con `width` o `max-width` ──
+
+   `width: 100%` no basta: el suelo del mínimo de contenido gana igual (probado,
+   sigue en 1030). `max-width: 100%` sí lo clava, pero es la misma propiedad que
+   el `max-w-2xl`/`max-w-6xl` de cada página, así que se la comería y todas
+   quedarían a lo ancho del monitor.
+
+   Con el envoltorio no hay nada que anular: **él** es el item flexible, no
+   tiene márgenes automáticos, y por tanto se estira a la pantalla como cualquier
+   hijo de un flex de columna. El `<main>` vuelve a ser un bloque normal dentro
+   de un bloque normal, y su `mx-auto max-w-…` significa otra vez lo que dice.
+   Ninguna pantalla tiene que acordarse de nada.
+
+   `min-width: 0` es el par del estirado: sin él, el mínimo de contenido puede
+   volver a empujar desde dentro. */
+body > .pagina {
   flex: 1 0 auto;
   min-height: 0;
+  min-width: 0;
 }
 
 
