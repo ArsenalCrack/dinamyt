@@ -736,25 +736,16 @@ export default function PerfilPage() {
         )}
       </section>
 
-      {/* ── Lo que se mudó a Configuración ──────────────────────────────────
-          Aquí estaban la contraseña, las sesiones abiertas, el tema, el idioma
-          y la zona horaria. Nada de eso es el perfil: el perfil es lo que otras
-          personas leen de ti —tu nombre en la llave, tu foto en el carnet, tu
-          tipo de sangre—, y eso es lo contrario. Ver la cabecera de
-          `app/configuracion/page.tsx`.
+      {/* ── Por qué aquí ya no hay tarjeta de «Configuración» ───────────────
+          Porque el botón está arriba, en la cabecera, y tenerlo también abajo
+          eran DOS botones para el mismo sitio en la misma pantalla. Se
+          reportó tal cual: «en perfil dejas el botón de configuración dos
+          veces». El de la cabecera se queda porque es donde vive la navegación
+          de esta pantalla —al lado de «Mis aplicaciones»— y porque se ve sin
+          desplazarse.
 
-          Queda el enlace y no el silencio: quien viene a cambiar su contraseña
-          la ha buscado siempre en «Mi perfil», y una pantalla que se lleva algo
-          sin decir a dónde se lee como una pantalla que lo perdió. */}
-      <section className="card mt-4 p-5">
-        <h2 className="text-lg font-semibold">{t('config.titulo')}</h2>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-          {t('config.enElPerfilNo')}
-        </p>
-        <Link href="/configuracion" className="btn btn-outline mt-3 self-start">
-          {t('config.desdeElPerfil')} →
-        </Link>
-      </section>
+          Lo que se fue de aquí (contraseña, sesiones, tema, idioma y hora)
+          está en `app/configuracion/page.tsx`. */}
     </main>
   );
 }

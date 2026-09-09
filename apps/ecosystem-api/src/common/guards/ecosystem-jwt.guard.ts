@@ -108,6 +108,11 @@ function explicar(motivo: MotivoCierre): string {
       return 'Cerramos todas las sesiones al recuperar tu contraseña. Entra con la nueva.';
     case 'salir-todas':
       return 'Esta sesión se cerró desde otro dispositivo.';
+    case 'reemplazada':
+      // Pasa en una pestaña vieja del MISMO navegador cuando se ha vuelto a
+      // entrar: no es una alarma y no hay que decirle a nadie que le cerraron
+      // la sesión desde otro sitio, porque el otro sitio es él mismo.
+      return 'Volviste a entrar desde este dispositivo y esta pestaña se quedó atrás. Recárgala.';
     case 'admin':
       return 'Un administrador cerró esta sesión.';
     case 'reloj-torcido':

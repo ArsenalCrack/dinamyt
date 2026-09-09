@@ -108,6 +108,10 @@ export class SessionsService {
     ip?: string | null;
     /** Marcó «mantener la sesión iniciada en este dispositivo». */
     recordada?: boolean;
+    /** Zona IANA declarada por el navegador. De ella sale la ciudad. */
+    zona?: string | null;
+    /** Dos letras ISO, de `CF-IPCountry`. `null` sin Cloudflare delante. */
+    pais?: string | null;
   }): Promise<{ id: string; expiresAt: Date; recordada: boolean }> {
     // ── Las tres fechas las pone JavaScript, NUNCA la base ─────────────────
     //
@@ -140,6 +144,43 @@ export class SessionsService {
           ? SessionsService.RECORDADA_DIAS * 24 * 60 * 60 * 1000
           : SessionsService.MAXIMO_HORAS * 60 * 60 * 1000),
     );
+    // ── UNA FILA POR DISPOSITIVO, no una por inicio de sesión ─────────────
+    //
+    // Cada login abría una fila nueva sin mirar si ya había una de ESE mismo
+    // navegador. Las no recordadas se caían solas a los veinte minutos y no se
+    // notaba; las recordadas viven treinta días, así que entrar cada mañana
+    // desde el mismo celular dejaba una fila por mañana. A la semana,
+    // «dispositivos conectados» eran siete filas identicas —mismo navegador,
+    // misma IP— de las que solo una estaba de verdad en uso.
+    //
+    // Eso rompe justo lo que la pantalla promete: si no se puede distinguir una
+    // fila de otra, no se puede decidir cuál cerrar, y una lista que no se
+    // puede usar se ignora. Se reportó tal cual.
+    //
+    // Al abrir, las anteriores del mismo dispositivo se cierran. El
+    // «dispositivo» es el par navegador + IP, que es lo que hay: no existe un
+    // identificador de equipo y ponerlo (una cookie marcadora) seria seguir a
+    // la gente para ordenar una lista.
+    //
+    // ⚠️ Solo se cierran las que YA estaban; la nueva se inserta después. Y no
+    // pasa nada si el par se equivoca por exceso —dos personas tras la misma
+    // IP con el mismo navegador— porque tambien se compara `user_id`: son
+    // sesiones de la MISMA cuenta, y de la misma cuenta en el mismo navegador
+    // no puede haber dos a la vez de todos modos.
+    if (datos.userAgent && datos.ip) {
+      await db
+        .update(sessions)
+        .set({ revokedAt: ahora, revokedReason: 'reemplazada' })
+        .where(
+          and(
+            eq(sessions.userId, datos.userId),
+            eq(sessions.userAgent, datos.userAgent.slice(0, 400)),
+            eq(sessions.ip, datos.ip.slice(0, 60)),
+            isNull(sessions.revokedAt),
+          ),
+        );
+    }
+
     const [fila] = await db
       .insert(sessions)
       .values({
@@ -151,6 +192,14 @@ export class SessionsService {
         // cabecera por sesión no aporta nada a «¿desde qué navegador entré?».
         userAgent: datos.userAgent ? datos.userAgent.slice(0, 400) : null,
         ip: datos.ip ? datos.ip.slice(0, 60) : null,
+        zona: datos.zona ? datos.zona.slice(0, 64) : null,
+        // En mayúsculas y dos letras, como lo manda Cloudflare. `XX` es su
+        // valor para «no lo sé» (Tor, redes internas) y no dice nada, así que
+        // se guarda como si no hubiera venido.
+        pais:
+          datos.pais && /^[A-Za-z]{2}$/.test(datos.pais) && datos.pais.toUpperCase() !== 'XX'
+            ? datos.pais.toUpperCase()
+            : null,
         expiresAt,
         recordada,
       })
@@ -283,6 +332,8 @@ export class SessionsService {
         lastSeenAt: sessions.lastSeenAt,
         expiresAt: sessions.expiresAt,
         recordada: sessions.recordada,
+        zona: sessions.zona,
+        pais: sessions.pais,
       })
       .from(sessions)
       .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)))
@@ -309,6 +360,8 @@ export class SessionsService {
           id: f.id,
           dispositivo: describirDispositivo(f.userAgent),
           ip: f.ip,
+          zona: f.zona,
+          pais: f.pais,
           createdAt: f.createdAt,
           lastSeenAt: f.lastSeenAt,
         }))
@@ -458,6 +511,13 @@ export type MotivoCierre =
    * usara.
    */
   | 'reloj-torcido'
+  /**
+   * Se abrió otra sesión desde el MISMO dispositivo (mismo navegador, misma
+   * IP) y esta quedó sustituida. No es un cierre que la persona pidió ni una
+   * alarma: es la limpieza que evita que «dispositivos conectados» acumule una
+   * fila por cada vez que alguien entró desde su celular. Ver `abrir`.
+   */
+  | 'reemplazada'
   | 'desconocida';
 
 /** Una sesión abierta, tal y como se le enseña a su dueño. */
@@ -466,6 +526,10 @@ export interface SesionAbierta {
   /** «Chrome en Windows», «Safari en iPhone»… Ver `describirDispositivo`. */
   dispositivo: string;
   ip: string | null;
+  /** Zona IANA declarada por el navegador. `America/Bogota` → Bogotá. */
+  zona: string | null;
+  /** Dos letras ISO. `null` en las sesiones anteriores a la migración 0022. */
+  pais: string | null;
   createdAt: Date;
   lastSeenAt: Date;
 }

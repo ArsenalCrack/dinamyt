@@ -155,6 +155,13 @@
       "when": 1788300300000,
       "tag": "0021_tema_e_idioma",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788300400000,
+      "tag": "0022_sesion_desde_donde",
+      "breakpoints": true
     }
   ]
 }

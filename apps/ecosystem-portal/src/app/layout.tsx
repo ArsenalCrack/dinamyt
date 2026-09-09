@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { AplicarApariencia } from '@/components/AplicarApariencia';
+import { ControlesApariencia } from '@/components/ControlesApariencia';
 import { PieDePagina } from '@/components/PieDePagina';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
 import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
@@ -45,7 +46,29 @@ export const metadata: Metadata = {
    * el buscador — ver `robots.ts` y OPERAR.md §3.6.
    */
   metadataBase: new URL(PORTAL),
-  title: 'DINAMYT — El ecosistema digital del Hapkido',
+  /**
+   * ── El nombre de la pestaña, igual en las cuatro webs ───────────────────
+   *
+   * Cada app decía una cosa distinta y de un largo distinto:
+   *
+   *     Membresías    «Mi Club · DINAMYT»
+   *     Campeonatos   «DINAMYT - Sistema de Competencias Hapkido»
+   *     el portal     «DINAMYT — El ecosistema digital del Hapkido»
+   *
+   * Con tres pestañas abiertas —que es como se usa esto— no se distinguía
+   * ninguna: las dos largas se recortan justo donde empiezan a diferenciarse.
+   * La forma buena es la de Membresías: **dónde estoy · de quién es**, corto y
+   * con lo que identifica al principio.
+   *
+   * `default` se queda con la frase larga porque el `<title>` de la PORTADA es
+   * lo que lee Google y lo que se ve al pegar el enlace en WhatsApp: ahí una
+   * palabra suelta no vende nada. `template` es lo que usan las pantallas de
+   * dentro, cada una con su `layout.tsx` de dos líneas.
+   */
+  title: {
+    default: 'DINAMYT — El ecosistema digital del Hapkido',
+    template: '%s · DINAMYT',
+  },
   description:
     'Una sola cuenta para el club y el campeonato: mensualidades y asistencia con Membresías, y torneos con puntuación en vivo desde el tatami con Campeonatos.',
   /** La dirección buena de esta página. Evita que se indexe dos veces. */
@@ -158,6 +181,10 @@ export default function RootLayout({
               notara aquí hasta entrar justo ahí. Ver el componente. */}
           <AplicarApariencia />
           {children}
+          {/* El globo de tema e idioma, solo donde NO hay navegación: la
+              portada, el login, el registro. Dentro ya está el botón de
+              Configuración en la cabecera. Ver el componente. */}
+          <ControlesApariencia />
           {/* El pie va aquí por el mismo motivo que el reloj: para que salga
               en todas las pantallas. La de soporte tiene que verse sobre todo
               en login y registro, donde no hay menú al que ir. */}

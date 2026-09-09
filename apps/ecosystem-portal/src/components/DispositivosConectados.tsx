@@ -9,7 +9,7 @@ import {
   INACTIVIDAD_MINUTOS,
   type SesionAbierta,
 } from '@/lib/api';
-import { haceCuanto } from '@/lib/fechas';
+import { haceCuanto, lugarDeSesion } from '@/lib/fechas';
 
 /**
  * Desde dónde está abierta tu cuenta, y el botón para cerrarlo.
@@ -82,9 +82,10 @@ export function DispositivosConectados() {
       <h2 className="text-lg font-semibold">Dispositivos conectados</h2>
       <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
         Dónde está abierta tu cuenta ahora mismo. Si reconoces algo que no
-        deberías —un computador prestado, el del club—, ciérralo desde aquí. Sin
-        actividad, cualquier sesión se cierra sola a los {INACTIVIDAD_MINUTOS}{' '}
-        minutos.
+        deberías —un computador prestado, el del club—, ciérralo desde aquí. Hay
+        una fila por dispositivo: volver a entrar desde el mismo navegador
+        sustituye la anterior en vez de añadir otra. Sin actividad, cualquier
+        sesión se cierra sola a los {INACTIVIDAD_MINUTOS} minutos.
       </p>
 
       {sesiones === null && !error && (
@@ -107,7 +108,9 @@ export function DispositivosConectados() {
 
       {sesiones && sesiones.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {sesiones.map((s) => (
+          {sesiones.map((s) => {
+            const lugar = lugarDeSesion(s.zona, s.pais);
+            return (
             <li
               key={s.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2.5"
@@ -120,12 +123,26 @@ export function DispositivosConectados() {
                     <span className="badge badge-gold ml-2">Este</span>
                   )}
                 </p>
+                {/* ── El sitio primero, la IP después y en pequeño ──────
+                    Aquí solo salían el navegador y la IP, y con varias filas
+                    del mismo navegador y la misma IP no había forma de
+                    distinguirlas — que es justo la decisión que esta pantalla
+                    pide tomar. «Bogotá · Colombia» sí se reconoce.
+
+                    La IP se queda porque para quien sabe leerla es la prueba, y
+                    para quien no, no estorba: va debajo y en gris. Ver
+                    `lugarDeSesion`. */}
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                   {/* La hora se pinta en la zona de quien mira: el navegador ya
                       lo hace solo, y es la correcta por definición. */}
                   Activa {haceCuanto(s.lastSeenAt)}
-                  {s.ip ? ` · ${s.ip}` : ''}
+                  {lugar ? ` · ${lugar}` : ''}
                 </p>
+                {s.ip && (
+                  <p className="mono text-xs" style={{ color: 'var(--text-dim)' }}>
+                    {s.ip}
+                  </p>
+                )}
               </div>
               {!s.actual && (
                 <button
@@ -138,7 +155,8 @@ export function DispositivosConectados() {
                 </button>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 

@@ -302,6 +302,26 @@ export const sessions = eco.table(
     userAgent: text('user_agent'),
     ip: varchar('ip', { length: 60 }),
     /**
+     * DESDE DÓNDE, en palabras que alguien reconozca.
+     *
+     * `zona` es la zona horaria IANA que declara el navegador (`X-Zona`, la
+     * misma cabecera con la que ya se decide a qué hora se escriben los
+     * correos). De ahí sale la ciudad: `America/Bogota` → Bogotá.
+     *
+     * `pais` son las dos letras que pone Cloudflare en `CF-IPCountry`.
+     *
+     * Las dos existen por lo mismo: una lista de seis filas que dicen «Chrome
+     * en Windows · 181.49.x.x» no permite distinguir el computador del club
+     * del de casa, que es justo la decisión que la pantalla pide tomar. Y una
+     * IP no es un sitio para quien la lee.
+     *
+     * No es geolocalización y no se le pregunta a nadie de fuera: las dos
+     * llegan dentro de la propia petición. `NULL` en las sesiones abiertas
+     * antes de la migración 0022 — no hay de dónde sacarlas hacia atrás.
+     */
+    zona: varchar('zona', { length: 64 }),
+    pais: varchar('pais', { length: 2 }),
+    /**
      * ── Sin `defaultNow()`, y es lo que hace que esto funcione ────────────
      *
      * Estas columnas son `timestamp` **sin zona**. Postgres escribe `now()`

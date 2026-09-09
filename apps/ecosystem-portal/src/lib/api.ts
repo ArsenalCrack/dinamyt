@@ -265,6 +265,35 @@ export async function refrescarSesionAPI(): Promise<TokenPayload | null> {
     return null;
   }
 }
+/**
+ * Guardar el tema o el idioma en la CUENTA, sin ruido si no se puede.
+ *
+ * La eligen dos sitios: `<Apariencia>` en `/configuracion` —donde se elige de
+ * verdad, con las tres opciones escritas— y el globo 🌐 de las pantallas
+ * públicas, que no sabe quién eres hasta que entras.
+ *
+ * Por eso no falla ni avisa: sin sesión no hay a quién escribirle, y ahí la
+ * elección se queda en la cookie compartida de `.dinamyt.org`, que ya la
+ * reparte a las otras tres webs de este navegador. La cuenta es lo que la lleva
+ * a OTRO dispositivo, y eso puede esperar a que la persona entre.
+ *
+ * Escribe en el perfil (`PATCH /users/:id/profile`) y no en un endpoint aparte
+ * porque el servidor ya trata el tema y el idioma como lo que son: dos campos
+ * de la persona, con la misma regla que la zona horaria —solo los cambia ella
+ * misma— (`users.controller.ts`).
+ */
+export function guardarAparienciaEnLaCuenta(datos: {
+  theme?: string;
+  locale?: string;
+}): void {
+  const t = obtenerToken();
+  if (!t) return;
+  const yo = decodificarToken(t)?.sub;
+  if (!yo) return;
+  void api.patch(`/users/${yo}/profile`, datos).catch(() => {
+    /* sin red o sin sesión viva: se queda en la cookie de este navegador */
+  });
+}
 
 // ── Dispositivos conectados ─────────────────────────────────────────────────
 //
@@ -276,6 +305,10 @@ export interface SesionAbierta {
   /** «Chrome en Windows», «Safari en iPhone»… */
   dispositivo: string;
   ip: string | null;
+  /** Zona IANA declarada por el navegador. De ella sale la ciudad. */
+  zona: string | null;
+  /** Dos letras ISO. `null` en sesiones abiertas antes de la migración 0022. */
+  pais: string | null;
   createdAt: string;
   lastSeenAt: string;
   /** La sesión desde la que se está mirando la lista. */

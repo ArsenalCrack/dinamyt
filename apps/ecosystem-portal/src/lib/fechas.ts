@@ -163,3 +163,76 @@ export function nombreDeZona(zona: string | null | undefined): string {
     return zona;
   }
 }
+
+/** Las ciudades cuya grafía IANA pierde la tilde. Solo las que se van a ver. */
+const CIUDADES: Record<string, string> = {
+  Bogota: 'Bogotá',
+  Medellin: 'Medellín',
+  Asuncion: 'Asunción',
+  Panama: 'Panamá',
+  'Mexico City': 'Ciudad de México',
+  Merida: 'Mérida',
+  Cancun: 'Cancún',
+  Sao_Paulo: 'São Paulo',
+  'Sao Paulo': 'São Paulo',
+  Cordoba: 'Córdoba',
+  Tucuman: 'Tucumán',
+  Jujuy: 'Jujuy',
+  Ushuaia: 'Ushuaia',
+  Guayaquil: 'Guayaquil',
+  Caracas: 'Caracas',
+};
+
+/**
+ * De dónde está abierta una sesión, dicho en sitios y no en números.
+ *
+ * ── Por qué hace falta ──
+ *
+ * «Dispositivos conectados» enseñaba «Chrome en Windows · 181.49.x.x». Con seis
+ * filas iguales del mismo navegador y la misma IP, no hay forma de saber cuál
+ * es el computador del club y cuál el de casa — que es la única decisión que
+ * esa pantalla pide tomar. Y una IP no es un sitio para quien la lee.
+ *
+ * ── De dónde sale ──
+ *
+ * La CIUDAD, de la zona horaria que el propio navegador declara:
+ * `America/Bogota` → «Bogotá». No es geolocalización y no se le pregunta a
+ * ningún servicio de fuera; es el mismo dato con el que ya se decide a qué hora
+ * se escriben los correos.
+ *
+ * El PAÍS, de las dos letras que pone Cloudflare (`CF-IPCountry`), traducidas
+ * con `Intl.DisplayNames` al idioma en que se está leyendo. Sin Cloudflare
+ * delante no viene, y entonces se enseña solo la ciudad — que es la mitad que
+ * importa.
+ *
+ * Devuelve `null` cuando no hay ninguno de los dos: las sesiones que ya estaban
+ * abiertas antes de la migración 0022 no tienen de dónde sacarlos, y ahí la
+ * pantalla se queda como estaba.
+ */
+export function lugarDeSesion(
+  zona: string | null | undefined,
+  pais: string | null | undefined,
+): string | null {
+  // `America/Argentina/Buenos_Aires` → «Buenos Aires». El último tramo es la
+  // ciudad; los de en medio son la región administrativa de la IANA.
+  const crudo = zona ? (zona.split('/').pop() ?? '').replace(/_/g, ' ') : '';
+  // Los identificadores IANA van sin tildes por norma (`America/Bogota`), y
+  // «Bogota» escrito así en una pantalla en español canta. Se corrigen a mano
+  // las de aquí y las vecinas, que son las que van a salir de verdad; el resto
+  // pasa tal cual, que es mejor que no enseñar nada.
+  const ciudad = CIUDADES[crudo] ?? crudo;
+
+  let nombrePais = '';
+  if (pais) {
+    try {
+      nombrePais =
+        new Intl.DisplayNames([idioma()], { type: 'region' }).of(pais) ?? pais;
+    } catch {
+      // Navegador viejo sin `DisplayNames`: las dos letras ya dicen algo.
+      nombrePais = pais;
+    }
+  }
+
+  if (ciudad && nombrePais) return `${ciudad} · ${nombrePais}`;
+  return ciudad || nombrePais || null;
+}

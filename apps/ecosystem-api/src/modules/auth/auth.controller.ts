@@ -44,6 +44,13 @@ function contextoDe(req: Request): ContextoPeticion {
     ip: cabecera('x-forwarded-for')?.split(',')[0].trim() || req.ip || null,
     timezone: cabecera('x-zona-horaria'),
     locale: cabecera('x-idioma'),
+    // El país, gratis y sin preguntarle a nadie: lo pone Cloudflare delante
+    // (`CF-IPCountry`, dos letras ISO). Sin Cloudflare no viene y la lista de
+    // dispositivos enseña solo la ciudad, que sale de la zona horaria.
+    //
+    // No autoriza nada, como todo lo de esta función: es una cabecera y
+    // cualquiera puede escribirla. Se guarda para ENSEÑARLA.
+    pais: cabecera('cf-ipcountry'),
   };
 }
 

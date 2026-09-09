@@ -218,7 +218,11 @@ const es = {
   'config.seguridad': 'Seguridad',
   'config.seguridadDesc':
     'Tu contraseña es una sola para todo DINAMYT, y las sesiones abiertas se cierran desde aquí.',
-  'config.irAlPerfil': '← Mi perfil',
+  // Sin flecha: en la cabecera hay DOS enlaces y solo uno es «atrás». Con
+  // flecha los dos, parecían dos botones de volver y no se sabía cuál era cuál
+  // — es la misma forma que ya tenía el perfil: al lado, «Configuración»
+  // (lateral, sin flecha) y «← Mis aplicaciones» (el de volver).
+  'config.irAlPerfil': 'Mi perfil',
   'config.desdeElPerfil': 'Configuración',
   'config.enElPerfilNo':
     'El tema, el idioma, tu hora y tus sesiones se cambian en Configuración.',
@@ -396,7 +400,7 @@ const en: Record<ClaveTexto, string> = {
   'config.seguridad': 'Security',
   'config.seguridadDesc':
     'You have a single password for all of DINAMYT, and open sessions are closed from here.',
-  'config.irAlPerfil': '← My profile',
+  'config.irAlPerfil': 'My profile',
   'config.desdeElPerfil': 'Settings',
   'config.enElPerfilNo':
     'Theme, language, your time zone and your sessions are changed in Settings.',

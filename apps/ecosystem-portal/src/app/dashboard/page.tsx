@@ -298,10 +298,36 @@ export default function DashboardPage() {
               la única forma de comprobar cómo quedó el encuadre sin abrir otra
               aplicación. */}
           <Avatar src={foto} nombre={payload.fullName} size={56} ampliable />
-          <div className="min-w-0" style={{ overflowWrap: 'anywhere' }}>
+          <div className="min-w-0">
             <p className="eyebrow mb-1">{t('login.eyebrow')}</p>
-            <h1 className="display text-2xl sm:text-3xl">Hola, {payload.fullName}</h1>
-            <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+            {/* ── Por qué el saludo NO lleva `overflow-wrap: anywhere` ────────
+                Porque lo llevaba, y por eso el nombre se partía por la mitad:
+                «MAESTRO DEL CLUB DE / MO». `anywhere` autoriza a cortar DENTRO
+                de una palabra aunque haya un espacio donde partir, y un nombre
+                propio cortado a la mitad se lee como un fallo de la aplicación
+                —que es exactamente como se reportó—.
+
+                Se puso para arreglar un desborde horizontal real (la letra de
+                titular mide 118 % de ancho y un apellido largo se salía de la
+                pantalla), pero el remedio correcto para eso es `break-word`:
+                parte una palabra SOLO cuando esa palabra sola no cabe. Con
+                espacios disponibles, parte por los espacios.
+
+                Y `text-wrap: balance` para que, cuando toque partir, las líneas
+                queden parejas en vez de dejar una palabra suelta abajo. */}
+            <h1
+              className="display text-2xl sm:text-3xl"
+              style={{ overflowWrap: 'break-word', textWrap: 'balance' }}
+            >
+              Hola, {payload.fullName}
+            </h1>
+            {/* El correo SÍ lleva `anywhere`: es una sola palabra sin espacios
+                y puede medir más que la columna. Ahí cortar por donde sea es la
+                única salida, y nadie lee un correo como lee un nombre. */}
+            <p
+              className="mt-1 text-sm"
+              style={{ color: 'var(--text-muted)', overflowWrap: 'anywhere' }}
+            >
               {payload.email}
               {payload.is_super_admin ? ' · Super administrador' : ''}
             </p>

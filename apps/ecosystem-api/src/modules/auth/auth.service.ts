@@ -1041,6 +1041,11 @@ export class AuthService {
       userId: user.id,
       userAgent: contexto?.userAgent,
       ip: contexto?.ip,
+      // De dónde está abierta, para que la lista de dispositivos diga «Bogotá»
+      // y no una IP. La zona la declara el navegador y el país lo pone
+      // Cloudflare; ninguno de los dos decide nada.
+      zona: contexto?.timezone,
+      pais: contexto?.pais,
       recordada: recordar,
     });
     return {
@@ -1203,4 +1208,6 @@ export interface ContextoPeticion {
   ip?: string | null;
   timezone?: string | null;
   locale?: string | null;
+  /** Dos letras ISO de `CF-IPCountry`. Solo para enseñar de dónde. */
+  pais?: string | null;
 }
