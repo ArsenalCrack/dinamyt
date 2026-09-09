@@ -21,6 +21,7 @@ import { Carnet } from '@/components/Carnet';
 import { Cinturon } from '@/components/Cinturon';
 import { SelectMenu } from '@/components/SelectMenu';
 import { VerMas } from '@/components/Paginacion';
+import { Cargando } from '@/components/Cargando';
 
 interface Pago {
   id: string;
@@ -304,8 +305,10 @@ export default function MiPanel() {
 
   if (cargandoSesion || !mi) {
     return (
-      <main style={{ padding: '2rem' }} className="muted">
-        {error || t('comun.cargando')}
+      <main style={{ padding: '2rem' }}>
+        {/* Con error se enseña el error, no la espera: seguir «cargando» algo
+            que ya falló es la forma más segura de que alguien espere de balde. */}
+        {error ? <p className="muted">{error}</p> : <Cargando />}
       </main>
     );
   }

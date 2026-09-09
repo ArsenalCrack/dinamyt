@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte, ne, sql } from 'drizzle-orm';
 import {
   memberships,
   payments,
@@ -167,20 +167,56 @@ export async function reportsRoutes(app: FastifyInstance) {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const today = todayStr();
+      /**
+       * ── Esto cuenta PERSONAS A LAS QUE HAY QUE COBRAR, no filas vencidas ──
+       *
+       * Se reportó así: «el panel dice 3 vencidos y en mi lista de alumnos solo
+       * hay 2». Las dos cifras eran ciertas y contaban cosas distintas, porque
+       * esta consulta miraba SOLO `memberships` y el roster mira `users`.
+       *
+       * Las dos diferencias, las dos reales:
+       *
+       *   · **El maestro tiene su propia membresía.** El roster excluye a los
+       *     `owner` a propósito —la pantalla se llama «Alumnos» y verse a uno
+       *     mismo entre su gente desconcierta, ver `GET /users`—, pero aquí
+       *     entraba como uno más. Un club de dos alumnos con el maestro
+       *     vencido decía 3, y ese tercero no estaba en ninguna lista.
+       *   · **Quien tiene el acceso cortado.** El roster enseña por defecto
+       *     solo a los activos. A alguien a quien YA le cortaste el acceso no
+       *     lo estás persiguiendo para que pague: precisamente por eso se lo
+       *     cortaste. Dejarlo en el contador es una alarma roja que no se puede
+       *     bajar haciendo nada — y eso es lo que hacía que ni recargando
+       *     cambiara el número.
+       *
+       * Con el `innerJoin` las dos pantallas contestan la misma pregunta. Y se
+       * devuelve el NOMBRE, que es lo que faltaba para poder comprobar un
+       * número que no cuadra sin abrir la base de datos.
+       */
       const rows = await req.db
         .select({
           userId: memberships.userId,
+          fullName: users.fullName,
           venceEl: memberships.venceEl,
           currentPlanId: memberships.currentPlanId,
           status: memberships.status,
         })
         .from(memberships)
-        .where(eq(memberships.orgId, orgId));
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(
+          and(
+            eq(memberships.orgId, orgId),
+            // Los mismos dos filtros del roster (`GET /users`), y por los
+            // mismos motivos. Si allí cambian, aquí también.
+            ne(users.role, 'owner'),
+            eq(users.isActive, true),
+          ),
+        );
 
       return rows
         .filter((r) => r.venceEl != null && r.venceEl < today && r.status !== 'retirado')
         .map((r) => ({
           userId: r.userId,
+          fullName: r.fullName,
           venceEl: r.venceEl,
           currentPlanId: r.currentPlanId,
           diasVencido: Math.round(

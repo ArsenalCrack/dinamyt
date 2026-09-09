@@ -30,6 +30,7 @@ import { Etiqueta, LeyendaObligatorios } from '@/components/Etiqueta';
 import { Filtros, type GrupoFiltro } from '@/components/Filtros';
 import { SelectMenu } from '@/components/SelectMenu';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
+import { Cargando } from '@/components/Cargando';
 
 interface Persona {
   id: string;
@@ -401,8 +402,8 @@ export default function Alumnos() {
 
   if (cargandoSesion || cargando) {
     return (
-      <main style={{ padding: '2rem' }} className="muted">
-        {t('comun.cargando')}
+      <main style={{ padding: '2rem' }}>
+        <Cargando />
       </main>
     );
   }
