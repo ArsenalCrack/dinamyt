@@ -34,7 +34,11 @@ const mono = IBM_Plex_Mono({
 // nombre interno del proyecto sigue siendo «membresías»; lo que ve el usuario,
 // no: su club.
 export const metadata: Metadata = {
-  title: 'Mi Club · DINAMYT',
+  // «club» en minúscula: no es un nombre propio. Es la misma regla de
+  // mayúsculas del ecosistema — ver `.microetiqueta` en
+  // `estilos-ecosistema.css`. La FORMA de este título es la que adoptaron las
+  // otras tres: dónde estoy · de quién es.
+  title: 'Mi club · DINAMYT',
   description: 'Tu carnet, tus asistencias y tu estado en el club.',
   manifest: '/manifest.json',
   /**
@@ -64,7 +68,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Mi Club',
+    title: 'Mi club',
     statusBarStyle: 'black-translucent',
   },
 };
