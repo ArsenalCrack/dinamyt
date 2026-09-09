@@ -3061,6 +3061,44 @@ sudo journalctl -u campeonatos-api --since "10 min ago" | grep ecosistema
 sudo -u postgres psql -d dinamyt -c "select count(*) filter (where eco_sub is null) as sin_enlazar, count(*) as total from usuarios;"
 ```
 
+#### ⚠️ Y en Membresías era otra cosa: no se guardaba en NINGUNA parte
+
+*(9 de septiembre de 2026, el mismo día y por el mismo hilo)*
+
+`PATCH /me/apariencia` de Membresías **no guardaba nada en su base**: leía el
+`eco_sub` de la fila y reenviaba al portal, y ya. Con las mismas dos rendiciones
+mudas de arriba:
+
+```ts
+if (!altaEnElEcosistema()) return;   // sin JWKS o sin secreto compartido
+if (!datos.ecoSub) return;           // «el alumno de carnet QR»
+```
+
+Así que **para cualquiera sin `eco_sub` la elección no se guardaba en ningún
+sitio**: vivía en la cookie del navegador y se perdía al cambiar de teléfono.
+
+**Y no se arreglaba solo reparando el puente**, porque hay gente que no tiene
+cuenta del portal ni la va a tener: el alumno de carnet QR, y cualquier club que
+use Membresías sola —que es lo que la mantiene vendible por su cuenta—. Para
+ellos «tu cuenta» ES la fila de Membresías. De ahí la **migración 0020**
+(`users.theme`, `users.locale`): manda el ecosistema cuando contesta, y esto es
+la copia que responde cuando no y la única verdad de quien no está en el portal.
+
+> **La tercera cosa, que salió al escribir las pruebas.** Esas dos rutas eran
+> las únicas de `routes/users.ts` que consultaban por **`app.db`**; las otras
+> diecisiete usan `req.db`. `app.db` es el pool pelado, y el plugin de RLS ya
+> envolvió el handler en una transacción sobre una conexión: contra PGlite —una
+> sola conexión— la consulta de fuera espera a la transacción que la contiene y
+> **la petición no vuelve nunca**. Es literalmente el síntoma que
+> `plugins/rls.ts` ya tenía documentado para `/sync/rol`, y es la razón por la
+> que estas rutas nunca tuvieron pruebas de punta a punta.
+>
+> Contra un PostgreSQL de verdad **no cuelga** —el pool da otra conexión— pero
+> corre **fuera del contexto de RLS**. Aquí no filtraba nada (la consulta ya iba
+> por `users.id`), pero es la clase de descuido que en la siguiente ruta sí
+> filtra. **Regla: en Membresías se consulta por `req.db`, nunca por `app.db`,
+> salvo en los guards que corren antes del contexto.**
+
 > **Lo que este arreglo NO explica.** La cookie compartida `.dinamyt.org`
 > (`dinamyt_tema`, `dinamyt_idioma`) reparte la elección entre las cuatro webs
 > **en el acto y sin servidor**, y esa sí funcionaba. Por eso el síntoma era
