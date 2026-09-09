@@ -7,6 +7,7 @@ import api, {
   obtenerToken,
   decodificarToken,
   extraerError,
+  misOrganizacionesAPI,
 } from '@/lib/api';
 import {
   soloLetras,
@@ -15,18 +16,14 @@ import {
   PARENTESCOS,
   GENEROS,
   TIPOS_SANGRE,
+  CINTURONES_GRADO,
+  hoyISO,
   comprimirAvatar,
-  validarContrasena,
   LIM,
 } from '@/lib/validacion';
-import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
-import { MedidorContrasena } from '@/components/MedidorContrasena';
-import { DispositivosConectados } from '@/components/DispositivosConectados';
-import { ZonaHoraria } from '@/components/ZonaHoraria';
-import { Apariencia } from '@/components/Apariencia';
-import { Ampliable } from '@/components/VisorImagen';
+import { Avatar } from '@/components/Avatar';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 
 interface Disciplina {
@@ -89,9 +86,36 @@ function progresoPerfil(p: Perfil, avatarActual: string) {
 }
 
 /**
- * Mi perfil — la persona ÚNICA del ecosistema. Lo que se edita aquí lo ven
- * todas las apps (Campeonatos, Membresías, Academy). El correo y el documento
- * no se editan (identidad); el grado/cinturón lo promueve el maestro.
+ * Mi perfil — la persona ÚNICA del ecosistema, y **la única puerta a tus
+ * propios datos**.
+ *
+ * ── Las dos puertas que había ────────────────────────────────────────────────
+ *
+ * Los mismos diez campos —nombre, nacimiento, género, tipo de sangre, teléfono,
+ * contacto de emergencia, notas médicas, foto— se editaban en DOS formularios
+ * distintos:
+ *
+ *   · aquí, `/perfil`, con la mitad de los campos bloqueados; y
+ *   · en `/mi-organizacion/miembro/<id>`, el editor del maestro, que la lista
+ *     de miembros ofrecía **también para la fila de uno mismo**.
+ *
+ * Y no eran copias: el editor del maestro dejaba corregir el nombre y la fecha
+ * de nacimiento, y además el cinturón; este no. Así que el maestro que quería
+ * arreglarse un dedazo en su propio nombre tenía que saber que ESA pantalla —la
+ * de administrar a su gente— era donde estaba su propio nombre. Dos sitios para
+ * un dato es la forma segura de que nadie sepa cuál manda.
+ *
+ * ── Lo que se hizo ───────────────────────────────────────────────────────────
+ *
+ * El editor del maestro es ahora para OTRAS personas: entrar en él con el
+ * propio identificador redirige aquí, y en la lista de miembros la fila de uno
+ * mismo lleva a «Mi perfil». A cambio, esta pantalla **desbloquea los campos de
+ * gestor cuando la persona gestiona su propio club** (`gestor`, abajo): es
+ * exactamente lo que el servidor ya permitía —`isOrgManagerOf(yo, yo)` es
+ * cierto para un maestro— y lo único que faltaba era que el formulario lo
+ * ofreciera.
+ *
+ * El correo y el documento no se editan nunca (son la identidad).
  * La contraseña SOLO se cambia aquí (las apps no tienen su propio formulario).
  */
 export default function PerfilPage() {
@@ -116,14 +140,33 @@ export default function PerfilPage() {
     medicalNotes: '',
   });
 
-  // Cambio de contraseña.
-  const [passActual, setPassActual] = useState('');
-  const [passNueva, setPassNueva] = useState('');
-  const [passMsg, setPassMsg] = useState('');
-
   // Subida de foto.
   const inputFoto = useRef<HTMLInputElement>(null);
   const [fotoMsg, setFotoMsg] = useState('');
+
+  /**
+   * ¿Esta persona gestiona un club?
+   *
+   * De esto depende que los campos protegidos —nombre, nacimiento, género,
+   * tipo de sangre y cinturón— salgan editables. No es un permiso nuevo: el
+   * servidor ya los aceptaba de un gestor **aunque el gestionado fuera él
+   * mismo** (`isOrgManagerOf(yo, yo)` en `users.service.ts`). Lo que faltaba
+   * era ofrecerlos, y por eso el maestro acababa en la pantalla de administrar
+   * a su gente para corregirse su propio nombre.
+   *
+   * `null` mientras no se sabe: se pinta bloqueado, que es lo prudente. Si la
+   * consulta falla, se queda bloqueado y el aviso de siempre sigue diciendo a
+   * quién pedírselo.
+   */
+  const [gestor, setGestor] = useState<boolean | null>(null);
+
+  /**
+   * Cinturón y antigüedad. Viven en la misma fila (`user_disciplines`) y por
+   * eso viajan juntos, igual que en el editor del maestro. Solo se ven —y solo
+   * se mandan— si `gestor`.
+   */
+  const [cinturon, setCinturon] = useState('');
+  const [desde, setDesde] = useState('');
 
   const fechas = limitesFechaNacimiento();
 
@@ -139,9 +182,21 @@ export default function PerfilPage() {
       return;
     }
     try {
-      const res = await api.get(`/users/${payload.sub}/profile`);
+      // Las dos en paralelo: el perfil es lo que se pinta y las
+      // organizaciones deciden qué campos salen editables. En serie, la
+      // pantalla esperaba dos viajes para enseñar lo mismo.
+      const [res, orgs] = await Promise.all([
+        api.get(`/users/${payload.sub}/profile`),
+        misOrganizacionesAPI().catch(() => null),
+      ]);
+      // `null` = no se pudo preguntar. Se queda bloqueado, que es lo prudente:
+      // un campo que se deja escribir y luego el servidor rechaza es peor que
+      // uno que nunca se ofreció.
+      setGestor(orgs === null ? null : orgs.length > 0);
       const p = res.data as Perfil;
       setPerfil(p);
+      setCinturon(p.disciplines?.[0]?.currentGrade ?? '');
+      setDesde(p.disciplines?.[0]?.since?.slice(0, 10) ?? '');
       setForm({
         fullName: p.fullName ?? '',
         phone: p.phone ?? '',
@@ -182,17 +237,29 @@ export default function PerfilPage() {
     setError('');
     setOk('');
     try {
-      // El nombre y la fecha ya registrada NO se envían: son campos protegidos
-      // que solo corrige el maestro del club o un administrador.
+      // ── Qué se manda y qué no ──────────────────────────────────────────
+      // Quien gestiona un club manda TODO, porque el servidor se lo acepta:
+      // `isOrgManagerOf(yo, yo)` es cierto para un maestro, y esa es la regla
+      // que ya se aplicaba en el editor de miembros. Quien no gestiona sigue
+      // pudiendo RELLENAR lo que falta, pero no cambiar lo ya registrado —y
+      // por eso esos tres campos se omiten cuando ya tienen valor: mandarlos
+      // sería pedir un error que no hace falta pedir.
+      const puede = gestor === true;
       await api.patch(`/users/${perfil.id}/profile`, {
-        ...(perfil.birthDate ? {} : { birthDate: form.birthDate || null }),
-        // El género se manda solo si todavía no estaba: rellenar un hueco sí,
-        // cambiarlo no. Las cuentas importadas llegan sin él.
-        ...(perfil.gender ? {} : { gender: form.gender || null }),
-        // Y el tipo de sangre igual: se rellena si falta, no se cambia. El
-        // servidor aplica la misma regla, así que mandarlo cuando ya está
-        // registrado sería pedir un error que no hace falta pedir.
-        ...(perfil.bloodType ? {} : { bloodType: form.bloodType || null }),
+        ...(puede
+          ? {
+              fullName: form.fullName.trim().toLocaleUpperCase('es'),
+              birthDate: form.birthDate || null,
+              gender: form.gender || null,
+              bloodType: form.bloodType || null,
+            }
+          : {
+              ...(perfil.birthDate ? {} : { birthDate: form.birthDate || null }),
+              // El género se manda solo si todavía no estaba: rellenar un hueco
+              // sí, cambiarlo no. Las cuentas importadas llegan sin él.
+              ...(perfil.gender ? {} : { gender: form.gender || null }),
+              ...(perfil.bloodType ? {} : { bloodType: form.bloodType || null }),
+            }),
         phone: form.phone || null,
         avatarUrl: form.avatarUrl || null,
         emergencyContactName: form.emergencyContactName || null,
@@ -200,8 +267,31 @@ export default function PerfilPage() {
         emergencyContactRelationship: form.emergencyContactRelationship || null,
         medicalNotes: form.medicalNotes || null,
       });
+
+      // El cinturón y la antigüedad viven en otra tabla, así que van en su
+      // propio viaje — y solo si cambió alguno de los dos. Es el mismo código
+      // que tenía el editor de miembros: se trae para que esta pantalla no
+      // tenga que mandar a nadie a la otra.
+      if (puede) {
+        const dis = perfil.disciplines?.[0];
+        if (
+          cinturon !== (dis?.currentGrade ?? '') ||
+          desde !== (dis?.since?.slice(0, 10) ?? '')
+        ) {
+          await api.put(`/users/${perfil.id}/disciplines`, {
+            discipline: dis?.discipline ?? 'hapkido',
+            currentGrade: cinturon || null,
+            since: desde || null,
+          });
+        }
+      }
+
       setOk('Perfil guardado. Los cambios se ven en todas las aplicaciones.');
       setFotoMsg('');
+      // Se relee: el servidor normaliza el nombre a mayúsculas y recalcula el
+      // progreso del perfil. Sin esto la pantalla enseñaba lo tecleado y la
+      // barra de progreso se quedaba en el número de antes.
+      await cargar();
     } catch (e2) {
       setError(extraerError(e2, 'No se pudo guardar el perfil.'));
     } finally {
@@ -209,54 +299,28 @@ export default function PerfilPage() {
     }
   }
 
-  async function cambiarPassword(e: FormEvent) {
-    e.preventDefault();
-    setPassMsg('');
-    try {
-      await api.post('/auth/change-password', {
-        currentPassword: passActual,
-        newPassword: passNueva,
-      });
-      setPassMsg('Contraseña actualizada.');
-      setPassActual('');
-      setPassNueva('');
-    } catch (e2) {
-      setPassMsg(extraerError(e2, 'No se pudo cambiar la contraseña.'));
-    }
-  }
-
+  /**
+   * Un campo de texto con su etiqueta. Ya no distingue contraseñas: la única
+   * que había en esta pantalla se mudó a Configuración, y el `type ===
+   * 'password'` que quedaba aquí era una rama muerta que obligaba a importar
+   * `CampoContrasena` para nada.
+   */
   const campo = (
     etiqueta: string,
     valor: string,
     onChange: (v: string) => void,
     props: Record<string, unknown> = {},
-  ) => {
-    // Las contraseñas llevan el ojo del ecosistema, el mismo que el login,
-    // Membresías y Campeonatos (ver OPERAR.md §4.9). `type` sobra ahí: el
-    // componente lo maneja él.
-    const { type, ...resto } = props;
-    return (
-      <label className="block text-sm">
-        <span style={{ color: 'var(--text-muted)' }}>{etiqueta}</span>
-        {type === 'password' ? (
-          <span className="mt-1 block">
-            <CampoContrasena
-              value={valor}
-              onChange={(e) => onChange(e.target.value)}
-              {...resto}
-            />
-          </span>
-        ) : (
-          <input
-            className="mt-1"
-            value={valor}
-            onChange={(e) => onChange(e.target.value)}
-            {...props}
-          />
-        )}
-      </label>
-    );
-  };
+  ) => (
+    <label className="block text-sm">
+      <span style={{ color: 'var(--text-muted)' }}>{etiqueta}</span>
+      <input
+        className="mt-1"
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        {...props}
+      />
+    </label>
+  );
 
   if (!perfil) {
     return (
@@ -268,6 +332,15 @@ export default function PerfilPage() {
     );
   }
 
+  /**
+   * ¿Salen los campos de gestor?
+   *
+   * `gestor === true` y no `gestor` a secas: mientras se pregunta vale `null`,
+   * y `null` tiene que pintar BLOQUEADO. Al revés, la pantalla abría los campos
+   * medio segundo y los cerraba de golpe al llegar la respuesta.
+   */
+  const puedeGestor = gestor === true;
+
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-4 py-10 sm:px-6">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -278,9 +351,14 @@ export default function PerfilPage() {
             {perfil.email} · {t('perfil.documento')} {perfil.documentId}
           </p>
         </div>
-        <Link href="/dashboard" className="btn btn-outline">
-          {t('perfil.misApps')}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/configuracion" className="btn btn-outline">
+            {t('config.desdeElPerfil')}
+          </Link>
+          <Link href="/dashboard" className="btn btn-outline">
+            {t('perfil.misApps')}
+          </Link>
+        </div>
       </header>
 
       {/* ── Progreso del perfil (Campeonatos exige el perfil completo) ── */}
@@ -331,33 +409,26 @@ export default function PerfilPage() {
       {/* ── Foto + datos de cuenta ── */}
       <section className="card mb-4 p-5">
         <div className="flex flex-wrap items-center gap-5">
-          {form.avatarUrl ? (
-            <Ampliable src={form.avatarUrl} alt={t('perfil.tuFoto')}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={form.avatarUrl}
-                alt={t('perfil.tuFoto')}
-                className="h-24 w-24 shrink-0 rounded-full object-cover"
-                style={{ border: '2px solid var(--gold)' }}
-              />
-            </Ampliable>
-          ) : (
-            <div
-              className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full text-3xl font-extrabold"
-              style={{
-                background: 'var(--bg-elevated)',
-                border: '2px solid var(--gold)',
-                color: 'var(--gold)',
-              }}
-            >
-              {perfil.fullName
-                .split(' ')
-                .map((p) => p[0])
-                .slice(0, 2)
-                .join('')
-                .toUpperCase()}
-            </div>
-          )}
+          {/* ── Por qué esto es `<Avatar>` y no una `<img>` propia ──────────
+              Porque era una `<img>` propia, y ahí estaba el fallo de «la foto
+              no se ve hasta que le doy clic para ampliarla»: la foto guardada
+              se anota como una ruta del disco (`/media/avatars/…`), y esa ruta
+              es de la API, no del portal. `<Avatar>` la resuelve con
+              `urlImagen`; esta pantalla la metía cruda en el `src`, así que el
+              navegador la pedía al origen del portal y recibía un 404. Al
+              ampliarla sí aparecía porque el visor sí la resuelve — de ahí que
+              pareciera que la foto «estaba» pero no se pintaba.
+
+              La lección es la de todo este cambio: una sola puerta. Mientras
+              cada pantalla pinte su propia foto, arreglarlo en `<Avatar>` no
+              arregla nada. */}
+          <Avatar
+            src={form.avatarUrl}
+            nombre={perfil.fullName}
+            size={96}
+            ampliable
+            destacada
+          />
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold">{t('perfil.foto')}</h2>
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -432,9 +503,26 @@ export default function PerfilPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
             <span style={{ color: 'var(--text-muted)' }}>{t('perfil.nombreCompleto')}</span>
-            <input className="mt-1" value={form.fullName} readOnly style={{ opacity: 0.7 }} />
+            {/* Editable solo para quien gestiona un club. No es un permiso
+                nuevo: es el que el servidor ya daba y que obligaba al maestro a
+                irse a la pantalla de administrar a su gente para corregirse el
+                propio nombre. Ver el bloque de arriba del archivo. */}
+            <input
+              className="mt-1"
+              value={form.fullName}
+              readOnly={!puedeGestor}
+              onChange={
+                puedeGestor
+                  ? (e) => setForm({ ...form, fullName: soloLetras(e.target.value) })
+                  : undefined
+              }
+              maxLength={LIM.nombrePersona}
+              style={puedeGestor ? undefined : { opacity: 0.7 }}
+            />
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-              {t('perfil.nombreLoCorrigeMaestro')}
+              {puedeGestor
+                ? 'Como gestionas un club, puedes corregirlo. Se guarda en mayúsculas.'
+                : t('perfil.nombreLoCorrigeMaestro')}
             </span>
           </label>
           {campo(
@@ -459,15 +547,17 @@ export default function PerfilPage() {
                 onChange={(v) => setForm({ ...form, birthDate: v })}
                 min={fechas.min}
                 max={fechas.max}
-                disabled={!!perfil.birthDate}
+                disabled={!puedeGestor && !!perfil.birthDate}
                 borrable={false}
                 etiquetaAria={t('perfil.nacimiento')}
               />
             </div>
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-              {perfil.birthDate
-                ? 'Ya registrada: solo tu maestro o un administrador puede corregirla.'
-                : 'Regístrala con cuidado: después solo la corrige tu maestro.'}
+              {puedeGestor
+                ? 'Gestionas un club: puedes corregirla.'
+                : perfil.birthDate
+                  ? 'Ya registrada: solo tu maestro o un administrador puede corregirla.'
+                  : 'Regístrala con cuidado: después solo la corrige tu maestro.'}
             </span>
           </div>
           <div className="block text-sm">
@@ -479,7 +569,7 @@ export default function PerfilPage() {
               <SelectMenu
                 valor={form.gender}
                 etiquetaAria={t('perfil.genero')}
-                disabled={!!perfil.gender}
+                disabled={!puedeGestor && !!perfil.gender}
                 placeholder={t('perfil.selecciona')}
                 onChange={(v) => setForm({ ...form, gender: v })}
                 opciones={GENEROS.map((g) => ({
@@ -489,9 +579,11 @@ export default function PerfilPage() {
               />
             </div>
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-              {perfil.gender
-                ? 'Ya registrado: lo corrige tu maestro o un administrador.'
-                : 'Con esto Campeonatos te ubica en tu categoría.'}
+              {puedeGestor
+                ? 'Gestionas un club: puedes corregirlo. Mueve tu categoría en Campeonatos.'
+                : perfil.gender
+                  ? 'Ya registrado: lo corrige tu maestro o un administrador.'
+                  : 'Con esto Campeonatos te ubica en tu categoría.'}
             </span>
           </div>
           <div className="block text-sm">
@@ -508,16 +600,18 @@ export default function PerfilPage() {
               <SelectMenu
                 valor={form.bloodType}
                 etiquetaAria={t('perfil.tipoSangre')}
-                disabled={!!perfil.bloodType}
+                disabled={!puedeGestor && !!perfil.bloodType}
                 placeholder={t('perfil.porRegistrar')}
                 onChange={(v) => setForm({ ...form, bloodType: v })}
                 opciones={TIPOS_SANGRE.map((s) => ({ valor: s, etiqueta: s }))}
               />
             </div>
             <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-              {perfil.bloodType
-                ? 'Ya registrado: lo corrige tu maestro o un administrador.'
-                : 'Regístralo con cuidado: después solo lo corrige tu maestro.'}
+              {puedeGestor
+                ? 'Gestionas un club: puedes corregirlo. Va impreso en tu carnet.'
+                : perfil.bloodType
+                  ? 'Ya registrado: lo corrige tu maestro o un administrador.'
+                  : 'Regístralo con cuidado: después solo lo corrige tu maestro.'}
             </span>
           </div>
         </div>
@@ -573,13 +667,56 @@ export default function PerfilPage() {
         </button>
       </form>
 
-      {/* ── Disciplinas y grado (las promueve el maestro) ── */}
+      {/* ── Disciplinas y grado ──────────────────────────────────────────────
+          De solo lectura para quien entrena: el cinturón lo promueve su
+          maestro, y esa regla no cambia. Editable para quien gestiona un club,
+          porque el suyo tenía que ponérselo desde la pantalla de administrar a
+          su gente — el último trozo de «mi perfil» que vivía en otra parte.
+
+          Va FUERA del formulario de arriba a propósito: el cinturón se guarda
+          en otra tabla y con otra petición, y mezclarlos escondería que son dos
+          cosas. El botón de guardar es el mismo, que es lo que importa. */}
       <section className="card mt-4 p-5">
         <h2 className="text-lg font-semibold">{t('perfil.disciplinas')}</h2>
         <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-          El cinturón lo actualiza tu maestro cuando te promueve.
+          {puedeGestor
+            ? 'Gestionas un club, así que tu propio grado lo registras aquí.'
+            : 'El cinturón lo actualiza tu maestro cuando te promueve.'}
         </p>
-        {perfil.disciplines.length === 0 ? (
+
+        {puedeGestor ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Cinturón</span>
+              <div className="mt-1">
+                <SelectMenu
+                  valor={cinturon}
+                  etiquetaAria="Cinturón"
+                  placeholder={t('perfil.selecciona')}
+                  onChange={setCinturon}
+                  opciones={CINTURONES_GRADO.map((c) => ({ valor: c, etiqueta: c }))}
+                />
+              </div>
+            </div>
+            <div className="block text-sm">
+              <span style={{ color: 'var(--text-muted)' }}>Entrena desde</span>
+              <div className="mt-1">
+                <CampoFecha
+                  valor={desde}
+                  onChange={setDesde}
+                  max={hoyISO()}
+                  etiquetaAria="Entrena desde"
+                />
+              </div>
+              <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+                Va impresa en tu carnet de Membresías.
+              </span>
+            </div>
+            <p className="text-xs sm:col-span-2" style={{ color: 'var(--text-muted)' }}>
+              Se guarda con el botón «{t('perfil.guardarCambios')}» de arriba.
+            </p>
+          </div>
+        ) : perfil.disciplines.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             Aún no tienes disciplinas registradas.
           </p>
@@ -599,68 +736,25 @@ export default function PerfilPage() {
         )}
       </section>
 
-      {/* ── Cambiar contraseña (ÚNICO lugar del ecosistema) ── */}
-      <form onSubmit={cambiarPassword} className="card mt-4 flex flex-col gap-4 p-5">
-        <h2 className="text-lg font-semibold">{t('perfil.cambiarContrasena')}</h2>
-        <p className="-mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Tu contraseña es una sola para todo DINAMYT y solo se cambia aquí.
+      {/* ── Lo que se mudó a Configuración ──────────────────────────────────
+          Aquí estaban la contraseña, las sesiones abiertas, el tema, el idioma
+          y la zona horaria. Nada de eso es el perfil: el perfil es lo que otras
+          personas leen de ti —tu nombre en la llave, tu foto en el carnet, tu
+          tipo de sangre—, y eso es lo contrario. Ver la cabecera de
+          `app/configuracion/page.tsx`.
+
+          Queda el enlace y no el silencio: quien viene a cambiar su contraseña
+          la ha buscado siempre en «Mi perfil», y una pantalla que se lleva algo
+          sin decir a dónde se lee como una pantalla que lo perdió. */}
+      <section className="card mt-4 p-5">
+        <h2 className="text-lg font-semibold">{t('config.titulo')}</h2>
+        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+          {t('config.enElPerfilNo')}
         </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {campo('Contraseña actual', passActual, setPassActual, {
-            type: 'password',
-            required: true,
-            autoComplete: 'current-password',
-          })}
-          <div>
-            {campo('Nueva contraseña', passNueva, setPassNueva, {
-              type: 'password',
-              required: true,
-              maxLength: LIM.password,
-              autoComplete: 'new-password',
-            })}
-            {/* Los mismos mínimos que el registro, a la vista. «(mín. 8)» en la
-                etiqueta era todo lo que se decía, y era todo lo que se exigía:
-                `12345678` pasaba. */}
-            <MedidorContrasena clave={passNueva} />
-          </div>
-        </div>
-        {passMsg && (
-          <p
-            className="text-sm"
-            style={{ color: passMsg.includes('actualizada') ? 'var(--ok)' : 'var(--danger)' }}
-          >
-            {passMsg}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={!passActual || !validarContrasena(passNueva).ok}
-          className="btn btn-outline self-start"
-        >
-          Actualizar contraseña
-        </button>
-      </form>
-
-      {/* Va justo debajo de «cambiar contraseña» a propósito: son la misma
-          preocupación. Quien viene aquí porque cree que alguien entró en su
-          cuenta necesita las dos cosas, y en este orden — cambiar la cerradura
-          no sirve de nada si el intruso sigue dentro con su sesión abierta. */}
-      {/* «Cómo veo DINAMYT»: el tema, el idioma y la hora responden la misma
-          pregunta, así que van juntos y en este orden — los dos primeros se
-          ven al instante, la hora explica algo que pasa cuando no estás. */}
-      <Apariencia
-        usuarioId={perfil.id}
-        temaGuardado={perfil.theme}
-        localeGuardado={perfil.locale}
-      />
-
-      <ZonaHoraria
-        usuarioId={perfil.id}
-        zonaGuardada={perfil.timezone}
-        manual={!!perfil.timezoneManual}
-      />
-
-      <DispositivosConectados />
+        <Link href="/configuracion" className="btn btn-outline mt-3 self-start">
+          {t('config.desdeElPerfil')} →
+        </Link>
+      </section>
     </main>
   );
 }

@@ -14,17 +14,27 @@ import { urlImagen } from '@/lib/api';
  *
  * Lo único donde NO se enciende es dentro de un `<a>` o de un `<button>` que
  * ya hace otra cosa: ahí el anidado no es HTML válido.
+ *
+ * `destacada` es el aro de 2 px en oro pleno de la foto GRANDE —la del propio
+ * perfil, que es el retrato de la pantalla y no una miniatura de una lista—.
+ * Existe para que esa pantalla no tenga que pintar su propia `<img>`: cuando lo
+ * hacía, se saltaba el `urlImagen` de aquí y la foto guardada en el disco
+ * (`/media/…`) se pedía al origen del PORTAL en vez de al de la API. No cargaba
+ * nunca; solo al ampliarla, porque el visor sí resuelve la ruta. Ese era el
+ * fallo de «la foto no se ve hasta que le doy clic».
  */
 export function Avatar({
   src,
   nombre,
   size = 40,
   ampliable = false,
+  destacada = false,
 }: {
   src?: string | null;
   nombre: string;
   size?: number;
   ampliable?: boolean;
+  destacada?: boolean;
 }) {
   const iniciales = (nombre || '?')
     .split(' ')
@@ -38,6 +48,10 @@ export function Avatar({
   // único sitio por el que pasan todas. Ver `urlImagen` en `lib/api.ts`.
   const url = urlImagen(src);
 
+  const aro = destacada
+    ? '2px solid var(--gold)'
+    : '1.5px solid var(--gold-dim, var(--gold))';
+
   if (url) {
     const foto = (
       // eslint-disable-next-line @next/next/no-img-element
@@ -47,7 +61,7 @@ export function Avatar({
         width={size}
         height={size}
         className="shrink-0 rounded-full object-cover"
-        style={{ width: size, height: size, border: '1.5px solid var(--gold-dim, var(--gold))' }}
+        style={{ width: size, height: size, border: aro }}
       />
     );
     if (!ampliable) return foto;
@@ -66,7 +80,7 @@ export function Avatar({
         height: size,
         fontSize: size * 0.38,
         background: 'var(--bg-elevated)',
-        border: '1.5px solid var(--gold-dim, var(--gold))',
+        border: aro,
         color: 'var(--gold)',
       }}
     >

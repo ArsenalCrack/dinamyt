@@ -316,6 +316,12 @@ export default function DashboardPage() {
           <Link href="/perfil" className="btn btn-outline">
             Mi perfil
           </Link>
+          {/* Configuración va al lado del perfil y no dentro: el perfil es
+              quién eres —lo que las apps leen de ti— y esto es cómo quieres
+              usar la cuenta. Ver `app/configuracion/page.tsx`. */}
+          <Link href="/configuracion" className="btn btn-outline">
+            {t('config.titulo')}
+          </Link>
           {/* Salir se distingue: es la única acción destructiva */}
           <button onClick={salir} className="btn btn-danger">
             <IconoSalir /> Salir

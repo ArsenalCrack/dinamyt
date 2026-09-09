@@ -800,18 +800,38 @@ export default function MiOrganizacionPage() {
                       desplegable de rol, no los botones. Sin esto, en un
                       teléfono el «✎ Perfil» se estrujaba hasta partir su
                       etiqueta en dos líneas y la fila crecía a lo alto. */}
+                  {/* ── La fila de uno mismo lleva a «Mi perfil» ───────────
+                      Los datos de una persona se editan en UN sitio. Este
+                      editor es el del maestro sobre SU gente; para uno mismo,
+                      la puerta es `/perfil`, que además desbloquea los campos
+                      de gestor a quien gestiona un club. Antes las dos puertas
+                      salían aquí, una al lado de la otra, y llevaban a
+                      formularios distintos sobre los mismos campos. Ver la
+                      cabecera de `app/perfil/page.tsx`. */}
                   <Link
-                    href={`/mi-organizacion/miembro/${m.userId}`}
+                    href={
+                      m.userId === yo
+                        ? '/perfil'
+                        : `/mi-organizacion/miembro/${m.userId}`
+                    }
                     className="btn btn-outline shrink-0 whitespace-nowrap"
                     style={{ padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
-                    title={`Editar el perfil de ${m.fullName}`}
+                    title={
+                      m.userId === yo
+                        ? 'Editar tus propios datos en Mi perfil'
+                        : `Editar el perfil de ${m.fullName}`
+                    }
                   >
                     {/* En pantalla estrecha solo el icono: «Perfil» son 44 px
                         que le hacen falta al nombre de al lado, y el `title` y
                         el `aria-label` siguen diciendo qué es. */}
                     <span aria-hidden="true">✎</span>
-                    <span className="ml-1 hidden @xs:inline">Perfil</span>
-                    <span className="sr-only">Editar perfil</span>
+                    <span className="ml-1 hidden @xs:inline">
+                      {m.userId === yo ? 'Mi perfil' : 'Perfil'}
+                    </span>
+                    <span className="sr-only">
+                      {m.userId === yo ? 'Editar mi perfil' : 'Editar perfil'}
+                    </span>
                   </Link>
                   {m.userId === yo ? (
                     <span

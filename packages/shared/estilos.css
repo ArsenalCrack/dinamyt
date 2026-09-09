@@ -506,6 +506,55 @@ input[type="password"]::-ms-clear { display: none; }
     font-family: var(--font-mono), ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
   }
+
+  /* ── LA MICRO-ETIQUETA: el nombre de un dato ──────────────────────────
+  
+     Lo que va ENCIMA de una cifra o de un valor y dice qué es: «Inscritos»
+     sobre el 128, «Sede» sobre «Coliseo El Salitre», el nombre de una
+     columna sobre su tabla. Es exactamente lo que ya hacían los `th` de las
+     cuatro webs, y no tenía nombre fuera de las tablas.
+     
+     ── Por qué existe esta clase ────────────────────────────────────────
+     
+     Porque cada pantalla se inventaba la suya, y en Campeonatos todas
+     salieron igual de mal: `font-weight: 800` + `text-transform: uppercase`
+     en la tipografía del CUERPO. Auditado el 5 de septiembre de 2026 —seis
+     copias del mismo error en seis archivos distintos:
+     
+         .ficha-stat-lbl    .ficha-dato dt    .ficha-tatami-lbl
+         .resultados-label  .e404-ruta-label  .divider-label
+     
+     Una palabra corta, en mayúsculas, en negrita gruesa y en una sans ancha
+     pesa MÁS que el dato que está nombrando. En la ficha de un campeonato
+     eso significaba que «INSCRITOS» se leía antes que el 128, que es lo que
+     alguien vino a mirar. No es un problema de gusto: es la jerarquía al
+     revés.
+     
+     ── Y por qué sigue en mayúsculas ────────────────────────────────────
+     
+     Porque en MONO, a 0.7 rem, con peso 500 y mucho interletrado, las
+     mayúsculas ya no gritan: hacen de etiqueta, que es justo lo que se
+     quiere. Es el mismo recurso de `.eyebrow` un punto más bajo, y es lo
+     que Membresías usa en cada cabecera de tabla y en cada dato apilado del
+     teléfono (`td[data-etq]::before`).
+     
+     La regla del ecosistema, entera y en tres renglones:
+     
+         titular          → `.display`  (MAYÚSCULAS, display, tracking -)
+         antetítulo       → `.eyebrow`  (MAYÚSCULAS, mono 0.72, tracking ++)
+         nombre de un dato→ esto        (MAYÚSCULAS, mono 0.7,  tracking +)
+         todo lo demás    → como se escribe
+     
+     Si algo no es ninguno de los tres primeros —una etiqueta de formulario,
+     un pie, un botón, un aviso— va en minúsculas. */
+  .microetiqueta {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
   /* ── La palabra en oro de un TITULAR ─────────────────────────────────
      «Se acabó **el cuaderno** del club», «Bienvenido a **DINAMYT**»: la firma
      de la marca en las cuatro webs. Se escribía a mano

@@ -2,8 +2,14 @@
 
 import { useEffect } from 'react';
 import api from '@/lib/api';
-import { aplicarTema, escucharTemaDelSistema, hayModoElegido, type Tema } from '@/lib/tema';
-import { hayIdiomaElegido, idiomaDeLocale, useI18n } from '@/lib/i18n';
+import {
+  aplicarTema,
+  escucharTemaDelSistema,
+  hayModoElegido,
+  refrescarDesdeLaCookie,
+  type Tema,
+} from '@/lib/tema';
+import { hayIdiomaElegido, idiomaDeLaCookie, idiomaDeLocale, useI18n } from '@/lib/i18n';
 import { obtenerPaseCrudo, obtenerToken } from '@/lib/sesion';
 
 /**
@@ -72,6 +78,52 @@ export function AplicarApariencia() {
     if (!hayIdiomaElegido() && typeof pase.locale === 'string' && pase.locale) {
       setIdioma(idiomaDeLocale(pase.locale));
     }
+  }, [setIdioma]);
+
+  // ── 2b. La cookie compartida, cada vez que se vuelve a esta pestaña ──────
+  //
+  // Es la pieza que faltaba, y es la que de verdad arregla «lo cambio en una
+  // app y en la otra sigue igual». La cookie `.dinamyt.org` ya reparte la
+  // elección a las cuatro webs en el acto, pero solo se LEE al arrancar la
+  // página: una pestaña abierta desde hace media hora no vuelve a mirarla.
+  //
+  // El paso 3 parecía cubrirlo —pregunta al servidor al volver—, pero su
+  // guarda `hayModoElegido()` es cierta en cuanto exista la cookie, o sea
+  // siempre que alguien haya elegido modo alguna vez en este navegador. La
+  // sincronización estaba tapiada por su propia guarda.
+  //
+  // Aquí no hay guarda que valga: la cookie ES la última elección de esta
+  // persona en este navegador, en cualquiera de las cuatro apps. Aplicarla no
+  // puede pisar nada más reciente, porque no hay nada más reciente.
+  //
+  // Va sin sesión también: las pantallas públicas del portal se ven sin entrar
+  // y también tienen que respetar el modo claro.
+  useEffect(() => {
+    const releer = () => {
+      refrescarDesdeLaCookie();
+      const idi = idiomaDeLaCookie();
+      if (idi) setIdioma(idi);
+    };
+    // Al VOLVER a la pestania, no al esconderla: `visibilitychange` avisa de
+    // los dos, y releer al irse no le sirve a nadie.
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') releer();
+    };
+    document.addEventListener('visibilitychange', alVolver);
+    // Y `focus` además de `visibilitychange`: cambiar de VENTANA (dos ventanas
+    // lado a lado, o la app instalada junto al navegador) no siempre dispara el
+    // segundo, y ese es justo el caso de quien tiene el portal y Membresías
+    // abiertos a la vez.
+    // `focus` va SIN la comprobacion de visibilidad, y a proposito: hay
+    // contextos donde `visibilityState` dice `hidden` aunque la ventana este
+    // delante —una vista incrustada, un panel lateral, algun navegador
+    // embebido—, y ahi la comprobacion dejaba el refresco muerto. Recibir el
+    // foco ya significa que alguien esta mirando; leer una cookie es gratis.
+    window.addEventListener('focus', releer);
+    return () => {
+      document.removeEventListener('visibilitychange', alVolver);
+      window.removeEventListener('focus', releer);
+    };
   }, [setIdioma]);
 
   // ── 3. Lo que dice el servidor: verdadero, aunque llegue un instante tarde ─

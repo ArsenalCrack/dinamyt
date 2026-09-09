@@ -207,6 +207,22 @@ const es = {
   'perfil.nombreLoCorrigeMaestro':
     'Solo tu maestro o un administrador puede corregirlo.',
 
+  // ── Configuración ──
+  // Lo que NO es el perfil. Ver `app/configuracion/page.tsx`: el perfil es
+  // quién eres —lo que las apps leen de ti—, y esto es cómo quieres usar la
+  // cuenta. Estaban mezclados en la misma pantalla.
+  'config.titulo': 'Configuración',
+  'config.eyebrow': 'Una cuenta, la misma en todas partes',
+  'config.desc':
+    'Lo que elijas aquí vale en DINAMYT, en Campeonatos, en Membresías y en Academy, y en cualquier dispositivo donde entres.',
+  'config.seguridad': 'Seguridad',
+  'config.seguridadDesc':
+    'Tu contraseña es una sola para todo DINAMYT, y las sesiones abiertas se cierran desde aquí.',
+  'config.irAlPerfil': '← Mi perfil',
+  'config.desdeElPerfil': 'Configuración',
+  'config.enElPerfilNo':
+    'El tema, el idioma, tu hora y tus sesiones se cambian en Configuración.',
+
   // ── Planes ──
   // El escaparate. Es publico: lo lee gente que todavia no tiene cuenta, y por
   // eso se traduce entero — la pagina que decide una compra no puede ser la
@@ -372,6 +388,18 @@ const en: Record<ClaveTexto, string> = {
   'perfil.telefonoSoloNumeros': 'Phone (digits only)',
   'perfil.nombreLoCorrigeMaestro':
     'Only your master or an administrator can correct it.',
+
+  'config.titulo': 'Settings',
+  'config.eyebrow': 'One account, the same everywhere',
+  'config.desc':
+    'What you choose here applies in DINAMYT, Championships, Memberships and Academy, and on any device you sign in from.',
+  'config.seguridad': 'Security',
+  'config.seguridadDesc':
+    'You have a single password for all of DINAMYT, and open sessions are closed from here.',
+  'config.irAlPerfil': '← My profile',
+  'config.desdeElPerfil': 'Settings',
+  'config.enElPerfilNo':
+    'Theme, language, your time zone and your sessions are changed in Settings.',
 
   'planes.eyebrow': 'Subscription per organization',
   'planes.titulo': 'Plans',

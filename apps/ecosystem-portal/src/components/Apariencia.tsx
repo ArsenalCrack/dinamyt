@@ -2,16 +2,28 @@
 
 import { useEffect, useState } from 'react';
 import api, { extraerError } from '@/lib/api';
-import { aplicarTema, getTema, temaDelSistema, type Tema } from '@/lib/tema';
-import { IDIOMAS, idiomaDeLocale, useI18n, type Idioma } from '@/lib/i18n';
+import {
+  aplicarTema,
+  getTema,
+  hayModoElegido,
+  temaDelSistema,
+  type Tema,
+} from '@/lib/tema';
+import {
+  IDIOMAS,
+  hayIdiomaElegido,
+  idiomaDeLocale,
+  useI18n,
+  type Idioma,
+} from '@/lib/i18n';
 
 /**
  * Cómo veo DINAMYT: el tema y el idioma.
  *
- * Va en el perfil, al lado de «Tu hora», porque las tres responden la misma
- * pregunta —cómo quiero ver esto— y porque esa pantalla ya existía para una de
- * ellas. Tres pantallas para tres preferencias del mismo tipo es la forma
- * segura de que nadie encuentre ninguna.
+ * Vive en `/configuracion`, al lado de «Tu hora», porque las tres responden la
+ * misma pregunta —cómo quiero ver esto— y ninguna de las tres es el perfil.
+ * Estuvo dentro de «Mi perfil» mientras no hubo otro sitio; ver la cabecera de
+ * `app/configuracion/page.tsx` para por qué se separó.
  *
  * ── Por qué se guarda en el servidor y no solo en el navegador ──
  *
@@ -48,10 +60,40 @@ export function Apariencia({
   const [error, setError] = useState('');
   const [ocupado, setOcupado] = useState(false);
 
-  // El servidor manda. Se aplica tras montar —no en el render— porque el HTML
-  // se pinta antes de saber quién eres, y cambiarlo durante la hidratación
-  // rompería el emparejamiento con lo que dejó el script anti-parpadeo.
+  /**
+   * Qué botón sale marcado al abrir.
+   *
+   * ── El fallo que había aquí, y que era la mitad del «se revierte» ────────
+   *
+   * Esta pantalla IMPONÍA lo que dijera la cuenta: llamaba a `aplicarTema` con
+   * `temaGuardado` nada más montarse. Y `aplicarTema` escribe la cookie
+   * compartida de `.dinamyt.org`. O sea que abrir esta pantalla —solo abrirla,
+   * sin tocar nada— repartía el valor del servidor a las cuatro webs y
+   * deshacía la elección que se acababa de hacer en Membresías o en
+   * Campeonatos. Se veía como «lo cambio y se me devuelve solo», y se veía
+   * justo al entrar a mirar por qué no se había quedado.
+   *
+   * El orden bueno ya estaba escrito y documentado en `hayModoElegido`:
+   *
+   *     cookie  (lo último que se eligió EN ESTE navegador, en cualquier app)
+   *       > cuenta  (lo último que se eligió en CUALQUIER dispositivo)
+   *
+   * Esta pantalla era la única del portal que no lo respetaba — `AplicarApariencia`
+   * sí—, y precisamente la que la gente abre cuando algo del tema no cuadra.
+   *
+   * Ahora: si este navegador ya tiene elección, se ENSEÑA (y no se toca nada);
+   * si no la tiene, se adopta la de la cuenta, que es para lo que sirve — el
+   * dispositivo nuevo.
+   *
+   * Se hace tras montar y no en el render porque el HTML se pinta antes de
+   * saber quién eres, y cambiarlo durante la hidratación rompería el
+   * emparejamiento con lo que dejó el script anti-parpadeo.
+   */
   useEffect(() => {
+    if (hayModoElegido()) {
+      setTema(getTema());
+      return;
+    }
     const delServidor = (temaGuardado ?? '') as Tema;
     const valido =
       delServidor === 'claro' ||
@@ -62,7 +104,11 @@ export function Apariencia({
     aplicarTema(elegido);
   }, [temaGuardado]);
 
+  // El idioma, la misma regla y por el mismo motivo. Este era el más visible
+  // de los dos: se ponía inglés en Campeonatos, se venía al portal a mirar y
+  // esta pantalla lo devolvía a español sola.
   useEffect(() => {
+    if (hayIdiomaElegido()) return;
     if (localeGuardado) setIdioma(idiomaDeLocale(localeGuardado));
   }, [localeGuardado, setIdioma]);
 

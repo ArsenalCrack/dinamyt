@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import api, { obtenerToken, extraerError } from '@/lib/api';
+import api, { obtenerToken, decodificarToken, extraerError } from '@/lib/api';
 import {
   soloLetras,
   soloTelefono,
@@ -49,6 +49,16 @@ interface PerfilMiembro {
  * tocar (nombre, fecha de nacimiento), se registra el tipo de sangre y se
  * promueve el cinturón. La API rechaza estos cambios si quien pide no
  * gestiona a la persona.
+ *
+ * ── Para OTRAS personas, nunca para uno mismo ────────────────────────────────
+ *
+ * Antes también servía para uno mismo, y eso hacía dos formularios para los
+ * mismos diez campos: este y `/perfil`. Distintos, además —aquí se corregía el
+ * nombre y allí no—, así que cuál mandaba dependía de por dónde hubieras
+ * entrado. Ahora entrar aquí con el propio identificador redirige a `/perfil`,
+ * que es la única puerta a los datos de uno; y `/perfil` desbloquea los campos
+ * de gestor a quien gestiona un club, para que nadie pierda nada por el camino.
+ * Ver la cabecera de `app/perfil/page.tsx`.
  */
 export default function EditarMiembroPage() {
   const router = useRouter();
@@ -88,8 +98,16 @@ export default function EditarMiembroPage() {
   const fechas = limitesFechaNacimiento();
 
   const cargar = useCallback(async () => {
-    if (!obtenerToken()) {
+    const pase = obtenerToken();
+    if (!pase) {
       router.replace('/login');
+      return;
+    }
+    // Uno mismo se edita en «Mi perfil», y en ningún otro sitio. Se comprueba
+    // ANTES de pedir nada: el perfil que se iba a traer es el mismo que va a
+    // pintar la otra pantalla.
+    if (decodificarToken(pase)?.sub === userId) {
+      router.replace('/perfil');
       return;
     }
     try {
