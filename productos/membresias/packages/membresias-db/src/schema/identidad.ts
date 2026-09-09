@@ -162,6 +162,33 @@ export const users = mem.table(
      * QR o PIN—, que siguen funcionando igual que siempre.
      */
     ecoSub: uuid('eco_sub'),
+    /**
+     * Cómo quiere ver DINAMYT esta persona: `sistema` | `claro` | `oscuro`.
+     *
+     * ── Por qué existe aquí, si la verdad vive en el portal ──
+     *
+     * Porque `PATCH /me/apariencia` no guardaba NADA: leía el `eco_sub` y
+     * reenviaba al ecosistema, y ese reenvío se rinde en silencio si no hay
+     * secreto compartido o si la ficha no tiene cuenta del portal. Para el
+     * alumno de carnet QR —y para un club que use Membresías sola— eso
+     * significaba que su elección no se guardaba en ningún sitio: vivía en la
+     * cookie del navegador y se perdía al cambiar de dispositivo. Se reportó
+     * como «esta información no queda guardada por cuentas».
+     *
+     * ── El reparto ──
+     *
+     * Con `eco_sub`, manda el ecosistema: es la verdad compartida por las
+     * cuatro webs, y es lo que hace que elegir en el portal se vea aquí. Esta
+     * columna es entonces la copia, y sirve para lo que la de allá no puede:
+     * contestar cuando el portal no responde.
+     *
+     * Sin `eco_sub`, **esta columna ES la cuenta**. No hay otra.
+     *
+     * `null` = no consta: manda el ecosistema, y si no, el navegador.
+     */
+    theme: varchar('theme', { length: 16 }),
+    /** Su idioma (`es-CO`, `en-US`…). Mismo reparto que `theme`. */
+    locale: varchar('locale', { length: 10 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
