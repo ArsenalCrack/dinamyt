@@ -1,14 +1,22 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   aplicarTema,
   escucharTemaDelSistema,
+  fijarCuenta,
   hayModoElegido,
   refrescarDesdeLaCookie,
   type Tema,
 } from '@/lib/tema';
-import { hayIdiomaElegido, idiomaDeLaCookie, idiomaDeLocale, useI18n } from '@/lib/i18n';
+import {
+  fijarCuentaIdioma,
+  hayIdiomaElegido,
+  idiomaDeLaCookie,
+  idiomaDeLocale,
+  useI18n,
+} from '@/lib/i18n';
 import { obtenerPaseCrudo } from '@/lib/sesion';
 
 /**
@@ -37,6 +45,10 @@ import { obtenerPaseCrudo } from '@/lib/sesion';
  */
 export function AplicarApariencia() {
   const { setIdioma } = useI18n();
+  // La ruta dice que la sesión pudo cambiar: este componente monta en el layout
+  // —o sea en el login, sin pase— y sin esto la cuenta se quedaría en `null`
+  // toda la sesión, firmando cada elección como `anon`. Ver el efecto de abajo.
+  const pathname = usePathname();
 
   // `sistema` es el valor por defecto, y `prefers-color-scheme` se consultaba
   // una sola vez al pintar: el teléfono que se oscurece solo al anochecer no
@@ -59,6 +71,14 @@ export function AplicarApariencia() {
     }
     if (!pase) return;
 
+    // QUIÉN está dentro. De esto depende que la cookie de este navegador se
+    // acepte o se descarte: es del navegador y no de la persona, así que sin
+    // firma quien sale de una cuenta y entra en otra hereda su tema y su
+    // idioma. Ver «DE QUIÉN ES LA ELECCIÓN» en `lib/tema.ts`.
+    const sub = typeof pase.sub === 'string' ? pase.sub : null;
+    fijarCuenta(sub);
+    fijarCuentaIdioma(sub);
+
     // ⚠️ Solo si este navegador NO tiene ya una elección, y esta guarda
     // faltaba justo aquí. El pase es una FOTO de la cuenta del momento de
     // entrar: es lo más viejo que hay. Sin la guarda, Academy pisaba con él el
@@ -73,7 +93,7 @@ export function AplicarApariencia() {
     if (!hayIdiomaElegido() && typeof pase.locale === 'string' && pase.locale) {
       setIdioma(idiomaDeLocale(pase.locale));
     }
-  }, [setIdioma]);
+  }, [setIdioma, pathname]);
 
   // ── La cookie compartida, cada vez que se vuelve a esta pestaña ──────────
   //

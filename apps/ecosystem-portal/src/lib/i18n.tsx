@@ -66,11 +66,56 @@ function dominioDeLaCookie(): string {
 }
 
 /** Lo que eligio esta persona en CUALQUIERA de las cuatro webs, o `null`. */
-export function idiomaDeLaCookie(): Idioma | null {
+/**
+ * La firma de la cookie: `en~<id>`. Es el mismo mecanismo que el del tema, y
+ * está por lo mismo — la cookie es del NAVEGADOR y no de la cuenta, así que sin
+ * firma quien salía de una cuenta y entraba en otra se encontraba el idioma de
+ * la anterior. Ver el bloque «DE QUIÉN ES LA ELECCIÓN» en el módulo del tema.
+ */
+const ANON = 'anon';
+
+/** Quién está dentro AHORA. Lo fija `AplicarApariencia` al montar. */
+let cuentaActual: string | null = null;
+
+export function fijarCuentaIdioma(id: string | null): void {
+  cuentaActual = id || null;
+}
+
+function brutoIdioma(): string | null {
   if (typeof document === 'undefined') return null;
   const m = new RegExp(`(?:^|; )${COOKIE_IDIOMA}=([^;]*)`).exec(document.cookie);
-  const v = m ? decodeURIComponent(m[1]) : null;
-  return v === 'es' || v === 'en' ? v : null;
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function partesIdioma(bruto: string | null): { valor: string; de: string } {
+  if (!bruto) return { valor: '', de: '' };
+  const i = bruto.indexOf('~');
+  return i === -1
+    ? { valor: bruto, de: ANON }
+    : { valor: bruto.slice(0, i), de: bruto.slice(i + 1) || ANON };
+}
+
+export function idiomaDeLaCookie(): Idioma | null {
+  // Sin la firma: para PINTAR da igual de quién sea.
+  const { valor } = partesIdioma(brutoIdioma());
+  return valor === 'es' || valor === 'en' ? valor : null;
+}
+
+/**
+ * Borra el idioma guardado EN ESTE NAVEGADOR. La usa la salida de sesión, por
+ * lo mismo que su gemela del tema: la siguiente persona que entre aquí no debe
+ * heredar el idioma de la anterior. `users.locale` no se toca.
+ */
+export function olvidarIdiomaDeEsteNavegador(): void {
+  if (typeof document === 'undefined') return;
+  const dominio = dominioDeLaCookie();
+  if (dominio) document.cookie = `${COOKIE_IDIOMA}=; path=/; max-age=0`;
+  document.cookie = `${COOKIE_IDIOMA}=; path=/; max-age=0${dominio}`;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* modo incógnito: no había copia que borrar */
+  }
 }
 
 function guardarIdiomaEnCookie(i: Idioma) {
@@ -83,7 +128,8 @@ function guardarIdiomaEnCookie(i: Idioma) {
   // disfraz. Borrar sin dominio solo afecta a la de host: la identidad de una
   // cookie es (nombre, dominio, ruta).
   if (dominio) document.cookie = `${COOKIE_IDIOMA}=; path=/; max-age=0`;
-  document.cookie = `${COOKIE_IDIOMA}=${i}; path=/; max-age=31536000; samesite=lax${dominio}`;
+  // Firmada con quien está dentro, como la del tema.
+  document.cookie = `${COOKIE_IDIOMA}=${i}~${cuentaActual ?? ANON}; path=/; max-age=31536000; samesite=lax${dominio}`;
 }
 
 /**
@@ -96,7 +142,11 @@ function guardarIdiomaEnCookie(i: Idioma) {
  * estaba guardando en la cuenta y el servidor contestaba `es-CO` cada vez.
  */
 export function hayIdiomaElegido(): boolean {
-  return idiomaDeLaCookie() !== null;
+  const { valor, de } = partesIdioma(brutoIdioma());
+  if (valor !== 'es' && valor !== 'en') return false;
+  // De OTRA cuenta no cuenta: que exista una elección en este navegador no
+  // significa que sea de quien está dentro ahora.
+  return de === ANON || !cuentaActual || de === cuentaActual;
 }
 
 /**
@@ -119,10 +169,18 @@ const es = {
   'menu.miOrganizacion': 'Mi organización',
   'menu.admin': 'Administración',
   'menu.apariencia': 'Tema e idioma',
-  'menu.modoClaro': '☀️ Modo claro',
-  'menu.modoOscuro': '🌙 Modo oscuro',
-  'menu.modoSistema': '🖥️ Como el sistema',
+  // Sin emojis: se quitaron de los menús de las otras tres webs y el portal se
+  // había quedado atrás. Un emoji delante de «Modo claro» no dice nada que la
+  // palabra no diga, y en Android se pinta con otra fuente y otro tamaño.
+  'menu.modoClaro': 'Modo claro',
+  'menu.modoOscuro': 'Modo oscuro',
+  'menu.modoSistema': 'Como el sistema',
   'menu.idioma': 'Idioma',
+  // ── La barra del portal ──
+  'menu.ecosistema': 'Ecosistema',
+  'menu.navegacion': 'Ir a',
+  'menu.abrir': 'Abrir el menú',
+  'menu.cerrar': 'Cerrar el menú',
 
   // ── Login ──
   'login.eyebrow': 'Tu cuenta DINAMYT',
@@ -243,6 +301,25 @@ const es = {
   'config.enElPerfilNo':
     'El tema, el idioma, tu hora y tus sesiones se cambian en Configuración.',
 
+  // ── Textos que estaban escritos a mano en las pantallas ──
+  'config.contrasenaActual': 'Contraseña actual',
+  'config.contrasenaNueva': 'Nueva contraseña',
+  'config.actualizarContrasena': 'Actualizar contraseña',
+  'config.contrasenaLista': 'Contraseña actualizada.',
+  'config.cargando': 'Cargando…',
+  'panel.abrirAdmin': 'Abrir panel de administración',
+  'panel.adminDesc': 'Organizaciones, miembros con su rol y suscripciones a planes.',
+  'panel.membresiasCortado': 'Tu acceso a Membresías está desactivado',
+  'perfil.sinDisciplinas': 'Aún no tienes disciplinas registradas.',
+  'perfil.cinturon': 'Cinturón',
+  'perfil.entrenaDesde': 'Entrena desde',
+  'perfil.enTuCarnet': 'Va impresa en tu carnet de Membresías.',
+  'perfil.notasMedicasEtq': 'Notas médicas (solo las ve tu maestro; se guardan cifradas)',
+  'config.dispositivos': 'Dispositivos conectados',
+  'config.dispositivosDesc': 'Dónde está abierta tu cuenta. Si ves algo que no reconoces, ciérralo.',
+  'config.sinOtrasSesiones': 'No hay ninguna otra sesión abierta.',
+  'comun.cerrarAviso': 'Cerrar el aviso',
+
   // ── Planes ──
   // El escaparate. Es publico: lo lee gente que todavia no tiene cuenta, y por
   // eso se traduce entero — la pagina que decide una compra no puede ser la
@@ -317,10 +394,14 @@ const en: Record<ClaveTexto, string> = {
   'menu.miOrganizacion': 'My organization',
   'menu.admin': 'Administration',
   'menu.apariencia': 'Theme and language',
-  'menu.modoClaro': '☀️ Light mode',
-  'menu.modoOscuro': '🌙 Dark mode',
-  'menu.modoSistema': '🖥️ Match system',
+  'menu.modoClaro': 'Light mode',
+  'menu.modoOscuro': 'Dark mode',
+  'menu.modoSistema': 'Match system',
   'menu.idioma': 'Language',
+  'menu.ecosistema': 'Ecosystem',
+  'menu.navegacion': 'Go to',
+  'menu.abrir': 'Open menu',
+  'menu.cerrar': 'Close menu',
 
   'login.eyebrow': 'Your DINAMYT account',
   'login.titulo': 'Sign',
@@ -421,6 +502,23 @@ const en: Record<ClaveTexto, string> = {
   'config.enElPerfilNo':
     'Theme, language, your time zone and your sessions are changed in Settings.',
 
+  'config.contrasenaActual': 'Current password',
+  'config.contrasenaNueva': 'New password',
+  'config.actualizarContrasena': 'Update password',
+  'config.contrasenaLista': 'Password updated.',
+  'config.cargando': 'Loading…',
+  'panel.abrirAdmin': 'Open the admin panel',
+  'panel.adminDesc': 'Organizations, members with their role, and plan subscriptions.',
+  'panel.membresiasCortado': 'Your access to Memberships is switched off',
+  'perfil.sinDisciplinas': 'You have no disciplines registered yet.',
+  'perfil.cinturon': 'Belt',
+  'perfil.entrenaDesde': 'Training since',
+  'perfil.enTuCarnet': 'It is printed on your Memberships card.',
+  'perfil.notasMedicasEtq': 'Medical notes (only your master sees them; stored encrypted)',
+  'config.dispositivos': 'Connected devices',
+  'config.dispositivosDesc': 'Where your account is open. If you see something you do not recognize, close it.',
+  'config.sinOtrasSesiones': 'No other session is open.',
+  'comun.cerrarAviso': 'Dismiss',
   'planes.eyebrow': 'Subscription per organization',
   'planes.titulo': 'Plans',
   'planes.inicio': '← Home',

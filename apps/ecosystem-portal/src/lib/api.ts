@@ -10,6 +10,8 @@ import {
   olvidarToken,
   type TokenPayload,
 } from './sesion';
+import { olvidarTemaDeEsteNavegador } from './tema';
+import { olvidarIdiomaDeEsteNavegador } from './i18n';
 
 const API_URL =
   process.env.NEXT_PUBLIC_ECOSYSTEM_API_URL || 'http://localhost:3001';
@@ -144,6 +146,17 @@ export function sesionActual(): TokenPayload | null {
  * dejaría a alguien dentro de una cuenta de la que está intentando salir.
  */
 export async function cerrarSesion(): Promise<void> {
+  // ── Lo primero: olvidar el tema y el idioma de ESTE navegador ─────────────
+  //
+  // La cookie de apariencia se comparte entre las cuatro webs y dura un año, y
+  // no es de la cuenta: es del navegador. Sin borrarla aquí, la siguiente
+  // persona que entre en este equipo se encuentra la pantalla con el tema y el
+  // idioma de quien acaba de salir. Se reportó exactamente así.
+  //
+  // `users.theme` y `users.locale` no se tocan: la cuenta conserva lo suyo y lo
+  // recupera al entrar. Lo que se borra es la copia local.
+  olvidarTemaDeEsteNavegador();
+  olvidarIdiomaDeEsteNavegador();
   // El pase CRUDO, no `obtenerToken()`: ese devuelve `null` en cuanto vence, y
   // sin pase el servidor no sabe qué fila cerrar. El pase dura media hora y la
   // sesión hasta doce, así que el caso «pestaña abierta desde hace un rato» era

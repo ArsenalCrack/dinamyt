@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * El resultado de una acción, donde se pueda ver desde donde se pulsó.
@@ -43,6 +44,7 @@ export function Aviso({
   msg: Mensaje | null;
   onCerrar: () => void;
 }) {
+  const { t } = useI18n();
   const esError = msg?.tipo === 'error';
 
   // El «hecho» se retira solo; el error se queda hasta que lo cierren. El
@@ -86,7 +88,7 @@ export function Aviso({
       <button
         type="button"
         onClick={onCerrar}
-        aria-label="Cerrar el aviso"
+        aria-label={t('comun.cerrarAviso')}
         style={{
           flexShrink: 0,
           border: 'none',

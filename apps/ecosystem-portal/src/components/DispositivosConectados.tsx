@@ -10,6 +10,7 @@ import {
   type SesionAbierta,
 } from '@/lib/api';
 import { haceCuanto, lugarDeSesion } from '@/lib/fechas';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Desde dónde está abierta tu cuenta, y el botón para cerrarlo.
@@ -29,6 +30,7 @@ import { haceCuanto, lugarDeSesion } from '@/lib/fechas';
  * mientras intenta echar a otro.
  */
 export function DispositivosConectados() {
+  const { t } = useI18n();
   const [sesiones, setSesiones] = useState<SesionAbierta[] | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
@@ -79,13 +81,24 @@ export function DispositivosConectados() {
 
   return (
     <section className="card mt-4 p-5">
-      <h2 className="text-lg font-semibold">Dispositivos conectados</h2>
+      {/* ── Por qué esta descripción es una línea y no un párrafo ───────────
+          Porque eran cinco renglones explicando el mecanismo —una fila por
+          dispositivo, los veinte minutos de inactividad, qué pasa al volver a
+          entrar— en una pantalla de ajustes que ya tiene tres bloques encima.
+          Nadie viene aquí a estudiar cómo funcionan las sesiones: viene a mirar
+          la lista y, como mucho, a cerrar una.
+
+          Lo que se quitó no se pierde: está en el `title` de la sección, y sobre
+          todo está en la propia lista, que ya dice desde dónde y desde cuándo.
+          El comportamiento se explica solo en cuanto se mira. */}
+      <h2
+        className="text-lg font-semibold"
+        title={`Hay una fila por dispositivo: volver a entrar desde el mismo navegador sustituye la anterior. Sin actividad, una sesión se cierra sola a los ${INACTIVIDAD_MINUTOS} minutos.`}
+      >
+        {t('config.dispositivos')}
+      </h2>
       <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Dónde está abierta tu cuenta ahora mismo. Si reconoces algo que no
-        deberías —un computador prestado, el del club—, ciérralo desde aquí. Hay
-        una fila por dispositivo: volver a entrar desde el mismo navegador
-        sustituye la anterior en vez de añadir otra. Sin actividad, cualquier
-        sesión se cierra sola a los {INACTIVIDAD_MINUTOS} minutos.
+        {t('config.dispositivosDesc')}
       </p>
 
       {sesiones === null && !error && (
@@ -175,7 +188,7 @@ export function DispositivosConectados() {
 
       {sesiones && otras.length === 0 && !error && (
         <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-          No hay ninguna otra sesión abierta.
+          {t('config.sinOtrasSesiones')}
         </p>
       )}
     </section>

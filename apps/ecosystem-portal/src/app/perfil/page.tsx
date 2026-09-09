@@ -648,7 +648,7 @@ export default function PerfilPage() {
 
         <label className="block text-sm">
           <span style={{ color: 'var(--text-muted)' }}>
-            Notas médicas (solo las ve tu maestro; se guardan cifradas)
+            {t('perfil.notasMedicasEtq')}
           </span>
           <textarea
             className="mt-1"
@@ -687,7 +687,7 @@ export default function PerfilPage() {
         {puedeGestor ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Cinturón</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('perfil.cinturon')}</span>
               <div className="mt-1">
                 <SelectMenu
                   valor={cinturon}
@@ -699,7 +699,7 @@ export default function PerfilPage() {
               </div>
             </div>
             <div className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Entrena desde</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('perfil.entrenaDesde')}</span>
               <div className="mt-1">
                 <CampoFecha
                   valor={desde}
@@ -709,7 +709,7 @@ export default function PerfilPage() {
                 />
               </div>
               <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-                Va impresa en tu carnet de Membresías.
+                {t('perfil.enTuCarnet')}
               </span>
             </div>
             <p className="text-xs sm:col-span-2" style={{ color: 'var(--text-muted)' }}>
@@ -718,7 +718,7 @@ export default function PerfilPage() {
           </div>
         ) : perfil.disciplines.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Aún no tienes disciplinas registradas.
+            {t('perfil.sinDisciplinas')}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { AplicarApariencia } from '@/components/AplicarApariencia';
+import { BarraPortal } from '@/components/BarraPortal';
 import { ControlesApariencia } from '@/components/ControlesApariencia';
 import { PieDePagina } from '@/components/PieDePagina';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
@@ -185,6 +186,11 @@ export default function RootLayout({
               de «mide lo que lleves dentro». Sin él, un correo largo en una
               lista ensanchaba la página entera. La cuenta completa está en
               `globals.css`, junto a `body > .pagina`. */}
+          {/* La barra del portal, la misma que las otras tres webs. Va en el
+              layout —no en cada pantalla— porque la navegación tiene que valer
+              en todas, y porque colgar el desplegable de la BARRA es lo que
+              impide que se salga por el borde derecho. Ver el componente. */}
+          <BarraPortal />
           <div className="pagina">{children}</div>
           {/* El globo de tema e idioma, solo donde NO hay navegación: la
               portada, el login, el registro. Dentro ya está el botón de

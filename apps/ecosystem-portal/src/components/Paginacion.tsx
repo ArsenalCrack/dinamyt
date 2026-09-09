@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 /**
  * Paso de páginas, igual que el de Membresías.
  *
@@ -16,15 +18,60 @@
  */
 
 /**
- * Cuántos por página.
+ * Cuántos por página EN EL TELÉFONO, y el valor por defecto.
  *
- * Eran veinte, y en el celular veinte filas con foto son un rato largo de
- * pulgar para llegar al final — donde estaba el único paso de páginas. Quince
- * se recorre de un gesto y cabe en un portátil sin desplazarse. Es el mismo
- * número que usa Membresías, a propósito: la misma gente pasa de una lista a
- * la otra y «página 3» tiene que querer decir lo mismo en las dos.
+ * Veinte filas con foto son un rato largo de pulgar para llegar al final, que
+ * es donde estaba el único paso de páginas. Quince se recorre de un gesto.
+ *
+ * Es también el número que se usa cuando todavía no se sabe el ancho —el
+ * servidor no tiene ventana que medir—, y eso es lo correcto: pedir de menos y
+ * corregir hacia arriba solo añade filas; al revés se pediría de más y habría
+ * que tirar la mitad.
  */
 export const POR_PAGINA = 15;
+
+/**
+ * Y cuántos en un MONITOR.
+ *
+ * La lista se pinta a dos columnas a partir de `lg`, así que quince filas
+ * dejaban una columna con ocho y otra con siete y un hueco debajo. Veinte
+ * llenan las dos y siguen cabiendo sin desplazarse. Es el mismo número que
+ * tenía antes de que el teléfono obligara a bajarlo — lo que faltaba no era
+ * elegir uno de los dos, era distinguirlos.
+ */
+export const POR_PAGINA_ANCHO = 20;
+
+/** A partir de aquí se considera monitor. El mismo corte que usa la barra. */
+const ANCHO_MONITOR = '(min-width: 860px)';
+
+/**
+ * Cuántos caben de verdad en esta pantalla.
+ *
+ * Arranca en `POR_PAGINA` —igual que el servidor, para que el primer render
+ * coincida— y sube tras montar si hay sitio. Escucha los cambios de ancho: girar
+ * el teléfono o partir la ventana en dos cambia la respuesta, y una lista que se
+ * queda con el número de antes deja media pantalla vacía.
+ */
+export function usePorPagina(): number {
+  const [n, setN] = useState(POR_PAGINA);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const consulta = window.matchMedia(ANCHO_MONITOR);
+    const aplicar = () => setN(consulta.matches ? POR_PAGINA_ANCHO : POR_PAGINA);
+    aplicar();
+    // Safari no soportó `addEventListener` aquí hasta la 14, y en iOS todavía
+    // se ve la 13 en teléfonos que la gente usa a diario.
+    if (consulta.addEventListener) {
+      consulta.addEventListener('change', aplicar);
+      return () => consulta.removeEventListener('change', aplicar);
+    }
+    consulta.addListener(aplicar);
+    return () => consulta.removeListener(aplicar);
+  }, []);
+
+  return n;
+}
 
 export function Paginacion({
   offset,

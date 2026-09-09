@@ -1360,9 +1360,10 @@ input[type="password"]::-ms-clear { display: none; }
    Y el nombre de pila se ve SIEMPRE: en la barra se esconde por debajo de 860
    px porque ahí compite con los enlaces, y aquí no hay enlaces con los que
    competir. */
-.menu-cuenta { position: relative; }
-.menu-cuenta > .navbar-panel { top: calc(100% + 6px); right: 0; }
-.menu-cuenta .navbar-toggle-nombre { display: block; }
+/* `.menu-cuenta` se fue con el chip suelto del panel del portal: ahora el
+   portal tiene BARRA como las otras tres, y el desplegable cuelga de ella. Ese
+   anclaje al chip (`right: 0`) era justo lo que dejaba medio desplegable fuera
+   de la pantalla en el teléfono. Ver `BarraPortal` en el portal. */
 
 /* De aquí para arriba caben los enlaces principales en línea. Por debajo, la
    barra se queda en marca + campana + chip, y TODO lo demás está a un toque

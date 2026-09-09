@@ -101,7 +101,7 @@ export default function ConfiguracionPage() {
         currentPassword: passActual,
         newPassword: passNueva,
       });
-      setPassMsg('Contraseña actualizada.');
+      setPassMsg(t('config.contrasenaLista'));
       setPassActual('');
       setPassNueva('');
     } catch (e2) {
@@ -113,7 +113,7 @@ export default function ConfiguracionPage() {
     return (
       <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
         <p style={{ color: error ? 'var(--danger)' : 'var(--text-muted)' }}>
-          {error || 'Cargando…'}
+          {error || t('config.cargando')}
         </p>
       </main>
     );
@@ -162,7 +162,7 @@ export default function ConfiguracionPage() {
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Contraseña actual</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('config.contrasenaActual')}</span>
             <span className="mt-1 block">
               <CampoContrasena
                 value={passActual}
@@ -174,7 +174,7 @@ export default function ConfiguracionPage() {
           </label>
           <div>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Nueva contraseña</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('config.contrasenaNueva')}</span>
               <span className="mt-1 block">
                 <CampoContrasena
                   value={passNueva}
@@ -204,7 +204,7 @@ export default function ConfiguracionPage() {
           disabled={!passActual || !validarContrasena(passNueva).ok}
           className="btn btn-outline self-start"
         >
-          Actualizar contraseña
+          {t('config.actualizarContrasena')}
         </button>
       </form>
 

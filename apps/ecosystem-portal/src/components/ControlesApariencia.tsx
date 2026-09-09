@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { aplicarTema, getTema, temaEfectivo, type Tema } from '@/lib/tema';
 import { IDIOMAS, useI18n } from '@/lib/i18n';
 import { guardarAparienciaEnLaCuenta } from '@/lib/api';
+import { tieneBarra } from '@/lib/rutas';
 
 /**
  * El globo 🌐 de tema e idioma, para las pantallas SIN navegación.
@@ -67,21 +68,15 @@ export function ControlesApariencia() {
   }, [abierto]);
 
   /**
-   * Las pantallas de dentro, que ya tienen su botón de Configuración.
+   * Donde HAY barra no hay globo: el tema y el idioma están dentro de su menú,
+   * y un flotante encima sería el segundo sitio para lo mismo.
    *
-   * Se listan las que lo llevan en vez de las públicas: una pantalla nueva del
-   * área privada nace sin cabecera propia hasta que alguien se la pone, y es
-   * mejor que le sobre el globo a que a una pública le falte.
+   * La lista de rutas es la misma que usa la barra (`lib/rutas.ts`), leída al
+   * revés. Antes cada uno llevaba la suya y cualquier pantalla que se les
+   * escapara a los dos se quedaba sin forma de cambiar el modo — que es
+   * literalmente lo que se reportó.
    */
-  const conNavegacion = [
-    '/dashboard',
-    '/perfil',
-    '/configuracion',
-    '/mi-club',
-    '/mi-organizacion',
-    '/admin',
-  ].some((r) => pathname === r || pathname.startsWith(`${r}/`));
-  if (conNavegacion) return null;
+  if (tieneBarra(pathname)) return null;
 
   function cambiarTema() {
     // Dos estados y no tres: `sistema` es un punto de partida, no un destino al

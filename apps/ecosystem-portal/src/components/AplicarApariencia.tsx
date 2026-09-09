@@ -1,15 +1,23 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import api from '@/lib/api';
 import {
   aplicarTema,
   escucharTemaDelSistema,
+  fijarCuenta,
   hayModoElegido,
   refrescarDesdeLaCookie,
   type Tema,
 } from '@/lib/tema';
-import { hayIdiomaElegido, idiomaDeLaCookie, idiomaDeLocale, useI18n } from '@/lib/i18n';
+import {
+  fijarCuentaIdioma,
+  hayIdiomaElegido,
+  idiomaDeLaCookie,
+  idiomaDeLocale,
+  useI18n,
+} from '@/lib/i18n';
 import { obtenerPaseCrudo, obtenerToken } from '@/lib/sesion';
 
 /**
@@ -45,6 +53,48 @@ import { obtenerPaseCrudo, obtenerToken } from '@/lib/sesion';
  */
 export function AplicarApariencia() {
   const { setIdioma } = useI18n();
+  /**
+   * La ruta, y no por decoración: es lo que dice que la sesión pudo cambiar.
+   *
+   * El efecto 0 leía el pase UNA vez, al montar — y este componente monta en el
+   * layout, o sea en `/login`, cuando todavía no hay pase. Resultado: la cuenta
+   * se quedaba en `null` toda la sesión y cada elección se firmaba `anon`, que
+   * es exactamente la firma que NO distingue una cuenta de otra. Se vio en la
+   * primera prueba: `dinamyt_tema=claro~anon` con la sesión abierta.
+   *
+   * Entrar y salir son navegaciones, así que la ruta cambia justo cuando el
+   * pase aparece o desaparece.
+   */
+  const pathname = usePathname();
+
+  // ── 0. QUIÉN está dentro ─────────────────────────────────────────────────
+  //
+  // Va primero y sin depender de nada: de esto depende que la cookie de este
+  // navegador se acepte o se descarte. Sin ello, quien salía de una cuenta y
+  // entraba en otra se encontraba el tema y el idioma de la anterior — la
+  // cookie es del navegador, no de la persona. Ver «DE QUIÉN ES LA ELECCIÓN»
+  // en `lib/tema.ts`.
+  //
+  // Se lee del pase CRUDO: aunque haya vencido sigue diciendo de quién es esta
+  // sesión, y para decidir de quién es una preferencia no hace falta que la
+  // sesión esté viva.
+  useEffect(() => {
+    let sub: string | null = null;
+    try {
+      const t = obtenerPaseCrudo();
+      if (t) {
+        const parte = t.split('.')[1];
+        const datos = JSON.parse(
+          atob(parte.replace(/-/g, '+').replace(/_/g, '/')),
+        ) as { sub?: string };
+        sub = datos.sub ?? null;
+      }
+    } catch {
+      /* pase ilegible: se trata como «nadie ha entrado» */
+    }
+    fijarCuenta(sub);
+    fijarCuentaIdioma(sub);
+  }, [pathname]);
 
   // ── 1. El tema del sistema, en vivo ──────────────────────────────────────
   useEffect(() => escucharTemaDelSistema(), []);

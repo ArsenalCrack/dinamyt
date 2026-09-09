@@ -20,10 +20,8 @@ import { nombreRol, operaCampeonatos } from '@/lib/roles';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { Avatar } from '@/components/Avatar';
 import { useI18n } from '@/lib/i18n';
-import { CampanaOrg } from '@/components/CampanaOrg';
 import { PedirAvisos } from '@/components/PedirAvisos';
 import { EntrarAClub } from '@/components/EntrarAClub';
-import { MenuCuenta } from '@/components/MenuCuenta';
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
@@ -217,10 +215,6 @@ export default function DashboardPage() {
     }
   }
 
-  function salir() {
-    cerrarSesion();
-    router.replace('/login');
-  }
 
   if (!payload) {
     return (
@@ -301,30 +295,13 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
-        {/* ── Dos controles, no cuatro ──────────────────────────────────
-            Aquí había cuatro sueltos —campana, «Mi perfil», «Configuración» y
-            «Salir»— y los dos fallos que daban eran el mismo fallo visto desde
-            dos pantallas: en el celular no cabían en la fila y quedaban
-            amontonados; en el monitor SÍ cabían, y entonces el que cedía era el
-            saludo, que se partía en renglones cortos uno debajo de otro. Con la
-            cuenta metida en su menú, la columna del nombre recupera unos 200 px
-            y la fila deja de desbordarse. Ver `MenuCuenta`. */}
-        <div className="flex shrink-0 items-center gap-2">
-          {/* La campana se queda FUERA del menú, igual que en Membresías: un
-              aviso que hay que abrir un menú para ver no avisa de nada. Y solo
-              para quien lleva un club: a un alumno no le llega ninguno de
-              estos, así que se dibujaría siempre vacía — una campana que nunca
-              suena es un adorno que promete algo que no va a pasar. `=== true`
-              porque `null` es «aún no se sabe». */}
-          {gestiona === true && <CampanaOrg />}
-          <MenuCuenta
-            nombre={payload.fullName}
-            email={payload.email}
-            foto={foto}
-            esSuperAdmin={payload.is_super_admin}
-            onSalir={salir}
-          />
-        </div>
+        {/* ── Por qué aquí ya no hay ni campana ni chip de cuenta ─────────
+            Porque ahora hay BARRA, y los dos viven en ella —como en Membresías
+            y en Campeonatos—. Aquí competían por el ancho con el saludo, que va
+            en la tipografía de titular: en el teléfono no cabían en la fila y en
+            el monitor el que cedía era el nombre, que se partía en renglones
+            cortos. Y el desplegable, anclado al chip con `right: 0`, se salía
+            por el borde derecho. Ver `BarraPortal`. */}
       </header>
 
       {msg && (
@@ -498,7 +475,7 @@ export default function DashboardPage() {
                 style={{ borderColor: 'var(--danger)' }}
               >
                 <span className="block font-semibold">
-                  Tu acceso a Membresías está desactivado
+                  {t('panel.membresiasCortado')}
                 </span>
                 <span
                   className="mt-0.5 block text-xs"
@@ -634,14 +611,14 @@ export default function DashboardPage() {
         >
           <h2 className="mb-1 text-lg font-semibold">{t('panel.admin')}</h2>
           <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-            Organizaciones, miembros con su rol y suscripciones a planes.
+            {t('panel.adminDesc')}
           </p>
           <Link
             href="/admin"
             className="inline-block rounded-lg px-4 py-2 text-sm font-semibold"
             style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
           >
-            Abrir panel de administración
+            {t('panel.abrirAdmin')}
           </Link>
         </section>
       )}

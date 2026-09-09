@@ -41,7 +41,7 @@ import { FilaMiembro } from '@/components/FilaMiembro';
 import { CampanaOrg } from '@/components/CampanaOrg';
 import { CodigoYSolicitudes } from '@/components/CodigoYSolicitudes';
 import { PaisCiudad } from '@/components/PaisCiudad';
-import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
+import { Paginacion, usePorPagina } from '@/components/Paginacion';
 import { Ampliable } from '@/components/VisorImagen';
 
 const TIPO: Record<string, string> = {
@@ -95,6 +95,12 @@ export default function MiOrganizacionPage() {
   // servidor no le dejaría quitarse el mando y una pantalla que ofrece lo que
   // luego rechaza es peor que una que no lo ofrece.
   const yo = sesionActual()?.sub ?? null;
+  /**
+   * Cuánta gente por página. Veinte en monitor y quince en el teléfono: la
+   * lista va a dos columnas a partir de `lg`, y quince dejaban una con ocho,
+   * otra con siete y un hueco debajo. Ver `usePorPagina`.
+   */
+  const porPagina = usePorPagina();
 
   const [nuevoClub, setNuevoClub] = useState({ name: '', city: '', country: '' });
 
@@ -206,7 +212,7 @@ export default function MiOrganizacionPage() {
     const t = setTimeout(() => {
       listMiembrosAPI(sel, {
         search: busquedaGente,
-        limit: POR_PAGINA,
+        limit: porPagina,
         offset: offsetGente,
         incluirSinAcceso: verSinAcceso,
       })
@@ -222,7 +228,22 @@ export default function MiOrganizacionPage() {
         });
     }, 250);
     return () => clearTimeout(t);
-  }, [sel, busquedaGente, offsetGente, recargaGente, verSinAcceso]);
+    // `porPagina` entra en la lista: girar el teléfono o partir la ventana
+    // cambia cuántos caben, y sin recargar la lista se quedaría con los quince
+    // de antes en una pantalla donde caben veinte.
+  }, [sel, busquedaGente, offsetGente, recargaGente, verSinAcceso, porPagina]);
+
+  /**
+   * Al cambiar cuántos caben, se vuelve a la primera página.
+   *
+   * El desplazamiento es un número de FILAS (30 = «desde la treinta y uno»), y
+   * ese número lo calculó el tamaño anterior. Con quince, la página 3 empieza
+   * en la 30; con veinte, en la 30 no empieza ninguna. Quedarse ahí deja a
+   * alguien en mitad de una página que el contador de abajo dice que no existe.
+   */
+  useEffect(() => {
+    setOffsetGente(0);
+  }, [porPagina]);
 
   /**
    * Las bajas del club. Aparte de la lista de gente porque no se pagina ni se
@@ -755,7 +776,7 @@ export default function MiOrganizacionPage() {
         <Paginacion
           arriba
           offset={offsetGente}
-          limit={POR_PAGINA}
+          limit={porPagina}
           total={totalMiembros}
           onIr={setOffsetGente}
         />
@@ -897,7 +918,7 @@ export default function MiOrganizacionPage() {
             la acepta o la rechaza. Ver `CodigoYSolicitudes.tsx`. */}
         <Paginacion
           offset={offsetGente}
-          limit={POR_PAGINA}
+          limit={porPagina}
           total={totalMiembros}
           onIr={setOffsetGente}
         />
