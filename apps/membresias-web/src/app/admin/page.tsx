@@ -21,6 +21,7 @@ import { avisoError, avisoOk } from '@/lib/toast';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { SelectMenu } from '@/components/SelectMenu';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
+import { Cargando } from '@/components/Cargando';
 
 interface Club {
   id: string;
@@ -343,8 +344,8 @@ export default function Admin() {
 
   if (cargandoSesion || cargando) {
     return (
-      <main style={{ padding: '2rem' }} className="muted">
-        {t('comun.cargando')}
+      <main style={{ padding: '2rem' }}>
+        <Cargando />
       </main>
     );
   }

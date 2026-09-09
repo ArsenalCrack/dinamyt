@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { fmtFecha, fmtMoneda } from '@/lib/formato';
 import { cinturonPorNombre, fondoCinturon } from '@/lib/cinturones';
+import { Cargando } from '@/components/Cargando';
 
 interface Estadisticas {
   mes: string;
@@ -201,8 +202,8 @@ export default function EstadisticasPage() {
 
   if (cargandoSesion || (!s && !error)) {
     return (
-      <main style={{ padding: '2rem' }} className="muted">
-        {t('comun.cargando')}
+      <main style={{ padding: '2rem' }}>
+        <Cargando />
       </main>
     );
   }

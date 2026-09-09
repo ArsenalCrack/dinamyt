@@ -16,6 +16,7 @@ import { Filtros, type GrupoFiltro } from '@/components/Filtros';
 import { LogoClub } from '@/components/LogoClub';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 import { avisoError, avisoInfo, avisoOk } from '@/lib/toast';
+import { Cargando } from '@/components/Cargando';
 
 interface RosterItem {
   userId: string;
@@ -57,6 +58,8 @@ interface Revenue {
 }
 interface Overdue {
   userId: string;
+  /** Quién es. Viene para poder comprobar la cifra sin abrir la base. */
+  fullName: string | null;
   venceEl: string;
   diasVencido: number;
 }
@@ -262,8 +265,8 @@ export default function Panel() {
 
   if (cargandoSesion || cargando) {
     return (
-      <main style={{ padding: '2rem' }} className="muted">
-        {t('comun.cargando')}
+      <main style={{ padding: '2rem' }}>
+        <Cargando />
       </main>
     );
   }
@@ -498,7 +501,23 @@ export default function Panel() {
             {t('panel.esperados')}
           </div>
         </div>
-        <div className="card" style={{ padding: '0.9rem' }}>
+        {/* ── El número, y de quién ────────────────────────────────────────
+            Un contador rojo que no cuadra con la lista de alumnos no se puede
+            comprobar: hay que creérselo o abrir la base. Los nombres van en el
+            `title`, así que basta dejar el cursor encima. Lo que se contaba de
+            más eran el propio maestro y la gente con el acceso cortado; ver
+            `GET /reports/overdue`. */}
+        <div
+          className="card"
+          style={{ padding: '0.9rem' }}
+          title={
+            overdue.length
+              ? overdue
+                  .map((o) => `${o.fullName ?? o.userId} · ${o.diasVencido} d`)
+                  .join('\n')
+              : undefined
+          }
+        >
           <div className="muted" style={{ fontSize: '0.75rem' }}>
             {t('panel.vencidos')}
           </div>

@@ -12,6 +12,7 @@ import { avisoError, avisoInfo, avisoOk } from '@/lib/toast';
 import { Avatar } from '@/components/Avatar';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 import { SelectMenu } from '@/components/SelectMenu';
+import { Cargando } from '@/components/Cargando';
 
 interface RosterItem {
   userId: string;
@@ -172,8 +173,8 @@ export default function AsistenciaPage() {
 
   if (cargandoSesion || cargando) {
     return (
-      <main style={{ padding: '2rem' }} className="muted">
-        {t('comun.cargando')}
+      <main style={{ padding: '2rem' }}>
+        <Cargando />
       </main>
     );
   }
