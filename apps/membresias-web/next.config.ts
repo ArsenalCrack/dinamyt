@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { execSync } from 'node:child_process';
 
 /**
  * Origen real de la API. Solo se usa aquí, en el servidor: el navegador nunca
@@ -30,7 +31,37 @@ if (process.env.VERCEL && !process.env.MEMBRESIAS_API_ORIGIN) {
   );
 }
 
+/**
+ * La versión que se enseña en la app, calculada EN EL BUILD.
+ *
+ * Es CalVer —`AAAA.MM.DD`— más el commit corto: aquí se despliega cuando algo
+ * está listo, no en versiones numeradas, así que lo único que responde «¿esto
+ * es de antes o de después del arreglo?» es una fecha.
+ *
+ * La fecha sale del COMMIT y no del reloj de quien compila: dos personas
+ * compilando el mismo código tienen que obtener la misma versión, y un build
+ * que se repite en el servidor no puede cambiarla.
+ *
+ * Sin git —un tarball, un contenedor sin `.git`— se queda vacía y la app enseña
+ * `dev`, que es lo honesto: no sabemos qué está corriendo.
+ *
+ * Es el mismo bloque que en el portal y en Academy (`next.config.ts`).
+ */
+function delGit(comando: string): string {
+  try {
+    return execSync(comando, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return '';
+  }
+}
+
+const VERSION = {
+  NEXT_PUBLIC_VERSION_FECHA: delGit('git log -1 --format=%cd --date=format:%Y.%m.%d'),
+  NEXT_PUBLIC_VERSION_COMMIT: delGit('git rev-parse --short HEAD'),
+};
+
 const nextConfig: NextConfig = {
+  env: VERSION,
   /**
    * La API se sirve bajo el MISMO origen que la web, en `/api`.
    *

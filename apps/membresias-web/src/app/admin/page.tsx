@@ -394,20 +394,16 @@ export default function Admin() {
               alguien no ha pagado y hay que avisarle. */}
           <Cifra etiqueta="En pausa por plan" valor={enPausa.length} alerta />
           <Cifra etiqueta="Suspendidos" valor={suspendidos.length} alerta />
-          {/* Un club sin enlazar no recibe escudo, ni plan, ni avisos del
-              portal: existe aquí y no existe allí.
+          {/* ── Por qué ya no hay una cifra de «sin enlazar al portal» ──────
+              Porque no era un número que se mirara: desde que los clubes se
+              crean en el portal y bajan solos, vale cero siempre. Una cifra que
+              siempre dice cero —y encima en rojo, porque iba con `alerta`— no
+              informa de nada y se lleva un sexto del ancho del resumen, que es
+              donde están los números que sí se miran.
 
-              Solo con portal delante. Corriendo sola —Membresías se vende por
-              su cuenta— NINGÚN club está enlazado y nunca lo estará, así que
-              esta cifra sería el total de clubes pintado en rojo: una alarma
-              permanente de algo que no es un problema. */}
-          {federada === true && (
-            <Cifra
-              etiqueta="Sin enlazar al portal"
-              valor={clubes.filter((c) => !c.ecoOrgId).length}
-              alerta
-            />
-          )}
+              Lo que hacía falta de verdad sigue estando, y en el sitio donde se
+              puede actuar: la insignia «Sin enlazar» junto al nombre del club de
+              la lista de abajo. Ahí dice CUÁL, que es lo único accionable. */}
           <Cifra
             etiqueta="Personas"
             valor={clubes.reduce((n, c) => n + (c.usuariosActivos ?? 0), 0)}

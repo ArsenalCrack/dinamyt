@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { usePathname } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
+import { Version } from './Version';
 
 /**
  * El pie de la aplicación.
@@ -97,6 +98,11 @@ export function PieLegal() {
           © {años} <strong>{AUTOR}</strong> · {t('legal.derechos')}
         </p>
         <p className="pie-legal-nota">{t('legal.nota')}</p>
+        {/* Qué versión está corriendo. Faltaba, y es lo primero que hace falta
+            saber cuando alguien dice «me sigue pasando»: el portal ya la
+            enseñaba y aquí no había forma de saber si la app instalada estaba
+            al día. Ver `Version`. */}
+        <Version />
       </div>
     </footer>
   );

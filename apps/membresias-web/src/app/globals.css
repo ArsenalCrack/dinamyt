@@ -310,75 +310,9 @@
 /* ── Pie legal ──
    Discreto y al final de todo. `margin-top: auto` no sirve aquí (el body no es
    flex), así que se separa con margen y una línea. */
-/* ── El pie, el mismo que el del portal ────────────────────────────────────
-   Dos franjas: arriba quién es esto y dónde pedir ayuda; abajo, de quién es.
-   En el escritorio la de arriba se reparte a los extremos; en el celular no
-   caben en una fila, y `flex-wrap` los dejaba pegados a la izquierda con la
-   dirección de correo colgando fuera de la pantalla — así que se convierte en
-   columna centrada, que es la única forma de que una lista de enlaces de
-   anchos distintos no parezca rota. */
-.pie {
-  max-width: 1180px;
-  margin: 3rem auto 0;
-  padding: 1.25rem 1.5rem 2rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: var(--text-muted);
-}
-.pie-fila {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.9rem;
-  text-align: center;
-}
-.pie-marca {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.pie-marca img { border-radius: 0.25rem; }
-.pie-enlaces {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.7rem;
-}
-.pie-enlaces a:hover { color: var(--text); }
-.pie-soporte {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.1rem 0.4rem;
-  max-width: 100%;
-}
-.pie-correo { color: var(--gold); word-break: break-all; }
-@media (min-width: 640px) {
-  .pie-fila {
-    flex-direction: row;
-    justify-content: space-between;
-    text-align: left;
-    gap: 1rem;
-  }
-  .pie-enlaces {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.5rem 1.1rem;
-  }
-}
-
-.pie-legal {
-  margin-top: 1.1rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--border);
-  text-align: center;
-  font-size: 0.72rem;
-}
-.pie-legal strong { color: var(--text); font-weight: 700; }
-.pie-legal-nota { margin-top: 0.2rem; opacity: 0.75; }
+/* El pie (`.pie*`) se mudó a `estilos-ecosistema.css`: estaba solo aquí, y por
+   eso Campeonatos no tenía ninguno. Ahora es el mismo archivo para las tres
+   webs sin Tailwind. */
 
 /* ════════════════════════════════════════════════════════════════════════
    EL CALENDARIO Y SUS CLASES
