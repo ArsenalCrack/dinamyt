@@ -40,3 +40,6 @@ pnpm-debug.log*
 .venv/
 __pycache__/
 *.pyc
+
+# Grafo de conocimiento (graphify) — se regenera con `/graphify . --update`
+graphify-out/
