@@ -4,12 +4,18 @@ import { useEffect } from 'react';
 import {
   aplicarTema,
   escucharTemaDelSistema,
+  fijarCuenta,
   hayModoElegido,
   refrescarDesdeLaCookie,
   type Tema,
 } from '@/lib/theme';
 import { leerAparienciaDeLaCuenta } from '@/lib/api';
-import { hayIdiomaElegido, idiomaDeLaCookie, useI18n } from '@/lib/i18n';
+import {
+  fijarCuentaIdioma,
+  hayIdiomaElegido,
+  idiomaDeLaCookie,
+  useI18n,
+} from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 
 /**
@@ -45,6 +51,18 @@ export function AplicarApariencia() {
   // el login: preguntar el color de la pantalla no puede echar a nadie del
   // kiosco.
   const { user } = useAuth();
+
+  // ── QUIEN esta dentro ────────────────────────────────────────────────────
+  //
+  // De esto depende que la cookie de este navegador se acepte o se descarte: es
+  // del navegador y no de la persona, asi que sin firma quien sale de una
+  // cuenta y entra en otra hereda su tema y su idioma. Se reporto asi. Ver «DE
+  // QUIEN ES LA ELECCION» en `lib/theme.ts`.
+  useEffect(() => {
+    const id = user ? String((user as { id?: string | number }).id ?? '') : '';
+    fijarCuenta(id || null);
+    fijarCuentaIdioma(id || null);
+  }, [user]);
 
   // ── El tema del sistema, mientras la eleccion sea `sistema` ──────────────
   useEffect(() => escucharTemaDelSistema(), []);

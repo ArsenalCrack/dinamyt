@@ -50,16 +50,25 @@
 
    Las tarjetas siguen estirándose a la misma altura (`stretch` por defecto),
    así que la fila de abajo queda pareja sin tener que fijar alturas. */
+/* ── Por qué DOS columnas desde el principio, y no una ──
+   «Vencidos» y «Presentes» son dos números cortos —un rótulo de 0.75 rem y una
+   cifra— y apilados uno debajo del otro gastaban dos tarjetas de alto para
+   decir dos dígitos. En el teléfono eso empuja el roster fuera de la primera
+   pantalla, que es justo lo que el panel viene a evitar.
+
+   La CAJA se sigue llevando la fila entera mientras no haya tres columnas: es
+   un importe con moneda y separadores de miles más una segunda línea que
+   compara dos cifras más. Partida por la mitad se recorta o se parte en dos
+   renglones, y un importe partido no se lee.
+
+   A partir de 900 px caben las tres en fila y la caja deja de ser especial. */
 .panel-cifras {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
   margin-bottom: 1.25rem;
 }
-@media (min-width: 560px) {
-  .panel-cifras { grid-template-columns: 1fr 1fr; }
-  .panel-cifras > :first-child { grid-column: 1 / -1; }
-}
+.panel-cifras > :first-child { grid-column: 1 / -1; }
 @media (min-width: 900px) {
   .panel-cifras { grid-template-columns: repeat(3, 1fr); }
   .panel-cifras > :first-child { grid-column: auto; }
