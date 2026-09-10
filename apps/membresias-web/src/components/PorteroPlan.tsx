@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { EVENTO_PLAN_VENCIDO, type AvisoPlanVencido } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * La pantalla que ve un club cuyo plan no está al día.
@@ -35,6 +36,7 @@ import { EVENTO_PLAN_VENCIDO, type AvisoPlanVencido } from '@/lib/api';
  * su primera pregunta no es cuánto debe: es si se fueron los pagos del mes.
  */
 export function PorteroPlan({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [aviso, setAviso] = useState<AvisoPlanVencido | null>(null);
 
   useEffect(() => {
@@ -71,9 +73,9 @@ export function PorteroPlan({ children }: { children: React.ReactNode }) {
       <div style={{ maxWidth: '32rem', textAlign: 'center' }}>
         <p style={{ fontSize: '2.5rem', lineHeight: 1, marginBottom: '0.75rem' }}>⏸️</p>
         <h1 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-          Membresías está en pausa
+          {t('portero.pausa')}
         </h1>
-        <p style={{ marginBottom: '0.75rem' }}>{aviso.mensaje}</p>
+        <p style={{ marginBottom: '0.75rem' }}>{aviso.mensaje ?? t('portero.enPausaApi')}</p>
         {desde && (
           <p style={{ opacity: 0.7, fontSize: '0.9rem', marginBottom: '0.75rem' }}>
             En pausa desde el {desde}.
@@ -88,7 +90,7 @@ export function PorteroPlan({ children }: { children: React.ReactNode }) {
           onClick={() => window.location.reload()}
           style={{ padding: '0.6rem 1.1rem', borderRadius: '0.5rem', cursor: 'pointer' }}
         >
-          Ya renovamos — volver a entrar
+          {t('portero.renovamos')}
         </button>
       </div>
     </div>

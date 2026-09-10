@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Red de seguridad de la app.
@@ -22,6 +23,7 @@ export default function ErrorApp({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useI18n();
   useEffect(() => {
     console.error('[membresias] error no controlado:', error);
   }, [error]);
@@ -38,13 +40,13 @@ export default function ErrorApp({
     >
       <div className="card" style={{ padding: '1.75rem', width: '100%', maxWidth: 460 }}>
         <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>
-          Algo se rompió
+          {t('error.eyebrow')}
         </p>
         <h1 className="display" style={{ fontSize: '1.35rem', marginBottom: '0.5rem' }}>
-          No se pudo cargar esta pantalla
+          {t('error.titulo')}
         </h1>
         <p className="muted" style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>
-          Tu sesión sigue abierta. Reintenta; si vuelve a pasar, recarga la página.
+          {t('error.texto')}
         </p>
 
         {error.message && (
@@ -67,13 +69,13 @@ export default function ErrorApp({
 
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-cta" onClick={reset}>
-            Reintentar
+            {t('error.reintentar')}
           </button>
           <button className="btn btn-outline" onClick={() => window.location.reload()}>
-            Recargar la página
+            {t('error.recargar')}
           </button>
           <a className="btn btn-outline" href="/login">
-            Volver a entrar
+            {t('error.volverEntrar')}
           </a>
         </div>
       </div>

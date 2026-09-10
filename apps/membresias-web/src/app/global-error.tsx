@@ -1,6 +1,52 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
+/**
+ * El idioma, leido A MANO de la cookie compartida.
+ *
+ * ── Por que aqui no vale `useI18n` ──
+ *
+ * Porque este archivo REEMPLAZA el documento entero —trae su propio <html>— y
+ * por tanto corre fuera del `I18nProvider`. Llamar al hook aqui no daria un
+ * texto en ingles: daria un segundo error encima del que ya estamos enseniando,
+ * que es la unica cosa que esta pantalla no se puede permitir.
+ *
+ * La cookie `dinamyt_idioma` es la misma que reparten las cuatro webs, y su
+ * valor va firmado (`en~<id>`): aqui solo interesa la parte de delante. Si no
+ * existe o no se puede leer, espaniol, que es lo que habia.
+ *
+ * Se lee en un efecto y no al pintar: en el servidor no hay `document`, y
+ * mirarlo durante el render descuadraria la hidratacion.
+ */
+const TEXTOS = {
+  es: {
+    titulo: 'No se pudo cargar la aplicación',
+    ayuda: 'Recarga la página. Si sigue igual, vuelve a entrar desde el login.',
+    reintentar: 'Reintentar',
+    volver: 'Volver a entrar',
+  },
+  en: {
+    titulo: 'The application could not load',
+    ayuda: 'Reload the page. If it keeps happening, sign in again from the login screen.',
+    reintentar: 'Try again',
+    volver: 'Sign in again',
+  },
+} as const;
+
+function useIdiomaDeLaCookie(): 'es' | 'en' {
+  const [idioma, setIdioma] = useState<'es' | 'en'>('es');
+  useEffect(() => {
+    try {
+      const m = /(?:^|; )dinamyt_idioma=([^;]*)/.exec(document.cookie);
+      const valor = m ? decodeURIComponent(m[1]).split('~')[0] : '';
+      if (valor === 'en') setIdioma('en');
+    } catch {
+      /* sin cookies: se queda en espaniol */
+    }
+  }, []);
+  return idioma;
+}
 
 /**
  * Último recinto: errores del propio layout raíz, donde `error.tsx` ya no
@@ -15,12 +61,15 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const idioma = useIdiomaDeLaCookie();
+  const txt = TEXTOS[idioma];
+
   useEffect(() => {
     console.error('[membresias] error global:', error);
   }, [error]);
 
   return (
-    <html lang="es">
+    <html lang={idioma}>
       <body
         style={{
           margin: 0,
@@ -45,10 +94,10 @@ export default function GlobalError({
           }}
         >
           <h1 style={{ fontSize: '1.35rem', margin: '0 0 0.5rem' }}>
-            No se pudo cargar la aplicación
+            {txt.titulo}
           </h1>
           <p style={{ fontSize: '0.85rem', color: '#9a9aad', margin: '0 0 1rem' }}>
-            Recarga la página. Si sigue igual, vuelve a entrar desde el login.
+            {txt.ayuda}
           </p>
 
           {error.message && (
@@ -82,7 +131,7 @@ export default function GlobalError({
                 cursor: 'pointer',
               }}
             >
-              Reintentar
+              {txt.reintentar}
             </button>
             <a
               href="/login"
@@ -94,7 +143,7 @@ export default function GlobalError({
                 textDecoration: 'none',
               }}
             >
-              Volver a entrar
+              {txt.volver}
             </a>
           </div>
         </div>
