@@ -1085,8 +1085,7 @@ export default function MiPanel() {
               {t('mi.cambiarContrasena')}
             </h2>
             <p className="muted" style={{ fontSize: '0.78rem', margin: '0 0 0.7rem' }}>
-              Tu contraseña es la de DINAMYT y sirve para todo el ecosistema.
-              Cámbiala en tu perfil del portal y aquí sigue entrando la misma.
+              {t('mi.contrasenaDinamyt')}
             </p>
             {PORTAL_URL && (
               <a

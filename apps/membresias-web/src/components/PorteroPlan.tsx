@@ -78,12 +78,11 @@ export function PorteroPlan({ children }: { children: React.ReactNode }) {
         <p style={{ marginBottom: '0.75rem' }}>{aviso.mensaje ?? t('portero.enPausaApi')}</p>
         {desde && (
           <p style={{ opacity: 0.7, fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-            En pausa desde el {desde}.
+            {t('portero.desde').replace('{fecha}', desde)}
           </p>
         )}
         <p style={{ opacity: 0.7, fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-          La renovación se hace desde DINAMYT. Si ya se renovó, vuelve a entrar:
-          el acceso se restablece en cuanto el pago queda registrado.
+          {t('portero.comoRenovar')}
         </p>
         <button
           type="button"
