@@ -385,7 +385,17 @@ const es = {
   'miembro.notasMedicas': 'Notas médicas (se guardan cifradas)',
   'miembro.telefono': 'Teléfono',
   'miembro.tipoSangre': 'Tipo de sangre',
-  'codigo.dosPuertas': 'Dos puertas, y las dos las cierra alguien:',
+  // Decía: «Dos puertas, y las dos las cierra alguien: tú repartes el código y
+  // aceptas a quien lo teclee, o tú invitas y la persona acepta. En cualquiera
+  // de las dos, su ficha se crea sola en Membresías al entrar.»
+  // Tres líneas para explicar dos botones que se ven debajo. Se queda lo único
+  // que el usuario no puede deducir mirando la pantalla: que la ficha se crea
+  // sola.
+  'codigo.intro': 'Da entrada a tu club con un código o por invitación. Al aceptar, su ficha se crea sola en Membresías.',
+  'codigo.tuCodigo': '1 · Tu código',
+  'codigo.pidenEntrar': 'Piden entrar',
+  'codigo.aceptar': 'Aceptar',
+  'codigo.rechazar': 'Rechazar',
   'codigo.verElMio': 'Ver el código de mi club',
   'codigo.generar': 'Generar un código',
   'codigo.regenerar': 'Genera uno nuevo. Quien ya entró sigue dentro.',
@@ -678,7 +688,11 @@ const en: Record<ClaveTexto, string> = {
   'miembro.notasMedicas': 'Medical notes (stored encrypted)',
   'miembro.telefono': 'Phone',
   'miembro.tipoSangre': 'Blood type',
-  'codigo.dosPuertas': 'Two doors, and someone closes both:',
+  'codigo.intro': 'Let people into your club with a code or by invitation. When you accept, their record is created in Memberships automatically.',
+  'codigo.tuCodigo': '1 · Your code',
+  'codigo.pidenEntrar': 'Waiting to join',
+  'codigo.aceptar': 'Accept',
+  'codigo.rechazar': 'Decline',
   'codigo.verElMio': 'See my club code',
   'codigo.generar': 'Generate a code',
   'codigo.regenerar': 'Generates a new one. Whoever already joined stays in.',

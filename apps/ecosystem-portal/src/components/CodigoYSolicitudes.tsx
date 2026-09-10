@@ -320,9 +320,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       {abierta && (
         <>
       <p className="mb-5 mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-        {t('codigo.dosPuertas')} <b>tú repartes el código</b> y
-        aceptas a quien lo teclee, o <b>tú invitas</b> y la persona acepta. En
-        cualquiera de las dos, su ficha se crea sola en Membresías al entrar.
+        {t('codigo.intro')}
       </p>
 
       {/* ══ Puerta 1 · El código ════════════════════════════════════════ */}
@@ -330,7 +328,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         className="eyebrow mb-2"
         style={{ color: 'var(--gold-dim)' }}
       >
-        1 · Tu código
+        {t('codigo.tuCodigo')}
       </h3>
 
       {!pedido ? (
@@ -422,7 +420,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
       {/* ── La bandeja del código ──────────────────────────────────────── */}
       <h4 className="mb-2 mt-5 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-        Piden entrar ({solicitudes.length})
+        {t('codigo.pidenEntrar')} ({solicitudes.length})
       </h4>
 
       {solicitudes.length === 0 && (
@@ -464,10 +462,21 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
             {/* `min-w-0` junto a `shrink-0`: lo segundo impide que la fila de
                 acciones ceda ancho a costa del nombre, y lo primero impide que
-                se plante en su ancho mínimo y ensanche la tarjeta. Los dos
-                hacen falta, y sin el primero esta fila es la única de la
-                sección que puede empujar hacia los lados. */}
-            <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-1.5">
+                se plante en su ancho mínimo y ensanche la tarjeta.
+
+                ── Y los dos botones van JUNTOS, en su propia caja ──
+
+                Antes los tres hijos —el desplegable y los dos botones— estaban
+                sueltos en el mismo `flex-wrap`. Con el desplegable pidiendo
+                10.5 rem, lo primero que no cabía era el último botón, así que
+                «Rechazar» se descolgaba SOLO a una segunda línea: el par de
+                acciones partido por la mitad, que es lo que se veía mal en
+                ancho normal y en estrecho.
+
+                Envolviéndolos, el punto de corte pasa a estar entre el
+                desplegable y el par: o caben los dos al lado del rol, o bajan
+                los dos juntos y alineados. Un botón nunca se queda huérfano. */}
+            <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-1.5">
               {/* El desplegable del ecosistema, no el gris del sistema
                   operativo: ver `SelectMenu.tsx`. */}
               <SelectMenu
@@ -482,20 +491,22 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                 style={{ width: 'auto', minWidth: 'min(10.5rem, 100%)' }}
                 botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
               />
-              <button
-                onClick={() => void responder(s, true)}
-                disabled={ocupado}
-                className="btn btn-gold btn-sm"
-              >
-                Aceptar
-              </button>
-              <button
-                onClick={() => void responder(s, false)}
-                disabled={ocupado}
-                className="btn btn-outline btn-sm"
-              >
-                Rechazar
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  onClick={() => void responder(s, true)}
+                  disabled={ocupado}
+                  className="btn btn-gold btn-sm"
+                >
+                  {t('codigo.aceptar')}
+                </button>
+                <button
+                  onClick={() => void responder(s, false)}
+                  disabled={ocupado}
+                  className="btn btn-outline btn-sm"
+                >
+                  {t('codigo.rechazar')}
+                </button>
+              </div>
             </div>
           </li>
         ))}
