@@ -150,21 +150,18 @@ export function NavBar() {
   }, [abierto]);
 
   // La única pantalla sin barra es el login: todavía no hay sesión ni sitio a
-  // donde navegar. El kiosco SÍ la lleva desde ahora — se abre en la puerta del
-  // salón, sí, pero de allí se sale igual que de cualquier otra pantalla, y
-  // tenerla escondida obligaba a mantener aquí dentro un enlace de vuelta y un
-  // par de controles duplicados.
+  // donde navegar.
   if (pathname === '/login') return null;
   if (!user) return null;
 
   // El orden es el de la barra. `principal` marca lo que se abre a diario: el
-  // panel, el roster, la asistencia y el kiosco de la puerta. Planes,
-  // calendario y estadísticas se tocan al empezar el mes.
+  // panel, el roster y la asistencia. Planes, calendario y estadísticas se
+  // tocan al empezar el mes.
   //
   // ── Por qué el super-admin NO ve las pantallas de club ──
   //
   // `esStaff` lo incluye —maestro, auxiliar o super-admin— y por eso le salían
-  // las siete: panel, alumnos, asistencia, kiosco, estadísticas, planes y
+  // las seis: panel, alumnos, asistencia, estadísticas, planes y
   // calendario. **Ninguna le sirve**: todas operan sobre `req.user.org_id`, y
   // el super-admin no pertenece a ningún club, así que las abría vacías.
   //
@@ -182,7 +179,6 @@ export function NavBar() {
     { href: '/', clave: 'menu.panel', visible: gestionaUnClub, principal: true },
     { href: '/alumnos', clave: 'menu.alumnos', visible: gestionaUnClub, principal: true },
     { href: '/asistencia', clave: 'menu.asistencia', visible: gestionaUnClub, principal: true },
-    { href: '/kiosco', clave: 'menu.kiosco', visible: gestionaUnClub, principal: true },
     { href: '/estadisticas', clave: 'menu.estadisticas', visible: gestionaUnClub, principal: false },
     { href: '/planes', clave: 'menu.planes', visible: gestionaUnClub, principal: false },
     { href: '/calendario', clave: 'menu.calendario', visible: gestionaUnClub, principal: false },

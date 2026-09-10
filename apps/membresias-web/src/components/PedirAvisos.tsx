@@ -64,7 +64,7 @@ const CLAVE = 'dinamyt.avisos.preguntado';
 const ESPERA_MS = 4000;
 
 /** Pantallas donde esto no sale, pase lo que pase. */
-const PROHIBIDO = ['/login', '/kiosco'];
+const PROHIBIDO = ['/login'];
 
 export function PedirAvisos() {
   const { t } = useI18n();
@@ -77,9 +77,13 @@ export function PedirAvisos() {
   const [motivo, setMotivo] = useState('');
 
   /**
-   * El kiosco es la razón de la lista de arriba. Es un aparato compartido en la
-   * puerta del salón, con la sesión de nadie: una tarjeta pidiéndole el permiso
-   * del navegador ahí lo apuntaría a los avisos de la primera persona que pase.
+   * En el login no hay a quién preguntarle todavía.
+   *
+   * La lista tenía además `/kiosco`, el aparato compartido de la puerta: pedirle
+   * ahí el permiso del navegador lo habría apuntado a los avisos de la primera
+   * persona que pasara. Esa pantalla ya no existe —su escáner vive dentro de
+   * Asistencia— y ahí no hace falta la excepción, porque Asistencia es del
+   * maestro y a los maestros esto no se les pregunta (ver abajo).
    */
   const permitido = Boolean(user) && !PROHIBIDO.some((p) => ruta?.startsWith(p));
 
