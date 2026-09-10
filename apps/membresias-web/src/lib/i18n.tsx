@@ -300,7 +300,7 @@ const es = {
   'ficha.soloPorClases': 'Solo para planes por clases (clase suelta o paquete).',
   'ficha.cobrar': 'Registrar el pago de este plan',
   'ficha.cobrarAyuda':
-    'Esta es la forma normal de poner al día a un alumno: el vencimiento y las clases los calcula la app a partir del plan y de la fecha. Los campos de arriba son solo para cuadrar a mano lo que venga de antes.',
+    'Registra el pago y la app calcula el vencimiento y las clases según el plan. Los campos de arriba son para cuadrar a mano lo que venga de antes.',
   'ficha.accesoTitulo': 'Acceso rápido con QR',
   'ficha.accesoDescripcion':
     'El alumno apunta la cámara de su celular a este código y entra sin escribir nada. Se muestra en pantalla y caduca en 10 minutos: no lo imprimas.',
@@ -330,7 +330,7 @@ const es = {
   // Qué hace el botón, dicho antes de pulsarlo: revisa mensualidades y crea
   // avisos. Nadie debería tener que pulsar un botón para averiguar qué hace.
   'panel.avisosAyuda':
-    'Repasa las mensualidades del club y crea un aviso para quien esté por vencer o ya vencido. A quien tenga las notificaciones activadas le llega además al celular. Esto se hace solo cada mañana; el botón lo adelanta.',
+    'Crea un aviso para quien tenga la mensualidad por vencer o vencida, y lo manda al celular de quien tenga notificaciones. Se hace solo cada mañana; el botón lo adelanta.',
   'panel.avisosCreados': 'Avisos creados',
   'panel.avisosPush': 'notificaciones enviadas',
   'panel.avisosNinguno':
@@ -345,7 +345,7 @@ const es = {
   'panel.deEsperados': 'de',
   'panel.esperados': 'esperados',
   'panel.cajaAyuda':
-    'Arriba, el dinero que ENTRÓ este mes. Abajo, cuánto de todo lo cobrado le corresponde a este mes —quien paga tres meses de golpe adelanta los dos siguientes— y cuánto debería entrar si pagaran todos tus alumnos con plan mensual.',
+    'Arriba, lo que entró este mes. Abajo, lo que corresponde a este mes de todo lo cobrado, y lo que entraría si pagaran todos los alumnos con plan mensual.',
   // Cumpleaños. La tarjeta solo sale el día que hay alguno: una tarjeta que
   // dice «hoy nadie cumple años» 360 días al año es ruido, no información.
   'panel.cumpleHoy': 'Hoy cumple años',
@@ -383,7 +383,7 @@ const es = {
   // qué hay que hacer para volver a poder tocar nada.
   'ficha.desactivada': 'Esta cuenta está desactivada',
   'ficha.desactivadaAyuda':
-    'No entra al club y no se le puede cambiar nada: ni datos, ni plan, ni cobros, ni carnet. Lo suyo sigue entero —sus pagos y su asistencia están abajo— y se puede consultar. Para volver a editarla hay que reactivarla.',
+    'No entra al club y su ficha es de solo lectura. Sus pagos y su asistencia se conservan. Reactívala para poder editarla.',
   'alumnos.nuevaContrasena': 'Poner contraseña nueva',
   'alumnos.contrasenaCambiada': 'Contraseña actualizada.',
   // El maestro ya no sale en su propia lista (ver `GET /users`): su ficha se
@@ -435,7 +435,7 @@ const es = {
   // El aviso se lee ANTES de elegir el archivo: dice qué se acepta y qué va a
   // pasar con la imagen, para que nadie ande recortándola a mano por si acaso.
   'foto.ayuda':
-    'Cualquier imagen (JPG, PNG, WebP…) de hasta 20 MB. Al elegirla podrás encuadrarla, y se reduce sola a 400 × 400 px: no tienes que prepararla. Es la foto que sale en el carnet.',
+    'Cualquier imagen (JPG, PNG, WebP…) de hasta 20 MB. La encuadras al elegirla y se reduce sola a 400 × 400 px. Es la foto del carnet.',
   'foto.errorTipo': 'Ese archivo no es una imagen. Elige un JPG, un PNG o un WebP.',
   'foto.errorLeer': 'No se pudo abrir esa imagen. Prueba con otra.',
   'foto.errorPesoArchivo':
@@ -458,7 +458,7 @@ const es = {
   // escribe el portal, porque la misma cuenta entra también a Campeonatos y a
   // Academy. Un club que usa Membresías por su cuenta no ve nada de esto.
   'eco.fichaDelPortal':
-    'Estos datos son de la persona en todo DINAMYT y se editan en el portal: aquí se ven. Lo del club —su plan, su PIN, su clase, sus cobros y su carnet— se sigue haciendo desde esta pantalla.',
+    'Estos datos son de la persona en todo DINAMYT y se editan en el portal. Su plan, PIN, clase, cobros y carnet se llevan desde aquí.',
   'eco.misDatosDelPortal':
     'Tus datos son los mismos en todo DINAMYT y se editan en tu perfil del portal. Aquí se ven, y desde aquí sigues llevando lo de tu club.',
   'eco.editarEnPortal': 'Editar en DINAMYT',
@@ -469,7 +469,7 @@ const es = {
   'logo.poner': 'Poner escudo',
   'logo.cambiar': 'Cambiar escudo',
   'logo.ayuda':
-    'Cualquier imagen de hasta 20 MB. Entra entera —no se recorta— y se reduce sola a 512 × 512 px; si tiene fondo transparente, se respeta. Al elegirla podrás moverla y ajustar su tamaño. Sale en el carnet de tus alumnos y en su panel.',
+    'Cualquier imagen de hasta 20 MB. Se reduce sola a 512 × 512 px sin recortar y respeta el fondo transparente. Sale en el carnet y en el panel de tus alumnos.',
   'logo.guardado': 'Escudo actualizado.',
 
   // Días de clase, vistos por el alumno
@@ -490,7 +490,7 @@ const es = {
   // Las clases del club, vistas por el maestro
   'grupos.titulo': 'Clases del club',
   'grupos.ayuda':
-    'Si divides a tus alumnos en varias clases —los niños a una hora y los adultos a otra—, créalas aquí. Cada una lleva su propio horario, su descripción y su nota de la semana, y el alumno solo ve la suya.',
+    'Crea aquí las clases en que divides a tus alumnos. Cada una tiene su horario, su descripción y su nota de la semana, y el alumno solo ve la suya.',
   'grupos.sinClases': 'Un solo horario para todo el club',
   'grupos.sinClasesAyuda':
     'Así funciona ahora: todos tus alumnos comparten los mismos días. Crea una clase solo si necesitas separarlos.',
@@ -662,13 +662,13 @@ const es = {
   'planes.ayuda.mensual':
     'Vence el mismo día del mes siguiente. Quien paga el 5 vuelve a pagar el 5, aunque el mes tenga 28 días o 31.',
   'planes.ayuda.semanal':
-    'Cubre LA SEMANA, de lunes a domingo, no siete días sueltos: quien paga el miércoles paga esta semana y renueva el lunes, igual que quien pagó el lunes.',
+    'Cubre la semana de lunes a domingo, no siete días sueltos: quien paga el miércoles renueva igual el lunes.',
   'planes.ayuda.clase':
     'Una clase, una entrada. No mueve fechas: le suma 1 clase disponible. Para venderle tres de una vez, registra el pago con 3 periodos.',
   'planes.ayuda.paquete':
     'Un bono de varias clases (8, 12, las que pongas). No vence por tiempo: se gasta a medida que el alumno marca asistencia.',
   'planes.ayuda.matricula':
-    'La inscripción, que se paga UNA vez al entrar al club. No da tiempo ni clases y no vence: solo deja al alumno marcado como matriculado. Si tu club cobra inscripción cada año, vuelve a registrarla ese año.',
+    'Se paga una vez al entrar al club. No da tiempo ni clases: solo marca al alumno como matriculado. Si tu club la cobra cada año, vuelve a registrarla.',
 
   // Calendario
   'calendario.titulo': 'Clases y calendario',
@@ -797,7 +797,7 @@ const es = {
   'stats.caja': 'Caja',
   'stats.devengado': 'Corresponde al mes',
   'stats.adelantos':
-    'La caja es lo que entró; lo devengado es lo que le toca a cada mes. Se separan porque quien paga tres meses de golpe no recauda el triple ese mes.',
+    'La caja es lo que entró; lo devengado es lo que corresponde a cada mes. Un pago de tres meses entra una vez y se reparte en tres.',
   'stats.pagosMes': 'pagos registrados',
   'stats.recaudo6': 'Recaudo de los últimos 6 meses',
   'stats.estados': 'Estado de las mensualidades',
@@ -1025,7 +1025,7 @@ const en: Record<ClaveTexto, string> = {
   'ficha.soloPorClases': 'Only for class-based plans (single class or pack).',
   'ficha.cobrar': 'Record a payment for this plan',
   'ficha.cobrarAyuda':
-    'This is the normal way to bring a student up to date: the app works out the due date and the classes from the plan and the date. The fields above are only for settling what came from before.',
+    'Record the payment and the app works out the due date and the classes from the plan. The fields above are for settling what came from before by hand.',
   'ficha.accesoTitulo': 'Quick access QR',
   'ficha.accesoDescripcion':
     'The student points their phone camera at this code and gets in without typing anything. It shows on screen and expires in 10 minutes: do not print it.',
@@ -1051,7 +1051,7 @@ const en: Record<ClaveTexto, string> = {
   'panel.clases': 'Classes',
   'panel.avisos': 'Generate notices',
   'panel.avisosAyuda':
-    "Goes through the club's memberships and creates a notice for anyone due soon or already overdue. Whoever turned notifications on also gets it on their phone. This runs on its own every morning; the button brings it forward.",
+    "Creates a notice for anyone due soon or overdue, and sends it to the phone of whoever has notifications on. This runs every morning on its own; the button brings it forward.",
   'panel.avisosCreados': 'Notices created',
   'panel.avisosPush': 'notifications sent',
   'panel.avisosNinguno':
@@ -1062,7 +1062,7 @@ const en: Record<ClaveTexto, string> = {
   'panel.deEsperados': 'of',
   'panel.esperados': 'expected',
   'panel.cajaAyuda':
-    'Above, the money that CAME IN this month. Below, how much of everything collected belongs to this month —whoever pays three months at once is paying the next two in advance— and how much should come in if every student on a monthly plan paid.',
+    'Above, what came in this month. Below, how much of everything collected belongs to this month, and what would come in if every student on a monthly plan paid.',
   'panel.cumpleHoy': 'Birthday today',
   'panel.cumpleHoyVarios': 'Birthdays today',
   'panel.cumpleAnos': 'years old',
@@ -1088,7 +1088,7 @@ const en: Record<ClaveTexto, string> = {
   'alumnos.activar': 'Re-enable access',
   'ficha.desactivada': 'This account is disabled',
   'ficha.desactivadaAyuda':
-    'They cannot enter the club and nothing can be changed: no details, no plan, no payments, no card. Everything of theirs is intact —their payments and attendance are below— and can be read. To edit it again, re-enable the account.',
+    'They cannot enter the club and their record is read-only. Payments and attendance are kept. Re-enable the account to edit it.',
   'alumnos.nuevaContrasena': 'Set a new password',
   'alumnos.contrasenaCambiada': 'Password updated.',
   'alumnos.miFicha': 'My record',
@@ -1129,7 +1129,7 @@ const en: Record<ClaveTexto, string> = {
   'foto.quitar': 'Remove',
   'foto.procesando': 'Working…',
   'foto.ayuda':
-    'Any image (JPG, PNG, WebP…) up to 20 MB. You get to frame it after picking it, and it is shrunk to 400 × 400 px for you — no need to prepare it. This is the photo on the card.',
+    'Any image (JPG, PNG, WebP…) up to 20 MB. You frame it after picking it and it is shrunk to 400 × 400 px. This is the photo on the card.',
   'foto.errorTipo': 'That file is not an image. Pick a JPG, a PNG or a WebP.',
   'foto.errorLeer': "Couldn't open that image. Try another one.",
   'foto.errorPesoArchivo': "That image is over 20 MB and can't be opened. Pick a lighter one.",
@@ -1146,7 +1146,7 @@ const en: Record<ClaveTexto, string> = {
   'encuadre.guardar': 'Use it like this',
 
   'eco.fichaDelPortal':
-    "These details belong to the person across all of DINAMYT and are edited in the portal; here they are read-only. Club matters — plan, PIN, class, payments and card — are still handled from this screen.",
+    "These details belong to the person across all of DINAMYT and are edited in the portal. Their plan, PIN, class, payments and card are handled here.",
   'eco.misDatosDelPortal':
     'Your details are the same across all of DINAMYT and are edited in your portal profile. Here you can see them, and you still handle your club from here.',
   'eco.editarEnPortal': 'Edit in DINAMYT',
@@ -1156,7 +1156,7 @@ const en: Record<ClaveTexto, string> = {
   'logo.poner': 'Add crest',
   'logo.cambiar': 'Change crest',
   'logo.ayuda':
-    "Any image up to 20 MB. It fits in whole — no cropping — and is shrunk to 512 × 512 px for you; a transparent background is kept. After picking it you can move it and resize it. It shows on your students' cards and in their panel.",
+    "Any image up to 20 MB. Shrunk to 512 × 512 px without cropping, keeping a transparent background. It shows on your students' cards and panel.",
   'logo.guardado': 'Crest updated.',
 
   'clases.titulo': 'Club classes',
@@ -1173,7 +1173,7 @@ const en: Record<ClaveTexto, string> = {
 
   'grupos.titulo': 'Club classes',
   'grupos.ayuda':
-    'If you split your students into several classes — kids at one time, adults at another — create them here. Each one keeps its own schedule, description and weekly note, and students only see their own.',
+    'Create here the classes you split your students into. Each has its own schedule, description and weekly note, and students only see their own.',
   'grupos.sinClases': 'One schedule for the whole club',
   'grupos.sinClasesAyuda':
     'That is how it works right now: all your students share the same days. Create a class only if you need to separate them.',
@@ -1310,13 +1310,13 @@ const en: Record<ClaveTexto, string> = {
   'planes.ayuda.mensual':
     'Due on the same day of the following month. Pay on the 5th and you pay again on the 5th, whether the month has 28 days or 31.',
   'planes.ayuda.semanal':
-    'Covers THE WEEK, Monday to Sunday, not seven loose days: pay on Wednesday and you have paid for this week, renewing on Monday just like whoever paid on Monday.',
+    'Covers the week from Monday to Sunday, not seven loose days: pay on Wednesday and you still renew on Monday.',
   'planes.ayuda.clase':
     'One class, one entry. Moves no dates: it adds 1 available class. To sell three at once, record the payment with 3 periods.',
   'planes.ayuda.paquete':
     'A voucher for several classes (8, 12, whatever you set). It does not expire by time: it is spent as the student checks in.',
   'planes.ayuda.matricula':
-    'The joining fee, paid ONCE on entering the club. It grants no time and no classes and never expires: it only marks the student as enrolled. If your club charges it every year, record it again that year.',
+    'Paid once on joining the club. It grants no time and no classes: it only marks the student as enrolled. If your club charges it yearly, record it again.',
 
   'calendario.titulo': 'Classes and calendar',
   'calendario.diasSemana': 'Days of the week',
@@ -1432,7 +1432,7 @@ const en: Record<ClaveTexto, string> = {
   'stats.caja': 'Cash in',
   'stats.devengado': 'Belongs to the month',
   'stats.adelantos':
-    'Cash in is what arrived; the other is what each month is owed. They differ because paying three months at once is not triple income that month.',
+    'Cash in is what arrived; accrued is what belongs to each month. A three-month payment arrives once and is spread over three.',
   'stats.pagosMes': 'payments recorded',
   'stats.recaudo6': 'Income over the last 6 months',
   'stats.estados': 'Membership status',
