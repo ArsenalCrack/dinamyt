@@ -725,6 +725,7 @@ const es = {
   'mi.pinAyuda':
     'Dilo en el kiosco si el QR no lee o si dejaste el carnet en casa. Apréndetelo de memoria.',
   'mi.sinPin': 'Tu maestro todavía no te asignó un PIN. Pídeselo.',
+  'mi.contrasenaDinamyt': 'Tu contraseña es la de DINAMYT y sirve para todo el ecosistema. Cámbiala en tu perfil del portal.',
   'mi.cambiarContrasena': 'Cambiar contraseña',
   'mi.contrasenaActual': 'Contraseña actual',
   'mi.contrasenaNueva': 'Contraseña nueva',
@@ -880,6 +881,8 @@ const es = {
   'error.volverEntrar': 'Volver a entrar',
 
   'portero.pausa': 'Membresías está en pausa',
+  'portero.desde': 'En pausa desde el {fecha}.',
+  'portero.comoRenovar': 'La renovación se hace desde DINAMYT. Al registrarse el pago, el acceso se restablece.',
   'portero.renovamos': 'Ya renovamos — volver a entrar',
   'portero.enPausaApi': 'El plan de tu club no está al día, así que Membresías está en pausa.',
 } as const;
@@ -1362,6 +1365,7 @@ const en: Record<ClaveTexto, string> = {
   'mi.pinAyuda':
     "Say it at the kiosk if the QR won't scan or you left your card at home. Learn it by heart.",
   'mi.sinPin': 'Your master has not assigned you a PIN yet. Ask them for one.',
+  'mi.contrasenaDinamyt': 'Your password is your DINAMYT one and works across the whole ecosystem. Change it in your portal profile.',
   'mi.cambiarContrasena': 'Change password',
   'mi.contrasenaActual': 'Current password',
   'mi.contrasenaNueva': 'New password',
@@ -1498,6 +1502,8 @@ const en: Record<ClaveTexto, string> = {
   'error.volverEntrar': 'Sign in again',
 
   'portero.pausa': 'Memberships is paused',
+  'portero.desde': 'Paused since {fecha}.',
+  'portero.comoRenovar': 'Renewal is done from DINAMYT. Once the payment is recorded, access is restored.',
   'portero.renovamos': 'We already renewed — sign in again',
   'portero.enPausaApi': "Your club's plan is not up to date, so Memberships is paused.",
 };
