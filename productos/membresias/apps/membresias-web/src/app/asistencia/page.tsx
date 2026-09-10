@@ -13,6 +13,7 @@ import { Avatar } from '@/components/Avatar';
 import { POR_PAGINA, Paginacion } from '@/components/Paginacion';
 import { SelectMenu } from '@/components/SelectMenu';
 import { Cargando } from '@/components/Cargando';
+import { MarcarConCarnet } from '@/components/MarcarConCarnet';
 
 interface RosterItem {
   userId: string;
@@ -171,6 +172,23 @@ export default function AsistenciaPage() {
   // veinticinco escondería a quien no esté en ella.
   const visibles = roster;
 
+  /**
+   * Cómo se llama el dueño de ese id, para la tarjeta del carnet.
+   *
+   * Mira primero en las asistencias de hoy y luego en la página del roster que
+   * esté cargada. Si no está en ninguna de las dos —el roster viene paginado—
+   * se devuelve lo que llegó: es preferible enseñar un identificador a dejar el
+   * hueco en blanco justo cuando alguien acaba de pasar el carnet.
+   */
+  function nombreDe(id?: string) {
+    if (!id) return '';
+    return (
+      asistencias.find((a) => a.userId === id)?.fullName ??
+      roster.find((r) => r.userId === id)?.fullName ??
+      id
+    );
+  }
+
   if (cargandoSesion || cargando) {
     return (
       <main style={{ padding: '2rem' }}>
@@ -189,12 +207,15 @@ export default function AsistenciaPage() {
           {t('asistencia.titulo')}
         </h1>
         <p className="muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
-          {t('asistencia.instruccion')}{' '}
-          <Link href="/kiosco" style={{ color: 'var(--gold)' }}>
-            {t('menu.kiosco')} →
-          </Link>
+          {t('asistencia.instruccion')}
         </p>
       </header>
+
+      {/* Primero el carnet y el PIN, que es lo que se usa con la fila delante;
+          la lista de abajo es para repasar y para marcar a mano al que se dejó
+          el carnet en casa. Vino de `/kiosco`, que hacía esto mismo en otra
+          pantalla. */}
+      <MarcarConCarnet nombreDe={nombreDe} onMarcado={() => void cargar()} />
 
       <div style={{ marginBottom: '1rem' }}>
         <span className="badge badge-ok" style={{ fontSize: '0.8rem' }}>

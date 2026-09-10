@@ -1,7 +1,6 @@
 'use client';
 
 /* eslint-disable @next/next/no-img-element */
-import { usePathname } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
 import { Version } from './Version';
 
@@ -52,8 +51,6 @@ const PORTAL_URL = process.env.NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL || '';
 
 export function PieLegal() {
   const { t } = useI18n();
-  const pathname = usePathname();
-  if (pathname === '/kiosco') return null;
 
   const ahora = new Date().getFullYear();
   const años = ahora > AÑO_INICIAL ? `${AÑO_INICIAL}–${ahora}` : String(AÑO_INICIAL);

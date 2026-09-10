@@ -149,7 +149,6 @@ const es = {
   'menu.panel': 'Panel del club',
   'menu.alumnos': 'Alumnos',
   'menu.asistencia': 'Asistencia',
-  'menu.kiosco': 'Kiosco',
   'menu.planes': 'Planes',
   'menu.calendario': 'Calendario',
   'menu.miEstado': 'Mi estado',
@@ -460,7 +459,7 @@ const es = {
   'eco.fichaDelPortal':
     'Estos datos son de la persona en todo DINAMYT y se editan en el portal. Su plan, PIN, clase, cobros y carnet se llevan desde aquí.',
   'eco.misDatosDelPortal':
-    'Tus datos son los mismos en todo DINAMYT y se editan en tu perfil del portal. Aquí se ven, y desde aquí sigues llevando lo de tu club.',
+    'Tus datos son los mismos en todo DINAMYT y se editan en tu perfil del portal.',
   'eco.editarEnPortal': 'Editar en DINAMYT',
   'eco.escudoEnPortal': 'El escudo del club se pone en su ficha de DINAMYT.',
 
@@ -595,11 +594,9 @@ const es = {
     'Cada cara en su propia tarjeta de 85,6 × 54 mm, para impresoras de PVC.',
 
   // Kiosco / check-in
-  'kiosco.titulo': 'Check-in de clase',
+  'asistencia.conCarnet': 'Marcar con carnet o PIN',
   'kiosco.escanear': '📷 Escanear carnet QR',
   'kiosco.pin': 'Marcar con PIN',
-  'kiosco.manual': 'Marcar manualmente',
-  'kiosco.afina': 'escribe para encontrar al resto',
   'kiosco.apunta': 'Apunta al carnet QR del alumno.',
   'kiosco.sinCamara':
     'Este navegador no puede escanear con la cámara. Usa el PIN del alumno o el marcado manual.',
@@ -895,7 +892,6 @@ const en: Record<ClaveTexto, string> = {
   'menu.panel': 'Club dashboard',
   'menu.alumnos': 'Students',
   'menu.asistencia': 'Attendance',
-  'menu.kiosco': 'Kiosk',
   'menu.planes': 'Plans',
   'menu.calendario': 'Calendar',
   'menu.miEstado': 'My status',
@@ -1148,7 +1144,7 @@ const en: Record<ClaveTexto, string> = {
   'eco.fichaDelPortal':
     "These details belong to the person across all of DINAMYT and are edited in the portal. Their plan, PIN, class, payments and card are handled here.",
   'eco.misDatosDelPortal':
-    'Your details are the same across all of DINAMYT and are edited in your portal profile. Here you can see them, and you still handle your club from here.',
+    'Your details are the same across all of DINAMYT and are edited in your portal profile.',
   'eco.editarEnPortal': 'Edit in DINAMYT',
   'eco.escudoEnPortal': "The club crest is set in the club's DINAMYT profile.",
 
@@ -1257,11 +1253,9 @@ const en: Record<ClaveTexto, string> = {
   'carnet.formatoTarjetaAyuda':
     'Each side on its own 85.6 × 54 mm card, for PVC printers.',
 
-  'kiosco.titulo': 'Class check-in',
+  'asistencia.conCarnet': 'Check in with card or PIN',
   'kiosco.escanear': '📷 Scan QR card',
   'kiosco.pin': 'Check in with PIN',
-  'kiosco.manual': 'Check in manually',
-  'kiosco.afina': 'type to find the rest',
   'kiosco.apunta': "Point at the student's QR card.",
   'kiosco.sinCamara':
     "This browser can't scan with the camera. Use the student's PIN or manual check-in.",
