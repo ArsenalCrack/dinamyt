@@ -222,7 +222,15 @@ export const EVENTO_PLAN_VENCIDO = 'membresias:plan-vencido';
 
 /** Lo que viaja en ese evento: desde cuándo está en pausa, si se sabe. */
 export interface AvisoPlanVencido {
-  mensaje: string;
+  /**
+   * Lo que dijo el servidor, o `null` si no dijo nada.
+   *
+   * `null` y no un texto por defecto a proposito: esto es una libreria, no un
+   * componente, asi que no tiene `t()` y su texto salia SIEMPRE en espaniol —
+   * tambien con la pantalla en ingles. La frase de reserva la pone
+   * `PorteroPlan`, que si esta dentro del proveedor de idioma.
+   */
+  mensaje: string | null;
   desde: string | null;
 }
 
@@ -287,9 +295,7 @@ api.interceptors.response.use(
       window.dispatchEvent(
         new CustomEvent<AvisoPlanVencido>(EVENTO_PLAN_VENCIDO, {
           detail: {
-            mensaje:
-              datos.error ??
-              'El plan de tu club no está al día, así que Membresías está en pausa.',
+            mensaje: datos.error ?? null,
             desde: datos.desde ?? null,
           },
         }),

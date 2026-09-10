@@ -865,6 +865,26 @@ const es = {
   'mant.desactivadoOk': 'Modo mantenimiento desactivado.',
   'mant.error': 'No se pudo cambiar el modo mantenimiento.',
   'mant.desde': 'Activo desde',
+
+  // ── Las redes de seguridad ───────────────────────────────────────────────
+  //
+  // `app/error.tsx` (una pantalla que revienta) y `components/PorteroPlan.tsx`
+  // (el club con el plan vencido). Las dos estaban escritas a mano en español.
+  //
+  // `app/global-error.tsx` NO usa estas claves y no es descuido: reemplaza el
+  // documento entero —trae su propio <html>—, así que corre FUERA del
+  // `I18nProvider` y ningún hook de aquí existe todavía. Ahí el idioma se lee
+  // de la cookie compartida a mano, en el propio archivo.
+  'error.eyebrow': 'Algo se rompió',
+  'error.titulo': 'No se pudo cargar esta pantalla',
+  'error.texto': 'Tu sesión sigue abierta. Reintenta; si vuelve a pasar, recarga la página.',
+  'error.reintentar': 'Reintentar',
+  'error.recargar': 'Recargar la página',
+  'error.volverEntrar': 'Volver a entrar',
+
+  'portero.pausa': 'Membresías está en pausa',
+  'portero.renovamos': 'Ya renovamos — volver a entrar',
+  'portero.enPausaApi': 'El plan de tu club no está al día, así que Membresías está en pausa.',
 } as const;
 
 export type ClaveTexto = keyof typeof es;
@@ -1475,6 +1495,17 @@ const en: Record<ClaveTexto, string> = {
   'mant.desactivadoOk': 'Maintenance mode is off.',
   'mant.error': 'Could not change maintenance mode.',
   'mant.desde': 'On since',
+
+  'error.eyebrow': 'Something broke',
+  'error.titulo': 'This screen could not load',
+  'error.texto': 'Your session is still open. Try again; if it keeps happening, reload the page.',
+  'error.reintentar': 'Try again',
+  'error.recargar': 'Reload the page',
+  'error.volverEntrar': 'Sign in again',
+
+  'portero.pausa': 'Memberships is paused',
+  'portero.renovamos': 'We already renewed — sign in again',
+  'portero.enPausaApi': "Your club's plan is not up to date, so Memberships is paused.",
 };
 
 const DICCIONARIOS: Record<Idioma, Record<ClaveTexto, string>> = { es, en };
