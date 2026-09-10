@@ -460,23 +460,23 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
               </div>
             </div>
 
-            {/* `min-w-0` junto a `shrink-0`: lo segundo impide que la fila de
-                acciones ceda ancho a costa del nombre, y lo primero impide que
-                se plante en su ancho mínimo y ensanche la tarjeta.
+            {/* ── Una sola fila, y el desplegable es el que cede ──────────
+                Los tres controles colgaban de un `flex-wrap`, y con el
+                desplegable pidiendo 10.5 rem fijos lo primero que dejaba de
+                caber era el ÚLTIMO botón: «Rechazar» se descolgaba solo.
+                Agruparlos arregló eso, pero dejaba el rol flotando en una fila
+                de arriba y el par debajo — dos renglones irregulares.
 
-                ── Y los dos botones van JUNTOS, en su propia caja ──
+                Ahora no envuelve nadie: la fila es una y quien encoge es el
+                desplegable (`flex: 1 1 auto`, entre 6.5 y 10.5 rem). Los
+                botones no se estrechan nunca —`shrink-0`— porque un botón
+                recortado no se lee.
 
-                Antes los tres hijos —el desplegable y los dos botones— estaban
-                sueltos en el mismo `flex-wrap`. Con el desplegable pidiendo
-                10.5 rem, lo primero que no cabía era el último botón, así que
-                «Rechazar» se descolgaba SOLO a una segunda línea: el par de
-                acciones partido por la mitad, que es lo que se veía mal en
-                ancho normal y en estrecho.
-
-                Envolviéndolos, el punto de corte pasa a estar entre el
-                desplegable y el par: o caben los dos al lado del rol, o bajan
-                los dos juntos y alineados. Un botón nunca se queda huérfano. */}
-            <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-1.5">
+                Y debajo de `sm` la tarjeta ya se apila sola (`flex-col`), así
+                que esta fila se lleva el ancho entero: el rol a la izquierda,
+                los dos botones a la derecha, y el nombre completo arriba sin
+                recortar. */}
+            <div className="flex min-w-0 shrink-0 items-center gap-1.5">
               {/* El desplegable del ecosistema, no el gris del sistema
                   operativo: ver `SelectMenu.tsx`. */}
               <SelectMenu
@@ -485,28 +485,23 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                 opciones={OPCIONES_ROL}
                 etiquetaAria={`Rol de ${s.fullName} al entrar`}
                 disabled={ocupado}
-                /* `min()` y no un mínimo fijo: en una columna estrecha, 10.5 rem
-                   dejan de ser un mínimo cómodo y pasan a ser un suelo que
-                   ensancha lo que hay alrededor. */
-                style={{ width: 'auto', minWidth: 'min(10.5rem, 100%)' }}
+                style={{ flex: '1 1 auto', minWidth: '6.5rem', maxWidth: '10.5rem' }}
                 botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
               />
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                  onClick={() => void responder(s, true)}
-                  disabled={ocupado}
-                  className="btn btn-gold btn-sm"
-                >
-                  {t('codigo.aceptar')}
-                </button>
-                <button
-                  onClick={() => void responder(s, false)}
-                  disabled={ocupado}
-                  className="btn btn-outline btn-sm"
-                >
-                  {t('codigo.rechazar')}
-                </button>
-              </div>
+              <button
+                onClick={() => void responder(s, true)}
+                disabled={ocupado}
+                className="btn btn-gold btn-sm shrink-0"
+              >
+                {t('codigo.aceptar')}
+              </button>
+              <button
+                onClick={() => void responder(s, false)}
+                disabled={ocupado}
+                className="btn btn-outline btn-sm shrink-0"
+              >
+                {t('codigo.rechazar')}
+              </button>
             </div>
           </li>
         ))}
