@@ -385,13 +385,9 @@ const es = {
   'miembro.notasMedicas': 'Notas médicas (se guardan cifradas)',
   'miembro.telefono': 'Teléfono',
   'miembro.tipoSangre': 'Tipo de sangre',
-  // Decía: «Dos puertas, y las dos las cierra alguien: tú repartes el código y
-  // aceptas a quien lo teclee, o tú invitas y la persona acepta. En cualquiera
-  // de las dos, su ficha se crea sola en Membresías al entrar.»
-  // Tres líneas para explicar dos botones que se ven debajo. Se queda lo único
-  // que el usuario no puede deducir mirando la pantalla: que la ficha se crea
-  // sola.
-  'codigo.intro': 'Da entrada a tu club con un código o por invitación. Al aceptar, su ficha se crea sola en Membresías.',
+  // Una línea que diga QUÉ se hace en esta pantalla, y nada más. Lo demás —los
+  // dos caminos, qué pasa al aceptar— se ve en los dos apartados de abajo.
+  'codigo.intro': 'Aquí decides quién entra a tu club: comparte tu código o envía una invitación.',
   'codigo.tuCodigo': '1 · Tu código',
   'codigo.pidenEntrar': 'Piden entrar',
   'codigo.aceptar': 'Aceptar',
@@ -688,7 +684,7 @@ const en: Record<ClaveTexto, string> = {
   'miembro.notasMedicas': 'Medical notes (stored encrypted)',
   'miembro.telefono': 'Phone',
   'miembro.tipoSangre': 'Blood type',
-  'codigo.intro': 'Let people into your club with a code or by invitation. When you accept, their record is created in Memberships automatically.',
+  'codigo.intro': 'Here you decide who joins your club: share your code or send an invitation.',
   'codigo.tuCodigo': '1 · Your code',
   'codigo.pidenEntrar': 'Waiting to join',
   'codigo.aceptar': 'Accept',
