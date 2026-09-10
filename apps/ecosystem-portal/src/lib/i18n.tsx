@@ -346,6 +346,7 @@ const es = {
   'poner.irAlLogin': 'Ir a iniciar sesión',
   'poner.titulo': 'Pon tu contraseña',
   'salir.cerrando': 'Cerrando tu sesión de DINAMYT…',
+  'pie.derechos': 'Todos los derechos reservados.',
   'pie.obra': 'DINAMYT Ecosystem es una obra protegida por el derecho de autor.',
   // ── LA POLÍTICA DE PRIVACIDAD ────────────────────────────────────────────
   //
@@ -765,6 +766,7 @@ const en: Record<ClaveTexto, string> = {
   'poner.irAlLogin': 'Go to sign in',
   'poner.titulo': 'Set your password',
   'salir.cerrando': 'Signing you out of DINAMYT…',
+  'pie.derechos': 'All rights reserved.',
   'pie.obra': 'DINAMYT Ecosystem is a work protected by copyright.',
   'priv.ley': 'Ley 1581 de 2012 · Colombia',
   'priv.titulo': 'Privacy policy',

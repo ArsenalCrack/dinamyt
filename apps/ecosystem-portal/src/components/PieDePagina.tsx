@@ -72,9 +72,13 @@ export function PieDePagina() {
         </span>
         <nav className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-x-4 sm:gap-y-2">
           <span className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-            <Link href="/planes">Planes</Link>
-            <Link href="/privacidad">Privacidad</Link>
-            <a href={`${CAMPEONATOS_URL}/pantalla`}>Resultados</a>
+            {/* Las tres claves existian desde el principio y NADIE las usaba:
+                el pie imprimia los literales en espaniol al lado de un
+                `t('pie.ayuda')` que si traducia. Media traduccion es peor que
+                ninguna, porque nadie la busca. */}
+            <Link href="/planes">{t('pie.planes')}</Link>
+            <Link href="/privacidad">{t('pie.privacidad')}</Link>
+            <a href={`${CAMPEONATOS_URL}/pantalla`}>{t('pie.resultados')}</a>
           </span>
           <a
             href={`mailto:${CORREO_SOPORTE}`}
@@ -95,8 +99,8 @@ export function PieDePagina() {
         style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
       >
         <p className="text-xs">
-          © {años} <strong style={{ color: 'var(--text)' }}>{AUTOR}</strong> · Todos
-          los derechos reservados.
+          © {años} <strong style={{ color: 'var(--text)' }}>{AUTOR}</strong> ·{' '}
+          {t('pie.derechos')}
         </p>
         <p className="mt-0.5 text-xs opacity-75">
           {t('pie.obra')}

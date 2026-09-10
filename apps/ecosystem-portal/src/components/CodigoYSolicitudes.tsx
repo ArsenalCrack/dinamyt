@@ -485,7 +485,17 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                 opciones={OPCIONES_ROL}
                 etiquetaAria={`Rol de ${s.fullName} al entrar`}
                 disabled={ocupado}
-                style={{ flex: '1 1 auto', minWidth: '6.5rem', maxWidth: '10.5rem' }}
+                /* `width: auto` NO sobra, y quitarlo es lo que rompió esto una
+                   vez: `.selectmenu` trae `width: 100%` en su clase
+                   (`globals.css`), así que sin anularlo el desplegable pide la
+                   fila entera como base de flex y aplasta los dos botones.
+                   `flex` reparte lo que sobra; `width` decide de cuánto parte. */
+                style={{
+                  flex: '1 1 auto',
+                  width: 'auto',
+                  minWidth: '6.5rem',
+                  maxWidth: '10.5rem',
+                }}
                 botonStyle={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
               />
               <button
