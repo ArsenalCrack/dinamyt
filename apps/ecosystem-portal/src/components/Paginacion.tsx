@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Paso de páginas, igual que el de Membresías.
@@ -94,6 +95,7 @@ export function Paginacion({
    */
   arriba?: boolean;
 }) {
+  const { t } = useI18n();
   if (total <= limit) return null;
 
   const desde = offset + 1;
@@ -108,7 +110,7 @@ export function Paginacion({
       }`}
     >
       <span style={{ color: 'var(--text-muted)' }}>
-        {desde}–{hasta} de {total}
+        {desde}–{hasta} {t('pag.de')} {total}
       </span>
       <div className="flex gap-1.5">
         <button
@@ -117,7 +119,7 @@ export function Paginacion({
           disabled={!hayAnterior}
           onClick={() => onIr(Math.max(0, offset - limit))}
         >
-          ‹ Anterior
+          {t('pag.anterior')}
         </button>
         <button
           type="button"
@@ -125,7 +127,7 @@ export function Paginacion({
           disabled={!haySiguiente}
           onClick={() => onIr(offset + limit)}
         >
-          Siguiente ›
+          {t('pag.siguiente')}
         </button>
       </div>
     </div>

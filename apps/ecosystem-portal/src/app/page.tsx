@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { CORREO_ADMIN } from '@/lib/contacto';
+import { useI18n, type ClaveTexto } from '@/lib/i18n';
 
 const CAMPEONATOS_API =
   process.env.NEXT_PUBLIC_CAMPEONATOS_API_URL || 'http://localhost:3002';
@@ -69,6 +70,7 @@ interface CampeonatoVivo {
  *     Si una frase no cabe, la frase está mal, no la pantalla.
  */
 export default function HomePage() {
+  const { t } = useI18n();
   const [enVivo, setEnVivo] = useState<CampeonatoVivo[]>([]);
 
   useEffect(() => {
@@ -101,13 +103,13 @@ export default function HomePage() {
               href={`${CAMPEONATOS_URL}/resultados`}
               className="btn btn-outline hidden sm:inline-flex"
             >
-              Resultados
+              {t('pie.resultados')}
             </a>
             <Link href="/planes" className="btn btn-outline hidden sm:inline-flex">
-              Planes
+              {t('planes.titulo')}
             </Link>
             <Link href="/login" className="btn btn-gold">
-              Iniciar sesión
+              {t('portada.entrar')}
             </Link>
           </nav>
         </div>
@@ -116,7 +118,7 @@ export default function HomePage() {
       {/* ── Hero ───────────────────────────────────────────────────────── */}
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-20 lg:grid-cols-[1fr_1fr] lg:gap-12">
         <div>
-          <p className="eyebrow mb-4">Hapkido · Colombia</p>
+          <p className="eyebrow mb-4">{t('portada.eyebrow')}</p>
           {/* El titular nombra al rival de verdad, que no es otro software: es
               el cuaderno donde hoy está apuntado quién pagó y quién vino. Las
               versiones anteriores («Del club al podio» y «Tu club. Tu torneo.
@@ -136,34 +138,33 @@ export default function HomePage() {
                 · **xl** → la columna llega a ~528 px y ahí sí entra `text-6xl`,
                   que es donde el titular tiene el tamaño que merece. */}
           <h1 className="display text-[2rem] sm:text-5xl xl:text-6xl">
-            Se acabó
+            {t('portada.titulo1')}
             <br />
-            <span className="acento">el cuaderno</span>
+            <span className="acento">{t('portada.titulo2')}</span>
             <br />
-            del club.
+            {t('portada.titulo3')}
           </h1>
           <p
             className="mt-5 max-w-md text-base leading-relaxed sm:text-lg"
             style={{ color: 'var(--text-muted)' }}
           >
-            Mensualidades, asistencia y campeonatos en un solo sitio. Tus
-            alumnos entran con la misma cuenta que tú.
+            {t('portada.sub')}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link href="/registro" className="btn btn-gold px-6 py-3 text-base">
-              Crear mi cuenta
+              {t('portada.crearCuenta')}
             </Link>
             <a
               href={`${CAMPEONATOS_URL}/resultados`}
               className="btn btn-outline px-6 py-3 text-base"
             >
-              Ver resultados
+              {t('portada.verResultados')}
             </a>
           </div>
           <p className="mt-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-            La cuenta es gratis. Las apps van con la suscripción del club —{' '}
+            {t('portada.gratis')}{' '}
             <Link href="/planes" style={{ color: 'var(--gold)' }}>
-              cómo se cobra
+              {t('portada.comoSeCobra')}
             </Link>
             .
           </p>
@@ -179,9 +180,9 @@ export default function HomePage() {
       {enVivo.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <h2 className="display text-2xl">Sucediendo ahora</h2>
+            <h2 className="display text-2xl">{t('portada.ahora')}</h2>
             <span className="badge badge-live">
-              <span className="punto-vivo" /> En vivo
+              <span className="punto-vivo" /> {t('portada.enVivo')}
             </span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -193,7 +194,7 @@ export default function HomePage() {
               >
                 <h3 className="text-lg font-semibold">{c.nombre}</h3>
                 <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-                  Tatamis y resultados en tiempo real →
+                  {t('portada.tiempoReal')}
                 </p>
               </a>
             ))}
@@ -210,20 +211,20 @@ export default function HomePage() {
       {/* ── Cierre ─────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-4 py-14 text-center sm:px-6">
         <h2 className="display mx-auto max-w-lg text-3xl sm:text-4xl">
-          Empieza por tu club
+          {t('portada.empieza')}
         </h2>
         <p
           className="mx-auto mt-3 max-w-md text-sm leading-relaxed"
           style={{ color: 'var(--text-muted)' }}
         >
-          Creas tu cuenta, fundas tu club y le pasas el código a tus alumnos.
+          {t('portada.empiezaSub')}
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <Link href="/registro" className="btn btn-gold px-6 py-3 text-base">
-            Crear mi cuenta
+            {t('portada.crearCuenta')}
           </Link>
           <Link href="/planes" className="btn btn-outline px-6 py-3 text-base">
-            Cómo se cobra
+            {t('planes.comoSeCobra')}
           </Link>
         </div>
       </section>
@@ -244,24 +245,25 @@ export default function HomePage() {
      · 3   → los métodos de check-in vivos: qr, pin, manual
      · 7   → MAX_DIAS_COLA del kiosco (routes/checkin.ts)
    Si alguno cambia en el código, cambia aquí el mismo día. */
-const CIFRAS: { valor: string; etiqueta: string }[] = [
-  { valor: '10', etiqueta: 'tatamis a la vez' },
-  { valor: '4+1', etiqueta: 'jueces por tatami' },
-  { valor: '5', etiqueta: 'tipos de plan' },
-  { valor: '3', etiqueta: 'formas de marcar' },
-  { valor: '7', etiqueta: 'días sin señal' },
+const CIFRAS: { valor: string; clave: ClaveTexto }[] = [
+  { valor: '10', clave: 'portada.cifra.tatamis' },
+  { valor: '4+1', clave: 'portada.cifra.jueces' },
+  { valor: '5', clave: 'portada.cifra.planes' },
+  { valor: '3', clave: 'portada.cifra.marcar' },
+  { valor: '7', clave: 'portada.cifra.sinSenal' },
 ];
 
 function Cifras() {
+  const { t } = useI18n();
   return (
     <section
       className="border-y"
       style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}
     >
       <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-x-4 gap-y-7 px-4 py-10 sm:grid-cols-3 sm:px-6 lg:grid-cols-5">
-        {CIFRAS.map(({ valor, etiqueta }) => (
-          <div key={etiqueta}>
-            <dt className="sr-only">{etiqueta}</dt>
+        {CIFRAS.map(({ valor, clave }) => (
+          <div key={clave}>
+            <dt className="sr-only">{t(clave)}</dt>
             <dd className="m-0">
               <span
                 className="mono acento block text-3xl font-semibold leading-none sm:text-4xl"
@@ -272,7 +274,7 @@ function Cifras() {
                 className="mt-2 block text-xs leading-snug"
                 style={{ color: 'var(--text-muted)' }}
               >
-                {etiqueta}
+                {t(clave)}
               </span>
             </dd>
           </div>
@@ -290,11 +292,12 @@ function Cifras() {
    celular de 320 px — esa es la medida, no un gusto. */
 interface AppInfo {
   id: string;
+  /** La marca de la aplicación. NO es una clave: no se traduce. */
   nombre: string;
-  titulo: string;
-  lineas: string[];
+  titulo: ClaveTexto;
+  lineas: ClaveTexto[];
   /** Sin `cta` la pestaña no ofrece puerta: es lo que hace «Próximamente». */
-  cta?: { texto: string; href: string };
+  cta?: { texto: ClaveTexto; href: string };
   proximamente?: boolean;
 }
 
@@ -328,52 +331,37 @@ const APPS: AppInfo[] = [
   {
     id: 'membresias',
     nombre: 'Membresías',
-    titulo: 'El club, al día',
-    lineas: [
-      'Sabes quién está al día y quién debe',
-      'Cobras, y el vencimiento se actualiza solo',
-      'Pasas lista en la puerta, sin papel',
-      'Tus alumnos se enteran antes de que se les venza',
-      'Ves el recaudo y la asistencia del mes',
-    ],
-    cta: { texto: 'Entrar a Membresías', href: MEMBRESIAS_URL },
+    titulo: 'apps.memb.titulo',
+    lineas: ['apps.memb.l1', 'apps.memb.l2', 'apps.memb.l3', 'apps.memb.l4', 'apps.memb.l5'],
+    cta: { texto: 'apps.memb.cta', href: MEMBRESIAS_URL },
   },
   {
     id: 'campeonatos',
     nombre: 'Campeonatos',
-    titulo: 'El torneo, de punta a punta',
-    lineas: [
-      'Montas el campeonato y armas las llaves',
-      'Los maestros inscriben a su gente y tú apruebas',
-      'Cada juez puntúa desde su tatami',
-      'El público sigue el marcador en vivo',
-      'Al terminar, los resultados quedan publicados',
-    ],
-    cta: { texto: 'Ver campeonatos', href: `${CAMPEONATOS_URL}/campeonatos` },
+    titulo: 'apps.camp.titulo',
+    lineas: ['apps.camp.l1', 'apps.camp.l2', 'apps.camp.l3', 'apps.camp.l4', 'apps.camp.l5'],
+    cta: { texto: 'apps.camp.cta', href: `${CAMPEONATOS_URL}/campeonatos` },
   },
   {
     id: 'academy',
     nombre: 'Academy',
-    titulo: 'La formación del practicante',
-    lineas: [
-      'Cada alumno ve qué le falta para el próximo cinturón',
-      'Sus evaluaciones de grado quedan en su historial',
-      'El maestro sigue el avance de todo su grupo',
-    ],
+    titulo: 'apps.acad.titulo',
+    lineas: ['apps.acad.l1', 'apps.acad.l2', 'apps.acad.l3'],
     proximamente: !ACADEMY_EN_EL_PORTAL,
     cta: ACADEMY_EN_EL_PORTAL
-      ? { texto: 'Entrar a Academy', href: ACADEMY_URL }
+      ? { texto: 'apps.acad.cta', href: ACADEMY_URL }
       : undefined,
   },
 ];
 
 function Aplicaciones() {
+  const { t } = useI18n();
   const [activa, setActiva] = useState(APPS[0].id);
   const app = APPS.find((a) => a.id === activa) ?? APPS[0];
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-      <p className="eyebrow mb-2">El ecosistema</p>
+      <p className="eyebrow mb-2">{t('apps.eyebrow')}</p>
       <h2 className="display mb-6 text-3xl sm:text-4xl">Una cuenta, tus apps</h2>
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Aplicaciones">
@@ -408,11 +396,11 @@ function Aplicaciones() {
         className="card mt-4 p-5 sm:p-7"
       >
         <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-xl font-bold sm:text-2xl">{app.titulo}</h3>
+          <h3 className="text-xl font-bold sm:text-2xl">{t(app.titulo)}</h3>
           {app.proximamente ? (
-            <span className="badge">Próximamente</span>
+            <span className="badge">{t('apps.proximamente')}</span>
           ) : (
-            <span className="badge badge-ok">En producción</span>
+            <span className="badge badge-ok">{t('apps.enProduccion')}</span>
           )}
         </div>
         <ul className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -427,21 +415,21 @@ function Aplicaciones() {
                 className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
                 style={{ background: 'var(--gold-fill)' }}
               />
-              <span>{linea}</span>
+              <span>{t(linea)}</span>
             </li>
           ))}
         </ul>
         {app.cta ? (
           <a href={app.cta.href} className="btn btn-outline mt-6">
-            {app.cta.texto}
+            {t(app.cta.texto)}
           </a>
         ) : (
           <p className="mt-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-            Todavía no se ofrece.{' '}
+            {t('apps.noSeOfrece')}{' '}
             <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
-              Escríbenos
+              {t('portada.escribenos')}
             </a>{' '}
-            si la quieres para tu club y te avisamos.
+            {t('apps.teAvisamos')}
           </p>
         )}
       </div>
@@ -453,11 +441,8 @@ function Aplicaciones() {
         className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 text-sm"
         style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
       >
-        <span className="badge badge-gold">Sin red</span>
-        <span>
-          Si se cae el internet del coliseo, el campeonato sigue. Si se cae el
-          del salón, la clase también.
-        </span>
+        <span className="badge badge-gold">{t('portada.sinRed')}</span>
+        <span>{t('portada.sinRedSub')}</span>
       </div>
     </section>
   );
@@ -471,16 +456,17 @@ function Aplicaciones() {
    quiere saber si el sistema contempla a su gente —el acudiente que paga, el
    auxiliar que pasa lista—, y para eso basta con ver su palabra escrita. El
    detalle de qué puede hacer cada uno vive donde se usa, no aquí. */
-const ROLES = [
-  'Federación',
-  'Maestro',
-  'Auxiliar',
-  'Acudiente',
-  'Alumno',
-  'Juez',
+const ROLES: ClaveTexto[] = [
+  'rol.federacion',
+  'rol.maestro',
+  'rol.auxiliar',
+  'rol.acudiente',
+  'rol.alumno',
+  'rol.juez',
 ];
 
 function Roles() {
+  const { t } = useI18n();
   return (
     <section
       className="border-y py-8"
@@ -488,12 +474,12 @@ function Roles() {
     >
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 px-4 sm:px-6">
         <p className="eyebrow" style={{ marginBottom: 0 }}>
-          Cada quien ve lo suyo
+          {t('portada.cadaQuien')}
         </p>
         <ul className="flex flex-wrap gap-2">
           {ROLES.map((rol) => (
             <li key={rol} className="badge">
-              {rol}
+              {t(rol)}
             </li>
           ))}
         </ul>
@@ -524,6 +510,7 @@ function Roles() {
  * Respeta prefers-reduced-motion (el cronómetro queda congelado en 01:23).
  */
 function MarcadorDemo() {
+  const { t } = useI18n();
   const [segundos, setSegundos] = useState(83); // 01:23 de la R2
   const intervalo = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -552,12 +539,12 @@ function MarcadorDemo() {
             aria-hidden="true"
             style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--hong)' }}
           />
-          Campeonatos · el marcador
+          {t('demo.camp')}
         </figcaption>
         <div className="marcador">
         <div className="marcador-head">
           <span className="eyebrow" style={{ color: 'var(--text-muted)' }}>
-            Tatami 1 · Semifinal
+            {t('demo.tatami')}
           </span>
           <span
             className="mono text-lg font-semibold"
@@ -607,7 +594,7 @@ function MarcadorDemo() {
             KyongGo 1 · GamJeum 0
           </span>
           <span className="mono text-xs" style={{ color: 'var(--text-muted)' }}>
-            4 jueces + central
+            {t('demo.jueces')}
           </span>
           </div>
         </div>
@@ -625,7 +612,7 @@ function MarcadorDemo() {
             aria-hidden="true"
             style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--gold-fill)' }}
           />
-          Membresías · el kiosco
+          {t('demo.memb')}
         </figcaption>
         <div
           className="card flex items-center justify-between gap-3 px-4 py-3"
@@ -640,13 +627,13 @@ function MarcadorDemo() {
               ✓
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-semibold">Ana Gómez marcó asistencia</p>
+              <p className="text-sm font-semibold">{t('demo.marco')}</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Entró con su carnet
+                {t('demo.conCarnet')}
               </p>
             </div>
           </div>
-          <span className="badge badge-ok shrink-0">Al día</span>
+          <span className="badge badge-ok shrink-0">{t('demo.alDia')}</span>
         </div>
       </figure>
     </div>
