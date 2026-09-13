@@ -8,9 +8,13 @@
 > | **F5-bis** | ✅ **hecha** | La ficha del alumno se reutiliza. Backend, pantalla del maestro y las pruebas que fijaban lo roto, dadas la vuelta |
 > | **F6-a** | ✅ **hecha** | El paquete lleva `eco_sub`. Los otros tres datos de F6 **no tienen todavía dónde vivir**, así que F6 se reparte: ver «F6 se reparte» en la PARTE 4 |
 > | **F6-bis** | ✅ **hecha** | El local dice de cuándo es la copia y avisa cuando envejece. Y el runbook de la víspera, en `INICIAR-LOCAL.md` |
+> | **F7** | ✅ **hecha** | `INICIAR.bat` comprueba antes de arrancar, espera al «listo» de verdad y saca la dirección en QR. `APAGAR.bat` apaga por puerto |
+> | **F1** | ✅ **hecha** | El pase lleva `roles_campeonatos` además de `role_campeonatos`, y el portal tiene casillas para marcarlos. Con dos cambios sobre lo escrito: ver la nota dentro de F1 |
 >
-> Con eso **el carril A está cerrado**. Lo siguiente es F7 (carril B, no toca
-> nada de nadie) o abrir el carril C por F1. El resto sigue sin empezar.
+> Los carriles A y B están cerrados, y **el C ha empezado**. Lo siguiente es
+> **F2** —Campeonatos lee la lista—, que es la primera fase que vuelve a este
+> repositorio. Todo el carril C tiene que estar dentro **antes del ensayo del
+> ~26 de septiembre**.
 >
 > **⏱ Fecha límite: el 8 de octubre de 2026.** Hay campeonato el 9, 10 y 11 y
 > **no hay «después»** (decisión D6): lo que no esté dentro para entonces, no
@@ -445,9 +449,62 @@ Ver F8.
 
 ---
 
-## F1 · El pase lleva varios roles (ecosystem)
+## F1 · El pase lleva varios roles (ecosystem) — ✅ hecha
 
 **Dónde:** `apps/ecosystem-api` (monorepo `dinamyt`).
+
+> **Hecho, el 13 de septiembre de 2026.** Los puntos 1 a 3 tal cual, el 4 de
+> otra manera, y una regla que no estaba escrita:
+>
+> - **La migración `0023_roles_campeonatos`** añade `roles_campeonatos` (`text[]`)
+>   a `org_members` **y también a `org_member_bajas`**, que el plan no nombraba:
+>   readmitir a alguien tiene que devolverle todos sus papeles, igual que la
+>   0018 le devuelve el rol. Probada sobre una base vacía (de la 0000 a la 0023)
+>   y el relleno, con filas de muestra.
+> - **`roles-por-app.ts`** gana `rolesParaApp`, `rolPrincipal`,
+>   `propiosDeCampeonatos` y `rolesCampeonatosDelPase`, y la traducción
+>   `member → competitor`. Una fila escrita por las puertas de un solo papel
+>   —invitar, aceptar una solicitud— sigue contando: si la lista está vacía,
+>   vale el singular.
+> - **El pase lleva las dos formas**, y Academy y Membresías no se enteran.
+> - **Cambiar el rol general vacía también la lista**, como ya vaciaba las
+>   otras tres excepciones. Si no, el rol nuevo no llegaría a Campeonatos.
+>
+> **Cambio 1 · la pantalla del punto 4 no tiene roles.** `mi-organizacion/
+> miembro/[id]` es el editor de PERFIL —nombre, sangre, cinturón—; el rol se
+> cambia en la fila de la lista del club (`FilaMiembro`), y lo que se cambia
+> ahí es el rol GENERAL. **No había ningún desplegable de Campeonatos que
+> convertir en casillas.** Las casillas son nuevas: van plegadas en esa fila
+> («Campeonatos: Maestro + Juez»), con su ruta
+> `PATCH /organizations/:id/members/:userId/campeonatos`. Y reparten **lo que
+> esa organización ya daba** (`ROLES_POR_TIPO`): un club da maestros, coaches y
+> competidores; la federación, administradores y jueces. Lo que alguien ya
+> tenía se le puede quitar aunque no se pueda dar — si no, marcarle «maestro» a
+> un alumno que llegó con «juez» obligaría a quitarle el de juez.
+>
+> **Cambio 2 · el singular NO es «el de mayor rango», y la lista suma clubes.**
+> Al escribirlo apareció que el caso que motiva todo esto casi nunca vive en
+> una fila: el maestro lo es de SU club y juez lo es de la FEDERACIÓN. Son dos
+> pertenencias, y mirando solo la principal el pase seguiría sin poder decir
+> «maestro y juez». Así que:
+>
+> | | De dónde sale |
+> |---|---|
+> | `roles_campeonatos` | Todos los papeles de **todas** sus pertenencias, sumados |
+> | `role_campeonatos` | **La pertenencia principal, como hasta hoy.** Dentro de ella, el de mayor rango |
+>
+> Si el singular fuera el mayor de la suma, **el administrador de una
+> federación que además es alumno de un club entraría a Campeonatos como
+> administrador** de un despliegue para otro, sin que nadie hubiera tocado
+> nada. Hay una prueba que lo fija.
+>
+> **Pruebas:** los tres archivos que nombraba el plan, ampliados — 26 pruebas
+> nuevas. La batería entera del ecosistema, en verde.
+>
+> ⚠️ **Al desplegar, el orden importa** (`OPERAR.md` §1.2 y §1.3): compilar
+> `packages/shared` antes que la API, y **migrar antes de reiniciar**. El código
+> nuevo pide `roles_campeonatos` al firmar el pase: sin la columna, **no entra
+> nadie**. Campeonatos no se toca: todavía no lee la lista.
 
 1. Migración: añadir `org_members.roles_campeonatos` (`text[]`), rellenándola
    con `ARRAY[role_campeonatos]` para las filas que lo tengan y `ARRAY[]` para
@@ -883,9 +940,41 @@ resultados se reconcilian por correo — que es el camino que puede acabar en
 
 ---
 
-## F7 · Encender en local: un archivo, y que avise
+## F7 · Encender en local: un archivo, y que avise — ✅ hecha
 
 **Dónde:** `dinamyt-combat`, raíz. **Solo Campeonatos** (`B3-RIESGOS.md` §1.4).
+
+> **Hecho.** `INICIAR.bat` + `iniciar_local.py`, `APAGAR.bat` +
+> `apagar_local.py`, y `INICIAR-LOCAL.md` §3 reescrita. Los seis puntos, más
+> uno que no estaba:
+>
+> - **`INICIAR.bat --comprobar`**: comprueba y **no arranca nada**. Es lo que
+>   se corre la víspera, junto con la bajada de F6-bis, cuando todavía queda
+>   tiempo de arreglar lo que falte. No estaba pedido y es la mitad del valor:
+>   un arrancador que solo avisa el sábado avisa tarde.
+>
+> **Lo que se midió al probarlo**, y por qué el punto 3 importaba: en este PC
+> el backend contestó a los **9 s** y el frontend a los **26 s**. El manual
+> decía «espera unos 15 segundos» — o sea que repartir la dirección a los 15
+> era repartirla once segundos antes de que existiera, y esperar por si acaso
+> era esperar de más. Ahora no se cuenta: se sondea el puerto y se dice LISTO
+> cuando lo está.
+>
+> **Tres decisiones del camino:**
+>
+> - **Se arranca con `CREATE_NEW_CONSOLE`, no con `start`.** Con `start` el
+>   proceso que se puede vigilar es la shell que lanza y muere al instante, así
+>   que el sondeo lo habría leído como «el servicio se murió» en el primer
+>   segundo. Las dos ventanas negras siguen ahí a propósito (§6 del manual): si
+>   un servicio revienta, el error se queda a la vista.
+> - **Se apaga por PUERTO, no por ventana.** Cerrar la ventana mata al `cmd` y
+>   puede dejar el servidor vivo escuchando; el síntoma aparece después y
+>   disfrazado —el puerto ocupado «por nada» al volver a encender—.
+> - **El QR sale del `qrcode` que el frontend ya trae.** Ninguna dependencia
+>   nueva, y por tanto nada que instalar el día del evento — que es la única
+>   condición que cuenta: ahí no hay internet.
+>
+> `2-INICIAR.bat` se queda llamando al nuevo, como decía el plan.
 
 Nuevo `INICIAR.bat` que sustituye a `2-INICIAR.bat` y **comprueba antes de
 arrancar**, porque el sitio donde falla esto es un gimnasio a las siete de la
@@ -1012,8 +1101,8 @@ el puesto 2 no se puede terminar. Ver «F6 se reparte» aquí abajo.)*
 | **1** | **F5-bis** ✅ | La ficha del alumno se reutiliza | **Lo único ROTO.** Un maestro no podía inscribir a su alumna en el segundo campeonato del año | F3, D5 |
 | **2** | **F6-a** ✅ | El paquete lleva **`eco_sub`** | Todo lo que baje de la VPS antes de tenerlo llega sin enlace al ecosistema. Es la parte de F6 que **sí tiene columna hoy**, y la que sostiene su puesto | F6-bis, F8 |
 | **3** | **F6-bis** ✅ | La copia dice de cuándo es + el runbook | Sin esto, el sábado nadie sabe si la copia trae las inscripciones del jueves | — |
-| **4** | **F7** | Encender en local con comprobaciones | Se nota el 9 a las siete de la mañana. **No toca nada de nadie**: se puede hacer en paralelo desde el primer día | — |
-| **5** | **F1** | El pase lleva varios roles (ecosystem) | Empieza el bloque de identidad. **Todo esto, dentro antes del ensayo del ~26 de septiembre** | F2 |
+| **4** | **F7** ✅ | Encender en local con comprobaciones | Se nota el 9 a las siete de la mañana. **No toca nada de nadie**: se puede hacer en paralelo desde el primer día | — |
+| **5** | **F1** ✅ | El pase lleva varios roles (ecosystem) | Empieza el bloque de identidad. **Todo esto, dentro antes del ensayo del ~26 de septiembre** | F2 |
 | **6** | **F2** + **F6-b** | Campeonatos entiende varios roles — **y el paquete lleva `roles`** | De cara al usuario **no cambia nada**: es el andamio de F3. La columna nace aquí, así que el paquete la lleva aquí | F3 |
 | **7** | **F3** + **F6-c** | El panel del alumno + el atleta independiente — **y el paquete lleva la identidad del competidor** | Lo que multiplica por cien quién entra. Necesita ficha estable (1) y roles (6) | — |
 | **8** | **F4** + **F6-d** | La organización llega a Campeonatos — **y el paquete lleva `org_id`** | El admin único por organización. `org_id` no existe hoy en ninguna tabla (§1.3): nace aquí | F5 |
@@ -1050,11 +1139,12 @@ paquete se exporta sin lo que ya se podía meter.
 ### Los tres carriles, para no trabajar en serie lo que no lo es
 
 ```
+                          [ok]      [ok]       [ok]
 CARRIL A (el evento)     1·F5-bis ──► 2·F6-a ──► 3·F6-bis
-                             ✅          ✅           ✅
                                                       │
-CARRIL B (independiente)          4·F7 ───────────────┤  ← desde el primer día
-                                                      │
+                                  [ok]                │
+CARRIL B (independiente)          4·F7 ───────────────┤
+                         [ok]                         │
 CARRIL C (identidad)     5·F1 ─► 6·F2 ─► 7·F3         │
                                   +F6-b  +F6-c        │
                                     └─► 8·F4 ─► 9·F5  │
