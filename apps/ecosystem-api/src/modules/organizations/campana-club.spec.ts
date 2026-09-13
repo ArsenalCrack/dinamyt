@@ -29,6 +29,11 @@
  */
 
 jest.mock('../../db', () => ({ db: {} }));
+// El envío al celular, de mentira: lo que se prueba aquí es QUÉ se manda, no
+// que web-push sepa mandarlo.
+jest.mock('../../common/push', () => ({
+  enviarPushA: jest.fn().mockResolvedValue(0),
+}));
 
 import { OrgNotificationsService } from './org-notifications.service';
 import {
@@ -298,6 +303,54 @@ describe('La campana del club · la frase del aviso al celular', () => {
     expect(textoDelAviso('lo_que_venga', { quien: 'Ana' }).body).toBe(
       'Hay una novedad en tu club.',
     );
+  });
+
+  /**
+   * ── Y los datos tienen que LLEGAR hasta la frase ──────────────────────────
+   *
+   * `textoDelAviso` sabía escribir «vence en 5 días» desde el principio; lo que
+   * no llegaba eran los datos. De `empujar` salía solo el nombre de quien lo
+   * provocó, así que `dias` caía en su valor por defecto —cero— y al maestro le
+   * llegaba **«Tu plan vence hoy» todos los días**, faltara una semana o
+   * faltara uno. Ésa es la clase de aviso que se aprende a barrer sin leer, y
+   * de paso enseña a barrer los que sí cambian.
+   */
+  it('el aviso del plan lleva los días que faltan, no siempre «hoy»', async () => {
+    const { servicio } = armar([{ userId: MAESTRO }]);
+    const { enviarPushA } = jest.requireMock('../../common/push') as {
+      enviarPushA: jest.Mock;
+    };
+    enviarPushA.mockClear();
+
+    await servicio.avisar({
+      orgId: CLUB,
+      kind: 'plan_por_vencer',
+      entityId: SOLICITUD,
+      data: { dias: 5, importe: '80000' },
+    });
+
+    expect(enviarPushA).toHaveBeenCalledTimes(1);
+    const [, aviso] = enviarPushA.mock.calls[0] as [string[], { body: string }];
+    expect(aviso.body).toBe('Tu plan vence en 5 días · 80000.');
+  });
+
+  it('y el día que vence de verdad sí dice «hoy»', async () => {
+    const { servicio } = armar([{ userId: MAESTRO }]);
+    const { enviarPushA } = jest.requireMock('../../common/push') as {
+      enviarPushA: jest.Mock;
+    };
+    enviarPushA.mockClear();
+
+    // El cero es un dato, no un hueco: `?? null` y no `|| null`.
+    await servicio.avisar({
+      orgId: CLUB,
+      kind: 'plan_por_vencer',
+      entityId: SOLICITUD,
+      data: { dias: 0 },
+    });
+
+    const [, aviso] = enviarPushA.mock.calls[0] as [string[], { body: string }];
+    expect(aviso.body).toBe('Tu plan vence hoy.');
   });
 });
 

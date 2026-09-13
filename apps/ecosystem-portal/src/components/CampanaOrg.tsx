@@ -86,6 +86,42 @@ function frase(a: AvisoOrg): { titulo: string; detalle: string; color?: string }
       };
     case 'miembro_baja':
       return { titulo: 'Salió del club', detalle: quien, color: 'var(--danger)' };
+
+    /**
+     * ── Los del plan: el sujeto es el CLUB, no una persona ─────────────────
+     *
+     * Estos tres se añadieron en la API (`common/avisos-org.ts`) y aquí no los
+     * esperaba nadie, así que caían en el `default` y salían como «Novedad en
+     * tu club · Alguien» — sin decir qué pasa ni cuánto falta, que es justo lo
+     * que el aviso venía a decir. Es el error contra el que avisa el comentario
+     * de `destinoDelAviso`: se añade un tipo allá, nadie toca el componente.
+     *
+     * Y por eso ninguno de los tres usa `quien`: no hablan de nadie. Lo que va
+     * en el detalle es el dato que decide si hay que hacer algo hoy.
+     */
+    case 'plan_por_vencer': {
+      const d = a.data?.dias;
+      const cuando =
+        d == null ? 'pronto' : d <= 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`;
+      return {
+        titulo: `Tu plan vence ${cuando}`,
+        detalle: a.data?.importe ? `Pendiente: ${a.data.importe}` : 'Renuévalo para no perder el acceso.',
+        color: 'var(--gold)',
+      };
+    }
+    case 'plan_vencido':
+      return {
+        titulo: 'Tu plan venció',
+        detalle: 'Renuévalo para no perder el acceso a las aplicaciones.',
+        color: 'var(--danger)',
+      };
+    case 'plan_pagado':
+      return {
+        titulo: 'Recibimos tu pago',
+        detalle: a.data?.importe ? `${a.data.importe} · gracias.` : 'Gracias.',
+        color: 'var(--ok)',
+      };
+
     default:
       return { titulo: 'Novedad en tu club', detalle: quien };
   }

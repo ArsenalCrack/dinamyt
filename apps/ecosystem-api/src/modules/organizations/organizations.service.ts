@@ -937,12 +937,25 @@ export class OrganizationsService {
     // Y que lo sepan los DEMÁS gestores. Quien la hizo no necesita que se lo
     // cuenten; los otros dos administradores del club, sí — es gente que se va
     // de su club y hasta ahora se enteraban por no encontrarla en la lista.
+    //
+    // Con el NOMBRE, que es lo que faltaba. Sin él, la frase del celular se
+    // queda en «Alguien salió de tu club» —`textoDelAviso` no tiene de dónde
+    // sacarlo— y un aviso que obliga a abrir la app para saber de quién habla
+    // no ahorró nada. En la campana se salvaba de milagro, por el `subjectName`
+    // que sale del join; el día que esa persona borre su cuenta, también ahí
+    // pone «Alguien». Copiarlo aquí es lo que hace que la frase no dependa de
+    // que siga existiendo (ver la tabla `org_notifications`).
+    const [quien] = await db
+      .select({ fullName: users.fullName })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
     await this.avisos.avisar({
       orgId,
       kind: 'miembro_baja',
       subjectUserId: userId,
       actorUserId: porUserId ?? null,
-      data: { role: result[0].role },
+      data: { fullName: quien?.fullName ?? null, role: result[0].role },
     });
     return { ok: true };
   }
@@ -1079,12 +1092,16 @@ export class OrganizationsService {
       `Readmisión: ${userId} vuelve a ${orgId} como ${baja.role}; ` +
         `lo hace ${porUserId ?? '?'}.`,
     );
+    // El nombre ya está leído aquí arriba para el espejo, así que no cuesta
+    // nada — y sin él la frase del celular es «Alguien entró a tu club», que
+    // obliga a abrir la app para saber quién. Los otros cuatro sitios que
+    // escriben avisos sí lo mandaban; éste y la baja se habían quedado atrás.
     await this.avisos.avisar({
       orgId,
       kind: 'miembro_nuevo',
       subjectUserId: userId,
       actorUserId: porUserId ?? null,
-      data: { role: baja.role },
+      data: { fullName: cuenta?.fullName ?? null, role: baja.role },
     });
     return { ok: true, yaEraMiembro: false };
   }

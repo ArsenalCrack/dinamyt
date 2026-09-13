@@ -1228,6 +1228,9 @@ export interface AvisoOrg {
     role?: string | null;
     note?: string | null;
     via?: string | null;
+    /** Los avisos del plan: cuántos días faltan y cuánto se debe. */
+    dias?: number | null;
+    importe?: string | null;
   } | null;
   readAt: string | null;
   createdAt: string;

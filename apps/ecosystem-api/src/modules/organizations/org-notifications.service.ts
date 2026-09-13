@@ -129,6 +129,16 @@ export class OrgNotificationsService {
    *
    * `data.fullName` es el nombre copiado cuando pasó (ver la tabla), así que la
    * frase no depende de que la persona siga existiendo.
+   *
+   * ── Y `data` viaja ENTERO, que es lo que faltaba ──
+   *
+   * De aquí solo salía `quien`, así que los avisos del plan llegaban al celular
+   * con sus datos vacíos: `textoDelAviso` lee `dias` para escribir «vence en 5
+   * días» y, sin él, cae en su valor por defecto —cero— y **manda «Tu plan
+   * vence hoy» todos los días**, falte una semana o falte uno. Un aviso que
+   * dice lo mismo pase lo que pase es un aviso que se aprende a ignorar, y de
+   * paso enseña a ignorar los que sí cambian. Lo mismo con `importe`, que se
+   * caía del «recibimos tu pago».
    */
   private async empujar(
     entrada: {
@@ -145,11 +155,15 @@ export class OrgNotificationsService {
       .where(eq(organizations.id, entrada.orgId))
       .limit(1);
 
-    const quien =
-      typeof entrada.data?.fullName === 'string' ? entrada.data.fullName : null;
+    const datos = entrada.data ?? {};
+    const quien = typeof datos.fullName === 'string' ? datos.fullName : null;
     const { title, body } = textoDelAviso(entrada.kind, {
       quien,
       club: club?.name ?? null,
+      // Los del plan. `dias` puede ser 0 —«vence hoy» es verdad ese día—, así
+      // que se distingue el cero del «no vino»: `?? null` y no `|| null`.
+      dias: typeof datos.dias === 'number' ? datos.dias : null,
+      importe: typeof datos.importe === 'string' ? datos.importe : null,
     });
 
     await enviarPushA(destinatarios, {

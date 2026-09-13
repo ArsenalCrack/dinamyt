@@ -1349,7 +1349,20 @@ export class SubscriptionsService {
       //
       // Va fuera del `try` del correo a propósito: que no haya SMTP configurado
       // no puede dejar al maestro sin el aviso de que su plan vence.
-      void this.avisos.avisar({
+      //
+      // ── Primero se apaga el anterior, y por eso se ESPERA ──
+      //
+      // Este aviso sustituye al que hubiera de la misma suscripción, no se le
+      // suma. Sin esto la campana acumulaba: el mismo «tu plan está por vencer»
+      // una vez por semana mientras no se pagara, y cuando por fin vencía, el
+      // «venció» aparecía DEBAJO de tres «está por vencer» que ya no eran
+      // verdad. La campana solo sirve mientras lo que enseña sea de hoy.
+      //
+      // El orden importa —resolver después de escribir apagaría el nuevo—, así
+      // que las dos se esperan en vez de dispararse y olvidarse. Son unas
+      // decenas de clubes una vez al día.
+      await this.avisos.resolverPor(v.id);
+      await this.avisos.avisar({
         orgId: v.orgId,
         kind: clase === 'VENCIDA' ? 'plan_vencido' : 'plan_por_vencer',
         // El id de la suscripción: es lo que hace que el aviso se resuelva solo
