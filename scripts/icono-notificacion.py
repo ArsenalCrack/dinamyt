@@ -7,6 +7,9 @@ Genera `badge-96.png`, el icono pequeño de las notificaciones, desde el logo.
 Escribe el resultado en el `public/` del portal y en el de Membresías, que son
 las dos apps que mandan avisos push. Necesita Pillow (`pip install pillow`).
 
+Y lo INCRUSTA en el `sw.js` de las dos (la línea `var BADGE = '…';`): ver la
+nota 4 de abajo.
+
 ── Por qué existe este script y no un PNG hecho a mano ──────────────────────
 
 `badge` **no es una imagen: es una plantilla**. Android le quita todo el color
@@ -24,7 +27,7 @@ Y por eso es un script: el día que cambie el logo, el icono de las
 notificaciones se vuelve a sacar de él en un comando, en vez de quedarse
 señalando a un dibujo que ya no existe.
 
-── Las tres decisiones que no son obvias ────────────────────────────────────
+── Las cuatro decisiones que no son obvias ──────────────────────────────────
 
 1. **La rampa va alta** (120–200 sobre 255). Los grises intermedios son el
    antialias del trazo oscuro; mandarlos a transparente es justo lo que abre el
@@ -39,7 +42,19 @@ señalando a un dibujo que ya no existe.
 3. **Lleva margen** (76 de 96). Android mete este icono dentro de un círculo en
    la bandeja de notificaciones, y sin margen la pierna que sobresale se queda
    fuera del recorte.
+
+4. **Viaja incrustado en el service worker**, como `data:` URL. Con la ruta
+   `/badge-96.png`, Chrome lo descargaba en el momento de enseñar el aviso —el
+   teléfono recién despertado por el push, la red a medio levantar— y cuando esa
+   descarga fallaba, Android ponía su icono de reserva: el de la app si estaba
+   instalada, **el logo de Chrome si no**. Por eso los avisos del portal salían
+   con el logo de Chrome y los de Membresías no, con el mismo PNG. Incrustado no
+   hay descarga que pueda fallar. El PNG se sigue escribiendo porque es la
+   fuente legible y lo que se abre para mirarlo.
 """
+import base64
+import io
+import re
 import sys
 
 try:
@@ -55,6 +70,15 @@ DESTINOS = [
     # clonado al lado, se salta: el del portal se genera igual.
     '../dinamyt-membresias/apps/membresias-web/public/badge-96.png',
 ]
+
+#: Los service workers que llevan el badge INCRUSTADO. Ver la nota 4.
+SERVICE_WORKERS = [
+    'apps/ecosystem-portal/public/sw.js',
+    '../dinamyt-membresias/apps/membresias-web/public/sw.js',
+]
+
+#: La línea que se reescribe. Tiene que existir UNA vez en cada service worker.
+LINEA_BADGE = re.compile(r"var BADGE = '[^']*';")
 
 #: Por debajo del primero todo se va; por encima del segundo todo se queda.
 OSCURO, CLARO = 120, 200
@@ -125,6 +149,37 @@ def encajar(alfa: 'Image.Image', lado: int, contenido: int) -> 'Image.Image':
     return lienzo
 
 
+def incrustar(png: bytes) -> int:
+    """Escribe el badge como `data:` URL en cada service worker. Ver la nota 4.
+
+    Respeta el fin de línea que tenga cada archivo: Membresías vive en otro
+    repositorio con CRLF en disco, y reescribirlo con LF convertiría el diff en
+    el archivo entero.
+    """
+    url = 'data:image/png;base64,' + base64.b64encode(png).decode('ascii')
+    escritos = 0
+    for ruta in SERVICE_WORKERS:
+        try:
+            with open(ruta, encoding='utf-8', newline='') as f:
+                texto = f.read()
+        except FileNotFoundError:
+            print('  (falta)  %s' % ruta)
+            continue
+        apariciones = len(LINEA_BADGE.findall(texto))
+        if apariciones != 1:
+            # Sin acentos: ver la nota de la consola de Windows en `main`.
+            sys.exit("%s: esperaba UNA linea `var BADGE = '...';` y hay %d."
+                     % (ruta, apariciones))
+        # Función y no cadena: el base64 lleva `/` y `+`, y `re.sub` leería
+        # las barras de una cadena como escapes.
+        texto = LINEA_BADGE.sub(lambda _: "var BADGE = '%s';" % url, texto)
+        with open(ruta, 'w', encoding='utf-8', newline='') as f:
+            f.write(texto)
+        print('  incrustado  %s (%d bytes de PNG)' % (ruta, len(png)))
+        escritos += 1
+    return escritos
+
+
 def main() -> None:
     try:
         original = Image.open(ORIGEN)
@@ -132,11 +187,15 @@ def main() -> None:
         sys.exit('No encuentro %s. Corre esto desde la raíz del monorepo.' % ORIGEN)
 
     badge = encajar(erosionar(alfa_por_luminancia(original), EROSION), LADO, CONTENIDO)
+    buffer = io.BytesIO()
+    badge.save(buffer, format='PNG')
+    png = buffer.getvalue()
 
     escritos = 0
     for destino in DESTINOS:
         try:
-            badge.save(destino)
+            with open(destino, 'wb') as f:
+                f.write(png)
         except (FileNotFoundError, OSError):
             # Sin acentos ni símbolos: la consola de Windows escribe en cp1252 y
             # un carácter de más aquí revienta el script después de haber hecho
@@ -148,6 +207,10 @@ def main() -> None:
 
     if not escritos:
         sys.exit('No se pudo escribir en ningún destino.')
+
+    # El PNG y el incrustado salen de los MISMOS bytes: lo que se ve al abrir el
+    # archivo es exactamente lo que llega a la barra de estado.
+    incrustar(png)
 
 
 if __name__ == '__main__':
