@@ -169,3 +169,98 @@ describe('El plan de la federación llega a sus clubes', () => {
     expect(payload.app_scopes).toEqual([]);
   });
 });
+
+/**
+ * El pase lleva los papeles de Campeonatos en las DOS formas (F1).
+ *
+ * `roles_campeonatos` es lo nuevo; `role_campeonatos` es lo que Campeonatos lee
+ * HOY en producción, y tiene que salir igual que antes: si cambiara, alguien
+ * entraría a otra consola de un despliegue para otro sin que nadie lo pidiera.
+ */
+describe('El pase lleva todos los papeles en Campeonatos', () => {
+  it('maestro que además juzga, en el mismo club: las dos formas', async () => {
+    const payload = await pase([
+      [
+        {
+          orgId: CLUB,
+          role: 'maestro',
+          roleCampeonatos: 'maestro',
+          rolesCampeonatos: ['judge', 'maestro'],
+        },
+      ],
+      [{ id: CLUB, parentId: null }],
+      [{ orgId: CLUB, appsIncluded: ['campeonatos'] }],
+      [],
+    ]);
+
+    expect(payload.roles_campeonatos).toEqual(['maestro', 'judge']);
+    expect(payload.role_campeonatos).toBe('maestro');
+  });
+
+  it('suma los papeles de sus otras organizaciones', async () => {
+    const payload = await pase([
+      // Maestro de su club, y juez en otra organización.
+      [
+        { orgId: CLUB, role: 'maestro' },
+        { orgId: OTRO_CLUB, role: 'judge' },
+      ],
+      [
+        { id: CLUB, parentId: null },
+        { id: OTRO_CLUB, parentId: null },
+      ],
+      [{ orgId: CLUB, appsIncluded: ['campeonatos'] }],
+      [],
+    ]);
+
+    expect(payload.roles_campeonatos).toEqual(['maestro', 'judge']);
+  });
+
+  it('el singular NO sale de la suma: sigue saliendo del club principal', async () => {
+    // ESTA es la prueba que protege el despliegue. Alumno de su club (el
+    // principal, el que paga) y administrador en otra organización. Si el
+    // singular fuera el mayor de la suma, este alumno entraría HOY a
+    // Campeonatos como administrador, sin que nadie hubiera tocado nada.
+    const payload = await pase([
+      [
+        { orgId: CLUB, role: 'competitor' },
+        { orgId: OTRO_CLUB, role: 'admin' },
+      ],
+      [
+        { id: CLUB, parentId: null },
+        { id: OTRO_CLUB, parentId: null },
+      ],
+      [{ orgId: CLUB, appsIncluded: ['campeonatos'] }],
+      [],
+    ]);
+
+    expect(payload.org_id).toBe(CLUB);
+    expect(payload.role_campeonatos).toBe('competitor');
+    expect(payload.roles_campeonatos).toEqual(['admin', 'competitor']);
+  });
+
+  it('quien no es nada en Campeonatos: lista vacía y null', async () => {
+    const payload = await pase([
+      [{ orgId: CLUB, role: 'guardian' }],
+      [{ id: CLUB, parentId: null }],
+      [],
+      [],
+    ]);
+
+    expect(payload.roles_campeonatos).toEqual([]);
+    expect(payload.role_campeonatos).toBeNull();
+  });
+
+  it('una fila anterior a F1 da el mismo singular que antes', async () => {
+    // Solo `role_campeonatos` puesto y la lista sin columna todavía: lo que
+    // devuelve la base si el código nuevo llega antes que la migración.
+    const payload = await pase([
+      [{ orgId: CLUB, role: 'competitor', roleCampeonatos: 'judge' }],
+      [{ id: CLUB, parentId: null }],
+      [],
+      [],
+    ]);
+
+    expect(payload.role_campeonatos).toBe('judge');
+    expect(payload.roles_campeonatos).toEqual(['judge']);
+  });
+});

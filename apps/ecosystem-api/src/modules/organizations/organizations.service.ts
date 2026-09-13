@@ -42,7 +42,13 @@ import {
   espejarRol,
 } from '../../common/espejo-membresias';
 import { OrgNotificationsService } from './org-notifications.service';
-import { rolParaApp } from '../../common/roles-por-app';
+import {
+  ROLES_CAMPEONATOS,
+  ordenarPorRango,
+  propiosDeCampeonatos,
+  rolParaApp,
+  rolesParaApp,
+} from '../../common/roles-por-app';
 import { ROLES_GESTOR, esRolGestor } from '../../common/roles';
 import { patronBusqueda } from '../../common/busqueda';
 import { normalizarCorreo } from '../../common/validacion';
@@ -102,6 +108,21 @@ const NOMBRE_DE_ROL: Record<string, string> = {
   guardian: 'Acudiente',
   member: 'Miembro',
 };
+
+/**
+ * Los papeles de Campeonatos que ESA organización puede dar.
+ *
+ * No es una regla nueva: es `ROLES_POR_TIPO` —la que ya decide qué rol general
+ * da cada una— recortada al catálogo de Campeonatos. Un club da maestros,
+ * coaches y alumnos; la federación, administradores y jueces. Así las casillas
+ * no pueden repartir nada que el desplegable de al lado no pudiera ya.
+ */
+function papelesCampeonatosQueDa(tipo: string): string[] {
+  const generales = ROLES_POR_TIPO[tipo] ?? [];
+  return (ROLES_CAMPEONATOS as readonly string[]).filter((r) =>
+    generales.includes(r),
+  );
+}
 
 @Injectable()
 export class OrganizationsService {
@@ -665,6 +686,7 @@ export class OrganizationsService {
           role,
           roleMembresias: null,
           roleCampeonatos: null,
+          rolesCampeonatos: [],
           roleAcademy: null,
         })
         .where(eq(orgMembers.id, previa.id))
@@ -830,10 +852,13 @@ export class OrganizationsService {
       // alguien en todas las apps desde aquí. Si hace falta devolverle el
       // suyo, se hace con `POST /organizations/:id/invite`, que sí los escribe
       // uno por uno.
+      // La lista de Campeonatos es la misma excepción en plural, y se borra por
+      // lo mismo: si se quedara, el rol nuevo no llegaría a Campeonatos.
       .set({
         role,
         roleMembresias: null,
         roleCampeonatos: null,
+        rolesCampeonatos: [],
         roleAcademy: null,
       })
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
@@ -866,6 +891,141 @@ export class OrganizationsService {
       cuenta?.email,
     );
     return result[0];
+  }
+
+  // ── Los papeles de alguien en Campeonatos (F1 de PLAN-CAMPEONATOS) ───────
+  /**
+   * Fija TODOS los papeles de una persona en Campeonatos dentro de este club.
+   *
+   * Es lo que hace que F1 sirva para algo: sin una forma de escribir la lista,
+   * la columna solo tendría lo que puso la migración, que es un papel por
+   * persona — lo mismo que ya había.
+   *
+   * ── Tres reglas ──
+   *
+   * **Se da lo que esta organización ya daba** (`papelesCampeonatosQueDa`): un
+   * club no hace jueces ni administradores, igual que no puede ponerlos como
+   * rol general.
+   *
+   * **Pero no se le quita a nadie lo que ya tenía por no poder darlo.** Si el
+   * alumno llegó con `judge` de la reconciliación, su club puede dejárselo
+   * marcado al guardar; lo que no puede es dárselo a otro. Si no, marcarle
+   * «maestro» a ese alumno obligaría a quitarle el de juez.
+   *
+   * **Repetir lo que ya da su rol general no deja excepción** (la regla de la
+   * 0020): se guarda vacío, y la persona queda como todas las demás. Sin
+   * marcar nada, lo mismo — vuelve a valer su rol general.
+   *
+   * ── Lo que NO hace ──
+   *
+   * No toca el rol general ni los de las otras apps, y no avisa a Membresías:
+   * ahí no cambia nada. Tampoco empuja el cambio a Campeonatos — llega con el
+   * pase la próxima vez que la persona entre, y allí decide F2 qué se suma.
+   */
+  async fijarRolesCampeonatos(
+    orgId: string,
+    userId: string,
+    roles: unknown,
+    porUserId?: string,
+  ) {
+    if (!Array.isArray(roles)) {
+      throw new BadRequestException('Falta la lista de papeles en Campeonatos.');
+    }
+    // Mismo criterio que la fila del portal: quien administra no se toca a sí
+    // mismo. Aquí además protege de quedarse fuera de la consola por un clic.
+    if (porUserId && porUserId === userId) {
+      throw new ForbiddenException(
+        'Tus propios papeles en Campeonatos no los cambias tú: pídeselo a otra persona que administre la organización.',
+      );
+    }
+    const pedidos = [
+      ...new Set(roles.map((r) => String(r ?? '').trim()).filter(Boolean)),
+    ];
+    const desconocido = pedidos.find(
+      (r) => !(ROLES_CAMPEONATOS as readonly string[]).includes(r),
+    );
+    if (desconocido) {
+      throw new BadRequestException(
+        `«${desconocido}» no es un papel de Campeonatos.`,
+      );
+    }
+
+    const [org] = await db
+      .select({ type: organizations.type })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    if (!org) throw new NotFoundException('No se encontró la organización.');
+
+    const [fila] = await db
+      .select({
+        role: orgMembers.role,
+        roleCampeonatos: orgMembers.roleCampeonatos,
+        rolesCampeonatos: orgMembers.rolesCampeonatos,
+      })
+      .from(orgMembers)
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+      .limit(1);
+    if (!fila) {
+      throw new NotFoundException(
+        'Ese usuario no es miembro de la organización.',
+      );
+    }
+
+    const tenia = rolesParaApp(
+      'campeonatos',
+      propiosDeCampeonatos(fila),
+      fila.role,
+    );
+    const queDa = papelesCampeonatosQueDa(org.type);
+    const nuevoQueNoDa = pedidos.find(
+      (r) => !queDa.includes(r) && !tenia.includes(r),
+    );
+    if (nuevoQueNoDa) {
+      const esOrg = org.type === 'FEDERATION' || org.type === 'LEAGUE';
+      throw new BadRequestException(
+        esOrg
+          ? 'En Campeonatos, una organización da administradores y jueces. Los maestros, coaches y alumnos los da cada club.'
+          : 'En Campeonatos, un club da maestros, coaches y alumnos. Los jueces y administradores los da la organización.',
+      );
+    }
+
+    const lista = ordenarPorRango('campeonatos', pedidos);
+    const traduccion = rolesParaApp('campeonatos', [], fila.role);
+    const sinExcepcion =
+      lista.length === 0 ||
+      (lista.length === traduccion.length &&
+        lista.every((r, i) => r === traduccion[i]));
+
+    const [actualizada] = await db
+      .update(orgMembers)
+      .set({
+        rolesCampeonatos: sinExcepcion ? [] : lista,
+        // El singular guarda el de mayor rango: es lo que sigue leyendo el
+        // pase viejo, y lo que ve Campeonatos hasta que sepa leer la lista.
+        roleCampeonatos: sinExcepcion ? null : lista[0],
+      })
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+      .returning();
+    if (!actualizada) {
+      throw new NotFoundException(
+        'Ese usuario no es miembro de la organización.',
+      );
+    }
+    this.log.log(
+      `Campeonatos: ${userId} en ${orgId} pasa de [${tenia.join(', ')}] a ` +
+        // Lo que QUEDA, no lo que se pidió: repetir la traducción no deja
+        // excepción, y el registro no puede decir que se guardó una.
+        `[${sinExcepcion ? 'su rol general' : lista.join(', ')}] (lo hace ${porUserId ?? '?'}).`,
+    );
+    return {
+      ...actualizada,
+      papelesCampeonatos: rolesParaApp(
+        'campeonatos',
+        propiosDeCampeonatos(actualizada),
+        actualizada.role,
+      ),
+    };
   }
 
   // ── Quitar un miembro de la organización ──────────────────────────────────
@@ -906,6 +1066,7 @@ export class OrganizationsService {
         role: result[0].role,
         roleMembresias: result[0].roleMembresias,
         roleCampeonatos: result[0].roleCampeonatos,
+        rolesCampeonatos: result[0].rolesCampeonatos,
         roleAcademy: result[0].roleAcademy,
         membresiasActivo: result[0].membresiasActivo,
         joinedAt: result[0].joinedAt,
@@ -918,6 +1079,7 @@ export class OrganizationsService {
           role: result[0].role,
           roleMembresias: result[0].roleMembresias,
           roleCampeonatos: result[0].roleCampeonatos,
+          rolesCampeonatos: result[0].rolesCampeonatos,
           roleAcademy: result[0].roleAcademy,
           membresiasActivo: result[0].membresiasActivo,
           joinedAt: result[0].joinedAt,
@@ -980,6 +1142,7 @@ export class OrganizationsService {
         role: orgMemberBajas.role,
         roleMembresias: orgMemberBajas.roleMembresias,
         roleCampeonatos: orgMemberBajas.roleCampeonatos,
+        rolesCampeonatos: orgMemberBajas.rolesCampeonatos,
         roleAcademy: orgMemberBajas.roleAcademy,
         joinedAt: orgMemberBajas.joinedAt,
         removedAt: orgMemberBajas.removedAt,
@@ -1068,6 +1231,7 @@ export class OrganizationsService {
       role: baja.role,
       roleMembresias: baja.roleMembresias,
       roleCampeonatos: baja.roleCampeonatos,
+      rolesCampeonatos: baja.rolesCampeonatos,
       roleAcademy: baja.roleAcademy,
       membresiasActivo: baja.membresiasActivo,
       joinedAt: baja.joinedAt ?? new Date(),
@@ -1727,6 +1891,7 @@ export class OrganizationsService {
         role: orgMembers.role,
         roleMembresias: orgMembers.roleMembresias,
         roleCampeonatos: orgMembers.roleCampeonatos,
+        rolesCampeonatos: orgMembers.rolesCampeonatos,
         roleAcademy: orgMembers.roleAcademy,
         /**
          * Si Membresías le cortó el acceso. `null` = no consta.
@@ -1753,7 +1918,24 @@ export class OrganizationsService {
       .limit(limit)
       .offset(offset);
 
-    return { items, total, limit, offset, sinAcceso: sinAcceso?.n ?? 0 };
+    return {
+      // Lo que ES cada persona en Campeonatos, ya resuelto: la excepción si la
+      // hay, o la traducción de su rol general. La pantalla marca las casillas
+      // con esto, y calcularlo allí sería copiar la tabla de traducción en el
+      // navegador — que es como se separan dos reglas que dicen lo mismo.
+      items: items.map((m) => ({
+        ...m,
+        papelesCampeonatos: rolesParaApp(
+          'campeonatos',
+          propiosDeCampeonatos(m),
+          m.role,
+        ),
+      })),
+      total,
+      limit,
+      offset,
+      sinAcceso: sinAcceso?.n ?? 0,
+    };
   }
 
   // ══════════════════════════════════════════════════════════════════════════

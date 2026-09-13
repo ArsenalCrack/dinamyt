@@ -138,6 +138,37 @@ export const ROLES_CONSOLA_CAMPEONATOS = [
   'judge',
 ] as const;
 
+/**
+ * Los papeles de Campeonatos que ESA organización puede dar (F1).
+ *
+ * Es el reparto de `rolesAsignablesEn` recortado a Campeonatos, y el servidor
+ * valida exactamente lo mismo (`papelesCampeonatosQueDa`). Aquí solo sirve para
+ * no ofrecer una casilla que luego se rechaza.
+ */
+export function papelesCampeonatosQueDa(tipo: string): readonly string[] {
+  return esParaguas(tipo)
+    ? (['admin', 'judge'] as const)
+    : (['maestro', 'coach', 'competitor'] as const);
+}
+
+/**
+ * Cómo se llama cada papel DENTRO de Campeonatos.
+ *
+ * No es `NOMBRE_ROL`: allí `competitor` es «Alumno» porque en un club el alumno
+ * y el competidor son la misma persona, pero en una casilla de Campeonatos lo
+ * que se marca es que compite.
+ */
+export const NOMBRE_PAPEL_CAMPEONATOS: Record<string, string> = {
+  admin: 'Administrador',
+  maestro: 'Maestro',
+  coach: 'Coach',
+  judge: 'Juez',
+  competitor: 'Competidor',
+};
+
+/** De más a menos: el mismo orden en que el servidor guarda la lista. */
+export const RANGO_CAMPEONATOS = ['admin', 'maestro', 'coach', 'judge', 'competitor'];
+
 /** `true` si con ese rol se opera un campeonato. */
 export const operaCampeonatos = (rol: string | null | undefined): boolean =>
   Boolean(rol && (ROLES_CONSOLA_CAMPEONATOS as readonly string[]).includes(rol));

@@ -540,6 +540,17 @@ export interface Miembro {
    */
   roleMembresias?: string | null;
   roleCampeonatos?: string | null;
+  /**
+   * La EXCEPCIÓN de Campeonatos en lista: sus papeles allí cuando no son lo que
+   * dice su rol general. Vacía casi siempre. Ver `papelesCampeonatos`.
+   */
+  rolesCampeonatos?: string[];
+  /**
+   * Lo que ES en Campeonatos, ya resuelto por el servidor: la excepción si la
+   * hay, o la traducción de su rol general. Es lo que marcan las casillas.
+   * Opcional solo porque un servidor anterior a F1 no lo manda.
+   */
+  papelesCampeonatos?: string[];
   roleAcademy?: string | null;
   /**
    * Si Membresías le cortó el acceso a esta persona. `null`/`undefined` = no
@@ -693,6 +704,17 @@ export const cambiarRolMiembroAPI = async (
   userId: string,
   role: string,
 ) => (await api.patch(`/organizations/${orgId}/members/${userId}`, { role })).data;
+/**
+ * TODOS los papeles de alguien en Campeonatos dentro de ese club. Vacía = que
+ * vuelva a valer su rol general. El servidor aplica el mismo reparto que al
+ * elegir el rol: un club no da jueces, una federación no da maestros.
+ */
+export const fijarRolesCampeonatosAPI = async (
+  orgId: string,
+  userId: string,
+  roles: string[],
+) =>
+  (await api.patch(`/organizations/${orgId}/members/${userId}/campeonatos`, { roles })).data;
 export const quitarMiembroAPI = async (orgId: string, userId: string) =>
   (await api.delete(`/organizations/${orgId}/members/${userId}`)).data;
 

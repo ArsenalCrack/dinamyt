@@ -12,6 +12,7 @@ import {
   eliminarOrgAPI,
   listMiembrosAPI,
   cambiarRolMiembroAPI,
+  fijarRolesCampeonatosAPI,
   quitarMiembroAPI,
   bajasOrgAPI,
   readmitirMiembroAPI,
@@ -33,7 +34,14 @@ import {
 import { soloTelefono, comprimirAvatar, PROPS_CORREO,
   LIM,
 } from '@/lib/validacion';
-import { ROLES_CLUB, ROLES_ORG, mandaEnLaOrg, nombreRol } from '@/lib/roles';
+import {
+  NOMBRE_PAPEL_CAMPEONATOS,
+  ROLES_CLUB,
+  ROLES_ORG,
+  mandaEnLaOrg,
+  nombreRol,
+  papelesCampeonatosQueDa,
+} from '@/lib/roles';
 import { Avatar } from '@/components/Avatar';
 import { useConfirmar, type PeticionConfirmar } from '@/components/Confirmar';
 import { Aviso, type Mensaje } from '@/components/Aviso';
@@ -794,6 +802,37 @@ export default function MiOrganizacionPage() {
               asignables={rolesPermitidos}
               ocupado={ocupado}
               esUnoMismo={m.userId === yo}
+              campeonatos={
+                orgSel
+                  ? {
+                      disponibles: papelesCampeonatosQueDa(orgSel.type),
+                      onGuardar: (roles) =>
+                        void confirmarYHacer(
+                          {
+                            titulo: `¿Cambiar lo que ${m.fullName} es en Campeonatos?`,
+                            detalle: (
+                              <>
+                                {roles.length
+                                  ? `Pasa a ser ${roles
+                                      .map((r) => NOMBRE_PAPEL_CAMPEONATOS[r] ?? r)
+                                      .join(' + ')}. `
+                                  : 'Vuelve a valer lo que dice su rol general. '}
+                                Le llega la próxima vez que entre a Campeonatos.{' '}
+                                <strong>
+                                  Mientras Campeonatos no se actualice, allí solo
+                                  cuenta el de más rango.
+                                </strong>
+                              </>
+                            ),
+                            textoOk: 'Guardar',
+                          },
+                          () => fijarRolesCampeonatosAPI(sel!, m.userId, roles),
+                          'Papeles en Campeonatos guardados.',
+                          'No se pudieron guardar los papeles en Campeonatos.',
+                        ),
+                    }
+                  : undefined
+              }
               onCambiarRol={(rol) =>
                 void confirmarYHacer(
                   {

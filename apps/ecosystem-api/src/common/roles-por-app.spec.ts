@@ -10,7 +10,15 @@
  * Un caso por app y por rol es barato; descubrirlo otra vez en producción, no.
  */
 
-import { rolGeneralDesdeMembresias, rolParaApp } from './roles-por-app';
+import {
+  ordenarPorRango,
+  propiosDeCampeonatos,
+  rolGeneralDesdeMembresias,
+  rolParaApp,
+  rolPrincipal,
+  rolesCampeonatosDelPase,
+  rolesParaApp,
+} from './roles-por-app';
 
 describe('El rol general traducido a Membresías', () => {
   it('el maestro del dojang es el dueño de su club', () => {
@@ -138,5 +146,96 @@ describe('Entrar a un club sin excepciones por app', () => {
     expect(rolParaApp('membresias', null, 'coach')).toBe('staff');
     expect(rolParaApp('campeonatos', null, 'guardian')).toBeNull();
     expect(rolParaApp('academy', null, 'guardian')).toBeNull();
+  });
+});
+
+/**
+ * Varios papeles a la vez en Campeonatos (F1 de `PLAN-CAMPEONATOS.md`).
+ *
+ * La regla es una: los papeles se SUMAN. Lo que se prueba aquí es que sumar no
+ * cambie nada para quien tiene uno solo —que hoy es todo el mundo— y que el
+ * singular que sigue leyendo Campeonatos salga igual que antes.
+ */
+describe('Campeonatos: varios papeles a la vez', () => {
+  it('el miembro a secas es competidor, que NO abre la consola', () => {
+    // Competir es el papel que tiene todo el mundo (§2.1 del plan). Y no abre
+    // nada: `competitor` no está entre los que operan un campeonato.
+    expect(rolParaApp('campeonatos', null, 'member')).toBe('competitor');
+  });
+
+  it('la lista propia sale de mayor a menor rango', () => {
+    expect(
+      rolesParaApp('campeonatos', ['competitor', 'judge', 'maestro'], 'student'),
+    ).toEqual(['maestro', 'judge', 'competitor']);
+  });
+
+  it('sin lista propia se traduce el general, en lista de uno', () => {
+    expect(rolesParaApp('campeonatos', [], 'student')).toEqual(['competitor']);
+    expect(rolesParaApp('campeonatos', null, 'maestro')).toEqual(['maestro']);
+  });
+
+  it('quien no es nada allí lleva una lista vacía, no un papel inventado', () => {
+    expect(rolesParaApp('campeonatos', [], 'owner')).toEqual([]);
+    expect(rolesParaApp('campeonatos', null, 'guardian')).toEqual([]);
+  });
+
+  it('lo repetido cuenta una vez', () => {
+    expect(ordenarPorRango('campeonatos', ['judge', 'judge', '', null])).toEqual([
+      'judge',
+    ]);
+  });
+
+  it('lo que no se conoce va al final: no se tira en silencio', () => {
+    expect(ordenarPorRango('campeonatos', ['sensei', 'judge'])).toEqual([
+      'judge',
+      'sensei',
+    ]);
+  });
+
+  it('el principal es el de mayor rango, o nadie', () => {
+    expect(rolPrincipal('campeonatos', ['judge', 'maestro'])).toBe('maestro');
+    // `coach` va por encima de `judge`: en Campeonatos se traduce a maestro.
+    expect(rolPrincipal('campeonatos', ['judge', 'coach'])).toBe('coach');
+    expect(rolPrincipal('campeonatos', [])).toBeNull();
+  });
+
+  it('una fila escrita antes de F1 —solo el singular— sigue contando', () => {
+    // Es lo que escriben las puertas de un solo papel: invitar, aceptar una
+    // solicitud, readmitir una baja vieja. Sin esto, perderían su papel.
+    expect(
+      propiosDeCampeonatos({ roleCampeonatos: 'judge', rolesCampeonatos: [] }),
+    ).toEqual(['judge']);
+    expect(
+      propiosDeCampeonatos({ roleCampeonatos: 'judge', rolesCampeonatos: null }),
+    ).toEqual(['judge']);
+  });
+
+  it('pero la lista manda sobre el singular', () => {
+    expect(
+      propiosDeCampeonatos({
+        roleCampeonatos: 'maestro',
+        rolesCampeonatos: ['maestro', 'judge'],
+      }),
+    ).toEqual(['maestro', 'judge']);
+  });
+
+  it('el pase suma los papeles de TODOS sus clubes', () => {
+    // El caso real: maestro de su club, juez de la federación. Dos filas.
+    expect(
+      rolesCampeonatosDelPase([{ role: 'maestro' }, { role: 'judge' }]),
+    ).toEqual(['maestro', 'judge']);
+  });
+
+  it('quien no es nada en ningún club no lleva nada', () => {
+    expect(
+      rolesCampeonatosDelPase([{ role: 'owner' }, { role: 'guardian' }]),
+    ).toEqual([]);
+    expect(rolesCampeonatosDelPase([])).toEqual([]);
+  });
+
+  it('un papel que aparece en dos clubes cuenta una vez', () => {
+    expect(
+      rolesCampeonatosDelPase([{ role: 'student' }, { role: 'competitor' }]),
+    ).toEqual(['competitor']);
   });
 });

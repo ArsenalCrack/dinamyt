@@ -21,8 +21,24 @@ export interface JwtPayload {
   app_scopes: string[];
   /** Rol del usuario en Academy (catálogo aún abierto). */
   role_academy: string | null;
-  /** Rol del usuario en Campeonatos. Ver `CampeonatosRole` para los valores previstos. */
+  /**
+   * Rol del usuario en Campeonatos. Ver `CampeonatosRole` para los valores previstos.
+   *
+   * UNO: el de la pertenencia principal. Se mantiene porque Campeonatos lo lee;
+   * lo nuevo es `roles_campeonatos`, y este se retira cuando nadie lo lea (F9).
+   */
   role_campeonatos: string | null;
+  /**
+   * TODOS los papeles del usuario en Campeonatos, sumando sus clubes, de mayor
+   * a menor rango. `[]` si no es nada allí.
+   *
+   * Existe porque una persona es a la vez maestro de su club y juez en la
+   * federación, y con un solo claim había que elegir cuál mentir.
+   *
+   * Opcional en el tipo, y solo por los pases firmados antes de que existiera:
+   * quien lo lea tiene que caer a `role_campeonatos` si no viene.
+   */
+  roles_campeonatos?: string[];
   /** Rol del usuario en Membresías. Ver `MembresiasRole` para los valores previstos. */
   role_membresias: string | null;
   is_super_admin: boolean;

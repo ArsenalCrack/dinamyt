@@ -20,7 +20,13 @@ import {
 import { eq, and, gt, inArray, InferSelectModel } from 'drizzle-orm';
 import { cadenasDeMando } from '../../common/jerarquia';
 import { padresDe } from '../../common/apps-de-la-org';
-import { rolParaApp } from '../../common/roles-por-app';
+import {
+  propiosDeCampeonatos,
+  rolParaApp,
+  rolPrincipal,
+  rolesCampeonatosDelPase,
+  rolesParaApp,
+} from '../../common/roles-por-app';
 import {
   validarNombreCompleto,
   validarDocumento,
@@ -852,6 +858,7 @@ export class AuthService {
         role: orgMembers.role,
         roleMembresias: orgMembers.roleMembresias,
         roleCampeonatos: orgMembers.roleCampeonatos,
+        rolesCampeonatos: orgMembers.rolesCampeonatos,
         roleAcademy: orgMembers.roleAcademy,
       })
       .from(orgMembers)
@@ -976,11 +983,25 @@ export class AuthService {
     // perdía camino de Membresías, que llama `owner` a esa misma persona.
     const general = principal?.role ?? null;
     const roleAcademy = rolParaApp('academy', principal?.roleAcademy, general);
-    const roleCampeonatos = rolParaApp(
-      'campeonatos',
-      principal?.roleCampeonatos,
-      general,
-    );
+    // ── Campeonatos, en las DOS formas (F1 de PLAN-CAMPEONATOS) ──
+    //
+    // `roles_campeonatos` es la lista: todos sus papeles en todos sus clubes
+    // (ver `rolesCampeonatosDelPase`). `role_campeonatos` es el singular de
+    // siempre, de la pertenencia PRINCIPAL, y va a la vez porque Campeonatos
+    // en producción lo lee hoy: si el pase dejara de traerlo antes de que allí
+    // sepan leer la lista, nadie entraría entre un despliegue y el otro.
+    //
+    // El singular da exactamente lo mismo que antes: con una sola excepción o
+    // ninguna, la lista de la principal tiene un papel —el de antes— y ese es
+    // su mayor. Solo cambia para quien tenga varios en la misma fila, que hoy
+    // no existe, y entonces es el de mayor rango.
+    const roleCampeonatos = principal
+      ? rolPrincipal(
+          'campeonatos',
+          rolesParaApp('campeonatos', propiosDeCampeonatos(principal), general),
+        )
+      : null;
+    const rolesCampeonatos = rolesCampeonatosDelPase(pertenencias);
     const roleMembresias = rolParaApp(
       'membresias',
       principal?.roleMembresias,
@@ -996,6 +1017,7 @@ export class AuthService {
       app_scopes: uniqueScopes,
       role_academy: roleAcademy,
       role_campeonatos: roleCampeonatos,
+      roles_campeonatos: rolesCampeonatos,
       role_membresias: roleMembresias,
       is_super_admin: user.isSuperAdmin ?? false,
       // Viaja en el token para que las apps federadas puedan pintar horas sin

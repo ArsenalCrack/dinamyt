@@ -1,9 +1,15 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Avatar } from '@/components/Avatar';
 import { SelectMenu } from '@/components/SelectMenu';
-import { NOMBRE_ROL, nombreRol, opcionesDeRol } from '@/lib/roles';
+import {
+  NOMBRE_PAPEL_CAMPEONATOS,
+  NOMBRE_ROL,
+  RANGO_CAMPEONATOS,
+  nombreRol,
+  opcionesDeRol,
+} from '@/lib/roles';
 import type { Miembro } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 
@@ -88,6 +94,134 @@ function InsigniaApp({
   );
 }
 
+/** Ordena como el servidor, para comparar la lista marcada con la guardada. */
+const porRango = (roles: readonly string[]) =>
+  [...new Set(roles)].sort(
+    (a, b) =>
+      (RANGO_CAMPEONATOS.indexOf(a) + 1 || 99) -
+      (RANGO_CAMPEONATOS.indexOf(b) + 1 || 99),
+  );
+
+/**
+ * Los papeles de una persona en Campeonatos, en casillas (F1 del plan de
+ * Campeonatos).
+ *
+ * ── Por qué casillas y no otro desplegable ──
+ *
+ * Porque una persona es maestro de su club Y juez en la federación, y un
+ * desplegable obliga a elegir cuál de las dos mentir. Campeonatos ya se rompió
+ * una vez por eso: `puede_juzgar` es el parche booleano que tuvo que inventarse.
+ *
+ * ── Por qué va plegado ──
+ *
+ * Porque casi nadie lo necesita: a casi todo el mundo le basta su rol general,
+ * traducido. Abierto por defecto serían cinco casillas por fila en una lista de
+ * doscientas personas, para cambiarle algo a tres.
+ */
+function PapelesCampeonatos({
+  miembro,
+  disponibles,
+  onGuardar,
+  bloqueado,
+}: {
+  miembro: Miembro;
+  disponibles: readonly string[];
+  onGuardar: (roles: string[]) => void;
+  bloqueado: boolean;
+}) {
+  const actuales = porRango(miembro.papelesCampeonatos ?? []);
+  const [abierto, setAbierto] = useState(false);
+  const [marcados, setMarcados] = useState<string[]>(actuales);
+
+  // Lo que se ofrece: lo que esta organización da, MÁS lo que la persona ya
+  // tiene aunque aquí no se pueda dar. Si no, quien llegó con «Juez» de la
+  // reconciliación no vería su casilla, y guardar le quitaría el papel sin que
+  // nadie lo hubiera pedido. El servidor deja conservarlo, no darlo.
+  const opciones = porRango([...disponibles, ...actuales]);
+  const cambiado = porRango(marcados).join('|') !== actuales.join('|');
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        className="text-xs underline"
+        style={{ color: 'var(--text-muted)' }}
+        onClick={() => {
+          setMarcados(actuales);
+          setAbierto(true);
+        }}
+        title="Qué es esta persona dentro de Campeonatos"
+      >
+        Campeonatos:{' '}
+        {actuales.length
+          ? actuales.map((r) => NOMBRE_PAPEL_CAMPEONATOS[r] ?? r).join(' + ')
+          : 'nada'}
+      </button>
+    );
+  }
+
+  return (
+    <fieldset
+      className="mt-2 rounded-md border px-3 py-2"
+      style={{ borderColor: 'var(--border)' }}
+      disabled={bloqueado}
+    >
+      <legend className="px-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+        Papeles en Campeonatos
+      </legend>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {opciones.map((r) => (
+          <label key={r} className="flex items-center gap-1.5 text-sm">
+            <input
+              type="checkbox"
+              checked={marcados.includes(r)}
+              onChange={(e) =>
+                setMarcados((prev) =>
+                  e.target.checked ? [...prev, r] : prev.filter((x) => x !== r),
+                )
+              }
+            />
+            {NOMBRE_PAPEL_CAMPEONATOS[r] ?? r}
+            {!disponibles.includes(r) && (
+              <span
+                className="text-xs"
+                style={{ color: 'var(--text-muted)' }}
+                title="Ya lo tenía. Aquí se le puede quitar, pero no dárselo a otra persona."
+              >
+                (ya lo tenía)
+              </span>
+            )}
+          </label>
+        ))}
+      </div>
+      <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+        Se suman: puede ser maestro y competir a la vez. Sin marcar nada, vale lo
+        que dice su rol general.
+      </p>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          className="btn btn-gold btn-sm"
+          disabled={bloqueado || !cambiado}
+          onClick={() => {
+            onGuardar(porRango(marcados));
+            setAbierto(false);
+          }}
+        >
+          Guardar
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={() => setAbierto(false)}
+        >
+          Cancelar
+        </button>
+      </div>
+    </fieldset>
+  );
+}
+
 export function FilaMiembro({
   miembro,
   asignables,
@@ -95,6 +229,7 @@ export function FilaMiembro({
   ocupado,
   acciones,
   esUnoMismo = false,
+  campeonatos,
 }: {
   miembro: Miembro;
   /** Roles que ESTA pantalla puede asignar. El actual se añade solo. */
@@ -105,12 +240,27 @@ export function FilaMiembro({
   acciones?: ReactNode;
   /** ¿Esta fila es la de quien está mirando la pantalla? */
   esUnoMismo?: boolean;
+  /**
+   * Las casillas de Campeonatos. Solo las pantallas que saben en qué
+   * organización están las pasan: el reparto depende de si es un club o una
+   * federación.
+   */
+  campeonatos?: {
+    disponibles: readonly string[];
+    onGuardar: (roles: string[]) => void;
+  };
 }) {
   const { t } = useI18n();
   const m = miembro;
+  // La excepción de Campeonatos puede ser una lista (F1): «Maestro + Juez».
+  const excepcionCampeonatos = m.rolesCampeonatos?.length
+    ? m.rolesCampeonatos
+        .map((r) => NOMBRE_PAPEL_CAMPEONATOS[r] ?? r)
+        .join(' + ')
+    : m.roleCampeonatos;
   const tieneApps = Boolean(
     m.roleMembresias ||
-      m.roleCampeonatos ||
+      excepcionCampeonatos ||
       m.roleAcademy ||
       m.membresiasActivo === false,
   );
@@ -159,9 +309,23 @@ export function FilaMiembro({
                 rol={m.roleMembresias}
                 sinAcceso={m.membresiasActivo === false}
               />
-              <InsigniaApp app="Campeonatos" rol={m.roleCampeonatos} />
+              <InsigniaApp app="Campeonatos" rol={excepcionCampeonatos} />
               <InsigniaApp app="Academy" rol={m.roleAcademy} />
             </p>
+          )}
+          {campeonatos && m.papelesCampeonatos && (
+            <div className="mt-1">
+              <PapelesCampeonatos
+                // La clave cambia con lo guardado: al volver la lista
+                // recargada, las casillas arrancan de lo que hay ahora y no de
+                // lo que se marcó antes de guardar.
+                key={(m.papelesCampeonatos ?? []).join('|')}
+                miembro={m}
+                disponibles={campeonatos.disponibles}
+                onGuardar={campeonatos.onGuardar}
+                bloqueado={bloqueado}
+              />
+            </div>
           )}
         </div>
       </div>

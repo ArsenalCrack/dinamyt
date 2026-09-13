@@ -545,6 +545,26 @@ export class OrganizationsController {
     );
   }
 
+  // ── PATCH /organizations/:id/members/:userId/campeonatos — sus papeles ────
+  // Body: { roles: string[] }. TODOS sus papeles en Campeonatos dentro de este
+  // club; vacía = vuelve a valer su rol general. Ver `fijarRolesCampeonatos`.
+  @Patch(':id/members/:userId/campeonatos')
+  @UseGuards(EcosystemJwtGuard)
+  async fijarRolesCampeonatos(
+    @Param('id') orgId: string,
+    @Param('userId') userId: string,
+    @Body() body: { roles?: unknown },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    await this.orgsService.exigirGestorDe(user.sub, orgId, user.is_super_admin);
+    return this.orgsService.fijarRolesCampeonatos(
+      orgId,
+      userId,
+      body?.roles,
+      user.sub,
+    );
+  }
+
   // ── DELETE /organizations/:id/members/:userId — quitar miembro ────────────
   @Delete(':id/members/:userId')
   @UseGuards(EcosystemJwtGuard)

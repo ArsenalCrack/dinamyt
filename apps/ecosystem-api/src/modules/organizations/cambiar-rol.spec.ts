@@ -111,6 +111,9 @@ describe('Cambiar el rol general', () => {
       role: 'maestro',
       roleMembresias: null,
       roleCampeonatos: null,
+      // La lista de Campeonatos (F1) es la misma excepción en plural: si no se
+      // vaciara, el rol nuevo no llegaría a Campeonatos.
+      rolesCampeonatos: [],
       roleAcademy: null,
     });
   });
@@ -138,5 +141,135 @@ describe('Cambiar el rol general', () => {
     // El juez es de la federación y no es nada dentro de un club. `espejarRol`
     // recibe `null` y no manda nada: mejor callarse que degradar al azar.
     expect(espejarRol).toHaveBeenCalledWith(ALUMNO, null, 'alguien@dinamyt.org');
+  });
+});
+
+/**
+ * Los papeles de alguien en Campeonatos, marcados en casillas (F1).
+ *
+ * Lo que importa probar es el reparto: las casillas no pueden dar nada que el
+ * desplegable de rol de al lado no pudiera ya dar, y a la vez no pueden
+ * obligar a quitarle a nadie lo que ya tenía.
+ */
+describe('Fijar los papeles en Campeonatos', () => {
+  const GESTOR = '22222222-2222-4222-8222-222222222222';
+  const ES_CLUB = [{ type: 'CLUB' }];
+  const ES_FEDERACION = [{ type: 'FEDERATION' }];
+  const alumno = [
+    { role: 'competitor', roleCampeonatos: null, rolesCampeonatos: [] },
+  ];
+  /** La fila que devolvería el UPDATE con esa lista puesta. */
+  const queda = (role: string, lista: string[]) => [
+    { role, roleCampeonatos: lista[0] ?? null, rolesCampeonatos: lista },
+  ];
+
+  it('un club le da a su alumno también el papel de maestro', async () => {
+    const { service, escrituras } = armar(
+      [ES_CLUB, alumno],
+      queda('competitor', ['maestro', 'competitor']),
+    );
+    const r = await service.fijarRolesCampeonatos(
+      CLUB,
+      ALUMNO,
+      ['competitor', 'maestro'],
+      GESTOR,
+    );
+
+    // La lista, ordenada; y el singular, el de mayor rango, que es lo que
+    // Campeonatos sigue leyendo hasta que sepa leer la lista.
+    expect(escrituras[0]).toEqual({
+      rolesCampeonatos: ['maestro', 'competitor'],
+      roleCampeonatos: 'maestro',
+    });
+    expect(r.papelesCampeonatos).toEqual(['maestro', 'competitor']);
+  });
+
+  it('repetir lo que ya da su rol general no deja excepción', async () => {
+    const { service, escrituras } = armar([ES_CLUB, alumno], queda('competitor', []));
+    await service.fijarRolesCampeonatos(CLUB, ALUMNO, ['competitor'], GESTOR);
+
+    // La regla de la 0020: una excepción que dice lo mismo que el general es
+    // ruido, y deja a la persona marcada distinto a las demás.
+    expect(escrituras[0]).toEqual({ rolesCampeonatos: [], roleCampeonatos: null });
+  });
+
+  it('sin marcar nada, vuelve a valer su rol general', async () => {
+    const { service, escrituras } = armar(
+      [ES_CLUB, [{ role: 'competitor', roleCampeonatos: 'maestro', rolesCampeonatos: ['maestro'] }]],
+      queda('competitor', []),
+    );
+    const r = await service.fijarRolesCampeonatos(CLUB, ALUMNO, [], GESTOR);
+
+    expect(escrituras[0]).toEqual({ rolesCampeonatos: [], roleCampeonatos: null });
+    expect(r.papelesCampeonatos).toEqual(['competitor']);
+  });
+
+  it('un club no da jueces', async () => {
+    const { service, escrituras } = armar([ES_CLUB, alumno], []);
+
+    await expect(
+      service.fijarRolesCampeonatos(CLUB, ALUMNO, ['competitor', 'judge'], GESTOR),
+    ).rejects.toThrow(/un club da maestros/i);
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it('pero no obliga a quitarle el de juez a quien ya lo tenía', async () => {
+    // Llegó con `judge` por la reconciliación. Su club le marca «maestro», y el
+    // de juez sigue marcado: eso no es DAR un juez, es no quitarlo.
+    const juezDeAntes = [
+      { role: 'competitor', roleCampeonatos: 'judge', rolesCampeonatos: ['judge'] },
+    ];
+    const { service, escrituras } = armar(
+      [ES_CLUB, juezDeAntes],
+      queda('competitor', ['maestro', 'judge']),
+    );
+    await service.fijarRolesCampeonatos(CLUB, ALUMNO, ['judge', 'maestro'], GESTOR);
+
+    expect(escrituras[0]).toEqual({
+      rolesCampeonatos: ['maestro', 'judge'],
+      roleCampeonatos: 'maestro',
+    });
+  });
+
+  it('la federación sí da jueces y administradores', async () => {
+    const juez = [{ role: 'judge', roleCampeonatos: null, rolesCampeonatos: [] }];
+    const { service, escrituras } = armar(
+      [ES_FEDERACION, juez],
+      queda('judge', ['admin', 'judge']),
+    );
+    await service.fijarRolesCampeonatos(CLUB, ALUMNO, ['judge', 'admin'], GESTOR);
+
+    expect(escrituras[0]).toEqual({
+      rolesCampeonatos: ['admin', 'judge'],
+      roleCampeonatos: 'admin',
+    });
+  });
+
+  it('y no da maestros: esos los da cada club', async () => {
+    const juez = [{ role: 'judge', roleCampeonatos: null, rolesCampeonatos: [] }];
+    const { service, escrituras } = armar([ES_FEDERACION, juez], []);
+
+    await expect(
+      service.fijarRolesCampeonatos(CLUB, ALUMNO, ['maestro'], GESTOR),
+    ).rejects.toThrow(/una organización da administradores y jueces/i);
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it('lo que no es un papel de Campeonatos se rechaza antes de mirar nada', async () => {
+    const { service, escrituras } = armar([], []);
+
+    await expect(
+      service.fijarRolesCampeonatos(CLUB, ALUMNO, ['sensei'], GESTOR),
+    ).rejects.toThrow(/no es un papel de Campeonatos/);
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it('nadie se cambia sus propios papeles', async () => {
+    const { service, escrituras } = armar([], []);
+
+    await expect(
+      service.fijarRolesCampeonatos(CLUB, GESTOR, ['admin'], GESTOR),
+    ).rejects.toThrow(/no los cambias tú/);
+    expect(escrituras).toHaveLength(0);
   });
 });

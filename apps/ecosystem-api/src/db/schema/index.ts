@@ -427,6 +427,22 @@ export const orgMembers = eco.table('org_members', {
   roleCampeonatos: varchar('role_campeonatos', { length: 50 }),
   roleAcademy: varchar('role_academy', { length: 50 }),
   /**
+   * TODOS los papeles de esta persona en Campeonatos, dentro de este club.
+   *
+   * `role_campeonatos` guarda uno, y la misma persona es maestro de su club y
+   * juez en la federación: con un hueco había que elegir cuál mentir.
+   * Campeonatos ya se rompió una vez por esto (`usuarios.puede_juzgar`).
+   *
+   * Es una EXCEPCIÓN, como las columnas de arriba: vacía = se traduce el rol
+   * general (`common/roles-por-app.ts`). Con algo dentro, `role_campeonatos`
+   * guarda el de mayor rango de la lista — que es lo que sigue leyendo el pase
+   * viejo hasta que Campeonatos lea la lista (F9 lo retira). Migración 0023.
+   */
+  rolesCampeonatos: text('roles_campeonatos')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  /**
    * Si esta persona tiene acceso a Membresías EN ESTE CLUB. Lo dice Membresías,
    * no se decide aquí (`POST /sync/acceso`).
    *
@@ -494,6 +510,11 @@ export const orgMemberBajas = eco.table(
     roleMembresias: varchar('role_membresias', { length: 50 }),
     roleCampeonatos: varchar('role_campeonatos', { length: 50 }),
     roleAcademy: varchar('role_academy', { length: 50 }),
+    /** La lista de papeles en Campeonatos: readmitir tiene que devolverlos todos. */
+    rolesCampeonatos: text('roles_campeonatos')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     membresiasActivo: boolean('membresias_activo'),
     /** Desde cuándo pertenecía. Sin esto, readmitir le borraría la antigüedad. */
     joinedAt: timestamp('joined_at', { withTimezone: true }),

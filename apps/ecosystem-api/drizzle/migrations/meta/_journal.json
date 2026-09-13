@@ -162,6 +162,13 @@
       "when": 1788300400000,
       "tag": "0022_sesion_desde_donde",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788300500000,
+      "tag": "0023_roles_campeonatos",
+      "breakpoints": true
     }
   ]
 }
