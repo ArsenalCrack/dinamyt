@@ -33,7 +33,46 @@ export async function generarAvisos(
   const today = todayStr();
   const startToday = new Date(`${today}T00:00:00.000Z`);
 
-  const filas = await db.select().from(memberships).where(eq(memberships.orgId, orgId));
+  /**
+   * ── Los avisos son de los ALUMNOS del club, no de todas sus filas ─────────
+   *
+   * Se reportó así: «el club tiene 3 vencidos y el aviso del maestro dice 4,
+   * todos los días». Las dos cifras eran ciertas y contaban cosas distintas,
+   * porque esto miraba SOLO `memberships` y las pantallas miran `users`.
+   *
+   * Es exactamente el mismo error que ya se arregló en `GET /reports/overdue`,
+   * y por los mismos dos motivos:
+   *
+   *   · **El maestro tiene su propia membresía.** El roster excluye a quien no
+   *     es alumno —la pantalla se llama «Alumnos»—, pero aquí entraba como uno
+   *     más: se contaba a sí mismo entre sus morosos y encima se mandaba a sí
+   *     mismo un «tu mensualidad venció» cada mañana.
+   *   · **Quien tiene el acceso cortado.** A alguien a quien YA le cortaste el
+   *     acceso no lo estás persiguiendo para que pague: precisamente por eso se
+   *     lo cortaste. Y como su fecha ya no se mueve nunca, es el sumando que
+   *     hacía que el número **no cambiara ningún día** — ni pagando, porque no
+   *     era de nadie a quien se le pudiera cobrar.
+   *
+   * Son los DOS filtros del roster (`GET /memberships`) y del panel
+   * (`GET /reports/estadisticas`), que son las dos pantallas contra las que el
+   * maestro compara este número. Si allí cambian, aquí también.
+   */
+  const filas = await db
+    .select({
+      id: memberships.id,
+      userId: memberships.userId,
+      venceEl: memberships.venceEl,
+      clasesRestantes: memberships.clasesRestantes,
+    })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(
+      and(
+        eq(memberships.orgId, orgId),
+        eq(users.role, 'student'),
+        eq(users.isActive, true),
+      ),
+    );
   const plan = planNotificaciones(
     filas.map((m) => ({
       userId: m.userId,
@@ -47,10 +86,21 @@ export async function generarAvisos(
 
   // Dedup: no repetir el mismo (membresía, tipo) el mismo día. Sin esto, dos
   // clics seguidos —o el cron reintentando— llenan la campana de duplicados.
+  //
+  // Acotado a las membresías que se van a escribir, y eso no es un detalle: por
+  // aquí pasa el cron, que corre SIN contexto de club (`sinFiltroDeClub`) para
+  // poder recorrerlos todos, así que sin esta condición cada club se leía los
+  // avisos de hoy de TODOS los demás para descartarlos uno por uno.
+  const aEscribir = [...new Set(plan.map((p) => p.membershipId))];
   const yaHoy = await db
     .select({ membershipId: notifications.membershipId, type: notifications.type })
     .from(notifications)
-    .where(gte(notifications.scheduledFor, startToday));
+    .where(
+      and(
+        gte(notifications.scheduledFor, startToday),
+        inArray(notifications.membershipId, aEscribir),
+      ),
+    );
   const vistos = new Set(yaHoy.map((e) => `${e.membershipId}:${e.type}`));
   const nuevos = plan.filter((p) => !vistos.has(`${p.membershipId}:${p.type}`));
   if (nuevos.length === 0) return { creados: 0, pushEnviados: 0 };
@@ -106,7 +156,14 @@ export async function generarAvisos(
     // resumen sale **solo, cada mañana**, sin que nadie pulse nada. Y sale una
     // vez: si no hubo avisos nuevos, esta función ya se salió arriba, de modo
     // que pulsar el botón dos veces no manda dos resúmenes.
-    pushEnviados += await avisarAlClub(db, orgId, nuevos);
+    //
+    // Cuenta `plan` —cómo está el club HOY— y no `nuevos`, que son solo las
+    // filas que ha escrito esta pasada. En el cron diario son lo mismo, pero en
+    // cuanto se genera dos veces el mismo día dejan de serlo: si el maestro
+    // inscribe a un alumno que ya venía vencido y vuelve a generar, `nuevos` es
+    // uno y el aviso decía «Hoy: 1 alumno con la mensualidad vencida» en un
+    // club con cuatro. El resumen habla del club, así que cuenta el club.
+    pushEnviados += await avisarAlClub(db, orgId, plan);
   } catch {
     /* push best-effort */
   }
@@ -131,7 +188,8 @@ export async function generarAvisos(
 async function avisarAlClub(
   db: Db,
   orgId: string,
-  nuevos: { type: 'pre_venc' | 'venc' | 'mora' }[],
+  /** Cómo está el club HOY: todos sus avisos vigentes, no solo los recién escritos. */
+  hoy: { type: 'pre_venc' | 'venc' | 'mora' }[],
 ): Promise<number> {
   const [club] = await db
     .select({ name: orgs.name })
@@ -139,7 +197,7 @@ async function avisarAlClub(
     .where(eq(orgs.id, orgId))
     .limit(1);
 
-  const resumen = resumenParaElClub(nuevos, club?.name ?? null);
+  const resumen = resumenParaElClub(hoy, club?.name ?? null);
   if (!resumen) return 0;
 
   const gestores = await db
@@ -242,9 +300,20 @@ export async function notificationsRoutes(app: FastifyInstance) {
   );
 
   // ── POST /notifications/cron — el disparo diario, para TODOS los clubes ────
-  // Esto es lo que hace que los avisos existan sin que nadie pulse nada. Lo
-  // llama el cron de Vercel una vez al día (ver `apps/membresias-web/src/app/
-  // cron/avisos/route.ts` y `vercel.json`).
+  // Esto es lo que hace que los avisos existan sin que nadie pulse nada.
+  //
+  // ── Quién lo llama, HOY ──
+  //
+  // Un `systemd timer` del VPS a las 08:00, vía `scripts/avisos-diarios.sh` del
+  // monorepo (ver `OPERAR.md` §4.5). El mismo disparo despierta también los
+  // avisos de suscripción del ecosistema: comparten reloj, no son lo mismo.
+  //
+  // Esto decía «lo llama el cron de Vercel», y era mentira desde la mudanza al
+  // VPS del 20 de agosto. No es un detalle de documentación: cuando el reloj se
+  // quedó en Vercel, los avisos dejaron de salir sin fallar —sencillamente no
+  // ocurrían—, y lo primero que hace quien lo investiga es venir a leer esto.
+  // `apps/membresias-web/.../cron/avisos/route.ts` y su `vercel.json` siguen ahí
+  // por si algún día se vuelve a desplegar en Vercel; hoy no los llama nadie.
   //
   // No lleva sesión: quien llama es una máquina y no tiene cuenta. La puerta es
   // `CRON_SECRET`, y si esa variable no está definida la ruta responde 404 —
@@ -341,6 +410,18 @@ export async function notificationsRoutes(app: FastifyInstance) {
               .where(
                 and(
                   eq(memberships.orgId, orgId),
+                  /**
+                   * Los mismos dos filtros del roster, y por el mismo motivo
+                   * que en `generarAvisos`: esta lista es «a quién hay que
+                   * cobrarle», y ni el maestro ni el alumno con el acceso
+                   * cortado son eso. Aquí además hacen falta para lo YA
+                   * ESCRITO: el generador deja de crearles filas, pero las de
+                   * antes seguirían saliendo —su motivo sigue siendo verdad,
+                   * así que `vigentes` no las tira— y la campana seguiría
+                   * contando de más sin que nada la pudiera bajar.
+                   */
+                  eq(users.role, 'student'),
+                  eq(users.isActive, true),
                   isNull(notifications.staffReadAt),
                 ),
               )

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { memberships, notifications } from '@dinamyt/membresias-db';
+import { memberships, notifications, users } from '@dinamyt/membresias-db';
 import { crearEscenario } from './testing/escenario';
 import { planNotificaciones, resumenParaElClub } from './lib/notifications';
 import { vigentes } from './routes/notifications';
@@ -201,6 +201,95 @@ describe('notificaciones', () => {
       expect(list.json()).toHaveLength(1);
       expect(list.json()[0].type).toBe('venc');
       await app.close();
+    });
+
+    /**
+     * ── El número del aviso tiene que ser el de la pantalla ─────────────────
+     *
+     * Se reportó así: «el club tiene 3 vencidos y al maestro le llegan 4, todos
+     * los días». Los dos sumandos de más son los de siempre —el mismo error que
+     * ya se arregló en `GET /reports/overdue`— y los dos comparten lo peor: no
+     * los baja nadie pagando, así que el número se queda clavado para siempre.
+     */
+    describe('quién cuenta como vencido', () => {
+      it('la membresía del MAESTRO no: la pantalla se llama «Alumnos»', async () => {
+        const { app, db, auth, ids, orgId } = await crearEscenario();
+        const headers = auth(ids.owner);
+        await db.insert(memberships).values([
+          { orgId, userId: ids.alumno, venceEl: '2000-01-01' },
+          // El maestro también entrena, y su fila estaba en la misma tabla.
+          { orgId, userId: ids.owner, venceEl: '2000-01-01' },
+        ]);
+
+        const r = await app.inject({ method: 'POST', url: '/notifications/run', headers });
+        expect(r.json().creados).toBe(1);
+
+        const lista = (
+          await app.inject({ method: 'GET', url: '/notifications?all=1', headers })
+        ).json();
+        expect(lista).toHaveLength(1);
+        expect(lista[0].fullName).toBe('Alumno Uno');
+        await app.close();
+      });
+
+      it('el alumno con el acceso cortado tampoco: a ése ya no se le cobra', async () => {
+        const { app, db, auth, ids, orgId } = await crearEscenario();
+        const headers = auth(ids.owner);
+        await db.insert(memberships).values([
+          { orgId, userId: ids.alumno, venceEl: '2000-01-01' },
+          { orgId, userId: ids.alumno2, venceEl: '2000-01-01' },
+        ]);
+        await db
+          .update(users)
+          .set({ isActive: false })
+          .where(eq(users.id, ids.alumno2));
+
+        const r = await app.inject({ method: 'POST', url: '/notifications/run', headers });
+        expect(r.json().creados).toBe(1);
+        await app.close();
+      });
+
+      /**
+       * Y lo YA ESCRITO también se cae. El generador deja de crearles filas,
+       * pero las de antes seguirían saliendo —su motivo sigue siendo verdad, así
+       * que `vigentes` no las tira— y la campana seguiría contando de más sin
+       * que nada la pudiera bajar.
+       */
+      it('los avisos viejos del maestro y del inactivo salen de la campana del club', async () => {
+        const { app, db, auth, ids, orgId } = await crearEscenario();
+        const headers = auth(ids.owner);
+        const mems = await db
+          .insert(memberships)
+          .values([
+            { orgId, userId: ids.alumno, venceEl: '2000-01-01' },
+            { orgId, userId: ids.alumno2, venceEl: '2000-01-01' },
+            { orgId, userId: ids.owner, venceEl: '2000-01-01' },
+          ])
+          .returning();
+        await db
+          .update(users)
+          .set({ isActive: false })
+          .where(eq(users.id, ids.alumno2));
+
+        // Escritas por el generador de ANTES del arreglo: las tres existen.
+        await db.insert(notifications).values(
+          mems.map((m) => ({
+            userId: m.userId,
+            membershipId: m.id,
+            type: 'venc' as const,
+            channel: 'inapp' as const,
+            scheduledFor: new Date(),
+            sentAt: new Date(),
+            status: 'ENVIADA' as const,
+          })),
+        );
+
+        const lista = (
+          await app.inject({ method: 'GET', url: '/notifications?all=1', headers })
+        ).json();
+        expect(lista.map((a: { fullName: string }) => a.fullName)).toEqual(['Alumno Uno']);
+        await app.close();
+      });
     });
 
     it('el aviso trae el nombre y el vencimiento: la pantalla no tiene que preguntarlos', async () => {
