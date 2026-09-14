@@ -179,6 +179,8 @@ export interface TokenPayload {
   app_scopes: string[];
   role_academy: string | null;
   role_campeonatos: string | null;
+  /** Todos los papeles de Campeonatos (F1). Un ecosistema viejo no lo manda. */
+  roles_campeonatos?: string[] | null;
   role_membresias: string | null;
   is_super_admin: boolean;
   /** La sesión a la que pertenece este pase. Lo que permite cerrarla. */

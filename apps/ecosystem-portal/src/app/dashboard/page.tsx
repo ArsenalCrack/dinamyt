@@ -16,7 +16,7 @@ import api, {
   type TokenPayload,
   type MiInvitacion,
 } from '@/lib/api';
-import { nombreRol, operaCampeonatos } from '@/lib/roles';
+import { entraACampeonatos, NOMBRE_PAPEL_CAMPEONATOS, nombreRol } from '@/lib/roles';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { Avatar } from '@/components/Avatar';
 import { useI18n } from '@/lib/i18n';
@@ -40,8 +40,10 @@ const ACADEMY_URL =
  * se da aquí**, que es donde la persona ya está y donde estará lo suyo.
  */
 const AVISO_CAMPEONATOS: Record<string, string> = {
+  // Desde F3 el alumno SÍ entra a Campeonatos (a su panel): esto ya solo le
+  // llega a quien no tiene ningún papel ahí, ni opera ni compite.
   sin_consola:
-    'Campeonatos es la consola de quien organiza, inscribe o juzga. Lo tuyo —tus inscripciones y tus resultados— lo verás aquí, en DINAMYT.',
+    'Tu cuenta no tiene ningún papel en Campeonatos. Si compites, pídele a tu maestro que te marque como competidor en tu club.',
   sin_plan:
     'Tu club no tiene Campeonatos en su plan. Habla con tu maestro si crees que debería tenerlo.',
   desactivado:
@@ -424,28 +426,32 @@ export default function DashboardPage() {
               ni una explicación. Desde fuera, «tengo Campeonatos pagado y el
               portal no me lo enseña».
 
-              Sigue siendo verdad que **tener el plan no es operar la consola**
-              (§4.13): administrar, inscribir y puntuar es lo único que hay
-              dentro, y un alumno no tiene ahí una sola pantalla. Lo que cambia
-              es a dónde se le manda, no si se le enseña:
+              **Tener el plan no es tener un papel en Campeonatos** (§4.13), y
+              lo que cambia es a dónde se le manda, no si se le enseña:
 
-                · **Quien opera** → salta a su consola con el pase en el
-                  fragmento (`#token=`, que nunca llega al servidor).
-                · **Quien no** → a las páginas PÚBLICAS de Campeonatos, que no
-                  piden sesión: los campeonatos abiertos y los resultados. Es
-                  lo suyo, y es lo que estaba buscando.
+                · **Quien opera o compite** → salta con el pase en el fragmento
+                  (`#token=`, que nunca llega al servidor). Quien opera cae en
+                  su consola; quien compite, desde F3, en SU panel: sus
+                  inscripciones, sus resultados y sus números.
+                · **Quien no tiene ningún papel ahí** → a las páginas PÚBLICAS
+                  de Campeonatos, que no piden sesión: los campeonatos abiertos
+                  y los resultados.
 
-              Mandarlo a `/login` sería mandarlo a un 403 con su formulario
-              delante. Esconderlo era no contestarle. */}
+              Mandar a este último a `/login` sería mandarlo a un 403 con su
+              formulario delante. Esconderlo era no contestarle. */}
           {(payload.is_super_admin || payload.app_scopes.includes('campeonatos')) &&
-            (payload.is_super_admin || operaCampeonatos(payload.role_campeonatos) ? (
+            (payload.is_super_admin || entraACampeonatos(payload) ? (
               <a
                 href={`${CAMPEONATOS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
                 className="rounded-lg px-4 py-3 font-semibold"
                 style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
               >
                 Entrar a Campeonatos
-                {payload.role_campeonatos ? ` (${nombreRol(payload.role_campeonatos)})` : ''}
+                {/* El nombre del papel DENTRO de Campeonatos: ahí `competitor`
+                    es «Competidor», no el «Alumno» del club. */}
+                {payload.role_campeonatos
+                  ? ` (${NOMBRE_PAPEL_CAMPEONATOS[payload.role_campeonatos] ?? nombreRol(payload.role_campeonatos)})`
+                  : ''}
               </a>
             ) : (
               <a
@@ -455,9 +461,9 @@ export default function DashboardPage() {
               >
                 <span className="block font-semibold">{t('panel.verCampeonatos')}</span>
                 <span className="mt-0.5 block text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Tu club tiene Campeonatos. La consola es para quien organiza,
-                  inscribe o juzga; aquí ves los campeonatos abiertos y sus
-                  resultados, sin escribir contraseña.
+                  Tu club tiene Campeonatos, pero tu cuenta no tiene ningún papel
+                  ahí. Aquí ves los campeonatos abiertos y sus resultados, sin
+                  escribir contraseña.
                 </span>
               </a>
             ))}

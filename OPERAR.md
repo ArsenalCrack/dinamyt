@@ -1877,16 +1877,53 @@ semana **sin internet**.
 Es la distinción que hizo falta en cuanto la federación pudo pagar Campeonatos
 para todos sus clubes (§4.5): **cualquier alumno de un club afiliado trae
 `campeonatos` en sus `app_scopes`**. Y la consola de Campeonatos solo sabe de
-administrar, inscribir y puntuar — no tiene una sola pantalla para él.
+administrar, inscribir y puntuar.
 
-| Rol en el pase | Qué pasa |
+**Desde el 13 de septiembre de 2026 (F3 de `PLAN-CAMPEONATOS.md`) el alumno SÍ
+entra** — no a la consola, sino a **su panel** (`/mi-panel`): sus inscripciones
+con su estado y el motivo si se la rechazaron, sus próximos campeonatos, su
+maestro, sus resultados y sus números.
+
+| Papel en el pase | Qué pasa |
 |---|---|
 | `admin` · `maestro` · `coach` · `judge` | Entra a la consola |
-| `competitor` · `student` · vacío | **No entra**, y se le dice por qué con un enlace de vuelta al portal |
+| `competitor` · `student` | **Entra a su panel.** Su fila nace con `competidor` de principal |
+| ninguno de los anteriores | **No entra** (`sin_consola`), y se le dice por qué con un enlace de vuelta al portal |
 
-La regla vive en los **dos** lados: el portal no le ofrece la consola
-(`lib/roles.ts`) y el servidor rechaza el pase (`app/espejo.py`). Ofrecer el
-botón no es la seguridad; es no mandar a nadie a una puerta que le van a cerrar.
+La regla vive en los **dos** lados: el portal elige el botón
+(`entraACampeonatos` en `lib/roles.ts`) y el servidor decide la fila
+(`rol_principal` en `app/espejo.py`). Ofrecer el botón no es la seguridad; es
+no mandar a nadie a una puerta que le van a cerrar. **Lo que le cierra la
+consola** a quien solo compite es `require_personal()` en `api/scoping.py`, y
+**lo que acota su panel** es que `/api/mi/*` filtra siempre por el `eco_sub`
+de la sesión.
+
+> **Al desplegar F3, Campeonatos ANTES que el portal.** Con el portal nuevo y
+> Campeonatos viejo, el botón de «Entrar» le sale al alumno y Campeonatos lo
+> devuelve con `sin_consola`: no rompe nada, pero es una puerta que se abre y
+> se cierra en la cara.
+
+#### La ficha y la cuenta
+
+Que la persona entre no basta: su panel tiene que saber **qué ficha de atleta
+es suya**. Eso lo dice `competidores.eco_sub` —el `sub` de su cuenta, no el id
+de su fila, que cambia entre la instalación de internet y la del evento—, y lo
+escriben tres caminos:
+
+| Camino | Quién | Lo que exige |
+|---|---|---|
+| **Reclamarla** desde su panel | La persona | Documento **y** fecha de nacimiento que cuadren. Cinco intentos cada quince minutos. «No existe» y «la fecha no cuadra» contestan lo mismo |
+| **Enlazarla a mano** en `/admin/competidores` | El administrador de esa ficha | Que la persona haya entrado ya una vez (el `sub` sale de su espejo) |
+| **El paquete** entre instalaciones (F6-c) | El importador | Nada: viaja con la ficha |
+
+En los tres **no se pisa un enlace puesto**: si la ficha ya es de otra cuenta,
+se para y lo mira una persona — primero se desenlaza, a la vista.
+
+Los resultados del panel salen **exactos** de las llaves generadas desde el 13
+de septiembre de 2026 (llevan `competidor_uid`) y **«sin confirmar»** de todo
+lo anterior, buscados por nombre y club **solo en los campeonatos donde esa
+ficha está inscrita**. Los resultados importados del modo local también salen
+por nombre hasta F8.
 
 > **Pero al que no opera ya no se le esconde la tarjeta entera.** *(30 ago
 > 2026)* Hasta ahora, quien tenía el plan sin un rol que operara no veía
@@ -1897,9 +1934,12 @@ botón no es la seguridad; es no mandar a nadie a una puerta que le van a cerrar
 > de Campeonatos** —los campeonatos abiertos y los resultados—, que no piden
 > sesión y son lo que esa persona estaba buscando.
 
-> **Y el pase de un alumno no crea ninguna fila** en `usuarios`. Sin esa regla,
-> una federación con doscientos alumnos serían doscientas filas de gente que no
-> va a entrar nunca, cada una ocupando un correo único en la consola.
+> **Y la fila de un alumno nace cuando ENTRA, no cuando firma el pase.** Hasta
+> F3 su pase no creaba ninguna: una federación con doscientos alumnos habrían
+> sido doscientas filas de gente que no va a entrar nunca. Esa razón sigue en
+> pie, y por eso la fila nace al canjear el pase —la primera vez que la persona
+> abre Campeonatos—, y en `/admin` los competidores quedan detrás de un
+> contador «+N competidores» para no tapar al personal.
 
 ### La fila local es un espejo, y su rol manda
 

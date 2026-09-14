@@ -123,13 +123,10 @@ export const ROLES_GESTOR = ['admin', 'owner', 'maestro'] as const;
  * **Tener el plan y operar la consola son dos cosas distintas**, y desde que
  * la federación puede pagar Campeonatos para todos sus clubes hay que
  * separarlas: el alumno de un club afiliado tiene `campeonatos` en sus
- * `app_scopes` —su federación lo paga— y no tiene nada que hacer en una
- * herramienta de mesa de control. Su historial, sus inscripciones y sus
- * resultados van en el portal.
+ * `app_scopes` —su federación lo paga— y no opera nada.
  *
- * El servidor de Campeonatos aplica exactamente esta misma regla al canjear el
- * pase (`app/espejo.py`), así que esconder el botón no es la seguridad: es no
- * mandar a nadie a una puerta que le van a cerrar.
+ * Desde F3 (13 sep 2026) eso ya no lo deja fuera: entra a SU panel —sus
+ * inscripciones, sus resultados, sus números—. Ver `entraACampeonatos`.
  */
 export const ROLES_CONSOLA_CAMPEONATOS = [
   'admin',
@@ -137,6 +134,39 @@ export const ROLES_CONSOLA_CAMPEONATOS = [
   'coach',
   'judge',
 ] as const;
+
+/**
+ * Los papeles con los que se ENTRA a Campeonatos: los que operan y competir.
+ *
+ * El servidor de Campeonatos aplica exactamente esta misma regla al canjear el
+ * pase (`rol_principal` en `app/espejo.py`), así que esconder el botón no es
+ * la seguridad: es no mandar a nadie a una puerta que le van a cerrar.
+ */
+export const ROLES_ENTRAN_CAMPEONATOS = [
+  ...ROLES_CONSOLA_CAMPEONATOS,
+  'competitor',
+  'student',
+] as const;
+
+/**
+ * `true` si ese pase abre Campeonatos — a la consola o al panel.
+ *
+ * Mira la LISTA de papeles (F1) y cae al singular si el ecosistema no la
+ * manda: un maestro que además compite tiene `maestro` de principal, pero un
+ * alumno al que el club marcó también como juez tiene los dos.
+ */
+export function entraACampeonatos(pase: {
+  role_campeonatos: string | null;
+  roles_campeonatos?: string[] | null;
+}): boolean {
+  const papeles =
+    Array.isArray(pase.roles_campeonatos) && pase.roles_campeonatos.length > 0
+      ? pase.roles_campeonatos
+      : [pase.role_campeonatos];
+  return papeles.some((papel) =>
+    Boolean(papel && (ROLES_ENTRAN_CAMPEONATOS as readonly string[]).includes(papel)),
+  );
+}
 
 /**
  * Los papeles de Campeonatos que ESA organización puede dar (F1).
