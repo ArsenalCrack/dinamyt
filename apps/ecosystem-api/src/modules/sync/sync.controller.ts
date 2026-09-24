@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
@@ -245,6 +246,47 @@ export class SyncController {
       theme: fila?.theme ?? 'sistema',
       locale: fila?.locale ?? null,
     };
+  }
+
+  // ── GET /sync/clubes — el directorio de clubes, para invitar (F5) ─────────
+  //
+  // Campeonatos invita CLUBES a un campeonato (F5 de PLAN-CAMPEONATOS), y el
+  // administrador tiene que poder buscarlos. Los clubes viven aquí, y
+  // Campeonatos ya no tiene el pase de esa persona —lo canjeó por su cookie al
+  // entrar—, así que pregunta por el mismo canal servidor-a-servidor que la
+  // apariencia.
+  //
+  // Con `federacion`, los clubes afiliados a ella salen primero y marcados:
+  // son a los que una federación invita casi siempre.
+  //
+  // ⚠️ Solo LEE, y solo lo que el portal ya enseña a cualquiera con sesión en
+  // su buscador (`GET /organizations/clubes`): id, nombre y ciudad de los
+  // clubes activos. Ni miembros, ni contactos.
+  @Get('clubes')
+  async clubes(
+    @Headers('x-dinamyt-sync') secreto: string | undefined,
+    @Query('search') search?: string,
+    @Query('federacion') federacion?: string,
+  ) {
+    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
+    if (!esperado) throw new NotFoundException('No encontrado.');
+    if (!SyncController.valido(secreto, esperado)) {
+      throw new UnauthorizedException('Secreto inválido.');
+    }
+
+    const fed = (federacion ?? '').trim();
+    const lista = await this.orgsService.listarClubes(search);
+    return lista
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        city: c.city ?? null,
+        afiliado: !!fed && c.parentId === fed,
+      }))
+      .sort(
+        (a, b) =>
+          Number(b.afiliado) - Number(a.afiliado) || a.name.localeCompare(b.name, 'es'),
+      );
   }
 
   // ── POST /sync/apariencia — el tema y el idioma, desde CUALQUIER app ──────
