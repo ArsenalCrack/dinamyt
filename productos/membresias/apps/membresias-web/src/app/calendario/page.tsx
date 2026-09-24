@@ -11,7 +11,19 @@ import { LIM } from '@/lib/campos';
 import { CampoFecha } from '@/components/CampoFecha';
 import { Contador } from '@/components/Contador';
 import { SelectMenu } from '@/components/SelectMenu';
+import { CalendarioMes } from '@/components/CalendarioMes';
 import { avisoError, avisoOk } from '@/lib/toast';
+
+/**
+ * Las dos vistas de esta pantalla, y cuál se dejó abierta.
+ *
+ * El mes es lo que se consulta —quién cumple, cuándo cerramos, a quién le toca
+ * pagar— y el horario es lo que se edita, un par de veces al año. Por eso abre
+ * en el mes. La elección se recuerda en el navegador: quien vino a tocar el
+ * horario y recarga no tiene que volver a buscar la pestaña.
+ */
+type Vista = 'mes' | 'horario';
+const VISTA_GUARDADA = 'dinamyt.calendario.vista';
 
 interface Exc {
   id: string;
@@ -134,6 +146,24 @@ export default function Calendario() {
   const { t, idioma } = useI18n();
   const { user, cargando: cargandoSesion, esStaff } = useAuth();
   const esMaestro = user?.role === 'owner' || user?.isSuperAdmin;
+
+  const [vista, setVista] = useState<Vista>('mes');
+  // Al montar y no en el `useState`: en el servidor no hay `localStorage`.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VISTA_GUARDADA) === 'horario') setVista('horario');
+    } catch {
+      /* sin almacenamiento, se abre en el mes */
+    }
+  }, []);
+  function elegirVista(v: Vista) {
+    setVista(v);
+    try {
+      localStorage.setItem(VISTA_GUARDADA, v);
+    } catch {
+      /* dura lo que dure la pantalla */
+    }
+  }
 
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   /** Los días marcados, tal como se están editando. Se guardan todos de golpe. */
@@ -561,6 +591,28 @@ export default function Calendario() {
         </p>
       )}
 
+      <div className="calendario-vistas" role="tablist" aria-label={t('calendario.titulo')}>
+        {(['mes', 'horario'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            className="calendario-vista"
+            aria-selected={vista === v}
+            onClick={() => elegirVista(v)}
+          >
+            {v === 'mes' ? t('calendario.vistaMes') : t('calendario.vistaHorario')}
+          </button>
+        ))}
+      </div>
+
+      {vista === 'mes' ? (
+        // Solo con la sesión ya resuelta y del personal: el efecto de arriba
+        // manda al alumno a /mi, y sin esto el mes alcanzaba a pedir
+        // `/calendar` antes y a pintar un 403 de paso.
+        !cargandoSesion && esStaff && <CalendarioMes />
+      ) : (
+      <>
       {/* ── La semana que se está mirando ──
           Manda sobre las notas de abajo, y por eso está arriba del todo: es el
           contexto de todo lo que sigue, no un control más. */}
@@ -886,6 +938,8 @@ export default function Calendario() {
           ))}
         </div>
       </div>
+      </>
+      )}
     </main>
   );
 }

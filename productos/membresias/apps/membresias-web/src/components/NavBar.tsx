@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { claveRol, useAuth } from '@/lib/auth';
 import { IDIOMAS, useI18n, type ClaveTexto } from '@/lib/i18n';
-import { alternarModo, aplicarTema, getTema, temaEfectivo, type Tema } from '@/lib/theme';
+import { alternarModo, getTema, temaEfectivo, type Tema } from '@/lib/theme';
 import { guardarAparienciaEnLaCuenta } from '@/lib/api';
 import { Avatar } from './Avatar';
 import { Avisos } from './Avisos';

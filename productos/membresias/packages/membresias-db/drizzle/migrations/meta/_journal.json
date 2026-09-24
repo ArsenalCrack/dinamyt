@@ -148,6 +148,13 @@
       "when": 1786001203000,
       "tag": "0020_apariencia_de_la_cuenta",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786001303000,
+      "tag": "0021_aviso_de_cumpleanos",
+      "breakpoints": true
     }
   ]
 }

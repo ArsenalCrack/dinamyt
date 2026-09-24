@@ -1,0 +1,21 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 0021 · El aviso de cumpleaños
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+-- Hasta hoy el cumpleaños se contestaba en vivo (`GET /reports/birthdays`) y
+-- solo lo veía quien abría el panel. El club pidió que también AVISE: un push
+-- al maestro y al auxiliar por la mañana, y la felicitación del club al alumno
+-- en su campana y en su celular.
+--
+-- Va como un tipo más de `notifications` porque recorre exactamente el mismo
+-- camino que los demás —el cron de las 08:00, el dedup por día, la campana y el
+-- push— y porque la campana del alumno solo lee de esa tabla.
+--
+-- Lo que lo hace distinto no está aquí sino en `vigentes`: un «feliz
+-- cumpleaños» solo es verdad el día que toca, así que al día siguiente deja de
+-- devolverse sin que nadie tenga que marcarlo.
+--
+-- `IF NOT EXISTS` para que repetirla no falle. Y sin nada más en el archivo: un
+-- valor nuevo de un enum no se puede usar en la misma transacción que lo crea.
+
+ALTER TYPE "membresias"."tipo_notif" ADD VALUE IF NOT EXISTS 'cumple';

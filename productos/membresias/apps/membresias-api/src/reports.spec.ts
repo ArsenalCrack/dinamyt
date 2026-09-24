@@ -201,6 +201,35 @@ describe('membresias-api — reportes', () => {
     await app.close();
   });
 
+  it('overdue cuenta lo mismo que el filtro «vencido» del roster', async () => {
+    // Las dos personas que hacían que el contador rojo del panel no cuadrara
+    // con la lista: el auxiliar con su membresía vencida (sobraba) y el alumno
+    // de paquete que se quedó sin clases (faltaba: su plan no vence por fecha,
+    // así que `vence_el` es nulo y el filtro por fecha no lo veía).
+    const { app, db, auth, ids, orgId } = await crearEscenario();
+    await db.insert(memberships).values([
+      { orgId, userId: ids.staff, venceEl: '2000-01-01' },
+      { orgId, userId: ids.alumno, venceEl: null, clasesRestantes: 0 },
+    ]);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/reports/overdue',
+      headers: auth(ids.owner),
+    });
+    const list = res.json();
+    expect(list.map((o: { userId: string }) => o.userId)).toEqual([ids.alumno]);
+    expect(list[0].diasVencido).toBe(0);
+
+    const roster = await app.inject({
+      method: 'GET',
+      url: '/memberships?estado=vencido',
+      headers: auth(ids.owner),
+    });
+    expect(roster.json().total).toBe(list.length);
+    await app.close();
+  });
+
   it('los reportes no mezclan clubes', async () => {
     const { app, db, auth, ids, orgId, otroOrgId } = await crearEscenario();
     await db.insert(memberships).values([

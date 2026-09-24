@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { and, eq, gte, isNull, desc, inArray } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, desc, inArray, sql } from 'drizzle-orm';
 import {
   memberships,
   notifications,
@@ -10,7 +10,15 @@ import {
 } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireAuth, requireClub, requireRole } from '../plugins/auth';
 import { limitarPorIp } from '../lib/auth/rate-limit';
-import { planNotificaciones, resumenParaElClub, textoAviso } from '../lib/notifications';
+import {
+  planNotificaciones,
+  resumenParaElClub,
+  textoAviso,
+  type AvisoPlan,
+  type Cumpleanero,
+  type TipoAviso,
+} from '../lib/notifications';
+import { anosQueCumple, nacimientosQueSeCelebran } from '../lib/cumpleanos';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { estado, todayStr } from '../lib/billing';
 import { enviarPush } from '../lib/push';
@@ -82,16 +90,57 @@ export async function generarAvisos(
     })),
     today,
   );
-  if (plan.length === 0) return { creados: 0, pushEnviados: 0 };
+
+  /**
+   * ── Y quién cumple años hoy ──────────────────────────────────────────────
+   *
+   * Los mismos dos filtros de arriba (alumno y con acceso), por la misma razón:
+   * la campana del club es de sus alumnos. La membresía hace falta porque la
+   * lista del club cuelga de ella (`GET /notifications?all=1` y `/visto`), y
+   * todo alumno tiene una desde el alta (`ensureMembership`).
+   *
+   * El filtro por `orgId` va en las DOS tablas y no sobra: el cron corre sin
+   * contexto de club (`sinFiltroDeClub`).
+   */
+  const cumpleaneros = await db
+    .select({
+      userId: users.id,
+      membershipId: memberships.id,
+      fullName: users.fullName,
+      birthDate: users.birthDate,
+    })
+    .from(users)
+    .innerJoin(
+      memberships,
+      and(eq(memberships.userId, users.id), eq(memberships.orgId, orgId)),
+    )
+    .where(
+      and(
+        eq(users.orgId, orgId),
+        eq(users.role, 'student'),
+        eq(users.isActive, true),
+        inArray(sql`to_char(${users.birthDate}, 'MM-DD')`, nacimientosQueSeCelebran(today)),
+      ),
+    )
+    .orderBy(asc(users.fullName));
+  const felicitaciones: AvisoPlan[] = cumpleaneros.map((c) => ({
+    userId: c.userId,
+    membershipId: c.membershipId,
+    type: 'cumple',
+  }));
+
+  const todos = [...plan, ...felicitaciones];
+  if (todos.length === 0) return { creados: 0, pushEnviados: 0 };
 
   // Dedup: no repetir el mismo (membresía, tipo) el mismo día. Sin esto, dos
   // clics seguidos —o el cron reintentando— llenan la campana de duplicados.
+  // Y al alumno le llegarían dos «feliz cumpleaños».
   //
   // Acotado a las membresías que se van a escribir, y eso no es un detalle: por
   // aquí pasa el cron, que corre SIN contexto de club (`sinFiltroDeClub`) para
   // poder recorrerlos todos, así que sin esta condición cada club se leía los
   // avisos de hoy de TODOS los demás para descartarlos uno por uno.
-  const aEscribir = [...new Set(plan.map((p) => p.membershipId))];
+  const aEscribir = [...new Set(todos.map((p) => p.membershipId))];
   const yaHoy = await db
     .select({ membershipId: notifications.membershipId, type: notifications.type })
     .from(notifications)
@@ -102,7 +151,7 @@ export async function generarAvisos(
       ),
     );
   const vistos = new Set(yaHoy.map((e) => `${e.membershipId}:${e.type}`));
-  const nuevos = plan.filter((p) => !vistos.has(`${p.membershipId}:${p.type}`));
+  const nuevos = todos.filter((p) => !vistos.has(`${p.membershipId}:${p.type}`));
   if (nuevos.length === 0) return { creados: 0, pushEnviados: 0 };
 
   await db.insert(notifications).values(
@@ -123,6 +172,15 @@ export async function generarAvisos(
   // ya está guardado y el alumno verá en la campana la próxima vez que entre.
   let pushEnviados = 0;
   try {
+    // La felicitación dice de parte de quién, y el resumen del maestro lo
+    // lleva en el título: los dos necesitan el nombre del club.
+    const [club] = await db
+      .select({ name: orgs.name })
+      .from(orgs)
+      .where(eq(orgs.id, orgId))
+      .limit(1);
+    const nombreDelClub = club?.name ?? null;
+
     const userIds = [...new Set(nuevos.map((n) => n.userId))];
     const subs = await db
       .select()
@@ -134,7 +192,11 @@ export async function generarAvisos(
           { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth },
           {
             title: 'DINAMYT · Mi Club',
-            body: textoAviso(n.type, venceElPorMembership.get(n.membershipId) ?? null),
+            body: textoAviso(
+              n.type,
+              venceElPorMembership.get(n.membershipId) ?? null,
+              nombreDelClub,
+            ),
             // El alumno va a su estado, que es donde ve su vencimiento y su
             // carnet. Es el mismo destino que dentro de la campana.
             url: '/mi',
@@ -163,7 +225,19 @@ export async function generarAvisos(
     // inscribe a un alumno que ya venía vencido y vuelve a generar, `nuevos` es
     // uno y el aviso decía «Hoy: 1 alumno con la mensualidad vencida» en un
     // club con cuatro. El resumen habla del club, así que cuenta el club.
-    pushEnviados += await avisarAlClub(db, orgId, plan);
+    //
+    // Los cumpleañeros, igual: todos los de hoy, no solo los recién escritos.
+    const anoHoy = Number(today.slice(0, 4));
+    pushEnviados += await avisarAlClub(
+      db,
+      orgId,
+      plan,
+      nombreDelClub,
+      cumpleaneros.map((c) => ({
+        fullName: c.fullName,
+        cumple: c.birthDate ? anosQueCumple(c.birthDate, anoHoy) : null,
+      })),
+    );
   } catch {
     /* push best-effort */
   }
@@ -189,15 +263,11 @@ async function avisarAlClub(
   db: Db,
   orgId: string,
   /** Cómo está el club HOY: todos sus avisos vigentes, no solo los recién escritos. */
-  hoy: { type: 'pre_venc' | 'venc' | 'mora' }[],
+  hoy: { type: TipoAviso }[],
+  nombreDelClub: string | null,
+  cumpleaneros: Cumpleanero[],
 ): Promise<number> {
-  const [club] = await db
-    .select({ name: orgs.name })
-    .from(orgs)
-    .where(eq(orgs.id, orgId))
-    .limit(1);
-
-  const resumen = resumenParaElClub(hoy, club?.name ?? null);
+  const resumen = resumenParaElClub(hoy, nombreDelClub, cumpleaneros);
   if (!resumen) return 0;
 
   const gestores = await db
@@ -251,6 +321,8 @@ interface AvisoConEstado {
   type: string;
   venceEl: string | null;
   clasesRestantes: number | null;
+  /** El día para el que se escribió. Es lo que decide un `cumple`. */
+  scheduledFor?: Date | null;
 }
 
 /**
@@ -272,6 +344,9 @@ interface AvisoConEstado {
  *   · `pre_venc` sobrevive mientras siga por vencer: si pagó, se cae; y si se
  *     le pasó del todo, también —lo que le toca ahora es un `venc`, que
  *     generará el aviso diario, y no un «no olvides renovar» a destiempo.
+ *   · `cumple` solo es verdad el día que se escribió. Un «feliz cumpleaños»
+ *     de ayer no se le dice a nadie, y el maestro no tiene que descartarlo:
+ *     se va solo a medianoche, leído o no.
  *   · `maestro` es un mensaje escrito por una persona y no lo resuelve ningún
  *     estado: ése se queda hasta que lo lean.
  */
@@ -281,6 +356,9 @@ export function vigentes<T extends AvisoConEstado>(avisos: T[], hoy: string): T[
       return estado(a, hoy) === 'vencido';
     }
     if (a.type === 'pre_venc') return estado(a, hoy) === 'por_vencer';
+    // `scheduledFor` es la medianoche UTC del día civil (ver `generarAvisos`),
+    // así que sus diez primeros caracteres SON ese día, sin conversión de zona.
+    if (a.type === 'cumple') return a.scheduledFor?.toISOString().slice(0, 10) === hoy;
     return true;
   });
 }
@@ -376,6 +454,8 @@ export async function notificationsRoutes(app: FastifyInstance) {
       venceEl: memberships.venceEl,
       // Hacen falta para saber si el aviso todavía es verdad. Ver `vigentes`.
       clasesRestantes: memberships.clasesRestantes,
+      // Para que la campana del club diga cuántos cumple, sin otro viaje.
+      birthDate: users.birthDate,
     };
 
     const filas =

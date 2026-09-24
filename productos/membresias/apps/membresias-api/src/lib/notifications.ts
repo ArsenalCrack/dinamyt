@@ -9,7 +9,8 @@ export interface MembershipLite {
   clasesRestantes?: number | null;
 }
 
-export type TipoAviso = 'pre_venc' | 'venc' | 'mora';
+/** Los que escribe `generarAvisos`. `maestro` lo escribe una persona. */
+export type TipoAviso = 'pre_venc' | 'venc' | 'mora' | 'cumple';
 
 export interface AvisoPlan {
   userId: string;
@@ -51,7 +52,12 @@ export function planNotificaciones(
  * Sin fecha el aviso es de un plan por clases: ahí no venció nada, se acabaron
  * las clases. Antes salía «Tu mensualidad venció el null».
  */
-export function textoAviso(type: TipoAviso, venceEl: string | null): string {
+export function textoAviso(
+  type: TipoAviso,
+  venceEl: string | null,
+  nombreDelClub: string | null = null,
+): string {
+  if (type === 'cumple') return felicitacion(nombreDelClub);
   if (type === 'venc') {
     return venceEl
       ? `Tu mensualidad venció el ${venceEl}. Acércate a ponerte al día.`
@@ -63,6 +69,44 @@ export function textoAviso(type: TipoAviso, venceEl: string | null): string {
       : 'Se te están acabando las clases. ¡No olvides renovar!';
   }
   return 'Tienes un pago pendiente en el club.';
+}
+
+/**
+ * La felicitación que le llega AL ALUMNO el día de su cumpleaños.
+ *
+ * Sin su nombre: los nombres se guardan en mayúsculas, y «¡Feliz cumpleaños,
+ * ANA MARÍA!» en la pantalla bloqueada suena a grito. Y no hace falta: a quien
+ * le llega sabe de quién es el cumpleaños. Lo que sí dice es DE PARTE DE QUIÉN.
+ */
+export function felicitacion(nombreDelClub: string | null): string {
+  return nombreDelClub
+    ? `¡Feliz cumpleaños! Todo ${nombreDelClub} te desea un gran día. 🎂`
+    : '¡Feliz cumpleaños! Todo el club te desea un gran día. 🎂';
+}
+
+/** Quien cumple años hoy, tal como lo cuenta el resumen del maestro. */
+export interface Cumpleanero {
+  fullName: string;
+  /** Los años que cumple. `null` no pasa —sin fecha no hay cumpleaños—, pero el tipo lo admite. */
+  cumple: number | null;
+}
+
+/**
+ * «ANA PÉREZ (12)», «ANA PÉREZ (12) y JUAN GÓMEZ (30)», «ANA, JUAN, LUIS y 2 más».
+ *
+ * Tres nombres como mucho: el push se lee en la pantalla bloqueada, que corta
+ * el texto a las dos líneas. Con más, lo que importa es el número; los nombres
+ * están en el panel.
+ */
+function listaDeCumpleaneros(gente: Cumpleanero[]): string {
+  const nombre = (c: Cumpleanero) => (c.cumple != null ? `${c.fullName} (${c.cumple})` : c.fullName);
+  if (gente.length <= 3) {
+    const nombres = gente.map(nombre);
+    return nombres.length === 1
+      ? nombres[0]
+      : `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`;
+  }
+  return `${gente.slice(0, 3).map(nombre).join(', ')} y ${gente.length - 3} más`;
 }
 
 /**
@@ -91,14 +135,21 @@ export function textoAviso(type: TipoAviso, venceEl: string | null): string {
  *
  * Devuelve `null` cuando no hay nada que resumir: un push que dice «cero» es
  * ruido puro.
+ *
+ * ── Los cumpleaños van en el MISMO push ──
+ *
+ * Y no en uno aparte, por la misma razón que el resumen es uno: dos avisos de
+ * la misma app a la misma hora se barren juntos. El cumpleaños va después del
+ * cobro porque el cobro es lo que pide hacer algo; el cumpleaños, decirlo.
  */
 export function resumenParaElClub(
   avisos: { type: TipoAviso }[],
   nombreDelClub: string | null,
+  cumpleaneros: Cumpleanero[] = [],
 ): { title: string; body: string } | null {
   const vencidos = avisos.filter((a) => a.type === 'venc' || a.type === 'mora').length;
   const porVencer = avisos.filter((a) => a.type === 'pre_venc').length;
-  if (vencidos === 0 && porVencer === 0) return null;
+  if (vencidos === 0 && porVencer === 0 && cumpleaneros.length === 0) return null;
 
   const partes: string[] = [];
   if (vencidos > 0) {
@@ -110,10 +161,21 @@ export function resumenParaElClub(
     partes.push(porVencer === 1 ? '1 por vencer' : `${porVencer} por vencer`);
   }
 
+  const frases: string[] = [];
+  if (partes.length > 0) frases.push(`Hoy: ${partes.join(' y ')}.`);
+  if (cumpleaneros.length > 0) {
+    const verbo = cumpleaneros.length === 1 ? 'cumple' : 'cumplen';
+    frases.push(
+      partes.length > 0
+        ? `🎂 ${verbo[0].toUpperCase()}${verbo.slice(1)} años ${listaDeCumpleaneros(cumpleaneros)}.`
+        : `🎂 Hoy ${verbo} años ${listaDeCumpleaneros(cumpleaneros)}.`,
+    );
+  }
+
   return {
     // El nombre del club en el título: quien lleva dos no puede tener que
     // adivinar de cuál le están hablando.
     title: nombreDelClub ? `DINAMYT · ${nombreDelClub}` : 'DINAMYT · Mi Club',
-    body: `Hoy: ${partes.join(' y ')}.`,
+    body: frases.join(' '),
   };
 }
