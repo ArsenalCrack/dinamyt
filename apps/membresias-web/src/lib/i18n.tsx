@@ -678,6 +678,18 @@ const es = {
   'calendario.sinExcepciones': 'Sin excepciones registradas.',
   'calendario.notaEjemplo':
     'Ej.: cerrado por el campeonato departamental, volvemos el lunes.',
+  // El mes del club (components/CalendarioMes.tsx)
+  'calendario.vistaMes': 'Mes',
+  'calendario.vistaHorario': 'Horario de clases',
+  'calendario.mesAnterior': 'Mes anterior',
+  'calendario.mesSiguiente': 'Mes siguiente',
+  'calendario.hoy': 'Hoy',
+  'calendario.capas': 'Qué se ve en el calendario',
+  'calendario.capaCumple': 'Cumpleaños',
+  'calendario.capaCierre': 'Cierres y festivos',
+  'calendario.capaVence': 'Vencimientos',
+  'calendario.sinEventos': 'Nada este día.',
+  'calendario.clubNoAbre': 'El club no abre este día de la semana.',
 
   // Pie legal
   'legal.derechos': 'Todos los derechos reservados.',
@@ -768,6 +780,11 @@ const es = {
   'aviso.maestro': 'Resumen del club',
   'aviso.venceEl': 'Vence el',
   'aviso.vencioEl': 'Venció el',
+  // El de cumpleaños (migración 0021): solo vive el día que toca.
+  'aviso.cumple': '🎂 Cumpleaños',
+  'aviso.cumpleTuyo': '🎂 ¡Feliz cumpleaños!',
+  'aviso.cumpleHoy': 'cumple',
+  'aviso.cumpleDelClub': 'Todo el club te desea un gran día.',
   'aviso.sinFecha': 'Sin fecha de vencimiento.',
   'aviso.marcarLeido': 'Ya lo leí',
   'aviso.marcarTodo': 'Marcar todo como leído',
@@ -775,9 +792,9 @@ const es = {
   // que la persona diga que sí aquí. Ver `components/PedirAvisos.tsx`.
   'push.titulo': '¿Te avisamos?',
   'push.texto':
-    'Te escribimos al celular cuando tu mensualidad esté por vencer y cuando venza. Nada más: ni promociones, ni recordatorios de clase.',
+    'Te escribimos al celular cuando tu mensualidad esté por vencer, cuando venza y el día de tu cumpleaños. Nada más: ni promociones, ni recordatorios de clase.',
   'push.textoStaff':
-    'Un aviso al día con lo que hay que cobrar: cuántos alumnos tienen la mensualidad vencida y cuántos están por vencer. Uno solo, no uno por alumno.',
+    'Un aviso al día con lo que hay que cobrar —cuántos alumnos tienen la mensualidad vencida y cuántos están por vencer— y quién cumple años. Uno solo, no uno por alumno.',
   'push.activar': 'Sí, avísenme',
   'push.ahoraNo': 'Ahora no',
   'push.despues': 'Puedes activarlos cuando quieras desde la campana 🔔.',
@@ -1325,6 +1342,17 @@ const en: Record<ClaveTexto, string> = {
   'calendario.sinExcepciones': 'No exceptions recorded.',
   'calendario.notaEjemplo':
     'E.g. closed for the regional championship, back on Monday.',
+  'calendario.vistaMes': 'Month',
+  'calendario.vistaHorario': 'Class schedule',
+  'calendario.mesAnterior': 'Previous month',
+  'calendario.mesSiguiente': 'Next month',
+  'calendario.hoy': 'Today',
+  'calendario.capas': 'What the calendar shows',
+  'calendario.capaCumple': 'Birthdays',
+  'calendario.capaCierre': 'Closures and holidays',
+  'calendario.capaVence': 'Due dates',
+  'calendario.sinEventos': 'Nothing on this day.',
+  'calendario.clubNoAbre': 'The club is closed on this weekday.',
 
   'legal.derechos': 'All rights reserved.',
   'legal.nota': 'DINAMYT Membresías is a work protected by copyright.',
@@ -1406,14 +1434,18 @@ const en: Record<ClaveTexto, string> = {
   'aviso.maestro': 'Club summary',
   'aviso.venceEl': 'Due on',
   'aviso.vencioEl': 'Expired on',
+  'aviso.cumple': '🎂 Birthday',
+  'aviso.cumpleTuyo': '🎂 Happy birthday!',
+  'aviso.cumpleHoy': 'turns',
+  'aviso.cumpleDelClub': 'The whole club wishes you a great day.',
   'aviso.sinFecha': 'No due date.',
   'aviso.marcarLeido': 'Got it',
   'aviso.marcarTodo': 'Mark all as read',
   'push.titulo': 'Want a heads-up?',
   'push.texto':
-    "We'll ping your phone when your membership is about to expire and when it does. Nothing else: no promos, no class reminders.",
+    "We'll ping your phone when your membership is about to expire, when it does, and on your birthday. Nothing else: no promos, no class reminders.",
   'push.textoStaff':
-    "One notice a day with what needs collecting: how many members are overdue and how many are about to expire. Just one, not one per member.",
+    "One notice a day with what needs collecting — how many members are overdue and how many are about to expire — and whose birthday it is. Just one, not one per member.",
   'push.activar': 'Yes, notify me',
   'push.ahoraNo': 'Not now',
   'push.despues': 'You can turn them on any time from the bell 🔔.',

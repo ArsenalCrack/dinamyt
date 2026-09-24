@@ -19,6 +19,7 @@ import { plansRoutes } from './routes/plans';
 import { membershipsRoutes } from './routes/memberships';
 import { paymentsRoutes } from './routes/payments';
 import { scheduleRoutes } from './routes/schedule';
+import { calendarRoutes } from './routes/calendar';
 import { checkinRoutes } from './routes/checkin';
 import { reportsRoutes } from './routes/reports';
 import { notificationsRoutes } from './routes/notifications';
@@ -74,6 +75,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(membershipsRoutes);
   void app.register(paymentsRoutes);
   void app.register(scheduleRoutes);
+  void app.register(calendarRoutes);
   void app.register(checkinRoutes);
   void app.register(reportsRoutes);
   void app.register(notificationsRoutes);

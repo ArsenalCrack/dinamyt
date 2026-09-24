@@ -12,7 +12,7 @@ interface Aviso {
   id: string;
   userId: string;
   membershipId: string | null;
-  type: 'pre_venc' | 'venc' | 'mora' | 'maestro';
+  type: 'pre_venc' | 'venc' | 'mora' | 'maestro' | 'cumple';
   channel: string;
   scheduledFor: string | null;
   status: string;
@@ -23,6 +23,8 @@ interface Aviso {
   fullName: string;
   /** Vencimiento que motivó el aviso: es lo que lo hace legible. */
   venceEl: string | null;
+  /** Para decir cuántos cumple, en el aviso de cumpleaños. */
+  birthDate: string | null;
 }
 
 /**
@@ -201,9 +203,12 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
    * (`#cobrar`, el mismo ancla que usa el botón «Cobrar» del panel): el aviso
    * dice que alguien debe, y lo siguiente que se hace es cobrarle. Al alumno,
    * a «Mi estado», que es donde ve su vencimiento y su carnet.
+   *
+   * El cumpleaños no se cobra: al maestro lo lleva a la ficha, sin el ancla.
    */
   function destino(a: Aviso): string {
-    return deTodoElClub ? `/alumnos/${a.userId}#cobrar` : '/mi';
+    if (!deTodoElClub) return '/mi';
+    return a.type === 'cumple' ? `/alumnos/${a.userId}` : `/alumnos/${a.userId}#cobrar`;
   }
 
   async function alternar() {
@@ -276,6 +281,17 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
 
   /** El aviso en una frase: de quién es, qué pasa y cuándo. */
   function texto(a: Aviso): string {
+    if (a.type === 'cumple') {
+      if (!deTodoElClub) return t('aviso.cumpleDelClub');
+      // Los años del día del aviso, que es hoy: el aviso no vive más (`vigentes`).
+      const anos =
+        a.birthDate && a.scheduledFor
+          ? Number(a.scheduledFor.slice(0, 4)) - Number(a.birthDate.slice(0, 4))
+          : null;
+      return anos != null
+        ? `${a.fullName} · ${t('aviso.cumpleHoy')} ${anos} ${t('panel.cumpleAnos')}`
+        : a.fullName;
+    }
     const fecha = a.venceEl ? fmtFecha(a.venceEl, idioma) : '';
     const cuando =
       a.type === 'venc' || a.type === 'mora'
@@ -373,12 +389,14 @@ export function Avisos({ deTodoElClub = false }: { deTodoElClub?: boolean }) {
                           color:
                             a.type === 'mora' || a.type === 'venc'
                               ? 'var(--danger)'
-                              : a.type === 'pre_venc'
+                              : a.type === 'pre_venc' || a.type === 'cumple'
                                 ? 'var(--gold)'
                                 : 'var(--text)',
                         }}
                       >
-                        {t(`aviso.${a.type}` as ClaveTexto)}
+                        {a.type === 'cumple' && !deTodoElClub
+                          ? t('aviso.cumpleTuyo')
+                          : t(`aviso.${a.type}` as ClaveTexto)}
                       </span>
                       <span className="avisos-texto">{texto(a)}</span>
                       <span className="avisos-fecha">

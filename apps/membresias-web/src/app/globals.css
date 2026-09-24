@@ -1473,6 +1473,204 @@ td.mono, .tabular { font-variant-numeric: tabular-nums; }
    archivo para las cuatro webs. Estos valores salieron de aqui; lo que cambia
    es que ahora el portal, Academy y Campeonatos usan exactamente los mismos. */
 
+/* ── El mes del club (components/CalendarioMes.tsx) ─────────────────────
+   Una cuadrícula de pared: siete columnas de lunes a domingo. La casilla
+   resume y el detalle de abajo cuenta. En el teléfono la casilla mide un
+   dedo y solo caben el número y un punto por capa; los nombres salen desde
+   los 560 px. Los colores de las capas son los de siempre: el oro para el
+   cumpleaños (la marca, la celebración), el rojo para el cierre, el azul
+   para el cobro — que ya no es rojo para no confundirse con un cierre. */
+.calmes { padding: 1rem; }
+/* Mientras llega el mes pedido, el anterior se queda a la vista, apagado. */
+.calmes[aria-busy='true'] .calmes-rejilla,
+.calmes[aria-busy='true'] .calmes-capas { opacity: 0.55; transition: opacity 0.2s ease; }
+.calmes-nav { margin-bottom: 0.8rem; }
+.calmes-titulo {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.calmes-hoy { margin-top: 0.35rem; }
+.calmes-capas { margin-bottom: 0.9rem; }
+.calmes-cuenta {
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+.filtros-chip[data-capa='cumple'][data-activa='true'] {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+.filtros-chip[data-capa='cierre'][data-activa='true'] {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+}
+.filtros-chip[data-capa='vence'][data-activa='true'] {
+  border-color: var(--info);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+  color: var(--info);
+}
+
+.calmes-rejilla {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+/* La letra la pone `.microetiqueta`: es el nombre de un dato. */
+.calmes-semana {
+  padding: 0.2rem 0;
+  text-align: center;
+  overflow: hidden;
+}
+.calmes-hueco { min-height: 3rem; }
+.calmes-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--bg-elevated);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.calmes-dia:hover { border-color: var(--border-strong); }
+.calmes-dia:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+/* El club no abre ese día de la semana: la casilla se apaga, no desaparece.
+   Un cumpleaños un domingo sigue siendo un cumpleaños. */
+.calmes-dia[data-no-abre='true'] {
+  background: transparent;
+  border-style: dashed;
+}
+.calmes-dia[data-no-abre='true'] .calmes-num { color: var(--text-muted); }
+.calmes-dia[data-cerrado='true'] {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.calmes-dia[data-hoy='true'] .calmes-num {
+  background: var(--gold-fill);
+  color: #111111;
+  border-radius: 999px;
+  padding: 0 0.35rem;
+  align-self: flex-start;
+}
+.calmes-dia[data-elegido='true'] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold);
+}
+.calmes-num {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.calmes-puntos {
+  display: flex;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+}
+.calmes-punto {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+}
+.calmes-punto[data-capa='cumple'] { background: var(--gold-fill); }
+.calmes-punto[data-capa='cierre'] { background: var(--danger-fill); }
+.calmes-punto[data-capa='vence'] { background: var(--info-fill); }
+.calmes-marcas {
+  display: none;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.calmes-marca {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.3rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+.calmes-marca[data-capa='cumple'] { background: var(--gold-soft); color: var(--gold); }
+.calmes-marca[data-capa='cierre'] { color: var(--danger); padding-left: 0; }
+.calmes-marca[data-capa='vence'] {
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+  color: var(--info);
+}
+.calmes-mas {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+@media (min-width: 560px) {
+  .calmes-hueco,
+  .calmes-dia { min-height: 5.2rem; }
+  .calmes-puntos { display: none; }
+  .calmes-marcas { display: flex; }
+}
+
+.calmes-detalle {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+.calmes-detalle-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.calmes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.calmes-lista-fila {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  font-size: 0.82rem;
+}
+.calmes-lista-fila[data-enlace='true']:hover { border-color: var(--border-strong); }
+.calmes-lista-nombre {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.calmes-lista-dato { font-size: 0.75rem; }
+
+/* Las dos vistas de /calendario: el mes y el horario de clases. */
+.calendario-vistas {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.calendario-vista {
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.calendario-vista[aria-selected='true'] {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
 /* ── Impresión ───────────────────────────────────────────────────────────
    El carnet YA NO se imprime desde aquí: tiene su propio documento, a tamaño
    de tarjeta, dentro de un iframe (ver `lib/carnet.ts`). Lo que queda es lo
@@ -1496,4 +1694,8 @@ td.mono, .tabular { font-variant-numeric: tabular-nums; }
     break-inside: avoid;
   }
   .muted { color: #444444 !important; }
+  /* El mes sí se imprime: es el calendario que se pega en la pared del
+     dojo. Sus casillas son botones y la regla de arriba las borraba. */
+  .calmes-dia { display: flex !important; }
+  .calendario-vistas { display: none !important; }
 }

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, gte, inArray, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import {
   memberships,
   payments,
@@ -11,6 +11,7 @@ import { orgDelRequest, requireRole } from '../plugins/auth';
 import { limitarPorIp } from '../lib/auth/rate-limit';
 import { columnaImagenLigera, direccionFoto } from '../lib/imagenes';
 import { estado, iniciosDePeriodo, todayStr, type PlanType } from '../lib/billing';
+import { anosQueCumple, nacimientosQueSeCelebran } from '../lib/cumpleanos';
 
 /**
  * Reparte un pago entre los meses a los que de verdad corresponde.
@@ -191,37 +192,55 @@ export async function reportsRoutes(app: FastifyInstance) {
        * Con el `innerJoin` las dos pantallas contestan la misma pregunta. Y se
        * devuelve el NOMBRE, que es lo que faltaba para poder comprobar un
        * número que no cuadra sin abrir la base de datos.
+       *
+       * ── Y «vencido» lo decide `estado()`, como en todas las demás ──
+       *
+       * Esto miraba solo `vence_el < hoy`, filtraba `role != 'owner'` y
+       * descartaba la membresía `retirado`. Tres diferencias con el roster, el
+       * panel de estadísticas y la campana, y las tres se veían:
+       *
+       *   · el **auxiliar** con membresía entraba en la cuenta —no es alumno, y
+       *     `role = 'student'` es el filtro de las otras tres pantallas—;
+       *   · el alumno de **paquete o clase suelta que se quedó sin clases** no
+       *     entraba: su plan no vence por fecha, así que `vence_el` es nulo o
+       *     futuro, pero el filtro «vencido» del roster sí lo enseña;
+       *   · `retirado` no lo excluye nadie más: a quien sale del club se le
+       *     corta el acceso (`is_active`), y ese filtro ya está.
        */
       const rows = await req.db
         .select({
           userId: memberships.userId,
           fullName: users.fullName,
           venceEl: memberships.venceEl,
+          clasesRestantes: memberships.clasesRestantes,
           currentPlanId: memberships.currentPlanId,
-          status: memberships.status,
         })
         .from(memberships)
         .innerJoin(users, eq(users.id, memberships.userId))
         .where(
           and(
             eq(memberships.orgId, orgId),
-            // Los mismos dos filtros del roster (`GET /users`), y por los
-            // mismos motivos. Si allí cambian, aquí también.
-            ne(users.role, 'owner'),
+            // Los mismos dos filtros del roster (`GET /memberships`), de
+            // `/reports/estadisticas` y de `generarAvisos`. Si allí cambian,
+            // aquí también.
+            eq(users.role, 'student'),
             eq(users.isActive, true),
           ),
         );
 
       return rows
-        .filter((r) => r.venceEl != null && r.venceEl < today && r.status !== 'retirado')
+        .filter((r) => estado(r, today) === 'vencido')
         .map((r) => ({
           userId: r.userId,
           fullName: r.fullName,
           venceEl: r.venceEl,
           currentPlanId: r.currentPlanId,
-          diasVencido: Math.round(
-            (Date.parse(today) - Date.parse(r.venceEl as string)) / 86_400_000,
-          ),
+          // Quien se quedó sin clases con la fecha aún por delante (o sin
+          // fecha) no lleva días vencido: lleva 0, y va al final de la lista.
+          diasVencido:
+            r.venceEl != null && r.venceEl < today
+              ? Math.round((Date.parse(today) - Date.parse(r.venceEl)) / 86_400_000)
+              : 0,
         }))
         .sort((a, b) => b.diasVencido - a.diasVencido);
     },
@@ -508,9 +527,13 @@ export async function reportsRoutes(app: FastifyInstance) {
   // ── GET /reports/birthdays — quién cumple años HOY ────────────────────────
   //
   // Existe para que el maestro no tenga que acordarse. Es una pregunta que solo
-  // tiene sentido contestada el día que toca, así que se resuelve en vivo y no
-  // se encola como aviso: un cumpleaños no es una tarea pendiente que haya que
-  // marcar como leída, es algo que o se dice hoy o ya no se dice.
+  // tiene sentido contestada el día que toca, así que se resuelve en vivo.
+  //
+  // Desde la migración 0021 el cumpleaños TAMBIÉN avisa (`generarAvisos`): push
+  // al maestro y felicitación al alumno. Pero sigue sin ser una tarea: ese
+  // aviso solo es verdad el día que toca y al siguiente se va solo (`vigentes`).
+  // Esta ruta cuenta a TODO el club activo —el auxiliar también cumple años—;
+  // el aviso, solo a los alumnos, que son quienes tienen campana de club.
   //
   // La comparación va por MES Y DÍA, nunca por la fecha entera —esa solo
   // coincide el día que alguien nace—, y la hace PostgreSQL: traerse el club
@@ -523,21 +546,8 @@ export async function reportsRoutes(app: FastifyInstance) {
       const orgId = orgDelRequest(req);
       if (!orgId) return reply.code(400).send({ error: 'Sin club seleccionado.' });
       const today = todayStr();
-      const mmdd = today.slice(5); // 'MM-DD'
-
-      /**
-       * El 29 de febrero se celebra el 28 los años que no son bisiestos.
-       *
-       * Sin esto, quien nació un 29 de febrero no cumple años en esta
-       * aplicación tres de cada cuatro años. Es el único caso que, si no se
-       * contempla, jamás se descubre probando.
-       */
-      const esBisiesto = (() => {
-        const a = Number(today.slice(0, 4));
-        return (a % 4 === 0 && a % 100 !== 0) || a % 400 === 0;
-      })();
-      const diasQueCuentan =
-        mmdd === '02-28' && !esBisiesto ? ['02-28', '02-29'] : [mmdd];
+      // Con el 29 de febrero incluido los años no bisiestos: ver el módulo.
+      const diasQueCuentan = nacimientosQueSeCelebran(today);
 
       const filas = await req.db
         .select({
@@ -565,9 +575,7 @@ export async function reportsRoutes(app: FastifyInstance) {
         belt: u.belt,
         birthDate: u.birthDate,
         /** Los años que cumple HOY, que es el número que se dice en voz alta. */
-        cumple: u.birthDate
-          ? Number(today.slice(0, 4)) - Number(u.birthDate.slice(0, 4))
-          : null,
+        cumple: u.birthDate ? anosQueCumple(u.birthDate, Number(today.slice(0, 4))) : null,
       }));
     },
   );

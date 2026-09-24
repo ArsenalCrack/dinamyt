@@ -527,8 +527,6 @@ export default function Ficha() {
   /** Quien no pasa por el kiosco: su carnet no marca asistencia, acredita. */
   const esDelStaff = persona?.role === 'owner' || persona?.role === 'staff';
   const planCobro = planes.find((p) => p.id === cobro.planId) ?? null;
-  /** El plan que el alumno tiene puesto: va impreso en su carnet. */
-  const planActual = planes.find((p) => p.id === membership?.currentPlanId) ?? null;
 
   /**
    * Qué cobertura tiene sentido tocar a mano, según el plan elegido.

@@ -106,6 +106,8 @@ export const tipoNotifEnum = mem.enum('tipo_notif', [
   'venc',
   'mora',
   'maestro',
+  /** Migración 0021. Solo vale el día que se escribe: ver `vigentes`. */
+  'cumple',
 ]);
 
 /** Estado de un aviso encolado. */
