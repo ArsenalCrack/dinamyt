@@ -23,6 +23,8 @@ import CampoFecha from "@/components/CampoFecha";
 import ClubesInput from "@/components/ClubesInput";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import ImportarPaquetePanel from "@/components/ImportarPaquetePanel";
+import InformeAdministradoresCard from "@/components/InformeAdministradores";
+import SubidaResultados from "@/components/SubidaResultados";
 import UltimaBajada from "@/components/UltimaBajada";
 import PaisCiudadSelect from "@/components/PaisCiudadSelect";
 import { useI18n, type ClaveTexto } from "@/lib/i18n";
@@ -318,6 +320,12 @@ export default function AdminPage() {
   // Jerarquía: el dato fresco de superadmin viene de la lista de usuarios
   // (el user guardado en localStorage puede ser de un login viejo sin el campo)
   const esSuper = users.some((u) => u.id === user.id && u.es_superadmin);
+  // La organización, por lo mismo: la de localStorage es la del día que se
+  // entró, y la de la lista es la que Campeonatos sabe hoy (F4).
+  const yo = users.find((u) => u.id === user.id) ?? user;
+  const deQueOrganizacion = esSuper
+    ? t("org.todas")
+    : yo.org_nombre || (yo.org_id ? t("org.sinNombre") : t("org.noConsta"));
 
   // Filtro combinado de campeonatos: búsqueda por nombre + estado activo/inactivo
   const coincideCamp = (c: Campeonato) =>
@@ -345,10 +353,20 @@ export default function AdminPage() {
           <p className="muted" style={{ fontSize: "0.85rem", marginTop: 2 }}>
             {user.nombre}
           </p>
+          {/* De qué organización es lo que se está viendo (punto 5 de F4).
+              Con dos workspaces conviviendo, no decirlo ya era confuso. */}
+          <p className="muted" style={{ fontSize: "0.8rem", marginTop: 2 }}>
+            <span className="microetiqueta">{t("org.etiqueta")}</span>{" "}
+            {deQueOrganizacion}
+          </p>
         </div>
       </div>
 
       {dialogo}
+
+      {/* Quién administra qué (F4, D3). Solo el superadmin, y solo si hay algo
+          que decidir. */}
+      {esSuper && <InformeAdministradoresCard />}
 
       {/* ══════════════ MODO MANTENIMIENTO (solo superadmin) ══════════════
           Va arriba del todo y no dentro de una pestaña: se busca justo antes
@@ -444,6 +462,9 @@ export default function AdminPage() {
           {/* De cuándo es la copia que corre en este PC. En la instalación de
               internet no pinta nada: nunca ha importado un paquete. */}
           <UltimaBajada refrescar={bajadaKey} />
+          {/* Lo que falta por subir a internet (F8). Solo en el PC del evento:
+              en la instalación de internet no hay destino ni nada pendiente. */}
+          <SubidaResultados />
 
           <div className="admin-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
             <h2 style={{ fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "1.1rem" }}>

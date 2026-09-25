@@ -282,6 +282,15 @@ def _sesion_con_pase(pase):
     if not user.activo:
         return _error_sso("desactivado")
 
+    # F8: en el PC del evento, la entrada de un admin con DINAMYT es el momento
+    # de subir los resultados pendientes. El pase queda SOLO en memoria, y solo
+    # si esta instalación tiene a dónde subir (`cartero.recordar_pase`).
+    from flask import current_app
+
+    from .. import cartero
+
+    cartero.recordar_pase(user, _token_de_cabecera(), pase, current_app._get_current_object())
+
     return _respuesta_con_cookie(user, SESION_SSO_HORAS), 200
 
 
@@ -388,6 +397,18 @@ def logout():
     navegador es lo que le costó dos pulsaciones a Membresías (§5.12): una
     marca del `localStorage` se pierde sola y no había forma de notarlo.
     """
+    # F8: si quien sale es el admin cuyo pase sube los resultados, ese pase se
+    # olvida con él. Salir es decir «ya no actúes en mi nombre».
+    try:
+        verify_jwt_in_request(optional=True)
+        saliente = usuario_actual()
+    except Exception:  # noqa: BLE001 — sin sesión válida también se sale
+        saliente = None
+    if saliente is not None:
+        from .. import cartero
+
+        cartero.olvidar_pase(saliente.email)
+
     respuesta = jsonify({"ok": True, "portal": hay_ecosistema()})
     unset_jwt_cookies(respuesta)
     return respuesta, 200
@@ -586,6 +607,28 @@ def list_users():
 
     users = query.order_by(Usuario.nombre).all()
     return jsonify([u.to_dict(include_asignaciones=True) for u in users]), 200
+
+
+@auth_bp.route("/organizaciones/administradores", methods=["GET"])
+@jwt_required()
+def informe_de_administradores():
+    """
+    GET /api/auth/organizaciones/administradores (solo superadmin)
+
+    El informe que D3 pide antes de aplicar nada: las organizaciones con MÁS
+    DE UN administrador, con nombre y correo de cada uno, más los admins que
+    todavía no tienen organización (no han vuelto a entrar desde el portal
+    desde F4, o se crearon a mano en la consola).
+
+    Solo el superadmin: un admin normal no ve a los de otros workspaces, y
+    este informe va justo de eso.
+    """
+    current_user = require_admin()
+    if not current_user or not current_user.es_super:
+        return jsonify({"error": "Solo el superadministrador"}), 403
+    from ..organizacion import informe_de_administradores as informe
+
+    return jsonify(informe()), 200
 
 
 @auth_bp.route("/clubes", methods=["GET"])
