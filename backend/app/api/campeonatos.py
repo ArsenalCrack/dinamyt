@@ -8,6 +8,7 @@ from flask_jwt_extended import jwt_required
 from ..extensions import db
 from ..security import limitar
 from ..models.campeonato import ESTADOS_CAMPEONATO, Campeonato
+from ..models.invitacion import InvitacionClub
 from ..models.tatami import Tatami
 from .auth import mayusculas
 from .scoping import (
@@ -140,6 +141,14 @@ def crear():
     estado = data.get("estado", "preparacion")
     if estado not in ESTADOS_CAMPEONATO:
         return jsonify({"error": "Estado de campeonato inválido"}), 400
+    # Antes se convertían sin mirar, y una fecha mal escrita era un 500.
+    fechas = {}
+    for campo, etiqueta in (("fecha_inicio", "de inicio"), ("fecha_fin", "de fin")):
+        valor = data.get(campo)
+        try:
+            fechas[campo] = date.fromisoformat(valor) if valor else None
+        except (TypeError, ValueError):
+            return jsonify({"error": f"La fecha {etiqueta} no es válida (AAAA-MM-DD)."}), 400
 
     camp = Campeonato(
         # El nombre del campeonato encabeza la pantalla pública, el acta y las
@@ -147,14 +156,18 @@ def crear():
         # descripción no — ahí cabe una frase, no un dato.
         nombre=mayusculas(str(data["nombre"]).strip()),
         descripcion=data.get("descripcion"),
-        fecha_inicio=date.fromisoformat(data["fecha_inicio"]) if data.get("fecha_inicio") else None,
-        fecha_fin=date.fromisoformat(data["fecha_fin"]) if data.get("fecha_fin") else None,
+        fecha_inicio=fechas["fecha_inicio"],
+        fecha_fin=fechas["fecha_fin"],
         lugar=lugar,
         ciudad=ciudad,
         pais=pais,
         estado=estado,
         activo=True,
         created_by=admin.id,
+        # La organización de quien lo crea (F4). NULL si no consta —el modo
+        # local, un admin creado a mano—, y la rellena el arranque o su
+        # próxima entrada desde el portal.
+        org_id=admin.org_id,
     )
     db.session.add(camp)
     db.session.flush()  # Para obtener el ID
@@ -193,7 +206,8 @@ def actualizar(camp_id):
     camp = Campeonato.query.get_or_404(camp_id)
     if not es_dueno_campeonato(admin, camp):
         return jsonify({"error": "Campeonato no encontrado"}), 404
-    data = request.get_json()
+    # Sin cuerpo JSON, `data.get` era un 500.
+    data = request.get_json(silent=True) or {}
 
     if data.get("nombre"):
         camp.nombre = mayusculas(str(data["nombre"]).strip())
@@ -201,12 +215,14 @@ def actualizar(camp_id):
         camp.descripcion = data["descripcion"]
     if "activo" in data:
         camp.activo = data["activo"]
-    if data.get("fecha_inicio"):
-        from datetime import date
-        camp.fecha_inicio = date.fromisoformat(data["fecha_inicio"])
-    if data.get("fecha_fin"):
-        from datetime import date
-        camp.fecha_fin = date.fromisoformat(data["fecha_fin"])
+    from datetime import date
+    for campo, etiqueta in (("fecha_inicio", "de inicio"), ("fecha_fin", "de fin")):
+        if data.get(campo):
+            # Una fecha mal escrita era un 500; ahora es una frase.
+            try:
+                setattr(camp, campo, date.fromisoformat(data[campo]))
+            except (TypeError, ValueError):
+                return jsonify({"error": f"La fecha {etiqueta} no es válida (AAAA-MM-DD)."}), 400
     for campo, etiqueta, propio in (
         ("lugar", "La sede", True), ("ciudad", "La ciudad", False), ("pais", "El país", False),
     ):
@@ -662,3 +678,184 @@ def generar_llaves_auto(camp_id):
         "omitidas": omitidas,
         "avisos": avisos,
     }), 201
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Clubes invitados (F5 de PLAN-CAMPEONATOS)
+# ══════════════════════════════════════════════════════════════════
+#
+# El administrador decide, campeonato a campeonato, qué clubes inscriben. Ver
+# `models/invitacion.py` (qué es una invitación y sus estados) y
+# `app/invitaciones.py` (cómo entra el maestro con ella).
+
+CLUB_NOMBRE_MAX = 150
+
+
+def _campeonato_del_admin(camp_id):
+    """(admin, campeonato, error) para las rutas de invitaciones."""
+    admin = _require_admin()
+    if not admin:
+        return None, None, (jsonify({"error": "Solo administradores"}), 403)
+    camp = db.session.get(Campeonato, camp_id)
+    if camp is None or not es_dueno_campeonato(admin, camp):
+        return None, None, (jsonify({"error": "Campeonato no encontrado"}), 404)
+    return admin, camp, None
+
+
+@campeonatos_bp.route("/<int:camp_id>/clubes", methods=["GET"])
+@jwt_required()
+def listar_invitaciones(camp_id):
+    """GET /api/campeonatos/:id/clubes — los clubes invitados, retirados incluidos."""
+    _, camp, error = _campeonato_del_admin(camp_id)
+    if error:
+        return error
+    invitaciones = (
+        InvitacionClub.query.filter_by(campeonato_id=camp.id)
+        .order_by(InvitacionClub.club_nombre)
+        .all()
+    )
+    return jsonify([i.to_dict() for i in invitaciones]), 200
+
+
+@campeonatos_bp.route("/<int:camp_id>/clubes", methods=["POST"])
+@jwt_required()
+def invitar_club(camp_id):
+    """
+    POST /api/campeonatos/:id/clubes
+    Body: { "org_id"?: str, "nombre": str, "ciudad"?: str }
+
+    Con `org_id` —el club del ecosistema, elegido del buscador— la invitación
+    abre la puerta a sus maestros aunque sean de otro workspace. Sin él es solo
+    un nombre (el modo local): queda anotado y viaja en el paquete, pero no
+    deja entrar a nadie de fuera (ver `models/invitacion.py`).
+
+    Invitar otra vez a un club retirado lo vuelve a invitar. Invitar a uno que
+    ya está es un 409 con una frase, no un duplicado.
+    """
+    admin, camp, error = _campeonato_del_admin(camp_id)
+    if error:
+        return error
+    data = request.get_json(silent=True) or {}
+    org_id = str(data.get("org_id") or "").strip()[:64] or None
+    nombre = mayusculas(str(data.get("nombre") or "").strip())
+    if not nombre:
+        return jsonify({"error": "Escribe el nombre del club."}), 400
+    if len(nombre) > CLUB_NOMBRE_MAX:
+        return jsonify({"error": f"El nombre no puede superar {CLUB_NOMBRE_MAX} caracteres."}), 400
+    ciudad = str(data.get("ciudad") or "").strip()[:120] or None
+
+    existentes = InvitacionClub.query.filter_by(campeonato_id=camp.id).all()
+    previa = next(
+        (
+            i for i in existentes
+            if (org_id and i.org_id == org_id)
+            or (not org_id and not i.org_id and i.club_nombre.casefold() == nombre.casefold())
+        ),
+        None,
+    )
+    if previa is not None and previa.vigente:
+        return jsonify({"error": f"{previa.club_nombre} ya está invitado a este campeonato."}), 409
+    if previa is not None:
+        previa.estado = "invitado"
+        previa.invitado_por_id = admin.id
+        invitacion = previa
+    else:
+        invitacion = InvitacionClub(
+            campeonato_id=camp.id,
+            org_id=org_id,
+            club_nombre=nombre,
+            club_ciudad=ciudad,
+            estado="invitado",
+            invitado_por_id=admin.id,
+        )
+        db.session.add(invitacion)
+    db.session.commit()
+    return jsonify({
+        "message": f"{invitacion.club_nombre} invitado.",
+        "invitacion": invitacion.to_dict(),
+    }), 201
+
+
+@campeonatos_bp.route("/<int:camp_id>/clubes/<int:inv_id>", methods=["DELETE"])
+@jwt_required()
+def retirar_invitacion(camp_id, inv_id):
+    """
+    DELETE /api/campeonatos/:id/clubes/:inv_id — retirar la invitación.
+
+    No se borra: pasa a `retirado`. El club deja de ver el campeonato, y lo que
+    ya inscribió se queda —lo modera el admin como siempre—. Borrar la fila
+    haría desaparecer de la ficha el rastro de que ese club participó.
+    """
+    _, camp, error = _campeonato_del_admin(camp_id)
+    if error:
+        return error
+    invitacion = InvitacionClub.query.filter_by(id=inv_id, campeonato_id=camp.id).first()
+    if invitacion is None:
+        return jsonify({"error": "Invitación no encontrada"}), 404
+    invitacion.estado = "retirado"
+    db.session.commit()
+    return jsonify({
+        "message": f"Se retiró la invitación a {invitacion.club_nombre}.",
+        "invitacion": invitacion.to_dict(),
+    }), 200
+
+
+@campeonatos_bp.route("/<int:camp_id>/clubes/buscar", methods=["GET"])
+@jwt_required()
+@limitar(60, 60, nombre="buscar-clubes")
+def buscar_clubes_para_invitar(camp_id):
+    """
+    GET /api/campeonatos/:id/clubes/buscar?q=
+
+    Del directorio del ecosistema (`espejo.buscar_clubes`), con los afiliados a
+    la organización del admin primero. `disponible: false` cuando no se puede
+    preguntar —el modo local, o `ECOSYSTEM_SYNC_SECRET` que falta—: la pantalla
+    lo dice y ofrece invitar por nombre, que es lo único que hay sin ecosistema.
+    En ese caso sugiere los clubes que ya conoce este workspace.
+
+    Cada club dice si ya está invitado, para no ofrecerlo dos veces.
+    """
+    admin, camp, error = _campeonato_del_admin(camp_id)
+    if error:
+        return error
+    texto = str(request.args.get("q") or "").strip()[:80]
+
+    from ..espejo import buscar_clubes
+
+    clubes = buscar_clubes(texto or None, admin.org_id)
+    disponible = clubes is not None
+    if not disponible:
+        clubes = _clubes_conocidos(admin, texto)
+
+    invitados = {
+        (i.org_id or i.club_nombre.casefold())
+        for i in InvitacionClub.query.filter_by(campeonato_id=camp.id).all()
+        if i.vigente
+    }
+    for club in clubes:
+        clave = club.get("org_id") or club["nombre"].casefold()
+        club["ya_invitado"] = clave in invitados
+    return jsonify({"disponible": disponible, "clubes": clubes[:50]}), 200
+
+
+def _clubes_conocidos(admin, texto):
+    """Sin ecosistema: los dojangs de los maestros de este workspace."""
+    from ..models.usuario import Usuario
+
+    query = Usuario.query.filter(Usuario.rol == "maestro")
+    if not admin.es_super:
+        query = query.filter(Usuario.creado_por_id == admin.id)
+    vistos, clubes = set(), []
+    for maestro in query.all():
+        for club in maestro.clubes:
+            nombre = club["nombre"]
+            if texto and texto.casefold() not in nombre.casefold():
+                continue
+            if nombre.casefold() in vistos:
+                continue
+            vistos.add(nombre.casefold())
+            clubes.append({
+                "org_id": None, "nombre": nombre, "ciudad": club.get("ciudad"),
+                "afiliado": False,
+            })
+    return sorted(clubes, key=lambda c: c["nombre"])

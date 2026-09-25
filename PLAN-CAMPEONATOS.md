@@ -13,16 +13,29 @@
 > | **F2** + **F6-b** | ✅ **hecha** | Campeonatos guarda y lee varios papeles, el pase los SUMA a quien ya estaba, y lo que quita la consola se recuerda. El paquete lleva `roles`. Con una contradicción del plan resuelta: ver la nota dentro de F2 |
 > | **F3** + **F6-c** | ✅ **hecha** | El alumno entra a **su panel** (`/mi-panel`): inscripciones con su estado, próximos campeonatos, su maestro, resultados y números. La ficha se reclama con documento y fecha, o la enlaza el admin, y viaja en el paquete. Las lecturas del personal se cerraron antes de abrir la puerta. Con cuatro cambios sobre lo escrito: ver la nota de la parte 3 dentro de F3 |
 >
-> Los carriles A y B están cerrados, y del C quedan **F4** —la organización
-> llega a Campeonatos, con F6-d— y **F5** —inscribirse por invitación—. Todo
-> el carril C tiene que estar dentro **antes del ensayo del ~26 de
-> septiembre**; F8, la subida automática, va al final.
+> | **F4** + **F6-d** | ✅ **hecha** | La organización del ecosistema llega a Campeonatos (`org_id` en usuarios y campeonatos), la regla del admin único al crear el espejo y el informe de D3 para el superadmin. El punto 3 (que `org_id` decida quién es dueño) **a propósito no**: ver la nota dentro de F4 |
+> | **F5** + **F6-e** | ✅ **hecha** | El admin invita clubes desde la ficha del campeonato (buscador contra el directorio de DINAMYT, `GET /sync/clubes`), el maestro invitado inscribe en el workspace del campeonato, y la invitación viaja en el paquete. El documento pasó a ser único **por workspace** |
+> | **F8** | ✅ **hecha, sin puerta** | Los resultados del PC del evento suben solos a internet con la sesión del propio admin (nada guardado en el PC). Endurecida el 25 de septiembre. **Pero el portal todavía no devuelve el pase al PC del evento**, así que de cara al usuario no arranca: ver la nota ⚠️ dentro de F8 |
 >
-> **⏱ Fecha límite: el 8 de octubre de 2026.** Hay campeonato el 9, 10 y 11 y
-> **no hay «después»** (decisión D6): lo que no esté dentro para entonces, no
-> existe el día del evento. La PARTE 4 es el orden que sale de eso. Lo que sí está implementado se cuenta en la
-> PARTE 1, con archivo y línea, para que el plan se apoye en lo que hay y no en
-> lo que uno recuerda que hay.
+> **Todas las fases de F1 a F8 están escritas y probadas** (también contra
+> PostgreSQL con RLS). **Nada del carril C está desplegado todavía**: la VPS
+> sigue con Campeonatos en `8dbc599` y el portal en `583abc4` (comprobado el
+> 25 sep). Lo que queda es desplegar (PARTE 4, nº 0), las decisiones del nº 5,
+> el ensayo §6.0 y, tras un campeonato real, F9.
+>
+> **⏱ Ya no hay fecha límite (D7, 24 de septiembre de 2026).** El campeonato
+> del 9, 10 y 11 de octubre **no se hace**, y el siguiente es el año que viene,
+> sin fecha todavía. Lo que ordenaba este plan —«lo que no esté el 8 no existe
+> el 9» (D6)— deja de valer: ahora se hace **bien y con pruebas**, fase a fase,
+> y lo que estaba aplazado «hasta después del campeonato» ya se puede
+> programar. La PARTE 4 está reescrita con eso. Lo que sí está implementado se
+> cuenta en la PARTE 1, con archivo y línea, para que el plan se apoye en lo
+> que hay y no en lo que uno recuerda que hay.
+>
+> ### 📍 Dónde quedamos — LEER PRIMERO (se actualiza al cerrar cada sesión)
+>
+> **Sesión del 25 de septiembre de 2026.** Ver el diario al final de este
+> archivo (**PARTE 6**): qué se hizo, qué quedó a medias y qué sigue.
 >
 > Los documentos hermanos siguen valiendo y este no los sustituye:
 > `PLAN-SINCRONIZACION-LOCAL-ONLINE.md` (cómo viajan los datos, ya funciona),
@@ -401,10 +414,28 @@ de DINAMYT o entre a un club, **su historial ya está ahí esperándolo**. O sea
 que la ficha del competidor **no depende de tener cuenta**, y la cuenta se le
 engancha después. Desarrollado en F3.
 
-**D6 · TODO tiene que estar funcional para el 9 de octubre.** No hay «después
-del campeonato». Lo que no esté antes del 8, no existe el día del evento — así
-que el plan deja de estar ordenado por prudencia y pasa a estarlo por **lo que
-más duele el sábado por la mañana**. Ver la PARTE 4, reescrita entera.
+**~~D6 · TODO tiene que estar funcional para el 9 de octubre.~~** **REVOCADA
+el 24 de septiembre de 2026**, ver D7. Decía: no hay «después del campeonato»,
+lo que no esté antes del 8 no existe el día del evento, y el plan se ordena por
+lo que más duele el sábado por la mañana.
+
+**D7 · No hay campeonato en octubre: se hace con tiempo** *(24 de septiembre de
+2026)*. El del 9, 10 y 11 de octubre no se celebra y el siguiente es el año que
+viene, sin fecha. Consecuencias:
+
+- **No hay congelación de despliegues** el 8–11 de octubre (`OPERAR.md` §1.5
+  se actualiza).
+- **El ensayo de `OPERAR.md` §6.0 pasa a «antes del próximo campeonato»**, no a
+  la última semana de septiembre. Sigue siendo obligatorio: lo que cambia es
+  cuándo.
+- **Lo aplazado «hasta después del campeonato» se puede programar**: el
+  `/sync/rol` de Campeonatos (`OPERAR.md` §6.1), el bloqueo por plan vencido
+  (PARTE 5) y retirar `POST /auth/register` en internet. Van a la PARTE 4.
+- **F9 sigue esperando un campeonato real**: su definición no era una fecha,
+  era «cuando F1–F8 lleven un campeonato encima». Eso será el año que viene.
+- **Cada fase se prueba también contra PostgreSQL** (`tests/test_rls_postgres.py`):
+  la batería corre en SQLite, donde RLS no existe, y así se escapó un fallo
+  que rompía el flujo entero del maestro (ver PARTE 6).
 
 ### Todas las preguntas, contestadas
 
@@ -844,9 +875,54 @@ cara al producto**, y por eso va sola.
 
 ---
 
-## F4 · La organización llega a Campeonatos
+## F4 · La organización llega a Campeonatos — ✅ hecha (con F6-d)
 
 **Dónde:** `dinamyt-combat/backend`.
+
+> **Hecho, el 24 de septiembre de 2026.** Todo vive en `app/organizacion.py`,
+> más su enganche en `espejo.py`. Los puntos 1, 2, 4 y 5 como estaban
+> escritos; el 3, **a propósito no**:
+>
+> - **Punto 1.** `usuarios.org_id` + `usuarios.org_nombre` y `campeonatos.org_id`
+>   (texto: se copian, no se relacionan). La organización se reescribe en CADA
+>   entrada desde el portal —es un reflejo, no algo que se edite aquí—, y el
+>   nombre se pregunta solo cuando cambia. **Una sola pregunta al ecosistema
+>   por entrada** (`_ClubDelPase`): el club del maestro y el nombre de la
+>   organización salen de la misma. Sin `org_id` en el pase no se borra nada.
+> - **Punto 2.** `rellenar_org_de_campeonatos`: al arrancar y cuando entra un
+>   admin cuya organización se acaba de saber. Un campeonato que ya tiene
+>   organización no se cambia nunca (el creador pudo cambiarse de club).
+> - **Punto 3 NO se hizo: `org_id` todavía no decide quién es dueño de qué.**
+>   Tres razones, escritas también en la cabecera de `organizacion.py`: (1)
+>   RLS filtra por `created_by`, así que un segundo admin de la misma
+>   organización vería el campeonato pero no sus llaves, fichas ni resultados
+>   —una consola a medias—; (2) sería un cambio por sorpresa para los
+>   duplicados de hoy, justo lo que D3 pide no hacer; (3) con un solo admin
+>   por organización las dos reglas dicen lo mismo. Queda para cuando el
+>   informe esté limpio, y entonces se decide si hace falta.
+> - **Punto 4.** Al CREAR el espejo de un admin cuya organización ya tiene
+>   otro activo: entra sin `admin` (con sus otros papeles, o `maestro` si no
+>   le queda ninguno) y queda en el registro. El super-admin no cuenta.
+> - **Punto 5.** `/admin` dice la organización debajo del nombre. El dato sale
+>   de la lista fresca de usuarios, no de `localStorage`.
+> - **La verificación de D3.** `GET /api/auth/organizaciones/administradores`
+>   (solo superadmin) y su tarjeta en `/admin`, que no pinta nada si no hay
+>   nada que decidir.
+> - **F6-d.** Usuarios y campeonato viajan con `org_id` (el usuario, también
+>   con `org_nombre`); `VERSION_PAQUETE` 5. El importador no pisa una
+>   organización que ya esté (avisa), y un campeonato nuevo sin organización en
+>   el paquete recibe la de quien lo importa.
+>
+> **De propina:** crear o editar un campeonato con una fecha mal escrita era
+> un 500 (`date.fromisoformat` sin mirar); y editar sin cuerpo JSON, también.
+> Ahora son un 400 con una frase.
+>
+> **Pruebas:** `tests/test_organizacion.py` (21), cuatro más en
+> `test_sincronizacion.py` y el relleno contra PostgreSQL.
+>
+> **Al desplegar:** nada que migrar a mano (`schema_compat` crea las
+> columnas). El informe sale vacío hasta que los admins vuelvan a entrar desde
+> el portal: es cuando se sabe su organización.
 
 1. `usuarios.org_id` y `campeonatos.org_id` (texto, el UUID del ecosistema).
    `usuarios.org_id` se rellena desde el pase en `resolver_espejo`;
@@ -872,9 +948,76 @@ organizaciones con más de un admin. Si sale largo, F0.2 se decide otra vez.
 
 ---
 
-## F5 · Inscribirse por invitación, no por herencia
+## F5 · Inscribirse por invitación, no por herencia — ✅ hecha (con F6-e)
 
-**Dónde:** `dinamyt-combat` (backend + frontend).
+**Dónde:** `dinamyt-combat` (backend + frontend), y una ruta en el ecosystem.
+
+> **Hecho, el 24 de septiembre de 2026.** Los cuatro puntos, con tres
+> decisiones que el plan no tomaba y un arreglo de fondo que hizo falta antes:
+>
+> - **Punto 1.** `campeonato_clubes` (`models/invitacion.py`): `org_id` (el
+>   club del ecosistema), `club_nombre` (siempre, y lo único en local),
+>   `estado` y `uid`. **`aceptado` lo pone el sistema** con la primera
+>   solicitud del club: participar ES aceptar, no hay botón que pulsar.
+> - **Punto 2.** Sección «Clubes invitados» en la ficha del campeonato
+>   (`components/ClubesInvitados.tsx`): buscar, invitar, retirar. El buscador
+>   pregunta al directorio de DINAMYT por el canal servidor-a-servidor —
+>   **ruta nueva en el ecosystem, `GET /sync/clubes`**, con los afiliados a la
+>   federación que invita primero—. Sin conexión lo dice, sugiere los clubes
+>   que ya conoce el workspace, y deja invitar por nombre.
+> - **Punto 3.** Sin invitación, 403 «Tu club no está invitado a este
+>   campeonato.» (`app/invitaciones.py`).
+> - **Punto 4 (migración blanda), por otro camino: no se crean filas.** La
+>   puerta vieja —«el campeonato es del admin que me creó»— se CONSERVA y se
+>   SUMA a la nueva. Crear invitaciones para todos los maestros de hoy habría
+>   obligado a invitar a los propios maestros en cada campeonato nuevo, y en
+>   el modo local (sin ecosistema) es la única puerta que hay.
+>
+> **Decisión 1 · un nombre no es una llave.** La invitación solo por nombre
+> NO deja entrar a nadie de fuera del workspace. Un nombre lo escribe
+> cualquier admin en la ficha de cualquier maestro: si abriera la puerta, el
+> admin de otra federación se colaría en tus campeonatos poniéndole a su
+> maestro el nombre de un club invitado. Hay prueba.
+>
+> **Decisión 2 · todo lo del maestro invitado vive en el workspace del
+> CAMPEONATO.** La ficha del alumno y la solicitud son de ese admin: es quien
+> las ve y las acepta. Para operar ahí, `rls.en_workspace()` —solo después de
+> comprobar la invitación—; y las lecturas del maestro (`/maestro/mias`, su
+> lista de campeonatos) van con la red levantada y filtradas a mano, como
+> `/api/mi/*`.
+>
+> **Decisión 3 · retirar no borra.** El club deja de ver el campeonato y ya no
+> corrige sus rechazadas; lo que inscribió se queda y lo modera el admin.
+> Volver a invitar lo reabre (la misma fila).
+>
+> **El arreglo de fondo: el documento es único por WORKSPACE.** Era único en
+> toda la base, y eso chocaba con que la ficha es del workspace que la
+> inscribió. Dos síntomas: en PostgreSQL, un admin que daba de alta a alguien
+> con ficha en OTRO workspace recibía un **500** (RLS escondía la ficha ajena
+> y el INSERT chocaba); y con F5, la misma alumna no podía ir a campeonatos de
+> dos federaciones. Ahora `(created_by, documento)` es único, `schema_compat`
+> cambia las bases viejas al arrancar (el índice era aparte, así que no hay
+> que reconstruir la tabla ni en SQLite), `_aplicar_datos` y el importador
+> comparan dentro del workspace, y **reclamar la ficha enlaza TODAS** las que
+> tengan ese documento y esa fecha (una por organización con la que compitió).
+> La prueba que fijaba el 400 viejo cambió de signo, a propósito.
+>
+> **F6-e.** Las invitaciones viajan en el paquete (`VERSION_PAQUETE` 6). Un
+> paquete no BAJA una invitación que aquí ya se aceptó; `retirado` sí se
+> aplica.
+>
+> **Pruebas:** `tests/test_invitaciones.py` (23), tres en
+> `test_sincronizacion.py`, cinco contra PostgreSQL (el flujo entero del
+> maestro invitado con RLS, el documento en dos workspaces, la migración del
+> índice y el borrado en cascada), y `clubes.spec.ts` en el ecosystem.
+>
+> **Al desplegar:** el ecosystem (la ruta `/sync/clubes`) y Campeonatos, en
+> cualquier orden: sin la ruta, el buscador dice que no hay directorio y se
+> invita por nombre. Nada que migrar a mano.
+>
+> **Lo que queda fuera, a propósito:** avisar al maestro de que lo invitaron
+> (hoy lo ve al entrar en su lista), y un interruptor por campeonato de «solo
+> clubes invitados» que cierre también la puerta vieja. Ver PARTE 6.
 
 1. Tabla `campeonato_clubes`: `campeonato_id`, `org_id` (o nombre de club en
    local), `estado` (`invitado` | `aceptado` | `retirado`), `invitado_por_id`,
@@ -985,7 +1128,7 @@ cambia. Multiplicado por cuarenta alumnos y por cada campeonato.
 
 ---
 
-## F6 · Los paquetes llevan la identidad — 🟡 F6-a, F6-b y F6-c hechas; F6-d viaja con F4
+## F6 · Los paquetes llevan la identidad — ✅ F6-a, F6-b, F6-c y F6-d hechas (la d, con F4, el 24 sep)
 
 **Dónde:** `dinamyt-combat/backend/app/api/sincronizacion.py`.
 
@@ -1005,7 +1148,7 @@ cambia. Multiplicado por cuarenta alumnos y por cada campeonato.
 > |---|---|---|
 > | `usuarios.roles` | Campeonatos | **F2** (nº 6) — ✅ viaja desde el 13 sep |
 > | `competidores.eco_sub` ~~/ `usuario_uid`~~ | Campeonatos | **F3** (nº 7) — ✅ viaja desde el 13 sep. Sin `usuario_uid`: el `sub` ya es el mismo en las dos instalaciones |
-> | `org_id` | **no existe en ninguna tabla** (§1.3) | **F4** (nº 8) |
+> | `org_id` | ~~no existe en ninguna tabla~~ (§1.3) | **F4** (nº 8) — ✅ viaja desde el 24 sep (versión 5) |
 >
 > O sea que F6 no se puede *terminar* en el puesto nº 2 — pero **sí se puede
 > hacer la parte que importa**, y es justo la que sostiene su lugar en la
@@ -1192,10 +1335,109 @@ que hay en la carpeta del evento dice «2-INICIAR».
 
 ---
 
-## F8 · La subida automática de resultados
+## F8 · La subida automática de resultados — ✅ hecha
 
 **Dónde:** `dinamyt-combat/backend`. **Depende de F6** (sin `eco_sub` en el
 paquete, lo que sube son filas huérfanas).
+
+> **Hecho, el 24 de septiembre de 2026** (`app/cartero.py`, `api/subida.py`,
+> `components/SubidaResultados.tsx`). El diseño de abajo —la sesión del propio
+> admin, nada guardado en el PC— tal cual, con un cambio en la cola y dos
+> arreglos que hacían falta ANTES para que la vuelta sirviera de algo:
+>
+> - **Cambio · la cola no guarda copias, guarda qué se subió**
+>   (`subidas_resultados`: una fila por `export_uuid` con la huella sha256 de
+>   lo último que llegó). «Pendiente» es todo campeonato cuyos resultados de
+>   HOY no coinciden con los subidos, y lo que sube se construye en el momento
+>   con la MISMA función que el USB (`sobre_de_resultados`). Así no hace falta
+>   engancharse a los tres sitios donde termina una llave (dos son de los
+>   sockets), y una copia encolada no se queda vieja si alguien corrige un
+>   podio después.
+> - **El pase, solo en memoria.** Lo guarda la entrada con DINAMYT de un ADMIN
+>   (`recordar_pase`, solo si hay destino), abre sesión en internet con él
+>   (`POST /api/auth/sesion`, leyendo la cookie de entre las DOS `Set-Cookie`)
+>   y se olvida al salir. Un hilo de fondo vacía la cola mientras el pase dure
+>   (cada minuto; espera creciente 1 → 60 min tras un fallo). Nunca con una
+>   llave activa.
+> - **Se ve:** la línea en `/admin` con los pendientes, el destino, el último
+>   intento, el último error, por qué no sube y [Subir ahora]. Y al arrancar:
+>   destino con pase (info), o destino SIN pase (aviso: nadie podrá subir).
+> - **Configuración del PC del evento:** `CAMPEONATOS_ONLINE_URL` (la raíz de
+>   internet) y `ECOSYSTEM_JWKS_URL` (para poder entrar con DINAMYT cuando
+>   vuelva la red). Va en `INICIAR-LOCAL.md`.
+>
+> **Arreglo 1 · lo que volvía del evento no se veía.** El campeonato sigue
+> activo en internet —es el mismo del que salió— y sin combates propios, y en
+> `/resultados` ganaba siempre el vivo: «0 resultados», y los que volvieron
+> escondidos. Ahora manda el que tiene algo que enseñar, y el enlace por id
+> del campeonato lleva a lo publicado.
+>
+> **Arreglo 2 · cualquier admin con el archivo pisaba lo publicado por otro**
+> (y en PostgreSQL era un 500: RLS le escondía el snapshot ajeno y el INSERT
+> chocaba). Ahora es un 409 con una frase.
+>
+> **Arreglo 3 · el QR del juez ya no sale a la red.** `verificar_pase`
+> descargaba el JWKS para CUALQUIER token. Con `ECOSYSTEM_JWKS_URL` puesta en
+> el PC del evento (que F8 pide) y sin internet, cada juez que entraba por QR
+> esperaba el tiempo de espera de esa descarga. Un token que no es RS256 del
+> ecosistema se descarta sin preguntar.
+>
+> **Pruebas:** `tests/test_subida_resultados.py` (13) con DOS instalaciones
+> reales en el mismo proceso —el cartero habla con la de internet por su
+> cliente de pruebas, no con un simulacro—, `test_vuelta_resultados.py` (5),
+> una en `test_identidad_ecosystem.py` y dos contra PostgreSQL.
+>
+> **Endurecida el 25 de septiembre de 2026**, al revisarla antes del commit.
+> Tres agujeros que la primera versión dejaba:
+>
+> - **Resultados falsos sobre un campeonato ajeno.** El arreglo 1 hace que lo
+>   publicado TAPE al campeonato vivo sin combates. Eso convertía el
+>   `export_uuid` en una llave: quien lo tuviera —viaja en el paquete que se
+>   baja al PC del evento, lo ve cualquiera que toque ese PC— publicaba
+>   resultados que se veían como los de otro organizador. Ahora
+>   `importar_resultados` mira, con la red levantada, el campeonato vivo de
+>   ese `export_uuid`: si existe y no es tuyo (`es_dueno_campeonato`), 409
+>   `campeonato_de_otro`. Vale igual para el USB que para el cartero.
+> - **El botón y el hilo se cruzaban.** Dos pasadas a la vez creaban dos
+>   veces la fila del mismo `export_uuid` (única): el botón devolvía un 500, o
+>   el hilo moría en silencio. Ahora hay UNA pasada a la vez (`_vaciando`); la
+>   segunda no espera, contesta `subiendo` y la pantalla lo dice.
+> - **El pase viajaba en claro si el destino era `http://`.** Lo primero que
+>   el cartero envía es el pase de DINAMYT del admin. Un destino que no es
+>   `https://` (salvo `localhost`, para ensayar) cuenta como ninguno, y el
+>   arranque avisa de que la subida quedó apagada y por qué.
+>
+> **Límite conocido, a propósito:** el pase del ecosistema dura 30 minutos
+> (`B3-RIESGOS.md` §1.3), así que el cartero trabaja durante la media hora
+> siguiente a que el admin entre con DINAMYT. Si no terminó, basta con volver
+> a entrar. Y una llave que quedó `activa` sin terminar (un combate
+> abandonado) frena la subida de TODO: la línea de `/admin` lo dice («hay un
+> combate en marcha»), y el USB sigue ahí.
+>
+> ### ⚠️ Lo que F8 NO tiene todavía: la puerta de entrada (25 sep 2026)
+>
+> Todo lo de arriba funciona **una vez que el pase llega** al backend del PC
+> del evento. Lo que no funciona es que llegue: «Entrar con DINAMYT» manda al
+> portal con `?redirect=<origen de este PC>/login`, y el portal solo devuelve
+> el `#token=` a los orígenes de `NEXT_PUBLIC_CAMPEONATOS_URL`,
+> `…_MEMBRESIAS_URL` y `…_ACADEMY_URL` (`destinoSeguro`,
+> `apps/ecosystem-portal/src/lib/apps.ts:66`). El PC del evento
+> (`http://localhost:3000`, o su IP de la LAN) no es ninguno: la persona
+> entra al portal y se queda en su panel. Las pruebas no lo ven porque
+> entregan el pase directamente a `POST /api/auth/sesion`.
+>
+> **Hay que decidirlo, y es del usuario** (toca la lista blanca del portal en
+> producción):
+>
+> | Opción | Qué es | Coste |
+> |---|---|---|
+> | **A · Volver a este mismo PC** (recomendada) | El portal acepta también `http://localhost:3000` y `http://127.0.0.1:3000` como vuelta **de Campeonatos**, nada más (el patrón de «loopback» de las apps nativas, RFC 8252 §7.3). El admin sube desde el navegador del PC del evento | Un programa que escuche en ese puerto de ese PC recibiría un pase de 30 min. Si ya hay algo así en el PC, el PC está perdido de todos modos. La IP de la LAN NO entra: esa sí la puede suplantar otro en la red del evento |
+> | **B · Dejarlo dormido** | F8 queda escrita y probada, sin puerta. La vuelta sigue siendo el USB | Nada, salvo que la subida automática no existe de cara al usuario |
+> | C · Llave de máquina | La descartada arriba | Una llave viva en un portátil que viaja |
+>
+> Con A: un cambio de pocas líneas en `destinoSeguro` (más su prueba) y
+> recompilar el portal (§1.3 de `OPERAR.md`: es `NEXT_PUBLIC_*`, no basta con
+> reiniciar).
 
 **La regla del diseño no cambia y no se toca:** sigue siendo un solo sentido, y
 **solo suben podios y rankings**
@@ -1264,29 +1506,37 @@ Solo cuando F1–F8 lleven **un campeonato real** encima:
 
 ---
 
-# PARTE 4 · El orden — TODO antes del 8 de octubre
+# PARTE 4 · El orden
 
-*(reescrita el 9 de septiembre de 2026, tras D6. La versión anterior repartía el
-plan en «antes» y «después del campeonato». **Ya no hay después**: lo que no
-esté el 8, no existe el 9.)*
+*(reescrita el 24 de septiembre de 2026, tras D7. La versión del 9 de
+septiembre lo metía todo antes del 8 de octubre; ese campeonato no se hace y el
+siguiente es el año que viene. Lo que queda abajo de «EL ORDEN DE TRABAJO» es
+la historia de cómo se llegó hasta F3, y se conserva.)*
 
-### Lo único que sigue siendo intocable
+### Lo que manda ahora
 
-- **Los días 9, 10 y 11 no se despliega nada.** El 8 solo arreglos
-  (`OPERAR.md` §1.5). Eso no es prudencia opcional: es que hay gente delante y
-  una llave en marcha.
-- **La última semana de septiembre se corre el ensayo** de `OPERAR.md` §6.0, y
-  se anotan los números. Todo lo que toque login, roles o identidad **tiene que
-  estar dentro antes de ese ensayo**, o el ensayo no mide lo que va a correr.
+- **Sin fecha: cada fase entra cuando está probada**, también contra
+  PostgreSQL (ver D7). Mejor una fase bien que tres a medias.
+- **El ensayo de `OPERAR.md` §6.0 se corre antes del próximo campeonato**, con
+  todo lo que toque login, roles e identidad ya desplegado. Sigue siendo
+  obligatorio.
+- **Cada fase sigue dejando la aplicación desplegable**, y se despliega en
+  cuanto está: nada de acumular tres fases para un despliegue grande.
 
-Eso da **dos fechas reales**, y son las que ordenan lo de abajo:
+### EL ORDEN NUEVO (24 de septiembre de 2026)
 
-| | |
-|---|---|
-| **~26 de septiembre** | Todo lo que toca identidad, roles o login, DENTRO. Después se corre el ensayo sobre lo que de verdad va a correr el 9 |
-| **8 de octubre** | Todo lo demás, DENTRO. Y a partir del 9, nada |
+| # | Qué | Estado |
+|---|---|---|
+| **0** | **Desplegar lo que ya está hecho y no está en la VPS** (comprobado el 25 sep: sigue igual): el portal va sin F1 (`583abc4`) y Campeonatos sin la parte 3 de F3 (`8dbc599`), ni F4, F5 ni F8. Orden: Campeonatos → ecosystem (shared, migrar 0023, reiniciar; trae `/sync/clubes`) → portal. Los comandos, en el diario (PARTE 6) | ⏳ lo hace el usuario |
+| **1** | **Arreglo de RLS en `inscripciones`** — el maestro no podía inscribir en PostgreSQL | ✅ hecho el 24 sep, sin desplegar |
+| **2** | **F4 + F6-d** — la organización llega a Campeonatos | ✅ hecho el 24 sep, sin desplegar |
+| **3** | **F5 + F6-e** — inscribirse por invitación, y la invitación viaja en el paquete | ✅ hecho el 24 sep, sin desplegar |
+| **4** | **F8** — la subida automática de resultados | ✅ hecho el 24 sep, endurecido el 25, sin desplegar. **Le falta la puerta**: el portal no devuelve el pase al PC del evento (ver la nota ⚠️ dentro de F8) — decisión A/B del usuario |
+| **5** | **Lo que esperaba «a después del campeonato»**: `/sync/rol` a Campeonatos (`OPERAR.md` §6.1), bloqueo por plan vencido (PARTE 5), retirar `POST /auth/register` de la instalación de internet | pendiente, por decidir cada uno |
+| **6** | **Ensayo §6.0** con todo lo anterior dentro | antes del próximo campeonato |
+| **7** | **F9** — retirar los andamios | después del próximo campeonato |
 
-### EL ORDEN DE TRABAJO — se empieza por arriba
+### EL ORDEN DE TRABAJO — se empieza por arriba *(versión del 9 de septiembre, histórica)*
 
 *(reordenado el 9 de septiembre de 2026, al implementar F6 y descubrir que en
 el puesto 2 no se puede terminar. Ver «F6 se reparte» aquí abajo.)*
@@ -1411,3 +1661,149 @@ Escrito para que dentro de tres meses nadie lo busque aquí:
 - **No sincroniza en tiempo real.** Sigue siendo un sentido y por tandas.
 - **No toca el motor de combate ni el de figuras.** Ni una línea de
   `backend/app/engine/`.
+
+---
+
+# PARTE 6 · Diario de sesiones — dónde quedamos
+
+*Una entrada por sesión, la más reciente arriba. Es lo primero que lee la
+siguiente: qué se hizo, qué quedó a medias, qué falta desplegar y qué sigue.*
+
+## Sesión del 25 de septiembre de 2026
+
+**Contexto:** la sesión del 24 se cortó por el límite de uso con F8 escrita y
+en verde pero **sin commit**, y con F4 y F5 con commit pero **sin empujar**
+(ni en `dinamyt-combat` ni el `/sync/clubes` del monorepo). Esta sesión la
+cierra.
+
+### Qué se hizo
+
+1. **F8 revisada antes del commit, y tres agujeros cerrados** (detalle en la
+   nota «Endurecida» dentro de F8): resultados falsos sobre un campeonato
+   ajeno vía `export_uuid` (409 `campeonato_de_otro`), el botón y el hilo del
+   cartero cruzándose (una pasada a la vez), y el pase viajando en claro a un
+   destino `http://` (solo `https://` o `localhost`). +6 pruebas.
+2. **El hueco que las pruebas no veían: F8 no tiene puerta** (nota ⚠️ dentro
+   de F8). El portal no devuelve el pase al PC del evento. Documentado aquí y
+   en `INICIAR-LOCAL.md` §7.2; **decisión A/B pendiente del usuario**.
+3. **Commits:** `e67acbf` (F8) en `dinamyt-combat`; empujados con él
+   `248df50` (RLS de inscripciones), `d7f145a` (F4) y `7d5bf4f` (F5). En el
+   monorepo, `0c30eeb` (`/sync/clubes`) y el espejo de `productos/campeonatos`.
+4. **La VPS, comprobada por SSH:** igual que el 24. Campeonatos en `8dbc599`,
+   portal en `583abc4`, Membresías en `3488b31`; los seis servicios activos.
+
+### Baterías al cerrar
+
+- Campeonatos, SQLite: **444 en verde** (12 saltadas: son las de PostgreSQL).
+- Campeonatos contra PostgreSQL 18 con `FORCE ROW LEVEL SECURITY` y un rol
+  sin superusuario: **13/13**.
+- Frontend de Campeonatos: `tsc` y `eslint` limpios.
+- Ecosystem (el 24, con `/sync/clubes`): 362/362 y `tsc` limpio.
+
+### Hallazgos que siguen en pie
+
+- **F8 sin puerta** (arriba). Mientras no se decida, la vuelta es el USB.
+- **`/srv/campeonatos/backend/.env.bak-2026-08-30`**: una copia del `.env`
+  —con sus secretos— dentro de la carpeta del repositorio en la VPS. No la
+  sirve nada (el backend no expone archivos de su carpeta), pero **git no la
+  ignora** —por eso sale como `??` en `git status`—: un `git add -A` en el
+  servidor la subiría a GitHub con los secretos. Desde esta sesión el
+  `.gitignore` ignora `*.env.bak*` (tras el `git pull` deja de salir), pero el
+  archivo sigue ahí: moverlo fuera del repo o borrarlo. Lo hace el usuario.
+- **Una llave abandonada en `activa` frena toda la subida** (F8). Se ve en
+  `/admin`; no se arregla solo.
+- Lo que F5 dejó fuera a propósito: avisar al maestro de que lo invitaron, y
+  el interruptor «solo clubes invitados» que cierre la puerta vieja.
+
+### Cómo desplegar lo pendiente (`OPERAR.md` §1.2, §2.3, §2.4-bis)
+
+Orden: **respaldo → Campeonatos → ecosystem (shared, migrar 0023) → portal**.
+Campeonatos no migra (`schema_compat` crea al arrancar las columnas de F4,
+la tabla de F5, la de F8 y el índice nuevo del documento), pero ese arranque
+hace `ALTER TABLE`: si se cuelga es §5.1-ter (`NRestarts`, `pg_stat_activity`).
+
+```bash
+sudo -v && sudo -u postgres pg_dump -Fc dinamyt > ~/respaldo-$(date +%F).dump && sudo mv ~/respaldo-$(date +%F).dump /var/backups/ && sudo ls -lh /var/backups/
+```
+
+```bash
+cd /srv/campeonatos && git fetch && git log --oneline -1 origin/main && git status --short
+```
+
+```bash
+cd /srv/campeonatos && git pull && backend/venv/bin/pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build && sudo systemctl restart campeonatos-api campeonatos-web && systemctl is-active campeonatos-api campeonatos-web
+```
+
+```bash
+cd /srv/dinamyt && git fetch && git log --oneline -1 origin/main && git status --short
+```
+
+```bash
+cd /srv/dinamyt && git pull && pnpm install --frozen-lockfile && pnpm --filter @dinamyt/shared build && pnpm --filter @dinamyt/ecosystem-api build && pnpm --filter @dinamyt/ecosystem-portal build
+```
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && pnpm db:migrar
+```
+
+```bash
+sudo systemctl restart dinamyt-id dinamyt-portal && sudo systemctl status dinamyt-id --no-pager
+```
+
+Comprobaciones que no mienten: las rutas nuevas dan **401, no 404**
+(`curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5000/api/subida/estado`
+y `…/api/mi/panel`); a los cinco minutos, `systemctl show campeonatos-api -p
+NRestarts` sigue igual; y `curl -s -o /dev/null -w "%{http_code}
+"
+http://127.0.0.1:3001/sync/clubes` da **401** (un 404 querría decir que falta
+`ECOSYSTEM_SYNC_SECRET`: entonces el buscador de clubes no funciona).
+
+### Qué sigue, en orden
+
+1. **Desplegar** (arriba). Es lo único que hace visible el carril C.
+2. **Decidir la puerta de F8** (A o B). Si es A, es una tarde: el cambio en
+   `destinoSeguro`, su prueba y recompilar el portal.
+3. **Las tres decisiones del nº 5 de la PARTE 4**: `/sync/rol` a Campeonatos,
+   el bloqueo por plan vencido y retirar `POST /auth/register` de internet.
+4. **El ensayo de `OPERAR.md` §6.0** con todo desplegado.
+5. **F9**, solo después de un campeonato real.
+
+## Sesión del 24 de septiembre de 2026
+
+**Contexto que cambió:** no hay campeonato en octubre (D7). Se revisó lo hecho
+antes de seguir, y se trabajó con una base PostgreSQL de verdad al lado.
+
+### Estado de la VPS al empezar (comprobado por SSH)
+
+| App | Commit en la VPS | Lo que le falta |
+|---|---|---|
+| Campeonatos (`/srv/campeonatos`) | `8dbc599` | la parte 3 de F3 (`d26d300`) y todo lo de hoy |
+| Portal + ecosystem (`/srv/dinamyt`) | `583abc4` | **F1** (`58b3e08`, migración 0023) y el botón de F3 (`696e1dd`) |
+| Membresías | `3488b31` | nada |
+
+Consecuencia: **F2 corre en producción sin F1** — no pasa nada, porque sin
+`roles_campeonatos` en el pase Campeonatos lee `role_campeonatos`, que es para
+lo que F2 se escribió así. Pero nada del carril C se ve todavía de cara al
+usuario.
+
+### 1 · El fallo que la batería no podía ver: RLS en `inscripciones` — ✅ arreglado
+
+`tests/test_rls_postgres.py` (nuevo) corre contra un PostgreSQL con
+`FORCE ROW LEVEL SECURITY` y un rol normal, como producción. La primera prueba
+—el maestro inscribe a una alumna y el admin la ve— **falló al insertar**:
+
+    new row violates row-level security policy for table "inscripciones"
+
+La solicitud del maestro se guarda con `created_by = maestro.id` (es quien la
+envía), y la política pedía `created_by = workspace` (el id del admin). En
+producción eso es un **500 en cada inscripción de un maestro**, y aunque
+hubiera entrado, el admin no la habría visto. En SQLite no hay RLS: 374 pruebas
+en verde y el flujo roto.
+
+**Arreglo** (`app/rls.py`): la política de `inscripciones` mira el workspace de
+SU CAMPEONATO, no quién la envió. Se aplica sola al reiniciar (`ensure_rls`
+reescribe las políticas). Sirve también al importador, que ya guardaba las
+solicitudes con el maestro como autor.
+
+**Cómo correr la prueba contra PostgreSQL:** ver la cabecera de
+`tests/test_rls_postgres.py`. Sin `CAMPEONATOS_PG_URL` se salta sola.

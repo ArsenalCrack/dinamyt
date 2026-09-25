@@ -193,16 +193,47 @@ def _decir_como_quedo_el_ecosistema(app):
         # La combinación de la avería: se entra desde DINAMYT, pero el tema y el
         # idioma no viajan en ninguna de las dos direcciones.
         log.warning(
-            "[ecosistema] EL ESPEJO DE APARIENCIA ESTÁ APAGADO: falta "
-            "ECOSYSTEM_SYNC_SECRET. Se entra desde DINAMYT, pero el tema y el "
-            "idioma elegidos en el portal NO llegan aquí, ni los de aquí allá. "
-            "Tiene que ser el MISMO valor que en ecosystem-api. Ver OPERAR.md §1.4."
+            "[ecosistema] EL ESPEJO ESTÁ APAGADO: falta ECOSYSTEM_SYNC_SECRET. "
+            "Se entra desde DINAMYT, pero el tema y el idioma elegidos en el "
+            "portal NO llegan aquí, ni los de aquí allá; y al invitar clubes a "
+            "un campeonato NO se puede buscar en el directorio de DINAMYT (solo "
+            "por nombre, que no abre la puerta a maestros de fuera). Tiene que "
+            "ser el MISMO valor que en ecosystem-api. Ver OPERAR.md §1.4."
         )
     else:
         log.warning(
             "[ecosistema] hay ECOSYSTEM_SYNC_SECRET pero no ECOSYSTEM_JWKS_URL: "
             "el espejo de apariencia no sirve de nada sin pase que lo estrene. "
             "Ver OPERAR.md §1.4."
+        )
+
+    # ── La subida automática de resultados (F8) ──
+    # Solo tiene sentido en el PC del evento, que es el único con destino. Lo
+    # que no puede pasar es tener destino y no poder usarlo sin que se note:
+    # sin pase, ningún admin puede entrar con DINAMYT, y el cartero sale con
+    # la sesión de un admin que entró así (ver `app/cartero.py`).
+    from . import cartero
+
+    crudo = cartero.destino_configurado()
+    destino = cartero.destino()
+    if crudo and not destino:
+        log.warning(
+            "[subida] CAMPEONATOS_ONLINE_URL (%s) NO ES https://: la subida queda "
+            "APAGADA, porque lo primero que viaja es el pase de DINAMYT del admin "
+            "y en claro lo lee cualquiera en la red del evento.",
+            crudo,
+        )
+    elif destino and pase:
+        log.info(
+            "[subida] los resultados suben a %s cuando un admin entra con DINAMYT.",
+            destino,
+        )
+    elif destino:
+        log.warning(
+            "[subida] HAY DESTINO (%s) PERO NO HAY PASE: falta ECOSYSTEM_JWKS_URL, "
+            "así que nadie puede entrar con DINAMYT y los resultados NO van a "
+            "subir solos. Se pueden llevar a mano (Reportes → Exportar).",
+            destino,
         )
 
 
