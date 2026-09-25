@@ -54,10 +54,40 @@ export function appsDelEcosistema(): { origen: string; nombre: string }[] {
 }
 
 /**
+ * **La vuelta al PC del evento** *(F8 de `PLAN-CAMPEONATOS.md`, opción A,
+ * decidida el 25 de septiembre de 2026).*
+ *
+ * El día del campeonato, Campeonatos corre en un portátil sin internet
+ * (`INICIAR-LOCAL.md`). Cuando vuelve la red, el admin entra ahí con su cuenta
+ * de DINAMYT y es ESA sesión la que sube los resultados a internet — en el PC
+ * no se guarda ninguna llave. Para eso este portal tiene que poder devolverle
+ * el pase, y el PC no es ninguna de las direcciones de arriba.
+ *
+ * ── Por qué SOLO el propio PC, y solo el puerto 3000 ──
+ *
+ * - **`localhost` / `127.0.0.1`**: el pase acaba en el navegador del mismo
+ *   ordenador que lo pidió. Es el patrón de las apps nativas (RFC 8252 §7.3).
+ *   Quien pudiera recibirlo ahí ya controla ese ordenador.
+ * - **Nunca la IP de la LAN** (`http://192.168.x.x:3000`): en la red del
+ *   evento esa dirección la puede suplantar cualquiera con un portátil, y el
+ *   pase viajaría en claro por el aire. Desde otro dispositivo se entra con
+ *   la contraseña de la instalación, como siempre.
+ * - **`3000`** es donde `INICIAR.bat` sirve la web del evento. Otro puerto de
+ *   la misma máquina es otro programa, no Campeonatos.
+ *
+ * Un enlace malicioso a `/login?redirect=http://localhost:3000/…` solo
+ * consigue mandar el pase de la víctima a SU propio ordenador. Y como el
+ * referente no es ese origen, `laPidioEsaApp` lo trata como no fresco: enviar
+ * el formulario entra al portal, y volver queda como segundo botón.
+ */
+const VUELTAS_DEL_PC_DEL_EVENTO = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+/**
  * SSO por redirección: una app federada manda aquí con `?redirect=<su login>`;
  * tras iniciar sesión se vuelve a esa URL con el token en el FRAGMENTO
  * (`#token=` nunca viaja al servidor). Solo se permite volver a orígenes
- * conocidos del ecosistema — jamás a un dominio arbitrario.
+ * conocidos del ecosistema — jamás a un dominio arbitrario — y al PC del
+ * evento visto desde sí mismo (arriba).
  *
  * `/salir` usa esta misma función, y ahí importa igual o más: sin ella,
  * cualquiera podría repartir un enlace a `/salir?redirect=<su web>` que cierra
@@ -70,7 +100,11 @@ export function destinoSeguro(
   try {
     const url = new URL(redirect);
     const app = appsDelEcosistema().find((a) => a.origen === url.origin);
-    return app ? { url: url.toString(), nombre: app.nombre } : null;
+    if (app) return { url: url.toString(), nombre: app.nombre };
+    if (VUELTAS_DEL_PC_DEL_EVENTO.includes(url.origin)) {
+      return { url: url.toString(), nombre: 'Campeonatos' };
+    }
+    return null;
   } catch {
     return null;
   }
