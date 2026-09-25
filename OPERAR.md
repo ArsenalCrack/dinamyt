@@ -94,14 +94,17 @@ nunca depende de que alguien se acordara de sincronizar.
 | `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe, y el pie de los correos apunta a ninguna parte |
 | `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: ver §3 |
 | `CRON_SECRET` | ecosystem-api | El aviso diario de suscripciones **no existe** (la ruta responde 404). El botón del panel sigue funcionando |
-| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api, membresias-api **y campeonatos-api** | **El mismo valor en las tres.** En Membresías: la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan — el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7). En **Campeonatos**: el tema y el idioma **no viajan en ninguna de las dos direcciones** (§4.21) |
+| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api, membresias-api **y campeonatos-api** | **El mismo valor en las tres.** En Membresías: la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan — el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7). En **Campeonatos**: el tema y el idioma **no viajan en ninguna de las dos direcciones** (§4.21), y el juez que se da de alta en `/admin` nace con contraseña de allí, **sin cuenta de DINAMYT** (§4.4). Es a propósito que el PC del evento NO la lleve |
 | `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
 | `MEDIA_PUBLIC_URL` | ecosystem-api | **El interruptor de las fotos en disco** (§4.20). Sin ella no falla nada: las imágenes se siguen guardando incrustadas en la fila, como siempre. Con ella van al disco **y** el espejo las manda absolutas — las dos cosas a la vez, y por eso es una sola variable. ⚠️ **Tiene que ser `https://`**: Membresías solo acepta `data:` o `https://`, y su rechazo es mudo |
 
 ## 1.5 Lo que nunca se hace
 
-- **Desplegar los días 9, 10 y 11 de octubre.** Son los tres del campeonato, con
-  gente delante y una llave en marcha: ahí no se sube nada, y punto.
+- **Desplegar durante un campeonato, ni la víspera.** Con gente delante y una
+  llave en marcha no se sube nada, y punto; el día anterior solo entran
+  arreglos. *(Hasta el 24 sep 2026 esto decía «el 9, 10 y 11 de octubre»: ese
+  campeonato no se celebra —D7 de `PLAN-CAMPEONATOS.md`— y el siguiente es el
+  año que viene, sin fecha. La regla vale para el que sea.)*
 
   > **La regla era de trece días (del 1 al 13) y se recortó a tres el 4 de
   > septiembre.** Congelar dos semanas para proteger un fin de semana salía
@@ -109,7 +112,7 @@ nunca depende de que alguien se acordara de sincronizar.
   > aplazado en un solo despliegue del día 14 — que es la forma más segura de
   > estrenar un fallo justo después del evento, y con todo el mundo mirando.
   > Se trabaja normal; lo que se cuida es el fin de semana y la víspera:
-  > **el día 8 solo entran arreglos**, nada de estrenos.
+  > **la víspera solo entran arreglos**, nada de estrenos.
 - **Desplegar sin respaldo** si la migración toca datos.
 - **Exigir correo para que alguien ENTRE cada día.** El alumno marca asistencia
   con su carnet QR o su PIN, sin escribir nada. Eso no se toca.
@@ -909,6 +912,21 @@ esto — las cuentas nacen en el ecosistema.
 | **Sin correo saliente, el enlace vuelve** | Y la pantalla de alumnos lo enseña para pasarlo por WhatsApp (§3). Con el correo funcionando, quien inscribe no ve la llave |
 | **`owner` no viaja por esa puerta** | El dueño de un club no se da de alta desde el formulario de alumnos, y repartir el mando de un club por una ruta de servidor a servidor no es algo que deba poder pasar |
 | **Se añadió `guardian` al catálogo del club** | El acudiente existía en Membresías desde siempre y aquí faltaba: un alta de acudiente se estrellaba contra un 400 |
+
+> **Campeonatos hace lo mismo con sus jueces desde el 25 sep 2026** (D8 de
+> `PLAN-CAMPEONATOS.md`): `POST /api/auth/register` → `POST /sync/alta` con
+> `app: campeonatos`, que **solo** traduce `juez → judge`, en la organización
+> del admin. El maestro no viaja por esta puerta (en DINAMYT es gestor de club,
+> y aquí dueño en Membresías), ni el admin. En Campeonatos el interruptor es
+> `ECOSYSTEM_SYNC_SECRET`, no `ECOSYSTEM_JWKS_URL`: el PC del evento lleva la
+> segunda desde F8 y ese día no tiene red.
+>
+> **Y un fallo que tenía esta puerta, arreglado el mismo día:** reenviar la
+> invitación de alguien que ya era miembro sin contraseña contestaba **200 sin
+> `ecoSub`** (`inviteMember` leía esa fila sin `userId`), y Membresías, que lo
+> guarda sin mirar, creaba una ficha suelta. Ahora el `select` lo trae y
+> `/sync/alta` da un error antes que un falso éxito. Si `ensayo.sh sueltas`
+> sube, mirar primero esto.
 
 > **Membresías sola sigue creando la cuenta ella.** Sin `ECOSYSTEM_JWKS_URL` no
 > hay portal al que pedirle nada: el producto independiente y **el modo del día
@@ -1959,6 +1977,11 @@ preguntar, y una app que solo sabe entrar por SSO no arranca ese día. Lo que s�
 se retira —después del campeonato— es `POST /auth/register`, que es lo que de
 verdad contradice «las cuentas nacen en el ecosistema». Membresías aplica este
 mismo criterio, y tres apps con la misma regla es una regla que se recuerda.
+
+> **Hecho el 25 sep 2026, convirtiéndolo y no retirándolo** (D8): con el
+> puente entero, el juez nace en DINAMYT (§4.4); sin él —el PC del evento—
+> sigue siendo la puerta de siempre. Y la consola ya no le pone contraseña a
+> una cuenta de DINAMYT (D10).
 
 ### El maestro estrena su club al entrar
 
@@ -4620,7 +4643,14 @@ mirar.
       > ni llega a compararse. Se le añadió el caso el mismo día — son **12**
       > pruebas ahora, no 11.
 
-`[ ]` **El bloqueo por plan vencido solo llega a Membresías.** *(3 sep 2026)*
+`[~]` **El bloqueo por plan vencido solo llega a Membresías.** *(3 sep 2026)*
+      **Campeonatos, decidido el 25 sep 2026 (D10 de `PLAN-CAMPEONATOS.md`):
+      basta el pase.** Sin `app_scopes` no entra quien llega del portal; desde
+      D8 el juez nuevo de internet no tiene otra entrada, y la consola ya no
+      le pone contraseña a una cuenta de DINAMYT. Quedan las cuentas viejas
+      con contraseña propia. **Academy sigue abierto.** Lo de abajo es cómo
+      estaba razonado antes:
+
       `/sync/plan` y el barrido diario cierran el club que no está al día
       (§4.16), pero **solo allí**. En Campeonatos no hay nada equivalente, y en
       Academy tampoco.
@@ -4636,7 +4666,12 @@ mirar.
       pase: sin `app_scopes` no entra quien llegue desde el portal. Lo que
       sigue abierto es su **login propio**, igual que pasaba en Membresías.
 
-`[ ]` **El cambio de rol solo viaja a Membresías.** *(30 ago 2026)* Campeonatos
+`[~]` **El cambio de rol solo viaja a Membresías.** *(30 ago 2026)*
+      **Campeonatos, cerrado el 25 sep 2026 sin `/sync/rol` (D9 de
+      `PLAN-CAMPEONATOS.md`):** lo que dio el portal lo quita el portal, al
+      entrar (`usuarios.roles_del_portal`); lo puesto a mano en la consola y
+      `admin` no se tocan. **Academy sigue abierto.** Lo de abajo es cómo
+      estaba razonado antes: Campeonatos
       y Academy siguen leyendo el rol del pase **solo al crear** su fila local;
       después manda el suyo. Es lo que impide degradar en silencio al
       administrador de un campeonato en marcha (§4.7), y por eso no se cambió a
