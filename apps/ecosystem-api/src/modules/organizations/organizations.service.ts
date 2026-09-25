@@ -405,9 +405,12 @@ export class OrganizationsService {
 
     const userId = usuario.id;
 
-    // Verificar que no sea ya miembro
+    // Verificar que no sea ya miembro. Con `userId`: cuando es una invitación
+    // que nadie abrió, esta fila ES el `miembro` que se devuelve, y
+    // `POST /sync/alta` lee de ahí el `ecoSub`. Sin él contestaba un alta sin
+    // `ecoSub` —con forma de éxito— y Membresías creaba una ficha suelta.
     const [yaMiembro] = await db
-      .select({ id: orgMembers.id })
+      .select({ id: orgMembers.id, userId: orgMembers.userId })
       .from(orgMembers)
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
       .limit(1);

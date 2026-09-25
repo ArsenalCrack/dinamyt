@@ -31,6 +31,7 @@ jest.mock('../../db', () => ({ db: {} }));
 
 import {
   BadRequestException,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -283,5 +284,55 @@ describe('POST /sync/alta · Membresías inscribe a alguien en su club', () => {
     await expect(controlador.alta(SECRETO, cuerpo())).rejects.toThrow(
       /ya está en otro club/,
     );
+  });
+
+  // ── 5 · Un alta con forma de éxito y sin `ecoSub` es un error ──────────────
+
+  it('sin `ecoSub` en la respuesta NO se contesta 200 (el reenvío de una invitación sin abrir)', async () => {
+    // Era un fallo de verdad: `inviteMember` devolvía como `miembro` la fila
+    // de «ya era miembro», leída sin `userId`. La respuesta salía sin `ecoSub`
+    // y Membresías creaba una ficha suelta. El servicio ya lo trae; esta
+    // guarda es para que no vuelva a pasar por otro camino.
+    const { controlador } = armar({
+      invitar: () =>
+        Promise.resolve({ ...INVITACION, miembro: {} as { userId: string } }),
+    });
+
+    await expect(controlador.alta(SECRETO, cuerpo())).rejects.toThrow(
+      InternalServerErrorException,
+    );
+  });
+
+  // ── 6 · Campeonatos da de alta a sus jueces (nº 5 de su plan) ──────────────
+
+  it('desde Campeonatos, el juez entra como `judge`', async () => {
+    const { controlador, llamadas } = armar();
+
+    const r = await controlador.alta(
+      SECRETO,
+      cuerpo({ app: 'campeonatos', role: 'juez' }),
+    );
+
+    expect(r.ecoSub).toBe(NUEVO);
+    expect((llamadas[0] as unknown[])[2]).toBe('judge');
+  });
+
+  it('desde Campeonatos, ni el maestro ni el admin viajan por esta puerta', async () => {
+    // El maestro es gestor de club aquí (dueño en Membresías): el mando de un
+    // club no se reparte de servidor a servidor, igual que `owner`.
+    for (const rol of ['maestro', 'admin', 'owner', 'student', undefined]) {
+      const { controlador, llamadas } = armar();
+      await expect(
+        controlador.alta(SECRETO, cuerpo({ app: 'campeonatos', role: rol })),
+      ).rejects.toThrow(/solo se dan de alta jueces/);
+      expect(llamadas).toEqual([]);
+    }
+  });
+
+  it('sin `app` sigue siendo Membresías: `juez` no es un rol de allí', async () => {
+    const { controlador } = armar();
+    await expect(
+      controlador.alta(SECRETO, cuerpo({ role: 'juez' })),
+    ).rejects.toThrow(BadRequestException);
   });
 });

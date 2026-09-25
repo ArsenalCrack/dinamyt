@@ -13,6 +13,7 @@
 import {
   ordenarPorRango,
   propiosDeCampeonatos,
+  rolGeneralDesdeCampeonatos,
   rolGeneralDesdeMembresias,
   rolParaApp,
   rolPrincipal,
@@ -237,5 +238,18 @@ describe('Campeonatos: varios papeles a la vez', () => {
     expect(
       rolesCampeonatosDelPase([{ role: 'student' }, { role: 'competitor' }]),
     ).toEqual(['competitor']);
+  });
+});
+
+describe('rolGeneralDesdeCampeonatos · el alta que pide Campeonatos', () => {
+  it('el juez entra como `judge`, se llame como se llame', () => {
+    expect(rolGeneralDesdeCampeonatos('juez')).toBe('judge');
+    expect(rolGeneralDesdeCampeonatos(' judge ')).toBe('judge');
+  });
+
+  it('nada más viaja por aquí: ni maestro, ni admin, ni dueño', () => {
+    for (const rol of ['maestro', 'admin', 'owner', 'coach', 'student', '']) {
+      expect(rolGeneralDesdeCampeonatos(rol)).toBeNull();
+    }
   });
 });

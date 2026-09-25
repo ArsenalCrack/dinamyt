@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Headers,
+  InternalServerErrorException,
   NotFoundException,
   Param,
   Post,
@@ -15,7 +16,10 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { orgMembers, organizations, users } from '../../db/schema';
 import { OrganizationsService } from '../organizations/organizations.service';
-import { rolGeneralDesdeMembresias } from '../../common/roles-por-app';
+import {
+  rolGeneralDesdeCampeonatos,
+  rolGeneralDesdeMembresias,
+} from '../../common/roles-por-app';
 import { validarTema, validarIdioma } from '../../common/validacion';
 
 /**
@@ -74,8 +78,13 @@ export class SyncController {
       email?: string;
       fullName?: string;
       phone?: string | null;
-      /** El rol de Membresías: `student`, `staff` o `guardian`. */
+      /**
+       * El rol en el idioma de quien pide el alta. Membresías: `student`,
+       * `staff` o `guardian`. Campeonatos: solo `juez`.
+       */
       role?: string;
+      /** Quién pide el alta. Sin él, Membresías (el único que la pedía antes). */
+      app?: 'membresias' | 'campeonatos';
       /** El `eco_sub` del maestro que lo inscribe, para la trazabilidad. */
       invitadoPor?: string | null;
     },
@@ -101,12 +110,18 @@ export class SyncController {
       );
     }
 
-    // El rol viaja en el idioma de Membresías y aquí se traduce al general,
-    // que es el que esta base entiende. Ver `common/roles-por-app.ts`.
-    const rol = rolGeneralDesdeMembresias(body.role ?? 'student');
+    // El rol viaja en el idioma de la app que pide el alta y aquí se traduce
+    // al general, que es el que esta base entiende. Ver
+    // `common/roles-por-app.ts`: de Campeonatos solo entra el juez.
+    const desdeCampeonatos = body.app === 'campeonatos';
+    const rol = desdeCampeonatos
+      ? rolGeneralDesdeCampeonatos(body.role ?? '')
+      : rolGeneralDesdeMembresias(body.role ?? 'student');
     if (!rol) {
       throw new BadRequestException(
-        `El rol '${body.role}' no tiene equivalente en DINAMYT.`,
+        desdeCampeonatos
+          ? 'Desde Campeonatos solo se dan de alta jueces. Los maestros entran con su cuenta de DINAMYT desde su club, y los administradores se crean en DINAMYT.'
+          : `El rol '${body.role}' no tiene equivalente en DINAMYT.`,
       );
     }
 
@@ -121,10 +136,19 @@ export class SyncController {
       { fullName: body.fullName, phone: body.phone ?? undefined },
     );
 
+    // Lo que la app necesita para nacer enlazada: sin esto la ficha volvería a
+    // quedar suelta y todo el espejo seguiría sin alcanzarla. Una respuesta
+    // con forma de éxito y sin `ecoSub` es exactamente cómo nace una ficha
+    // suelta (ya pasó: el reenvío de una invitación sin abrir la devolvía
+    // vacía), así que eso es un error, no un 200.
+    const ecoSub = r.miembro?.userId;
+    if (!ecoSub) {
+      throw new InternalServerErrorException(
+        'El alta se hizo pero DINAMYT no devolvió la cuenta. Vuelve a intentarlo.',
+      );
+    }
     return {
-      // Lo que Membresías necesita para nacer enlazada: sin esto la ficha
-      // volvería a quedar suelta y todo el espejo seguiría sin alcanzarla.
-      ecoSub: r.miembro.userId,
+      ecoSub,
       cuenta: r.cuenta,
       invitacion: r.invitacion,
     };

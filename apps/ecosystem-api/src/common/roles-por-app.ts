@@ -255,3 +255,19 @@ export function rolGeneralDesdeMembresias(rol: string): string | null {
   if (limpio === 'owner') return null;
   return GENERALES_DE_CLUB.includes(limpio) ? limpio : null;
 }
+
+/**
+ * Lo mismo cuando el alta la pide **Campeonatos** (nº 5 de la PARTE 4 de su
+ * plan, 25 sep 2026): el admin de un campeonato da de alta a un juez desde su
+ * consola, y la cuenta nace aquí en vez de allí.
+ *
+ * **Solo el juez.** `maestro` NO viaja por esta puerta, por la misma razón que
+ * `owner`: aquí es un rol de gestor de club —`espejarAlta` lo hace dueño del
+ * club en Membresías— y el mando de un club no se reparte de servidor a
+ * servidor. Los maestros entran con su propia cuenta, desde su club, y a su
+ * club se le invita al campeonato (F5). `admin`, tampoco.
+ */
+export function rolGeneralDesdeCampeonatos(rol: string): string | null {
+  const limpio = (rol || '').trim();
+  return limpio === 'juez' || limpio === 'judge' ? 'judge' : null;
+}
