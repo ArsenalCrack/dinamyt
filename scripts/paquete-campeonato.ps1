@@ -41,11 +41,22 @@
 .PARAMETER Usb
   Ruta opcional (una memoria USB) donde dejar una segunda copia.
 
+.PARAMETER ParaElEvento
+  Además de bajarlo, CIERRA el campeonato en internet (el candado de sede,
+  backend/app/sede.py de Campeonatos): desde ese momento allí solo se puede
+  mirar, para que no haya dos escritores mientras corre en el PC del evento.
+  Úsalo en la ÚLTIMA bajada con red (la de la mañana, o la de la víspera si
+  esa mañana no habrá internet). Sin él es una copia de prueba.
+  Se devuelve a la nube desde la web, en el campeonato: «Devolver a la nube».
+
 .EXAMPLE
   .\scripts\paquete-campeonato.ps1 -Campeonato 12
 
 .EXAMPLE
   .\scripts\paquete-campeonato.ps1 -Campeonato 12 -Usb E:\dinamyt
+
+.EXAMPLE
+  .\scripts\paquete-campeonato.ps1 -Campeonato 12 -Usb E:\dinamyt -ParaElEvento
 #>
 
 [CmdletBinding()]
@@ -54,7 +65,8 @@ param(
     [string]$Correo = $env:DINAMYT_ADMIN_EMAIL,
     [string]$Origen = 'https://campeonatos.dinamyt.org',
     [string]$Destino = 'D:\dinamyt-respaldos',
-    [string]$Usb
+    [string]$Usb,
+    [switch]$ParaElEvento
 )
 
 $ErrorActionPreference = 'Stop'
@@ -89,6 +101,10 @@ Write-Host "  entrado como $($sesion.user.nombre) ($($sesion.user.rol))" -Foregr
 # sin usuarios deja las asignaciones de jueces apuntando a gente que no existe
 # en la otra instancia.
 $url = "$Origen/api/sincronizacion/campeonato/$Campeonato/exportar?usuarios=1&competidores=1&llaves=1"
+if ($ParaElEvento) {
+    $url += '&para_el_evento=1'
+    Write-Host '⚠ Para el evento: el campeonato quedará CERRADO en internet (solo lectura).' -ForegroundColor Yellow
+}
 
 if (-not (Test-Path $Destino)) { New-Item -ItemType Directory -Force $Destino | Out-Null }
 $marca = Get-Date -Format 'yyyy-MM-dd_HHmm'
