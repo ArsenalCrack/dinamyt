@@ -1750,6 +1750,16 @@ emisor** (§5.4) y que su scope esté en `app_scopes`.
 > que va a contestar 403. Viven en `modules/sync/`, aparte del controlador de
 > organizaciones, para no dejar rutas sin sesión en medio de treinta que sí la
 > exigen.
+>
+> **Y las de Campeonatos** *(24–26 sep 2026)*, por el mismo secreto:
+> `GET /sync/clubes` (el directorio, para invitar clubes, F5);
+> `POST /sync/alta` con `app: campeonatos` (el admin da de alta a un JUEZ, y
+> solo a un juez: D8); `GET /sync/miembros?maestro=<sub>` (la gente de los
+> clubes donde ese `sub` es maestro o coach en Campeonatos, para inscribirla
+> sin teclearla — sin correo ni teléfono, y la regla de a quién se contesta
+> se aplica AQUÍ); y `POST /sync/aviso-campeonato` (la campana del club: «te
+> invitaron a un campeonato»). Todas validan que los ids sean uuid: otra cosa
+> era un 500 de PostgreSQL.
 
 > **Las dos rutas de afiliar, que son distintas a propósito:**
 > `POST /organizations/:id/invitar-club` la usa el `admin` de la federación y
@@ -1969,6 +1979,20 @@ aleatoria que nadie conoce, así que **por el formulario no se entra con ella**.
 **El rol local manda sobre el del pase.** El pase solo decide el rol al crear la
 fila. Es el mismo criterio de Academy, y evita que un cambio de rol en el portal
 degrade en silencio al administrador de un campeonato en marcha.
+
+### Puntuar pide identidad *(desde el 26 de septiembre de 2026)*
+
+Hasta esa fecha el socket del tatami (`/combate`) aceptaba **cualquier papel
+sin token**: quien abría `?rol=arbitro` entraba como Juez Central y echaba al
+de verdad, y el juez de un punto salía del mensaje (la pantalla pública podía
+puntuar). Ahora, para `arbitro` y `j1`–`j4` hace falta un token de esta
+instalación de alguien activo que sea superadmin, admin dueño del campeonato o
+juez **asignado a ese tatami con ese papel** — el QR del juez es exactamente
+eso. La pantalla sigue abierta y es de solo lectura.
+
+La salida de emergencia, solo para el PC del evento y solo con gente delante:
+`TATAMI_SIN_IDENTIDAD=1` en `backend/.env` y reiniciar
+(`INICIAR-LOCAL.md` §8). En la VPS no se pone nunca.
 
 ### El login propio de Campeonatos NO se retira
 
@@ -4126,8 +4150,8 @@ falta dos semanas de informes.
 | **Del 12 de sept. en adelante** | DMARC a `quarantine` (§3.5) | Dos semanas de informes desde el 29 de agosto. El DNS está comprobado y el cambio escrito palabra por palabra: es teclear, no investigar. `reject`, más tarde |
 | **Cuando se pueda, y ya se puede** | **Las mejoras del panel y del producto** — §6.1 y §6.2 | Ya no esperan al 14 de octubre. Se toman de arriba abajo: primero lo que se usa a diario |
 | **Última semana de septiembre** | Repetir el ensayo completo (abajo) y **anotar los números** | Es lo único que vigila que los despliegues de septiembre no hayan reabierto un eslabón. Con más despliegues por delante, ahora hace más falta, no menos |
-| **8 de octubre** | Solo arreglos. Nada que se estrene | La víspera |
-| **9, 10 y 11 de octubre** | Nada (§1.5) | Campeonato, con gente delante |
+| **La víspera del próximo campeonato** | Solo arreglos. Nada que se estrene | *(Era el 8 de octubre: ese campeonato no se hace, D7 de `PLAN-CAMPEONATOS.md`)* |
+| **Durante el campeonato** | Nada (§1.5) | Con gente delante |
 | ~~Después del 14 de oct.~~ | ~~**Cobro por usuario**~~ — **hecho el 3 de septiembre** (§4.18) | Se adelantó porque no toca identidad ni migra datos de nadie |
 
 ### Y una regla para trabajar así, que antes la ponía el calendario
@@ -4407,6 +4431,21 @@ mirar.
 
       Lo que **no** cambia: al alumno no le llega correo, y es a propósito
       (§4.6). El push es su único canal automático hasta que exista WhatsApp.
+
+`[ ]` **Lo que dejó abierto la revisión de seguridad del 26 sep 2026.** Lo
+      arreglado —el tatami sin identidad, el secreto de ejemplo en el PC del
+      evento, fórmulas en los Excel, el tope de tamaño, ids que no son uuid—
+      y el detalle de lo abierto están en el diario de `PLAN-CAMPEONATOS.md`.
+      Lo abierto, en una línea cada uno:
+      · **No hay Content-Security-Policy** en ninguna web, y el portal tiene
+        el pase al alcance de JavaScript. Se hace aparte y probando.
+      · **Un solo `ECOSYSTEM_SYNC_SECRET` para las tres apps.** A la larga,
+        uno por app.
+      · **Rotar las contraseñas de Supabase** que viajaron por chat
+        (`PLAN-ECOSYSTEM-VPS.md` §0.1).
+      · **El candado de sede y la publicación en vivo** (decisiones 8 y 9 de
+        `PLAN-ECOSYSTEM-VPS.md`): no están hechos y son lo que falta para que
+        un campeonato no tenga dos escritores.
 
 `[ ]` **WhatsApp para los avisos del alumno.** Es el canal que la gente de
       verdad lee, y el que el maestro ya usa a mano. **No está construido.**
