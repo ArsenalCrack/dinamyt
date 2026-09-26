@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import { execSync } from 'node:child_process';
+import { cabecerasDeSeguridad } from './cabeceras-seguridad';
 
 /**
  * Origen real de la API. Solo se usa aquí, en el servidor: el navegador nunca
@@ -62,6 +63,26 @@ const VERSION = {
 
 const nextConfig: NextConfig = {
   env: VERSION,
+  poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: cabecerasDeSeguridad({
+          // Normalmente la API va por el mismo origen (el rewrite de abajo);
+          // con `NEXT_PUBLIC_API_MODE=directo`, a su URL (lib/api.ts).
+          conectar: [
+            process.env.NEXT_PUBLIC_API_MODE === 'directo'
+              ? process.env.NEXT_PUBLIC_API_URL
+              : undefined,
+          ],
+          // La foto y el escudo llegan del portal (`https://id.dinamyt.org/media`)
+          // o de donde el club los tenga: Membresías también se vende sola.
+          imagenes: ['https:'],
+        }),
+      },
+    ];
+  },
   /**
    * La API se sirve bajo el MISMO origen que la web, en `/api`.
    *
