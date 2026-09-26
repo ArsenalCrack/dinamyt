@@ -88,7 +88,7 @@ nunca depende de que alguien se acordara de sincronizar.
 | `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe, y el pie de los correos apunta a ninguna parte |
 | `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: ver §3 |
 | `CRON_SECRET` | ecosystem-api | El aviso diario de suscripciones **no existe** (la ruta responde 404). El botón del panel sigue funcionando |
-| `ECOSYSTEM_SYNC_SECRET` | ecosystem-api, membresias-api **y campeonatos-api** | **El mismo valor en las tres.** En Membresías: la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan — el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7). En **Campeonatos**: el tema y el idioma **no viajan en ninguna de las dos direcciones** (§4.21), y el juez que se da de alta en `/admin` nace con contraseña de allí, **sin cuenta de DINAMYT** (§4.4). Es a propósito que el PC del evento NO la lleve |
+| `SYNC_SECRET_MEMBRESIAS` · `SYNC_SECRET_CAMPEONATOS` (ecosystem-api) ↔ `ECOSYSTEM_SYNC_SECRET` (en cada app) | las tres APIs | **Un secreto por app** (`common/secreto-sync.ts`): cada variable del ecosistema vale lo mismo que el `ECOSYSTEM_SYNC_SECRET` de SU app, y el de una app no abre las rutas de la otra (ni pide sus altas). Un `ECOSYSTEM_SYNC_SECRET` en el ecosistema es el compartido de antes: se acepta en todo con un `WARN [SecretoSync]` hasta que se quite. Si falta: en Membresías: la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan — el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7). En **Campeonatos**: el tema y el idioma **no viajan en ninguna de las dos direcciones** (§4.21), y el juez que se da de alta en `/admin` nace con contraseña de allí, **sin cuenta de DINAMYT** (§4.4). Es a propósito que el PC del evento NO la lleve |
 | `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
 | `MEDIA_PUBLIC_URL` | ecosystem-api | **El interruptor de las fotos en disco** (§4.20). Sin ella no falla nada: las imágenes se siguen guardando incrustadas en la fila, como siempre. Con ella van al disco **y** el espejo las manda absolutas — las dos cosas a la vez, y por eso es una sola variable. ⚠️ **Tiene que ser `https://`**: Membresías solo acepta `data:` o `https://`, y su rechazo es mudo |
 
@@ -317,7 +317,7 @@ cuando el carnet sale con la foto vieja.
 
 | Lo que dice | Qué es |
 |---|---|
-| `EL ESPEJO ESTÁ APAGADO` | Falta `MEMBRESIAS_SYNC_URL` o `ECOSYSTEM_SYNC_SECRET` aquí. En local es lo normal; en el VPS no |
+| `EL ESPEJO ESTÁ APAGADO` | Falta `MEMBRESIAS_SYNC_URL` o `SYNC_SECRET_MEMBRESIAS` aquí. En local es lo normal; en el VPS no |
 | `NO SE LLEGA A ESA DIRECCIÓN` | membresias-api no responde, o la URL no es su origen. No es cosa de secretos |
 | `404, y es a propósito` | Allí `ECOSYSTEM_SYNC_SECRET` está vacía y la ruta no existe. Ponle la misma y reinicia |
 | `SECRETO DISTINTO (401)` | Las dos la tienen, pero no es la misma |
@@ -505,7 +505,7 @@ en producción a media tarde. La otra mitad es una ventana con
 
 | Paso | En pantalla | En la base (`bash scripts/ensayo.sh …`) |
 |---|---|---|
-| 0 · Partida | — | `estado`: las apps `active`, **los dos hashes del secreto iguales**, `POST /sync/alta` → **401** (un 404 es que falta `ECOSYSTEM_SYNC_SECRET`). Anota el resumen |
+| 0 · Partida | — | `estado`: las apps `active`, **cada pareja de huellas del secreto igual** (ecosistema ↔ Membresías, ecosistema ↔ Campeonatos), `POST /sync/alta` → **401** (un 404 es que falta `ECOSYSTEM_SYNC_SECRET`). Anota el resumen |
 | 1 · Estructura | En `/admin`: una federación, su administrador, un club dentro y afiliarle otro que ya exista | `federacion 'NOMBRE'`: los clubes colgando y alguien con rol `admin` |
 | 2 · Herencia | Darle plan a la federación | `herencia alguien@delclub.com` (del club **hijo**): sale el plan de la federación como eslabón |
 | 3 · Alta desde Membresías | Un alumno con correo nuevo; vuelve el enlace de contraseña | `persona el@nuevo.com`: cuenta con `tiene_contrasena = f`, **`enlazada = t`**, `contrasena_propia = f` |
@@ -1979,7 +1979,7 @@ que el aviso se perdiera:
 | `sigue EN REVISIÓN` | **La causa número uno.** La suscripción nace en `PENDING_REVIEW` a propósito y hasta que no se pone en «Activa» el club **no abre nada** — ni por el portal ni por Membresías. En la fila se lee «En revisión», que no parece una avería |
 | `venció el …` | La fila sigue diciendo «Activa»: lo que caduca es la FECHA, no el `status`. Registrar el pago |
 | `no tiene ningún plan que incluya Membresías` | Se contrató el de otra app, o se le venció y se borró la fila |
-| `su aviso no llegó` | **No es un problema de datos**: falta `MEMBRESIAS_SYNC_URL` o `ECOSYSTEM_SYNC_SECRET`, o Membresías no respondió |
+| `su aviso no llegó` | **No es un problema de datos**: falta `MEMBRESIAS_SYNC_URL` o `SYNC_SECRET_MEMBRESIAS`, o Membresías no respondió |
 
 > **La lista no enseña a todo el que no abre**, y es a propósito: una federación
 > que solo compró Campeonatos no abre Membresías y no le pasa nada. Salen los
@@ -2911,8 +2911,7 @@ dice:
 Y al mismo tiempo, desde el mismo servidor:
 
 ```bash
-curl -s -o /dev/null -w "dns=%{time_namelookup}s total=%{time_total}s codigo=%{http_code}
-" https://id.dinamyt.org/auth/jwks
+curl -s -o /dev/null -w "dns=%{time_namelookup}s total=%{time_total}s codigo=%{http_code}\n" https://id.dinamyt.org/auth/jwks
 ```
 
 …responde **200 en 95 ms, con el DNS en 9 ms**. No es la red, no es el

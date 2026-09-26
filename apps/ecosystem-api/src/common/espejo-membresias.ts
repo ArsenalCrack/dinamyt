@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { absolutaMedia } from './almacen-imagenes';
+import { secretoParaFirmar } from './secreto-sync';
 
 /**
  * El aviso que mantiene al día la copia de Membresías.
@@ -45,7 +46,8 @@ const log = new Logger('EspejoMembresias');
 const TIMEOUT_MS = 5_000;
 
 const destino = () => (process.env.MEMBRESIAS_SYNC_URL ?? '').replace(/\/+$/, '');
-const secreto = () => process.env.ECOSYSTEM_SYNC_SECRET ?? '';
+// El de Membresías (`SYNC_SECRET_MEMBRESIAS`) o, en la transición, el compartido.
+const secreto = () => secretoParaFirmar('membresias');
 
 /** `true` si este despliegue tiene Membresías al otro lado. */
 export const espejoConfigurado = () => Boolean(destino() && secreto());
@@ -101,7 +103,7 @@ async function avisar(
 ): Promise<Respuesta | null> {
   if (!espejoConfigurado()) {
     log.warn(
-      `${ruta} no se mandó: falta MEMBRESIAS_SYNC_URL o ECOSYSTEM_SYNC_SECRET. ` +
+      `${ruta} no se mandó: falta MEMBRESIAS_SYNC_URL o SYNC_SECRET_MEMBRESIAS. ` +
         'Este despliegue no tiene Membresías al otro lado.',
     );
     return null;

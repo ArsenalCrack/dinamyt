@@ -53,11 +53,13 @@ const SOLO_ORG = (() => {
 })();
 
 const destino = (process.env.MEMBRESIAS_SYNC_URL ?? '').replace(/\/+$/, '');
-const secreto = process.env.ECOSYSTEM_SYNC_SECRET ?? '';
+// El de Membresías y, mientras dure la transición, el compartido de antes.
+const secreto =
+  process.env.SYNC_SECRET_MEMBRESIAS || process.env.ECOSYSTEM_SYNC_SECRET || '';
 
 if (!destino || !secreto) {
   console.error(`
-✗ El espejo está apagado: falta MEMBRESIAS_SYNC_URL o ECOSYSTEM_SYNC_SECRET.
+✗ El espejo está apagado: falta MEMBRESIAS_SYNC_URL o SYNC_SECRET_MEMBRESIAS.
 
   Sin las dos, este guion no tendría a quién avisar. Ver OPERAR.md §1.4 — el
   secreto tiene que ser EL MISMO en ecosystem-api y en membresias-api.

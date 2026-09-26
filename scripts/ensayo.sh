@@ -67,6 +67,27 @@ Uso: bash scripts/ensayo.sh <paso> [argumento]
 AYUDA
 }
 
+# La huella (12 caracteres del sha256) de una variable de un .env, o «SIN PONER».
+# Un `if` y no una expansión con `${v:+…}${v:-…}`: la segunda forma imprime el
+# VALOR cuando la variable está puesta —`:-` devuelve el contenido, no el texto
+# alternativo— y la primera versión de esto escupió el secreto entero en la
+# terminal. Lo que no se puede enseñar no se mete en una expansión con dos ramas.
+huella_de() {
+  local v
+  v=$(sudo grep -m1 "^$2=" "$1" 2>/dev/null | cut -d= -f2-)
+  if [ -n "$v" ]; then printf '%s' "$v" | sha256sum | cut -c1-12; else echo 'SIN PONER'; fi
+}
+
+# La variable propia del ecosistema, o el compartido de antes mientras dure la
+# transición, contra el ECOSYSTEM_SYNC_SECRET de la app.
+par_de_huellas() {
+  local aqui alla
+  aqui=$(huella_de "$2" "$3")
+  [ "$aqui" = 'SIN PONER' ] && aqui="$(huella_de "$2" ECOSYSTEM_SYNC_SECRET) (compartido)"
+  alla=$(huella_de "$4" ECOSYSTEM_SYNC_SECRET)
+  printf '  %s  ecosistema %-26s  app %s\n' "$1" "$aqui" "$alla"
+}
+
 # ── estado ─────────────────────────────────────────────────────────────────
 paso_estado() {
   titulo 'Servicios'
@@ -75,24 +96,16 @@ paso_estado() {
     printf '  %-20s %s\n' "$s" "$(systemctl is-active "$s" 2>/dev/null || echo '?')"
   done
 
-  # El espejo entero cuelga de que estas dos variables valgan LO MISMO en las
-  # dos APIs. Se compara el hash y no el valor: el valor no se enseña.
-  titulo 'El secreto del espejo (tienen que coincidir)'
-  for f in /srv/dinamyt/apps/ecosystem-api/.env /srv/membresias/apps/membresias-api/.env; do
-    v=$(sudo grep -m1 '^ECOSYSTEM_SYNC_SECRET=' "$f" 2>/dev/null | cut -d= -f2-)
-    # Un `if` y no una expansión con `${v:+…}${v:-…}`: la segunda forma
-    # imprime el VALOR cuando la variable está puesta —`:-` devuelve el
-    # contenido, no el texto alternativo— así que la primera versión de esto
-    # escupió el secreto entero en la terminal, detrás de su propia huella.
-    # Aquí no hay ingenio que valga la pena: lo que no se puede enseñar no se
-    # mete en una expansión con dos ramas.
-    if [ -n "$v" ]; then
-      huella=$(printf '%s' "$v" | sha256sum | cut -c1-12)
-    else
-      huella='SIN PONER'
-    fi
-    printf '  %-52s %s\n' "$f" "$huella"
-  done
+  # Cada app habla con el ecosistema con SU secreto (common/secreto-sync.ts):
+  # la variable de aquí tiene que valer lo mismo que el ECOSYSTEM_SYNC_SECRET
+  # de allá. Se compara el hash y no el valor: el valor no se enseña.
+  titulo 'Los secretos del espejo (cada pareja tiene que coincidir)'
+  eco=/srv/dinamyt/apps/ecosystem-api/.env
+  par_de_huellas 'Membresías ' "$eco" SYNC_SECRET_MEMBRESIAS /srv/membresias/apps/membresias-api/.env
+  par_de_huellas 'Campeonatos' "$eco" SYNC_SECRET_CAMPEONATOS /srv/campeonatos/backend/.env
+  if [ -n "$(sudo grep -m1 '^ECOSYSTEM_SYNC_SECRET=.' "$eco" 2>/dev/null)" ]; then
+    echo '  ⚠ El ecosistema aún acepta el ECOSYSTEM_SYNC_SECRET compartido (transición).'
+  fi
 
   titulo 'La puerta de entrada (401 = bien · 404 = falta el secreto)'
   printf '  POST /sync/alta  →  %s\n' \

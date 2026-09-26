@@ -22,13 +22,19 @@ import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 
 const destino = (process.env.MEMBRESIAS_SYNC_URL ?? '').replace(/\/+$/, '');
-const secreto = process.env.ECOSYSTEM_SYNC_SECRET ?? '';
+// El de Membresías y, mientras dure la transición, el compartido de antes.
+const secreto =
+  process.env.SYNC_SECRET_MEMBRESIAS || process.env.ECOSYSTEM_SYNC_SECRET || '';
 
 console.log('\n── Lo que dice el .env ──');
 console.log(`  MEMBRESIAS_SYNC_URL    : ${destino || '(vacía)'}`);
 console.log(
-  `  ECOSYSTEM_SYNC_SECRET  : ${
-    secreto ? `puesta (${secreto.length} caracteres)` : '(vacía)'
+  `  SYNC_SECRET_MEMBRESIAS : ${
+    process.env.SYNC_SECRET_MEMBRESIAS
+      ? `puesta (${secreto.length} caracteres)`
+      : process.env.ECOSYSTEM_SYNC_SECRET
+        ? '(vacía: se usa el ECOSYSTEM_SYNC_SECRET compartido)'
+        : '(vacía)'
   }`,
 );
 
@@ -41,8 +47,9 @@ if (!destino || !secreto) {
   escudo del club y la contraseña— se queda aquí, y Membresías sigue enseñando
   lo que tuviera.
 
-  En local eso es NORMAL. En el VPS no: ver OPERAR.md §1.4. El secreto tiene
-  que ser EL MISMO en ecosystem-api y en membresias-api.
+  En local eso es NORMAL. En el VPS no: ver OPERAR.md §1.4. El
+  SYNC_SECRET_MEMBRESIAS de aquí tiene que ser EL MISMO valor que el
+  ECOSYSTEM_SYNC_SECRET de membresias-api.
 `);
   process.exit(1);
 }
@@ -86,7 +93,8 @@ if (res.status === 401) {
   console.log(`
 ✗ SECRETO DISTINTO (401).
 
-  Las dos apps tienen su ECOSYSTEM_SYNC_SECRET puesta, pero no es la misma.
+  Las dos tienen secreto, pero no es el mismo: el SYNC_SECRET_MEMBRESIAS de
+  aquí tiene que valer lo que el ECOSYSTEM_SYNC_SECRET de membresias-api.
   Copia una en la otra —tal cual, sin comillas ni espacios— y reinicia las dos.
 `);
   process.exit(1);

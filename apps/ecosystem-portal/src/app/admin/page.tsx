@@ -2047,7 +2047,7 @@ function EspejoDeMembresias() {
           {r.noLlego > 0 && (
             <p className="mb-3 text-xs" style={{ color: 'var(--danger)' }}>
               Un aviso que no sale no es un problema de datos: falta{' '}
-              <code>MEMBRESIAS_SYNC_URL</code> o <code>ECOSYSTEM_SYNC_SECRET</code> en
+              <code>MEMBRESIAS_SYNC_URL</code> o <code>SYNC_SECRET_MEMBRESIAS</code> en
               el ecosystem, o Membresías no respondió. Mientras tanto, allí se ve lo
               de antes.
             </p>

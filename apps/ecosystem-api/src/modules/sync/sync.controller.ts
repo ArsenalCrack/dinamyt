@@ -11,7 +11,6 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
-import { timingSafeEqual } from 'crypto';
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { db } from '../../db';
 import { orgMembers, organizations, users } from '../../db/schema';
@@ -24,6 +23,7 @@ import {
   rolesParaApp,
 } from '../../common/roles-por-app';
 import { validarTema, validarIdioma } from '../../common/validacion';
+import { AppSync, identificarLlamada } from '../../common/secreto-sync';
 
 /**
  * La puerta de ENTRADA del espejo: Membresías llamando al ecosistema.
@@ -52,11 +52,12 @@ import { validarTema, validarIdioma } from '../../common/validacion';
  *
  * ── La puerta ──
  *
- * `ECOSYSTEM_SYNC_SECRET`, el mismo secreto compartido de los avisos de ida, en
- * la cabecera `x-dinamyt-sync`. **Sin esa variable la ruta no existe** (404):
- * una ruta sin autenticar que crea cuentas y las mete en clubes no puede
- * quedarse abierta «por si acaso». Es el mismo criterio de `CRON_SECRET` y el
- * de las tres rutas gemelas al otro lado.
+ * Un secreto POR APP en la cabecera `x-dinamyt-sync` (`common/secreto-sync.ts`):
+ * cada ruta dice qué apps pueden llamarla, y el secreto dice cuál llama. **Sin
+ * secreto para ninguna de ellas la ruta no existe** (404): una ruta sin
+ * autenticar que crea cuentas y las mete en clubes no puede quedarse abierta
+ * «por si acaso». Es el mismo criterio de `CRON_SECRET` y el de las rutas
+ * gemelas al otro lado.
  */
 @Controller('sync')
 export class SyncController {
@@ -67,12 +68,16 @@ export class SyncController {
     private readonly avisos?: OrgNotificationsService,
   ) {}
 
-  /** Comparación en tiempo constante; la diferencia de largo ya la delata el 401. */
-  private static valido(recibido: string | undefined, esperado: string) {
-    if (!recibido) return false;
-    const a = Buffer.from(recibido);
-    const b = Buffer.from(esperado);
-    return a.length === b.length && timingSafeEqual(a, b);
+  /**
+   * La puerta de todas las rutas: 404 si ninguna de las apps permitidas tiene
+   * secreto aquí, 401 si el que llega no es el de una de ellas. Devuelve quién
+   * llama (`compartido` mientras dure la transición al secreto por app).
+   */
+  private static puerta(recibido: string | undefined, ...permitidas: AppSync[]) {
+    const quien = identificarLlamada(recibido, permitidas);
+    if (quien === 'apagada') throw new NotFoundException('No encontrado.');
+    if (quien === 'rechazada') throw new UnauthorizedException('Secreto inválido.');
+    return quien;
   }
 
   // ── POST /sync/alta — Membresías inscribe a alguien en su club ────────────
@@ -97,10 +102,15 @@ export class SyncController {
       invitadoPor?: string | null;
     },
   ) {
-    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
-    if (!esperado) throw new NotFoundException('No encontrado.');
-    if (!SyncController.valido(secreto, esperado)) {
-      throw new UnauthorizedException('Secreto inválido.');
+    const quien = SyncController.puerta(secreto, 'membresias', 'campeonatos');
+    // Con el secreto de una app, el alta es de ESA app: con el de Membresías no
+    // se crea un juez de Campeonatos, ni al revés. Con el compartido de antes
+    // no se sabe quién llama y manda el campo, como siempre.
+    const app = quien === 'compartido' ? (body.app ?? 'membresias') : quien;
+    if (quien !== 'compartido' && body.app && body.app !== quien) {
+      throw new UnauthorizedException(
+        `Ese secreto es de ${quien}: no puede pedir altas de ${body.app}.`,
+      );
     }
 
     const orgId = (body.ecoOrgId ?? '').trim();
@@ -121,7 +131,7 @@ export class SyncController {
     // El rol viaja en el idioma de la app que pide el alta y aquí se traduce
     // al general, que es el que esta base entiende. Ver
     // `common/roles-por-app.ts`: de Campeonatos solo entra el juez.
-    const desdeCampeonatos = body.app === 'campeonatos';
+    const desdeCampeonatos = app === 'campeonatos';
     const rol = desdeCampeonatos
       ? rolGeneralDesdeCampeonatos(body.role ?? '')
       : rolGeneralDesdeMembresias(body.role ?? 'student');
@@ -182,8 +192,7 @@ export class SyncController {
   //
   // ── La puerta ──
   //
-  // El mismo `ECOSYSTEM_SYNC_SECRET` que `/sync/alta`, y sin él la ruta no
-  // existe.
+  // Solo Membresías: el acceso que se guarda aquí es el suyo.
   @Post('acceso')
   async acceso(
     @Headers('x-dinamyt-sync') secreto: string | undefined,
@@ -198,11 +207,7 @@ export class SyncController {
       activo?: boolean;
     },
   ) {
-    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
-    if (!esperado) throw new NotFoundException('No encontrado.');
-    if (!SyncController.valido(secreto, esperado)) {
-      throw new UnauthorizedException('Secreto inválido.');
-    }
+    SyncController.puerta(secreto, 'membresias');
 
     const userId = (body.ecoSub ?? '').trim();
     const orgId = (body.ecoOrgId ?? '').trim();
@@ -251,19 +256,15 @@ export class SyncController {
   // que tenga —el pase, la copia local— y corrige después: preguntar no puede
   // costar el fogonazo que tanto trabajo costó quitar.
   //
-  // ⚠️ Solo LEE, y solo estas dos columnas. Entra por el mismo secreto
-  // compartido, así que vale el mismo criterio que en el POST: quien lo tenga
-  // podría saber de qué color ve alguien su pantalla —cosmético— y nada más.
+  // ⚠️ Solo LEE, y solo estas dos columnas: quien tenga el secreto de
+  // Membresías o de Campeonatos podría saber de qué color ve alguien su
+  // pantalla —cosmético— y nada más.
   @Get('apariencia/:ecoSub')
   async leerApariencia(
     @Headers('x-dinamyt-sync') secreto: string | undefined,
     @Param('ecoSub') ecoSub: string,
   ) {
-    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
-    if (!esperado) throw new NotFoundException('No encontrado.');
-    if (!SyncController.valido(secreto, esperado)) {
-      throw new UnauthorizedException('Secreto inválido.');
-    }
+    SyncController.puerta(secreto, 'membresias', 'campeonatos');
 
     const id = (ecoSub ?? '').trim();
     if (!id) throw new BadRequestException('Falta `ecoSub`.');
@@ -308,11 +309,7 @@ export class SyncController {
     @Query('search') search?: string,
     @Query('federacion') federacion?: string,
   ) {
-    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
-    if (!esperado) throw new NotFoundException('No encontrado.');
-    if (!SyncController.valido(secreto, esperado)) {
-      throw new UnauthorizedException('Secreto inválido.');
-    }
+    SyncController.puerta(secreto, 'campeonatos');
 
     const fed = (federacion ?? '').trim();
     const lista = await this.orgsService.listarClubes(search);
@@ -357,11 +354,7 @@ export class SyncController {
     @Query('maestro') maestro?: string,
     @Query('persona') persona?: string,
   ) {
-    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
-    if (!esperado) throw new NotFoundException('No encontrado.');
-    if (!SyncController.valido(secreto, esperado)) {
-      throw new UnauthorizedException('Secreto inválido.');
-    }
+    SyncController.puerta(secreto, 'campeonatos');
 
     const quien = (maestro ?? '').trim();
     const una = (persona ?? '').trim();
@@ -456,11 +449,7 @@ export class SyncController {
     @Headers('x-dinamyt-sync') secreto: string | undefined,
     @Body() body: { orgId?: string; campeonato?: string; organiza?: string },
   ) {
-    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
-    if (!esperado) throw new NotFoundException('No encontrado.');
-    if (!SyncController.valido(secreto, esperado)) {
-      throw new UnauthorizedException('Secreto inválido.');
-    }
+    SyncController.puerta(secreto, 'campeonatos');
 
     const orgId = (body.orgId ?? '').trim();
     if (!SyncController.esUuid(orgId)) {
@@ -510,7 +499,7 @@ export class SyncController {
   // que ya existe y ya está probado.
   //
   // ⚠️ Solo escribe estas dos columnas. Es a propósito: una ruta que entra por
-  // un secreto compartido no puede tocar el rol, el correo ni la contraseña.
+  // un secreto de servidor no puede tocar el rol, el correo ni la contraseña.
   @Post('apariencia')
   async apariencia(
     @Headers('x-dinamyt-sync') secreto: string | undefined,
@@ -524,11 +513,7 @@ export class SyncController {
       locale?: string;
     },
   ) {
-    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
-    if (!esperado) throw new NotFoundException('No encontrado.');
-    if (!SyncController.valido(secreto, esperado)) {
-      throw new UnauthorizedException('Secreto inválido.');
-    }
+    SyncController.puerta(secreto, 'membresias', 'campeonatos');
 
     const id = (body.ecoSub ?? '').trim();
     if (!id) throw new BadRequestException('Falta `ecoSub`.');

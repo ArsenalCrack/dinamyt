@@ -40,7 +40,7 @@
 | 2 | [DMARC a `quarantine`](#2--dmarc-a-quarantine) | DNS | 15 min, y mirar informes antes |
 | 3 | [Terminar las fotos en disco, y respaldarlas](#3--terminar-las-fotos-en-disco-y-respaldarlas) | Servidor | 1 h |
 | 4 | [Rotar o cerrar los proyectos de Supabase](#4--rotar-o-cerrar-los-proyectos-de-supabase) | Cuentas | 15 min |
-| 5 | [Un secreto de sincronización por app](#5--un-secreto-de-sincronización-por-app) | Código + config | 1 día |
+| 5 | [Un secreto de sincronización por app](#5--un-secreto-de-sincronización-por-app--falta-ponerlo-en-la-vps) | **Tú**: poner los valores | 20 min |
 | 6 | [Cabeceras de seguridad y CSP](#6--cabeceras-de-seguridad-y-csp) | Código, probando | 2–3 días |
 | 7 | [**El candado de sede**](#7--el-candado-de-sede-decisión-8) (decisión 8) | Código | El grande |
 | 8 | [**Publicar en vivo durante el evento**](#8--publicar-en-vivo-durante-el-evento-decisión-9) (decisión 9) | **Una decisión** + código | Después del 7 |
@@ -183,50 +183,43 @@ el 26 sep.)*
 
 ---
 
-## 5 · Un secreto de sincronización por app
+## 5 · Un secreto de sincronización por app — falta ponerlo en la VPS
 
-**Hoy hay un solo `ECOSYSTEM_SYNC_SECRET`** en `ecosystem-api`, `membresias-api`
-y `campeonatos-api`. Quien lo tenga —una app comprometida— puede llamar a
-**todas** las rutas `/sync/*`: dar de alta jueces, leer la gente de cualquier
-club (`/sync/miembros`), apagarle el acceso a alguien o mandar avisos a la
-campana de cualquier club.
+**El código ya está** (26 sep 2026, `common/secreto-sync.ts`): el ecosistema
+sabe quién llama por el secreto que trae, el de Membresías no abre las rutas de
+Campeonatos ni al revés, y `/sync/alta` solo pide altas de la app que firma.
+Mientras el `ECOSYSTEM_SYNC_SECRET` compartido siga en el `.env` del
+ecosistema, **todo sigue funcionando como hoy** y el registro dice
+`WARN [SecretoSync]`. Lo que falta es tuyo, en la VPS, **después** de desplegar
+el ecosistema:
 
-**El diseño:**
+1. Genera dos valores distintos (en tu PC o en el servidor):
 
-| | Hoy | Después |
-|---|---|---|
-| `ecosystem-api` | `ECOSYSTEM_SYNC_SECRET` | `SYNC_SECRET_MEMBRESIAS` y `SYNC_SECRET_CAMPEONATOS` |
-| `membresias-api` | `ECOSYSTEM_SYNC_SECRET` | igual de nombre, con **su** valor |
-| `campeonatos-api` | `ECOSYSTEM_SYNC_SECRET` | igual de nombre, con **su** valor |
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+   ```
 
-Las dos apps no cambian de código: solo cambia el valor que llevan. Lo que
-cambia es el ecosistema, que sabe **quién llama**:
+2. **Membresías**, las dos puntas seguidas (entre un reinicio y el otro el
+   espejo de ida falla unos segundos):
+   - en `/srv/dinamyt/apps/ecosystem-api/.env`, añade
+     `SYNC_SECRET_MEMBRESIAS=<valor 1>`;
+   - en `/srv/membresias/apps/membresias-api/.env`, cambia
+     `ECOSYSTEM_SYNC_SECRET=<valor 1>`;
+   - `sudo systemctl restart dinamyt-id membresias-api`.
+3. **Campeonatos** (el ecosistema no le llama, así que no hay hueco):
+   - en el `.env` del ecosistema, añade `SYNC_SECRET_CAMPEONATOS=<valor 2>` y
+     `sudo systemctl restart dinamyt-id`;
+   - en `/srv/campeonatos/backend/.env`, cambia `ECOSYSTEM_SYNC_SECRET=<valor 2>`
+     y `sudo systemctl restart campeonatos-api`.
+4. Comprueba: `bash /srv/dinamyt/scripts/ensayo.sh estado` enseña las dos
+   parejas de huellas **iguales**, y
+   `cd /srv/dinamyt/apps/ecosystem-api && pnpm espejo:diagnostico` dice
+   `EL CANAL ESTÁ ABIERTO`.
+5. Un día después, si `sudo journalctl -u dinamyt-id --since "1 day ago" | grep SecretoSync`
+   no sale nada, **borra** `ECOSYSTEM_SYNC_SECRET` del `.env` del ecosistema y
+   `sudo systemctl restart dinamyt-id`.
 
-- Un guard `@SoloDesde('membresias' | 'campeonatos')` sustituye las ocho
-  comprobaciones que hoy están copiadas a mano en
-  `modules/sync/sync.controller.ts`, comparando con `timingSafeEqual`.
-- Cada ruta dice quién puede llamarla: `/sync/acceso` solo Membresías;
-  `/sync/clubes`, `/sync/miembros` y `/sync/aviso-campeonato` solo Campeonatos;
-  `/sync/apariencia` las dos.
-- **`/sync/alta` exige que el campo `app` sea el de quien firma**: con el
-  secreto de Membresías no se crea un juez de Campeonatos, ni al revés.
-- Los avisos de ida (`common/espejo-membresias.ts`) firman con
-  `SYNC_SECRET_MEMBRESIAS`. Comprobar al hacerlo que el ecosistema no llama a
-  Campeonatos por ningún lado.
-
-**La transición, sin cortar nada:** mientras `ECOSYSTEM_SYNC_SECRET` siga puesta
-en el ecosistema, se acepta para todo y se escribe un `WARN` por cada uso.
-Orden: desplegar el ecosistema → cambiar el valor en Membresías y reiniciarla →
-lo mismo en Campeonatos → cuando el log lleve un día sin `WARN`, quitar la
-compartida. El PC del evento sigue sin llevar ninguna (D8).
-
-**Lo que hay que tocar además:** las pruebas de `modules/sync/*.spec.ts` (el
-secreto de la otra app → 401), `scripts/ensayo.sh estado` (hoy compara **un**
-par de hashes; pasan a ser dos), `espejo:diagnostico` (§2.6-bis) y la fila de
-§1.4 de `OPERAR.md`.
-
-**Hecho cuando:** cada app lleva un valor distinto, la compartida ya no existe y
-las pruebas cruzadas dan 401.
+El PC del evento sigue sin llevar ninguno (D8).
 
 ---
 
