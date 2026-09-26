@@ -142,7 +142,7 @@ export function validarTipoSangre(tipo: string) {
  *   · `http(s)://…` — alojada fuera. Un club puede tener las suyas donde
  *     quiera, y eso se respeta.
  *
- * ⚠️ **El `/media/` no estaba, y esa era la trampa.** OPERAR.md §6.2 daba por
+ * ⚠️ **El `/media/` no estaba, y esa era la trampa.** La nota vieja del pendiente daba por
  * hecho que «la columna ya acepta las tres formas, así que la migración no
  * rompe nada». La columna sí —es `text`—, pero **esta función no**: un
  * `/media/…` se iba por el primer `if` con «La foto debe subirse desde tu

@@ -5,24 +5,18 @@
 >
 > Para montar el servidor desde cero: [MONTAR-VPS.md](MONTAR-VPS.md).
 > Para saber qué es cada pieza y correrlo en tu PC: [README.md](README.md).
-> Si se cae todo el día del campeonato: [CONTINGENCIA-CAMPEONATO.md](CONTINGENCIA-CAMPEONATO.md).
+> Lo que queda por hacer, en orden: [HOJA-DE-RUTA.md](HOJA-DE-RUTA.md).
+> El día del campeonato, sin internet: `INICIAR-LOCAL.md` de Campeonatos
+> (`D:\Repositorios\dinamyt-combat`, espejado en `productos/campeonatos/`).
 
 **Estado: en producción desde el 20 de agosto de 2026**, en un VPS propio, con
 una sola base PostgreSQL y un esquema por app. Todo lo que hable de Vercel,
-Render o Supabase es historia: está en el registro de git, no aquí.
+Render o Supabase es historia: está en el registro de git, no aquí. Lo mismo
+los planes ya cumplidos: las decisiones que siguen mandando están en §1.6.
 
-> **Repasado el 3 de septiembre de 2026.** Se comprobó una por una que las
-> **56 rutas de archivo**, las **12 variables de entorno**, las **13 columnas**
-> y los **19 identificadores** que este documento nombra existan de verdad en
-> los tres repositorios; y los cinco registros de DNS del correo, contra el DNS
-> público. La única ruta que no existe es `packages/shared/estilos.css`, y es a
-> propósito: es el archivo del pendiente de §6.2.
->
-> **Lo que ese repaso NO puede ver es lo que más engaña**: el nombre sigue ahí y
-> lo que hace ha cambiado. Las dos que se encontraron ese día fueron §4.11 —el
-> reloj de inactividad dejó de ser de veinte minutos para todo el mundo— y §4.7,
-> que no sabía que aceptar una solicitud escribía un rol por app a mano. **Al
-> cambiar comportamiento, buscar qué sección lo cuenta.**
+> **Al cambiar comportamiento, buscar qué sección lo cuenta.** Lo que más
+> engaña en un documento así no es una ruta que ya no existe: es un nombre que
+> sigue ahí y ahora hace otra cosa.
 
 ---
 
@@ -102,17 +96,10 @@ nunca depende de que alguien se acordara de sincronizar.
 
 - **Desplegar durante un campeonato, ni la víspera.** Con gente delante y una
   llave en marcha no se sube nada, y punto; el día anterior solo entran
-  arreglos. *(Hasta el 24 sep 2026 esto decía «el 9, 10 y 11 de octubre»: ese
-  campeonato no se celebra —D7 de `PLAN-CAMPEONATOS.md`— y el siguiente es el
-  año que viene, sin fecha. La regla vale para el que sea.)*
-
-  > **La regla era de trece días (del 1 al 13) y se recortó a tres el 4 de
-  > septiembre.** Congelar dos semanas para proteger un fin de semana salía
-  > carísimo: paraba las mejoras que se están pidiendo hoy y amontonaba todo lo
-  > aplazado en un solo despliegue del día 14 — que es la forma más segura de
-  > estrenar un fallo justo después del evento, y con todo el mundo mirando.
-  > Se trabaja normal; lo que se cuida es el fin de semana y la víspera:
-  > **la víspera solo entran arreglos**, nada de estrenos.
+  arreglos, nada de estrenos. El resto del tiempo se trabaja normal: congelar
+  semanas enteras amontona lo aplazado en un solo despliegue grande, que es la
+  forma más segura de estrenar un fallo. *(Hoy no hay campeonato con fecha: el
+  de octubre de 2026 no se celebró.)*
 - **Desplegar sin respaldo** si la migración toca datos.
 - **Exigir correo para que alguien ENTRE cada día.** El alumno marca asistencia
   con su carnet QR o su PIN, sin escribir nada. Eso no se toca.
@@ -130,6 +117,43 @@ nunca depende de que alguien se acordara de sincronizar.
   cerrar un club de verdad, **primero se desactiva**.
 - **Romper el modo local de Campeonatos.** Sin internet, sin ecosistema, tiene
   que arrancar igual: es la marcha atrás del día del evento.
+
+## 1.6 Las decisiones de fondo
+
+Vienen de los planes ya cumplidos —`PLAN-ECOSYSTEM-VPS.md` y
+`PLAN-CAMPEONATOS.md`, borrados el 26 sep 2026; siguen en la historia de
+`dinamyt-combat` (`git show 9e1d4e1:PLAN-CAMPEONATOS.md`)—. El código las cita
+como «F3 de PLAN-CAMPEONATOS» o «D9»; esto es lo que siguen mandando:
+
+| # | Decisión | Dónde se nota |
+|---|---|---|
+| 1 | **El ecosistema es el único emisor de identidad.** Las apps validan el RS256 contra el JWKS; no firman pases | §4.1 |
+| 2 | **Una base `dinamyt`, un esquema por app** | §2.5, §2.6 |
+| 3 | **Los repos de Campeonatos y Membresías mandan**; el monorepo los espeja | §1.1 |
+| 4 | **Las cuentas nacen en el ecosistema.** El maestro crea *fichas* e *invita* | §4.4 |
+| 5 | **El club vive en el ecosistema** (`organizations`); cada app guarda un espejo | §4.5, §4.16 |
+| 7 | **Las altas del día del evento no suben solas**: se pasan a mano desde `instance/` | `INICIAR-LOCAL.md` §0 |
+| 8 | **Una base de código, y un candado decide quién opera** cada campeonato (`sede`) | **Sin hacer** — `HOJA-DE-RUTA.md` |
+| 9 | **Durante el evento el local publica hacia arriba y nunca descarga** | **Sin hacer** — `HOJA-DE-RUTA.md` |
+| 10 | **El documento es la llave entre un competidor y una persona** (`competidores.documento` ↔ `users.document_id`) | §4.13 |
+| 11 | **La organización contrata y sus clubes heredan**; Membresías sigue siendo por club | §4.5 |
+| 12 | **El login propio de cada app es la marcha atrás y no se retira**; lo que se retira es *crear cuentas* | §4.13 |
+| D1 | El panel del alumno en Campeonatos es **de solo mirar**; inscribir es del maestro | §4.13 |
+| D2 · D9 | **El portal da papeles en Campeonatos, y lo que dio el portal lo quita el portal** al entrar (`roles_del_portal`). Lo puesto a mano en la consola y `admin` no se tocan | §4.13 |
+| D5 | **El competidor sin club también se inscribe**: su ficha no depende de tener cuenta | §4.13 |
+| D8 | **El juez de internet nace en DINAMYT** (`/sync/alta`, `app: campeonatos`); el interruptor es `ECOSYSTEM_SYNC_SECRET`, no `ECOSYSTEM_JWKS_URL` | §4.4 |
+| D10 | **El plan vencido en Campeonatos lo corta el pase, y basta.** La consola no le pone contraseña a una cuenta de DINAMYT. Nunca afecta al modo local | §4.16 |
+
+Y los límites que se aceptaron sabiendo que no tienen arreglo:
+
+- **Pasarse a local a mitad de campeonato es imposible** (`INICIAR-LOCAL.md` §0).
+- **Dos personas creadas sin red en dos sitios son dos identidades.** El sistema
+  puede proponer coincidencias —documento, nombre + club, nacimiento—, pero
+  **confirma una persona**.
+- **Una sesión revocada sigue entrando en Campeonatos y Academy hasta 30 min**:
+  verifican la firma sin preguntar a nadie (§4.11).
+- **Sin internet no existe el ecosistema**: en el PC del evento se entra con la
+  contraseña de esa instalación o con el QR del tatami.
 
 ---
 
@@ -212,11 +236,10 @@ cd /srv/dinamyt/packages/academy-db && pnpm db:migrar
 sudo systemctl restart academy-api academy-web && sudo systemctl status academy-api --no-pager
 ```
 
-> **`db:migrar`, no `db:migrate`** — la misma trampa que en el ecosystem, y
-> hasta ahora Academy **no tenía** el equivalente: MONTAR-VPS decía «compilar,
-> migrar y crear los servicios» sin decir con qué, y lo único que había era
-> `drizzle-kit`, que en un servidor con `--prod` no está. Una migración de
-> Academy no tenía camino a producción.
+> ⚠️ **Academy todavía no está montada en la VPS** (§4.14): estos comandos son
+> para cuando lo esté. El montaje, en MONTAR-VPS Anexo B.
+>
+> **`db:migrar`, no `db:migrate`** — la misma trampa que en el ecosystem.
 >
 > Si falla con **«type … already exists»**, el diario está en el esquema
 > equivocado (lo dejaban así las bases sembradas por la versión vieja de
@@ -235,14 +258,6 @@ cd /srv/membresias && git pull && pnpm install --frozen-lockfile && pnpm --filte
 Aquí reiniciar ES migrar. Si la API **no arranca**, es que la migración falló:
 ese es el aviso, no un misterio.
 
-> ⚠️ **`0019_plan_del_club` (3 sep 2026) no bloquea a nadie al aplicarse.**
-> Añade `orgs.plan_bloqueado_desde` con valor `NULL` —«no consta»— para todos
-> los clubes existentes, y `NULL` deja pasar. **El primer bloqueo real llega
-> cuando el ecosistema lo diga**, o sea en el barrido de la mañana siguiente
-> (§4.16). Ese orden importa: **despliega el ecosystem ANTES que Membresías** y
-> el barrido encontrará la columna ya puesta; al revés, la primera pasada no
-> aplica nada y hay que esperar un día.
-
 ## 2.4-bis Desplegar Campeonatos
 
 ```bash
@@ -254,12 +269,6 @@ cd /srv/campeonatos && git pull && backend/venv/bin/pip install -r backend/requi
 > verifica con `cryptography`, que antes no estaba en el entorno. Sin ese paso,
 > Campeonatos arranca y **rechaza todos los pases** con un error de librería que
 > no menciona ninguna llave.
-
-> ⚠️ **Antes del primer despliegue con SSO**, las dos variables de §1.4 tienen
-> que estar puestas: `ECOSYSTEM_JWKS_URL` en `backend/.env` (apuntando al origen
-> **local** del ecosistema, `http://127.0.0.1:3001/auth/jwks` — el porqué está
-> en §5.13) y `NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL` en
-> `frontend/.env.production`, que se hornea al compilar (§1.3).
 
 > Campeonatos **no migra**: crea lo que le falta al arrancar
 > (`schema_compat`). Lo que eso implica —y por qué una vez tiró el servicio
@@ -339,16 +348,17 @@ cruce exacto y el que conviene usar cuando algo se resiste.
 > token y el suyo sigue siendo el de antes hasta que caduque (30 min) o cierre
 > sesión.
 
-## 2.7 Encender el reloj de los avisos
+## 2.7 El reloj de los avisos
 
 **Los dos avisos —el de las suscripciones de los clubes y el de las
-mensualidades de los alumnos— necesitan que alguien los dispare cada día.** El
-reloj era el cron de Vercel, y Vercel ya no existe en este proyecto: al mudarse
-al VPS se trajeron las apps y **el reloj se quedó allí**. No falla: sencillamente
-no ocurre, que es la clase de avería más difícil de ver.
+mensualidades de los alumnos— necesitan que alguien los dispare cada día.** Está
+encendido en la VPS desde el 29 de agosto de 2026 (`dinamyt-avisos.timer`, a las
+08:00). Si faltara, no falla nada: sencillamente no ocurre, que es la clase de
+avería más difícil de ver. Lo de abajo es para un servidor nuevo; el final, para
+comprobarlo.
 
-Se enciende una vez. Primero, el secreto del ecosistema (Membresías ya tiene el
-suyo desde el montaje):
+Primero, el secreto del ecosistema (Membresías ya tiene el suyo desde el
+montaje):
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
@@ -448,39 +458,10 @@ Las demás banderas:
 > `ALTER TABLE` al arrancar: es exactamente el bloqueo de §5.1-ter, solo que con
 > los papeles cambiados. Espera a que termine.
 
-### Cómo salió · aplicada el 29 de agosto de 2026
+### Los superadmins de cada app se ponen a mano
 
-Censo de partida: **ecosystem 48 · membresías 37 · campeonatos 12**.
-
-| | |
-|---|---|
-| Cuentas creadas | **0** |
-| Personas enlazadas con una cuenta que ya existía | **46** |
-| Fichas sin correo válido (se quedan sin cuenta, entran por QR/PIN) | 0 |
-| Clubes creados en el ecosistema | **8** (con `--crear-clubes-campeonatos`) |
-| Clubes enlazados con uno existente | 5 |
-| Filas nuevas en `org_members` | 9 |
-| Personas sin club al que enlazarlas | 4 |
-
-**La línea que importa es `0 cuentas creadas`.** De 49 fichas entre las dos apps,
-las 46 con correo enlazaron con cuentas que **ya existían**: esto no fue una
-migración, fue **poner las uniones que faltaban**. Es lo que cura el
-«No existe una cuenta con ese correo» que veía en el portal quien sí entraba en
-Membresías.
-
-> **Y una deuda documentada se evaporó.** El plan avisaba de que a los importados
-> se les marcaría `is_email_verified = true` sin comprobación real, y que habría
-> que pedirles verificación de verdad cuando hubiera correo. **Con cero cuentas
-> creadas no hay importados**, así que esa deuda nunca llegó a existir.
-
-**Las 4 personas sin club, y por qué está bien:** dos son usuarios de Membresías
-que sencillamente no pertenecen a ningún club. Las otras dos tienen en
-Campeonatos un nombre de club que no cruza con ninguna organización — y no es
-contradictorio con el `0 de Campeonatos SIN cruzar`: `Competidor.club` es **texto
-libre**, mientras que los clubes salen de la lista de los maestros. Una variante
-de escritura o un nombre viejo no encaja con nada. Se arreglan a mano.
-
-### La limpieza de superadmins que vino después
+*(La reconciliación se aplicó el 29 de agosto de 2026: 0 cuentas creadas, 46
+personas enlazadas. Se puede volver a correr sin miedo: en seco por defecto.)*
 
 El guion **detecta pero no concede** los superadmins de las apps, y es
 deliberado: un guion que reparte permisos de administrador no debe existir. Hay
@@ -492,9 +473,7 @@ deliberado: un guion que reparte permisos de administrador no debe existir. Hay
 | Membresías | `membresias.users` | `is_super_admin` |
 | Campeonatos | `campeonatos.usuarios` | `es_superadmin` |
 
-El 29 de agosto se retiraron dos que sobraban —la cuenta personal del dueño en
-Membresías, y `admin-campeonatos@dinamyt.org` en Campeonatos, que es la clase de
-admin por app que B3 viene a eliminar—, dejando solo `admin@dinamyt.org`.
+Hoy solo queda `admin@dinamyt.org`. Para verlos:
 
 ```bash
 sudo -u postgres psql -d dinamyt -P pager=off -c "select 'membresias' as app, email, is_super_admin as super from membresias.users where is_super_admin union all select 'campeonatos', email, es_superadmin from campeonatos.usuarios where es_superadmin order by app, email;"
@@ -509,6 +488,38 @@ sudo -u postgres psql -d dinamyt -P pager=off -c "select 'membresias' as app, em
 > ⚠️ **Y antes de quitarse el propio permiso, entrar con el que va a quedar.**
 > Es la misma regla que el portal ya aplica a la gente: nadie se saca ni se
 > degrada a sí mismo sin que quede alguien con las llaves.
+
+## 2.9 El ensayo de punta a punta
+
+**Se corre antes de cada campeonato, y después de cualquier despliegue que
+toque login, roles o identidad.** El fallo del rol de agosto tenía cuatro
+eslabones y cada uno tapaba al siguiente (§4.7): ninguno se veía leyendo el
+código; se vieron recorriendo el camino con una persona real y mirando el log.
+Para Campeonatos, el guion de pantallas es `PRUEBAS-PLAN-CAMPEONATOS.md` (en
+`dinamyt-combat`).
+
+`scripts/ensayo.sh` responde cada comprobación y **solo lee**: se puede correr
+en producción a media tarde. La otra mitad es una ventana con
+`sudo journalctl -u dinamyt-id -f` abierta todo el rato: un
+`WARN [EspejoMembresias]` es un aviso que no se aplicó.
+
+| Paso | En pantalla | En la base (`bash scripts/ensayo.sh …`) |
+|---|---|---|
+| 0 · Partida | — | `estado`: las apps `active`, **los dos hashes del secreto iguales**, `POST /sync/alta` → **401** (un 404 es que falta `ECOSYSTEM_SYNC_SECRET`). Anota el resumen |
+| 1 · Estructura | En `/admin`: una federación, su administrador, un club dentro y afiliarle otro que ya exista | `federacion 'NOMBRE'`: los clubes colgando y alguien con rol `admin` |
+| 2 · Herencia | Darle plan a la federación | `herencia alguien@delclub.com` (del club **hijo**): sale el plan de la federación como eslabón |
+| 3 · Alta desde Membresías | Un alumno con correo nuevo; vuelve el enlace de contraseña | `persona el@nuevo.com`: cuenta con `tiene_contrasena = f`, **`enlazada = t`**, `contrasena_propia = f` |
+| 4 · Que entre | Abre el enlace, pone contraseña, portal → Membresías; cobrarle, asistencia y carnet | `persona` otra vez: `tiene_contrasena = t` |
+| 5 · El rol | Cambiarle el rol a auxiliar desde el portal | `rol el@nuevo.com`: `esperado_membresias` = `en_membresias` y `tiene_roles_de_app_escritos = f`. Si no cuadra, `espejo` |
+| 6 · Campeonatos | Entrar con un maestro, inscribir y **salir**: volver al portal no te mete dentro (§5.12). A un alumno el portal le ofrece su panel, no la consola (§4.13) | — |
+| 7 · Cierre | — | `resumen && sueltas`: `fichas_sueltas` **no puede haber subido** |
+
+**Anota los números del cierre cada vez, aquí debajo**: ese número solo dice
+algo comparado con la vez anterior.
+
+| Fecha | `fichas_sueltas` | Notas |
+|---|---|---|
+| 31 ago 2026 | 0 de 36 | Tras la reconciliación |
 
 ---
 
@@ -591,7 +602,7 @@ cabecera del mensaje (en Gmail: **⋮ → Mostrar original**) y comprueba
 
 ## 3.5 Cómo quedó montado el correo
 
-**Terminado el 29 de agosto de 2026.** Comprobado en el DNS contra tres
+Montado el 29 de agosto de 2026 y comprobado en el DNS contra tres
 resolutores (`1.1.1.1`, `8.8.8.8` y `9.9.9.9`), que es lo único que cuenta:
 el panel puede decir que sí y el DNS decir que no.
 
@@ -626,85 +637,26 @@ como» de Gmail (Anexo E.5) sale por el SMTP de Resend, o sea del mismo bote de
 **100 al día** — y `MAIL_DAILY_MAX` no las cuenta, porque se cuenta dentro del
 código de ecosystem-api. Hoy sobra sitio; cuando no sobre, buzón propio.
 
-### Lo que queda por decidir: subir la política
+### La política DMARC, y la pieza que sostiene todo el correo
 
-`p=none` significa «avísame, no bloquees». Los informes llegan al panel de
-Cloudflare (**Email → DMARC Management**), no al correo. Con dos semanas de
-informes limpios se sube a `quarantine`, y más tarde a `reject`.
+Hoy está en `p=none` («avísame, no bloquees»); los informes van al panel de
+Cloudflare (**Email → DMARC Management**). Subirla a `quarantine` y después a
+`reject` es una tarea con su procedimiento en `HOJA-DE-RUTA.md`. Lo que no
+caduca:
 
-> ⚠️ **No se sube la política durante el campeonato**, aunque lo demás sí se
-> toque: del 8 al 12 de octubre no se cambia el DNS del correo. Un `reject` mal
-> calibrado justo cuando salen las invitaciones y los códigos a competidores y
-> maestros es el peor momento posible para averiguarlo, y el correo no tiene
-> marcha atrás inmediata — la caché del DNS tarda. El orden: `quarantine` a
-> mediados de septiembre, `reject` desde el 13 de octubre.
+> **El SPF de la raíz no cubre lo que enviamos.** Autoriza al MX de Cloudflare,
+> que es para RECIBIR; el correo sale por Resend desde `send.dinamyt.org`. DMARC
+> pasa con SPF **o** con DKIM, y aquí quien alinea es el DKIM, que firma con
+> `d=dinamyt.org`. Consecuencia: **`resend._domainkey` es la única pieza que
+> sostiene todo el correo saliente.** Si se rota la clave en Resend y no se
+> actualiza ese TXT, con `p=none` no se nota; con `quarantine`, todos los
+> enlaces de contraseña van a spam.
 
-#### La fecha sale de una cuenta, no de «mediados»
-
-`p=none` se publicó el **29 de agosto**. Dos semanas de informes es el **12 de
-septiembre**, y ése es el primer día que tiene sentido mirar. Antes no hay datos
-suficientes: subir la política con cinco días de informes es subirla a ciegas.
-
-#### Antes de tocar nada: qué mirar en los informes
-
-Lo que se busca en **Email → DMARC Management** no es «que no haya fallos», es
-**que todo lo que falla sea de fuera**:
-
-· **Los envíos propios pasan.** Resend firmando con `d=dinamyt.org`. Si aquí
-  hay fallos, **no se sube nada**: `quarantine` mandaría a spam los códigos de
-  verificación y los enlaces de contraseña, que es todo el correo que manda
-  esto (§3.3).
-· **El «Enviar como» de Gmail pasa.** Es el que se usa para contestar a
-  `soporte@` (Anexo E.5), sale por el mismo SMTP y es el más fácil de olvidar
-  porque no lo manda la aplicación: lo manda una persona.
-· **Lo que falle sea remitente desconocido.** Eso es exactamente lo que la
-  política viene a bloquear, y su presencia es el motivo para subirla.
-
-#### El estado del DNS, comprobado el 3 de septiembre de 2026
-
-Las cinco piezas siguen como se montaron. Se comprobó contra el DNS público, que
-es lo único que cuenta:
-
-| Nombre | Vive |
-|---|---|
-| `_dmarc.dinamyt.org` | `v=DMARC1; p=none; rua=mailto:…@dmarc-reports.cloudflare.net` |
-| `dinamyt.org` TXT | `v=spf1 include:_spf.mx.cloudflare.net ~all` |
-| `dinamyt.org` MX | `route1/2/3.mx.cloudflare.net` |
-| `send.dinamyt.org` TXT | `v=spf1 include:amazonses.com ~all` |
-| `send.dinamyt.org` MX | `feedback-smtp.sa-east-1.amazonses.com` |
-| `resend._domainkey` | la clave pública, presente |
-
-> **Lo que hay que entender antes de subir la política, y es la pieza que
-> engaña:** el SPF de la raíz **no cubre lo que enviamos**. Autoriza al MX de
-> Cloudflare, que es para RECIBIR. Lo que manda el correo es Resend desde
-> `send.dinamyt.org`, un nombre distinto, así que **el SPF de la raíz no alinea
-> nada** — y no hace falta que lo haga: DMARC pasa con SPF **o** con DKIM, y
-> aquí quien alinea es el DKIM, que firma con `d=dinamyt.org`.
->
-> Consecuencia práctica: **`resend._domainkey` es la única pieza que sostiene
-> todo el correo saliente.** El día que se rote la clave en Resend y no se
-> actualice ese TXT, con `p=none` no pasa nada visible; con `quarantine`, todos
-> los enlaces de contraseña van a spam. **Comprobar ese registro es parte de
-> subir la política, no un extra.**
-
-#### El cambio, cuando toque
-
-Un solo TXT, `_dmarc`, cambiando una palabra:
-
-```
-v=DMARC1; p=quarantine; rua=mailto:cdd94eda59444bbf83153adc4282b0c5@dmarc-reports.cloudflare.net
-```
-
-Y se comprueba en el DNS, **nunca mirando el panel** (§3.5, punto 2):
+Cualquier cambio se comprueba en el DNS, **nunca mirando el panel**:
 
 ```powershell
 (Resolve-DnsName -Name _dmarc.dinamyt.org -Type TXT).Strings
 ```
-
-Se deja **una semana** antes de pensar en `reject`, y `reject` no antes del 14
-de octubre. Si algo se rompe, volver a `p=none` es editar la misma palabra: la
-vuelta atrás es inmediata y sin pérdida, que es lo que hace que este paso sea
-barato de intentar.
 
 ## 3.6 Que DINAMYT salga en Google
 
@@ -732,78 +684,28 @@ son. Se comprueba con:
 curl -s https://dinamyt.org/robots.txt && curl -s https://dinamyt.org/sitemap.xml | head -20
 ```
 
-### Lo que hay que hacer A MANO, una vez
+### La propiedad en Google Search Console
 
-Publicar el `robots.txt` **no mete a nadie en Google**. Lo que mete es esto:
+**Verificada**, por los dos caminos —comprobados los dos el 26 sep 2026—: la
+etiqueta HTML (`GOOGLE_SITE_VERIFICATION` en el `.env` del portal, que se lee
+**al compilar**) y el TXT `google-site-verification=…` en la raíz del DNS. La
+propiedad de tipo **Dominio** cubre también `club.`, `campeonatos.` y
+`academy.`, y solo se verifica por DNS.
 
-1. **Google Search Console** → «Añadir propiedad» → **Dominio** (`dinamyt.org`),
-   que cubre todos los subdominios de una vez.
-2. Verificar. **Hay dos caminos y conviene saber cuál usar** — ver abajo.
-3. **Sitemaps → añadir** `https://dinamyt.org/sitemap.xml`.
-4. **Inspección de URLs** → `https://dinamyt.org` → «Solicitar indexación».
+Si algún día hay que repetirlo, las dos trampas de la primera vez:
 
-### La verificación, que es donde se atascó
-
-El primer intento fue por DNS y Google contestó esto:
-
-> No se ha podido encontrar tu token de verificación en los registros TXT de tu
-> dominio. Se han encontrado estos registros TXT de DNS: `v=spf1
-> include:_spf.mx.cloudflare.net ~all`
-
-**Ese mensaje no dice «espera a que propague».** Dice que Google leyó la zona de
-`dinamyt.org` **y allí solo estaba el SPF**: el TXT de verificación no llegó a
-existir donde tenía que estar. Las tres formas de que pase eso, en orden de
-frecuencia:
-
-| Lo que pasó | Cómo se ve en Cloudflare | Cómo se arregla |
-|---|---|---|
-| El nombre se escribió `dinamyt.org` | El registro quedó en `dinamyt.org.dinamyt.org` — Cloudflare **añade el dominio solo** | El nombre tiene que ser `@` |
-| Se puso en la propiedad equivocada | El token de una propiedad «Prefijo de URL» no vale para una «Dominio» | Copiar el token de ESA propiedad |
-| El DNS del dominio no lo lleva Cloudflare | Los cambios se hacen donde estén los servidores de nombres | `dig NS dinamyt.org` dice dónde |
-
-Se comprueba desde el PC, sin esperar a Google:
+| Lo que pasó | Cómo se arregla |
+|---|---|
+| El TXT se escribió con nombre `dinamyt.org` y quedó en `dinamyt.org.dinamyt.org` | Cloudflare añade el dominio solo: el nombre es `@` |
+| El token era de una propiedad «Prefijo de URL» y no de «Dominio» | Copiar el token de ESA propiedad |
 
 ```bash
 dig +short TXT dinamyt.org @1.1.1.1
 ```
 
-Tienen que salir **dos** líneas: el `v=spf1…` y el `google-site-verification=…`.
-Si solo sale el SPF, el registro no está puesto — por mucho que el panel lo
-enseñe.
-
-### El otro camino: la etiqueta HTML (no depende del DNS)
-
-En Search Console, **«Etiqueta HTML»** en vez de «Proveedor de nombres de
-dominio». Da un `<meta name="google-site-verification" content="XXXX">`; **solo
-se copia el valor de `content`** y va al `.env` del portal:
-
-```bash
-# en /srv/dinamyt/apps/ecosystem-portal/.env
-GOOGLE_SITE_VERIFICATION=XXXX
-```
-
-Y se **recompila el portal** — el token se lee al compilar, no al arrancar:
-
-```bash
-cd /srv/dinamyt && pnpm --filter @dinamyt/ecosystem-portal build
-sudo systemctl restart dinamyt-portal
-curl -s https://dinamyt.org | grep google-site-verification
-```
-
-Con la etiqueta en el HTML, «Verificar» pasa en el acto.
-
-> ⚠️ **La etiqueta verifica el PREFIJO** (`https://dinamyt.org`), no el dominio
-> entero. Para que la propiedad cubra también `club.`, `campeonatos.` y
-> `academy.` hace falta la de tipo **Dominio**, y ésa **solo** se verifica por
-> DNS. Lo práctico: verificar ya por etiqueta para empezar a indexar, y arreglar
-> el TXT con calma para la propiedad de dominio.
-
-Tarda **de días a un par de semanas**. Que no aparezca al día siguiente no
-significa que esté mal puesto.
-
-> ⚠️ **Antes del paso 4, poner los precios de verdad en `/planes`** (§6.1). Lo
-> que Google guarde el primer día es lo que enseñará durante semanas, y un
-> precio de relleno en un resultado de búsqueda es peor que no aparecer.
+Enviar el sitemap (`https://dinamyt.org/sitemap.xml`) y pedir la indexación va
+**después de poner los precios de verdad en `/planes`**: lo que Google guarde el
+primer día es lo que enseñará durante semanas (`HOJA-DE-RUTA.md`).
 
 ### Por qué la portada se indexa aunque sea `'use client'`
 
@@ -886,18 +788,10 @@ administra el ecosistema entero y a veces tiene que. El maestro no.
 
 ### El alta que empieza en Membresías y acaba aquí
 
-*(30 de agosto de 2026.)* El maestro inscribe a su alumno **en su app**, con la
-persona delante, y ese gesto no se le puede quitar: es como se llena un club.
-Lo que sí cambió es qué nace de él.
-
-**Antes:** `POST /users` de Membresías creaba una cuenta **suya** —correo,
-contraseña puesta por el maestro— que no existía en DINAMYT. Dos identidades
-para una persona, y una ficha con `eco_sub` vacío: **la que ninguno de los
-cuatro avisos del espejo alcanza** (§4.7). No le llegaba la foto, ni el
-cinturón, ni la contraseña, ni el rol. Y contradecía la regla que sostiene todo
-esto — las cuentas nacen en el ecosistema.
-
-**Ahora**, con el club federado, ese mismo botón hace dos cosas en orden:
+El maestro inscribe a su alumno **en su app**, con la persona delante, y ese
+gesto no se le puede quitar: es como se llena un club. Con el club federado,
+ese botón hace dos cosas en orden (antes creaba una cuenta local de Membresías,
+con `eco_sub` vacío, que ningún aviso del espejo alcanzaba):
 
 1. Le pide al ecosistema que cree la cuenta y la pertenencia al club
    (`POST /sync/alta`, con el secreto compartido). Por dentro es **la misma
@@ -913,20 +807,17 @@ esto — las cuentas nacen en el ecosistema.
 | **`owner` no viaja por esa puerta** | El dueño de un club no se da de alta desde el formulario de alumnos, y repartir el mando de un club por una ruta de servidor a servidor no es algo que deba poder pasar |
 | **Se añadió `guardian` al catálogo del club** | El acudiente existía en Membresías desde siempre y aquí faltaba: un alta de acudiente se estrellaba contra un 400 |
 
-> **Campeonatos hace lo mismo con sus jueces desde el 25 sep 2026** (D8 de
-> `PLAN-CAMPEONATOS.md`): `POST /api/auth/register` → `POST /sync/alta` con
+> **Campeonatos hace lo mismo con sus jueces** (D8, §1.6):
+> `POST /api/auth/register` → `POST /sync/alta` con
 > `app: campeonatos`, que **solo** traduce `juez → judge`, en la organización
 > del admin. El maestro no viaja por esta puerta (en DINAMYT es gestor de club,
 > y aquí dueño en Membresías), ni el admin. En Campeonatos el interruptor es
 > `ECOSYSTEM_SYNC_SECRET`, no `ECOSYSTEM_JWKS_URL`: el PC del evento lleva la
 > segunda desde F8 y ese día no tiene red.
 >
-> **Y un fallo que tenía esta puerta, arreglado el mismo día:** reenviar la
-> invitación de alguien que ya era miembro sin contraseña contestaba **200 sin
-> `ecoSub`** (`inviteMember` leía esa fila sin `userId`), y Membresías, que lo
-> guarda sin mirar, creaba una ficha suelta. Ahora el `select` lo trae y
-> `/sync/alta` da un error antes que un falso éxito. Si `ensayo.sh sueltas`
-> sube, mirar primero esto.
+> **Una respuesta de alta sin `ecoSub` es un error, no un éxito**: así nacería
+> una ficha suelta. Si `ensayo.sh sueltas` sube, mirar primero `inviteMember`
+> (reenviar la invitación de quien ya era miembro sin contraseña).
 
 > **Membresías sola sigue creando la cuenta ella.** Sin `ECOSYSTEM_JWKS_URL` no
 > hay portal al que pedirle nada: el producto independiente y **el modo del día
@@ -1045,17 +936,10 @@ lista plana, un club afiliado y uno huérfano se ven igual.
 | Afiliar cierra la invitación que estuviera esperando | Al maestro no se le sigue preguntando algo que ya pasó |
 | Nada de esto se nota al instante | Los `app_scopes` viajan en el pase (30 min). Quien lo necesite ya: que salga y entre |
 
-> ⚠️ **Una federación creada desde `/admin` sigue naciendo sin nadie dentro**, y
-> mientras no tenga miembros no aparece en «Mi organización» de nadie. Ya no es
-> un silencio: al crearla queda seleccionada y el panel lo dice en un aviso.
-> Pero **ya no bloquea nada**: el panel afilia clubes sin necesidad de que la
-> federación tenga administrador. Ponérselo sigue siendo lo correcto — es quien
-> después mira a su gente y responde por ella.
->
-> Y el desplegable de rol de «+ Añadir» ya solo ofrece lo que ese tipo de
-> organización acepta: una federación admite `admin` y `judge` y nada más. Antes
-> ofrecía los seis de siempre y cuatro acababan en un 400 que no decía por qué —
-> justo al intentar poner al administrador que hacía falta.
+> ⚠️ **Una federación creada desde `/admin` nace sin nadie dentro**, y mientras
+> no tenga miembros no aparece en «Mi organización» de nadie (el panel lo
+> avisa). No impide afiliar, pero ponerle administrador es lo correcto. Una
+> federación admite los roles `admin` y `judge`, y nada más.
 
 ### El panel de recaudo
 
@@ -1146,67 +1030,25 @@ para ir a mirar, no un aviso nuevo.
 nuevos (el dedup por membresía y tipo), así que el botón «Generar avisos» del
 panel no manda un segundo resumen por pulsarlo otra vez.
 
-### Qué hace falta para que los avisos funcionen
+### Qué hace falta para que lleguen, y cómo se diagnostica un 0
 
-`[x]` **Las llaves VAPID.** *(comprobado el 29 ago 2026)* Están las tres en
-      `membresias-api/.env` y la pública coincide con la de la web.
-
-`[x]` **El reloj diario** (§2.7). *(comprobado el 29 ago 2026)*
-      `dinamyt-avisos.timer` está `enabled` y dispara a las 08:00; en el journal
-      salen sus dos líneas cada mañana.
-
-`[x]` **Gente suscrita.** *(3 de septiembre de 2026)* Era la que faltaba, y ya
-      no falta: **los avisos llegan a un teléfono de verdad**. Ojo a que eran
-      **dos** cosas y no una — hacía falta que alguien instalara la PWA, y
-      hacía falta que el botón de activar funcionara, que hasta ese día no lo
-      hacía desde un computador (§5.19).
-
-### Y aun así no llega nada: la tercera pieza es la gente
-
-`[x]` ~~**Nadie está suscrito.**~~ **Cerrado el 3 de septiembre de 2026.**
-      Durante días el aviso diario dijo
-      `{"clubes":3,"creados":12,"pushEnviados":0}` — doce avisos creados, cero
-      enviados—, y **no era configuración**: no había destinatarios. Ya los hay,
-      y llegan.
-
-      Lo que sigue se queda escrito porque es **cómo se diagnostica la próxima
-      vez**: un `pushEnviados` en 0 vuelve a significar lo mismo, y la consulta
-      de abajo es la que lo distingue de un fallo de verdad.
-
-      ⚠️ **Y ahora se sabe que el 0 tenía DOS causas, no una.** Además de que
-      nadie se hubiera suscrito, **el botón de activar no funcionaba desde un
-      computador** (§5.19): pedía el permiso después de esperar al service
-      worker, y para entonces el gesto del clic había caducado. Así que antes de
-      concluir «no hay destinatarios», comprueba que el botón hace algo.
+Tres piezas, las tres puestas desde el 3 de septiembre de 2026: las llaves VAPID
+(en `membresias-api/.env`, con la pública igual en la web), el reloj diario
+(§2.7) y **gente suscrita**. Si el aviso diario vuelve a decir
+`pushEnviados: 0`, hay dos causas y la segunda se olvida: que nadie se haya
+suscrito, **o que el botón de activar no haga nada** (§5.19). Contar
+suscripciones:
 
 ```bash
 sudo -u postgres psql -d dinamyt -P pager=off -c "select 'membresias' app, count(*) suscripciones from membresias.push_subscriptions union all select 'ecosystem', count(*) from ecosystem.push_subscriptions;"
 ```
 
-      Si sale 0, es eso. Se cierra desde el celular, no desde el servidor:
-      instalar Membresías («Añadir a pantalla de inicio»), entrar y activar los
-      avisos. Al día siguiente `pushEnviados` deja de ser 0.
-
-      **Desde 1 sep 2026 esto se pide solo.** La primera vez que alguien entra
-      le sale una tarjeta —«¿Te avisamos?»— explicando qué avisos son, y solo si
-      dice que sí se dispara el permiso del navegador. Antes el botón estaba
-      escondido al final del panel de la campana, que se abre cuando ya hay algo
-      que mirar: previsiblemente, casi nadie lo encontraba.
-
-      Se pregunta **una sola vez por navegador** (`localStorage`,
-      `dinamyt.avisos.preguntado`). En Membresías se le pregunta a todo el mundo
-      —alumno y maestro reciben cosas distintas, ver la tabla de arriba— y la
-      frase de la tarjeta cambia según quién sea, porque prometerle al maestro
-      avisos «de tu mensualidad» sería falso. En el portal se le pregunta solo a
-      quien **gestiona** un club: a un alumno no le llega ninguno de esos avisos.
-      Quien dijo «ahora no» lo tiene en el interruptor al pie del panel de la
-      campana.
-
-      El orden importa y es deliberado: **la tarjeta va ANTES del cuadro del
-      navegador**. El permiso del navegador se pide una sola vez en la vida —si
-      se dice que no, Chrome no vuelve a preguntar y desde la app ya no hay nada
-      que hacer—, así que gastarlo en un cuadro gris que aparece sin contexto es
-      perder el canal para siempre por un toque de dos segundos.
+Se pide solo: la primera vez que alguien entra le sale una tarjeta —«¿Te
+avisamos?»— y **solo si dice que sí** se dispara el permiso del navegador, que
+se pide una vez en la vida (gastarlo en un cuadro sin contexto es perder el
+canal para siempre). Una vez por navegador (`dinamyt.avisos.preguntado`). En
+Membresías se le pregunta a todo el mundo, con la frase según quién sea; en el
+portal, solo a quien **gestiona** un club.
 
 > **Y sí, el portal también manda push desde el 1 sep 2026.** `ecosystem-api`
 > escribe el aviso del club y, detrás, lo empuja al celular de sus gestores
@@ -1328,12 +1170,9 @@ Tres cosas que conviene saber de la de arriba:
 | Sede, horarios, contacto, escudo del club | `ecosystem.organizations` | Los gestores del club |
 | Plan, pagos, asistencia, kiosco | `membresias` | El club, en su app |
 
-> ⚠️ **Un tercer sitio escribía roles por app a escondidas, y se cerró el 3 de
-> septiembre**: aceptar una solicitud de entrada ponía `role_membresias =
-> 'student'` a mano, lo que convertía a todo recién llegado en una excepción
-> —y le escribía `student` aunque entrara de entrenador—. El relato está en
-> §4.15, y es la misma lección de §6.1: **el rol por app solo se escribe cuando
-> alguien lo pide de verdad.**
+> ⚠️ **El rol por app solo se escribe cuando alguien lo pide de verdad** (§4.15):
+> una columna `role_*` puesta sin motivo es una excepción que deja al portal sin
+> mandar.
 
 Membresías dejó de tener formulario para los datos de la persona: los **lee**.
 Y como quien imprime el carnet es Membresías, el portal le **avisa** cada vez
@@ -1367,17 +1206,18 @@ conviene tener escritas:
 
 Para comprobar que el canal está vivo: §2.6-bis.
 
-### «Le puse maestro y solo se vio en Campeonatos»
+### Cómo viaja el rol, y los cuatro eslabones que se rompieron
 
-*(Arreglado el 30 de agosto de 2026.)* Eran **dos fallos encadenados**, y el
-primero no era «el rol local manda»: era que el rol **se tiraba a la basura**
-por el camino.
+*(30 ago 2026.)* «Le puse maestro y solo se vio en Campeonatos» eran cuatro
+fallos encadenados, y **cada uno tapaba al siguiente**. Están arreglados; quedan
+aquí como mapa por si algo vuelve:
 
-#### 1 · `maestro` no existe en Membresías, y se perdía entero
-
-El pase lleva un rol por app. Cuando su columna está vacía —lo normal, casi
-nadie las pone a mano— se caía al rol general **solo si ese valor estaba en el
-catálogo de esa app**. Y los catálogos no se llaman igual:
+| | Qué pasaba | Lo que hay ahora |
+|---|---|---|
+| 1 | `maestro` no está en el catálogo de Membresías y el rol viajaba `null` | Se **traduce** (`common/roles-por-app.ts`, tabla de abajo) |
+| 2 | Aun traducido, el rol del pase solo se leía al CREAR la ficha | El portal **avisa**: `POST /sync/rol`, al cambiar el rol en `/admin` o «Mi organización» |
+| 3 | El aviso no encontraba la ficha sin enlazar y contestaba 200 | `/sync/rol` busca **también por correo** y ata la ficha (`eco_sub`); lo que no se aplica sale como `warn` en el log de `dinamyt-id` |
+| 4 | `role_membresias` escrita mandaba sobre el general | **Cambiar el rol general vacía las tres columnas de app** |
 
 | App | Su catálogo |
 |---|---|
@@ -1385,67 +1225,24 @@ catálogo de esa app**. Y los catálogos no se llaman igual:
 | Membresías | `owner` · `staff` · `guardian` · `student` |
 | Academy | `admin` · `teacher` · `student` |
 
-`maestro` está en el de Campeonatos, así que allí pasaba tal cual. En el de
-Membresías **no está**: el rol viajaba como `null`, la ficha nacía `student` y
-nadie se enteraba de por qué. La comprobación no estaba mal —colar `member`
-como rol de Membresías sería inventarse un permiso que la app no sabe leer—,
-estaba **incompleta**: le faltaba decir qué es un maestro en cada sitio.
+El maestro del dojang es `owner` en Membresías y `teacher` en Academy; el coach
+es `staff`; el alumno es `competitor` en Campeonatos. Lo que no tiene
+equivalente —el `judge`, que es de la federación— viaja `null`: mejor no decir
+nada que degradar al azar. **Una ampliación de permisos no se cuela de propina
+en el arreglo de otra cosa**: por eso `owner` no se traduce a `maestro` en
+Campeonatos.
 
-Ahora se **traduce** (`common/roles-por-app.ts`): el maestro del dojang es el
-`owner` de su club en Membresías y `teacher` en Academy, el coach es `staff`,
-el competidor es el alumno. Lo que no tiene equivalente —el `judge`, que es de
-la federación y no es nada dentro de un club— sigue viajando como `null`: se
-prefiere no decir nada a degradar al azar.
+Reglas de `/sync/rol`: no toca la PERTENENCIA (sacar a alguien de un club no le
+borra pagos ni asistencia); Membresías rechaza el aviso que dejaría un club sin
+ningún `owner` (§4.7-bis); la ficha sin cuenta (carnet QR o PIN) no se toca;
+nunca rompe el guardado; y **`is_super_admin` no viaja nunca** (§1.5). Vaciar
+las columnas de app se lleva un rol puesto a propósito (el `judge` de quien es
+alumno en su club): el diálogo lo avisa, y `POST /organizations/:id/invite` los
+vuelve a escribir uno por uno.
 
-> ⚠️ **Campeonatos no gana roles con esto.** Solo se le añadió
-> `student → competitor`, que no abre la consola (§4.13). Traducir
-> `owner → maestro` habría sido razonable y habría metido en la consola, de un
-> despliegue para otro, a gente que hoy no entra: una ampliación de permisos no
-> se cuela de propina en el arreglo de otra cosa.
-
-#### 2 · Y aun traducido, no llegaba a quien ya tenía ficha
-
-Porque el rol del pase **solo se lee al CREAR** la fila local. Quien ya estaba
-dentro de Membresías no se enteraba nunca — y allí no hay una pantalla evidente
-donde corregirlo. Quien administra tenía el botón y no tenía el efecto.
-
-Ahora el portal **avisa**: `POST /sync/rol`, por el mismo canal y con el mismo
-secreto que la foto y la contraseña (`ECOSYSTEM_SYNC_SECRET`). Se dispara al
-cambiar el rol desde `/admin` o desde «Mi organización».
-
-| | |
-|---|---|
-| **Esto no rompe la regla de arriba** | Lo que no viaja sigue sin viajar: la PERTENENCIA. Sacar a alguien de un club en el portal sigue sin tocar sus pagos, su asistencia ni su historial |
-| **Porque no es un silencio** | Alguien con permiso abrió el panel, eligió a una persona y le cambió el rol a propósito. Eso manda |
-| **El club no se queda sin dueño** | Membresías rechaza el aviso que dejaría un club sin ningún `owner` activo, y dice por qué. Es la misma regla de §4.7-bis, y hace falta otra vez allí porque aquí se mira `org_members`, que es otra tabla |
-| **La ficha sin cuenta del portal no se toca** | Busca por `eco_sub`. El alumno sin correo, que entra por carnet QR o PIN, sigue siendo asunto de su club |
-| **Nunca rompe el guardado** | Se dispara sin esperarlo. Si Membresías está caída, el rol se cambia igual aquí y allá queda el viejo hasta el próximo cambio |
-
-> **A quien ya le pasó:** vuelve a ponerle el rol en el panel. Ahora sí viaja.
-
-**Campeonatos y Academy siguen sin este aviso**: allí el rol local sigue
-mandando después de la primera vez, que es lo que impide degradar en silencio
-al administrador de un campeonato en marcha. Se cambian en su propia consola.
-
-#### 3 · Y aun avisando, no llegaba a la ficha sin enlazar
-
-*(30 ago, esa misma tarde.)* **Los cuatro avisos del espejo buscan por
-`eco_sub`.** Una ficha creada por su club y nunca enlazada con el ecosistema no
-la encuentra ninguno — ni la foto, ni el escudo, ni la contraseña, ni el rol —
-y como el aviso contestaba `200 {"encontrada": false}` y nadie miraba el
-cuerpo, **el registro quedaba limpio**. Desde el portal se veía un cambio de rol
-que había funcionado.
-
-Dos arreglos, y el segundo importa más que el primero:
-
-| | |
-|---|---|
-| `/sync/rol` busca **también por correo** | Y ata la ficha de paso (`eco_sub`), igual que hace `POST /auth/sso`. Solo sobre una ficha que todavía no tiene enlace, con el `isNull` en el `WHERE` para que dos avisos a la vez no se pisen. **A partir de ahí los otros tres avisos también empiezan a llegarle**: un cambio de rol repara el enlace para todo |
-| Lo que no se aplica **se registra** | `espejo-membresias.ts` mira ahora el cuerpo de la respuesta: si no había ficha, o si Membresías se negó y dijo por qué, sale un `warn` en el log de `dinamyt-id`. Un aviso que no se aplica tiene que dejar rastro |
-
-Y se quitó el veto al superadmin de Membresías: su `role` es lo que se imprime
-en el carnet y se cambia como el de cualquiera. Lo que **nunca** viaja por aquí
-es `is_super_admin`, que se concede a mano y mirando (§1.5).
+**En Campeonatos** el rol viaja de otra forma, sin `/sync/rol`: lo que dio el
+portal lo quita el portal al entrar (D9, §4.13). **En Academy no viaja**: el
+rol local manda después de la primera vez (`HOJA-DE-RUTA.md`).
 
 #### Por qué no llegó: dónde mirar
 
@@ -1453,60 +1250,15 @@ es `is_super_admin`, que se concede a mano y mirando (§1.5).
 sudo journalctl -u dinamyt-id -n 100 --no-pager | grep -i "sync/rol"
 ```
 
-Y la verdad de la base — el enlace y el rol de esa persona a los dos lados:
-
 ```bash
 sudo -u postgres psql -d dinamyt -P pager=off -c "select e.email, e.id as eco_id, om.role as rol_portal, om.role_membresias, m.id as ficha, m.eco_sub, m.role as rol_membresias, m.is_super_admin from ecosystem.users e left join ecosystem.org_members om on om.user_id = e.id left join membresias.users m on m.email = e.email where e.email ilike '%CORREO%';"
 ```
 
 | Lo que se ve | Qué significa |
 |---|---|
-| `ficha` vacío | Esa persona no existe en Membresías. No hay nada que copiar |
-| `eco_sub` vacío | **La ficha no estaba enlazada.** El siguiente cambio de rol la ata y la aplica |
+| `ficha` vacío | Esa persona no existe en Membresías |
+| `eco_sub` vacío | La ficha no estaba enlazada. El siguiente cambio de rol la ata y lo aplica |
 | `rol_membresias` distinto de lo traducido | El aviso no llegó: mira el log de arriba |
-
-#### 4 · Y la columna de app, que mandaba sobre todo lo anterior
-
-*(30 ago, por la noche.)* Con los tres eslabones de arriba arreglados, el aviso
-llegaba a Membresías y contestaba **«ya lo tenía»**. Y era verdad: le estaba
-mandando `student`.
-
-`org_members` guarda **cuatro** roles —el general y uno por app— y los de app
-**mandan sobre el general** (§4.7, la tabla de arriba). La reconciliación del 29
-de agosto los dejó escritos para las 46 personas que importó, con el rol que
-cada quien tenía en su app. Con `role_membresias = 'student'` puesto, cambiar el
-general a `maestro` no cambiaba **nada**:
-
-- el pase seguía llevando `student`, porque la columna propia gana;
-- el aviso mandaba `student`, y Membresías respondía «ya lo tenía»;
-- y el panel enseñaba la insignia `Membresías · Alumno` **al lado** del rol
-  nuevo, contradiciéndose sin que una sola línea lo explicara.
-
-**Ahora cambiar el rol general vacía las tres columnas de app.** A partir de ahí
-el rol de cada app sale del general traducido, que es lo que se pidió: quien
-administra cambia el rol de alguien **en todas las apps** desde el portal.
-
-> ⚠️ **Se lleva por delante un rol de app puesto a propósito** — el `judge` de
-> quien es alumno en su club y juez en la federación. Es deliberado, y el panel
-> lo dice antes de hacerlo (el diálogo nombra los que va a reemplazar). Para
-> devolverle el suyo está `POST /organizations/:id/invite`, que sí los escribe
-> uno por uno.
-
-> **Se vacían en vez de escribirles el valor traducido.** Vaciarlas dice «esta
-> persona no tiene nada especial en ninguna app», que es la verdad después de un
-> cambio hecho a mano — y deja que la traducción siga siendo correcta el día que
-> un catálogo cambie.
-
-#### El resumen, para no volver a recorrerlo entero
-
-Cuatro eslabones, y **cada uno tapaba al siguiente**:
-
-| | Qué pasaba | Dónde |
-|---|---|---|
-| 1 | `maestro` no está en el catálogo de Membresías y el rol se caía a `null` | `common/roles-por-app.ts` |
-| 2 | Aun traducido, solo se leía al CREAR la ficha | `POST /sync/rol` |
-| 3 | El aviso no encontraba la ficha sin enlazar, y contestaba 200 | Búsqueda por correo + `warn` en el log |
-| 4 | La columna `role_membresias` mandaba sobre el general | Se vacía al cambiar el rol |
 
 ### Varios maestros en un club, y qué imprime el carnet
 
@@ -1529,12 +1281,9 @@ falta que sea otro, es un campo en el club, no un accidente de `created_at`.
 
 ## 4.7-bis Nadie se queda sin quien mande, y nadie se echa a sí mismo
 
-> **Desde el 2 de septiembre de 2026, quitar a alguien ya no lo borra sin
-> rastro**: la fila entera se copia a `org_member_bajas` antes de borrarla, y
-> readmitir la devuelve con sus cuatro roles y su fecha de entrada. Las reglas
-> de abajo **no cambian** —siguen decidiendo a quién se puede quitar—; lo que
-> cambia es que equivocarse ya se puede deshacer. Cómo y por qué una tabla
-> aparte: §4.15.
+> Quitar a alguien no lo borra sin rastro: la fila se copia a
+> `org_member_bajas` y readmitir la devuelve con sus cuatro roles (§4.15). Las
+> reglas de abajo deciden a quién se puede quitar.
 
 `org_members` es lo que decide quién administra una organización: el rol
 `maestro`, `owner` o `admin` en esa fila. Todo cuelga de ahí — el panel de «Mi
@@ -1621,8 +1370,8 @@ sigue siendo asunto de su club.
 > Los colores, los tamaños y las formas se definen **una** vez y las tres apps
 > los leen. Ninguna app define un color propio.
 
-Hoy los tokens están espejados en el `globals.css` de cada web (tinta profunda +
-oro de marca, Archivo + Instrument Sans + IBM Plex Mono). El desplegable propio
+Los tokens viven en `packages/shared/estilos.css` (§4.22): tinta profunda + oro
+de marca, Archivo + Instrument Sans + IBM Plex Mono. El desplegable propio
 —`SelectMenu`— es el **mismo componente** en las tres: el `<select>` nativo se
 pinta con los colores del sistema operativo, y en Android abre su propia hoja a
 pantalla completa.
@@ -1795,14 +1544,7 @@ Hay ejemplos listos para usar en
 
 ## 4.11 El token no es la sesión: es su pase
 
-Hasta agosto de 2026 «cerrar sesión» no cerraba nada. El token era la sesión
-entera —firmado, veinticuatro horas, sin registro en ninguna parte—, así que
-salir solo borraba la copia del navegador: el original seguía abriendo puertas
-hasta caducar solo. Quien entraba desde un computador prestado y se iba dejaba
-su cuenta abierta ahí hasta el día siguiente, y **cambiar la contraseña tampoco
-echaba a nadie**.
-
-Ahora la sesión es una fila de `ecosystem.sessions` y el token lleva su id en
+La sesión es una fila de `ecosystem.sessions` y el token lleva su id en
 `jti`. Si la fila está revocada, el pase no abre — por perfecta que sea su firma.
 
 **Tres relojes, y hacen falta los tres:**
@@ -1813,11 +1555,10 @@ Ahora la sesión es una fila de `ecosystem.sessions` y el token lleva su id en
 | Tope absoluto | 12 h | Que quien toca la pantalla cada rato vuelva a escribir su contraseña alguna vez |
 | Revocación | inmediata | Salir, salir de todos lados, cambiar o recuperar la contraseña |
 
-⚠️ **Desde el 2 de septiembre de 2026 esos dos primeros dependen de la casilla**
-«mantener la sesión iniciada» (`sessions.recordada`, §4.15). Una sesión recordada
-**no tiene reloj de inactividad** y su tope es de 30 días. Lo que **no** cambia
-—y es lo que sostiene todo lo demás— es la tercera fila: **la revocación sigue
-siendo inmediata para todas**, recordadas incluidas.
+Los dos primeros dependen de la casilla «mantener la sesión iniciada»
+(`sessions.recordada`, §4.15): una sesión recordada **no tiene reloj de
+inactividad** y su tope es de 30 días. **La revocación es inmediata para
+todas**, recordadas incluidas.
 
 **El pase dura 30 minutos, y de eso depende todo lo demás.** Academy y
 Campeonatos verifican la firma sin preguntarle nada a nadie —es lo que las hace
@@ -1834,17 +1575,12 @@ silencio es justo el agujero que se vino a tapar.
 **En el navegador** (`lib/sesion.ts`, igual en el portal y en Academy):
 
 - El pase va a `sessionStorage` si no se marca «mantener la sesión iniciada», y
-  entonces muere al cerrar el navegador. **Durante meses eso fue lo ÚNICO que
-  hacía la casilla**, y por eso no cumplía lo que dice: el reloj de inactividad
-  lo aplica el servidor y la decisión no le llegaba. Desde el 2 de septiembre
-  viaja con la sesión (§4.15).
+  entonces muere al cerrar el navegador. La decisión viaja además con la
+  sesión, porque el reloj de inactividad lo aplica el servidor (§4.15).
 - `VigilanteDeSesion` avisa un minuto antes del cierre por inactividad y renueva
   el pase **solo si ha habido actividad**. Esa condición no es un detalle: sin
   ella, una pestaña olvidada renovaría para siempre y el reloj de inactividad no
   serviría de nada.
-
-**Al desplegar esto, todo el mundo vuelve a iniciar sesión una vez.** Los pases
-de antes no llevan `jti` y el guard los rechaza diciéndolo con esas palabras.
 
 ## 4.12 La hora de cada quien
 
@@ -1883,7 +1619,7 @@ contrario.
 
 ## 4.13 Entrar a Campeonatos desde DINAMYT
 
-**Funciona desde el 30 de agosto de 2026.** El botón del dashboard lleva el pase
+El botón del dashboard lleva el pase
 en el fragmento (`/login#token=…`), Campeonatos lo verifica contra el JWKS del
 ecosistema y abre **su propia cookie de sesión**. Sin segunda contraseña.
 
@@ -1907,8 +1643,7 @@ para todos sus clubes (§4.5): **cualquier alumno de un club afiliado trae
 `campeonatos` en sus `app_scopes`**. Y la consola de Campeonatos solo sabe de
 administrar, inscribir y puntuar.
 
-**Desde el 13 de septiembre de 2026 (F3 de `PLAN-CAMPEONATOS.md`) el alumno SÍ
-entra** — no a la consola, sino a **su panel** (`/mi-panel`): sus inscripciones
+**El alumno SÍ entra** — no a la consola, sino a **su panel** (`/mi-panel`): sus inscripciones
 con su estado y el motivo si se la rechazaron, sus próximos campeonatos, su
 maestro, sus resultados y sus números.
 
@@ -1925,11 +1660,6 @@ no mandar a nadie a una puerta que le van a cerrar. **Lo que le cierra la
 consola** a quien solo compite es `require_personal()` en `api/scoping.py`, y
 **lo que acota su panel** es que `/api/mi/*` filtra siempre por el `eco_sub`
 de la sesión.
-
-> **Al desplegar F3, Campeonatos ANTES que el portal.** Con el portal nuevo y
-> Campeonatos viejo, el botón de «Entrar» le sale al alumno y Campeonatos lo
-> devuelve con `sin_consola`: no rompe nada, pero es una puerta que se abre y
-> se cierra en la cara.
 
 #### La ficha y la cuenta
 
@@ -1950,17 +1680,12 @@ se para y lo mira una persona — primero se desenlaza, a la vista.
 Los resultados del panel salen **exactos** de las llaves generadas desde el 13
 de septiembre de 2026 (llevan `competidor_uid`) y **«sin confirmar»** de todo
 lo anterior, buscados por nombre y club **solo en los campeonatos donde esa
-ficha está inscrita**. Los resultados importados del modo local también salen
-por nombre hasta F8.
+ficha está inscrita**. Los que suben del PC del evento llevan su ficha
+(`competidor_uid`) desde el 26 sep 2026.
 
-> **Pero al que no opera ya no se le esconde la tarjeta entera.** *(30 ago
-> 2026)* Hasta ahora, quien tenía el plan sin un rol que operara no veía
-> **nada** en «Tus aplicaciones»: ni el botón ni una explicación. Y eso se lee
-> como «tengo Campeonatos pagado y el portal no me lo enseña», que es justo lo
-> que pasó. Ahora la tarjeta sale igual y lo que cambia es el destino: quien
-> opera salta a su consola con el pase; **quien no, va a las páginas públicas
-> de Campeonatos** —los campeonatos abiertos y los resultados—, que no piden
-> sesión y son lo que esa persona estaba buscando.
+> **Al que no opera no se le esconde la tarjeta**: quien opera salta a su
+> consola con el pase; **quien no, va a las páginas públicas** de Campeonatos
+> (campeonatos abiertos y resultados), que no piden sesión.
 
 > **Y la fila de un alumno nace cuando ENTRA, no cuando firma el pase.** Hasta
 > F3 su pase no creaba ninguna: una federación con doscientos alumnos habrían
@@ -1976,16 +1701,16 @@ hay espejo se usa; si existe una fila con ese correo se **enlaza** (toda la
 gente que ya operaba antes); si no existe, se crea — con una contraseña
 aleatoria que nadie conoce, así que **por el formulario no se entra con ella**.
 
-**El rol local manda sobre el del pase.** El pase solo decide el rol al crear la
-fila. Es el mismo criterio de Academy, y evita que un cambio de rol en el portal
-degrade en silencio al administrador de un campeonato en marcha.
+**Los papeles: el portal da, y lo que dio el portal lo quita el portal** (D2 y
+D9, §1.6). `usuarios.roles_del_portal` recuerda la procedencia: al entrar, un
+papel que llegó del portal y que el pase ya no trae se retira; lo puesto a mano
+en la consola y `admin` no se tocan nunca. Así un cambio en el portal no degrada
+en silencio al administrador de un campeonato en marcha.
 
 ### Puntuar pide identidad *(desde el 26 de septiembre de 2026)*
 
-Hasta esa fecha el socket del tatami (`/combate`) aceptaba **cualquier papel
-sin token**: quien abría `?rol=arbitro` entraba como Juez Central y echaba al
-de verdad, y el juez de un punto salía del mensaje (la pantalla pública podía
-puntuar). Ahora, para `arbitro` y `j1`–`j4` hace falta un token de esta
+Antes el socket del tatami (`/combate`) aceptaba cualquier papel sin token.
+Ahora, para `arbitro` y `j1`–`j4` hace falta un token de esta
 instalación de alguien activo que sea superadmin, admin dueño del campeonato o
 juez **asignado a ese tatami con ese papel** — el QR del juez es exactamente
 eso. La pantalla sigue abierta y es de solo lectura.
@@ -1996,16 +1721,14 @@ La salida de emergencia, solo para el PC del evento y solo con gente delante:
 
 ### El login propio de Campeonatos NO se retira
 
-Es **la marcha atrás del 9 de octubre**: sin internet no hay ecosistema al que
-preguntar, y una app que solo sabe entrar por SSO no arranca ese día. Lo que sí
-se retira —después del campeonato— es `POST /auth/register`, que es lo que de
-verdad contradice «las cuentas nacen en el ecosistema». Membresías aplica este
-mismo criterio, y tres apps con la misma regla es una regla que se recuerda.
-
-> **Hecho el 25 sep 2026, convirtiéndolo y no retirándolo** (D8): con el
-> puente entero, el juez nace en DINAMYT (§4.4); sin él —el PC del evento—
-> sigue siendo la puerta de siempre. Y la consola ya no le pone contraseña a
-> una cuenta de DINAMYT (D10).
+Es **la marcha atrás del día del evento**: sin internet no hay ecosistema al
+que preguntar, y una app que solo sabe entrar por SSO no arranca ese día
+(decisión 12). Lo que contradecía «las cuentas nacen en el ecosistema» era
+`POST /auth/register`, y se **convirtió**: con el puente entero, el juez nace en
+DINAMYT (D8, §4.4); sin él —el PC del evento— sigue siendo la puerta de
+siempre. La consola ya no le pone contraseña a una cuenta de DINAMYT (D10).
+Quedan cuentas viejas con contraseña propia que siguen entrando por aquí aunque
+su club deje de pagar (`HOJA-DE-RUTA.md`).
 
 ### El maestro estrena su club al entrar
 
@@ -2025,9 +1748,8 @@ apuntar a otro sitio.
 
 ### `eco_sub` es `uuid` en PostgreSQL y texto en SQLite
 
-Esa columna **ya existía en producción**: la creó el guion de reconciliación del
-29 de agosto —como `uuid`, con índice único— y dejó **12 de los 22** usuarios de
-Campeonatos ya enlazados. Declararla `String` a secas dejaba buscar (PostgreSQL
+En PostgreSQL la columna es `uuid` con índice único (la creó la
+reconciliación). Declararla `String` a secas dejaba buscar (PostgreSQL
 convierte el literal) pero la **lectura devolvía un objeto `UUID`**, y comparar
 ese objeto con la cadena del pase da distinto **siempre**: a quien llegara por
 la puerta del correo se le habría contestado «ese correo ya está enlazado con
@@ -2056,179 +1778,86 @@ las dos, firmar con la nueva, retirar la vieja—, que sin `kid` era imposible.
 
 ---
 
-## 4.14 Academy está apagada en el portal
+## 4.14 Academy: escrita, probada y sin montar
 
-*(30 de agosto de 2026)* La app **sigue viva**: desplegada, respondiendo por
-`academy.dinamyt.org`, con sus datos y su login propio. Lo que se retiró es el
-botón «Entrar a Academy» del panel de aplicaciones del dashboard, porque el
-producto todavía no se ofrece.
+**En la VPS no existe** *(comprobado por SSH el 26 sep 2026)*: no hay servicios
+`academy-api`/`academy-web`, ni sus `.env`, ni bloque en el Caddyfile, y el
+registro `academy` se borró del DNS al encender la nube naranja (MONTAR-VPS
+Anexo D.2). Hasta ese día esta sección decía que estaba «desplegada y
+respondiendo»: no era verdad. Encenderla es la tarea A de `HOJA-DE-RUTA.md`.
 
-**El interruptor es uno solo**: `ACADEMY_EN_EL_PORTAL` en
-`apps/ecosystem-portal/src/lib/apps.ts`. Para volver a encenderla: ponerlo en
-`true` y **recompilar el portal** (§1.3 — reiniciar no basta; el comando es
-§2.3). No hay nada más que tocar: los planes que incluyen `academy` siguen
-dando su scope, el rol sigue viajando en el pase y el salto por `#token=` sigue
-funcionando. El botón vuelve donde estaba, para quien tenga el scope.
+En código sí está entera, hecha contra los RF-ACA-01…28 del documento de
+requisitos: `academy-api` con **24 pruebas en verde** contra PGlite,
+`academy-web` con sus catorce pantallas, y el login va contra el ecosistema:
+Academy no tiene contraseñas propias.
+
+**El botón del portal es un interruptor**: `ACADEMY_EN_EL_PORTAL` en
+`apps/ecosystem-portal/src/lib/apps.ts`, hoy `false`. Para encenderlo: `true` y
+**recompilar el portal** (§1.3; el comando es §2.3). Los planes que incluyen
+`academy` siguen dando su scope y el rol sigue viajando en el pase.
 
 > ⚠️ **Lo que a propósito NO apaga:** la lista blanca de `appsDelEcosistema()`,
 > en ese mismo archivo, sigue incluyendo Academy. Es la que valida a dónde puede
-> volver `/salir`; quitarla de ahí dejaría sin camino de vuelta a quien tenga hoy
-> una sesión de Academy abierta. **Apagar un botón no puede romper una salida.**
-## 4.15 Dos promesas que la aplicación no cumplía, y una tarde de teléfono
+> volver `/salir`. **Apagar un botón no puede romper una salida.**
 
-*(2 y 3 de septiembre de 2026)*
+## 4.15 Sesiones recordadas, bajas reversibles y roles sin excepciones
 
-Seis despliegues en dos días, y conviene leerlos juntos porque **casi todo salió
-del mismo sitio: alguien usando el portal desde un celular Android**. Ninguno se
-habría encontrado leyendo código, y es la misma lección del ensayo de §6.0.
+*(2–4 sep 2026; casi todo salió de usar el portal desde un Android.)*
 
-### «Mantener la sesión iniciada» no mantenía nada (migración `0017`)
+### «Mantener la sesión iniciada» (migración `0017`)
 
-La casilla del login existía desde el principio y decidía **una** cosa: si el
-pase se guardaba en `localStorage` o en `sessionStorage` —o sea, si sobrevivía a
-cerrar el navegador—. **El reloj de inactividad de veinte minutos lo aplica el
-servidor** (§4.11), y al servidor no le llegaba la decisión: a los veinte minutos
-parada cerraba la sesión de todo el mundo, **incluida la de quien acababa de
-pedir por escrito lo contrario**.
-
-Una casilla que promete algo y no lo cumple es peor que no tenerla: enseña que
-las opciones de esta aplicación son de adorno.
-
-`sessions.recordada` hace que la decisión viaje con la sesión y la aplique quien
-la hace cumplir:
+`sessions.recordada` hace que la decisión viaje con la sesión y la aplique el
+servidor, que es quien lleva el reloj de inactividad:
 
 | | Inactividad | Tope absoluto |
 |---|---|---|
 | **Recordada** | ninguna | 30 días (`RECORDADA_DIAS`) |
 | **Sin marcar** | 20 min | 12 h |
 
-**El defecto de la columna es `false`**, así que toda sesión que ya existía se
-comporta igual que ayer: nadie se queda dentro por sorpresa por culpa de la
-migración. Y es **por sesión, no por cuenta** — la misma persona marca la casilla
-en su celular y no la marca en el computador del club.
+Es **por sesión, no por cuenta** (el celular sí, el computador del club no), y
+el defecto es `false`. La recordada **se cierra igual en cuanto alguien la
+revoca**, y por eso `listar()` no la esconde aunque lleve horas quieta: es la
+que hay que poder cerrar el día que se pierde el teléfono. Hacen falta los dos
+relojes, el del servidor y el vigilante del navegador.
 
-⚠️ **Lo que la recordada NO pierde son los otros dos relojes.** Caduca a los
-treinta días y **se cierra en cuanto alguien la revoque**: salir, salir de todos
-lados, cambiar la contraseña, o cerrarla desde «dispositivos conectados» — que es
-la salida el día que se pierde el teléfono. Por eso `listar()` **deja de
-esconderla**: una recordada lleva horas quieta por definición, y con el corte de
-inactividad aplicado desaparecía de la lista justo la sesión que más falta hace
-poder cerrar desde otro sitio.
-
-> **Hacían falta los DOS relojes.** Con solo el del servidor arreglado, el
-> vigilante del navegador seguía echando a la persona a los veinte minutos con el
-> pase todavía válido, y desde fuera la casilla seguiría sin servir para nada.
-
-### Quien salía del club desaparecía para siempre (migración `0018`)
-
-Dar de baja **borraba** la fila de `org_members`, y con ella todo lo que decía:
-el rol general, los tres roles por aplicación, desde cuándo pertenecía y quién la
-invitó. Sin fecha y sin rastro: ni a quién le pasó, ni cuándo, ni quién lo hizo,
-ni cómo deshacerlo. Y **el botón que lo provoca está en la misma fila que el que
-cambia el rol**, así que no era un caso raro. Lo único que quedaba era un renglón
-en el log y un script suelto para rehacer la fila a mano.
+### Quitar a alguien del club se puede deshacer (migración `0018`)
 
 `org_member_bajas` guarda la fila **entera antes de borrarla**, y readmitir la
-vuelve a escribir con lo que quedó: los cuatro roles y la fecha de entrada.
-Readmitir «de miembro» a quien era maestro es un fallo que no se ve hasta el día
-que intenta hacer su trabajo y no puede.
+vuelve a escribir con los cuatro roles y la fecha de entrada.
 
-**Por qué una tabla aparte y no un `removed_at` en `org_members`** — esta es la
-decisión que hay que entender antes de tocarlo:
+**Por qué una tabla aparte y no un `removed_at`**: `org_members` responde
+«¿es miembro?» en casi cien sitios. Marcar en vez de borrar obligaría a añadir
+«y que no esté dada de baja» a todos, y el día que se olvide uno, alguien a
+quien echaron sigue entrando. Con la tabla aparte, fila presente = es miembro, y
+lo que se gana es memoria. La bandeja descarta por consulta a quien ya volvió
+por otro camino.
 
-`org_members` es lo que decide **quién es miembro**, y esa pregunta se hace en
-casi cien sitios: los roles que van dentro del token, quién manda en el club,
-quién ve qué. Marcar la fila en vez de borrarla obligaría a añadir «y que no esté
-dada de baja» a **todas y cada una**, y el día que se olvide UNA, alguien a quien
-echaron sigue entrando por ahí. **Un fallo silencioso y de seguridad a cambio de
-una comodidad.** Con la tabla aparte, la regla de siempre no se toca —fila
-presente = es miembro— y lo que se gana es memoria.
+### El rol por app solo se escribe cuando alguien lo pide (migración `0020`)
 
-La bandeja **descarta por consulta** a quien ya volvió por otro camino
-(invitación, código del club), así que ninguno de los cinco sitios que dan de
-alta tiene que acordarse de limpiar nada.
+Las columnas `role_membresias`, `role_campeonatos` y `role_academy` son
+**excepciones** y **mandan sobre el general**. Aceptar una solicitud escribía
+`student` a mano (también a un entrenador), el portal lo mandaba desde
+`CodigoYSolicitudes.tsx` e `invitarPersona` tenía su propio defecto: tres
+sitios. Ya no lo escribe ninguno, y `0020_rol_sin_excepciones` vació lo escrito
+**solo donde repetía la traducción** (una excepción de verdad, como el alumno
+que es `judge` en su federación, no se tocó).
 
-En pantalla: «Ver N personas que salieron del club», plegada, con la fecha, el
-rol que tenían y quién las dio de baja; «Volver a agregar», y una ✕ que solo
-borra el recuerdo. Y el «¿seguro?» de quitar **deja de amenazar** con «habría que
-invitarla otra vez», que era lo que hacía que nadie se atreviera a usar el botón.
-
-### El `role_membresias = 'student'` que se escribía a mano
-
-Esto es una **corrección al modelo de §4.7**, y merece leerse dos veces porque es
-la misma clase de fallo que costó cuatro rondas encontrar.
-
-Al aceptar una solicitud de entrada se escribía `role_membresias = 'student'`.
-Esas columnas son **excepciones** —«en esta app esta persona es otra cosa»— y
-**mandan sobre el rol general**. Las insignias de la lista solo pintan
-excepciones: de ahí que el recién aceptado saliera marcado «Membresías · alumno»
-y los demás no, y que la insignia se fuera al cambiarle el rol (porque cambiar el
-rol **limpia** las columnas por app). Dos rarezas, una causa.
-
-**Y era peor que cosmético:** aceptar a alguien como entrenador o maestro le
-escribía `student` en Membresías igual. Ahora nace vacía y el rol sale de
-traducir el general, como todo el mundo. Es la misma lección de la limpieza de
-`role_*` de §6.1: **una excepción que nadie pidió es un rol que el portal ya no
-manda.**
-
-#### Y seguía pasando, por la puerta de al lado *(4 de septiembre de 2026)*
-
-Se arregló el servidor y **el fallo siguió viéndose igual**, que es exactamente
-la trampa que avisa la cabecera de este documento: el nombre sigue ahí y lo que
-hace ha cambiado. `responderSolicitud` dejó de escribir la columna por su
-cuenta… pero **el portal se la seguía mandando**, así que el servidor la
-escribía obedeciendo. Y `invitarPersona` conservaba su propio valor por
-defecto. Tres sitios, y solo se cerró uno.
-
-· **`CodigoYSolicitudes.tsx`** llevaba una tabla con una segunda columna —«y
-  con qué entra a Membresías»— que viajaba en las dos llamadas. Ya no existe.
-· **`invitarPersona`** ponía `'student'` cuando el rol era alumno «para que no
-  se quedara sin rol». Falso: vacía, `rolParaApp` traduce el general y da lo
-  mismo. Lo prueba `roles-por-app.spec.ts`.
-· **La migración `0020_rol_sin_excepciones`** limpia lo ya escrito. Vacía las
-  tres columnas **solo cuando repiten la traducción** —una excepción de verdad,
-  como el alumno que es `judge` en su federación, dice algo distinto y no se
-  toca— en `org_members`, en las invitaciones sin aceptar (si no, la excepción
-  vuelve a nacer al aceptarlas) y en las bajas, que es de donde se restaura.
-
-> ⚠️ **Y de propina, un permiso que sobraba.** «Acudiente» se guardaba como
-> `coach` y se corregía con `role_membresias = 'guardian'` — ése era el motivo
-> real de mandar el rol de app. Pero **`coach` abre la consola de Campeonatos**
-> (`ROLES_CONSOLA_CAMPEONATOS`), así que el acudiente de un menor podía entrar a
-> la mesa de control de un torneo. Ahora entra como `guardian`, que es un rol
-> general de verdad —los clubes lo aceptan desde el primer alta venida de
-> Membresías— y no se traduce a nada allí. La migración convierte a los que ya
-> estaban.
+> ⚠️ **El acudiente es `guardian`, no `coach`.** Se guardaba como `coach`, y
+> `coach` **abre la consola de Campeonatos**: el acudiente de un menor podía
+> entrar a la mesa de un torneo.
 
 ### Los topes de cada campo, en un solo sitio
 
-Las reglas de longitud existían y rechazaban **después** de escribir: el aviso
-llegaba al enviar, sobre un campo lleno, sin decir cuánto sobra. Y algunos ni
-eso — la contraseña admitía mil caracteres **de los que bcrypt mira 72**, y las
-notas médicas o la descripción del club iban a columnas `text`.
+`LIM`, en `lib/validacion.ts`, tiene el tope de cada tipo de campo (portal, el
+login de Academy y los formularios de Campeonatos). El del correo vive en
+`PROPS_CORREO` y el de la contraseña en `CampoContrasena` (bcrypt mira 72
+caracteres). **Nunca más estricto que el servidor**: cortar antes de lo que la
+API acepta deja a alguien sin poder escribir su propio apellido.
 
-`LIM`, en `lib/validacion.ts`, tiene el tope de cada tipo de campo y se aplica en
-las trece pantallas del portal, más el login de Academy y los formularios de
-Campeonatos. **El tope del correo vive dentro de `PROPS_CORREO` y el de la
-contraseña dentro de `CampoContrasena`**, no repartido por las pantallas: un
-límite que hay que copiar es un límite que falta en tres.
-
-> **La regla, y no es obvia: nunca más estricto que el servidor.** Cortar antes
-> de lo que la API acepta deja a alguien sin poder escribir su propio apellido.
-
-### Y el resto, que son trampas y viven en la Parte 5
-
-· El `?redirect=` que **duraba para siempre** porque lo guardaba el navegador,
-  no la aplicación → **§5.17**
-· El aviso que llegó al teléfono con el icono roto: `badge` **no es una imagen,
-  es una plantilla** → **§5.18**
-· El permiso de avisos que **no se podía conceder desde un computador** →
-  **§5.19**
-· La campana cuyo número **volvía a subir** al leer un aviso → **§5.20**
-· Los símbolos técnicos (⏻, ⇱) que **Android no trae en ninguna fuente** →
-  **§5.21**
-· Cuatro píxeles de desborde que parecían «esta pantalla no es responsiva» →
-  **§5.22**
+Las trampas de esos días están en la Parte 5: §5.17 (`?redirect=` pegado en el
+historial), §5.18 (`badge`), §5.19 (el permiso tras un `await`), §5.20 (la
+campana que volvía a subir), §5.21 (símbolos que Android no trae) y §5.22
+(cuatro píxeles de desborde).
 
 ## 4.16 El plan vencido cierra el club, y el plan contratado lo crea
 
@@ -2280,7 +1909,7 @@ separadas, cada llave abre su cerrojo y hacen falta las dos abiertas.
 
 · **El superadmin**, como en el mantenimiento: es quien tiene que poder mirar.
 · **El login**, o el maestro se quedaría fuera sin llegar a leer POR QUÉ está
-  fuera — que es el 403 mudo que ya costó una tarde en el portal (§6.1).
+  fuera — que es el 403 mudo que ya costó una tarde en el portal.
 · **El espejo (`/sync/*`), y esta es la que no se puede olvidar**: es por donde
   llega el aviso de que YA PAGARON. Bloquearlo dejaría al club encerrado con la
   llave dentro, que es peor que el problema original. Tiene su prueba.
@@ -2333,17 +1962,10 @@ puesto — o sea enlazado desde el primer segundo. Tres detalles:
 > contrataron antes de que esto existiera aparecen solos en la primera pasada,
 > sin que nadie tenga que tocarlos uno a uno.
 
-### 3 · El botón, y por qué el barrido diario no bastaba
+### 3 · El botón: el barrido, ahora y con el porqué
 
-*(4 de septiembre de 2026)*
-
-Los dos disparadores de arriba dejaban un hueco que se nota **el mismo día**: un
-club contrata, alguien activa su suscripción y no aparece en Membresías. Y no
-había forma de preguntar por qué. El barrido solo se podía disparar por la ruta
-del cron —que necesita el `CRON_SECRET` y se llama desde el servidor—, así que
-con el maestro al teléfono la única respuesta era «mañana lo miramos».
-
-En el panel del super-admin, arriba: **🔗 Membresías — quién la abre**, con
+Para el hueco que se nota el mismo día —un club contrata, se activa su
+suscripción y no aparece en Membresías—, en el panel del super-admin, arriba: **🔗 Membresías — quién la abre**, con
 `⟳ Sincronizar ahora`. Es la MISMA operación del cron
 (`POST /subscriptions/membresias/sincronizar`, con sesión en vez de secreto), y
 es inofensiva de repetir: no manda un solo correo y no reinicia ninguna fecha de
@@ -2383,9 +2005,11 @@ en el acta; si no entra, no hay nada que enseñar.
 de superadmin que lo lista—, así que un club sin nadie dentro era invisible y
 parecía no existir.
 
-⚠️ El bloqueo por plan vencido **tampoco está en Campeonatos**, y es a
-propósito: el 9 de octubre esa aplicación no puede depender de la red ni de una
-columna que alguien puso mal. Queda apuntado en §6.1.
+El bloqueo por plan vencido **tampoco está en Campeonatos**, y es a propósito
+(D10, §1.6): lo corta el pase. Un club cerrado por una columna mal puesta a
+mitad de un campeonato es peor que uno que operó un mes de más. **Academy no lo
+necesita**: no tiene login propio, así que toda entrada pasa por un pase que ya
+no trae `academy` si el plan venció.
 
 ## 4.17 Lo que el super-admin ve, que no es lo que ve un maestro
 
@@ -2430,103 +2054,25 @@ clubes que se crean en otro sitio.**
   interruptor que no existe. Solo sale si hay alguno: explicar algo que no está
   pasando es ruido.
 
-### Lo que se añadió el 4 de septiembre
+### Reglas del panel que salieron de usarlo
 
-*(Las cuatro salieron de mirar el panel con el trabajo del día delante.)*
-
-· **Las cifras de clubes ahora REPARTEN el total, y antes se solapaban.** El
-  panel decía *5 activos* y *2 en pausa por plan* sobre cinco clubes: los dos en
-  pausa se contaban **también** como activos, así que las dos cifras juntas no
-  cuadraban con nada — y un club en pausa no está operando, su gente no puede
-  entrar. Ahora cada club cae en uno y solo uno: **Operando** (encendido y al
-  día), **En pausa por plan** (encendido, cerrado por el ecosistema) y
-  **Suspendido** (apagado a mano, que manda sobre lo demás porque es lo que el
-  super-admin puede deshacer). Las etiquetas de la lista usan el mismo reparto:
-  una sola por club, o seguir una cifra hasta el club acabaría otra vez en una
-  tarjeta con dos insignias.
-
-· **«Suscripciones personales» ya no se crean desde el portal.** Era una sección
-  entera —lista, cuatro campos y un botón— para un caso que no ocurre: todo el
-  mundo entra por su club. **Pero no se borró del todo**, y esa es la parte que
-  importa: `user_subscriptions` sigue dando `app_scopes` al firmar el pase, así
-  que una fila viva sin pantalla que la enseñe sería un permiso que nadie puede
-  ver ni retirar. La tarjeta **aparece solo si queda alguna**, con su botón de
-  borrar. Para dar acceso a alguien está «Accesos rápidos», que además le crea
-  la membresía.
-
-· **Y en el portal, las dos cifras que faltaban.** La cabecera del recaudo
-  decía «N clubes · N cuentas» y del ecosistema en sí no contaba nada más.
-  Ahora dice cuánta gente **entró este mes** y **cuántos clubes abren cada
-  app** — contando la herencia, que es la única forma de que un club afiliado
-  no desaparezca de la cuenta. Un plan que nadie abre y uno que abren treinta
-  clubes se veían exactamente igual.
-
-· **El dinero se escribe como se lee.** El panel PINTA «$ 35.000» en todas
-  partes y se ESCRIBÍA en un `<input>` pelado donde `35000` se ve igual que
-  `350000`. En la pantalla donde se registra el dinero de los clubes, un cero de
-  más no lo nota nadie hasta que hay que devolverlo. `<CampoDinero>` —el mismo
-  que Membresías tenía desde el principio— en los seis campos de importe:
-  separa los miles mientras se teclea, pone el símbolo delante y **devuelve
-  siempre el valor crudo**, así que ninguna pantalla tiene que acordarse de
-  limpiarlo.
-
-· **«Cuánto costó» ya viene puesto, y «cuánto entregó» sigue vacío.** El precio
-  calculado vivía en el `placeholder`, y **un placeholder no es un valor**: se
-  ve gris, parece una ayuda y se manda vacío. Quien no lo copiaba a mano
-  registraba el pago sin precio. Ahora el campo nace con la cifra —y se
-  recalcula al cambiar los meses, hasta que alguien lo toque, momento en el que
-  deja de seguir al cálculo—. El de la entrega es el contrario y por eso se
-  queda vacío: **el precio lo sabe el sistema y la entrega no**. Vacío = pagó
-  todo; una cifra menor deja el abono con su deuda escrita.
-
-· **La tarifa de cada plan se pliega.** Era una tarjeta por plan con dos campos,
-  un botón y un párrafo de ejemplo: con siete planes, media pantalla para algo
-  que se toca una vez al trimestre — y lo que empujaba hacia abajo era lo que se
-  mira a diario. Ahora es una línea por plan, plegada, con el resumen a la vista
-  («7 planes · 4 por persona · 3 de importe fijo») y el ejemplo de «un club de
-  40 pagaría…» solo en el plan que se está editando.
-
-### Y en el panel del portal, cinco cosas del mismo día
-
-Todas del `/admin` del ecosistema, y ninguna es cosmética:
-
-· **Las federaciones se recogen.** La lista era siempre entera: seis
-  federaciones de diez clubes eran sesenta filas en una columna que además está
-  pegada al desplazar. El estado guarda las **cerradas** y no las abiertas, para
-  que «abierta» siga siendo el defecto y una federación nueva no tenga que
-  añadirse a ninguna lista. Y **si el club seleccionado cuelga de una plegada,
-  se enseña igual**: esconder lo que el panel de la derecha está mostrando deja
-  la pantalla contradiciéndose a sí misma. El botón es aparte del nombre, porque
-  el nombre ya hace algo — un control que hace dos cosas según dónde caiga el
-  dedo acaba haciendo la que no era.
-
-· **Rol, perfil y quitar caben en una línea.** Con `flex-wrap`, el desplegable
-  de rol se quedaba la línea entera y **la ✕ caía sola debajo**, junto al nombre,
-  donde parece que quita OTRA fila. Un botón destructivo desalineado de su fila
-  es la peor casilla del panel para una duda. Ahora lo que cede es el ANCHO del
-  desplegable —el rol también está escrito en la insignia de al lado— y los dos
-  botones no encogen.
-
-· **Ciudad y país dejan de ser texto libre** en «nueva organización» y en
-  «crear club dentro». Era el último sitio del portal donde seguían sueltos, o
-  sea **el que fabricaba el problema** que `PaisCiudad` vino a arreglar: la misma
-  ciudad escrita de cuatro maneras y cada variante como un grupo distinto en los
-  reportes. Y el nombre estrena `validarNombreOrganizacion`: se podía crear una
-  organización llamada «   » que después no hay forma de encontrar en ninguna
-  lista.
-
-· **El buscador de accesos rápidos dice qué está haciendo.** Estaban el
-  `debounce` y la lista, pero entre teclear y ver algo no pasaba nada visible, y
-  sin coincidencias tampoco: **tres estados —aún no busco, estoy buscando, no
-  encontré— se veían los tres igual**, como una caja de texto sola. Ahora los
-  tres tienen su línea, los resultados llevan iniciales para separarse, y una
-  respuesta lenta de «ju» ya no pisa a la de «juan».
-
-· **Los dos correos del panel** eran los únicos del portal sin `PROPS_CORREO`:
-  se escribían con mayúscula automática en Android y admitían texto sin fin. Y
-  su botón ahora exige un correo **válido**, no solo «algo escrito» — un correo
-  mal formado volvía con un 400 que dice «no se pudo invitar», que no dice qué
-  arreglar.
+- **Las cifras de clubes reparten el total, no se solapan**: cada club está en
+  uno y solo uno de **Operando**, **En pausa por plan** o **Suspendido** (el que
+  manda, porque es el que el super-admin puede deshacer). La lista usa el mismo
+  reparto: una etiqueta por club.
+- **`user_subscriptions` no tiene pantalla de alta**, pero sigue dando
+  `app_scopes`: la tarjeta aparece solo si queda alguna, con su botón de
+  borrar. Un permiso vivo que nadie puede ver ni retirar no puede existir.
+- **El dinero se escribe como se lee**: `<CampoDinero>` en todos los importes
+  (miles separados al teclear; devuelve el valor crudo).
+- **Un `placeholder` no es un valor**: «cuánto costó» nace con la cifra
+  calculada; «cuánto entregó» vacío = pagó todo.
+- **Esconder lo seleccionado contradice la pantalla**: si el club elegido
+  cuelga de una federación plegada, se enseña igual.
+- **Ciudad y país no son texto libre** (`PaisCiudad`), y el nombre de una
+  organización pasa por `validarNombreOrganizacion`.
+- **Un buscador dice qué está haciendo** —aún no busco, buscando, no
+  encontré—, y una respuesta lenta no pisa a una más nueva.
 
 ### «Ir a DINAMYT» y «Salir», separados
 
@@ -2681,60 +2227,18 @@ vuelva a crear: los `app_scopes` salen de ahí, y el barrido siguiente pondrá
 Membresías en pausa para todos. **Se corre cuando se vayan a recrear enseguida,
 no un viernes.** En seco por defecto, como la reconciliación (§2.8).
 
-### La tarifa del panel se movía sola, y era un fallo
+### «Esperado al mes» es lo pactado, no el padrón de hoy
 
-*(5 de septiembre de 2026)*
-
-Todo lo de arriba describe el trato: **se cuenta al renovar y desde ahí el
-importe está fijo**. El panel de recaudo no lo cumplía.
-
-La cifra **«Esperado al mes»** se calculaba volviendo a multiplicar la tarifa
-por el **padrón de ese momento**, en cada carga de la pantalla:
-
-```ts
-// lo que hacía  (subscriptions.service.ts → resumen)
-const precio = importeDelPeriodo(s, censo.get(s.orgId) ?? 0, 1).importe;
-```
-
-O sea que cada alumno que el maestro daba de alta a mitad de mes **subía la
-cifra ese mismo día**. La misma suscripción, sin cambiar de plan ni de precio ni
-de fecha, valía una cosa el día 3 y otra el 27; y ninguna de las dos era la que
-se iba a cobrar, porque lo que se cobra se fijó el día de la renovación.
-
-**Por qué importa y no es un detalle de pantalla:** es la cifra con la que se
-mira si un club pagó de más o de menos. Con un número que cambia solo no se
-puede cuadrar nada, y lo peor es que *parece* correcto —sube cuando el club
-crece, que es lo que uno espera— hasta que se compara con un recibo.
-
-#### Lo que hace ahora: dos cifras, porque son dos preguntas
+*(Corregido el 5 sep 2026: se recalculaba con el padrón en cada carga.)* Son dos
+cifras porque son dos preguntas:
 
 | Cifra | Qué contesta | De dónde sale |
 |---|---|---|
 | **Esperado al mes** | Lo **pactado** del ciclo vigente. Fijo hasta la próxima renovación | `subscriptions.total_amount ÷ renewal_months` |
-| **Al renovar** *(en la nota de la misma tarjeta)* | Lo que se cobrará en la **próxima** renovación con el padrón de hoy | `importeDelPeriodo(plan, censo)` |
+| **Al renovar** | Lo que se cobrará en la **próxima** renovación con el padrón de hoy | `importeDelPeriodo(plan, censo)` |
 
-La proyección sigue haciendo falta —dice hacia dónde va el negocio— pero es una
-**estimación**, no una tarifa. Mezclarlas en un solo número era todo el
-problema. Ahora la de arriba no se mueve y la de abajo se mueve a propósito, con
-su nombre puesto.
-
-Se divide entre `renewal_months` porque la cifra que se enseña es **mensual** y
-`total_amount` es la del ciclo entero: un club que paga por trimestre contaba
-por tres, y bastaban dos o tres así para que la previsión del mes no
-significara nada. Ese era un segundo error, más pequeño, que vivía debajo.
-
-> La regla vive ahora en una función sola —`mensualComprometido` en
-> `common/cobro-por-persona.ts`— y **no recibe el censo**. No es un descuido:
-> es la regla. Seis pruebas la protegen, y una de ellas dice exactamente eso.
-
-#### Lo que NO cambió
-
-· El importe se sigue calculando con el padrón **al renovar** y **al dar de
-  alta**. Eso estaba bien y sigue igual.
-· Sigue vivo el recálculo de las suscripciones **que nadie ha pagado**
-  (`recalcularNoPagadas`): mientras `paid_amount` sea cero el importe es un
-  presupuesto y sigue al padrón; con el primer peso se congela.
-· `billed_users` sigue guardando por cuánta gente se cobró.
+La regla vive en `mensualComprometido` (`common/cobro-por-persona.ts`) y **no
+recibe el censo**, a propósito; seis pruebas la protegen.
 
 ---
 
@@ -2852,20 +2356,9 @@ La foto de cada persona (`users.avatar_url`) y el escudo de cada club
 Fue la decisión correcta mientras el disco se borraba en cada despliegue: ni un
 bucket que contratar, ni credenciales de otro servicio. Ya no lo es.
 
-### Lo que costaba, medido y no supuesto
-
-Sobre `GET /organizations/:id/members`, en local, con la misma imagen de 31 KB:
-
-| | bytes |
-|---|---|
-| Siete miembros, ninguno con foto | **2 394** |
-| Los mismos siete, **una** con foto | **44 014** |
-| Los mismos siete, esa foto ya en disco | **2 435** |
-
-Una sola foto multiplicaba el listado por dieciocho. A los 25 por página que ya
-pagina el código son cerca de **un mega por carga de pantalla**, en el celular
-del maestro y con datos móviles. Y eso es solo lo que se ve: base64 son +33 % de
-peso en la tabla, y las fotos se meten enteras en el volcado diario.
+Una sola foto incrustada multiplicaba por dieciocho el listado de miembros
+(medido: 2 394 → 44 014 bytes), y las fotos entraban enteras en el volcado
+diario.
 
 ### Las tres formas de una imagen
 
@@ -2933,17 +2426,11 @@ falta primero darle al portal una cookie de sesión.
 un archivo cuyo nombre es el hash de su contenido no necesita autenticación
 ninguna. El nombre *es* la llave.
 
-### El escudo del club no se validaba. Nada.
+### El escudo se valida, porque el daño no se ve aquí
 
-`organizations.controller.ts` no llamaba a un solo `validar*`, así que el escudo
-entraba a la fila tal cual llegara. Comprobado mandando
-`logoUrl: "esto-no-es-una-imagen-ni-una-url"`: **200, y guardado**. Lo único que
-paraba algo era el `json({ limit: '5mb' })` de `main.ts`.
-
-El daño no se veía aquí, como siempre: el escudo se copia a Membresías por
-`/sync/club`, donde el tope son 90 000 caracteres. Todo lo que pasara de ahí se
-guardaba en el portal y **no llegaba al carnet**, en silencio. Ahora las tres
-rutas que lo escriben pasan por `validarLogo`.
+Las tres rutas que escriben `logoUrl` pasan por `validarLogo`. Sin eso entraba
+cualquier cosa, y lo que pasara de los 90 000 caracteres de `/sync/club` se
+guardaba en el portal y **no llegaba al carnet**, en silencio.
 
 ### Dónde está cada cosa
 
@@ -3034,189 +2521,63 @@ que nadie lo «arregle» devolviéndolo.
 | Validación | `common/validacion.ts` (`validarTema`, `validarIdioma`) |
 | Las columnas | migración `0021_tema_e_idioma` |
 
-### Lo que falta
+Lo que falta —que Academy pregunte la preferencia al ecosistema, y los textos
+sin traducir— está en `HOJA-DE-RUTA.md`.
 
-· **Academy todavía no PREGUNTA la preferencia al ecosistema.** Escucha el tema
-  del sistema y lee el pase, como las otras tres, pero le falta el `GET` que
-  corrige — es la única de las cuatro que no lo tiene. Cerrarlo es copiar lo que
-  ya hacen Membresías y Campeonatos (ver más abajo). Se dejó fuera a propósito:
-  Academy todavía no se ofrece.
-· **Los textos traducidos van por pantallas, no por app.** Traducido: el
-  armazón (menús, login, perfil, lo común), **Planes** y **Mi perfil** enteros.
-  Pendiente en el portal: `mi-club`, `mi-organizacion`, `/admin`, la portada y
-  `verificar`. Membresías y Campeonatos tienen sus diccionarios mucho más
-  completos (1.388 y 2.503 líneas contra 309 del portal), así que el trabajo
-  gordo que queda es **del portal**.
-· `/admin` es la pantalla más grande de las cuatro (2.460 líneas) y es de
-  **super-admin**: por eso va la última, aunque sea la que más texto tiene.
+### La preferencia viaja en los dos sentidos
 
-### La preferencia viaja en los DOS sentidos, y ya no se demora
+El tema y el idioma viajan **dentro del pase**, que sirve para pintar sin pedir
+nada; pero un pase de hace veinte minutos dice el tema de hace veinte minutos.
+Por eso se pregunta, y **después** de pintar:
 
-*(5 de septiembre de 2026, más tarde)*
-
-Lo de arriba resolvía la mitad: elegir una vez y que valiera en las cuatro. En
-la práctica seguía fallando, y la queja era exacta: **«cambio el modo en
-Membresías, paso a DINAMYT y muchas veces no cambia, o se demora»**.
-
-Eran tres cosas distintas debajo, y ninguna era la que parecía.
-
-#### 1 · El portal solo miraba la preferencia en el perfil
-
-`<Apariencia>` recibe el tema guardado y lo aplica — pero vive en `/perfil` y en
-**ninguna otra pantalla**. Así que quien cambiaba el modo en Membresías (que ya
-lo guarda en la cuenta) volvía al portal y lo encontraba como estaba… y al
-entrar en su perfil, de pronto se aclaraba. Eso es lo que se leía como «unas
-veces no cambia y otras se demora»: no era lentitud, **era la única pantalla que
-miraba**.
-
-Ahora hay un `<AplicarApariencia />` en el `layout`, junto al pie y al vigilante
-de sesión, por el mismo motivo que ellos: lo que tiene que valer en todas las
-pantallas no puede depender de que alguien se acordara de ponerlo en cada una.
-
-#### 2 · El pase se firma al ENTRAR, y decía el tema de entonces
-
-El tema y el idioma viajan **dentro del pase**, que es lo correcto para pintar
-sin pedir nada. Pero un pase de hace veinte minutos dice el tema de hace veinte
-minutos: si el cambio se hizo en otra app, aquí no se sabía hasta que el pase se
-renovara — **hasta media hora**. Ésa era la demora, y era literal.
-
-La solución es preguntar, y preguntar **después** de pintar:
+| Momento | Qué pinta |
+|---|---|
+| Antes del primer píxel | La copia local (`localStorage`) y la cookie compartida `.dinamyt.org` (`dinamyt_tema`, `dinamyt_idioma`) — sin esto vuelve el fogonazo |
+| Al montar | Lo que dice el pase — instantáneo, sin red |
+| En cuanto contesta el servidor | **La verdad**, y corrige si difiere |
+| Al volver a la pestaña | Otra vez la verdad |
 
 ```
 GET  /users/me/apariencia        ← el portal, con su pase
 GET  /sync/apariencia/:ecoSub    ← Membresías y Campeonatos, por el secreto compartido
+POST /sync/apariencia            ← la ida, desde esas dos
 ```
 
-| Momento | Qué pinta |
-|---|---|
-| Antes del primer píxel | La copia local (`localStorage`) — sin esto vuelve el fogonazo |
-| Al montar | Lo que dice el pase — instantáneo, sin red |
-| En cuanto contesta el servidor | **La verdad**, y corrige si difiere |
-| Al volver a la pestaña | Otra vez la verdad — es el momento en que de verdad pasa |
+- `<AplicarApariencia />` va en el `layout` de las cuatro webs: lo que vale en
+  todas las pantallas no puede depender de acordarse de ponerlo en cada una.
+- `escucharTemaDelSistema()` repinta cuando el teléfono pasa a oscuro,
+  **mientras la elección siga siendo `sistema`**, y no guarda nada.
+- ⚠️ **Nadie pregunta sin sesión**: un 401 en Membresías o Campeonatos manda al
+  login, y el marcador del tatami se ve sin entrar y proyectado en una pared
+  (`haySesionProbable`, `useAuth().user`).
+- Sin `ECOSYSTEM_SYNC_SECRET` la lectura devuelve `null` y la pantalla se queda
+  con lo que tenía: Campeonatos arranca sin internet el día del evento.
+- **Membresías guarda su propia copia** (`users.theme`, `users.locale`, su
+  migración `0020`): para el alumno de carnet QR o el club que usa Membresías
+  sola, «su cuenta» ES esa fila.
 
-Las tres apps lo hacen igual. Membresías y Campeonatos no pueden pedirlo con el
-pase (lo cambian por su propia cookie al entrar y después ya no lo tienen), así
-que van por el **mismo canal servidor-a-servidor** que ya usaban para escribir:
-`PATCH /me/apariencia` → `POST /sync/apariencia` de ida, y ahora
-`GET /me/apariencia` → `GET /sync/apariencia/:ecoSub` de vuelta.
-
-> ⚠️ **Nadie pregunta sin sesión, y no es una optimización.** Un 401 en
-> Membresías y en Campeonatos hace que el interceptor recargue hacia el login.
-> Las pantallas públicas de Campeonatos —el marcador del tatami, los
-> resultados— se ven sin entrar y a menudo **proyectadas en una pared**:
-> preguntar de qué color pintar no puede mandar el marcador al login en mitad de
-> un combate. Se comprueba antes (`haySesionProbable`, `useAuth().user`).
-
-> Y sigue sin ser obligatorio: sin `ECOSYSTEM_SYNC_SECRET` la lectura devuelve
-> `null` y la pantalla se queda con lo que tenía. Campeonatos tiene que arrancar
-> sin internet el día del evento (§1.5).
-
-#### ⚠️ «Lo cambio en el portal y Campeonatos sigue igual» — las DOS causas, las dos mudas
-
-*(9 de septiembre de 2026)*
-
-Se reportó así: el modo claro elegido en DINAMYT llega a Membresías y **no** a
-Campeonatos. El idioma, igual — es la misma función y la misma guarda.
-
-**Causa 1 · La tabla de §1.4 no nombraba a `campeonatos-api`.** Decía
-«`ecosystem-api` **y** `membresias-api`», y quien configuró el VPS siguiendo la
-tabla no puso la variable en la tercera. Las dos funciones de
-`backend/app/espejo.py` —`guardar_apariencia` (ida) y `leer_apariencia`
-(vuelta)— empiezan las dos con `if not secreto: return`, **sin escribir nada en
-el registro**. El `log.warning` que hay solo salta si falla la RED; un secreto
-que falta no es un fallo de red, es un silencio. Ya está corregida la tabla, y
-**ahora la app lo dice al arrancar**:
-
-```
-[ecosistema] EL ESPEJO DE APARIENCIA ESTÁ APAGADO: falta ECOSYSTEM_SYNC_SECRET…
-```
-
-**Causa 2 · `usuarios.eco_sub` en `NULL`.** La misma guarda incluye
-`or not eco_sub`. Toda fila de Campeonatos nacida antes de la identidad única
-—y cuyo dueño no haya vuelto a entrar DESDE EL PORTAL— la tiene vacía, así que
-para esa persona las dos direcciones siguen apagadas aunque el secreto esté
-puesto. Se llena sola la primera vez que entra por el salto de DINAMYT
-(`resolver_espejo`), no hace falta tocar nada.
-
-**Cómo se comprueba, en este orden:**
+**«Lo cambio en el portal y Campeonatos sigue igual»** tiene dos causas mudas:
+que a `campeonatos-api` le falte `ECOSYSTEM_SYNC_SECRET` (ahora lo dice al
+arrancar: `EL ESPEJO DE APARIENCIA ESTÁ APAGADO`), o que esa persona tenga
+`usuarios.eco_sub` en `NULL` (se llena sola la primera vez que entra desde el
+portal):
 
 ```bash
 sudo journalctl -u campeonatos-api --since "10 min ago" | grep ecosistema
 ```
 
 ```bash
-sudo -u postgres psql -d dinamyt -c "select count(*) filter (where eco_sub is null) as sin_enlazar, count(*) as total from usuarios;"
+sudo -u postgres psql -d dinamyt -c "select count(*) filter (where eco_sub is null) as sin_enlazar, count(*) as total from campeonatos.usuarios;"
 ```
 
-#### ⚠️ Y en Membresías era otra cosa: no se guardaba en NINGUNA parte
-
-*(9 de septiembre de 2026, el mismo día y por el mismo hilo)*
-
-`PATCH /me/apariencia` de Membresías **no guardaba nada en su base**: leía el
-`eco_sub` de la fila y reenviaba al portal, y ya. Con las mismas dos rendiciones
-mudas de arriba:
-
-```ts
-if (!altaEnElEcosistema()) return;   // sin JWKS o sin secreto compartido
-if (!datos.ecoSub) return;           // «el alumno de carnet QR»
-```
-
-Así que **para cualquiera sin `eco_sub` la elección no se guardaba en ningún
-sitio**: vivía en la cookie del navegador y se perdía al cambiar de teléfono.
-
-**Y no se arreglaba solo reparando el puente**, porque hay gente que no tiene
-cuenta del portal ni la va a tener: el alumno de carnet QR, y cualquier club que
-use Membresías sola —que es lo que la mantiene vendible por su cuenta—. Para
-ellos «tu cuenta» ES la fila de Membresías. De ahí la **migración 0020**
-(`users.theme`, `users.locale`): manda el ecosistema cuando contesta, y esto es
-la copia que responde cuando no y la única verdad de quien no está en el portal.
-
-> **La tercera cosa, que salió al escribir las pruebas.** Esas dos rutas eran
-> las únicas de `routes/users.ts` que consultaban por **`app.db`**; las otras
-> diecisiete usan `req.db`. `app.db` es el pool pelado, y el plugin de RLS ya
-> envolvió el handler en una transacción sobre una conexión: contra PGlite —una
-> sola conexión— la consulta de fuera espera a la transacción que la contiene y
-> **la petición no vuelve nunca**. Es literalmente el síntoma que
-> `plugins/rls.ts` ya tenía documentado para `/sync/rol`, y es la razón por la
-> que estas rutas nunca tuvieron pruebas de punta a punta.
->
-> Contra un PostgreSQL de verdad **no cuelga** —el pool da otra conexión— pero
-> corre **fuera del contexto de RLS**. Aquí no filtraba nada (la consulta ya iba
-> por `users.id`), pero es la clase de descuido que en la siguiente ruta sí
-> filtra. **Regla: en Membresías se consulta por `req.db`, nunca por `app.db`,
-> salvo en los guards que corren antes del contexto.**
-
-> **Lo que este arreglo NO explica.** La cookie compartida `.dinamyt.org`
-> (`dinamyt_tema`, `dinamyt_idioma`) reparte la elección entre las cuatro webs
-> **en el acto y sin servidor**, y esa sí funcionaba. Por eso el síntoma era
-> intermitente y costó verlo: en el mismo navegador y con las pestañas abiertas,
-> el tema cruzaba por la cookie; en otro dispositivo, o tras borrar cookies, no
-> cruzaba nada — que es justo el «unas veces se recuerda y otras no» que esta
-> sección lleva arrastrando.
-
-#### 3 · «Como el sistema» solo miraba el sistema UNA vez
-
-El tercero no era de sincronización, y es el que afectaba a **más gente**:
-`sistema` es el valor **por defecto** de `users.theme`, así que es el de casi
-todo el mundo. Y `prefers-color-scheme` se consultaba una sola vez, al pintar.
-
-O sea que «como el sistema» significaba en realidad **«como estaba el sistema
-cuando abrí la página»**. Se nota en el caso más común de todos: el teléfono que
-pasa a modo oscuro solo al anochecer. La pantalla se quedaba clara hasta que
-alguien recargara, y eso no se lee como «no escucha al sistema» sino como «se
-quedó pegada».
-
-`escucharTemaDelSistema()` —en el mismo `lib/tema.ts` de las cuatro— se suscribe
-al cambio y repinta **mientras la elección siga siendo `sistema`**. No guarda
-nada: no ha cambiado nada que sea de la persona, sigue eligiendo `sistema`;
-escribirlo convertiría una preferencia viva en un `claro` fijo.
-
-#### Dónde quedó cada pieza
+> **Regla de Membresías que salió de aquí: se consulta por `req.db`, nunca por
+> `app.db`**, salvo en los guards que corren antes del contexto. Contra PGlite
+> `app.db` cuelga la petición; contra PostgreSQL corre fuera de RLS.
 
 | Pieza | Dónde |
 |---|---|
 | Escuchar el tema del sistema | `escucharTemaDelSistema()` en `lib/tema.ts` / `lib/theme.ts` (las cuatro) |
-| Aplicarlo en todas las pantallas | `components/AplicarApariencia.tsx` (portal, Membresías, Campeonatos, Academy) |
+| Aplicarlo en todas las pantallas | `components/AplicarApariencia.tsx` |
 | Leer la verdad, portal | `GET /users/me/apariencia` → `UsersService.aparienciaDe` |
 | Leer la verdad, las otras dos | `GET /sync/apariencia/:ecoSub` |
 | El puente de Membresías | `leerAparienciaDelEcosistema` (`lib/alta-ecosistema.ts`) |
@@ -3226,20 +2587,10 @@ escribirlo convertiría una preferencia viva en un `claro` fijo.
 
 *(5 de septiembre de 2026)*
 
-Las cuatro se veían distintas, y no por gusto: cada una tenía **su copia** del
-sistema visual y las copias se habían separado. La auditoría, app por app:
-
-| Lo que se comparaba | Lo que se encontró |
-|---|---|
-| **Tipografía** | Campeonatos usaba **Bebas Neue + Barlow Condensed + Share Tech Mono**; las otras tres, Archivo + Instrument Sans + IBM Plex Mono. La letra es lo primero que se lee, y era lo primero que cambiaba |
-| **Paleta** | Campeonatos se había desviado en **8 de los 10** tokens compartidos |
-| **Botones** | El del portal era más gordo: `0.55rem 1.2rem` y `0.9rem` de letra, contra `0.5rem 1rem` y `0.875rem` |
-| **Campos** | El portal, `0.6rem 0.8rem`; Membresías, `0.55rem 0.75rem` |
-| **Login** | El portal ponía el logo a **72 px y FUERA** de la tarjeta; Academy y Membresías a **56 px y dentro**; Campeonatos usaba otro componente entero |
-| **Dentro del propio portal** | `login`, `registro` y `recuperar` tenían **tres cabeceras distintas**: una con `.display`, otra con `font-extrabold`, y `verificar`/`salir` sin logo |
-
-Nadie lo hizo mal. Se copiaba la pantalla de al lado y se retocaba, que es como
-se separan siempre las cosas que no tienen un solo sitio.
+Cada web tenía **su copia** del sistema visual y las copias se habían separado
+(Campeonatos, con otra tipografía y 8 de 10 colores distintos; el portal, con
+botones y login propios). Se copiaba la pantalla de al lado y se retocaba, que
+es como se separan las cosas que no tienen un solo sitio.
 
 ### El modelo es Membresías
 
@@ -3258,10 +2609,8 @@ pantalla de entrar.
   propósito no están en el workspace (§1.1)—, así que se les **copia**:
 
   ```powershell
-  .\scripts
-epartir-estilos.ps1            # reparte
-  .\scripts
-epartir-estilos.ps1 -Comprobar # solo dice si alguna está desfasada
+  .\scripts\repartir-estilos.ps1            # reparte
+  .\scripts\repartir-estilos.ps1 -Comprobar # solo dice si alguna está desfasada
   ```
 
   El archivo llega como `src/app/estilos-ecosistema.css` con una cabecera que
@@ -3319,103 +2668,29 @@ entiende. `paleta-correo.spec.ts` compara los dos archivos y falla si se
 separan: **nadie mira su propio correo de verificación dos veces**, así que sin
 esa prueba el correo sería lo último en notarse.
 
-### Por qué Campeonatos SEGUÍA sin parecerse, y no era el backend
+### Por qué Campeonatos no se parecía, y no era Flask
 
-*(5 de septiembre de 2026, más tarde)*
+El backend sirve JSON y no pinta un píxel: la causa era el CSS, y son reglas que
+siguen valiendo:
 
-Después de repartir el sistema compartido, Campeonatos seguía viéndose «más
-gordo y más apretado» que Membresías mirando la misma pantalla. La pregunta
-natural fue si tenía que ver con que su backend es **Flask** en vez de Node.
-
-**No.** Y conviene dejarlo escrito porque va a volver a preguntarse:
-
-| | Campeonatos | Membresías / Portal |
-|---|---|---|
-| Backend | Flask (Python) | NestJS / Fastify (Node) |
-| **Frontend** | **Next.js + React** | **Next.js + React** |
-
-El backend sirve **JSON**: no pinta ni un píxel. Reescribirlo no cambiaría nada
-de lo que se ve, y tiraría por la borda el marcador en vivo por *websockets*,
-las llaves y el modo sin internet del día del evento. **La causa era del CSS, y
-son estas tres:**
-
-#### 1 · La capa: lo NO capado gana siempre
-
-Es la causa estructural y explica por qué el rediseño «no se aplicaba».
-
-Membresías y el portal usan **Tailwind**, así que el sistema compartido
-—que va dentro de `@layer components`— convive con las utilidades como se
-espera. Campeonatos **no usa Tailwind**, así que sus reglas van **sin capa**, y
-en CSS:
-
-> **Una regla sin capa gana SIEMPRE a una capada**, sin importar el orden del
-> archivo ni la especificidad del selector.
-
-O sea que cualquier `.btn`, `.card` o `.input` propia de Campeonatos no
-«afinaba» la compartida: **la anulaba entera**. No hay aviso, no hay error en
-consola, y desde fuera parece que el archivo compartido no se cargó.
-
-#### 2 · El área táctil se aplicaba a TODOS los botones
-
-```css
-.btn { min-height: var(--touch-min); }   /* 44 px, sin capa → gana */
-```
-
-Puesta así, pisaba también a **`.btn-sm`**, que en esta app se usa unas **130
-veces** (las barras de acciones de cada tabla). Un botón pequeño mide ~26 px en
-las otras tres webs; aquí salía a 44, **casi el doble**. Multiplicado por todas
-esas barras, era la razón principal del «se ve más gordo».
-
-El área táctil sigue existiendo —esto se usa **de pie en un tatami, con prisa**—
-pero ahora dice lo que quería decir: solo con **dedo** (`@media (pointer: coarse)`)
-y **nunca sobre `.btn-sm`**.
-
-#### 3 · La caja de los campos, y el interletrado de una fuente que ya no está
-
-`.input` repetía la caja entera con otras medidas, y ganaba por lo mismo:
-
-| | Campeonatos | Ecosistema |
-|---|---|---|
-| `padding` | `12px 16px` | `0.55rem 0.75rem` (~9 / 12) |
-| `border` | `1.5px` | `1px` |
-| tipografía | `1rem` / peso 500 | la heredada |
-
-Las cajas crecen, el hueco entre ellas no, y el contenido acaba pegado al borde:
-eso es el «se ve al límite».
-
-Y los **títulos de pantalla** iban en **oro** con `letter-spacing: +0.08em`. Los
-dos valores venían de **Bebas Neue**, la condensada que esta app usaba antes: una
-condensada necesita aire entre letras. Archivo es ancha y además se usa estirada
-al 118 %, así que con ese mismo valor la palabra se desparrama hasta el borde.
-En las otras tres el título va del color del **texto** y el oro se reserva para
-el antetítulo y la marca — un oro que sale en cada título deja de ser un acento.
-
-#### 4 · «DINAMYT» se escribía de dos colores
-
-`<span>DINA<em>MYT</em></span>`: «DINA» del color del texto y «MYT» en oro. En
-el portal, Membresías y Academy la palabra va **entera** de un color, con el
-escudo dorado al lado haciendo de acento. Es la pieza que más delataba que esta
-app venía de otro sitio, porque el nombre es lo primero que se lee en las cuatro.
-
-Se queda en dos colores **en un solo sitio**: `/pantalla`, la proyección para el
-público, donde se lee desde la grada y el acento ayuda. Se pide a propósito con
-`.logo-acento`.
-
-#### Y el último token desviado
-
-`--chung` valía `#0055FF` aquí y `#2266ff` en las otras tres. Hong y chung son
-**reglamento, no decoración**: el azul de un competidor no puede ser uno en la
-inscripción del portal y otro en la llave. Ya no se redefine — ni en oscuro ni
-en claro. Lo que sí se queda son los derivados de competición
-(`--chung-vivid` para el marcador, `--chung-light` para escribir sobre blanco),
-que responden a un problema que las otras apps no tienen: **leerse a diez metros
-con luz de polideportivo**.
+1. **Una regla sin capa gana SIEMPRE a una capada**, sin importar orden ni
+   especificidad. Campeonatos no usa Tailwind, así que sus reglas van sin capa,
+   y un `.btn`, `.card` o `.input` propio **anula entero** al compartido (que va
+   en `@layer components`). No hay aviso: parece que el archivo no se cargó.
+2. **El área táctil de 44 px, solo con dedo** (`@media (pointer: coarse)`) y
+   **nunca sobre `.btn-sm`**, que en esa app sale unas 130 veces.
+3. **La caja de los campos no se redefine**, y los títulos van del color del
+   texto: el oro se reserva para el antetítulo y la marca.
+4. **«DINAMYT» se escribe de un solo color**, salvo en `/pantalla` (la
+   proyección para el público), que lo pide con `.logo-acento`.
+5. **Hong y chung son reglamento, no decoración**: `--chung` no se redefine. Sí
+   se quedan los derivados de competición (`--chung-vivid`, `--chung-light`).
 
 > **Comprobación de que no vuelve a pasar.** Cruzando los selectores de
 > `estilos-ecosistema.css` con los de `globals.css`, a Campeonatos solo le
 > quedan cinco en común —`:root`, `html`, `body` y las dos de Edge— y todos
-> añaden, no sustituyen. Si algún día vuelve a aparecer un `.btn` o un `.card`
-> en esa lista, es este mismo fallo otra vez.
+> añaden, no sustituyen. Si algún día aparece un `.btn` o un `.card` en esa
+> lista, es este mismo fallo otra vez.
 
 ## 4.23 Qué versión está corriendo
 
@@ -3498,14 +2773,28 @@ que coincide con lo que espera Drizzle. Cuadraba por casualidad.
 **JavaScript**, nunca `DEFAULT now()`. Lo que se escribe desde JS va y vuelve
 en UTC por los dos lados, y la zona de la base deja de importar.
 
-> **Y la regla que la sustituye**, en cuanto se aplique `0012_fechas_con_zona`
-> (escrita y ensayada; §6.1): **la columna lleva zona**. Sobre `timestamptz` lo
+> **Y la regla que la sustituye, desde `0012_fechas_con_zona`** (aplicada en
+> producción): **la columna lleva zona**. Sobre `timestamptz` lo
 > guardado es un instante, así que `now()` y `new Date()` escriben lo mismo y
 > deja de importar quién la rellene. Recordar un convenio en cada columna es
 > justo lo que falló; el tipo no se olvida.
 >
 > Lo que **no** cambia: una fecha civil —un cumpleaños, el día en que vence una
 > suscripción— no lleva zona ni la quiere. Esas se quedan como están.
+>
+> `0012` pasó a `timestamptz` las 35 columnas de instante de `ecosystem` (16
+> tablas), **cada una con su propio `USING`**: convertir a secas estropea lo que
+> escribió la aplicación. Hubo que auditar quién escribe cada una —siempre
+> `now()` (Bogotá), siempre `new Date()` (UTC), y los `updated_at` mixtos,
+> separados por la distancia a su `created_at`—. Si algún día se convierte otra
+> columna de instante: respaldo delante (no hay vuelta atrás automática),
+> `SHOW timezone;` tiene que decir `America/Bogota`, y el ensayo
+> `cd apps/ecosystem-api && pnpm zonas:ensayo`. Membresías hizo lo mismo en su
+> repositorio (`0017_fechas_con_zona`, con `current_setting('TimeZone')` porque
+> se instala en bases en UTC); Campeonatos no lo necesita (sus defaults son de
+> Python, en UTC). Las seis columnas de **día** (`birth_date` ×2 y los
+> `starts_at`/`ends_at` de las suscripciones) se quedaron sin zona a propósito:
+> su tipo correcto es `date` (`HOJA-DE-RUTA.md`).
 
 En `sessions` las columnas ya **no tienen** `defaultNow()` —ni en el esquema de
 Drizzle ni en la base (migración 0011)—, así que el tipo obliga a dar el valor
@@ -4076,7 +3365,7 @@ Academy. Por eso esto es una regla y no una anécdota:
 > apuesta no se hace.
 
 Y el criterio que hace que valga la pena: **es el mismo trazo en las cuatro
-apps** (`IconoSalir`, y el de «Ir a DINAMYT» de §6.2). La misma acción se dibuja
+apps** (`IconoSalir`, y el de «Ir a DINAMYT»). La misma acción se dibuja
 igual en todas partes, para que se reconozca por su forma antes que por su texto.
 
 ## 5.22 «Esta pantalla no es responsiva» eran cuatro píxeles
@@ -4117,841 +3406,6 @@ lateral. Es la única medida que no depende de mirar la pantalla y opinar.
 
 # PARTE 6 · Lo que queda pendiente
 
-## 6.0 En qué orden se trabaja
-
-*(escrito el 30 de agosto de 2026 · **reescrito el 4 de septiembre**)*
-
-**Hasta hoy esta sección era un calendario de espera**: campeonato el 9, 10 y 11
-de octubre, del 1 al 13 no se tocaba nada, y todo lo abierto quedaba aparcado
-«para después del 14». Eso se cambió, y conviene saber por qué, porque la regla
-que sustituye no es «ya da igual»:
-
-· **Congelar dos semanas para proteger un fin de semana salía carísimo.** Paraba
-  las mejoras que se están pidiendo hoy, y amontonaba lo aplazado en un solo
-  despliegue del día 14 — la forma más segura de estrenar un fallo justo después
-  del evento y con todo el mundo mirando.
-· **Lo que de verdad protege el campeonato son tres días, no trece** (§1.5):
-  los días 9, 10 y 11 no se sube nada, y el 8 solo entran arreglos. El resto del
-  tiempo se trabaja normal.
-· **Y lo que hace que eso sea seguro ya está montado**: cada cambio pasa por
-  `pnpm turbo build test` y por los dos ensayos de §2.1 —uno de ellos aplica las
-  migraciones reales sobre un PostgreSQL de verdad—, hay respaldo antes de tocar
-  datos (§2.5) y Campeonatos arranca sin internet (§1.5). Ésa es la red, no el
-  calendario.
-
-**Lo que sí sigue teniendo fecha propia es el DMARC**, porque su fecha sale de
-una cuenta y no de una preferencia: `p=none` se publicó el 29 de agosto y hacen
-falta dos semanas de informes.
-
-### El orden
-
-| Cuándo | Qué | Por qué ahí |
-|---|---|---|
-| **Del 12 de sept. en adelante** | DMARC a `quarantine` (§3.5) | Dos semanas de informes desde el 29 de agosto. El DNS está comprobado y el cambio escrito palabra por palabra: es teclear, no investigar. `reject`, más tarde |
-| **Cuando se pueda, y ya se puede** | **Las mejoras del panel y del producto** — §6.1 y §6.2 | Ya no esperan al 14 de octubre. Se toman de arriba abajo: primero lo que se usa a diario |
-| **Última semana de septiembre** | Repetir el ensayo completo (abajo) y **anotar los números** | Es lo único que vigila que los despliegues de septiembre no hayan reabierto un eslabón. Con más despliegues por delante, ahora hace más falta, no menos |
-| **La víspera del próximo campeonato** | Solo arreglos. Nada que se estrene | *(Era el 8 de octubre: ese campeonato no se hace, D7 de `PLAN-CAMPEONATOS.md`)* |
-| **Durante el campeonato** | Nada (§1.5) | Con gente delante |
-| ~~Después del 14 de oct.~~ | ~~**Cobro por usuario**~~ — **hecho el 3 de septiembre** (§4.18) | Se adelantó porque no toca identidad ni migra datos de nadie |
-
-### Y una regla para trabajar así, que antes la ponía el calendario
-
-Con la ventana cerrada, lo que separaba un cambio arriesgado de uno tranquilo
-era la fecha. Ahora lo separa **lo que toca**:
-
-| Si el cambio… | Entonces |
-|---|---|
-| Es de pantalla, texto o una ruta nueva | Se despliega el día que se hace |
-| **Añade** columnas o limpia datos | Respaldo antes (§2.5) y `db:migrar` **antes** de reiniciar (§1.2) |
-| Toca identidad, sesiones o roles | Además, los dos ensayos de §2.1 en verde **antes** de empujar |
-| Cambia precios o lo que se le cobra a alguien | Se avisa a los clubes antes de que lo vean en su factura |
-
-Lo del 4 de septiembre —§4.16, §4.17 y el `role_membresias` de §4.15— entra en
-las dos primeras filas: pantalla, una ruta nueva y una migración que solo
-**limpia** columnas.
-
-### El ensayo — corrido el 3 de septiembre de 2026
-
-El fallo del rol tenía **cuatro eslabones y cada uno tapaba al siguiente**
-(§4.7). Ninguno de los cuatro se veía leyendo el código: se vieron recorriendo
-el camino con una persona real y mirando el log. La única forma de encontrar la
-próxima cadena así es recorrer el camino entero antes de que lo recorra un
-maestro el 9 de octubre.
-
-**Ya se recorrió**, y el guion de abajo **no se borra por eso**: es lo que se
-vuelve a correr. Dos razones para repetirlo la última semana de septiembre, y
-las dos pesan más ahora que se trabaja hasta la víspera:
-
-· De aquí al campeonato entra código, y cada despliegue puede reabrir un
-  eslabón. Los seis arreglos del 2 y el 3 de septiembre (§4.15) cambiaron el
-  login, los roles por app y la campana — los tres sitios donde vivía la cadena.
-· El paso 7 mide `fichas_sueltas`, y ese número solo dice algo **comparado con
-  la vez anterior**. Un ensayo aislado no lo vigila; dos, sí.
-
-> **Anota los números del cierre cada vez que lo corras** (paso 7). Los del
-> último ensayo no quedaron escritos aquí, así que el próximo `resumen` vuelve a
-> ser un punto de partida y no una comparación. Es la única parte del ensayo
-> que se pierde si no se copia a mano.
-
-### El guion, paso a paso
-
-Cada paso tiene **lo que se hace en pantalla** y **lo que se comprueba en la
-base**. Lo segundo no es opcional: los cuatro eslabones del fallo del rol se
-veían todos igual desde la pantalla —«no pasa nada»— y distintos en la base.
-
-`scripts/ensayo.sh` es lo que responde cada comprobación. **Solo lee**: ni un
-`UPDATE`, ni un `INSERT`. Se puede correr en producción a media tarde.
-
-```bash
-cd /srv/dinamyt && bash scripts/ensayo.sh
-```
-
-Y una ventana aparte, abierta durante todo el ensayo — esto es la otra mitad:
-
-```bash
-sudo journalctl -u dinamyt-id -f
-```
-
-Un `WARN [EspejoMembresias]` es un aviso que no se aplicó. Hasta el 30 de agosto
-ese silencio era el problema; ahora los dice todos (§4.7).
-
-#### 0 · El punto de partida
-
-```bash
-cd /srv/dinamyt && bash scripts/ensayo.sh estado
-```
-
-Las seis apps `active`, **los dos hashes del secreto iguales** —si no, el espejo
-entero está muerto y el ensayo no prueba nada— y `POST /sync/alta` contestando
-**401** (un 404 es que falta `ECOSYSTEM_SYNC_SECRET`). Anota los números del
-resumen: al final tienen que haber cambiado en lo que esperas y en nada más.
-
-#### 1 · La estructura
-
-En pantalla: crear una federación desde `/admin`, ponerle su administrador,
-crearle un club dentro y **afiliarle otro que ya exista**.
-
-```bash
-bash scripts/ensayo.sh federacion 'NOMBRE DE LA FEDERACIÓN'
-```
-
-Los clubes colgando de ella, y **alguien con rol `admin`**. Sin eso la
-federación existe y no le sale a nadie en «Mi organización» (§4.5).
-
-#### 2 · La herencia
-
-En pantalla: darle plan a la federación. Después, con el correo de alguien del
-club **hijo** —no de la federación—:
-
-```bash
-bash scripts/ensayo.sh herencia alguien@delclub.com
-```
-
-Tiene que salir el plan de la federación como eslabón del club. Si sale aquí y
-la persona no lo ve en el portal, es el pase viejo: que salga y entre (§4.5).
-
-#### 3 · El alta desde Membresías
-
-En pantalla: dar de alta a un alumno con un **correo nuevo**. Tiene que volver
-el enlace de contraseña (§4.4).
-
-```bash
-bash scripts/ensayo.sh persona elnuevo@correo.com
-```
-
-Las tres cosas que importan: **cuenta en DINAMYT** con `tiene_contrasena = f`,
-**`enlazada = t`** en Membresías, y `contrasena_propia = f`. Si `enlazada` sale
-`f`, la ficha nació suelta y hay algo mal en el orden del alta.
-
-#### 4 · Que entre
-
-En pantalla: que esa persona abra el enlace, ponga su contraseña, entre al
-portal y de ahí salte a Membresías. Después, cobrarle, marcarle asistencia e
-imprimirle el carnet.
-
-Repite `persona`: ahora `tiene_contrasena = t`.
-
-#### 5 · El rol, que es donde estaba el fallo
-
-En pantalla: cambiarle el rol a **auxiliar** desde el portal.
-
-```bash
-bash scripts/ensayo.sh rol elnuevo@correo.com
-```
-
-`esperado_membresias` y `en_membresias` **iguales**, y
-`tiene_roles_de_app_escritos = f`. Si no cuadran:
-
-```bash
-bash scripts/ensayo.sh espejo
-```
-
-#### 6 · Campeonatos, ida y vuelta
-
-En pantalla: entrar con un maestro, inscribir a alguien, y **salir**. Al volver
-al portal no puede meterte dentro otra vez (§5.12). Y comprueba que a un alumno
-el portal le ofrece las páginas públicas, no la consola (§4.13).
-
-#### 7 · El cierre
-
-```bash
-bash scripts/ensayo.sh resumen && bash scripts/ensayo.sh sueltas
-```
-
-`fichas_sueltas` no puede haber subido: cada alta nueva nace enlazada. Si subió,
-algún camino sigue creando fichas sin cuenta y eso es lo siguiente que hay que
-mirar.
-
-## 6.1 Huecos conocidos
-
-`[x]` ~~**Los planes que hay no son los de verdad: el cobro será POR USUARIO.**~~
-      **Hecho el 3 de septiembre de 2026** — se adelantó a la Fase 2 porque el
-      modelo viejo ya estaba estorbando: el panel de recaudo sumaba importes
-      fijos que no significaban nada. El mecanismo entero, las tres formas de
-      contar que se compararon y por qué se eligió el prepago: **§4.18**.
-
-      Lo que queda de esta conversación es lo que de verdad era de la Fase 2: la
-      portada y los precios públicos. **`/planes` sigue enseñando los de
-      relleno**, así que el aviso de abajo sigue en pie hasta que se pongan los
-      de verdad en «Tarifa de cada plan».
-
-      **Lo que decía esta nota el 29 de agosto**, y que se cumplió entero:
-      los de la base eran precios fijos al mes —`Plan Membresías` 60.000,
-      `Academy` 50.000, los de Campeonatos «a cotizar»— y la intención siempre
-      fue tarifa por usuario. Las tres cosas que dejaba por resolver —dónde vive
-      el precio unitario y el mínimo, **qué cuenta como usuario**, y que
-      `total_amount` deja de ser una constante— están las tres contestadas en
-      §4.18.
-
-      ⚠️ **Mientras tanto: no publiques los precios de `/planes`.** Los que
-      enseña siguen siendo los de relleno, y hoy solo lo abre quien tiene el
-      enlace.
-
-`[x]` ~~**Una federación creada desde `/admin` nace sin nadie que la
-      gestione.**~~ Hecho el 30 de agosto de 2026. `/admin` enseña ahora la
-      **estructura** —cada federación con sus clubes debajo, y al final los que
-      no cuelgan de nadie, donde antes había una lista plana en la que un club
-      afiliado y uno huérfano se veían igual— y, al seleccionar una federación,
-      trae su propio bloque para **invitar clubes existentes** y para **crear
-      clubes nuevos dentro**. Afiliar sigue siendo por invitación: el maestro
-      del club acepta o rechaza. Cómo queda repartido: §4.5.
-
-      Nacer vacía **sigue siendo posible** —hay motivo para preparar la
-      estructura antes de que llegue su gente— pero ya no es un silencio: la
-      organización recién creada queda seleccionada, el panel avisa de que
-      todavía no la administra nadie, y el desplegable de «+ Añadir» ofrece solo
-      los roles que ese tipo de organización acepta (una federación, `admin` y
-      `judge`; antes ofrecía seis y cuatro acababan en un 400 mudo).
-
-      **Y el mismo día se afinó**: desde `/admin` no se invita, se **afilia
-      directo**. La invitación protege al maestro de que una federación se
-      lleve su club sin preguntar; el super-admin no está en esa conversación
-      —ya crea, desactiva y borra organizaciones desde ese panel—, así que
-      pedirle que se mandara una invitación a sí mismo era ceremonia. Con su
-      deshacer al lado (la ✕ de cada club afiliado), que es lo que hace que
-      afiliar de un clic no sea una trampa. Las dos rutas y el reparto: §4.5.
-
-`[x]` ~~**El usuario no tiene por dónde escribirte.**~~ Hecho el 29 de agosto de
-      2026. `soporte@dinamyt.org` ya recibía (§3.5) pero no aparecía en ninguna
-      pantalla; ahora está en el **pie del portal**, y el pie vive en el
-      `layout`, así que sale en **todas** — login, registro, recuperar y
-      poner-contraseña incluidas. Ese es el punto: quien no consigue entrar no
-      tiene ningún menú donde buscar ayuda.
-
-      Las dos direcciones se unificaron en `src/lib/contacto.ts`
-      (`CORREO_SOPORTE` y `CORREO_ADMIN`), que es lo que impide que vuelvan a
-      repartirse: `planes` tenía la suya en una constante local y `privacidad`
-      la tenía escrita a mano. Siguen siendo **dos buzones distintos a
-      propósito** — soporte para problemas de cuenta, admin para lo
-      administrativo (planes, cotizaciones, habeas data)— y cada uno tiene su
-      variable: `NEXT_PUBLIC_SUPPORT_CONTACT_EMAIL` y
-      `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`. **En producción no hay que tocar
-      nada**: los valores por defecto ya son los buenos.
-
-      El pie del `layout` sustituyó al que tenía escrito la portada, que era el
-      único que había: ahora hay uno solo, en `components/PieDePagina.tsx`. Y
-      como cada página trae su `min-h-screen`, `globals.css` reparte la pantalla
-      entre el `<main>` y el pie (`body > main { flex: 1 0 auto; min-height: 0 }`);
-      sin eso, **todas** las vistas cortas habrían salido con tres líneas de
-      scroll que no llevan a ninguna parte.
-
-      ⚠️ Al ser `NEXT_PUBLIC_*`, cambiar cualquiera de las dos obliga a **volver
-      a compilar** el portal (§1.3).
-
-`[x]` ~~**Nadie recibe lo que se escribe a `soporte@dinamyt.org`, y el dominio
-      no publica política DMARC.**~~ Hecho el 29 de agosto de 2026: Email
-      Routing con `soporte@` y `admin@`, y `_dmarc` en `p=none` con los informes
-      al panel de Cloudflare. Queda **subir la política a `quarantine`** a
-      mediados de septiembre, y a `reject` **desde el 13 de octubre**, nunca
-      durante el campeonato. Ver §3.5.
-
-`[x]` ~~**Un alumno desactivado en Membresías choca contra un 403 sin
-      explicación.**~~ Hecho el 31 de agosto de 2026, y por el camino que decía
-      la nota: **Membresías avisa**, el portal lo apunta y deja de ofrecer lo
-      que no va a poder abrir.
-
-      · Migración `0013_acceso_por_app`: `org_members.membresias_activo`, que
-        acepta NULL —«no consta», el valor de todo el mundo hasta que llegue el
-        primer aviso— para no afirmar de golpe que mil personas tienen acceso a
-        una app que la mayoría ni usa.
-      · Membresías llama a `POST /sync/acceso` cuando el maestro enciende o
-        apaga el acceso de alguien (`avisarAccesoAlEcosistema`). **Mismo
-        secreto que el resto del espejo: no hay variable nueva que poner.**
-      · El dashboard, con el acceso cortado, cambia la tarjeta por la
-        explicación —«tu maestro lo retiró; sigues siendo del club y no se ha
-        perdido nada tuyo»—, y la lista de gente del club marca a esa persona
-        con una insignia roja «Membresías · sin acceso».
-
-      **Y la baja al revés, que era la otra mitad y no estaba apuntada:** sacar
-      a alguien del club en el portal no llegaba a Membresías, así que seguía
-      en el listado y seguía entrando. `removeMember` llama ahora a
-      `POST /sync/pertenencia` (`espejarBaja`), que allá le retira el acceso
-      **sin borrar la ficha**: los pagos y la asistencia son la contabilidad del
-      club y no se van con la persona. Ese lado tiene once pruebas de punta a
-      punta (`baja-del-club.spec.ts`).
-
-`[x]` ~~**Al alumno no le llega ningún aviso automático todavía.**~~ **Cerrado
-      el 3 de septiembre de 2026: los avisos llegan.** Las llaves VAPID y el
-      reloj de las 08:00 estaban desde el 29 de agosto; lo que faltaba era la
-      tercera pieza, que alguien instalara la PWA y aceptara. `pushEnviados` ya
-      no es 0.
-
-      **Y la prueba de que llegan de verdad vino en forma de fallo**, que es la
-      mejor: el aviso apareció en un teléfono con el icono roto —un círculo
-      amarillo con una mancha dentro—, y eso solo se puede reportar habiéndolo
-      recibido. Arreglado el mismo día (§4.15).
-
-      ⚠️ **Faltaba además un botón que funcionara.** Hasta el 3 de septiembre
-      **no se podía activar desde un computador**: `activarPush` pedía el
-      permiso después de esperar al service worker, y para entonces el gesto del
-      clic ya había caducado. En el celular colaba porque el service worker
-      venía instalado de la visita anterior. O sea que «nadie se ha suscrito»
-      era medio diagnóstico: parte era que a mucha gente el botón no le hacía
-      nada. Ver §4.15.
-
-      Lo que **no** cambia: al alumno no le llega correo, y es a propósito
-      (§4.6). El push es su único canal automático hasta que exista WhatsApp.
-
-`[ ]` **Lo que dejó abierto la revisión de seguridad del 26 sep 2026.** Lo
-      arreglado —el tatami sin identidad, el secreto de ejemplo en el PC del
-      evento, fórmulas en los Excel, el tope de tamaño, ids que no son uuid—
-      y el detalle de lo abierto están en el diario de `PLAN-CAMPEONATOS.md`.
-      Lo abierto, en una línea cada uno:
-      · **No hay Content-Security-Policy** en ninguna web, y el portal tiene
-        el pase al alcance de JavaScript. Se hace aparte y probando.
-      · **Un solo `ECOSYSTEM_SYNC_SECRET` para las tres apps.** A la larga,
-        uno por app.
-      · **Rotar las contraseñas de Supabase** que viajaron por chat
-        (`PLAN-ECOSYSTEM-VPS.md` §0.1).
-      · **El candado de sede y la publicación en vivo** (decisiones 8 y 9 de
-        `PLAN-ECOSYSTEM-VPS.md`): no están hechos y son lo que falta para que
-        un campeonato no tenga dos escritores.
-
-`[ ]` **WhatsApp para los avisos del alumno.** Es el canal que la gente de
-      verdad lee, y el que el maestro ya usa a mano. **No está construido.**
-      Lo que costaría, para decidirlo con números en vez de con ganas:
-
-      · **El dinero es lo de menos.** Meta cobra por mensaje entregado desde
-        julio de 2025, y Colombia es de los mercados más baratos: una plantilla
-        de *utilidad* cuesta entre **0,0008 y 0,003 USD**. Un aviso al mes a
-        quinientos alumnos son **menos de dos dólares**. Ya no hay tramo
-        gratuito mensual, pero sí una regla que aquí sale a favor: si la persona
-        te escribió primero, tienes 24 h para responderle **gratis**.
-      · **Lo caro es entrar.** Cuenta de Meta Business, **verificación de la
-        empresa** (documentos, días de espera), un número de teléfono dedicado
-        que no esté ya en WhatsApp normal, y **cada plantilla aprobada una por
-        una** por Meta antes de poder mandarla.
-      · **Lo que habría que escribir**: un `WhatsappService` gemelo del
-        `MailerService` (mismo criterio: sin token configurado, la función no
-        existe), guardar el `phone` en formato E.164, y un registro de envíos
-        para no repetir.
-      · ⛔ **Las librerías que automatizan WhatsApp Web** (`whatsapp-web.js`,
-        Baileys) **no**. Violan los términos y el número acaba bloqueado — el
-        del club, que es el que usan para todo.
-
-`[x]` ~~**Los `created_at` van cinco horas desviados en el VPS.**~~
-      **Aplicada.** Era el mismo mecanismo de §5.1-bis, pero en las columnas que
-      solo se MUESTRAN: `DEFAULT now()` escribía hora de Bogotá y Drizzle la
-      leía como UTC. No rompía ninguna decisión —lo único que comparaba una de
-      estas fechas contra el reloj eran las sesiones, y eso ya estaba
-      arreglado—, pero sí desplazaba lo que se pinta. Se notaba de verdad en un
-      solo caso: quien se registró entre medianoche y las 5 de la mañana
-      aparecía con la fecha del día anterior en «Miembro desde».
-
-      **`0012_fechas_con_zona` está aplicada en producción**, y lo que sigue es
-      la referencia de qué hizo — que hace falta el día que alguien añada una
-      columna de instante nueva, o toque las seis que no convirtió.
-
-      > **Cómo se sabe, sin entrar al VPS.** El diario de Drizzle la pone
-      > **antes** de `0013`, y el migrador aplica en orden: si algo posterior
-      > corrió, ella corrió. Y corrió `0016_avisos_al_celular` — el 3 de
-      > septiembre llegó un aviso a un teléfono de verdad, con el icono mal, y
-      > ese fallo (§4.15) es la prueba de que la cadena entera está desplegada.
-      > La comprobación directa sigue siendo `pnpm db:diagnostico` (§2.6).
-
-      Pasó a `timestamptz` las **35** columnas de
-      instante del esquema `ecosystem`, repartidas en 16 tablas. Eso elimina la
-      clase de fallo entera en vez de taparla: sobre `timestamptz` da igual si
-      el valor lo pone `now()` o un `new Date()`, porque lo guardado es un
-      instante y no una hora de pared. Los `DEFAULT` se quedan — con el tipo
-      bueno vuelven a ser correctos.
-
-      ⚠️ **Lo que a propósito NO convierte: seis columnas.** `birth_date` (en
-      `users` y en `pending_registrations`) y los `starts_at` / `ends_at` de
-      las dos tablas de suscripciones **no son instantes, son días**: se
-      calculan como texto `'YYYY-MM-DD'` en `common/ciclo.ts` y se guardan a
-      medianoche. Un cumpleaños no ocurre a una hora, y una suscripción que
-      vence «el 31» no vence a las 19:00 del 30. Ponerles zona sería cometer el
-      mismo error por el otro lado. Su tipo correcto es `date`, y eso es otra
-      migración con su propio cambio de código.
-
-      **Cada columna lleva su propio `USING`**, y esa es la parte que no se
-      puede improvisar: convertir a secas interpretaría todo con la zona de la
-      sesión, lo que acierta con lo que escribió la base y **estropea lo que
-      escribió la aplicación**, que ya estaba bien. Hubo que auditar quién
-      escribe cada una. Salieron tres grupos —siempre `now()` (Bogotá), siempre
-      `new Date()` (UTC), y los cuatro `updated_at`, que son mixtos porque
-      nacen con el default y se pisan desde la app—. Los mixtos se separan por
-      la distancia a su `created_at`, y funciona porque los dos convenios están
-      cinco horas apartados: dos segundos de umbral deja el corte lejísimos de
-      los dos casos.
-
-      **Las tres cosas que se hicieron antes de aplicarla**, y que hay que
-      repetir el día que se convierta cualquier otra columna de instante —la
-      lista es esta y no otra:
-
-      1. Respaldo delante (`scripts/respaldar-produccion.ps1`) y comprobado
-         (`scripts/verificar-respaldo.ps1`). Reescribe 16 tablas y **no hay
-         vuelta atrás automática**: `timestamptz` → `timestamp` pierde la zona.
-      2. `SHOW timezone;` en la base tiene que decir `America/Bogota`. Todo un
-         grupo depende de eso. Si dijera otra cosa, se cambia el `AT TIME ZONE`
-         del SQL **antes**, no después.
-      3. El ensayo, que levanta PGlite en la zona de Bogotá, fabrica las dos
-         clases de fila, aplica las conversiones y además comprueba que el SQL
-         y el esquema de Drizzle dicen lo mismo columna por columna:
-
-         ```bash
-         cd apps/ecosystem-api && pnpm zonas:ensayo
-         ```
-
-      El despliegue fue el de §2.3 con su `db:migrar`; no hizo falta nada
-      especial más allá del respaldo.
-
-      **Lo que queda de este hueco es una migración distinta y pequeña**: las
-      seis columnas de día a tipo `date`. No corre prisa —hoy son `timestamp`
-      sin zona a medianoche, que es lo que se quiere leído como día— y va con su
-      cambio de código en `common/ciclo.ts`. **Después del campeonato.**
-
-      **Esto cubre `ecosystem` y solo `ecosystem`.** De los otros dos esquemas
-      de la misma base:
-
-      · **Membresías tenía el mismo fallo**, y ya está curado: migración
-        `0017_fechas_con_zona` en **su** repositorio
-        (`D:\Repositorios\dinamyt-membresias`), 24 columnas, hecha el 31 de
-        agosto de 2026. Era exactamente lo que se veía en el kiosco: la hora
-        del check-in salía cinco horas en el pasado.
-
-        **Su SQL no escribe `America/Bogota` a mano y el de aquí sí**, y no es
-        un descuido: Membresías se vende sola, así que su migración también
-        corre en la base de un club que la instaló en Supabase o en Neon, donde
-        `SHOW timezone` dice `UTC`. Usa `current_setting('TimeZone')`, que es
-        con la zona que escribió `now()` sea cual sea, y así no hay nada que
-        comprobar antes de correrla.
-
-        Su ensayo, gemelo del de aquí:
-
-        ```bash
-        pnpm --filter @dinamyt/membresias-db zonas:ensayo
-        ```
-      · **Campeonatos no lo tiene.** Sus modelos usan
-        `default=lambda: datetime.now(timezone.utc)`, que es un default de
-        **Python**, no de la base — no hay un solo `server_default` en el
-        backend—, así que escribe y lee UTC por los dos lados y cuadra.
-
-`[x]` ~~**Campeonatos no lee el `#token=`.**~~ Hecho el 30 de agosto de 2026:
-      el salto desde el portal abre sesión sin segunda contraseña, y `dinamyt-combat`
-      ya está clonado en `D:\Repositorios\dinamyt-combat`. Cómo funciona y qué
-      decide quién entra: §4.13.
-
-      **Desplegado el 30 de agosto de 2026.** El comando, con el `pip install`
-      que no sobra y las dos variables que hay que poner antes: **§2.4-bis**.
-
-      Y con el salto llegó su reverso: salir de Campeonatos no cerraba la
-      sesión de DINAMYT, así que volver al portal metía a la persona dentro
-      otra vez. Arreglado el mismo día con el criterio de Membresías (§5.12), y
-      de paso la vuelta atrás y el scroll del diálogo.
-
-`[x]` ~~**Quedan dos `admin@dinamyt.com` en Campeonatos**, y ese dominio es de
-      otra persona.~~ **Corregidos el 3 de septiembre de 2026** en
-      `dinamyt-combat` — no en el espejo de `productos/`, que se pierde en la
-      siguiente sincronización y es el error fácil de cometer porque el `grep`
-      los encuentra en los dos sitios.
-
-      El del código ya no estaba: lo arregló el barrido de §1.5 del plan
-      maestro, que eran ocho apariciones y no dos. Lo que sobrevivía era
-      documentación que la gente copia y pega, y **es exactamente por eso que
-      importaba** — un `.env.example` se copia a `.env`, y `INICIAR-LOCAL.md` es
-      la guía que alguien sigue el día del campeonato.
-
-      **Y en esa segunda línea había un tercer error, peor que el dominio.**
-      Decía:
-
-      > *Usuario admin inicial: `admin@dinamyt.com` / `Dinamyt2026*`*
-
-      Esa contraseña **no es el valor por defecto de nada** — aparecía en ese
-      renglón y en ningún otro sitio del repositorio. `ADMIN_PASSWORD` no tiene
-      defecto **a propósito**, para que ninguna contraseña viva en el código, y
-      sin ella el seed no crea el admin. O sea que quien siguiera la guía al pie
-      de la letra **no podía entrar**, y con un dato que además parecía una
-      credencial de verdad. Ahora dice qué dos variables poner, que la
-      contraseña no tiene defecto, y que van **antes del primer arranque**, que
-      es cuando se crea el admin.
-
-      > **La lección:** una guía de arranque que nombra una credencial concreta
-      > o miente o la filtra. Las dos cosas son peores que decir dónde ponerla.
-
-`[x]` ~~**Campeonatos ejecuta DDL al arrancar**~~ — el bloqueo, cerrado el 29 de
-      agosto de 2026 (`7a740cd` en `dinamyt-combat`, desplegado y espejado).
-      Tiró el servicio una mañana entera; el relato y cómo se reconoce están en
-      §5.1-ter. El `db.session.commit()` suelta el candado y el
-      `SET LOCAL lock_timeout = '5s'` hace visible cualquier recaída.
-
-`[x]` ~~**Las rutas del espejo y sus pruebas de punta a punta.**~~ **Completas el 3 de septiembre de 2026.**
-      *(31 ago 2026)* **Encontrado por qué colgaban, y no era el arnés: era la
-      ruta.** `/sync/rol` se quedó fuera de la lista `SIN_CONTEXTO` de
-      `plugins/rls.ts` cuando se escribió, así que la transacción que abre su
-      `sinFiltroDeClub` caía DENTRO de la que abre el plugin de RLS. Contra
-      PGlite —una sola conexión— eso se bloquea contra sí mismo y la petición no
-      vuelve nunca; contra un PostgreSQL de verdad no se cuelga porque el pool
-      le da otra conexión, así que **en producción funciona y solo abre una
-      transacción de más**. Un fallo que no se ve donde importa y que deja el
-      código sin poder probarse, que es la peor combinación de las dos.
-
-      Arreglado: `/sync/rol` y `/sync/pertenencia` están ya en esa lista.
-
-      **El inventario, ruta por ruta** *(al día el 3 de septiembre)*. Merece una
-      tabla porque el espejo tiene cinco rutas en dos repositorios y «está
-      probado» no significa lo mismo en cada una — la que emite y la que recibe
-      son dos pruebas distintas:
-
-      | Ruta | Quién la recibe | Cubierta por |
-      |---|---|---|
-      | `/sync/persona` | Membresías | `ecosistema.spec.ts` |
-      | `/sync/pertenencia` | Membresías | `baja-del-club.spec.ts` (12) y `alta-del-club.spec.ts` (12) |
-      | `/sync/acceso` | ecosystem | `modules/sync/acceso.spec.ts` (9) |
-      | `/sync/contrasena` | Membresías | `contrasena-espejo.spec.ts` (las dos puntas) |
-      | `/sync/rol` | Membresías | `cambiar-rol.spec.ts` (3, emite) **y `rol-del-portal.spec.ts` (17, recibe)** |
-      | `/sync/alta` | ecosystem | **`modules/sync/alta.spec.ts` (15)** |
-      | `/sync/plan` | Membresías | **`plan-vencido.spec.ts` (19)** — ver §4.16 |
-
-      La traducción de roles sigue con sus once casos en `roles-por-app.spec.ts`,
-      y que el club no se quede sin dueño tiene nueve en `ultimo-gestor.spec.ts`
-      — por la puerta del portal, que es la que se usa a diario.
-
-      **Las dos que faltaban, escritas el 3 de septiembre de 2026.** Las suites
-      quedan en **242** (ecosystem) y **321** (Membresías), las dos en verde:
-
-      · **`rol-del-portal.spec.ts`** — la punta de `/sync/rol` que RECIBE. Lo que
-        ya había probaba que el portal manda el rol traducido; esto prueba qué
-        hace Membresías con lo que llega. Las cuatro familias: la puerta (sin
-        cabecera, con secreto equivocado, y sin secreto configurado → 404 y no
-        401); a quién alcanza (por `eco_sub`, y **por correo sobre una ficha sin
-        enlazar, a la que ata de paso** — que era el fallo que dejaba el botón
-        del portal sin efecto); a quién no toca (la ficha con **otro** `eco_sub`,
-        que es de otra persona; la del alumno de carnet QR, sin correo); y que
-        el club no se queda sin dueño.
-      · **`alta.spec.ts`** — `POST /sync/alta`, que era la única de las cinco
-        rutas sin una sola prueba. Además de la puerta: que no crea la
-        organización a ciegas, que **`owner` no viaja por esta puerta** —el
-        mando de un club no se reparte de servidor a servidor—, y el invariante
-        que sostiene `ensayo.sh sueltas`: **si la invitación falla, el error
-        sale**. Una respuesta con forma de éxito y sin `ecoSub` es exactamente
-        cómo nacería una ficha suelta.
-
-      > **Y una que se encontró escribiéndolas, que vale para todo el
-      > repositorio:** la prueba de «sin el secreto» pasaba por el motivo
-      > contrario al que decía. El ayudante era
-      > `function llamar(..., secreto = SECRETO)`, y **pasarle `undefined`
-      > explícitamente activa el valor por defecto**: mandaba el secreto bueno y
-      > recibía un 200 — una prueba en verde que no probaba nada.
-      >
-      > El centinela de «sin cabecera» tiene que ser **`null`**.
-      > `baja-del-club.spec.ts` tenía el mismo ayudante y solo probaba el
-      > secreto equivocado, así que nunca cayó en ello **pero tampoco cubría la
-      > cabecera ausente**, que es otra rama: una falla la comparación, la otra
-      > ni llega a compararse. Se le añadió el caso el mismo día — son **12**
-      > pruebas ahora, no 11.
-
-`[~]` **El bloqueo por plan vencido solo llega a Membresías.** *(3 sep 2026)*
-      **Campeonatos, decidido el 25 sep 2026 (D10 de `PLAN-CAMPEONATOS.md`):
-      basta el pase.** Sin `app_scopes` no entra quien llega del portal; desde
-      D8 el juez nuevo de internet no tiene otra entrada, y la consola ya no
-      le pone contraseña a una cuenta de DINAMYT. Quedan las cuentas viejas
-      con contraseña propia. **Academy sigue abierto.** Lo de abajo es cómo
-      estaba razonado antes:
-
-      `/sync/plan` y el barrido diario cierran el club que no está al día
-      (§4.16), pero **solo allí**. En Campeonatos no hay nada equivalente, y en
-      Academy tampoco.
-
-      **En Campeonatos es a propósito, y hay que decidirlo con cuidado**: el 9
-      de octubre esa aplicación no puede depender de la red, y un club cerrado
-      por una columna mal puesta a mitad de un campeonato es peor que un club
-      que operó un mes de más. Además ahí no hay tabla de clubes de la que
-      colgar la marca (§4.16), así que el equivalente sería sobre `usuarios` y
-      es otra conversación. **Después del campeonato.**
-
-      Mientras tanto, lo que sí corta a un club vencido en Campeonatos es el
-      pase: sin `app_scopes` no entra quien llegue desde el portal. Lo que
-      sigue abierto es su **login propio**, igual que pasaba en Membresías.
-
-`[~]` **El cambio de rol solo viaja a Membresías.** *(30 ago 2026)*
-      **Campeonatos, cerrado el 25 sep 2026 sin `/sync/rol` (D9 de
-      `PLAN-CAMPEONATOS.md`):** lo que dio el portal lo quita el portal, al
-      entrar (`usuarios.roles_del_portal`); lo puesto a mano en la consola y
-      `admin` no se tocan. **Academy sigue abierto.** Lo de abajo es cómo
-      estaba razonado antes: Campeonatos
-      y Academy siguen leyendo el rol del pase **solo al crear** su fila local;
-      después manda el suyo. Es lo que impide degradar en silencio al
-      administrador de un campeonato en marcha (§4.7), y por eso no se cambió a
-      la vez — pero significa que «cambiar el rol en todas las apps» hoy son
-      dos de tres.
-
-      Para cerrarlo hace falta el equivalente de `/sync/rol` en cada una: en
-      Academy es la misma forma (Nest, mismo monorepo); en Campeonatos es Flask
-      y **no puede depender de la red el 9 de octubre**, así que ahí conviene
-      esperar a después del campeonato.
-
-`[x]` ~~**Las fichas de Membresías que nacieron sin cuenta de DINAMYT.**~~
-      **No queda ninguna** — `fichas_sueltas = 0` sobre 36, medido el 31 de
-      agosto de 2026 con `ensayo.sh resumen`. La reconciliación enlazó las
-      viejas, y el camino que las fabricaba —el `POST /users` que creaba una
-      cuenta local por cada alumno— ya no existe: desde el 30 de agosto la
-      cuenta nace en DINAMYT y la ficha nace enlazada (§4.4).
-
-      **Se vigila con `ensayo.sh resumen`**, y es la comprobación que cierra el
-      ensayo de §6.0: si ese número sube, algún camino volvió a crear fichas sin
-      cuenta y eso es lo siguiente que hay que buscar.
-
-      > Quedan **10 usuarios de Campeonatos sin `eco_sub`** (de 22; la
-      > reconciliación enlazó 12). No hace falta hacer nada: se atan por correo
-      > la primera vez que entren desde el portal (§4.13). El contador
-      > `campeonatos_sueltos` los sigue.
-
-`[x]` ~~**La reconciliación dejó los `role_*` escritos, y ahora estorban.**~~
-      Limpiado el 31 de agosto de 2026. Importó el rol que cada quien tenía en
-      su app a `org_members.role_membresias` y hermanas, y esas columnas
-      **mandan sobre el rol general** (§4.7): eran **43 filas de 45**, o sea que
-      para casi todo el mundo el rol del portal no decidía nada. Era el fallo
-      que costó cuatro rondas encontrar, esperando en el resto de las filas.
-
-      `scripts/limpiar-roles-de-app.sh` vació 34 de Membresías y 11 de
-      Campeonatos. **Y el dato que hizo la decisión fácil: cero filas en «las
-      que dicen algo distinto»** — no había ni un solo rol de app puesto a
-      propósito, las 43 repetían el general traducido. Vaciar una de esas no
-      cambia el pase (`rolParaApp` cae a la traducción); lo que cambia es que el
-      portal vuelve a mandar. `con_rol_de_app_escrito` quedó en **0 de 45**.
-
-      El guion sigue ahí y **se vuelve a correr sin miedo**: en seco por defecto,
-      dentro de una transacción que se deshace, como la reconciliación (§2.8).
-      Si algún día vuelve a salir un número, la segunda tabla es lo que hay que
-      mirar antes del `--aplicar`.
-
-`[x]` ~~**Cerrar la sesión en el `teardown_appcontext` de Flask.**~~ **Ya estaba
-      hecho, y lo hace el framework.** *(comprobado el 3 de septiembre de 2026)*
-      Era lo que quedaba del hueco anterior, y la nota daba por sentado que no
-      existía porque **en `backend/` no hay ni un `teardown_appcontext`** — lo
-      cual es cierto y no significa lo que parecía.
-
-      **Lo registra `db.init_app(app)`**, en `app/__init__.py`. En
-      Flask-SQLAlchemy —3.1.1 aquí— `init_app` hace, sin condición ni opción
-      para desactivarlo:
-
-      ```python
-      app.teardown_appcontext(self._teardown_session)   # extension.py
-      def _teardown_session(self, exc): self.session.remove()
-      ```
-
-      Está desde la versión 3.0. Así que **cada petición ya devuelve su conexión
-      al pool al terminar**, y el escenario que preocupaba —una transacción
-      abierta reteniendo candados hasta que la corte
-      `idle_in_transaction_session_timeout`— no puede venir de ahí.
-
-      **Y los dos caminos que corren FUERA de una petición tampoco lo abren**,
-      que era la otra mitad de la pregunta y hay que mirarla aparte, porque
-      `teardown_appcontext` solo salta cuando se suelta un contexto de app:
-
-      · `respaldos.py` — su hilo usa `sqlite3` **crudo**, no la sesión de
-        SQLAlchemy, y el `app_context()` que abre es momentáneo (leer la URL del
-        engine al arrancar) y se cierra.
-      · El cronómetro de `sockets/combate_ns.py` — `socketio.start_background_task`
-        sin contexto de app, pero su `tick` **no toca la base**: estado en
-        memoria y `socketio.emit`.
-
-      > **La lección, que vale para el próximo pendiente escrito así:** «no
-      > aparece en nuestro código» no es lo mismo que «no está». Una extensión
-      > registra hooks en su `init_app`, y buscarlos con `grep` sobre `backend/`
-      > da cero por diseño. **Escribir el `teardown` a mano habría sido código
-      > redundante**, y de la peor clase: el que parece que arregla algo.
-
-## 6.2 La cola de trabajo
-
-*(Se llamaba «Después del campeonato (desde el 14 de octubre)» hasta el 4 de
-septiembre de 2026. **Ya no espera a ninguna fecha**: se cambió la ventana de
-trece días por tres —§1.5— y esta lista pasó a ser lo que se hace ahora, de
-arriba abajo. Lo que la ordena es §6.0: primero lo que se usa a diario.)*
-
-> Lo único que sigue teniendo su propia fecha es el DMARC (§3.5), porque sale de
-> una cuenta y no de una preferencia. Todo lo de aquí abajo se puede empezar hoy.
-
-`[~]` **Las fotos, al disco.** **Construido y probado el 4 de septiembre de
-      2026; falta encenderlo en el VPS.** El mecanismo entero, lo que ya estaba
-      hecho en las otras dos apps y las dos cosas que se encontraron por el
-      camino: **§4.20**.
-
-      Lo que decía esta nota, y que se cumplió: viajaban como data-URL dentro de
-      la fila, lo cual estuvo bien mientras el disco se borraba en cada
-      despliegue; ahora hay disco propio y un Caddy que sirve archivos sin
-      despertar a Node. El nombre es el hash del contenido, que es lo que
-      permite cachear «para siempre» sin servir la vieja.
-
-      ⚠️ **Y una línea de esta nota era falsa, que es justo la clase de error
-      contra la que avisa el encabezado de este documento.** Decía que «la
-      columna ya acepta las tres formas (`data:`, `/media/…`, `https://`), así
-      que la migración no rompe nada». La columna sí —es `text`—, pero
-      `validarAvatar` **no**: un `/media/…` se iba por su primer `if` con «La
-      foto debe subirse desde tu dispositivo». O sea que el pendiente chocaba,
-      en su primer paso, con la única línea que lo tenía que dejar pasar.
-      Comprobado con un `PATCH` de verdad, que contestó 400.
-
-      **Lo que queda son tres cosas, y ninguna es código:**
-
-      1. Poner `MEDIA_PUBLIC_URL=https://id.dinamyt.org` en el `.env` de
-         `ecosystem-api` y reiniciar. **Es el interruptor**: sin ella todo sigue
-         guardándose incrustado, exactamente como hoy.
-      2. Correr el guion que mueve lo que ya estaba guardado, primero en seco:
-         `pnpm --filter @dinamyt/ecosystem-api fotos:al-disco` y, con respaldo
-         delante (§2.5), `--aplicar`.
-      3. Darle a Caddy el atajo, para que el archivo no despierte a Node:
-
-         ```caddyfile
-         id.dinamyt.org {
-         	encode zstd gzip
-
-         	handle /media/* {
-         		root * /srv/dinamyt-media
-         		file_server
-         		header Cache-Control "public, max-age=31536000, immutable"
-         		header X-Content-Type-Options "nosniff"
-         	}
-
-         	handle {
-         		reverse_proxy 127.0.0.1:3001
-         	}
-         }
-         ```
-
-         Con `MEDIA_DIR=/srv/dinamyt-media` en el `.env`, y ese directorio
-         **fuera del clon** para que un despliegue no lo toque. Mientras no se
-         añada, la API los sirve ella misma y funciona igual — solo que
-         despertando a Node.
-
-`[~]` ~~**Tokens de estilo en un solo archivo**~~ (`packages/shared/estilos.css`)
-      en vez de espejados en tres `globals.css`. **Hecho el 5 de septiembre de
-      2026 para el portal y Academy** — ver §4.21.
-
-      Eran **cuatro** copias, no tres. Tres decían lo mismo token por token; la
-      cuarta no: **Campeonatos se había desviado en ocho de los diez que
-      comparte**. Lo que este pendiente existía para evitar ya había pasado.
-
-      Los valores que quedaron son los de **Membresías**, enteros.
-
-      **Falta alinear Campeonatos**, y va en SU repositorio (§1.1).
-
-`[~]` **«Volver a mi ecosistema»** — **hecha el 2 de septiembre de 2026, y se
-      adelantó a la fecha porque no cuesta nada y faltaba de verdad.** Desde el
-      portal se entraba a cada app con un botón, pero de vuelta solo se llegaba
-      cerrando sesión o por el enlace de un aviso de error: **salir de una app
-      no puede ser la forma de llegar a la de al lado.**
-
-      «Ir a DINAMYT» va al final del menú, pegado a «Salir» —ahí están las dos
-      cosas que te sacan de esta app— y es el **mismo dibujo en Campeonatos,
-      Membresías y Academy**, para que la puerta se reconozca por su forma antes
-      que por su texto. Dos detalles que no son decorativos:
-
-      · **Apunta al dashboard SIN `?redirect=`**, a propósito. Ese parámetro le
-        dice al portal «cuando acabes, devuélvelo aquí», y es justo el que se
-        quedaba pegado en el historial y metía en la app equivocada a quien
-        quería el portal (§4.15).
-      · **El icono es un SVG, no un glifo** como ⇱ o ⊞: esos no están en las
-        fuentes de Android y salen como el cuadrito de «no lo tengo». Mismo
-        motivo que el de salir.
-
-      **Lo que sigue pendiente es la otra mitad:** el **selector de apps** dentro
-      de cada app, para saltar de Membresías a Campeonatos sin pasar por el
-      portal. Eso sí es de después del campeonato — necesita saber qué abre cada
-      quien, que es la pregunta de §4.2, y no es una fila de menú — pero ya no
-      espera a octubre: entra en esta misma cola.
-
-`[x]` ~~**Cerrar sesión en una app cierra en el ecosistema.**~~ Hecho el 24 de
-      agosto de 2026: `POST /auth/logout` cierra la fila de la sesión y a partir
-      de ahí el pase no vale en ninguna app. Ver §4.11.
-
-`[~]` **Idioma y tema en el ecosystem, elegidos por la persona.**
-      **Hecho el 5 de septiembre de 2026 en el portal; a medias en Academy.**
-      El mecanismo entero y lo que falta: **§4.21**.
-
-      ⚠️ **La premisa de esta nota era falsa cuando se escribió, y conviene
-      saberlo porque es la trampa contra la que avisa el encabezado.** Decía que
-      «el tema es uno solo: los `globals.css` de las tres apps definen la paleta
-      oscura y **no hay claro** ni preferencia del sistema».
-
-      **Membresías y Campeonatos ya tenían modo claro completo** —con
-      `data-theme="light"`, su `lib/theme.ts` y el script anti-parpadeo—, desde
-      antes de que se escribiera esto. Los que no lo tenían eran el portal y
-      Academy. O sea que el trabajo no era inventarlo: era copiar un patrón que
-      ya funcionaba, y reconciliar dos implementaciones que se habían separado
-      (distinta clave, distinto fondo claro).
-
-      Lo que sí era cierto: el idioma estaba clavado en el código.
-
-      **Y había un fallo que esta nota no podía ver**: `users.locale` se
-      escribía en CADA inicio de sesión con lo que dijera el navegador, sin
-      mirar si alguien lo había elegido. Poner «English» a mano duraba hasta la
-      siguiente entrada. Cerrado con `locale_manual` (migración `0021`).
-
-      **La mitad del camino ya está hecha** por el trabajo de zona horaria del
-      24 de agosto, y conviene aprovecharla en vez de empezar de cero:
-
-      · `users.locale` **ya existe** y ya se llena solo: el navegador manda
-        `X-Idioma` en cada login y renovación (ver §4.12). Hoy solo se guarda;
-        falta leerlo.
-      · `lib/fechas.ts` (las dos webs) ya toma el idioma de `navigator.language`
-        en vez de tenerlo clavado. Lo que sigue clavado son los `'es-CO'`
-        sueltos que quedan repartidos por las pantallas.
-      · El patrón de preferencia protegida ya está resuelto y probado:
-        `timezone_manual` distingue «lo detectamos» de «lo eligió». Idioma y
-        tema necesitan exactamente lo mismo — copiar esa forma, no inventar otra.
-
-      **Lo que falta de verdad:**
-
-      · **Tema**: `users.theme` (`sistema` | `claro` | `oscuro`), tokens de color
-        en `:root` con un bloque `@media (prefers-color-scheme: light)` y un
-        `[data-theme]` que gane sobre él. Va **junto** con el pendiente de §6.2
-        de unificar los tokens en `packages/shared/estilos.css`: hacerlo antes
-        significaría escribir la paleta clara tres veces, en tres `globals.css`.
-        Y hay que pintar el tema **antes del primer render** (un script pequeño
-        en el `layout`), o la pantalla parpadea en oscuro antes de aclararse.
-      · **Idioma**: `users.locale` como preferencia editable en el perfil, y
-        sacar los textos a un diccionario. Es lo más caro de los dos —son todas
-        las cadenas de cuatro aplicaciones—, así que conviene decidir primero
-        **si hay a quién servírselo**: hoy todo el uso es Colombia. El orden
-        barato es al revés del que parece: primero que las FECHAS y los NÚMEROS
-        respeten `locale` (ya casi está), y solo después traducir los textos.
-
-      Las dos preferencias van donde ya está «Tu hora», en el perfil del portal:
-      es la pantalla de «cómo quiero ver DINAMYT» y ya existe.
-
-> **El plan maestro** (el tablero de bloques B0…B5) vive dentro del espejo:
-> `productos/campeonatos/PLAN-ECOSYSTEM-VPS.md`. **Se edita en `dinamyt-combat`**,
-> nunca aquí.
+Vive en **[HOJA-DE-RUTA.md](HOJA-DE-RUTA.md)**, en orden. Lo que se termina sale
+de allí y, si deja una regla o una trampa, entra aquí en su parte. El ensayo que
+antes vivía en esta parte es ahora §2.9.

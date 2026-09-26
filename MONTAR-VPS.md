@@ -638,177 +638,25 @@ del paso 4.2 no coincide con la que estás usando aquí.
 ---
 ---
 
-# FASE 5 · Traer los datos viejos ⏱ 30 min
+# FASE 5 · Los datos ⏱ según el respaldo
 
-Tus respaldos del 19 de agosto están en `D:\dinamyt-migracion\respaldos`:
+En agosto de 2026 los datos vinieron de los volcados de Supabase; esa receta ya
+no se repite y vive en git (`git show 1277b99:MONTAR-VPS.md`, fase 5).
 
-| Archivo | Tamaño | Qué trae |
-|---|---|---|
-| `membresias_2026-08-19_1136.dump` | 363 KB | Club, alumnos, pagos, asistencias |
-| `campeonatos_2026-08-19_1136.dump` | 65 KB | Campeonatos, competidores, llaves |
-| `eco_acad_*.dump` | **0 KB** | **Vacío** — ver abajo |
+**Si rehaces el servidor, los datos salen del respaldo diario de la VPS**
+(§10.1, `/var/backups/dinamyt/dinamyt-AAAA-MM-DD.dump`, y la copia semanal en tu
+PC). ⚠️ **Esa restauración todavía no se ha ensayado de punta a punta**: está
+apuntada en `HOJA-DE-RUTA.md`. Hasta que se ensaye, un respaldo que nunca se ha
+restaurado es una esperanza, no un respaldo.
 
-> **El respaldo del ecosistema está vacío, y no es un error tuyo.** El proyecto de
-> Supabase del ecosistema ya no responde (§1.3.1 del plan). Ecosystem y Academy
-> **arrancan de cero** en el VPS: se crean las tablas y se siembra el
-> administrador. No se pierde nada de Campeonatos ni de Membresías, que son los
-> que tienen los datos reales.
-
-## 5.1 Subir los archivos (en tu PC)
-
-```powershell
-scp D:\dinamyt-migracion\respaldos\membresias_2026-08-19_1136.dump dinamyt@80.190.78.70:/home/dinamyt/memb.dump
-```
-
-```powershell
-scp D:\dinamyt-migracion\respaldos\campeonatos_2026-08-19_1136.dump dinamyt@80.190.78.70:/tmp/camp_public.dump
-```
-
-✅ Muestra una barra de progreso hasta `100%`.
-
-⚠️ **El de Campeonatos va a `/tmp`, no a tu carpeta personal, y no es un
-capricho.** Su restauración la hace el usuario `postgres`, y en Ubuntu 24.04
-`/home/dinamyt` tiene permisos `750`: nadie más entra. Desde `~` el `pg_restore`
-de postgres no puede abrir el archivo, la base temporal queda **vacía**, y el
-resto de la cadena sigue trabajando sobre la nada — sacando un archivo final de
-1 KB sin una sola tabla y sin un error que lo delate.
-
-Dale permiso de lectura a todos, por si acaso:
-
-```bash
-chmod 644 /tmp/camp_public.dump
-```
-
-## 5.2 Restaurar Membresías
-
-```bash
-PGPASSWORD='CLAVE_MEMB' pg_restore -h 127.0.0.1 -U dinamyt_memb -d dinamyt --no-owner ~/memb.dump
-```
-
-> **Van a salir dos errores, y son esperados:**
->
-> ```text
-> ERROR: permission denied for database dinamyt
-> Command was: CREATE SCHEMA drizzle;
-> Command was: CREATE SCHEMA membresias;
-> ```
->
-> El respaldo trae dentro la orden de crear sus esquemas, pero los usuarios de
-> app **no pueden crear esquemas a propósito** (fase 4). Como los dos ya existen,
-> las tablas entran igual. Al final dirá `errors ignored on restore: 2`.
->
-> ⚠️ **Lo que NO puede aparecer es `schema "drizzle" does not exist`.** Si sale
-> eso, es que te saltaste el `CREATE SCHEMA drizzle` de la fase 4.2. El arreglo,
-> sin repetir todo el restore:
->
-> ```bash
-> sudo -u postgres psql -d dinamyt -c "CREATE SCHEMA IF NOT EXISTS drizzle AUTHORIZATION dinamyt_memb;"
-> PGPASSWORD='CLAVE_MEMB' pg_restore -h 127.0.0.1 -U dinamyt_memb -d dinamyt --no-owner -n drizzle ~/memb.dump
-> ```
-
-Comprueba que los datos entraron:
-
-```bash
-sudo -u postgres psql -d dinamyt -c "SELECT (SELECT count(*) FROM membresias.orgs) AS clubes, (SELECT count(*) FROM membresias.users) AS personas, (SELECT count(*) FROM membresias.payments) AS pagos, (SELECT count(*) FROM membresias.attendances) AS asistencias;"
-```
-
-✅ Números que reconozcas, no ceros.
-
-Y que llegó el **diario de migraciones**:
-
-```bash
-sudo -u postgres psql -d dinamyt -c "SELECT count(*) FROM drizzle.__drizzle_migrations;"
-```
-
-✅ **15**.
-
-Ese diario tiene que vivir dentro del esquema de la app, o Membresías arrancará
-creyendo que nunca aplicó ninguna migración e intentará crear tablas que ya
-existen:
-
-```bash
-sudo -u postgres psql -d dinamyt -c 'ALTER TABLE drizzle.__drizzle_migrations SET SCHEMA membresias;' -c 'DROP SCHEMA drizzle;'
-```
-
-✅ `ALTER TABLE` y `DROP SCHEMA`. Confírmalo:
-
-```bash
-sudo -u postgres psql -d dinamyt -c "SELECT count(*) FROM membresias.__drizzle_migrations;"
-```
-
-✅ **15**, ahora dentro de `membresias`.
-
-## 5.3 Restaurar Campeonatos (tiene un rodeo)
-
-Sus tablas viven en `public` y aquí tienen que quedar en `campeonatos`. Se
-restaura en una base temporal, se renombra la carpeta, y se vuelve a sacar:
-
-⚠️ **Este bloque NO se pega entero.** Van uno a uno, mirando el resultado: si uno
-falla, los siguientes se ejecutan igual sobre el vacío que dejó, y el fallo no
-aparece hasta el final — o peor, no aparece.
-
-```bash
-sudo -u postgres createdb tmp_camp
-```
-
-```bash
-sudo -u postgres pg_restore -d tmp_camp --no-owner /tmp/camp_public.dump
-```
-
-⚠️ **Comprobación obligatoria antes de seguir.** Es donde se rompe la cadena:
-
-```bash
-sudo -u postgres psql -d tmp_camp -c "SELECT count(*) AS tablas FROM pg_tables WHERE schemaname='public';"
-```
-
-✅ **14**. Si da 0, para: postgres no pudo leer el archivo. Revisa que esté en
-`/tmp` y con `chmod 644`.
-
-```bash
-sudo -u postgres psql -d tmp_camp -c 'ALTER SCHEMA public RENAME TO campeonatos;'
-```
-
-```bash
-sudo -u postgres pg_dump -Fc --no-owner --no-privileges -n campeonatos tmp_camp -f /tmp/camp.dump
-```
-
-⚠️ **Segunda comprobación**, para no restaurar un archivo vacío:
-
-```bash
-ls -lh /tmp/camp.dump && pg_restore --list /tmp/camp.dump | grep -c "TABLE DATA"
-```
-
-✅ Decenas de KB y **14**. Si sale `1.3K` y `0`, el paso anterior trabajó sobre
-una base vacía.
-
-```bash
-PGPASSWORD='CLAVE_CAMP' pg_restore -h 127.0.0.1 -U dinamyt_camp -d dinamyt --no-owner /tmp/camp.dump
-```
-
-```bash
-sudo -u postgres dropdb tmp_camp && sudo rm -f /tmp/camp.dump /tmp/camp_public.dump
-```
-
-> El `sudo` del `rm` hace falta: `/tmp/camp.dump` lo creó `postgres` y `/tmp`
-> tiene el bit pegajoso, así que solo su dueño puede borrarlo.
-
-> Aquí también saldrá **un** error `permission denied ... CREATE SCHEMA
-> campeonatos;`, por el mismo motivo que en Membresías, y **no hay que hacer
-> nada**: el esquema ya existe desde la fase 4 y las tablas entran igual. Al
-> final: `errors ignored on restore: 1`.
-
-## 5.4 Verificación obligatoria
+Después de restaurar, la verificación de siempre:
 
 ```bash
 sudo -u postgres psql -d dinamyt -c "SELECT schemaname, relname, n_live_tup FROM pg_stat_user_tables WHERE schemaname IN ('ecosystem','membresias','campeonatos','academy') ORDER BY schemaname, relname;"
 ```
 
-✅ Tienen que aparecer las tablas de `membresias` y `campeonatos` **con números
-mayores que cero** en alumnos, pagos, competidores y campeonatos.
-
-⚠️ **No sirve «mirar si arranca».** Compara a ojo contra lo que recuerdas: número
-de alumnos activos, pagos del último mes, competidores del último campeonato. Si
-algo sale en cero y no debería, para y avísame antes de seguir.
+✅ Las tablas de `ecosystem`, `membresias` y `campeonatos` **con números mayores
+que cero** en usuarios, alumnos, pagos, competidores y campeonatos.
 
 ---
 ---
@@ -828,8 +676,8 @@ Los tres repositorios son privados, así que primero hay que darle al servidor u
 credencial. ⚠️ **La contraseña de tu cuenta de GitHub no sirve**: desde 2021 no
 se acepta para operaciones de Git (`Password authentication is not supported`).
 
-Lo mejor es una llave SSH del servidor: **no caduca**, y un token que expire en
-octubre rompería los despliegues en la semana del campeonato.
+Lo mejor es una llave SSH del servidor: **no caduca**, y un token que expire
+rompería los despliegues el día menos oportuno.
 
 ```bash
 ssh-keygen -t ed25519 -C "vps-dinamyt"
@@ -1436,8 +1284,7 @@ EOF
 
 ⚠️ **Caddy no admite bloques en una sola línea.** `handle /api/* { reverse_proxy
 ... }` da `Unexpected next token after '{' on same line`. Las llaves se abren al
-final de la línea y el contenido va debajo. (El Caddyfile de §7.2 del plan trae
-la forma corta: no funciona.)
+final de la línea y el contenido va debajo.
 
 ⚠️ **Comprueba la primera línea**, porque al copiar desde un chat o un navegador
 `www.dinamyt.org` se convierte a veces en un enlace:
@@ -1508,7 +1355,7 @@ No basta con que cargue. Marca cada casilla:
       `http://80.190.78.70:3000`, `:5000`, `:5432`
 
 ⚠️ **Si algo de la lista falla, no sigas montando.** Arréglalo o avísame: es
-mucho más barato ahora que en octubre.
+mucho más barato ahora que con gente usándolo.
 
 ---
 ---
@@ -1546,8 +1393,8 @@ aviso a tu correo. Así te enteras tú antes que un juez.
 
 ## 10.3 Snapshot antes del campeonato
 
-⚠️ **El 8 de octubre**, en el panel de Contabo → **Snapshots** → crear uno. Es la
-marcha atrás si algo pasa durante el campeonato.
+⚠️ **La víspera de cada campeonato**, en el panel de Contabo → **Snapshots** →
+crear uno. Es la marcha atrás si algo pasa durante el campeonato.
 
 ---
 ---
@@ -1570,10 +1417,17 @@ vieja sin que nadie lo note.
 
 ---
 
-# Anexo B · Academy (opcional, después de que lo demás funcione)
+# Anexo B · Academy
 
-Academy no es necesario para devolver el servicio ni para el campeonato. Móntalo
-cuando las cuatro apps del núcleo estén verificadas.
+> ⚠️ **Todavía no está montada** *(comprobado el 26 sep 2026)*: en la VPS no hay
+> servicios `academy-*`, ni `.env`, ni bloque en el Caddyfile, y
+> `academy.dinamyt.org` no existe en el DNS — se borró a propósito al encender
+> la nube naranja (Anexo D.2) para no dar un 525. Encenderla es la tarea A de
+> `HOJA-DE-RUTA.md`, y empieza aquí.
+>
+> **El orden**, para no estrenar un error a la vista de todos: `.env` →
+> compilar y migrar → servicios → bloque de Caddy → **y solo entonces** el
+> registro `A academy` en Cloudflare (naranja, con el puerto 80 abierto, D.1).
 
 ```bash
 nano /srv/dinamyt/packages/academy-db/.env
@@ -1609,10 +1463,9 @@ NEXT_PUBLIC_ECOSYSTEM_API_URL=https://id.dinamyt.org
 NEXT_PUBLIC_ECOSYSTEM_PORTAL_URL=https://dinamyt.org
 ```
 
-> **Ojo, esto corrige un hueco del plan.** El Caddyfile de §7.2 no daba dirección
-> pública a la API de Academy, y su web habla con ella **directo desde el
-> navegador** (no tiene proxy interno como las otras dos). La solución es
-> `handle_path`, que quita el `/api` antes de reenviar:
+> **La API de Academy necesita dirección pública**: su web habla con ella
+> **directo desde el navegador** (no tiene proxy interno como las otras dos).
+> `handle_path` quita el `/api` antes de reenviar:
 
 ```caddyfile
 academy.dinamyt.org {
@@ -1636,14 +1489,12 @@ cd /srv/dinamyt/packages/academy-db && pnpm db:migrar
 ```
 
 > **`db:migrar`, no `db:migrate`.** El segundo es `drizzle-kit`, una
-> **devDependency**: en un servidor instalado con `--prod` no está. Es la misma
-> trampa que el ecosystem ya documenta, y hasta el 24 de agosto de 2026 Academy
-> **no tenía** el equivalente — este párrafo decía «migrar» sin decir con qué, y
-> no había ningún comando que funcionara aquí. Ver OPERAR.md §2.3-bis.
+> **devDependency**: en un servidor instalado con `--prod` no está. Ver
+> OPERAR.md §2.3-bis.
 
-> El microservicio de figuras (`academy-figuras`, Python `:3009`) **no** se
-> despliega en B1: la evaluación de figuras quedará sin funcionar hasta que se
-> monte.
+> El microservicio de figuras (`academy-figuras`, Python `:3009`, MediaPipe + DTW)
+> va aparte y **no tiene receta todavía**: sin él, Academy funciona entera salvo
+> la evaluación de figuras por video. Está en `HOJA-DE-RUTA.md`.
 
 ---
 
@@ -1767,8 +1618,8 @@ vivo.
 Con el proxy encendido, quien averigüe la IP puede saltárselo. Se cierra
 dejando que solo Cloudflare hable con los puertos 80 y 443 (`ufw allow from
 <rangos de Cloudflare>`). **No lo hagas el mismo día**: si mañana apagas la nube
-naranja, el sitio se queda mudo y cuesta ver por qué. Y **nunca** entre el 1 y
-el 13 de octubre.
+naranja, el sitio se queda mudo y cuesta ver por qué. Y **nunca** durante un
+campeonato ni la víspera.
 
 ---
 ---

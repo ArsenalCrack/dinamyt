@@ -189,7 +189,7 @@ describe('almacén de imágenes · la dirección para el espejo', () => {
 
 describe('validación · las tres formas de una imagen', () => {
   it('acepta la ruta del disco', () => {
-    // ⚠️ Esta es la que faltaba. OPERAR.md §6.2 daba por hecho que la columna
+    // ⚠️ Esta es la que faltaba. La nota vieja del pendiente daba por hecho que la columna
     // ya aceptaba las tres formas; la columna sí (es `text`), pero
     // `validarAvatar` no: un `/media/…` se iba por el primer `if` con «La foto
     // debe subirse desde tu dispositivo». El pendiente entero chocaba, en su

@@ -61,7 +61,7 @@ if (!process.env.MEDIA_PUBLIC_URL) {
 
   Mover las filas ahora dejaría el despliegue a medias: las fotos viejas en el
   disco y las nuevas volviendo a incrustarse. Pon la variable, reinicia el
-  servicio y vuelve. Ver OPERAR.md §6.2.
+  servicio y vuelve. Ver OPERAR.md §4.20.
 `);
   process.exit(1);
 }

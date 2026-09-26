@@ -31,7 +31,7 @@ async function bootstrap() {
   // ── Las fotos, servidas desde el disco ────────────────────────────────────
   //
   // En el VPS esto lo adelanta Caddy, que sirve el mismo directorio sin
-  // despertar a Node (ver OPERAR.md §6.2). Esto de aquí es lo que hace que
+  // despertar a Node (ver OPERAR.md §4.20). Esto de aquí es lo que hace que
   // funcione igual en local, y la red de seguridad si algún día la petición
   // llega hasta aquí.
   //
