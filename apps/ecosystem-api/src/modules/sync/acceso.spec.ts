@@ -127,6 +127,16 @@ describe('POST /sync/acceso · Membresías le cortó el acceso a alguien', () =>
     expect(r).toEqual({ encontrada: false, aplicado: false });
   });
 
+  it('ids que no son uuid son un 400, no un 500 de la base', async () => {
+    for (const extra of [{ ecoSub: 'no-uuid' }, { ecoOrgId: 'nombre-del-club' }]) {
+      const { controlador, verbos } = armar();
+      await expect(controlador.acceso(SECRETO, cuerpo(extra))).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(verbos).toEqual([]);
+    }
+  });
+
   it('sin el secreto configurado, la ruta no existe', async () => {
     delete process.env.ECOSYSTEM_SYNC_SECRET;
     const { controlador, verbos } = armar();

@@ -1253,6 +1253,9 @@ export interface AvisoOrg {
     /** Los avisos del plan: cuántos días faltan y cuánto se debe. */
     dias?: number | null;
     importe?: string | null;
+    /** La invitación a un campeonato: cuál, y quién lo organiza. */
+    campeonato?: string | null;
+    organiza?: string | null;
   } | null;
   readAt: string | null;
   createdAt: string;

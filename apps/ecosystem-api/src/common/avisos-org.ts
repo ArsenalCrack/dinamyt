@@ -82,6 +82,22 @@ export const AVISOS_ORG = {
     resoluble: false,
     href: '/mi-organizacion#plan',
   },
+
+  // ── Campeonatos invitó al club (25 sep 2026) ───────────────────────────────
+  //
+  // Hasta aquí el maestro se enteraba de que a su club lo habían invitado a un
+  // campeonato si entraba a Campeonatos y miraba su lista. La invitación la
+  // hace el admin de OTRA organización —una federación—, y nadie le decía
+  // nada. Noticia, no tarea: inscribir o no es cosa suya.
+  //
+  // Lleva al panel del portal y no directo a Campeonatos: entrar allí con
+  // sesión necesita el pase EN EL NAVEGADOR (`#token=`), y el enlace de un
+  // aviso se arma en el servidor. En el panel está el botón que salta.
+  /** Invitaron al club a un campeonato. */
+  campeonato_invitacion: {
+    resoluble: false,
+    href: '/dashboard',
+  },
 } as const;
 
 export type TipoAvisoOrg = keyof typeof AVISOS_ORG;
@@ -139,6 +155,9 @@ export function textoDelAviso(
     /** Los avisos del plan: cuántos días faltan, y cuánto se debe. */
     dias?: number | null;
     importe?: string | null;
+    /** La invitación a un campeonato: cuál, y quién lo organiza. */
+    campeonato?: string | null;
+    organiza?: string | null;
   },
 ): { title: string; body: string } {
   const quien = (datos.quien ?? '').trim() || 'Alguien';
@@ -176,6 +195,14 @@ export function textoDelAviso(
       return {
         title,
         body: `Recibimos tu pago${datos.importe ? ` de ${datos.importe}` : ''}. Gracias.`,
+      };
+    // Lo que va delante es QUIÉN invita: es lo que decide si importa.
+    case 'campeonato_invitacion':
+      return {
+        title,
+        body: `${(datos.organiza ?? '').trim() || 'Una organización'} invitó a tu club a ${
+          (datos.campeonato ?? '').trim() || 'un campeonato'
+        }.`,
       };
     default:
       // Un tipo sin frase no se manda mudo, pero tampoco se calla: se dice lo

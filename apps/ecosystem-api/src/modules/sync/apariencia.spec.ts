@@ -185,6 +185,18 @@ describe('POST /sync/apariencia · el tema y el idioma desde otra app', () => {
     ).rejects.toThrow(/Idioma inválido/);
   });
 
+  it('un `ecoSub` que no es un uuid es un 400, no un 500 de la base', async () => {
+    // Revisión de seguridad del 25 sep 2026: `users.id` es `uuid`, y PostgreSQL
+    // revienta con cualquier otra cosa.
+    for (const ecoSub of ['no-soy-un-uuid', "1' or '1'='1"]) {
+      const { controlador, verbos } = armar();
+      await expect(
+        controlador.apariencia(SECRETO, { ecoSub, theme: 'claro' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(verbos).toEqual([]);
+    }
+  });
+
   it('una llamada vacía no gasta un UPDATE', async () => {
     const { controlador, verbos } = armar();
     await expect(

@@ -12,13 +12,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { db } from '../../db';
 import { orgMembers, organizations, users } from '../../db/schema';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { OrgNotificationsService } from '../organizations/org-notifications.service';
 import {
+  propiosDeCampeonatos,
   rolGeneralDesdeCampeonatos,
   rolGeneralDesdeMembresias,
+  rolesParaApp,
 } from '../../common/roles-por-app';
 import { validarTema, validarIdioma } from '../../common/validacion';
 
@@ -57,7 +60,12 @@ import { validarTema, validarIdioma } from '../../common/validacion';
  */
 @Controller('sync')
 export class SyncController {
-  constructor(private readonly orgsService: OrganizationsService) {}
+  constructor(
+    private readonly orgsService: OrganizationsService,
+    // Opcional solo para las pruebas que no lo usan; Nest lo inyecta siempre
+    // (lo exporta `OrganizationsModule`).
+    private readonly avisos?: OrgNotificationsService,
+  ) {}
 
   /** Comparación en tiempo constante; la diferencia de largo ya la delata el 401. */
   private static valido(recibido: string | undefined, esperado: string) {
@@ -201,6 +209,10 @@ export class SyncController {
     if (!userId || !orgId) {
       throw new BadRequestException('Faltan `ecoSub` y `ecoOrgId`.');
     }
+    // Las dos columnas son `uuid`: otra cosa revienta la consulta (un 500).
+    if (!SyncController.esUuid(userId) || !SyncController.esUuid(orgId)) {
+      throw new BadRequestException('`ecoSub` y `ecoOrgId` son ids de DINAMYT.');
+    }
     // Una app que este portal no conoce se rechaza en vez de guardarse en la
     // columna de otra: el día que haya dos, un typo escribiría en la que no es.
     if ((body.app ?? 'membresias') !== 'membresias') {
@@ -255,6 +267,10 @@ export class SyncController {
 
     const id = (ecoSub ?? '').trim();
     if (!id) throw new BadRequestException('Falta `ecoSub`.');
+    // `users.id` es `uuid`: otra cosa revienta la consulta (un 500).
+    if (!SyncController.esUuid(id)) {
+      throw new BadRequestException('`ecoSub` es un id de DINAMYT.');
+    }
 
     const [fila] = await db
       .select({ theme: users.theme, locale: users.locale })
@@ -313,6 +329,164 @@ export class SyncController {
       );
   }
 
+  // ── GET /sync/miembros — la gente del club del maestro, para inscribirla ──
+  //
+  // El maestro inscribe en Campeonatos a los alumnos de su club (punto 2 de lo
+  // que quedaba del plan de Campeonatos, 25 sep 2026). Hasta aquí elegía entre
+  // SUS fichas de Campeonatos, y la ficha de alguien nuevo nacía sin enlace a
+  // su cuenta de DINAMYT: el alumno tenía que reclamarla después. Ahora la
+  // elige de la gente de su club, y la ficha nace enlazada y rellena.
+  //
+  // ── A quién se le contesta ──
+  //
+  // A `maestro` (un `sub`) solo le salen los CLUBES donde es maestro o coach
+  // EN CAMPEONATOS —los mismos papeles que su pase le da allí—. Nadie más:
+  // ni el dueño a secas, ni el juez, ni un alumno. Campeonatos entra con el
+  // secreto, pero la regla se comprueba AQUÍ: un Campeonatos con un fallo no
+  // puede sacar la gente de un club que no es de ese maestro.
+  //
+  // ── Qué se da, y qué no ──
+  //
+  // Lo que la ficha necesita y DINAMYT ya sabe: nombre, fecha de nacimiento,
+  // género y documento. Ni correo ni teléfono. Los acudientes (`guardian`)
+  // no salen: no compiten. `persona` acota a una sola cuenta, que es como
+  // Campeonatos lo vuelve a comprobar al inscribir.
+  @Get('miembros')
+  async miembros(
+    @Headers('x-dinamyt-sync') secreto: string | undefined,
+    @Query('maestro') maestro?: string,
+    @Query('persona') persona?: string,
+  ) {
+    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
+    if (!esperado) throw new NotFoundException('No encontrado.');
+    if (!SyncController.valido(secreto, esperado)) {
+      throw new UnauthorizedException('Secreto inválido.');
+    }
+
+    const quien = (maestro ?? '').trim();
+    const una = (persona ?? '').trim();
+    // Un id que no es un uuid revienta la consulta en PostgreSQL (un 500):
+    // se para aquí con un 400.
+    if (!SyncController.esUuid(quien) || (una && !SyncController.esUuid(una))) {
+      throw new BadRequestException('`maestro` y `persona` son ids de DINAMYT.');
+    }
+
+    const suyas = await db
+      .select({
+        orgId: orgMembers.orgId,
+        role: orgMembers.role,
+        roleCampeonatos: orgMembers.roleCampeonatos,
+        rolesCampeonatos: orgMembers.rolesCampeonatos,
+        type: organizations.type,
+        name: organizations.name,
+      })
+      .from(orgMembers)
+      .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
+      .where(eq(orgMembers.userId, quien));
+    const clubes = suyas.filter(
+      (p) =>
+        p.type === 'CLUB' &&
+        rolesParaApp('campeonatos', propiosDeCampeonatos(p), p.role).some(
+          (r) => r === 'maestro' || r === 'coach',
+        ),
+    );
+    if (clubes.length === 0) return [];
+    const nombreDe = new Map(clubes.map((c) => [c.orgId, c.name]));
+
+    const filas = await db
+      .select({
+        sub: users.id,
+        fullName: users.fullName,
+        birthDate: users.birthDate,
+        gender: users.gender,
+        documentId: users.documentId,
+        isActive: users.isActive,
+        orgId: orgMembers.orgId,
+        role: orgMembers.role,
+        membresiasActivo: orgMembers.membresiasActivo,
+      })
+      .from(orgMembers)
+      .innerJoin(users, eq(orgMembers.userId, users.id))
+      .where(
+        and(
+          inArray(
+            orgMembers.orgId,
+            clubes.map((c) => c.orgId),
+          ),
+          ne(orgMembers.role, 'guardian'),
+          ...(una ? [eq(users.id, una)] : []),
+        ),
+      )
+      .orderBy(asc(users.fullName))
+      // Un club tiene decenas o cientos; el tope es para que ninguno pueda
+      // devolver la base entera por esta puerta.
+      .limit(2000);
+
+    return filas
+      .filter((f) => f.isActive !== false)
+      .map((f) => ({
+        sub: f.sub,
+        fullName: f.fullName,
+        // Fecha CIVIL: el día, sin hora ni zona (ver la cabecera del esquema).
+        birthDate: f.birthDate ? f.birthDate.toISOString().slice(0, 10) : null,
+        gender: f.gender ?? null,
+        documentId: f.documentId ?? null,
+        club: { id: f.orgId, name: nombreDe.get(f.orgId) ?? '' },
+        // Membresías le cortó el acceso en ese club. No se esconde: inscribir
+        // o no lo decide el maestro, pero tiene que saberlo.
+        sinAcceso: f.membresiasActivo === false,
+      }));
+  }
+
+  private static esUuid(valor: string) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
+  }
+
+  // ── POST /sync/aviso-campeonato — invitaron a un club a un campeonato ──────
+  //
+  // Campeonatos lo llama al invitar a un club del directorio (F5). El aviso
+  // llega a la campana del club —y al celular de sus gestores, si tienen el
+  // push— como los demás de `common/avisos-org.ts`.
+  //
+  // ⚠️ Solo avisa: no invita, no crea nada más ni toca pertenencias. Solo a
+  // CLUBES que existen aquí. Los textos se recortan: vienen de otra app y
+  // acaban en la pantalla bloqueada de un celular.
+  @Post('aviso-campeonato')
+  async avisoCampeonato(
+    @Headers('x-dinamyt-sync') secreto: string | undefined,
+    @Body() body: { orgId?: string; campeonato?: string; organiza?: string },
+  ) {
+    const esperado = process.env.ECOSYSTEM_SYNC_SECRET;
+    if (!esperado) throw new NotFoundException('No encontrado.');
+    if (!SyncController.valido(secreto, esperado)) {
+      throw new UnauthorizedException('Secreto inválido.');
+    }
+
+    const orgId = (body.orgId ?? '').trim();
+    if (!SyncController.esUuid(orgId)) {
+      throw new BadRequestException('`orgId` es el id de un club de DINAMYT.');
+    }
+    const campeonato = String(body.campeonato ?? '').trim().slice(0, 120);
+    if (!campeonato) throw new BadRequestException('Falta el nombre del campeonato.');
+    const organiza = String(body.organiza ?? '').trim().slice(0, 120) || null;
+
+    const [org] = await db
+      .select({ id: organizations.id, type: organizations.type })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    if (!org || org.type !== 'CLUB') {
+      throw new NotFoundException('Ese club no existe en DINAMYT.');
+    }
+
+    await this.avisos?.avisar({
+      orgId,
+      kind: 'campeonato_invitacion',
+      data: { campeonato, organiza },
+    });
+    return { avisado: true };
+  }
+
   // ── POST /sync/apariencia — el tema y el idioma, desde CUALQUIER app ──────
   //
   // ── Por qué hacía falta ──
@@ -358,6 +532,10 @@ export class SyncController {
 
     const id = (body.ecoSub ?? '').trim();
     if (!id) throw new BadRequestException('Falta `ecoSub`.');
+    // `users.id` es `uuid`: otra cosa revienta la consulta (un 500).
+    if (!SyncController.esUuid(id)) {
+      throw new BadRequestException('`ecoSub` es un id de DINAMYT.');
+    }
 
     const cambios: { theme?: string; locale?: string; localeManual?: boolean } =
       {};

@@ -115,6 +115,13 @@ function frase(a: AvisoOrg): { titulo: string; detalle: string; color?: string }
         detalle: 'Renuévalo para no perder el acceso a las aplicaciones.',
         color: 'var(--danger)',
       };
+    case 'campeonato_invitacion':
+      return {
+        titulo: 'Invitaron a tu club a un campeonato',
+        detalle: `${a.data?.organiza || 'Una organización'} invitó a tu club a ${
+          a.data?.campeonato || 'un campeonato'
+        }. Entra a Campeonatos para inscribir a los tuyos.`,
+      };
     case 'plan_pagado':
       return {
         titulo: 'Recibimos tu pago',

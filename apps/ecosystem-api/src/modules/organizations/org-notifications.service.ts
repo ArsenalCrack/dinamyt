@@ -164,6 +164,8 @@ export class OrgNotificationsService {
       // que se distingue el cero del «no vino»: `?? null` y no `|| null`.
       dias: typeof datos.dias === 'number' ? datos.dias : null,
       importe: typeof datos.importe === 'string' ? datos.importe : null,
+      campeonato: typeof datos.campeonato === 'string' ? datos.campeonato : null,
+      organiza: typeof datos.organiza === 'string' ? datos.organiza : null,
     });
 
     await enviarPushA(destinatarios, {
