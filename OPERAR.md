@@ -287,6 +287,18 @@ sudo -v && sudo -u postgres pg_dump -Fc dinamyt > ~/respaldo-$(date +%F).dump &&
 > Si se queda colgado, **no es lento: está haciendo fila detrás de un candado**.
 > Ver §5.1 — casi siempre es Campeonatos, y se resuelve parándolo un minuto.
 
+**El diario** lo hace `dinamyt-respaldo.timer` a las 03:00 (MONTAR-VPS §10.1):
+la base y las carpetas de archivos, en `/var/backups/dinamyt/`, 14 días. Para
+saber si el de anoche salió bien:
+
+```bash
+systemctl status dinamyt-respaldo --no-pager | head -5 && ls -lh /var/backups/dinamyt/ | tail -4
+```
+
+> ⚠️ **Un respaldo de 0 bytes no es un respaldo**, y así estuvieron los
+> diarios durante semanas hasta el 26 sep 2026 (el cron viejo usaba `sudo`
+> sin nadie que tecleara la contraseña). Mirar el tamaño es parte de mirar.
+
 ## 2.6 Diagnóstico de la base
 
 ```bash
@@ -2725,6 +2737,63 @@ cuando alguien escribe «me sigue pasando».
 Del **commit**, no del reloj de quien compila (`next.config.ts` de cada web):
 dos personas compilando el mismo código tienen que obtener la misma versión.
 Sin git —un tarball, un contenedor sin `.git`— dice `dev`, que es lo honesto.
+
+## 4.24 Las cabeceras de seguridad
+
+*(26 de septiembre de 2026)* Hasta ese día ninguna de las cuatro webs mandaba
+ni una. Ahora las manda cada una desde su `next.config.ts`, con el mismo
+archivo `cabeceras-seguridad.ts` en las cuatro (en Membresías y Campeonatos,
+en SU repositorio): lo que cambia es lo que cada una le pasa.
+
+| Cabecera | Valor | Por qué |
+|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | Que el navegador no adivine el tipo de un archivo |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Que un enlace hacia fuera no se lleve la ruta entera |
+| `X-Frame-Options` + `frame-ancestors` | `SAMEORIGIN` / `'self'` | Nadie mete estas webs en un `iframe` ajeno (*clickjacking*) |
+| `Permissions-Policy` | `camera=(self), microphone=(self)`… | **La cámara hace falta**: el kiosco de Membresías lee QR y Academy graba figuras. `camera=()` los rompe |
+| `Strict-Transport-Security` | `max-age=31536000` | Solo cuenta por HTTPS: en el PC del evento se ignora |
+| **CSP** | ver abajo | La red de debajo si algún día hay un XSS |
+
+Y `poweredByHeader: false`: ya no se anuncia `X-Powered-By: Next.js`.
+
+### La CSP va primero en modo informe
+
+Sale como `Content-Security-Policy-Report-Only`: **no bloquea nada**, y lo que
+bloquearía lo manda a `/csp-informe` de la propia web, que lo escribe en el
+registro del servicio:
+
+```bash
+sudo journalctl -u dinamyt-portal --since "7 days ago" | grep '\[CSP\]'
+```
+
+(Y lo mismo con `membresias-web`, `campeonatos-web` y, cuando exista,
+`academy-web`.) Con una semana sin líneas —o solo con las que se entiendan y se
+corrijan—, se enciende de verdad **compilando con `CSP_ESTRICTA=1`** en el
+`.env.production` de esa web: las cabeceras se hornean en el build, así que
+reiniciar no basta (§1.3).
+
+**Lo que tiene y por qué:**
+
+- `script-src 'self' 'unsafe-inline'`: Next mete guiones en línea y los
+  anti-parpadeo del tema lo son. Con nonces se perdería el pre-renderizado;
+  queda para otra vuelta si compensa. Lo que corta la exfiltración es lo demás.
+- `connect-src` solo a los orígenes que la web usa de verdad, sacados de las
+  mismas variables que su `lib/api.ts` (el portal: la API del ecosistema y la de
+  Campeonatos; Academy: la suya y la del ecosistema). En Campeonatos, sin el
+  proxy —el PC del evento—, también `http://*:5000` y `ws://*:5000`: el
+  navegador habla directo con el backend, sea cual sea la IP de la LAN.
+- `img-src`: en el portal y Academy, solo sus APIs; en Membresías y Campeonatos,
+  `https:` entero, porque un club puede tener su escudo donde quiera y
+  Membresías también se vende sola.
+- `frame-src`: `'none'`, salvo en Academy, que embebe YouTube y Drive.
+
+> ⚠️ **Si una web empieza a hablar con un origen nuevo** (otra API, un CDN), hay
+> que añadirlo en su `next.config.ts`. En modo informe solo sale una línea
+> `[CSP]`; con `CSP_ESTRICTA=1`, esa función deja de funcionar sin más aviso que
+> la consola del navegador.
+
+La ruta `/csp-informe` no pide sesión y escribe en el registro: por eso tiene
+tope (30 líneas por minuto, 2 KB por informe).
 
 ---
 

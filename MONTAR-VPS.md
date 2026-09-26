@@ -1364,19 +1364,53 @@ mucho más barato ahora que con gente usándolo.
 
 ## 10.1 Respaldo diario automático
 
+> ⚠️ **Hasta el 26 sep 2026 esto era una línea de cron que escribía archivos de
+> 0 bytes**: corría como `dinamyt` con `sudo -u postgres`, `sudo` pedía
+> contraseña y el `2>/dev/null` se tragaba el error. Si el crontab de `dinamyt`
+> todavía la tiene (`crontab -l`), bórrala con `crontab -e`.
+
+Lo hace `scripts/respaldo-diario.sh`, **como root** desde un temporizador de
+systemd: vuelca la base, comprueba que `pg_restore` la sabe leer, empaqueta
+`/srv/dinamyt-media` y `/srv/uploads` (las fotos y los archivos de Academy no
+viven en la base), guarda 14 días y **falla en voz alta** si algo sale mal.
+
 ```bash
 sudo mkdir -p /var/backups/dinamyt && sudo chown dinamyt:dinamyt /var/backups/dinamyt
-crontab -e
+sudo install -m 750 -o root -g root /srv/dinamyt/scripts/respaldo-diario.sh /usr/local/bin/dinamyt-respaldo
 ```
 
-(La primera vez pregunta qué editor: elige `1` para `nano`.) Pega al final:
+```bash
+sudo tee /etc/systemd/system/dinamyt-respaldo.service >/dev/null <<'EOF'
+[Unit]
+Description=DINAMYT — respaldo diario (base y archivos)
+After=postgresql.service
 
-```text
-0 3 * * * sudo -u postgres pg_dump -Fc dinamyt > /var/backups/dinamyt/dinamyt-$(date +\%F).dump 2>/dev/null
-30 3 * * * find /var/backups/dinamyt -name '*.dump' -mtime +14 -delete
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dinamyt-respaldo
+EOF
 ```
 
-Guarda con `Ctrl+O` → Enter → `Ctrl+X`.
+```bash
+sudo tee /etc/systemd/system/dinamyt-respaldo.timer >/dev/null <<'EOF'
+[Unit]
+Description=Respaldo diario de DINAMYT
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now dinamyt-respaldo.timer && sudo systemctl start dinamyt-respaldo && sudo journalctl -u dinamyt-respaldo -n 10 --no-pager && ls -lh /var/backups/dinamyt/ | tail -4
+```
+
+✅ Tres líneas con `✓` (base, archivos, cuántos quedan) y un `.dump` de
+cientos de KB, no de 0. Si un día falla, `systemctl --failed` lo enseña.
 
 ⚠️ **Un respaldo que solo vive en el mismo servidor no es un respaldo.** Una vez
 por semana, bájatelo a tu PC:

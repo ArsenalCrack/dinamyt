@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import { execSync } from 'node:child_process';
+import { cabecerasDeSeguridad } from './cabeceras-seguridad';
 
 /**
  * La versión que se enseña en la app, calculada EN EL BUILD.
@@ -24,10 +25,28 @@ function delGit(comando: string): string {
   }
 }
 
+// Los mismos valores por defecto que `lib/api.ts` y la portada.
+const API_ECOSISTEMA = process.env.NEXT_PUBLIC_ECOSYSTEM_API_URL || 'http://localhost:3001';
+const API_CAMPEONATOS = process.env.NEXT_PUBLIC_CAMPEONATOS_API_URL || 'http://localhost:3002';
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   env: {
     NEXT_PUBLIC_VERSION_FECHA: delGit('git log -1 --format=%cd --date=format:%Y.%m.%d'),
     NEXT_PUBLIC_VERSION_COMMIT: delGit('git rev-parse --short HEAD'),
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: cabecerasDeSeguridad({
+          // La API del ecosistema y los campeonatos abiertos de la portada.
+          conectar: [API_ECOSISTEMA, API_CAMPEONATOS],
+          // Las fotos y escudos viven en `id.dinamyt.org/media` (§4.20).
+          imagenes: [API_ECOSISTEMA],
+        }),
+      },
+    ];
   },
 };
 

@@ -38,10 +38,10 @@
 |---|---|---|---|
 | 1 | [Probar lo desplegado](#1--probar-lo-desplegado) | A mano | 1–2 h |
 | 2 | [DMARC a `quarantine`](#2--dmarc-a-quarantine) | DNS | 15 min, y mirar informes antes |
-| 3 | [Terminar las fotos en disco, y respaldarlas](#3--terminar-las-fotos-en-disco-y-respaldarlas) | Servidor | 1 h |
+| 3 | [**Los respaldos diarios estaban vacíos**](#3--los-respaldos-diarios-estaban-vacíos--y-las-fotos-no-entraban) | **Tú**: instalar el temporizador | 20 min — **ya** |
 | 4 | [Rotar o cerrar los proyectos de Supabase](#4--rotar-o-cerrar-los-proyectos-de-supabase) | Cuentas | 15 min |
 | 5 | [Un secreto de sincronización por app](#5--un-secreto-de-sincronización-por-app--falta-ponerlo-en-la-vps) | **Tú**: poner los valores | 20 min |
-| 6 | [Cabeceras de seguridad y CSP](#6--cabeceras-de-seguridad-y-csp) | Código, probando | 2–3 días |
+| 6 | [La CSP, de informe a estricta](#6--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Una semana después |
 | 7 | [**El candado de sede**](#7--el-candado-de-sede-decisión-8) (decisión 8) | Código | El grande |
 | 8 | [**Publicar en vivo durante el evento**](#8--publicar-en-vivo-durante-el-evento-decisión-9) (decisión 9) | **Una decisión** + código | Después del 7 |
 | 9 | [**Encender Academy**](#9--encender-academy) | Pruebas + servidor | 1–2 días, y una semana de uso |
@@ -117,52 +117,54 @@ se actualiza `OPERAR.md` §3.1 y §3.5 y esto se borra.
 
 ---
 
-## 3 · Terminar las fotos en disco, y respaldarlas
+## 3 · Los respaldos diarios estaban vacíos — y las fotos no entraban
 
-El interruptor ya está puesto. Quedan tres cosas, y **la tercera es la que
-importa**:
+⚠️ **Lo más urgente de la lista.** Comprobado el 26 sep 2026: **todos los
+volcados diarios de `/var/backups/dinamyt/` pesan 0 bytes.** La línea del
+crontab de `dinamyt` usa `sudo -u postgres`, `sudo` pide contraseña, en el cron
+nadie la teclea, y el `2>/dev/null` se tragaba el error. Los únicos respaldos
+buenos son los manuales (`/var/backups/respaldo-2026-09-26.dump`, de las 09:53).
+Y aunque el volcado funcionara, no incluía las fotos, que viven en disco desde
+§4.20.
 
-1. **Que no quede nada incrustado.** En seco, que solo cuenta:
+**El código ya está**: `scripts/respaldo-diario.sh` corre como root desde un
+temporizador de systemd, comprueba que `pg_restore` sabe leer el volcado,
+empaqueta `/srv/dinamyt-media` y `/srv/uploads`, guarda 14 días y **falla en voz
+alta**. Lo que falta es tuyo, en la VPS, después del `git pull` del ecosistema:
 
-   ```bash
-   cd /srv/dinamyt && pnpm --filter @dinamyt/ecosystem-api fotos:al-disco
+1. Quita la línea vieja: `crontab -e` (como `dinamyt`) y borra las dos líneas
+   que empiezan por `0 3` y `30 3`.
+2. Instala el temporizador: los cuatro bloques de **MONTAR-VPS §10.1**, tal cual.
+3. Comprueba que el último `.dump` de `ls -lh /var/backups/dinamyt/` pesa
+   cientos de KB y que hay un `archivos-….tar.gz`.
+4. Bájate una copia a tu PC (la semanal de siempre):
+
+   ```powershell
+   scp dinamyt@80.190.78.70:/var/backups/dinamyt/*-$(Get-Date -Format yyyy-MM-dd).* D:\dinamyt-migracion\respaldos\
    ```
 
-   Si lista filas: respaldo (`OPERAR.md` §2.5) y el mismo comando con
-   `--aplicar`.
-2. **El atajo de Caddy**, para que una foto no despierte a Node. Hoy la respuesta
-   lleva `x-powered-by: Express`. En el bloque de `id.dinamyt.org` del Caddyfile:
+**Y lo que queda de las fotos**, cuando haya un rato:
 
-   ```caddyfile
-   id.dinamyt.org {
-   	encode zstd gzip
+- Que no quede nada incrustado. En seco, que solo cuenta:
+  `cd /srv/dinamyt && pnpm --filter @dinamyt/ecosystem-api fotos:al-disco`. Si
+  lista filas: respaldo (`OPERAR.md` §2.5) y el mismo comando con `--aplicar`.
+- El atajo de Caddy, para que una foto no despierte a Node (hoy la respuesta
+  lleva `x-powered-by: Express`). En el bloque de `id.dinamyt.org` del
+  Caddyfile, delante del `reverse_proxy`:
 
-   	handle /media/* {
-   		root * /srv/dinamyt-media
-   		file_server
-   		header Cache-Control "public, max-age=31536000, immutable"
-   		header X-Content-Type-Options "nosniff"
-   		header Content-Security-Policy "default-src 'none'; sandbox"
-   	}
+  ```caddyfile
+  	handle /media/* {
+  		root * /srv/dinamyt-media
+  		file_server
+  		header Cache-Control "public, max-age=31536000, immutable"
+  		header X-Content-Type-Options "nosniff"
+  		header Content-Security-Policy "default-src 'none'; sandbox"
+  	}
+  ```
 
-   	handle {
-   		reverse_proxy 127.0.0.1:3001
-   	}
-   }
-   ```
-
-   Comprobación: `curl -sI https://id.dinamyt.org/media/<un-archivo>.jpg` ya no
-   dice `x-powered-by`.
-3. ⚠️ **El respaldo diario solo vuelca la base** (`pg_dump`, MONTAR-VPS §10.1).
-   Desde que las fotos viven en disco, **una restauración devolvería las filas
-   apuntando a archivos que no existen**. Lo mismo valdrá para
-   `/srv/uploads/academy` cuando Academy esté montada. Hace falta añadir al
-   cron de las 03:00 un `tar` de esas carpetas junto al volcado (con la misma
-   rotación de 14 días) y bajarlo en la copia semanal.
-
-**Hecho cuando:** el seco dice 0, Caddy sirve `/media`, y el respaldo lleva las
-carpetas. Entonces MONTAR-VPS §10.1 recoge el `tar` y `OPERAR.md` §4.20 deja de
-decir «falta».
+  y `sudo systemctl reload caddy`. Comprobación:
+  `curl -sI https://id.dinamyt.org/media/<un-archivo>.jpg` ya no dice
+  `x-powered-by`.
 
 ---
 
@@ -223,59 +225,28 @@ El PC del evento sigue sin llevar ninguno (D8).
 
 ---
 
-## 6 · Cabeceras de seguridad y CSP
+## 6 · La CSP, de informe a estricta
 
-**Hoy no hay ninguna cabecera de seguridad** en las cinco webs (comprobado con
-`curl -sI` el 26 sep): ni `Content-Security-Policy`, ni
-`Strict-Transport-Security`, ni `X-Frame-Options`, ni `Referrer-Policy`. Las
-únicas respuestas con CSP son los archivos que sirven `ecosystem-api`
-(`/media`) y `academy-api` (`/files`): `default-src 'none'; sandbox`.
+**Hecho el 26 sep 2026** (`OPERAR.md` §4.24): las cuatro webs mandan las
+cabeceras de seguridad y la CSP en **modo informe**, que no bloquea nada y
+escribe en el registro lo que bloquearía. Se despliega con el resto.
 
-**Por qué importa:** el portal guarda el pase de DINAMYT (30 min) en
-`sessionStorage`/`localStorage`, al alcance de JavaScript. Un XSS sería un robo
-de sesión. No se ha encontrado ninguno —React escapa, y los únicos
-`dangerouslySetInnerHTML` son los guiones anti-parpadeo del tema, constantes, en
-los cuatro `layout.tsx`—, pero la CSP es la red de debajo.
+Lo que queda, **una semana después de desplegar**:
 
-**En dos tandas, probando:**
+1. Mirar los informes de cada web:
 
-1. **Las baratas, ya** — en Caddy, un solo sitio para los cinco nombres (y así
-   el modo local de Campeonatos, que no pasa por Caddy, no se entera):
-   - `Strict-Transport-Security: max-age=31536000` (todos los subdominios ya
-     son HTTPS);
-   - `X-Content-Type-Options: nosniff`;
-   - `Referrer-Policy: strict-origin-when-cross-origin`;
-   - `X-Frame-Options: DENY` (antes, comprobar que ninguna web mete a otra en un
-     `iframe`);
-   - `Permissions-Policy` **con `camera=(self)`**, no `camera=()`: el kiosco de
-     Membresías lee QR con la cámara y Academy graba las figuras;
-   - `poweredByHeader: false` en los cuatro `next.config.ts`.
-2. **La CSP, primero en `Content-Security-Policy-Report-Only`** una semana por
-   web, mirando la consola, y después en serio. Lo que la rompe si se pone a
-   ciegas:
-   - **Next mete guiones en línea** (la carga de RSC) y los anti-parpadeo son
-     en línea. Con nonces hay que generarlos por petición en el `proxy.ts` (el
-     `middleware` de Next 16) y eso quita el pre-renderizado estático. **La
-     recomendación es empezar sin nonces** —`script-src 'self' 'unsafe-inline'`—
-     pero con todo lo demás cerrado, que es lo que corta la exfiltración y el
-     *clickjacking*: `connect-src` solo a los orígenes propios (y
-     `wss://campeonatos.dinamyt.org` para el marcador), `img-src 'self' data:
-     https://id.dinamyt.org`, `frame-ancestors 'none'`, `object-src 'none'`,
-     `base-uri 'self'`, `form-action 'self'`. Los nonces, en una segunda vuelta
-     si compensan.
-   - Academy embebe videos (RF-ACA-12): `frame-src` para `youtube-nocookie.com`,
-     `youtube.com` y `drive.google.com`.
-   - Las fuentes van incrustadas (`next/font`): `font-src 'self'`.
-   - Cloudflare puede inyectar un guion propio si está encendida la *Email
-     Address Obfuscation*: apagarla o permitirlo.
+   ```bash
+   for s in dinamyt-portal membresias-web campeonatos-web; do echo "== $s"; sudo journalctl -u $s --since "7 days ago" | grep '\[CSP\]' | sort | uniq -c | sort -rn | head; done
+   ```
 
-**Y la mejora de fondo, aparte:** sacar el pase del portal del alcance de
-JavaScript (cookie `httpOnly`, como ya hacen Membresías y Campeonatos con la
-suya). Es más grande; la CSP va primero.
+2. Lo que salga es un origen que falta en su `next.config.ts` (se añade) o algo
+   que no debería estar ahí (se investiga).
+3. Con la semana limpia: `CSP_ESTRICTA=1` en el `.env.production` de esa web y
+   recompilarla.
 
-**Hecho cuando:** las cinco webs llevan las cabeceras, la CSP va en serio tras
-una semana limpia en *report-only*, y `OPERAR.md` tiene una sección que dice
-dónde viven y qué no se puede añadir sin tocarla.
+**Después, aparte:** sacar el pase del portal del alcance de JavaScript
+(cookie `httpOnly`, como ya hacen Membresías y Campeonatos con la suya), y los
+nonces si compensan.
 
 ---
 

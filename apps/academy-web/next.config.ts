@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import { execSync } from 'node:child_process';
+import { cabecerasDeSeguridad } from './cabeceras-seguridad';
 
 /**
  * La versión que se enseña en la app, calculada EN EL BUILD.
@@ -24,10 +25,30 @@ function delGit(comando: string): string {
   }
 }
 
+// Los mismos valores por defecto que `lib/api.ts`.
+const API_ACADEMY = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3007';
+const API_ECOSISTEMA = process.env.NEXT_PUBLIC_ECOSYSTEM_API_URL || 'http://localhost:3001';
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   env: {
     NEXT_PUBLIC_VERSION_FECHA: delGit('git log -1 --format=%cd --date=format:%Y.%m.%d'),
     NEXT_PUBLIC_VERSION_COMMIT: delGit('git rev-parse --short HEAD'),
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: cabecerasDeSeguridad({
+          conectar: [API_ACADEMY, API_ECOSISTEMA],
+          // Los archivos que sirve la API (`/files`) y el escudo del club.
+          imagenes: [API_ACADEMY, API_ECOSISTEMA],
+          medios: [API_ACADEMY],
+          // Los videos que el maestro enlaza (RF-ACA-12, `lib/api.ts`).
+          marcos: ['https://www.youtube.com', 'https://drive.google.com'],
+        }),
+      },
+    ];
   },
 };
 
