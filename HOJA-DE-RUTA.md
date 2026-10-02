@@ -16,18 +16,20 @@
 
 ## Dónde estamos
 
-*(26 de septiembre de 2026, comprobado por SSH, `curl` y el DNS público)*
+*(1 de octubre de 2026, comprobado por SSH y `curl`)*
 
 | Pieza | Estado |
 |---|---|
-| Portal + identidad | En la VPS con `1277b99` (desplegado el 26 sep, 09:57) |
-| Campeonatos | En la VPS con `9e1d4e1` (26 sep, 09:55). **El plan entero está en producción**: F1–F8, D8–D10 y la revisión de seguridad. Las rutas nuevas dan 401, `NRestarts = 0` |
-| Membresías | En la VPS con `3488b31` (24 sep) |
+| Portal + identidad | En la VPS con `a9a898e` (desplegado el 26 sep, 13:03) |
+| Campeonatos | En la VPS con `aa975c3` (26 sep, 13:02): el plan entero **y el candado de sede**. `POST /api/campeonatos/:id/sede` da 401. **La publicación en vivo (1 oct) está en git, sin desplegar** |
+| Membresías | En la VPS con `5736acd` (26 sep, 13:04) |
 | Academy | **No está montada**: ni servicios, ni `.env`, ni Caddy, ni DNS. En código, entera: 24/24 pruebas |
-| Fotos en disco | **Encendidas**: `MEDIA_PUBLIC_URL` y `MEDIA_DIR` puestos, 30 imágenes en `/srv/dinamyt-media`. Las sirve Node, no Caddy, y **el respaldo diario no las incluye** |
+| Fotos en disco | **Encendidas**: `MEDIA_PUBLIC_URL` y `MEDIA_DIR` puestos, 30 imágenes en `/srv/dinamyt-media`. Las sirve Node, no Caddy |
+| **Respaldos diarios** | ⚠️ **Siguen vacíos**: los seis `.dump` del 26 sep al 1 oct pesan 0 bytes. El crontab viejo sigue puesto y el temporizador no está instalado (tarea 3) |
+| Secretos de sync por app | Sin poner: el `.env` del ecosistema no tiene ningún `SYNC_SECRET_*` (tarea 5) |
 | DMARC | Sigue en `p=none` (tocaba subirlo desde el 12 sep) |
 | Google | Propiedad verificada (etiqueta y TXT) |
-| Cabeceras de seguridad | **Ninguna** en las cinco webs: ni CSP, ni HSTS, ni `X-Frame-Options` |
+| Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 6) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
 
 ---
@@ -36,38 +38,40 @@
 
 | # | Qué | De qué es | Tamaño |
 |---|---|---|---|
-| 1 | [Probar lo desplegado](#1--probar-lo-desplegado) | A mano | 1–2 h |
+| 1 | [Probar lo desplegado](#1--probar-lo-desplegado), candado y publicación en vivo incluidos | A mano | 2–3 h |
 | 2 | [DMARC a `quarantine`](#2--dmarc-a-quarantine) | DNS | 15 min, y mirar informes antes |
 | 3 | [**Los respaldos diarios estaban vacíos**](#3--los-respaldos-diarios-estaban-vacíos--y-las-fotos-no-entraban) | **Tú**: instalar el temporizador | 20 min — **ya** |
 | 4 | [Rotar o cerrar los proyectos de Supabase](#4--rotar-o-cerrar-los-proyectos-de-supabase) | Cuentas | 15 min |
 | 5 | [Un secreto de sincronización por app](#5--un-secreto-de-sincronización-por-app--falta-ponerlo-en-la-vps) | **Tú**: poner los valores | 20 min |
-| 6 | [La CSP, de informe a estricta](#6--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Una semana después |
-| 7 | [**El candado de sede**](#7--el-candado-de-sede-decisión-8) (decisión 8) | Código | El grande |
-| 8 | [**Publicar en vivo durante el evento**](#8--publicar-en-vivo-durante-el-evento-decisión-9) (decisión 9) | **Una decisión** + código | Después del 7 |
-| 9 | [**Encender Academy**](#9--encender-academy) | Pruebas + servidor | 1–2 días, y una semana de uso |
-| 10 | [**Traducir lo que falta**](#10--traducir-lo-que-falta) | Código | Por pantallas |
-| 11 | [Fase 2: precios, plan gratuito, multi-arte](#11--fase-2) | Negocio + código | Semanas |
-| 12 | [Deuda pequeña](#12--deuda-pequeña) | Varios | Cuando toque |
+| 6 | [La CSP, de informe a estricta](#6--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Desde el 3 oct |
+| 7 | [**Encender Academy**](#7--encender-academy) | Pruebas + servidor | 1–2 días, y una semana de uso |
+| 8 | [**Traducir lo que falta**](#8--traducir-lo-que-falta) | Código | Por pantallas |
+| 9 | [Fase 2: precios, plan gratuito, multi-arte](#9--fase-2) | Negocio + código | Semanas |
+| 10 | [Deuda pequeña](#10--deuda-pequeña) | Varios | Cuando toque |
 | — | [En espera: WhatsApp y F9](#en-espera) | — | — |
 
 **Por qué este orden.** Del 1 al 4 cuestan minutos y cierran riesgos que ya
 existen hoy. El 5 y el 6 son seguridad de lo que está en producción todos los
-días. El 7 y el 8 son **lo más importante que queda de la arquitectura del
-evento**, pero solo muerden cuando hay un campeonato, y hoy no hay ninguno con
-fecha. **Si aparece una fecha, el 7 y el 8 pasan delante de todo**, con el
-ensayo (`OPERAR.md` §2.9) y el simulacro (`INICIAR-LOCAL.md` §0) detrás.
+días. La arquitectura del evento ya está entera en código —el candado de sede y
+la publicación en vivo, `OPERAR.md` §4.25—; lo que le falta es la prueba a mano
+de la tarea 1. **Si aparece una fecha de campeonato, esa prueba, el ensayo
+(`OPERAR.md` §2.9) y el simulacro (`INICIAR-LOCAL.md` §0) pasan delante de
+todo.**
 
 ---
 
 ## 1 · Probar lo desplegado
 
-Todo el plan de Campeonatos está en la VPS desde el 26 de septiembre y **nadie
-lo ha recorrido todavía con una persona delante**.
+Todo el plan de Campeonatos está en la VPS desde el 26 de septiembre —el
+candado de sede incluido— y **nadie lo ha recorrido todavía con una persona
+delante**. La publicación en vivo (1 oct) entra en cuanto se despliegue.
 
 1. `PRUEBAS-PLAN-CAMPEONATOS.md` (en `dinamyt-combat`, espejado en
-   `productos/campeonatos/`), de arriba abajo. Las dos comprobaciones del
-   despliegue ya están marcadas; falta la del registro de arranque, que pide
-   `sudo`:
+   `productos/campeonatos/`), de arriba abajo, **§12 (el candado) y §13 (la
+   publicación en vivo) incluidas**: son las únicas piezas de la arquitectura
+   del evento que solo se prueban con el PC del evento delante. Las dos
+   comprobaciones del despliegue ya están marcadas; falta la del registro de
+   arranque, que pide `sudo`:
 
    ```bash
    sudo journalctl -u campeonatos-api --since "today" | grep ecosistema
@@ -75,7 +79,10 @@ lo ha recorrido todavía con una persona delante**.
 
    Tiene que decir «pase RS256 y espejo: los dos ENCENDIDOS».
 2. El ensayo de punta a punta, `OPERAR.md` §2.9, **y anotar la fila** en su
-   tabla.
+   tabla. Con la bajada «para el evento» (`-ParaElEvento`) y con
+   `CAMPEONATOS_ONLINE_URL` en el `.env` del PC: el marcador de
+   `campeonatos.dinamyt.org/resultados` tiene que moverse con el evento y
+   enseñar su hora.
 
 **Hecho cuando:** todas las casillas marcadas, cada fallo apuntado aquí como
 tarea, y una fila nueva en la tabla de §2.9.
@@ -119,8 +126,9 @@ se actualiza `OPERAR.md` §3.1 y §3.5 y esto se borra.
 
 ## 3 · Los respaldos diarios estaban vacíos — y las fotos no entraban
 
-⚠️ **Lo más urgente de la lista.** Comprobado el 26 sep 2026: **todos los
-volcados diarios de `/var/backups/dinamyt/` pesan 0 bytes.** La línea del
+⚠️ **Lo más urgente de la lista.** Comprobado el 26 sep 2026, y otra vez el
+1 oct (seis volcados más, todos vacíos): **todos los volcados diarios de
+`/var/backups/dinamyt/` pesan 0 bytes.** La línea del
 crontab de `dinamyt` usa `sudo -u postgres`, `sudo` pide contraseña, en el cron
 nadie la teclea, y el `2>/dev/null` se tragaba el error. Los únicos respaldos
 buenos son los manuales (`/var/backups/respaldo-2026-09-26.dump`, de las 09:53).
@@ -227,11 +235,11 @@ El PC del evento sigue sin llevar ninguno (D8).
 
 ## 6 · La CSP, de informe a estricta
 
-**Hecho el 26 sep 2026** (`OPERAR.md` §4.24): las cuatro webs mandan las
-cabeceras de seguridad y la CSP en **modo informe**, que no bloquea nada y
-escribe en el registro lo que bloquearía. Se despliega con el resto.
+**Desplegado el 26 sep 2026, 13:03** (`OPERAR.md` §4.24): el portal,
+Campeonatos y Membresías mandan las cabeceras de seguridad y la CSP en **modo
+informe**, que no bloquea nada y escribe en el registro lo que bloquearía.
 
-Lo que queda, **una semana después de desplegar**:
+Lo que queda, **desde el 3 de octubre** (una semana después):
 
 1. Mirar los informes de cada web:
 
@@ -250,107 +258,7 @@ nonces si compensan.
 
 ---
 
-## 7 · El candado de sede (decisión 8)
-
-**Hoy nada impide que alguien toque llaves, inscripciones o tatamis en internet
-mientras el campeonato corre en el PC del evento**, y el paquete de vuelta solo
-trae resultados. Son dos escritores, y lo que diverge no avisa: se descubre al
-subir. **Es lo más importante que queda de la arquitectura del evento.**
-
-La idea es la de siempre: no resolver conflictos, **hacerlos imposibles**. Un
-escritor a la vez, y el dueño se traspasa explícitamente.
-
-**El diseño:**
-
-- `campeonatos.sede`: `nube` (el valor por defecto, y el de hoy) o `local`, con
-  `sede_desde` y `sede_por`. Por `schema_compat.py`, sin migraciones, como todo
-  en Campeonatos.
-- **Pasar a local es un gesto, y va junto con bajarse el paquete**: al exportar
-  el campeonato para el evento se elige «para el evento (cierra la nube)» o
-  «copia de prueba (no cierra nada)», que es la que usa el simulacro.
-- **Con `sede = local`, la VPS pone ese campeonato en solo lectura**: un guard
-  en cada ruta que escribe sobre él —inscripciones, competidores, llaves,
-  tatamis, asignaciones, invitaciones— contesta **423** con la frase «Este
-  campeonato se está operando en el PC del evento desde …». La consulta
-  pública sigue abierta.
-- **Devolverlo a la nube también es un gesto**: el admin dueño, en la VPS,
-  cuando la subida final de resultados (F8) llegó bien y no queda ninguna llave
-  activa. Nunca automático.
-- **Un minicampeonato sin PC a mano corre en la nube** sin tocar nada: por eso
-  el candado se pone y se quita, y no se amputa la consola de la VPS.
-
-**Dónde:** `models/campeonato.py`, `schema_compat.py`, un
-`exigir_sede_nube(camp)` junto a las guardas de `api/scoping.py`, la exportación
-del paquete, y en el frontend una franja fija en el campeonato («Operándose en
-el PC del evento desde el sábado 08:10 · Devolver a la nube»). Documentarlo en
-`INICIAR-LOCAL.md` §2.1.
-
-**Pruebas:** cada ruta que escribe, contra SQLite **y contra PostgreSQL**
-(`tests/test_rls_postgres.py`); la exportación que cierra y la que no; y una
-sección nueva en `PRUEBAS-PLAN-CAMPEONATOS.md`.
-
-**Después, opcional:** que el PC del evento se baje el paquete solo cada pocos
-minutos mientras haya red, con la franja «Al día · última copia hace 3 min».
-Saca la memoria del camino crítico (el único fallo sin marcha atrás es olvidarse
-de bajarlo, `INICIAR-LOCAL.md` §0), y con el candado puesto es seguro: la VPS
-ya no cambia.
-
-**Hecho cuando:** con `sede = local` ninguna ruta escribe en la VPS, está
-probado en las dos bases y en el simulacro, y la decisión 8 de `OPERAR.md` §1.6
-deja de decir «sin hacer».
-
----
-
-## 8 · Publicar en vivo durante el evento (decisión 9)
-
-Hoy los resultados suben **al final** (F8), cuando vuelve la red y el admin
-entra; el público no ve nada mientras tanto. La decisión 9 era que el PC del
-evento **publique hacia arriba cada pocos minutos**. No es sincronización: el
-local sigue siendo el único que escribe y la VPS solo recibe. El modo de fallo
-es «el público ve resultados de hace veinte minutos», nunca «se para el
-campeonato».
-
-**Las cinco reglas que lo hacen seguro:**
-
-1. **Solo hacia arriba.** Durante el evento el local no descarga nada.
-2. **Instantánea completa, nunca incrementos**: mandarla dos veces da igual.
-3. **Nunca en el camino de una petición**: tarea de fondo con timeout corto.
-   Bajo eventlet, una llamada que bloquea en el sitio equivocado congela el
-   bucle de sockets (`OPERAR.md` §5.13).
-4. **La VPS en solo lectura para ese campeonato**: necesita el 7.
-5. **El público ve la hora del dato**: «Resultados a las 11:42», no «en vivo».
-
-Y dos detalles: la VPS **descarta lo que llegue más viejo** que lo que ya tiene
-(`exportado_at`; con red mala la de las 11:40 puede llegar después de la de las
-11:45), y el local **guarda el hash de lo último enviado** para no mandar lo
-mismo por un hotspot de celular.
-
-**Casi todo está construido:** `_construir_resultados(camp_id)`,
-`ResultadoPublicado` con `export_uuid` y `exportado_at`,
-`importar_resultados()`, el cartero de F8 (mismo destino, mismo sobre) y el
-patrón «cada N minutos» de `RESPALDO_MINUTOS`.
-
-### ⚠️ Lo que hay que decidir antes: con qué credencial
-
-F8 sube con **la sesión del propio admin**, en el momento en que vuelve la red:
-en el PC no se guarda ninguna llave. Publicar durante horas no puede depender de
-que alguien tenga una sesión abierta en ese PC. Las opciones:
-
-| | Qué | En contra |
-|---|---|---|
-| **A** | El admin deja su sesión abierta en el PC todo el evento | Frágil (el pase dura 30 min), y es una sesión completa guardada en el PC |
-| **B** ✅ | **Una credencial por campeonato, que emite la VPS al pasar la sede a local** (el 7): solo sirve para publicar la instantánea de ESE campeonato, caduca al devolver la sede (o a los pocos días) y se revoca desde la VPS | Es una excepción a «nada guardado en el PC» — acotada: lo peor que permite es publicar resultados falsos de un evento un fin de semana, que la siguiente instantánea buena pisa |
-| **C** | No publicar en vivo: todo sube al final, como hoy | El público no ve nada durante el evento |
-
-**Recomendación: B**, porque encaja con el candado: el mismo gesto que cierra la
-nube entrega la llave, y el que la reabre la retira.
-
-**Hecho cuando:** está decidido, construido, y en el simulacro el marcador de
-`campeonatos.dinamyt.org/resultados` se mueve con el evento y enseña su hora.
-
----
-
-## 9 · Encender Academy
+## 7 · Encender Academy
 
 **Lo que hay hoy:** código completo contra los RF-ACA-01…28 del documento de
 requisitos (`DINAMYT_Academy_DocumentoPrincipal_v2.docx`): artes marciales y
@@ -402,7 +310,7 @@ Caddy → **y solo entonces** el registro `A academy` en Cloudflare, en naranja.
 ### C · Configurarla
 
 - Qué organizaciones abren Academy: el «Plan Academy» de la base es de relleno
-  (tarea 11).
+  (tarea 9).
 - Un administrador de Academy (su `local_role` manda sobre el del pase).
 - Los maestros con su arte asignada.
 - Los videos del programa oficial por cinturón (`D:\hapkido\Programa Cambio de
@@ -417,7 +325,7 @@ recompilar el portal (§2.3). **Solo cuando A, B y C estén hechos.**
 
 | Hueco | Qué hacer |
 |---|---|
-| **Casi nada está traducido**: 16 de sus 17 pantallas no usan `useI18n` | Tarea 10. Conviene hacerlo **antes** de abrir |
+| **Casi nada está traducido**: 16 de sus 17 pantallas no usan `useI18n` | Tarea 8. Conviene hacerlo **antes** de abrir |
 | No pregunta la preferencia de tema e idioma al ecosistema (las otras tres sí) | Copiar el `GET /users/me/apariencia` del portal en `AplicarApariencia` (`OPERAR.md` §4.21) |
 | Un cambio de rol en el portal no le llega después de la primera entrada | Decidir: como Campeonatos (D9, `roles_del_portal`) o dejar que mande el rol local |
 | El portal no enseña `GET /users/:id/academy-summary` (RF-ACA-04: cinturón, evaluaciones, último avance) | Decidir dónde (el perfil del alumno) y **con qué credencial**: el requisito pide un token de servicio y hoy la ruta acepta el pase del usuario |
@@ -431,7 +339,7 @@ la usan una semana, el botón está encendido y `OPERAR.md` §4.14 se reescribe.
 
 ---
 
-## 10 · Traducir lo que falta
+## 8 · Traducir lo que falta
 
 **Lo que ya existe:** las cuatro webs tienen diccionario español/inglés
 (`lib/i18n.tsx`), la cookie compartida `.dinamyt.org` que cruza la elección
@@ -465,7 +373,7 @@ fuera del diccionario; incluye algún comentario y la lista de ciudades de
 **El orden:**
 
 1. Fechas y números según `locale` — lo más barato, y lo que más se nota.
-2. **Academy**, antes de abrirla (tarea 9): ahora cuesta menos que con gente
+2. **Academy**, antes de abrirla (tarea 7): ahora cuesta menos que con gente
    usándola.
 3. Lo que falta del portal; `/admin` al final, que solo lo ve el super-admin.
 4. Membresías y Campeonatos (en SUS repositorios, `OPERAR.md` §1.1), carnet
@@ -481,9 +389,9 @@ pantalla, correo, aviso ni impreso de las cuatro webs.
 
 ---
 
-## 11 · Fase 2
+## 9 · Fase 2
 
-### 11.1 Los precios de verdad en `/planes`, y la portada
+### 9.1 Los precios de verdad en `/planes`, y la portada
 
 El **mecanismo** ya existe (`OPERAR.md` §4.18): cobro por persona,
 `price_per_user` y `min_users` en «Tarifa de cada plan» de `/admin`. Lo que
@@ -496,7 +404,7 @@ con capturas reales; y en Google Search Console, enviar el sitemap y pedir la
 indexación (`OPERAR.md` §3.6). Lo que Google guarde el primer día es lo que
 enseñará semanas.
 
-### 11.2 El plan gratuito
+### 9.2 El plan gratuito
 
 Que quien entre vea las pantallas y entienda a qué escala llega el producto, sin
 operar un club entero gratis.
@@ -513,7 +421,7 @@ operar un club entero gratis.
 - Al llegar al tope: qué falta, cuánto cuesta el siguiente plan, y un botón. No
   un error.
 
-### 11.3 Varias artes marciales en Membresías — lo fácil
+### 9.3 Varias artes marciales en Membresías — lo fácil
 
 Hoy los 11 cinturones de hapkido GHA son una constante duplicada en
 `lib/cinturones.ts` (API y web de Membresías).
@@ -526,7 +434,7 @@ Hoy los 11 cinturones de hapkido GHA son una constante duplicada en
 - `lib/cinturones.ts` pasa a una consulta por club, cacheada. Hacen falta
   `orgs.arte_marcial` y una tabla de grados por club: **no existen todavía**.
 
-### 11.4 Varias artes marciales en Campeonatos — lo difícil
+### 9.4 Varias artes marciales en Campeonatos — lo difícil
 
 Todo gira alrededor de un reglamento que hoy está repartido por el código:
 `engine/combate_engine.py` (782 líneas), `sockets/combate_ns.py` (1.821),
@@ -547,7 +455,7 @@ Es **el trabajo más grande de todos**, más que la identidad.
 
 ---
 
-## 12 · Deuda pequeña
+## 10 · Deuda pequeña
 
 | Qué | Por qué | Dónde |
 |---|---|---|
@@ -557,6 +465,7 @@ Es **el trabajo más grande de todos**, más que la identidad.
 | Las **cuentas viejas de Campeonatos con contraseña propia** | Siguen entrando por el login local aunque su club deje de pagar (D10). Y los dos extras de entonces: avisar al arrancar cuántas cuentas conservan contraseña usable, y en internet dejar el formulario de contraseña debajo de un enlace discreto («entrar sin DINAMYT») | `dinamyt-combat` |
 | El **QR del juez dura 72 h** | Una foto del QR vale ese papel en ese tatami todo el fin de semana. Se puede acotar a la duración real del campeonato | `dinamyt-combat` |
 | Los **jueces tienen «acceso total» en RLS** (`rls.contexto_de_usuario`) | La API ya filtra por workspace; falta la red de debajo | `dinamyt-combat` |
+| **La franja «Sucediendo ahora» de la portada no ha salido nunca en producción** | Cuatro causas a la vez (vistas el 1 oct): pide a `NEXT_PUBLIC_CAMPEONATOS_API_URL`, que no está en el `.env.production` del portal, así que llama a `http://localhost:3002` desde el navegador de cada visitante; filtra `estado === 'EN_CURSO'` y la API dice `en_curso`; enlaza a `/pantalla/:id`, que no existe; y `campeonatos-api` no le da CORS a `https://dinamyt.org`. Y aunque se arreglaran las cuatro, durante un evento el campeonato de internet está cedido y no pasa a `en_curso` allí. **Mejor rehacerla sobre la publicación en vivo** (`en_vivo` de `/api/resultados/campeonatos`) y que enlace a `/resultados`; si no, quitarla | `apps/ecosystem-portal/src/app/page.tsx` |
 | **El nombre en la red del pabellón** | Entrada DNS estática en el router (`campeonato.dinamyt` → la IP del PC, con punto para que no se lea como búsqueda) y servir en el puerto 80. La IP en un papel sigue siendo la garantía | `INICIAR-LOCAL.md` §1 |
 
 ---

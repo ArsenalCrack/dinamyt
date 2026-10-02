@@ -133,8 +133,8 @@ como «F3 de PLAN-CAMPEONATOS» o «D9»; esto es lo que siguen mandando:
 | 4 | **Las cuentas nacen en el ecosistema.** El maestro crea *fichas* e *invita* | §4.4 |
 | 5 | **El club vive en el ecosistema** (`organizations`); cada app guarda un espejo | §4.5, §4.16 |
 | 7 | **Las altas del día del evento no suben solas**: se pasan a mano desde `instance/` | `INICIAR-LOCAL.md` §0 |
-| 8 | **Una base de código, y un candado decide quién opera** cada campeonato (`sede`) | **Sin hacer** — `HOJA-DE-RUTA.md` |
-| 9 | **Durante el evento el local publica hacia arriba y nunca descarga** | **Sin hacer** — `HOJA-DE-RUTA.md` |
+| 8 | **Una base de código, y un candado decide quién opera** cada campeonato (`sede`) | §4.25 |
+| 9 | **Durante el evento el local publica hacia arriba y nunca descarga**, con una llave por campeonato | §4.25 |
 | 10 | **El documento es la llave entre un competidor y una persona** (`competidores.documento` ↔ `users.document_id`) | §4.13 |
 | 11 | **La organización contrata y sus clubes heredan**; Membresías sigue siendo por club | §4.5 |
 | 12 | **El login propio de cada app es la marcha atrás y no se retira**; lo que se retira es *crear cuentas* | §4.13 |
@@ -2794,6 +2794,44 @@ reiniciar no basta (§1.3).
 
 La ruta `/csp-informe` no pide sesión y escribe en el registro: por eso tiene
 tope (30 líneas por minuto, 2 KB por informe).
+
+## 4.25 El evento: un escritor a la vez, y el público al día
+
+*(Decisiones 8 y 9. Candado el 26 sep 2026, publicación en vivo el 1 oct. El
+código, en `dinamyt-combat`: `backend/app/sede.py` y `backend/app/en_vivo.py`;
+el manual del evento, `INICIAR-LOCAL.md` §2.1.)*
+
+**El candado.** Bajarse el paquete «para el evento» (casilla del panel de
+exportar, o `-ParaElEvento` en `scripts/paquete-campeonato.ps1`) **cede** el
+campeonato: en internet queda en solo lectura —23 rutas contestan 423 y el
+socket no deja puntuar, ni al superadmin— mientras corre en el PC del evento.
+Mirar, las fichas y la subida de resultados siguen abiertas. Se devuelve a mano,
+en el campeonato: «Devolver a la nube». Nunca pasa solo.
+
+**La publicación en vivo.** Mientras está cedido, el paquete lleva una llave
+que solo publica los resultados de ESE campeonato. El PC la guarda al importar
+y, con `CAMPEONATOS_ONLINE_URL` en `https://`, manda la instantánea completa
+cada `PUBLICAR_MINUTOS` (3) a `POST /api/resultados/en-vivo`, en un hilo de
+fondo: sin red, el evento ni se entera. Internet descarta lo más viejo y el
+público ve la hora del dato. Mientras se publica, la cola de F8 no lo cuenta;
+cuando la llave deja de valer, F8 sube lo que falte al final, como siempre.
+
+| Variable | Dónde | Qué hace |
+|---|---|---|
+| `PUBLICAR_MINUTOS` | `backend/.env` del PC del evento | Cada cuánto publica (3; `0` = no publicar en vivo) |
+| `PUBLICAR_LLAVE_DIAS` | `campeonatos-api` en la VPS | Cuánto vale la llave desde la última bajada «para el evento» (4) |
+
+- **La llave no se guarda en internet: se deriva de `JWT_SECRET_KEY`.**
+  ⚠️ Cambiar ese secreto en la VPS durante un evento mata la llave que lleva el
+  PC (y cierra todas las sesiones). Igual que no se despliega (§1.5), no se
+  rota.
+- **Cada bajada mientras siga cedido lleva la misma llave** y alarga su plazo:
+  la de la víspera y la de la mañana valen igual.
+- **«Retirar la llave»** (en la franja del campeonato) la mata para siempre sin
+  devolver la sede; «Devolver a la nube» también. Una bajada nueva entrega otra.
+- El nombre que ve el público es **el de internet**, no el que diga el archivo:
+  lo peor que permite una llave robada es publicar podios falsos de ese evento
+  hasta la siguiente instantánea buena.
 
 ---
 
