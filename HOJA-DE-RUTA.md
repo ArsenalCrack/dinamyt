@@ -32,6 +32,7 @@
 | Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 6) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
 | Política de privacidad | Reescrita contra el código el 13 oct (terceros, IA, qué se cifra, qué se conserva). **En git, sin desplegar**: rama `feat/privacidad-completa` aquí y `feat/aviso-ia` en Membresías y Campeonatos |
+| Eliminar del club | **En git, sin desplegar** (14 oct): `POST /users/:id/eliminar` en Membresías (migración `0022`) y `POST /sync/baja` en el ecosistema. Despliega el ecosistema **antes** que Membresías (`OPERAR.md` §4.15) |
 
 ---
 
@@ -107,9 +108,9 @@ solicitud sería SQL a mano sobre 20 tablas de `ecosystem` (14 con llave foráne
 a `users`, 13 de ellas sin `ON DELETE`), más la ficha de Membresías, el usuario y el
 competidor de Campeonatos, y las tablas de Academy.
 
-Tres decisiones tuyas, con lo que recomiendo:
+Decidido el 14 oct 2026:
 
-| Decisión | Recomendación |
+| Decisión | Qué se hace |
 |---|---|
 | Resultados de campeonatos de quien se va | Conservar los oficiales ya publicados, con nombre: es el registro del evento. Borrar inscripciones que no llegaron a competir |
 | Pagos que el club le cobró | Conservarlos sin datos personales: la contabilidad del club no puede cambiar de total |
@@ -135,28 +136,7 @@ Trampas ya vistas:
 
 **Se despliega con un respaldo recién hecho delante** (`OPERAR.md` §2.5).
 
-### 0.3 · Que el maestro pueda eliminar a alguien de su club
-
-En Membresías, `DELETE /users/:id` desactiva y nada más; la ficha se queda para
-siempre en «sin acceso». Falta el segundo gesto, para el alta por error y para
-quien no vuelve.
-
-- Sin pagos ni asistencias: se borra la ficha entera.
-- Con historia: se vacía la ficha (nombre, correo, teléfono, foto, nacimiento,
-  sangre, emergencia, PIN, `eco_sub`) y se marca con una columna nueva
-  `eliminado_el` (migración `0022`). Pagos y asistencias quedan, anónimos.
-- **Toda consulta que hoy enseña a los «sin acceso» tiene que saltarse a los
-  eliminados.** Las que ya filtran por `is_active` (roster, avisos, informes,
-  calendario) los dejan fuera solas; las que no (`GET /users`, la ficha, los
-  nombres de `/attendances`) son las que hay que tocar. Si se olvida una, el
-  eliminado reaparece como «ALUMNO ELIMINADO» en una lista.
-- No toca al último maestro con acceso, ni a uno mismo (§4.7-bis).
-- Se pregunta antes (§4.9-bis), diciendo qué se borra y qué queda.
-
-Se escribe en `D:\Repositorios\dinamyt-membresias`. Reiniciar es migrar: con
-respaldo delante.
-
-### 0.4 · Lo que la política dice y nada obliga
+### 0.3 · Lo que la política dice y nada obliga
 
 - **El contacto de emergencia y el tipo de sangre no van cifrados.** La
   política ya lo dice así. Cifrarlos es posible en el ecosistema; la copia de
@@ -180,7 +160,7 @@ respaldo delante.
 - **Membresías sola, sin portal, no enlaza ninguna política.**
 - **La casilla del registro** está escrita a mano en castellano (tarea 8).
 
-### 0.5 · Antes de encender Academy (tarea 7)
+### 0.4 · Antes de encender Academy (tarea 7)
 
 - No tiene pie: ni privacidad, ni soporte, ni la línea de IA.
 - Los videos se incrustan desde `www.youtube.com` y `drive.google.com`, que
@@ -191,7 +171,7 @@ respaldo delante.
   menores: hoy la política dice que la aplicación no usa IA, y deja de ser
   verdad el día que esto se encienda.
 
-### 0.6 · Revisar el código que ya existe
+### 0.5 · Revisar el código que ya existe
 
 - **thermos** (dos revisores: fallos y seguridad, y calidad) sobre cada rama
   antes de fusionarla. Se lanza con `/thermos`.

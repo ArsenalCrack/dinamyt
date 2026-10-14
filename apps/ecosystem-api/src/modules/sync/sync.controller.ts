@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Headers,
   InternalServerErrorException,
@@ -239,6 +240,66 @@ export class SyncController {
 
     return { encontrada: filas.length > 0, aplicado: filas.length > 0 };
   }
+
+  // ── POST /sync/baja — el maestro sacó a alguien del club desde Membresías ──
+  //
+  // «Eliminar del club» en Membresías es UN gesto, y aquí tiene que ser el
+  // mismo: si la persona siguiera en `org_members`, la próxima alta del espejo
+  // le haría nacer una ficha nueva allá y el maestro la vería reaparecer.
+  //
+  // Es la MISMA baja que `DELETE /organizations/:id/members/:userId` —su copia
+  // en `org_member_bajas` para readmitir, su aviso a los demás gestores y su
+  // regla de no dejar al club sin quien mande—, y por eso pasa por
+  // `removeMember` y no por un `DELETE` propio. Quien la pide tiene que poder
+  // darla aquí: el secreto dice que llama Membresías, no que ese maestro mande.
+  @Post('baja')
+  async baja(
+    @Headers('x-dinamyt-sync') secreto: string | undefined,
+    @Body()
+    body: {
+      /** A quién, con su id de AQUÍ (`users.eco_sub` allá). */
+      ecoSub?: string;
+      /** De qué club (`orgs.eco_org_id` allá). */
+      ecoOrgId?: string;
+      /** Quién lo pide: el `eco_sub` del maestro que pulsó el botón. */
+      porEcoSub?: string;
+    },
+  ) {
+    SyncController.puerta(secreto, 'membresias');
+
+    const userId = (body.ecoSub ?? '').trim();
+    const orgId = (body.ecoOrgId ?? '').trim();
+    const porUserId = (body.porEcoSub ?? '').trim();
+    if (!userId || !orgId || !porUserId) {
+      throw new BadRequestException('Faltan `ecoSub`, `ecoOrgId` y `porEcoSub`.');
+    }
+    if (![userId, orgId, porUserId].every((v) => SyncController.esUuid(v))) {
+      throw new BadRequestException('`ecoSub`, `ecoOrgId` y `porEcoSub` son ids de DINAMYT.');
+    }
+
+    const [actor] = await db
+      .select({ esSuper: users.isSuperAdmin, activo: users.isActive })
+      .from(users)
+      .where(eq(users.id, porUserId))
+      .limit(1);
+    if (!actor) throw new BadRequestException('Quien lo pide no tiene cuenta en DINAMYT.');
+    // La ruta del portal exige una sesión viva; esta, al menos, una cuenta viva.
+    if (actor.activo === false) {
+      throw new ForbiddenException('La cuenta de quien lo pide está desactivada.');
+    }
+    await this.orgsService.exigirGestorDe(porUserId, orgId, actor.esSuper === true);
+
+    try {
+      await this.orgsService.removeMember(orgId, userId, porUserId);
+    } catch (e) {
+      // Ya no era del club: lo que se pedía ya está hecho, y Membresías puede
+      // seguir con lo suyo.
+      if (e instanceof NotFoundException) return { encontrada: false, aplicado: false };
+      throw e;
+    }
+    return { encontrada: true, aplicado: true };
+  }
+
   // ── GET /sync/apariencia/:ecoSub — y la vuelta: qué tema tiene hoy ───────
   //
   // ── El hueco que quedaba abierto ──

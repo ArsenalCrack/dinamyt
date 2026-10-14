@@ -1855,6 +1855,33 @@ quien echaron sigue entrando. Con la tabla aparte, fila presente = es miembro, y
 lo que se gana es memoria. La bandeja descarta por consulta a quien ya volvió
 por otro camino.
 
+### Eliminar del club, en Membresías, NO se deshace (migración `0022`)
+
+Desactivar (`DELETE /users/:id`) guarda la ficha entera para quien vuelve.
+Eliminar (`POST /users/:id/eliminar`, solo el maestro) es el segundo gesto:
+
+- **Sin historia** (ni pagos, ni asistencias, ni pagos que haya registrado o
+  pague por otro), la ficha se borra entera.
+- **Con historia**, se vacía: nombre `PERSONA ELIMINADA`, correo
+  `eliminado-<id>@eliminado.invalid`, sin teléfono, foto, sangre, emergencia,
+  PIN ni `eco_sub`, y `eliminado_el` puesto. Pagos y asistencias se quedan:
+  la caja de meses cerrados no cambia.
+- **El portal va primero.** Si la ficha tiene `eco_sub` y el club espejo,
+  Membresías llama a `POST /sync/baja` y ESPERA: es la baja de siempre del
+  portal (reversible allí, con aviso a los gestores). Si el portal dice que
+  no, o no contesta, aquí no se toca nada. Por eso el ecosistema se
+  despliega antes que Membresías: con la ruta sin desplegar, eliminar a un
+  alumno con cuenta DINAMYT contesta que no se pudo.
+- **Toda consulta que enseñe personas sin filtrar por `is_active` tiene que
+  saltarse `eliminado_el`.** Para eso está `deEsteClub` (`lib/filtros.ts`);
+  una consulta nueva que lo olvide enseña «PERSONA ELIMINADA» en una lista.
+- **Un pase de DINAMYT de antes de la baja no lo devuelve.** El canje del SSO
+  crearía una ficha nueva con el club del pase; durante 35 minutos se rechaza
+  (`lib/eliminados-recientes.ts`, en memoria: un reinicio en esa media hora lo
+  olvida).
+- **El superadmin no elimina a quien tenga cuenta DINAMYT**: no tiene ficha en
+  el club en cuyo nombre pedir la baja. Se hace desde el portal.
+
 ### El rol por app solo se escribe cuando alguien lo pide (migración `0020`)
 
 Las columnas `role_membresias`, `role_campeonatos` y `role_academy` son
