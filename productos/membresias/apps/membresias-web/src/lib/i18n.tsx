@@ -694,6 +694,7 @@ const es = {
   // Pie legal
   'legal.derechos': 'Todos los derechos reservados.',
   'legal.nota': 'DINAMYT Membresías es una obra protegida por el derecho de autor.',
+  'legal.ia': 'Desarrollado con asistencia de inteligencia artificial.',
   // El pie es el mismo que el del portal: la misma cuenta, la misma ayuda y el
   // mismo aviso de derechos, se entre por donde se entre.
   'legal.ayuda': '¿Necesitas ayuda?',
@@ -1356,6 +1357,7 @@ const en: Record<ClaveTexto, string> = {
 
   'legal.derechos': 'All rights reserved.',
   'legal.nota': 'DINAMYT Membresías is a work protected by copyright.',
+  'legal.ia': 'Built with the help of artificial intelligence.',
   'legal.ayuda': 'Need help?',
   'legal.privacidad': 'Privacy',
   'legal.portal': 'My DINAMYT account',
