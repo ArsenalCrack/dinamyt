@@ -95,6 +95,21 @@ export function PieLegal() {
           © {años} <strong>{AUTOR}</strong> · {t('legal.derechos')}
         </p>
         <p className="pie-legal-nota">{t('legal.nota')}</p>
+        {/* Lleva a la sección de la política que dice qué hace la IA aquí y
+            qué no. */}
+        <p className="pie-legal-nota">
+          {PORTAL_URL ? (
+            <a
+              href={`${PORTAL_URL}/privacidad#ia`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t('legal.ia')}
+            </a>
+          ) : (
+            t('legal.ia')
+          )}
+        </p>
         {/* Qué versión está corriendo. Faltaba, y es lo primero que hace falta
             saber cuando alguien dice «me sigue pasando»: el portal ya la
             enseñaba y aquí no había forma de saber si la app instalada estaba
