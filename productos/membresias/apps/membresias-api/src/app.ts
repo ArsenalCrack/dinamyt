@@ -15,6 +15,7 @@ import { geoRoutes } from './routes/geo';
 import { authRoutes } from './routes/auth';
 import { orgsRoutes } from './routes/orgs';
 import { usersRoutes } from './routes/users';
+import { eliminarDelClubRoutes } from './routes/eliminar-del-club';
 import { plansRoutes } from './routes/plans';
 import { membershipsRoutes } from './routes/memberships';
 import { paymentsRoutes } from './routes/payments';
@@ -71,6 +72,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(authRoutes);
   void app.register(orgsRoutes);
   void app.register(usersRoutes);
+  void app.register(eliminarDelClubRoutes);
   void app.register(plansRoutes);
   void app.register(membershipsRoutes);
   void app.register(paymentsRoutes);

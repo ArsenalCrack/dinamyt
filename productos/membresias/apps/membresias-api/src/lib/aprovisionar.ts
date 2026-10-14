@@ -2,6 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import type { JwtPayload, MembresiasRole } from '../types/auth';
 import { ROLES_VALIDOS } from '../types/auth';
+import { paseDeAntesDeLaBaja } from './eliminados-recientes';
 
 /**
  * La ficha que nace sola cuando alguien llega del portal DINAMYT.
@@ -136,7 +137,7 @@ export async function asegurarFicha(
   const [suelta] = await db
     .update(users)
     .set({ ecoSub: datos.ecoSub, isActive: true, orgId: datos.clubId, updatedAt: new Date() })
-    .where(and(eq(users.email, correo), isNull(users.ecoSub)))
+    .where(and(eq(users.email, correo), isNull(users.ecoSub), isNull(users.eliminadoEl)))
     .returning();
   if (suelta) return { ficha: suelta, creada: false, enlazada: true };
 
@@ -177,6 +178,8 @@ export async function aprovisionarFicha(
     typeof payload.org_id === 'string' && UUID.test(payload.org_id) ? payload.org_id : null;
   const correo = (payload.email ?? '').trim().toLowerCase();
   if (!sub || !ecoOrgId || !correo) return null;
+  // Un pase de antes de que lo eliminaran de este club no lo devuelve a él.
+  if (paseDeAntesDeLaBaja(sub, ecoOrgId, (payload as { iat?: number }).iat)) return null;
 
   const [club] = await db
     .select({ id: orgs.id, name: orgs.name })

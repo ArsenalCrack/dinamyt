@@ -695,11 +695,23 @@ const es = {
   'legal.derechos': 'Todos los derechos reservados.',
   'legal.nota': 'DINAMYT Membresías es una obra protegida por el derecho de autor.',
   'legal.ia': 'Desarrollado con asistencia de inteligencia artificial.',
+
   // El pie es el mismo que el del portal: la misma cuenta, la misma ayuda y el
   // mismo aviso de derechos, se entre por donde se entre.
   'legal.ayuda': '¿Necesitas ayuda?',
   'legal.privacidad': 'Privacidad',
   'legal.portal': 'Mi cuenta DINAMYT',
+
+  // Eliminar del club (`components/EliminarDelClub.tsx`)
+  'eliminar.titulo': 'Eliminar del club',
+  'eliminar.ayuda': 'Para un alta por error o para quien no va a volver. Desactivar, en cambio, le guarda la ficha por si vuelve.',
+  'eliminar.boton': 'Eliminar del club…',
+  'eliminar.pregunta': 'Vas a eliminar del club a',
+  'eliminar.queBorra': 'Se borran su nombre, correo, teléfono, foto, fecha de nacimiento, datos de emergencia y PIN. Si tiene pagos o asistencias, se quedan en el club sin su nombre; si no tiene, la ficha desaparece entera.',
+  'eliminar.portal': 'También sale del club en DINAMYT, y con eso de Campeonatos y Academy.',
+  'eliminar.sinVuelta': 'En Membresías no se puede deshacer.',
+  'eliminar.si': 'Sí, eliminar del club',
+  'eliminar.hecho': 'Eliminado del club.',
 
   // Mi estado
   'mi.titulo': 'Mi estado',
@@ -1358,9 +1370,20 @@ const en: Record<ClaveTexto, string> = {
   'legal.derechos': 'All rights reserved.',
   'legal.nota': 'DINAMYT Membresías is a work protected by copyright.',
   'legal.ia': 'Built with the help of artificial intelligence.',
+
   'legal.ayuda': 'Need help?',
   'legal.privacidad': 'Privacy',
   'legal.portal': 'My DINAMYT account',
+
+  'eliminar.titulo': 'Remove from the club',
+  'eliminar.ayuda': 'For someone added by mistake or who will not come back. Deactivating, instead, keeps their profile in case they return.',
+  'eliminar.boton': 'Remove from the club…',
+  'eliminar.pregunta': 'You are about to remove from the club:',
+  'eliminar.queBorra': 'Their name, email, phone, photo, date of birth, emergency details and PIN are deleted. If they have payments or attendance, those stay with the club without their name; if not, the profile disappears entirely.',
+  'eliminar.portal': 'They also leave the club in DINAMYT, and with it Championships and Academy.',
+  'eliminar.sinVuelta': 'In Memberships this cannot be undone.',
+  'eliminar.si': 'Yes, remove from the club',
+  'eliminar.hecho': 'Removed from the club.',
 
   'mi.titulo': 'My status',
   'mi.estado': 'Status',

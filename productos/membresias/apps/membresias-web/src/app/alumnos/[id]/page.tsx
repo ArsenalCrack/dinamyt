@@ -26,6 +26,7 @@ import { Avatar } from '@/components/Avatar';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { CampoFecha } from '@/components/CampoFecha';
 import { CampoImagen } from '@/components/CampoImagen';
+import { EliminarDelClub } from '@/components/EliminarDelClub';
 import { Contador } from '@/components/Contador';
 import { Etiqueta, LeyendaObligatorios } from '@/components/Etiqueta';
 import { Carnet } from '@/components/Carnet';
@@ -1574,6 +1575,15 @@ export default function Ficha() {
             onMas={() => setVerAsistencias((n) => n + PASO_HISTORIAL)}
           />
         </div>
+      )}
+
+      {esMaestro && !esMiFicha && persona && persona.role !== 'owner' && (
+        <EliminarDelClub
+          id={id}
+          nombre={persona.fullName}
+          enDinamyt={Boolean(persona.ecoSub)}
+          onEliminado={() => router.push('/alumnos')}
+        />
       )}
     </main>
   );

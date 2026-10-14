@@ -29,7 +29,7 @@ import {
   mensajeSoloEnElPortal,
 } from '../lib/ecosistema';
 import { leerPagina, patron } from '../lib/paginacion';
-import { ACCESOS, ORDENES, opcion, ordenDeGente } from '../lib/filtros';
+import { ACCESOS, ORDENES, deEsteClub, opcion, ordenDeGente } from '../lib/filtros';
 import { todayStr } from '../lib/billing';
 import {
   altaEnDinamyt,
@@ -217,7 +217,7 @@ async function delClub(db: Db, orgId: string, id: string) {
   const [u] = await db
     .select()
     .from(users)
-    .where(and(eq(users.id, id), eq(users.orgId, orgId)))
+    .where(and(eq(users.id, id), deEsteClub(orgId)))
     .limit(1);
   return u ?? null;
 }
@@ -403,7 +403,7 @@ export async function usersRoutes(app: FastifyInstance) {
     };
     const { limit, offset, q } = leerPagina(req.query);
 
-    const conds = [eq(users.orgId, orgId)];
+    const conds = [deEsteClub(orgId)];
     if (role && (ROLES_ASIGNABLES as string[]).concat('owner').includes(role)) {
       conds.push(eq(users.role, role as MembresiasRole));
     } else {
