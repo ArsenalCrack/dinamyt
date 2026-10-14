@@ -566,6 +566,7 @@ Es **el trabajo más grande de todos**, más que la identidad.
 
 | Qué | Por qué | Dónde |
 |---|---|---|
+| **El PIN deja marcar asistencia a quien tiene el acceso cortado** | `POST /checkin` con PIN busca la membresía y no mira `users.is_active`; el carnet QR sí (`ensureMembership`). Visto el 14 oct | `membresias-api/src/routes/checkin.ts`, la rama `type === 'pin'` |
 | **Ensayar una restauración completa** del respaldo en una base de usar y tirar | MONTAR-VPS fase 5 ya no tiene receta probada: un respaldo que nunca se ha restaurado es una esperanza | MONTAR-VPS §5 y §10.1 |
 | Las seis columnas de **día** a tipo `date` | `birth_date` (×2) y los `starts_at`/`ends_at` de las suscripciones siguen como `timestamp` a medianoche. No corre prisa; va con su cambio en `common/ciclo.ts` | `OPERAR.md` §5.1-bis |
 | El **selector de apps** dentro de cada app | Hoy se salta de una app a otra pasando por el portal. Necesita saber qué abre cada quien (§4.2) | Las cuatro webs |
