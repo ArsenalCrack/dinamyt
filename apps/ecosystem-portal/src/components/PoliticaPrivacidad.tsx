@@ -1,8 +1,29 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { CORREO_ADMIN, CORREO_SOPORTE } from '@/lib/contacto';
 import { useI18n } from '@/lib/i18n';
+
+/** Un apartado de la política: el título se escribe igual en todos. */
+function Seccion({
+  titulo,
+  id,
+  children,
+}: {
+  titulo: string;
+  id?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id}>
+      <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text)' }}>
+        {titulo}
+      </h2>
+      {children}
+    </section>
+  );
+}
 
 /**
  * El cuerpo de la política de privacidad.
@@ -46,10 +67,7 @@ export function PoliticaPrivacidad() {
         className="flex flex-col gap-6 text-sm leading-relaxed"
         style={{ color: 'var(--text-muted)' }}
       >
-        <section>
-          <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text)' }}>
-            {t('priv.queDatos')}
-          </h2>
+        <Seccion titulo={t('priv.queDatos')}>
           <ul className="list-disc space-y-1 pl-5">
             <li>
               <strong style={{ color: 'var(--text)' }}>{t('priv.identificacion')}</strong>{' '}
@@ -68,32 +86,51 @@ export function PoliticaPrivacidad() {
               <strong style={{ color: 'var(--text)' }}>{t('priv.pago')}</strong>{' '}
               {t('priv.pagoA')} <strong>{t('priv.noProcesa')}</strong> {t('priv.pagoB')}
             </li>
+            <li>
+              <strong style={{ color: 'var(--text)' }}>{t('priv.tecnicos')}</strong>{' '}
+              {t('priv.tecnicosTexto')}
+            </li>
           </ul>
-        </section>
+        </Seccion>
 
-        <section>
-          <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text)' }}>
-            {t('priv.paraQue')}
-          </h2>
+        <Seccion titulo={t('priv.paraQue')}>
           <ul className="list-disc space-y-1 pl-5">
             <li>{t('priv.uso1')}</li>
             <li>{t('priv.uso2')}</li>
             <li>{t('priv.uso3')}</li>
             <li>{t('priv.uso4')}</li>
+            <li>{t('priv.uso5')}</li>
           </ul>
-        </section>
+        </Seccion>
 
-        <section>
-          <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text)' }}>
-            {t('priv.conQuien')}
-          </h2>
+        <Seccion titulo={t('priv.conQuien')}>
           <p>{t('priv.conQuienTexto')}</p>
-        </section>
+        </Seccion>
 
-        <section>
-          <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text)' }}>
-            {t('priv.derechos')}
-          </h2>
+        <Seccion titulo={t('priv.proveedores')}>
+          <p className="mb-2">{t('priv.proveedoresIntro')}</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>{t('priv.prov1')}</li>
+            <li>{t('priv.prov2')}</li>
+            <li>{t('priv.prov3')}</li>
+            <li>{t('priv.prov4')}</li>
+            <li>{t('priv.prov5')}</li>
+          </ul>
+          <p className="mt-2">{t('priv.proveedoresCierre')}</p>
+        </Seccion>
+
+        {/* Los pies del portal, de Membresías y de Campeonatos enlazan a
+            `/privacidad#ia`: este `id` no se renombra sin tocar los otros dos
+            repositorios. */}
+        <Seccion titulo={t('priv.ia')} id="ia">
+          <p>{t('priv.iaTexto')}</p>
+        </Seccion>
+
+        <Seccion titulo={t('priv.cookies')}>
+          <p>{t('priv.cookiesTexto')}</p>
+        </Seccion>
+
+        <Seccion titulo={t('priv.derechos')}>
           <p>
             {t('priv.derechosA')}{' '}
             <Link href="/perfil" style={{ color: 'var(--gold)' }}>
@@ -102,21 +139,23 @@ export function PoliticaPrivacidad() {
             {t('priv.derechosB')}{' '}
             <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
               {CORREO_ADMIN}
-            </a>
+            </a>{' '}
             {t('priv.derechosC')}{' '}
             <a href={`mailto:${CORREO_SOPORTE}`} style={{ color: 'var(--gold)' }}>
               {CORREO_SOPORTE}
             </a>
             {t('priv.derechosD')}
           </p>
-        </section>
+          <p className="mt-2">{t('priv.sic')}</p>
+        </Seccion>
 
-        <section>
-          <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text)' }}>
-            {t('priv.seguridad')}
-          </h2>
+        <Seccion titulo={t('priv.supresion')}>
+          <p>{t('priv.supresionTexto')}</p>
+        </Seccion>
+
+        <Seccion titulo={t('priv.seguridad')}>
           <p>{t('priv.seguridadTexto')}</p>
-        </section>
+        </Seccion>
       </div>
 
       <footer className="mt-10 border-t pt-6" style={{ borderColor: 'var(--border)' }}>

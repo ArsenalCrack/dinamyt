@@ -943,6 +943,10 @@ DATABASE_URL=postgresql://dinamyt_eco:CLAVE_ECO@127.0.0.1:5432/dinamyt
 DB_SCHEMA=ecosystem
 JWT_PRIVATE_KEY_PATH=./keys/private.pem
 JWT_PUBLIC_KEY_PATH=./keys/public.pem
+# Cifra las notas médicas. Sin ella NO se pueden guardar, y si se pierde lo
+# cifrado no se recupera: guárdala también fuera del servidor (OPERAR §1.4).
+# Se genera con: openssl rand -base64 48 | tr -d '\n/+='
+FIELD_ENCRYPTION_KEY=
 # Lo que dura el PASE, no la sesión. Desde que las sesiones se pueden cerrar
 # (tabla `ecosystem.sessions`), el token es un pase de media hora que el
 # navegador renueva solo contra POST /auth/refresh; la sesión vive en la base y
@@ -1534,8 +1538,12 @@ cd /srv/dinamyt/packages/academy-db && pnpm db:migrar
 
 # Anexo D · Encender el proxy de Cloudflare (la nube naranja)
 
-Hoy los registros están en **DNS only** (nube gris): Cloudflare solo dice dónde
-está el servidor y el tráfico va directo a él. Con el proxy encendido, Cloudflare
+**Está encendido** *(comprobado el 13 oct 2026: los cuatro nombres responden
+`Server: cloudflare`)*, así que Cloudflare ve todo el tráfico en claro y la
+política de privacidad lo nombra como proveedor.
+
+Al montar, los registros quedan en **DNS only** (nube gris): Cloudflare solo
+dice dónde está el servidor y el tráfico va directo a él. Con el proxy encendido, Cloudflare
 se pone **en medio**: esconde la IP del servidor, absorbe los ataques de volumen,
 sirve las imágenes desde su borde y filtra basura antes de que llegue a tus 8 GB
 de RAM.

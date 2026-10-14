@@ -25,12 +25,13 @@
 | Membresías | En la VPS con `5736acd` (26 sep, 13:04) |
 | Academy | **No está montada**: ni servicios, ni `.env`, ni Caddy, ni DNS. En código, entera: 24/24 pruebas |
 | Fotos en disco | **Encendidas**: `MEDIA_PUBLIC_URL` y `MEDIA_DIR` puestos, 30 imágenes en `/srv/dinamyt-media`. Las sirve Node, no Caddy |
-| **Respaldos diarios** | ⚠️ **Siguen vacíos**: los seis `.dump` del 26 sep al 1 oct pesan 0 bytes. El crontab viejo sigue puesto y el temporizador no está instalado (tarea 3) |
+| Respaldos diarios | **Funcionan desde el 13 oct**: `dinamyt-respaldo.timer` a las 03:00. El primero pesa 718 KB (53 tablas con datos, `pg_restore` lo lee) y lleva 30 archivos de 30. Falta sacar una copia del servidor (tarea 3) |
 | Secretos de sync por app | Sin poner: el `.env` del ecosistema no tiene ningún `SYNC_SECRET_*` (tarea 5) |
 | DMARC | Sigue en `p=none` (tocaba subirlo desde el 12 sep) |
 | Google | Propiedad verificada (etiqueta y TXT) |
 | Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 6) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
+| Política de privacidad | Reescrita contra el código el 13 oct (terceros, IA, qué se cifra, qué se conserva). **En git, sin desplegar**: rama `feat/privacidad-completa` aquí y `feat/aviso-ia` en Membresías y Campeonatos |
 
 ---
 
@@ -38,9 +39,10 @@
 
 | # | Qué | De qué es | Tamaño |
 |---|---|---|---|
+| 0 | [**Cumplir lo que la política promete**](#0--cumplir-lo-que-la-política-promete), y revisar el código con thermos y anti-slop | Decisiones tuyas + código | Días, por fases |
 | 1 | [Probar lo desplegado](#1--probar-lo-desplegado), candado y publicación en vivo incluidos | A mano | 2–3 h |
 | 2 | [DMARC a `quarantine`](#2--dmarc-a-quarantine) | DNS | 15 min, y mirar informes antes |
-| 3 | [**Los respaldos diarios estaban vacíos**](#3--los-respaldos-diarios-estaban-vacíos--y-las-fotos-no-entraban) | **Tú**: instalar el temporizador | 20 min — **ya** |
+| 3 | [La copia del respaldo fuera del servidor, y lo que queda de las fotos](#3--la-copia-del-respaldo-fuera-del-servidor-y-lo-que-queda-de-las-fotos) | **Tú**: un `scp` a la semana | 5 min |
 | 4 | [Rotar o cerrar los proyectos de Supabase](#4--rotar-o-cerrar-los-proyectos-de-supabase) | Cuentas | 15 min |
 | 5 | [Un secreto de sincronización por app](#5--un-secreto-de-sincronización-por-app--falta-ponerlo-en-la-vps) | **Tú**: poner los valores | 20 min |
 | 6 | [La CSP, de informe a estricta](#6--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Desde el 3 oct |
@@ -50,13 +52,154 @@
 | 10 | [Deuda pequeña](#10--deuda-pequeña) | Varios | Cuando toque |
 | — | [En espera: WhatsApp y F9](#en-espera) | — | — |
 
-**Por qué este orden.** Del 1 al 4 cuestan minutos y cierran riesgos que ya
+**Por qué este orden.** El 0 va delante porque es lo único de la lista que
+puede acabar en un reclamo ante la SIC: la política promete borrar una cuenta y
+no existe con qué hacerlo. Del 1 al 4 cuestan minutos y cierran riesgos que ya
 existen hoy. El 5 y el 6 son seguridad de lo que está en producción todos los
 días. La arquitectura del evento ya está entera en código —el candado de sede y
 la publicación en vivo, `OPERAR.md` §4.25—; lo que le falta es la prueba a mano
 de la tarea 1. **Si aparece una fecha de campeonato, esa prueba, el ensayo
 (`OPERAR.md` §2.9) y el simulacro (`INICIAR-LOCAL.md` §0) pasan delante de
 todo.**
+
+---
+
+## 0 · Cumplir lo que la política promete
+
+Sale de la auditoría del 13 de octubre de 2026 contra la Ley 1581 de 2012. La
+política (`/privacidad`, la única de las cuatro apps: las demás la enlazan) ya
+describe lo que el código hace. Lo que sigue es lo que el código todavía **no**
+hace, o lo que solo tú puedes decidir.
+
+### 0.0 · Antes de desplegar la política: la clave de cifrado
+
+**Las notas médicas se han guardado en claro**: `FIELD_ENCRYPTION_KEY` no está
+en el `.env` de la VPS (comprobado el 13 oct). El código nuevo se niega a
+guardarlas sin clave, así que el orden importa:
+
+1. Generar la clave, **guardarla en tu gestor de contraseñas** y ponerla en
+   `/srv/dinamyt/apps/ecosystem-api/.env` (`MONTAR-VPS.md` §6.3 y §6.8).
+2. Desplegar el ecosistema (`OPERAR.md` §2.3).
+3. `pnpm --filter @dinamyt/ecosystem-api notas:cifrar`, mirar el conteo, y
+   repetir con `--aplicar`. Tiene que acabar en «no queda ninguna en claro».
+4. Borrar los proyectos de Supabase (tarea 4): mientras existan, hay un
+   proveedor con copia de los datos que la política no nombra.
+
+### 0.1 · Lo que solo tú puedes poner — 20 min
+
+- **Quién es el responsable.** La política dice «DINAMYT Ecosystem» y dos
+  correos. El Decreto 1377 de 2013 (art. 13) pide nombre o razón social,
+  domicilio, dirección y teléfono. Dímelos y van a `priv.actualizado`.
+- **La región del servidor** (panel de Contabo). La política nombra a Contabo
+  GmbH (Alemania) como empresa; falta saber dónde está la máquina.
+- **Borrar los tres proyectos de Supabase** (tarea 4), no pausarlos: son una
+  copia de datos personales en un proveedor que la política no nombra.
+- **Una consulta con abogado**, con tres preguntas: el reparto
+  responsable/encargado entre DINAMYT y cada club (el maestro da de alta
+  alumnos que nunca aceptaron nada), si aplica el Registro Nacional de Bases de
+  Datos, y cuánto tiempo se conservan pagos y resultados.
+
+### 0.2 · Borrar una cuenta de verdad
+
+**Hoy no existe.** Ni en el portal, ni en ningún guion: `users.controller.ts`
+no tiene `DELETE`, y la política manda escribir a `admin@`. Atender una
+solicitud sería SQL a mano sobre 20 tablas de `ecosystem` (14 con llave foránea
+a `users`, 13 de ellas sin `ON DELETE`), más la ficha de Membresías, el usuario y el
+competidor de Campeonatos, y las tablas de Academy.
+
+Tres decisiones tuyas, con lo que recomiendo:
+
+| Decisión | Recomendación |
+|---|---|
+| Resultados de campeonatos de quien se va | Conservar los oficiales ya publicados, con nombre: es el registro del evento. Borrar inscripciones que no llegaron a competir |
+| Pagos que el club le cobró | Conservarlos sin datos personales: la contabilidad del club no puede cambiar de total |
+| Botón «Eliminar mi cuenta» o solo por soporte | Primero un guion (`scripts/suprimir-persona.mjs`, con `--ensayo` que solo cuenta filas); el botón, después y con 7 días de gracia |
+
+Cómo: el ecosistema manda, como en el resto del espejo. Borra lo suyo y avisa
+con `POST /sync/supresion` a Membresías y a Campeonatos (el secreto por app de
+la tarea 5); Academy se limpia por `ecosystem_user_id`. Deja una fila de
+constancia sin datos personales: es la prueba de que se atendió.
+
+Trampas ya vistas:
+
+- **Tres copias que no caen solas.** `org_member_bajas` sí se borra en cascada,
+  pero su `removed_by_user_id` no tiene `ON DELETE`; `org_notifications.data`
+  guarda nombre y correo dentro de un `jsonb`; y `org_invitations.email` no
+  tiene llave foránea.
+- **Las fotos van por hash de contenido** (§4.20): se borra el archivo solo si
+  nadie más apunta a él.
+- **El PC del evento vuelve a publicar** (decisión 9): un competidor borrado
+  arriba reaparece si el local lo sube otra vez.
+- **Los respaldos guardan 14 días.** La política ya lo dice; restaurar uno
+  obliga a repetir las supresiones de esos días, y para eso sirve la constancia.
+
+**Se despliega con un respaldo recién hecho delante** (`OPERAR.md` §2.5).
+
+### 0.3 · Que el maestro pueda eliminar a alguien de su club
+
+En Membresías, `DELETE /users/:id` desactiva y nada más; la ficha se queda para
+siempre en «sin acceso». Falta el segundo gesto, para el alta por error y para
+quien no vuelve.
+
+- Sin pagos ni asistencias: se borra la ficha entera.
+- Con historia: se vacía la ficha (nombre, correo, teléfono, foto, nacimiento,
+  sangre, emergencia, PIN, `eco_sub`) y se marca con una columna nueva
+  `eliminado_el` (migración `0022`). Pagos y asistencias quedan, anónimos.
+- **Toda consulta que hoy enseña a los «sin acceso» tiene que saltarse a los
+  eliminados.** Las que ya filtran por `is_active` (roster, avisos, informes,
+  calendario) los dejan fuera solas; las que no (`GET /users`, la ficha, los
+  nombres de `/attendances`) son las que hay que tocar. Si se olvida una, el
+  eliminado reaparece como «ALUMNO ELIMINADO» en una lista.
+- No toca al último maestro con acceso, ni a uno mismo (§4.7-bis).
+- Se pregunta antes (§4.9-bis), diciendo qué se borra y qué queda.
+
+Se escribe en `D:\Repositorios\dinamyt-membresias`. Reiniciar es migrar: con
+respaldo delante.
+
+### 0.4 · Lo que la política dice y nada obliga
+
+- **El contacto de emergencia y el tipo de sangre no van cifrados.** La
+  política ya lo dice así. Cifrarlos es posible en el ecosistema; la copia de
+  Membresías se imprime en el carnet.
+- **Lo que no caduca nunca**: `otp_codes`, `org_notifications` y las
+  invitaciones y solicitudes ya respondidas. (Las sesiones sí se borran, un mes
+  después de caducar; en `audit_auth` no escribe nadie.) Fijar un plazo y purgar.
+- **Las copias que no rotan**: los volcados manuales de `/var/backups/`, la
+  carpeta `D:\dinamyt-migracion\respaldos\` y los snapshots de Contabo. La
+  política dice que se renuevan; falta decidir cada cuánto y borrar los viejos.
+- **«Los menores se registran con autorización de su acudiente»** es una
+  costumbre (§1.5), no una regla: el registro valida la fecha (entre 3 y 100
+  años) pero no distingue a quien tiene menos de 18.
+- **Quien ya aceptó la política vieja no sabe que cambió.** Un cambio de fondo
+  se comunica, y `data_consent_at` no guarda qué versión se aceptó.
+- **Ningún asistente de IA recibe filas reales.** La política dice que la
+  aplicación no envía datos a proveedores de IA; para que también sea verdad de
+  la operación, al depurar se pegan conteos, nunca datos de personas.
+- **El alumno sin cuenta** (carnet QR o PIN) nunca aceptó la política. Va en la
+  consulta de 0.1.
+- **Membresías sola, sin portal, no enlaza ninguna política.**
+- **La casilla del registro** está escrita a mano en castellano (tarea 8).
+
+### 0.5 · Antes de encender Academy (tarea 7)
+
+- No tiene pie: ni privacidad, ni soporte, ni la línea de IA.
+- Los videos se incrustan desde `www.youtube.com` y `drive.google.com`, que
+  ponen sus cookies. Pasar a `youtube-nocookie.com` y nombrar a los dos en la
+  política.
+- **El microservicio de figuras analiza la postura con un modelo** (MediaPipe).
+  Corre en nuestro servidor, pero es IA que mira imágenes de alumnos, muchos
+  menores: hoy la política dice que la aplicación no usa IA, y deja de ser
+  verdad el día que esto se encienda.
+
+### 0.6 · Revisar el código que ya existe
+
+- **thermos** (dos revisores: fallos y seguridad, y calidad) sobre cada rama
+  antes de fusionarla. Se lanza con `/thermos`.
+- **anti-slop en modo «after»**, una app cada vez: portal, Membresías,
+  Campeonatos, Academy. Deja una lista numerada en `anti-slop/`, tú eliges los
+  números y solo esos se tocan.
+- **`/claude-api prompt-audit`** al cambiar de modelo. El 13 oct salió limpio.
+  La skill `frontend-design` del repo va por detrás de la de `anthropics/skills`.
 
 ---
 
@@ -124,32 +267,15 @@ se actualiza `OPERAR.md` §3.1 y §3.5 y esto se borra.
 
 ---
 
-## 3 · Los respaldos diarios estaban vacíos — y las fotos no entraban
+## 3 · La copia del respaldo fuera del servidor, y lo que queda de las fotos
 
-⚠️ **Lo más urgente de la lista.** Comprobado el 26 sep 2026, y otra vez el
-1 oct (seis volcados más, todos vacíos): **todos los volcados diarios de
-`/var/backups/dinamyt/` pesan 0 bytes.** La línea del
-crontab de `dinamyt` usa `sudo -u postgres`, `sudo` pide contraseña, en el cron
-nadie la teclea, y el `2>/dev/null` se tragaba el error. Los únicos respaldos
-buenos son los manuales (`/var/backups/respaldo-2026-09-26.dump`, de las 09:53).
-Y aunque el volcado funcionara, no incluía las fotos, que viven en disco desde
-§4.20.
+El respaldo diario funciona desde el 13 de octubre de 2026 (`OPERAR.md` §2.5).
+Lo que no hace solo es salir del servidor, y **un respaldo que solo vive en la
+misma máquina no es un respaldo**. Una vez por semana, desde tu PC:
 
-**El código ya está**: `scripts/respaldo-diario.sh` corre como root desde un
-temporizador de systemd, comprueba que `pg_restore` sabe leer el volcado,
-empaqueta `/srv/dinamyt-media` y `/srv/uploads`, guarda 14 días y **falla en voz
-alta**. Lo que falta es tuyo, en la VPS, después del `git pull` del ecosistema:
-
-1. Quita la línea vieja: `crontab -e` (como `dinamyt`) y borra las dos líneas
-   que empiezan por `0 3` y `30 3`.
-2. Instala el temporizador: los cuatro bloques de **MONTAR-VPS §10.1**, tal cual.
-3. Comprueba que el último `.dump` de `ls -lh /var/backups/dinamyt/` pesa
-   cientos de KB y que hay un `archivos-….tar.gz`.
-4. Bájate una copia a tu PC (la semanal de siempre):
-
-   ```powershell
-   scp dinamyt@80.190.78.70:/var/backups/dinamyt/*-$(Get-Date -Format yyyy-MM-dd).* D:\dinamyt-migracion\respaldos\
-   ```
+```powershell
+scp dinamyt@80.190.78.70:/var/backups/dinamyt/*-$(Get-Date -Format yyyy-MM-dd).* D:\dinamyt-migracion\respaldos\
+```
 
 **Y lo que queda de las fotos**, cuando haya un rato:
 
@@ -305,7 +431,8 @@ Caddy → **y solo entonces** el registro `A academy` en Cloudflare, en naranja.
 - `free -h` antes y después: son dos servicios Node más sobre los seis que ya
   hay en 8 GB;
 - `curl -s https://academy.dinamyt.org/api/health` al final;
-- `/srv/uploads/academy` en el respaldo (tarea 3).
+- que `/srv/uploads/academy` salga en el `archivos-….tar.gz` de la mañana
+  siguiente (el respaldo ya empaqueta `/srv/uploads` entero).
 
 ### C · Configurarla
 
@@ -330,7 +457,7 @@ recompilar el portal (§2.3). **Solo cuando A, B y C estén hechos.**
 | Un cambio de rol en el portal no le llega después de la primera entrada | Decidir: como Campeonatos (D9, `roles_del_portal`) o dejar que mande el rol local |
 | El portal no enseña `GET /users/:id/academy-summary` (RF-ACA-04: cinturón, evaluaciones, último avance) | Decidir dónde (el perfil del alumno) y **con qué credencial**: el requisito pide un token de servicio y hoy la ruta acepta el pase del usuario |
 | El microservicio de figuras no tiene receta de despliegue | Unidad `systemd` con el `venv` de Python, el modelo `pose_landmarker_lite.task` y `uvicorn` en `:3009`; medir su RAM (MediaPipe) antes de decidir si vive en esta VPS. Sin él, Academy funciona entera salvo las figuras |
-| Los archivos van a disco (`ACADEMY_UPLOADS_DIR`), no a Supabase Storage como decía RF-ACA-11 | Está bien así en la VPS; lo que falta es respaldarlos (tarea 3) |
+| Los archivos van a disco (`ACADEMY_UPLOADS_DIR`), no a Supabase Storage como decía RF-ACA-11 | Está bien así en la VPS: el respaldo diario ya empaqueta `/srv/uploads` |
 | El trabajo sin conexión de la PWA (service worker) | Después de abrir |
 | El plan vencido | **No hace falta nada**: sin login propio, toda entrada pasa por un pase que ya no trae `academy` |
 

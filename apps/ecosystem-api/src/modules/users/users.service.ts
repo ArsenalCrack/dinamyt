@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { db } from '../../db';
 import {
   users,
@@ -12,7 +12,11 @@ import {
 import { eq, and, gt, lt, inArray, isNull, sql } from 'drizzle-orm';
 import { ROLES_GESTOR } from '../../common/roles';
 import { normalizarCorreo } from '../../common/validacion';
-import { encryptField, decryptField } from '../../common/crypto';
+import {
+  cifradoApagadoEnProduccion,
+  encryptField,
+  decryptField,
+} from '../../common/crypto';
 import { espejarPersona, espejarContrasena } from '../../common/espejo-membresias';
 import * as bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
@@ -381,6 +385,14 @@ export class UsersService {
       localeManual?: boolean;
     },
   ) {
+    // Dicho aquí y no dejado a `encryptField`, que lanzaría un 500 sin
+    // explicación: quien guarda su perfil tiene que saber que es la nota la que
+    // no entra, y que lo demás no se perdió por un fallo suyo.
+    if (data.medicalNotes && cifradoApagadoEnProduccion()) {
+      throw new ServiceUnavailableException(
+        'Las notas médicas no se pueden guardar en este momento. Escríbenos a soporte.',
+      );
+    }
     const [row] = await db
       .update(users)
       .set({

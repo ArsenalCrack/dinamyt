@@ -91,6 +91,7 @@ nunca depende de que alguien se acordara de sincronizar.
 | `SYNC_SECRET_MEMBRESIAS` · `SYNC_SECRET_CAMPEONATOS` (ecosystem-api) ↔ `ECOSYSTEM_SYNC_SECRET` (en cada app) | las tres APIs | **Un secreto por app** (`common/secreto-sync.ts`): cada variable del ecosistema vale lo mismo que el `ECOSYSTEM_SYNC_SECRET` de SU app, y el de una app no abre las rutas de la otra (ni pide sus altas). Un `ECOSYSTEM_SYNC_SECRET` en el ecosistema es el compartido de antes: se acepta en todo con un `WARN [SecretoSync]` hasta que se quite. Si falta: en Membresías: la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan — el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7). En **Campeonatos**: el tema y el idioma **no viajan en ninguna de las dos direcciones** (§4.21), y el juez que se da de alta en `/admin` nace con contraseña de allí, **sin cuenta de DINAMYT** (§4.4). Es a propósito que el PC del evento NO la lleve |
 | `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
 | `MEDIA_PUBLIC_URL` | ecosystem-api | **El interruptor de las fotos en disco** (§4.20). Sin ella no falla nada: las imágenes se siguen guardando incrustadas en la fila, como siempre. Con ella van al disco **y** el espejo las manda absolutas — las dos cosas a la vez, y por eso es una sola variable. ⚠️ **Tiene que ser `https://`**: Membresías solo acepta `data:` o `https://`, y su rechazo es mudo |
+| `FIELD_ENCRYPTION_KEY` | ecosystem-api | **Las notas médicas no se pueden guardar**: el perfil contesta 503 y el arranque deja un `WARN [Cifrado]`. Es a propósito: hasta el 13 oct 2026 se guardaban **en claro y sin avisar** mientras la política decía «cifradas». La guarda solo actúa con `NODE_ENV=production`. ⚠️ **No está en el respaldo diario, y si se pierde lo cifrado no se recupera con nada**: guárdala también fuera del servidor. Lo que quedó en claro de antes se cifra con `pnpm --filter @dinamyt/ecosystem-api notas:cifrar` (ensayo) y `notas:cifrar --aplicar` |
 
 ## 1.5 Lo que nunca se hace
 
@@ -117,6 +118,12 @@ nunca depende de que alguien se acordara de sincronizar.
   cerrar un club de verdad, **primero se desactiva**.
 - **Romper el modo local de Campeonatos.** Sin internet, sin ecosistema, tiene
   que arrancar igual: es la marcha atrás del día del evento.
+- **Cambiar qué se guarda de una persona, o a qué proveedor va, sin cambiar la
+  política.** `/privacidad` (claves `priv.*` del portal) es la única de las
+  cuatro apps y es lo que cada quien aceptó al registrarse: una columna nueva
+  con un dato personal, un servicio externo nuevo o un cifrado que se quita van
+  en el mismo commit que su frase. Lo que hoy promete y todavía no se sostiene
+  está en `HOJA-DE-RUTA.md`, tarea 0.
 
 ## 1.6 Las decisiones de fondo
 
@@ -296,8 +303,12 @@ systemctl status dinamyt-respaldo --no-pager | head -5 && ls -lh /var/backups/di
 ```
 
 > ⚠️ **Un respaldo de 0 bytes no es un respaldo**, y así estuvieron los
-> diarios durante semanas hasta el 26 sep 2026 (el cron viejo usaba `sudo`
+> diarios durante semanas, hasta el 13 oct 2026 (el cron viejo usaba `sudo`
 > sin nadie que tecleara la contraseña). Mirar el tamaño es parte de mirar.
+>
+> `systemctl --failed` enseña siempre dos unidades del arranque de la imagen
+> de Contabo (`cloud-init` y `systemd-networkd-wait-online`). No son nuestras:
+> un respaldo fallido sería la tercera.
 
 ## 2.6 Diagnóstico de la base
 

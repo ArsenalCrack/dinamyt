@@ -1,6 +1,8 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { cifradoApagadoEnProduccion } from './common/crypto';
 import { json, urlencoded } from 'express';
 import { mkdirSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
@@ -83,6 +85,15 @@ async function bootstrap() {
       'X-Idioma',
     ],
   });
+
+  // Arranca igual —sin esto no entra nadie a ninguna de las tres apps—, pero
+  // que conste en el registro: es la única señal de que las notas médicas no
+  // se van a poder guardar.
+  if (cifradoApagadoEnProduccion()) {
+    new Logger('Cifrado').warn(
+      'FIELD_ENCRYPTION_KEY no está puesta: las notas médicas no se pueden guardar. OPERAR.md §1.4.',
+    );
+  }
 
   const port = process.env.PORT ?? 3001;
   await app.listen(port);

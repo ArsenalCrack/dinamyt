@@ -105,6 +105,13 @@ export function PieDePagina() {
         <p className="mt-0.5 text-xs opacity-75">
           {t('pie.obra')}
         </p>
+        {/* Lleva a la sección de la política que dice qué hace la IA aquí y
+            qué no: la frase sola no contesta lo que quien la lee quiere saber. */}
+        <p className="mt-0.5 text-xs opacity-75">
+          <Link href="/privacidad#ia" className="underline underline-offset-2">
+            {t('pie.ia')}
+          </Link>
+        </p>
         {/* La versión que está corriendo. Va aquí, al final del todo, porque no
             es algo que nadie venga a buscar — es algo que hace falta tener a
             mano el día que alguien dice «me sigue pasando». */}

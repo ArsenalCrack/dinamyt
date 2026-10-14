@@ -4,8 +4,11 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypt
  * Cifrado de campos sensibles a nivel de aplicación (AES-256-GCM). La clave sale de
  * `FIELD_ENCRYPTION_KEY` (cualquier cadena; se deriva a 32 bytes con SHA-256).
  *
- * - Si NO hay clave (dev/tests), guarda en claro y descifra lo que esté en claro:
- *   el sistema sigue funcionando sin secretos configurados.
+ * - Si NO hay clave en dev o en pruebas, guarda en claro y descifra lo que esté
+ *   en claro: el sistema sigue funcionando sin secretos configurados.
+ * - **En producción, sin clave no se guarda.** La política de privacidad dice
+ *   que estos campos van cifrados, y un `.env` sin la variable los estuvo
+ *   guardando en claro sin avisar hasta octubre de 2026. Ver OPERAR.md §1.4.
  * - Los valores cifrados llevan el prefijo `enc:v1:` para distinguirlos del legado.
  */
 const PREFIX = 'enc:v1:';
@@ -16,10 +19,22 @@ function getKey(): Buffer | null {
   return createHash('sha256').update(raw).digest();
 }
 
+/** Producción sin clave: lo que hay que cifrar no se puede guardar. */
+export function cifradoApagadoEnProduccion(): boolean {
+  return process.env.NODE_ENV === 'production' && getKey() === null;
+}
+
 export function encryptField(plain: string | null | undefined): string | null {
   if (plain == null || plain === '') return plain ?? null;
   const key = getKey();
-  if (!key) return plain; // dev sin clave: en claro
+  if (!key) {
+    if (cifradoApagadoEnProduccion()) {
+      throw new Error(
+        'FIELD_ENCRYPTION_KEY no está puesta: en producción no se guarda un dato sensible en claro.',
+      );
+    }
+    return plain; // dev y pruebas sin clave: en claro
+  }
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);

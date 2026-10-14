@@ -1,4 +1,4 @@
-import { encryptField, decryptField } from './crypto';
+import { cifradoApagadoEnProduccion, encryptField, decryptField } from './crypto';
 
 describe('crypto de campos sensibles', () => {
   const KEY = 'clave-de-prueba-super-secreta';
@@ -22,5 +22,34 @@ describe('crypto de campos sensibles', () => {
   it('null/vacío se mantienen', () => {
     expect(encryptField(null)).toBeNull();
     expect(decryptField(null)).toBeNull();
+  });
+
+  describe('en producción', () => {
+    const entorno = process.env.NODE_ENV;
+    beforeEach(() => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.FIELD_ENCRYPTION_KEY;
+    });
+    afterEach(() => {
+      process.env.NODE_ENV = entorno;
+      delete process.env.FIELD_ENCRYPTION_KEY;
+    });
+
+    it('sin clave: se niega a guardar en claro', () => {
+      expect(cifradoApagadoEnProduccion()).toBe(true);
+      expect(() => encryptField('asma leve')).toThrow(/FIELD_ENCRYPTION_KEY/);
+    });
+
+    it('sin clave: vaciar el campo y leer lo que ya estaba en claro siguen funcionando', () => {
+      expect(encryptField('')).toBe('');
+      expect(encryptField(null)).toBeNull();
+      expect(decryptField('alergia a la penicilina')).toBe('alergia a la penicilina');
+    });
+
+    it('con clave: cifra como siempre', () => {
+      process.env.FIELD_ENCRYPTION_KEY = KEY;
+      expect(cifradoApagadoEnProduccion()).toBe(false);
+      expect(decryptField(encryptField('asma leve'))).toBe('asma leve');
+    });
   });
 });
