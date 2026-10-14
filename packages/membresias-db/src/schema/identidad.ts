@@ -189,6 +189,12 @@ export const users = mem.table(
     theme: varchar('theme', { length: 16 }),
     /** Su idioma (`es-CO`, `en-US`…). Mismo reparto que `theme`. */
     locale: varchar('locale', { length: 10 }),
+    /**
+     * Cuándo la sacó su maestro del club con «Eliminar del club»: la fila
+     * quedó vaciada para que sus pagos y asistencias sigan sumando. Las
+     * consultas de gente se la saltan con `deEsteClub` (`lib/filtros.ts`).
+     */
+    eliminadoEl: timestamp('eliminado_el', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },

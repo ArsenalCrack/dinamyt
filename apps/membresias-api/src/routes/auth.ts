@@ -312,7 +312,11 @@ export async function authRoutes(app: FastifyInstance) {
           ? await db.select().from(users).where(eq(users.ecoSub, sub)).limit(1)
           : [];
         if (!u && correo) {
-          [u] = await db.select().from(users).where(eq(users.email, correo)).limit(1);
+          [u] = await db
+            .select()
+            .from(users)
+            .where(and(eq(users.email, correo), isNull(users.eliminadoEl)))
+            .limit(1);
 
           // ── El enlace que faltaba ──
           //

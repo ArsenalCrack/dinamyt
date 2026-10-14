@@ -566,7 +566,7 @@ export async function syncRoutes(app: FastifyInstance) {
         const [porCorreo] = await db
           .select(columnas)
           .from(users)
-          .where(and(eq(users.email, correo), isNull(users.ecoSub)))
+          .where(and(eq(users.email, correo), isNull(users.ecoSub), isNull(users.eliminadoEl)))
           .limit(1);
         if (porCorreo) {
           const [atada] = await db

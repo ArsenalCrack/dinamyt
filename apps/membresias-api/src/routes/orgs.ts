@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, ilike, ne, or, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
 import { orgs, users } from '@dinamyt/membresias-db';
 import {
   orgDelRequest,
@@ -8,6 +8,7 @@ import {
   requireSuperAdmin,
 } from '../plugins/auth';
 import { hashPassword, validarPassword } from '../lib/auth/passwords';
+import { deEsteClub } from '../lib/filtros';
 import {
   LIMITES,
   correo as validarCorreo,
@@ -243,7 +244,7 @@ export async function orgsRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { limit, offset, q } = leerPagina(req.query);
 
-    const conds = [eq(users.orgId, id)];
+    const conds = [deEsteClub(id)];
     if (q) {
       const p = patron(q);
       conds.push(or(ilike(users.fullName, p), ilike(users.email, p))!);
@@ -327,7 +328,11 @@ export async function orgsRoutes(app: FastifyInstance) {
       };
       const db = req.db;
 
-      const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const [u] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, userId), isNull(users.eliminadoEl)))
+        .limit(1);
       if (!u) return reply.code(404).send({ error: 'Usuario no encontrado.' });
 
       // Nadie degrada ni apaga al superadmin desde la API: ni él mismo.
@@ -391,7 +396,11 @@ export async function orgsRoutes(app: FastifyInstance) {
       if (error) return reply.code(422).send({ error });
 
       const db = req.db;
-      const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const [u] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, userId), isNull(users.eliminadoEl)))
+        .limit(1);
       if (!u) return reply.code(404).send({ error: 'Usuario no encontrado.' });
 
       // Lo mismo que en `POST /users/:id/password`: con cuenta del ecosistema,

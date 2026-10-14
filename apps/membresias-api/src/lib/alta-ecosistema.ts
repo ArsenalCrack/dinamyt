@@ -174,6 +174,51 @@ export function avisarAccesoAlEcosistema(
   })();
 }
 
+export type BajaPedida = { ok: true } | { ok: false; portalCaido: boolean; error: string };
+
+/**
+ * Pide al portal que saque a alguien del club, y ESPERA la respuesta.
+ *
+ * Al revés que `avisarAccesoAlEcosistema`, aquí no se sigue si el portal no
+ * contesta: la persona seguiría siendo del club allí, y la siguiente alta del
+ * espejo le haría nacer otra ficha aquí (ver `lib/eliminar-del-club.ts`).
+ *
+ * El portal hace su baja de siempre (reversible, con aviso a los demás
+ * gestores) y comprueba que `porEcoSub` gestione ese club. Lo que conteste mal
+ * vuelve tal cual, para que el maestro lea el motivo.
+ */
+export async function pedirBajaAlEcosistema(datos: {
+  ecoSub: string;
+  ecoOrgId: string;
+  porEcoSub: string;
+}): Promise<BajaPedida> {
+  try {
+    const res = await fetch(`${raizApi()}/sync/baja`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-dinamyt-sync': syncSecret(),
+      },
+      body: JSON.stringify(datos),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (res.ok) return { ok: true };
+    const cuerpo = (await res.json().catch(() => ({}))) as { message?: string | string[] };
+    const motivo = Array.isArray(cuerpo.message) ? cuerpo.message[0] : cuerpo.message;
+    return {
+      ok: false,
+      portalCaido: res.status >= 500,
+      error: motivo || `El portal DINAMYT contestó ${res.status}.`,
+    };
+  } catch {
+    return {
+      ok: false,
+      portalCaido: true,
+      error: 'No se pudo hablar con el portal DINAMYT. Inténtalo en un momento.',
+    };
+  }
+}
+
 /**
  * El tema y el idioma que la persona acaba de elegir AQUÍ, al portal.
  *

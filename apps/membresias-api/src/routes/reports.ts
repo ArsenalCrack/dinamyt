@@ -8,6 +8,7 @@ import {
   users,
 } from '@dinamyt/membresias-db';
 import { orgDelRequest, requireRole } from '../plugins/auth';
+import { deEsteClub } from '../lib/filtros';
 import { limitarPorIp } from '../lib/auth/rate-limit';
 import { columnaImagenLigera, direccionFoto } from '../lib/imagenes';
 import { estado, iniciosDePeriodo, todayStr, type PlanType } from '../lib/billing';
@@ -271,7 +272,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       const desde30 = menosDias(today, 29);
 
       const [gente, locales, tarifas, pagos, checkins] = await Promise.all([
-        db.select().from(users).where(eq(users.orgId, orgId)),
+        db.select().from(users).where(deEsteClub(orgId)),
         db.select().from(memberships).where(eq(memberships.orgId, orgId)),
         db.select().from(plans).where(eq(plans.orgId, orgId)),
         // Un año hacia atrás, aunque el gráfico enseñe seis meses: un pago

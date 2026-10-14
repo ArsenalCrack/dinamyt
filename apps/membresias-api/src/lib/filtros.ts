@@ -1,8 +1,21 @@
-import { asc, desc, inArray, notInArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, notInArray, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { users } from '@dinamyt/membresias-db';
 import { CINTURONES } from './cinturones';
 import type { EstadoMembresia } from './billing';
+
+/**
+ * La gente de este club. Quien fue eliminado (`eliminado_el`) ya no lo es: su
+ * fila vaciada solo existe para que sus pagos y su asistencia sigan sumando
+ * (ver `lib/eliminar-del-club.ts`).
+ *
+ * Toda consulta que enseñe o cuente personas sin filtrar `is_active = true`
+ * parte de aquí. Las que sí filtran ya lo dejan fuera solas: un eliminado
+ * nunca está activo.
+ */
+export function deEsteClub(orgId: string): SQL {
+  return and(eq(users.orgId, orgId), isNull(users.eliminadoEl))!;
+}
 
 /**
  * Los filtros y el ORDEN de los listados de gente.
