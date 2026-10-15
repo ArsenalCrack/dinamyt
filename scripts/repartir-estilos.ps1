@@ -35,6 +35,10 @@
   .\scripts\repartir-estilos.ps1
   .\scripts\repartir-estilos.ps1 -Comprobar
 #>
+# Windows PowerShell 5.1 lee los archivos sin BOM —este guion incluido— como
+# ANSI, y la copia sale con «tenÃ­a» en vez de «tenía» (pasó el 14 oct 2026).
+# Se corre con `pwsh`.
+#Requires -Version 7.0
 param(
     [switch]$Comprobar
 )
