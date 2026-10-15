@@ -33,7 +33,11 @@ export type Eliminacion =
  * ANTES de tocar nada aquí, y si dice que no —o no contesta, o esta instalación
  * no puede preguntarle—, aquí no pasa nada. Al revés quedaría a medias:
  * borrada aquí y miembro allí, y la próxima alta del espejo le haría nacer una
- * ficha nueva. Por eso esta es la única función que se exporta.
+ * ficha nueva. Por eso `eliminarDelClub` es la puerta del maestro.
+ *
+ * La otra, `suprimirFichaDeCuenta`, se salta esa regla a propósito: la llama
+ * el propio portal (`/sync/supresion`) cuando la cuenta entera se borra, y
+ * allí ya no queda pertenencia que pedir.
  *
  * ── Borrar o vaciar ──
  *
@@ -112,6 +116,20 @@ async function bajaEnElPortal(
   return r.ok
     ? { ok: true, ecoOrgId: club.ecoOrgId }
     : { ok: false, status: r.portalCaido ? 503 : 409, error: r.error };
+}
+
+/**
+ * Para cuando la cuenta entera se borró en DINAMYT (`POST /sync/supresion`):
+ * el portal ya no la tiene, así que aquí no hay baja que pedirle. Es la misma
+ * mitad local que la de «eliminar del club», con las mismas reglas.
+ */
+export async function suprimirFichaDeCuenta(
+  db: Db,
+  ficha: { id: string; ecoSub: string },
+): Promise<'borrada' | 'anonimizada'> {
+  const resultado = await vaciarOBorrar(db, ficha.id);
+  recordarEliminado(ficha.ecoSub, '*');
+  return resultado;
 }
 
 /** La mitad de aquí. Ver «Borrar o vaciar» arriba. */

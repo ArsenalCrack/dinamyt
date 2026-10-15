@@ -58,6 +58,7 @@ const SIN_CONTEXTO = new Set([
   // peor combinación de las dos.
   '/sync/persona',
   '/sync/club',
+  '/sync/supresion',
   '/sync/contrasena',
   '/sync/rol',
   '/sync/pertenencia',

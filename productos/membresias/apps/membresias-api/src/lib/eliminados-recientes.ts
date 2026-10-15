@@ -24,7 +24,8 @@
 const VIDA_DEL_PASE_MS = 35 * 60 * 1000;
 const recientes = new Map<string, number>();
 
-const clave = (ecoSub: string, ecoOrgId: string) => `${ecoSub}|${ecoOrgId}`;
+/** `*` = la cuenta entera se borró (`/sync/supresion`): ningún club la recupera. */
+const clave = (ecoSub: string, ecoOrgId: string | '*') => `${ecoSub}|${ecoOrgId}`;
 
 function olvidarLosViejos(ahora: number) {
   for (const [k, cuando] of recientes) {
@@ -32,7 +33,7 @@ function olvidarLosViejos(ahora: number) {
   }
 }
 
-export function recordarEliminado(ecoSub: string, ecoOrgId: string): void {
+export function recordarEliminado(ecoSub: string, ecoOrgId: string | '*'): void {
   const ahora = Date.now();
   olvidarLosViejos(ahora);
   recientes.set(clave(ecoSub, ecoOrgId), ahora);
@@ -45,8 +46,11 @@ export function paseDeAntesDeLaBaja(
   emitidoEnSegundos: number | undefined,
 ): boolean {
   olvidarLosViejos(Date.now());
-  const cuando = recientes.get(clave(ecoSub, ecoOrgId));
-  if (cuando === undefined) return false;
+  // La más reciente de las dos: una baja vieja de este club no puede tapar el
+  // borrado de la cuenta, que llegó después.
+  const marcas = [recientes.get(clave(ecoSub, ecoOrgId)), recientes.get(clave(ecoSub, '*'))];
+  const cuando = Math.max(...marcas.map((m) => m ?? -Infinity));
+  if (cuando === -Infinity) return false;
   // Sin `iat` no se puede saber: se trata como viejo.
   return emitidoEnSegundos === undefined || emitidoEnSegundos * 1000 <= cuando;
 }

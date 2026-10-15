@@ -4,6 +4,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import { orgs, users, type Db } from '@dinamyt/membresias-db';
 import { sinFiltroDeClub } from '../lib/db-contexto';
 import { asegurarFicha } from '../lib/aprovisionar';
+import { suprimirFichaDeCuenta } from '../lib/eliminar-del-club';
 import { adoptarClub, asegurarClub, fijarPlan, rellenarEscudo } from '../lib/plan-del-club';
 import { syncSecret } from '../config';
 import { cinturon } from '../lib/cinturones';
@@ -97,7 +98,7 @@ function aplicar(
 }
 
 export async function syncRoutes(app: FastifyInstance) {
-  /** Puerta común de las dos rutas. `null` = ya se contestó. */
+  /** Puerta común de todas las rutas `/sync/*` de aquí: `'ok'`, o el código que se contesta. */
   function abrir(req: { headers: Record<string, unknown> }): 'ok' | 404 | 401 {
     const esperado = syncSecret();
     if (!esperado) return 404;
@@ -633,6 +634,40 @@ export async function syncRoutes(app: FastifyInstance) {
 
       req.log.info({ usuario: u.id, de: u.role, a: rol }, 'rol cambiado desde el portal');
       return { encontrada: true, aplicado: true, enlazada, de: u.role, a: rol };
+    });
+  });
+
+  // ── POST /sync/supresion — la cuenta entera se borró en DINAMYT ───────────
+  //
+  // Lo pide el portal el día que se cumplen los siete días de «Borrar mi
+  // cuenta», ANTES de borrar lo suyo, y espera la respuesta: si aquí no se
+  // hizo, allí tampoco se hace y lo reintenta al día siguiente.
+  //
+  // Es la mitad local de «eliminar del club» (`lib/eliminar-del-club.ts`):
+  // sin historia la ficha se borra, con pagos o asistencias se vacía y lo suyo
+  // queda anónimo. No hay baja que pedirle al portal: es él quien la manda.
+  //
+  // Idempotente: una segunda vez no encuentra a nadie y contesta que no.
+  app.post('/sync/supresion', async (req, reply) => {
+    const puerta = abrir(req as never);
+    if (puerta === 404) return reply.code(404).send({ error: 'No encontrado.' });
+    if (puerta === 401) return reply.code(401).send({ error: 'Secreto inválido.' });
+
+    const { ecoSub } = (req.body ?? {}) as { ecoSub?: string };
+    if (typeof ecoSub !== 'string' || !UUID.test(ecoSub)) {
+      return reply.code(422).send({ error: 'Falta `ecoSub`.' });
+    }
+
+    return sinFiltroDeClub(req.server.db, async (db: Db) => {
+      const [ficha] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.ecoSub, ecoSub))
+        .limit(1);
+      if (!ficha) return { encontrada: false, aplicado: false };
+      const resultado = await suprimirFichaDeCuenta(db, { id: ficha.id, ecoSub });
+      req.log.warn({ usuario: ficha.id, resultado }, 'ficha borrada: la cuenta se borró en DINAMYT');
+      return { encontrada: true, aplicado: true, resultado };
     });
   });
 
