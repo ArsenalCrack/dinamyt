@@ -47,7 +47,11 @@ disparar() {
     return 0
   fi
   local respuesta codigo
-  respuesta=$(curl -sS -m 60 -w '\n%{http_code}' -X POST "$url" \
+  # 300 s y no 60: el del ecosistema también borra las cuentas vencidas, y
+  # pregunta a tres apps por cada una (hasta 8 s cada pregunta). Con 60 s,
+  # tres cuentas y una app colgada, se perdía la respuesta que dice cuáles
+  # esperan y por qué.
+  respuesta=$(curl -sS -m 300 -w '\n%{http_code}' -X POST "$url" \
     -H "x-cron-secret: $secreto" \
     -H 'content-type: application/json' \
     -d '{}' 2>&1) || { echo "[$nombre] no respondió: $respuesta"; return 1; }

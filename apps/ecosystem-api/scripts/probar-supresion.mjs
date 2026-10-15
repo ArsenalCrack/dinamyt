@@ -5,15 +5,17 @@
  *     pnpm --filter @dinamyt/ecosystem-api supresion:ensayo
  *
  * Levanta un PostgreSQL compilado a WebAssembly (PGlite), le aplica las
- * migraciones reales del ecosystem, siembra a una persona con algo en cada
- * tabla que cuelga de ella —y a otra con cosas que la primera tocó— y corre la
- * limpieza de verdad (`dist/modules/supresion/borrar-de-la-base.js`).
+ * migraciones reales del ecosystem, siembra a una persona con algo en las
+ * tablas donde hay algo que comprobar —y a otra con cosas que la primera
+ * tocó— y corre la limpieza de verdad (`dist/modules/supresion/borrar-de-la-base.js`).
  *
  * Lo que defiende es lo que una prueba con la base simulada no ve: que las
  * veinte tablas y sus llaves foráneas dejan hacerlo en este orden, que lo que
  * habla de la persona desaparece, que lo que se conserva sigue apuntando a una
- * fila vaciada, y que a nadie más se le toca nada. Si una migración nueva
- * añade una tabla que cuelga de `users` y la limpieza no la conoce, aquí se ve.
+ * fila vaciada, y que a nadie más se le toca nada. Y que cada llave foránea
+ * hacia `users` tiene su política (`POLITICA_DE_LLAVES`): una migración que
+ * añada una sin decidir qué pasa con ella al borrar hace fallar el paso 1.
+ * (Las llaves solas no lo avisarían: la fila de `users` se vacía, no se borra.)
  *
  * No necesita red ni base de datos. Sí necesita `dist/`: compila antes.
  */
@@ -33,7 +35,7 @@ if (!existsSync(modulo)) {
   process.exit(1);
 }
 const requerir = createRequire(import.meta.url);
-const { borrarDeLaBase, NOMBRE_BORRADA } = requerir(modulo);
+const { borrarDeLaBase, NOMBRE_BORRADA, POLITICA_DE_LLAVES } = requerir(modulo);
 const schema = requerir(join(dist, 'db', 'schema', 'index.js'));
 const {
   orgInvitations,
@@ -72,6 +74,22 @@ await migrate(db, {
   migrationsSchema: 'ecosystem',
 });
 console.log('  ✔ aplicadas');
+
+const llaves = (
+  await pg.query(`
+    SELECT c.conrelid::regclass::text AS tabla, a.attname AS columna
+    FROM pg_constraint c
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+    WHERE c.contype = 'f' AND c.confrelid = 'ecosystem.users'::regclass`)
+).rows.map((f) => `${f.tabla.replace(/^ecosystem\./, '')}.${f.columna}`);
+const sinPolitica = llaves.filter((l) => !(l in POLITICA_DE_LLAVES));
+const sobran = Object.keys(POLITICA_DE_LLAVES).filter((l) => !llaves.includes(l));
+comprobar(
+  `las ${llaves.length} llaves hacia users tienen política al borrar`,
+  sinPolitica.length === 0,
+  { sinPolitica },
+);
+comprobar('la política no habla de llaves que ya no existen', sobran.length === 0, { sobran });
 
 console.log('\n2. Una persona con algo en cada tabla, y otra a la que tocó');
 const [{ id: ana }, { id: otra }] = await db

@@ -397,6 +397,10 @@ a todos los clubes no puede quedarse abierta «por si acaso».
 sudo install -m 750 -o dinamyt -g dinamyt /srv/dinamyt/scripts/avisos-diarios.sh /usr/local/bin/dinamyt-avisos
 ```
 
+> Es una **copia**: cuando cambie `scripts/avisos-diarios.sh` (el 15 oct 2026
+> pasó a esperar 300 s, por el borrado de cuentas), se repite este `install`
+> después del `git pull`.
+
 ```bash
 sudo tee /etc/systemd/system/dinamyt-avisos.service >/dev/null <<'EOF'
 [Unit]
@@ -1888,16 +1892,25 @@ Eliminar (`POST /users/:id/eliminar`, solo el maestro) es el segundo gesto:
 
 Lo pide la persona en Configuración (contraseña y la palabra BORRAR) o el
 soporte con `pnpm --filter @dinamyt/ecosystem-api suprimir:persona --correo …`
-(`--programar`, `--ya`, `--cancelar`). Las dos cosas solo programan:
+(`--programar`, `--ya`, `--cancelar`; `--id` si el correo da varias cuentas).
+Las dos cosas solo programan:
 
-- **Al pedirlo** se cierran todas sus sesiones, se le escribe al correo y
-  `users.borrar_el` queda a 7 días. La cuenta sigue entera; entrar y pulsar
-  «Cancelar el borrado» lo deshace.
+- **Al pedirlo** se cierran sus sesiones de DINAMYT, se le escribe al correo
+  (el script no escribe: ya lo pidió por escrito) y `users.borrar_el` queda a
+  7 días. La cuenta sigue entera; entrar y pulsar «Cancelar el borrado» lo
+  deshace. Las sesiones de Membresías (24 h) y el pase de Campeonatos (30 min)
+  caducan solos.
+- **Vencido el plazo ya no se cancela** (409 en la pantalla y en el script, y
+  el aviso dice «se está borrando»): el barrido puede haber borrado en una app
+  y estar esperando a otra. Antes de borrar aquí vuelve a leer la fila con
+  `FOR UPDATE`.
 - **El barrido diario de las 08:00** (`/subscriptions/avisos/cron`) borra las
   vencidas: primero `POST /sync/supresion` a Membresías,
   `POST /api/sync/supresion` a Campeonatos y `POST /sync/supresion` a Academy,
-  y solo si confirman, lo del ecosistema (`borrar-de-la-base.ts`). Si una no contesta, la cuenta espera
-  entera al día siguiente; la respuesta del cron dice cuáles y por qué.
+  y solo si confirman, lo del ecosistema (`borrar-de-la-base.ts`). La tabla de
+  las tres está en `pedir-a-las-apps.ts`, y a todas se les manda solo el
+  `ecoSub`. Si una no contesta, la cuenta espera al día siguiente; la
+  respuesta del cron dice cuáles y por qué.
 - **En producción, un canal sin configurar también espera** (ver
   `CAMPEONATOS_SYNC_URL` en §1.4). Borrar solo en una app desmentiría la
   política. **Academy no**: sin `ACADEMY_SYNC_URL` se salta, porque no está
@@ -1905,13 +1918,20 @@ soporte con `pnpm --filter @dinamyt/ecosystem-api suprimir:persona --correo …`
 - **Qué se queda**: la fila de `users` vaciada (de ella cuelgan suscripciones
   y pagos de DINAMYT), los pagos que recibió el club y los resultados
   oficiales con su nombre. En Campeonatos la ficha que compitió se queda con
-  nombre y club; la que no, se borra. En Academy, lo que un maestro publicó
+  nombre y club; la que no (también si solo tuvo inscripciones pendientes o
+  rechazadas), se borra. **Campeonatos busca solo por `ecoSub`**: la ficha que
+  un organizador cargó a mano y nunca se ligó a la cuenta es suya. Buscar por
+  documento dejaba que cualquiera se registrara con el número de otra persona
+  y le borrara la ficha. En Academy, lo que un maestro publicó
   (contenidos, evaluaciones, figuras de referencia, anuncios) se queda sin su
   nombre (`lib/suprimir-persona.ts`).
 - **No lo puede pedir** un super administrador ni la única persona que
   administra un club.
 - **Después de restaurar un respaldo** hay que repetir los borrados de esos
-  días: `journalctl -u dinamyt-id | grep 'Cuenta borrada'` da los ids.
+  días: `sudo journalctl -u dinamyt-id | grep 'Cuenta borrada'` da los ids.
+- **Cada llave foránea hacia `users` tiene su política** (`borrar`, `anular`
+  o `conservar`) en `POLITICA_DE_LLAVES` (`borrar-de-la-base.ts`). Una
+  migración que añada una sin ponerla ahí hace fallar el ensayo de abajo.
 
 Ensayo contra un PostgreSQL de verdad: `pnpm --filter @dinamyt/ecosystem-api
 supresion:ensayo` (compila antes).

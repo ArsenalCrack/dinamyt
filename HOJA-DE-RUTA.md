@@ -146,13 +146,46 @@ hace, o lo que solo tú puedes decidir.
 ### 0.4 · Revisar el código que ya existe
 
 - **thermos** (dos revisores: fallos y seguridad, y calidad) sobre cada rama
-  antes de fusionarla. Se lanza con `/thermos`.
+  antes de fusionarla. Se lanza con `/thermos`. El 15 oct revisó
+  `feat/borrar-cuenta`: lo que quedó para después está en 0.5.
 - **anti-slop en modo «after»**, una app cada vez: portal, Membresías,
   Campeonatos, Academy. Se pide en el chat: «audita el portal con antislop
   en modo after». Deja una lista numerada en `anti-slop/`, tú eliges los
   números y solo esos se tocan.
 - **`/claude-api prompt-audit`** al cambiar de modelo. El 13 oct salió limpio.
   La skill `frontend-design` del repo va por detrás de la de `anthropics/skills`.
+
+### 0.5 · Lo que thermos dejó para después (15 oct)
+
+La revisión de `feat/borrar-cuenta` (dos revisores: fallos y calidad). Lo de
+antes de fusionar se hizo; esto quedó:
+
+- **El PC del evento vuelve a publicar.** Un competidor borrado arriba
+  reaparece si el PC del evento lo sube otra vez (`sincronizacion.py` lo
+  empareja por `uid` o por documento). Que el importador salte los `uid` de
+  fichas borradas.
+- **Un organizador de Campeonatos que borra su cuenta** deja su workspace (sus
+  campeonatos, llaves y fichas) sin quien lo gestione, salvo el super admin: el
+  workspace es su propio id, y la regla de «la única persona que administra»
+  solo mira los roles del ecosistema. Decidir: impedirlo hasta que traspase, o
+  dejarlo al super admin.
+- **Un borrado atascado no avisa a nadie.** La persona ve «se está borrando»;
+  el motivo solo sale en el registro y en la respuesta del cron. Avisar a
+  soporte si se aplaza más de una vez: la ley da 15 días hábiles.
+- **Borrar a un acudiente borra `user_guardians` con su `consent_at`**, que es
+  la única constancia del consentimiento por el menor. Decidir si se conserva.
+- **Las llaves ya generadas de un campeonato en preparación** siguen con el
+  nombre y el club de quien se borró.
+- **Campeonatos no recuerda las cuentas borradas.** Un pase emitido antes del
+  barrido (dura 30 min) haría nacer otra vez el usuario al entrar.
+- **`Confirmar.tsx` está copiado a mano en Membresías.** Generalizar
+  `repartir-estilos.ps1` a una lista (origen, destinos) con `-Comprobar`.
+- **Las pruebas del servicio usan una base simulada** que contesta en orden.
+  Pasar el ensayo de `supresion:ensayo` a jest sobre PGlite y quitar la cola.
+- Menores: las constantes `BORRAR`, `7` y `PERSONA ELIMINADA` están copiadas
+  en el portal, la API y Academy (pueden ir a `@dinamyt/shared`); el aviso
+  pregunta al cambiar de pantalla; `dondeEsElUnicoGestor` hace una consulta
+  por club.
 
 ---
 
@@ -281,7 +314,9 @@ el ecosistema:
    - en `/srv/membresias/apps/membresias-api/.env`, cambia
      `ECOSYSTEM_SYNC_SECRET=<valor 1>`;
    - `sudo systemctl restart dinamyt-id membresias-api`.
-3. **Campeonatos** (el ecosistema no le llama, así que no hay hueco):
+3. **Campeonatos** (el ecosistema solo le llama en el barrido de las 08:00,
+   para borrar cuentas: si le pilla entre los dos reinicios, esa cuenta espera
+   a mañana):
    - en el `.env` del ecosistema, añade `SYNC_SECRET_CAMPEONATOS=<valor 2>` y
      `sudo systemctl restart dinamyt-id`;
    - en `/srv/campeonatos/backend/.env`, cambia `ECOSYSTEM_SYNC_SECRET=<valor 2>`

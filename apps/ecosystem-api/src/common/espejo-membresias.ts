@@ -366,38 +366,6 @@ export function espejarRol(
  * maestro dé de baja a alguien de su club; lo que se pierde es la copia, y se
  * recupera repitiendo la baja o desactivándolo allá a mano.
  */
-/**
- * Pide a Membresías que borre la ficha de esta cuenta, y ESPERA la respuesta.
- *
- * Al revés que el resto del espejo, que avisa y se olvida: borrar una cuenta
- * no puede darse por hecho si allí no se hizo. `sin-espejo` = este despliegue
- * no tiene Membresías al otro lado, y entonces no hay nada que borrar allí.
- */
-export async function pedirSupresionAMembresias(
-  ecoSub: string,
-): Promise<'hecha' | 'sin-espejo' | 'fallo'> {
-  if (!espejoConfigurado()) return 'sin-espejo';
-  try {
-    const res = await fetch(`${destino()}/sync/supresion`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-dinamyt-sync': secreto() },
-      body: JSON.stringify({ ecoSub }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      log.warn(
-        `/sync/supresion respondió ${res.status}.` +
-          (res.status === 404 ? ' Membresías todavía no tiene esa ruta desplegada.' : ''),
-      );
-      return 'fallo';
-    }
-    return 'hecha';
-  } catch (e) {
-    log.warn(`/sync/supresion no llegó a Membresías (${e instanceof Error ? e.message : 'error'}).`);
-    return 'fallo';
-  }
-}
-
 export function espejarBaja(userId: string, orgId: string): void {
   void avisar('/sync/pertenencia', { ecoSub: userId, ecoOrgId: orgId });
 }

@@ -42,7 +42,7 @@ import { createPortal } from 'react-dom';
  * que dice que no se puede deshacer: lo que hace un aviso del sistema, y por
  * eso se reconoce antes de leerlo. Para lo que además pide escribir algo —una
  * contraseña, una palabra—, `ModalAccesible` es la misma caja con el mismo
- * comportamiento (ver `BorrarMiCuenta`).
+ * comportamiento (ver `BorrarMiCuenta` en el portal).
  *
  * ── Cómo se usa ──
  *

@@ -345,11 +345,44 @@ describe('academy-api — banco, notas, reportes y guards', () => {
       headers: ctx.alumno,
       payload: {
         respuestas: [
-          { questionId: crear.json().preguntas[0].id, evidenceUrl: 'evidencias/x.mp4' },
+          {
+            questionId: crear.json().preguntas[0].id,
+            evidenceUrl: 'evidencias/0b0e7a52-5c3e-4f3c-9d1a-2a7f3c1e9b10.mp4',
+          },
         ],
       },
     });
     expect(entrega.statusCode).toBe(201);
+    await app.close();
+  });
+
+  it('una evidencia que no es enlace ni archivo subido → 422', async () => {
+    // «evidencias» a secas es la carpeta de todos: el día que se borrara la
+    // cuenta de quien la entregó, se la llevaría entera.
+    const app = await makeApp();
+    const ctx = await escenario(app);
+    const crear = await app.inject({
+      method: 'POST',
+      url: '/evaluations',
+      headers: ctx.maestro,
+      payload: {
+        martialArtId: ctx.hapkido.id,
+        gradeId: ctx.blanco.id,
+        title: 'Con evidencia',
+        kind: 'tarea',
+        maxAttempts: 3,
+        preguntas: [{ type: 'evidencia', prompt: 'Sube tu video.', points: 1 }],
+      },
+    });
+    for (const evidenceUrl of ['evidencias', 'figuras/x.mp4', '../evidencias/a.mp4', 'javascript:alert(1)']) {
+      const entrega = await app.inject({
+        method: 'POST',
+        url: `/evaluations/${crear.json().id}/attempts`,
+        headers: ctx.alumno,
+        payload: { respuestas: [{ questionId: crear.json().preguntas[0].id, evidenceUrl }] },
+      });
+      expect(entrega.statusCode).toBe(422);
+    }
     await app.close();
   });
 

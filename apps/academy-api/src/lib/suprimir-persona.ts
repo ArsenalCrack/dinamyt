@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import {
   academyUsers,
   activityLog,
@@ -17,6 +17,12 @@ import {
   teacherRequests,
   type Db,
 } from '@dinamyt/academy-db';
+import {
+  ARCHIVO_DE_UNA_PERSONA,
+  CARPETA_DE_RESULTADOS,
+  carpetaResultados,
+  enlaceRevision,
+} from './rutas';
 
 /** Lo que queda donde otro registro guardó el nombre de quien se fue. El
  *  mismo texto que deja el ecosistema (`borrar-de-la-base.ts`). */
@@ -24,8 +30,8 @@ export const NOMBRE_BORRADA = 'PERSONA ELIMINADA';
 
 /**
  * Borra de Academy todo lo de una cuenta que se está borrando en el
- * ecosistema (`SupresionService`, OPERAR §4.15). Devuelve las rutas de sus
- * archivos en el almacén, para borrarlos DESPUÉS del commit: un archivo
+ * ecosistema (`SupresionService`, OPERAR §4.15). Devuelve sus archivos y
+ * carpetas en el almacén, para borrarlos DESPUÉS del commit: un archivo
  * borrado no vuelve si la transacción se deshace.
  *
  * ── Qué se borra ──
@@ -45,9 +51,15 @@ export const NOMBRE_BORRADA = 'PERSONA ELIMINADA';
  *
  * Idempotente: la segunda vez no encuentra nada y no falla.
  */
-export async function suprimirPersona(db: Db, ecoSub: string): Promise<string[]> {
+export interface LoSuyoEnDisco {
+  archivos: string[];
+  carpetas: string[];
+}
+
+export async function suprimirPersona(db: Db, ecoSub: string): Promise<LoSuyoEnDisco> {
   return db.transaction(async (tx) => {
     const archivos: string[] = [];
+    const carpetas: string[] = [];
 
     const intentos = await tx
       .select({ id: attempts.id })
@@ -59,13 +71,23 @@ export async function suprimirPersona(db: Db, ecoSub: string): Promise<string[]>
         .select({ url: answers.evidenceUrl })
         .from(answers)
         .where(and(inArray(answers.attemptId, idsIntentos), isNotNull(answers.evidenceUrl)));
-      archivos.push(...evidencias.map((e) => e.url!));
       await tx.delete(answers).where(inArray(answers.attemptId, idsIntentos));
       await tx.delete(attempts).where(inArray(attempts.id, idsIntentos));
+      // Un archivo que otra respuesta todavía nombra no es solo suyo.
+      const suyas = [...new Set(evidencias.map((e) => e.url!))];
+      const deOtros =
+        suyas.length === 0
+          ? []
+          : await tx
+              .select({ url: answers.evidenceUrl })
+              .from(answers)
+              .where(inArray(answers.evidenceUrl, suyas));
+      const compartidas = new Set(deOtros.map((e) => e.url));
+      archivos.push(...suyas.filter((u) => !compartidas.has(u)));
       // «📥 Fulano entregó…» en la campana de cada maestro del arte.
       await tx
         .delete(notifications)
-        .where(inArray(notifications.link, idsIntentos.map((id) => `/maestro/revisar/${id}`)));
+        .where(inArray(notifications.link, idsIntentos.map(enlaceRevision)));
     }
     await tx.delete(contentViews).where(eq(contentViews.studentUserId, ecoSub));
 
@@ -90,19 +112,13 @@ export async function suprimirPersona(db: Db, ecoSub: string): Promise<string[]>
     }
 
     const figuras = await tx
-      .select({
-        id: figureAttempts.id,
-        video: figureAttempts.videoPath,
-        reporte: figureAttempts.reportImgPath,
-        anotado: figureAttempts.annotatedVideoPath,
-      })
+      .select({ id: figureAttempts.id, video: figureAttempts.videoPath })
       .from(figureAttempts)
       .where(eq(figureAttempts.studentUserId, ecoSub));
     for (const f of figuras) {
-      // La carpeta de resultados la nombra `routes/figuras.ts` con el id del intento.
-      archivos.push(f.video, `figuras/resultados/${f.id}`);
-      if (f.reporte) archivos.push(f.reporte);
-      if (f.anotado) archivos.push(f.anotado);
+      // El reporte y el video anotado viven dentro de su carpeta de resultados.
+      archivos.push(f.video);
+      carpetas.push(carpetaResultados(f.id));
     }
     await tx.delete(figureAttempts).where(eq(figureAttempts.studentUserId, ecoSub));
 
@@ -126,27 +142,28 @@ export async function suprimirPersona(db: Db, ecoSub: string): Promise<string[]>
     await tx.delete(teacherRequests).where(eq(teacherRequests.userId, ecoSub));
     await tx.delete(academyUsers).where(eq(academyUsers.ecosystemUserId, ecoSub));
 
-    return archivos;
+    return { archivos, carpetas };
   });
 }
 
 /**
- * Borra esas rutas del almacén. Solo las que caen DENTRO de él: una evidencia
- * puede ser un enlace de YouTube, y una ruta con `..` no sale del almacén
- * aunque alguien la haya colado en la base. Lo que ya no está, no falla.
+ * Borra eso del almacén, y solo si tiene la forma exacta de lo que escribe
+ * Academy: un archivo `<carpeta>/<uuid>.<ext>` (`ARCHIVO_DE_UNA_PERSONA`) o la
+ * carpeta de resultados de un intento. Lo demás se salta: un enlace de
+ * YouTube, una ruta con `..`, o «evidencias» a secas, que sería la carpeta de
+ * todos. Solo las carpetas se borran con lo que tengan dentro. Lo que ya no
+ * está, no falla.
  */
-export async function borrarArchivos(almacen: string, rutas: string[]): Promise<void> {
-  for (const ruta of new Set(rutas)) {
-    const abs = dentroDelAlmacen(almacen, ruta);
-    if (abs) await rm(abs, { recursive: true, force: true }).catch(() => undefined);
+export async function borrarArchivos(almacen: string, { archivos, carpetas }: LoSuyoEnDisco) {
+  const raiz = resolve(almacen);
+  for (const ruta of new Set(archivos)) {
+    if (ARCHIVO_DE_UNA_PERSONA.test(ruta)) {
+      await rm(resolve(raiz, ruta), { force: true }).catch(() => undefined);
+    }
   }
-}
-
-function dentroDelAlmacen(almacen: string, ruta: string): string | null {
-  // `https:`, `blob:`… y también `C:` en Windows.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(ruta) || isAbsolute(ruta)) return null;
-  const abs = resolve(almacen, ruta);
-  const rel = relative(resolve(almacen), abs);
-  if (!rel || rel.startsWith('..') || isAbsolute(rel)) return null;
-  return abs;
+  for (const ruta of new Set(carpetas)) {
+    if (CARPETA_DE_RESULTADOS.test(ruta)) {
+      await rm(resolve(raiz, ruta), { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
 }

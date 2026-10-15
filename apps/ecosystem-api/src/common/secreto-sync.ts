@@ -20,7 +20,7 @@ import { timingSafeEqual } from 'crypto';
  * | `SYNC_SECRET_CAMPEONATOS`  | campeonatos-api                             |
  * | `SYNC_SECRET_ACADEMY`      | academy-api                                 |
  *
- * Las dos apps no cambian de código: solo del VALOR que llevan.
+ * Las apps no cambian de código: solo del VALOR que llevan.
  *
  * ── La transición, sin cortar nada ──
  *
@@ -108,6 +108,6 @@ function avisarDelCompartido(permitidas: readonly AppSync[]) {
     `Se entró a /sync con el ECOSYSTEM_SYNC_SECRET compartido (ruta de ${permitidas.join(
       ' o ',
     )}). Pon a cada app su propio secreto (SYNC_SECRET_MEMBRESIAS, ` +
-      'SYNC_SECRET_CAMPEONATOS) y, cuando esto deje de salir, quita el compartido.',
+      'SYNC_SECRET_CAMPEONATOS y, si Academy está encendida, SYNC_SECRET_ACADEMY) y, cuando esto deje de salir, quita el compartido.',
   );
 }

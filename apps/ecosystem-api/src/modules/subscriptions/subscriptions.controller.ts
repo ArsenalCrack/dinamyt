@@ -25,8 +25,7 @@ export class SubscriptionsController {
   constructor(
     private readonly subsService: SubscriptionsService,
     private readonly sessions: SessionsService,
-    // Opcional solo para las pruebas que construyen el controlador a mano.
-    private readonly supresion?: SupresionService,
+    private readonly supresion: SupresionService,
   ) {}
 
   // ── POST /subscriptions — crear suscripción org (solo super admin) ────────
@@ -182,7 +181,7 @@ export class SubscriptionsController {
     // falla, esas cuentas esperan a mañana enteras, que es el lado seguro.
     let supresiones: unknown = null;
     try {
-      supresiones = (await this.supresion?.ejecutarVencidas()) ?? null;
+      supresiones = await this.supresion.ejecutarVencidas();
     } catch (e) {
       supresiones = { error: e instanceof Error ? e.message : 'falló el borrado' };
     }

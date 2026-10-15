@@ -16,6 +16,7 @@ import { notaBloque, notaFinal } from '../lib/scoring';
 import { formatearInstante } from '@dinamyt/shared';
 import { notificar, estudiantesDe, maestrosDe } from '../lib/notify';
 import { registrarActividad } from '../lib/activity';
+import { enlaceRevision, RUTA_DE_EVIDENCIA } from '../lib/rutas';
 
 const KINDS = ['cuestionario', 'tarea', 'actividad'] as const;
 
@@ -518,15 +519,24 @@ export async function evaluationsRoutes(app: FastifyInstance) {
             isCorrect: correcta,
           });
         } else {
-          if (!r.evidenceUrl?.trim()) {
+          const evidencia = typeof r.evidenceUrl === 'string' ? r.evidenceUrl.trim() : '';
+          if (!evidencia) {
             return reply
               .code(422)
               .send({ error: 'Las preguntas de evidencia necesitan la URL del video/imagen.' });
           }
+          // Un enlace, o lo que devolvió `/uploads/evidencia`. Nada más: una
+          // ruta escrita a mano («evidencias» a secas) la borraría entera el
+          // día que se borre la cuenta de quien la entregó.
+          if (!/^https?:\/\//i.test(evidencia) && !RUTA_DE_EVIDENCIA.test(evidencia)) {
+            return reply
+              .code(422)
+              .send({ error: 'La evidencia tiene que ser un enlace (https://…) o un archivo subido.' });
+          }
           filasRespuesta.push({
             attemptId: '',
             questionId: p.id,
-            evidenceUrl: r.evidenceUrl.trim(),
+            evidenceUrl: evidencia,
           });
         }
       }
@@ -587,7 +597,7 @@ export async function evaluationsRoutes(app: FastifyInstance) {
         await notificar(db, await maestrosDe(db, evaluacion.martialArtId), {
           type: 'por_revisar',
           title: `📥 ${req.user!.fullName ?? 'Un estudiante'} entregó «${evaluacion.title}»`,
-          link: `/maestro/revisar/${intento.id}`,
+          link: enlaceRevision(intento.id),
         });
       }
 

@@ -23,18 +23,22 @@ function puerta(recibido: unknown): 'abierta' | 'apagada' | 'rechazada' {
 }
 
 export async function syncRoutes(app: FastifyInstance) {
-  // La pide el barrido diario de `SupresionService` al vencer los siete días
-  // de una cuenta. El ecosistema solo borra lo suyo si esto contesta 2xx.
-  app.post('/sync/supresion', async (req, reply) => {
+  // La puerta va como hook de este plugin: toda ruta que se añada aquí la
+  // hereda, y no hay forma de olvidarla.
+  app.addHook('onRequest', async (req, reply) => {
     const estado = puerta(req.headers['x-dinamyt-sync']);
     if (estado === 'apagada') return reply.code(404).send({ error: 'Not Found' });
     if (estado === 'rechazada') return reply.code(401).send({ error: 'Unauthorized' });
+  });
 
+  // La pide el barrido diario de `SupresionService` al vencer los siete días
+  // de una cuenta. El ecosistema solo borra lo suyo si esto contesta 2xx.
+  app.post('/sync/supresion', async (req, reply) => {
     const ecoSub = (req.body as { ecoSub?: string } | null)?.ecoSub;
     if (!esUuid(ecoSub)) return reply.code(400).send({ error: 'ecoSub debe ser un UUID.' });
 
-    const archivos = await suprimirPersona(req.server.db, ecoSub);
-    await borrarArchivos(config.uploadsDir, archivos);
+    const loSuyo = await suprimirPersona(req.server.db, ecoSub);
+    await borrarArchivos(config.uploadsDir, loSuyo);
     return { ok: true };
   });
 }

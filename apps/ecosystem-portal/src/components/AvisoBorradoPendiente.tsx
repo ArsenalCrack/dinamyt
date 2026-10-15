@@ -16,11 +16,16 @@ import { useI18n } from '@/lib/i18n';
  *
  * Pregunta otra vez al cambiar de pantalla: entrar desde el login no recarga
  * el layout, y sin eso el aviso no salía hasta refrescar.
+ *
+ * Vencido el plazo ya no ofrece cancelar: el barrido puede haber borrado en
+ * una app y estar esperando a otra (`SupresionService`, `enCurso`).
  */
 export function AvisoBorradoPendiente() {
   const { t, idioma } = useI18n();
   const ruta = usePathname();
-  const [borrarEl, setBorrarEl] = useState<string | null>(null);
+  const [pendiente, setPendiente] = useState<{ borrarEl: string; enCurso: boolean } | null>(
+    null,
+  );
   const [cancelando, setCancelando] = useState(false);
   const [mensaje, setMensaje] = useState('');
 
@@ -28,14 +33,15 @@ export function AvisoBorradoPendiente() {
     // El «listo» de una cancelación es para la pantalla donde se hizo.
     setMensaje('');
     if (!obtenerToken()) {
-      setBorrarEl(null);
+      setPendiente(null);
       return;
     }
     let vivo = true;
     api
       .get('/users/me/borrado')
       .then((r) => {
-        if (vivo) setBorrarEl((r.data as { borrarEl: string | null }).borrarEl);
+        const d = r.data as { borrarEl: string | null; enCurso?: boolean };
+        if (vivo) setPendiente(d.borrarEl ? { borrarEl: d.borrarEl, enCurso: !!d.enCurso } : null);
       })
       .catch(() => {
         // Sin respuesta no se inventa un aviso: se queda como estaba.
@@ -45,15 +51,19 @@ export function AvisoBorradoPendiente() {
     };
   }, [ruta]);
 
-  if (!borrarEl && !mensaje) return null;
+  if (!pendiente && !mensaje) return null;
 
   async function cancelar() {
     setCancelando(true);
     try {
       await api.delete('/users/me/borrado');
-      setBorrarEl(null);
+      setPendiente(null);
       setMensaje(t('borrar.cancelado'));
     } catch (err) {
+      // 409: el plazo venció entre que se cargó la pantalla y el clic.
+      if ((err as { response?: { status?: number } }).response?.status === 409) {
+        setPendiente((p) => p && { ...p, enCurso: true });
+      }
       setMensaje(extraerError(err, t('borrar.error')));
     } finally {
       setCancelando(false);
@@ -61,8 +71,8 @@ export function AvisoBorradoPendiente() {
   }
 
   const fecha =
-    borrarEl &&
-    new Date(borrarEl).toLocaleString(idioma === 'en' ? 'en-US' : 'es-CO', {
+    pendiente &&
+    new Date(pendiente.borrarEl).toLocaleString(idioma === 'en' ? 'en-US' : 'es-CO', {
       dateStyle: 'long',
       timeStyle: 'short',
       // 24 h: «11:01 p. m.» seguido de un punto se leía «p. m..».
@@ -73,10 +83,16 @@ export function AvisoBorradoPendiente() {
     <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6">
       <div
         className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-        role={borrarEl ? 'alert' : 'status'}
-        style={{ borderColor: borrarEl ? 'var(--danger)' : 'var(--ok)' }}
+        role={pendiente ? 'alert' : 'status'}
+        style={{ borderColor: pendiente ? 'var(--danger)' : 'var(--ok)' }}
       >
-        {borrarEl ? (
+        {pendiente?.enCurso ? (
+          <p className="text-sm">
+            {t('borrar.enCursoA')}
+            <strong style={{ color: 'var(--danger)' }}>{fecha}</strong>
+            {t('borrar.enCursoB')}
+          </p>
+        ) : pendiente ? (
           <>
             <p className="text-sm">
               <strong style={{ color: 'var(--danger)' }}>

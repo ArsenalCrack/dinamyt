@@ -1314,7 +1314,6 @@ export class OrganizationsService {
     return this.esAdminDe(userId, org.parentId);
   }
 
-  /** Lanza 403 si el usuario no es super admin ni gestor de la org. */
   /**
    * Las organizaciones activas que esta persona administra SOLA: si se fuera,
    * nadie podría gestionarlas. Es la regla 2 de `exigirQueNoSeRompaElMando`
@@ -1351,6 +1350,7 @@ export class OrganizationsService {
     return solas;
   }
 
+  /** Lanza 403 si el usuario no es super admin ni gestor de la org. */
   async exigirGestorDe(userId: string, orgId: string, esSuper: boolean) {
     if (esSuper) return;
     if (!(await this.esGestorDe(userId, orgId))) {

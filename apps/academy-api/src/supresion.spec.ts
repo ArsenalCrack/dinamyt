@@ -31,7 +31,7 @@ import {
   type Db,
 } from '@dinamyt/academy-db';
 import { buildApp } from './app';
-import { borrarArchivos, NOMBRE_BORRADA } from './lib/suprimir-persona';
+import { borrarArchivos, NOMBRE_BORRADA, suprimirPersona } from './lib/suprimir-persona';
 
 // Borrar una cuenta llega a Academy por `POST /sync/supresion` (OPERAR §4.15).
 // Lo que importa: que se vaya lo de la persona y NADA de los demás.
@@ -193,6 +193,16 @@ describe('POST /sync/supresion', () => {
     expect((await pedir(ALUMNO)).statusCode).toBe(200);
   });
 
+  it('un archivo que otra respuesta también nombra no se borra', async () => {
+    await db
+      .update(answers)
+      .set({ evidenceUrl: 'evidencias/a.mp4' })
+      .where(eq(answers.attemptId, ids.intentoOtro.id));
+    const { archivos } = await suprimirPersona(db, ALUMNO);
+    expect(archivos).not.toContain('evidencias/a.mp4');
+    expect(archivos).toContain('certificados/a.pdf');
+  });
+
   it('del maestro se queda lo que publicó, sin su nombre', async () => {
     expect((await pedir(MAESTRO)).statusCode).toBe(200);
 
@@ -220,29 +230,35 @@ describe('POST /sync/supresion', () => {
 });
 
 describe('borrarArchivos', () => {
-  it('borra dentro del almacén y nada fuera de él', async () => {
+  const U1 = '0b0e7a52-5c3e-4f3c-9d1a-2a7f3c1e9b10';
+  const U2 = '6f1c2d3e-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+
+  it('borra lo suyo, y nada que no tenga la forma exacta de un archivo de Academy', async () => {
     const raiz = await mkdtemp(join(tmpdir(), 'academy-supresion-'));
     const almacen = join(raiz, 'almacen');
     await mkdir(join(almacen, 'evidencias'), { recursive: true });
-    await mkdir(join(almacen, 'figuras/resultados/abc'), { recursive: true });
-    await writeFile(join(almacen, 'evidencias/a.mp4'), 'x');
-    await writeFile(join(almacen, 'evidencias/b.mp4'), 'x');
-    await writeFile(join(almacen, 'figuras/resultados/abc/reporte.png'), 'x');
+    await mkdir(join(almacen, `figuras/resultados/${U1}`), { recursive: true });
+    await writeFile(join(almacen, `evidencias/${U1}.mp4`), 'x');
+    await writeFile(join(almacen, `evidencias/${U2}.mp4`), 'de otra persona');
+    await writeFile(join(almacen, `figuras/resultados/${U1}/reporte.png`), 'x');
     await writeFile(join(raiz, 'fuera.txt'), 'x');
 
-    await borrarArchivos(almacen, [
-      'evidencias/a.mp4',
-      'figuras/resultados/abc',
-      'evidencias/no-existe.mp4',
-      'https://youtu.be/xyz',
-      '../fuera.txt',
-      join(raiz, 'fuera.txt'),
-      '',
-    ]);
+    await borrarArchivos(almacen, {
+      archivos: [
+        `evidencias/${U1}.mp4`,
+        `evidencias/${U1}.webm`, // ya no está: no falla
+        'evidencias', // la carpeta de todos
+        'https://youtu.be/xyz',
+        '../fuera.txt',
+        join(raiz, 'fuera.txt'),
+        '',
+      ],
+      carpetas: [`figuras/resultados/${U1}`, 'evidencias', 'figuras', '..'],
+    });
 
-    expect(await readdir(join(almacen, 'evidencias'))).toEqual(['b.mp4']);
-    expect(existsSync(join(almacen, 'figuras/resultados/abc'))).toBe(false);
+    expect(await readdir(join(almacen, 'evidencias'))).toEqual([`${U2}.mp4`]);
+    expect(existsSync(join(almacen, `figuras/resultados/${U1}`))).toBe(false);
+    expect(existsSync(join(almacen, 'figuras/resultados'))).toBe(true);
     expect(existsSync(join(raiz, 'fuera.txt'))).toBe(true);
-    expect(existsSync(almacen)).toBe(true);
   });
 });

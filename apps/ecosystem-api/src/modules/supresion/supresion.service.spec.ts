@@ -7,21 +7,22 @@
  * · Pedirlo exige la contraseña y la palabra, no lo puede hacer un super
  *   administrador ni la única persona que administra un club, y al pedirlo se
  *   cierran todas las sesiones y se avisa al correo.
- * · Hacerlo va en orden: Membresías y Campeonatos primero. Si uno de los dos no
+ * · Hacerlo va en orden: Membresías, Campeonatos y Academy primero. Si una no
  *   confirma, aquí no se borra nada y la cuenta espera a mañana entera.
+ * · Vencido el plazo ya no se cancela, ni se vuelve a pedir: el barrido puede
+ *   estar a medias.
  */
 
 jest.mock('../../db', () => ({ db: {} }));
-jest.mock('../../common/espejo-membresias', () => ({ pedirSupresionAMembresias: jest.fn() }));
-jest.mock('../../common/espejo-campeonatos', () => ({ pedirSupresionACampeonatos: jest.fn() }));
-jest.mock('../../common/espejo-academy', () => ({ pedirSupresionAAcademy: jest.fn() }));
+jest.mock('./pedir-a-las-apps', () => ({
+  ...jest.requireActual('./pedir-a-las-apps'),
+  pedirSupresion: jest.fn(),
+}));
 jest.mock('./borrar-de-la-base', () => ({ borrarDeLaBase: jest.fn() }));
 
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { db } from '../../db';
-import { pedirSupresionAMembresias } from '../../common/espejo-membresias';
-import { pedirSupresionACampeonatos } from '../../common/espejo-campeonatos';
-import { pedirSupresionAAcademy } from '../../common/espejo-academy';
+import { pedirSupresion, type AppQueBorra } from './pedir-a-las-apps';
 import { borrarDeLaBase } from './borrar-de-la-base';
 import { DIAS_DE_GRACIA, SupresionService } from './supresion.service';
 import type { UsersService } from '../users/users.service';
@@ -37,7 +38,7 @@ function base(respuestas: unknown[][]) {
   const cola = [...respuestas];
   const eslabon = (): Record<string, unknown> => {
     const e: Record<string, unknown> = {};
-    for (const m of ['from', 'where', 'limit', 'returning', 'innerJoin']) e[m] = () => e;
+    for (const m of ['from', 'where', 'limit', 'returning', 'innerJoin', 'for']) e[m] = () => e;
     e.set = (v: Record<string, unknown>) => {
       puestos.push(v);
       return e;
@@ -48,7 +49,7 @@ function base(respuestas: unknown[][]) {
   const fake = db as unknown as Record<string, unknown>;
   fake.select = () => eslabon();
   fake.update = () => eslabon();
-  fake.transaction = (fn: (tx: unknown) => unknown) => fn({});
+  fake.transaction = (fn: (tx: unknown) => unknown) => fn(fake);
   return { puestos };
 }
 
@@ -139,6 +140,23 @@ describe('SupresionService.pedir', () => {
     expect(puestos).toEqual([]);
   });
 
+  it('con el plazo vencido, no: el barrido puede estar a medias', async () => {
+    base([[ana({ borrarEl: new Date(Date.now() - 1000) })]]);
+    const { servicio, llamadas } = armar();
+    await expect(
+      servicio.pedir(ANA, { contrasena: 'clave', confirmacion: 'BORRAR' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(llamadas.revocar).toHaveLength(0);
+  });
+
+  it('lo que no es texto no revienta: 400', async () => {
+    base([]);
+    const { servicio } = armar();
+    await expect(
+      servicio.pedir(ANA, { contrasena: 1, confirmacion: ['BORRAR'] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('una cuenta ya borrada no existe', async () => {
     base([[ana({ borradaEl: new Date() })]]);
     const { servicio } = armar();
@@ -161,53 +179,95 @@ describe('SupresionService.cancelar', () => {
     const { servicio } = armar();
     await expect(servicio.cancelar(ANA)).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('con el plazo vencido, no: 409', async () => {
+    base([[], [{ borrarEl: new Date(Date.now() - 1000) }]]);
+    const { servicio } = armar();
+    await expect(servicio.cancelar(ANA)).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('SupresionService.estado', () => {
+  it('dice si ya está en curso', async () => {
+    const antes = new Date(Date.now() - 1000);
+    const despues = new Date(Date.now() + 60_000);
+    base([[{ borrarEl: despues }], [{ borrarEl: antes }], []]);
+    const { servicio } = armar();
+    await expect(servicio.estado(ANA)).resolves.toEqual({ borrarEl: despues, enCurso: false });
+    await expect(servicio.estado(ANA)).resolves.toEqual({ borrarEl: antes, enCurso: true });
+    await expect(servicio.estado(ANA)).resolves.toEqual({ borrarEl: null, enCurso: false });
+  });
 });
 
 describe('SupresionService.ejecutarVencidas', () => {
-  const vencida = { id: ANA, email: 'ana@correo.com', documentId: '1010', avatarUrl: null };
-  const membresias = pedirSupresionAMembresias as jest.Mock;
-  const campeonatos = pedirSupresionACampeonatos as jest.Mock;
-  const academy = pedirSupresionAAcademy as jest.Mock;
+  const vencida = { id: ANA, email: 'ana@correo.com', avatarUrl: null };
+  const pedir = pedirSupresion as jest.Mock;
   const borrar = borrarDeLaBase as jest.Mock;
+  let respuestas: Record<string, string>;
+
+  /** Las vencidas, y lo que devuelve el SELECT … FOR UPDATE antes de borrar. */
+  const vencidas = (sigue = true) => base([[vencida], sigue ? [{ id: ANA }] : []]);
+  const preguntadas = () =>
+    pedir.mock.calls.map(([d, id]: [AppQueBorra, string]) => [d.app, id]);
 
   beforeEach(() => {
-    membresias.mockReset();
-    campeonatos.mockReset();
-    academy.mockReset().mockResolvedValue('hecha');
+    respuestas = {};
+    pedir.mockReset().mockImplementation(async (d: AppQueBorra) => respuestas[d.app] ?? 'hecha');
     borrar.mockReset();
   });
 
-  it('Membresías, Campeonatos y Academy primero, con el documento; después aquí', async () => {
-    base([[vencida]]);
-    membresias.mockResolvedValue('hecha');
-    campeonatos.mockResolvedValue('hecha');
+  it('Membresías, Campeonatos y Academy primero, solo con el id; después aquí', async () => {
+    vencidas();
     const { servicio } = armar();
     await expect(servicio.ejecutarVencidas()).resolves.toEqual({ suprimidas: 1, pendientes: [] });
-    expect(membresias).toHaveBeenCalledWith(ANA);
-    expect(campeonatos).toHaveBeenCalledWith({ ecoSub: ANA, documento: '1010' });
-    expect(academy).toHaveBeenCalledWith(ANA);
+    expect(preguntadas()).toEqual([
+      ['membresias', ANA],
+      ['campeonatos', ANA],
+      ['academy', ANA],
+    ]);
     expect(borrar).toHaveBeenCalledTimes(1);
   });
 
-  it('si Academy no confirma, tampoco', async () => {
-    base([[vencida]]);
-    membresias.mockResolvedValue('hecha');
-    campeonatos.mockResolvedValue('hecha');
-    academy.mockResolvedValue('fallo');
-    const { servicio } = armar();
-    const r = await servicio.ejecutarVencidas();
-    expect(r.pendientes[0].motivo).toMatch(/Academy/);
-    expect(borrar).not.toHaveBeenCalled();
+  it.each(['membresias', 'campeonatos', 'academy'])(
+    'si %s no confirma, aquí no se borra nada',
+    async (app) => {
+      vencidas();
+      respuestas[app] = 'fallo';
+      const { servicio } = armar();
+      const r = await servicio.ejecutarVencidas();
+      expect(r.suprimidas).toBe(0);
+      expect(r.pendientes[0].motivo).toMatch(/no confirmó/);
+      expect(borrar).not.toHaveBeenCalled();
+    },
+  );
+
+  it('en producción, sin el canal a Membresías o a Campeonatos, espera', async () => {
+    const entorno = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      for (const [app, variable] of [
+        ['membresias', /MEMBRESIAS_SYNC_URL/],
+        ['campeonatos', /CAMPEONATOS_SYNC_URL/],
+      ] as const) {
+        borrar.mockReset();
+        respuestas = { [app]: 'sin-espejo' };
+        vencidas();
+        const { servicio } = armar();
+        const r = await servicio.ejecutarVencidas();
+        expect(r.pendientes[0].motivo).toMatch(variable);
+        expect(borrar).not.toHaveBeenCalled();
+      }
+    } finally {
+      process.env.NODE_ENV = entorno;
+    }
   });
 
   it('en producción, Academy sin canal no espera: no está encendida', async () => {
     const entorno = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
     try {
-      base([[vencida]]);
-      membresias.mockResolvedValue('hecha');
-      campeonatos.mockResolvedValue('hecha');
-      academy.mockResolvedValue('sin-espejo');
+      vencidas();
+      respuestas.academy = 'sin-espejo';
       const { servicio } = armar();
       await expect(servicio.ejecutarVencidas()).resolves.toEqual({ suprimidas: 1, pendientes: [] });
       expect(borrar).toHaveBeenCalledTimes(1);
@@ -216,58 +276,28 @@ describe('SupresionService.ejecutarVencidas', () => {
     }
   });
 
-  it('si Membresías no confirma, aquí no se borra nada', async () => {
-    base([[vencida]]);
-    membresias.mockResolvedValue('fallo');
-    const { servicio } = armar();
-    const r = await servicio.ejecutarVencidas();
-    expect(r.suprimidas).toBe(0);
-    expect(r.pendientes[0].motivo).toMatch(/Membresías/);
-    expect(campeonatos).not.toHaveBeenCalled();
-    expect(borrar).not.toHaveBeenCalled();
-  });
-
-  it('si Campeonatos no confirma, tampoco', async () => {
-    base([[vencida]]);
-    membresias.mockResolvedValue('hecha');
-    campeonatos.mockResolvedValue('fallo');
-    const { servicio } = armar();
-    const r = await servicio.ejecutarVencidas();
-    expect(r.pendientes[0].motivo).toMatch(/Campeonatos/);
-    expect(borrar).not.toHaveBeenCalled();
-  });
-
-  it('en producción, sin el canal a Campeonatos configurado, espera', async () => {
-    const entorno = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
-    try {
-      base([[vencida]]);
-      membresias.mockResolvedValue('hecha');
-      campeonatos.mockResolvedValue('sin-espejo');
-      const { servicio } = armar();
-      const r = await servicio.ejecutarVencidas();
-      expect(r.pendientes[0].motivo).toMatch(/CAMPEONATOS_SYNC_URL/);
-      expect(borrar).not.toHaveBeenCalled();
-    } finally {
-      process.env.NODE_ENV = entorno;
-    }
-  });
-
   it('fuera de producción, sin canales configurados, sigue', async () => {
-    base([[vencida]]);
-    membresias.mockResolvedValue('sin-espejo');
-    campeonatos.mockResolvedValue('sin-espejo');
+    vencidas();
+    respuestas = { membresias: 'sin-espejo', campeonatos: 'sin-espejo', academy: 'sin-espejo' };
     const { servicio } = armar();
     await expect(servicio.ejecutarVencidas()).resolves.toEqual({ suprimidas: 1, pendientes: [] });
     expect(borrar).toHaveBeenCalledTimes(1);
   });
 
+  it('si con la fila bloqueada ya no está pendiente, no la borra', async () => {
+    vencidas(false);
+    const { servicio } = armar();
+    const r = await servicio.ejecutarVencidas();
+    expect(r.pendientes[0].motivo).toMatch(/dejó de estar pendiente/);
+    expect(borrar).not.toHaveBeenCalled();
+  });
+
   it('si mientras tanto se quedó sola administrando un club, espera', async () => {
-    base([[vencida]]);
+    vencidas();
     const { servicio } = armar({ sinMando: ['Club Tigres'] });
     const r = await servicio.ejecutarVencidas();
     expect(r.pendientes[0].motivo).toMatch(/Club Tigres/);
-    expect(membresias).not.toHaveBeenCalled();
+    expect(pedir).not.toHaveBeenCalled();
     expect(borrar).not.toHaveBeenCalled();
   });
 });

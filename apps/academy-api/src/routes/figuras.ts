@@ -14,6 +14,7 @@ import { notificar } from '../lib/notify';
 import { registrarActividad } from '../lib/activity';
 import { guardarArchivoSeguro, borrarArchivoSubido, ErrorSubida } from '../lib/uploads';
 import { config } from '../config';
+import { carpetaResultados } from '../lib/rutas';
 
 /** Lee un multipart: campos de texto + UN video validado por la capa de
  *  seguridad de subidas (extensión + firma + tamaño). Lanza ErrorSubida. */
@@ -232,7 +233,7 @@ export async function figurasRoutes(app: FastifyInstance) {
       });
 
       // Análisis en segundo plano: el estudiante consulta el estado por polling.
-      const outDir = join('figuras/resultados', intento.id).replaceAll('\\', '/');
+      const outDir = carpetaResultados(intento.id);
       void (async () => {
         try {
           const r = await req.server.figurasClient.compare({

@@ -6,9 +6,11 @@
  *   pnpm --filter @dinamyt/ecosystem-api suprimir:persona --correo ana@x.com --programar       # en 7 días
  *   pnpm --filter @dinamyt/ecosystem-api suprimir:persona --correo ana@x.com --programar --ya  # en el próximo barrido
  *   pnpm --filter @dinamyt/ecosystem-api suprimir:persona --correo ana@x.com --cancelar
+ *   pnpm --filter @dinamyt/ecosystem-api suprimir:persona --id <uuid> …    # si el correo da varias
  *
  * Hace lo mismo que el botón de Configuración —poner `borrar_el` y cerrar sus
- * sesiones—, y el borrado de verdad lo hace el barrido diario de las 08:00
+ * sesiones—, salvo escribirle al correo: la persona ya lo pidió por escrito.
+ * El borrado de verdad lo hace el barrido diario de las 08:00
  * (`SupresionService.ejecutarVencidas`). No hay una segunda copia de qué se
  * borra: esto solo programa. `--ya` es para una solicitud ya confirmada por
  * escrito, que no necesita los siete días.
@@ -16,7 +18,12 @@
  * Sin `--programar` ni `--cancelar` solo enseña el estado.
  *
  * Antes de programarlo, comprueba lo mismo que la pantalla: que no sea la
- * única persona que administra un club, ni un super administrador.
+ * única persona que administra un club, ni un super administrador. Y como la
+ * pantalla, no cancela con el plazo vencido: el barrido puede estar a medias.
+ *
+ * Por correo puede salir más de una cuenta: la migración 0015 dejó a propósito
+ * las que solo se distinguen en mayúsculas (`Ana@x.com` y `ana@x.com`). Entonces
+ * las lista y pide `--id`.
  */
 
 import 'dotenv/config';
@@ -28,6 +35,7 @@ const valor = (nombre) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 const correo = (valor('--correo') ?? '').trim().toLowerCase();
+const idPedido = (valor('--id') ?? '').trim();
 const programar = args.includes('--programar');
 const ya = args.includes('--ya');
 const cancelar = args.includes('--cancelar');
@@ -35,8 +43,8 @@ const url =
   args.find((a) => a.startsWith('--url='))?.slice(6) ?? process.env.DATABASE_URL ?? '';
 const esquema = process.env.DB_SCHEMA || 'ecosystem';
 
-if (!correo) {
-  console.error('Falta --correo con la dirección de la cuenta.');
+if (!correo && !idPedido) {
+  console.error('Falta --correo con la dirección de la cuenta (o --id).');
   process.exit(1);
 }
 if (programar && cancelar) {
@@ -59,18 +67,27 @@ const sql = postgres(url, {
 const t = (tabla) => sql(`${esquema}.${tabla}`.split('.'));
 
 try {
-  const [p] = await sql`
-    SELECT id, full_name, is_super_admin, borrar_el, borrada_el
-      FROM ${t('users')} WHERE lower(email) = ${correo}`;
-  if (!p) {
-    console.log(`\nNo hay ninguna cuenta con ${correo}.\n`);
+  const cuentas = await sql`
+    SELECT id, email, full_name, is_super_admin, borrar_el, borrada_el
+      FROM ${t('users')}
+     WHERE ${idPedido ? sql`id::text = ${idPedido}` : sql`lower(email) = ${correo}`}`;
+  if (cuentas.length === 0) {
+    console.log(`\nNo hay ninguna cuenta con ${idPedido || correo}.\n`);
     process.exit(0);
   }
+  if (cuentas.length > 1) {
+    console.error(`\n  ✗ Con ${correo} hay ${cuentas.length} cuentas. Repite con --id:\n`);
+    for (const c of cuentas) console.error(`    ${c.id} · ${c.email} · ${c.full_name}`);
+    console.error('');
+    process.exit(1);
+  }
+  const [p] = cuentas;
   const solas = await sql`
     SELECT o.name
       FROM ${t('org_members')} m
       JOIN ${t('organizations')} o ON o.id = m.org_id
      WHERE m.user_id = ${p.id}
+       -- Los de ROLES_GESTOR (src/common/roles.ts).
        AND m.role IN ('admin', 'owner', 'maestro')
        AND o.is_active IS NOT FALSE
        AND NOT EXISTS (
@@ -93,8 +110,16 @@ try {
   if (p.borrada_el && (programar || cancelar)) {
     console.log('\n  Ya está borrada: no hay nada que programar ni que cancelar.\n');
   } else if (cancelar) {
-    await sql`UPDATE ${t('users')} SET borrar_el = NULL, updated_at = now() WHERE id = ${p.id}`;
-    console.log('\n  ✓ Borrado cancelado.\n');
+    const filas = await sql`
+      UPDATE ${t('users')} SET borrar_el = NULL, updated_at = now()
+       WHERE id = ${p.id} AND (borrar_el IS NULL OR borrar_el > now())
+   RETURNING id`;
+    if (filas.length === 0) {
+      console.error('\n  ✗ El plazo ya venció: el barrido puede estar a medias y no se cancela.\n');
+      process.exitCode = 1;
+    } else {
+      console.log('\n  ✓ Borrado cancelado.\n');
+    }
   } else if (programar) {
     if (p.is_super_admin) {
       console.error('\n  ✗ Es super administrador: quítale ese permiso antes.\n');
@@ -102,9 +127,13 @@ try {
     } else if (solas.length) {
       console.error('\n  ✗ Nombra antes a otra persona que administre esos clubes.\n');
       process.exitCode = 1;
+    } else if (p.borrar_el && p.borrar_el <= new Date()) {
+      console.error('\n  ✗ Ya se está borrando: no se vuelve a programar.\n');
+      process.exitCode = 1;
     } else {
       const [{ cuando }] = await sql`
         UPDATE ${t('users')}
+           -- Los 7 son DIAS_DE_GRACIA (supresion.service.ts).
            SET borrar_el = ${ya ? sql`now()` : sql`now() + interval '7 days'`}, updated_at = now()
          WHERE id = ${p.id}
      RETURNING borrar_el AS cuando`;

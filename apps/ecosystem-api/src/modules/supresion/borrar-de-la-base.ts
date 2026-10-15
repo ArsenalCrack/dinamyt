@@ -20,6 +20,43 @@ import {
 /** El nombre que queda en lo que el club o DINAMYT tienen que conservar. */
 export const NOMBRE_BORRADA = 'PERSONA ELIMINADA';
 
+/**
+ * Qué pasa con cada llave foránea que apunta a `users` cuando la persona se
+ * borra. El ensayo (`supresion:ensayo`) la compara con las migraciones de
+ * verdad y falla si aparece una llave que no está aquí: es un dato que cuelga
+ * de la persona y nadie ha decidido todavía qué se hace con él.
+ *
+ * `borrar`: la fila se va. `anular`: la columna queda en null. `conservar`:
+ * sigue apuntando a la fila vaciada, que ya no dice quién era.
+ */
+export const POLITICA_DE_LLAVES: Readonly<Record<string, 'borrar' | 'anular' | 'conservar'>> = {
+  'audit_auth.user_id': 'borrar',
+  'otp_codes.user_id': 'borrar',
+  'push_subscriptions.user_id': 'borrar',
+  'sessions.user_id': 'borrar',
+  'user_disciplines.user_id': 'borrar',
+  'user_guardians.guardian_user_id': 'borrar',
+  'user_guardians.minor_user_id': 'borrar',
+  'org_members.user_id': 'borrar',
+  'org_member_bajas.user_id': 'borrar',
+  'org_join_requests.user_id': 'borrar',
+  'org_invitations.user_id': 'borrar',
+  'org_notifications.user_id': 'borrar',
+  'org_notifications.subject_user_id': 'borrar',
+  'org_member_bajas.removed_by_user_id': 'anular',
+  'org_notifications.actor_user_id': 'anular',
+  // Quién invitó, quién respondió o quién registró un pago: se quedan,
+  // apuntando a «PERSONA ELIMINADA». Lo que conservan es del club o de
+  // DINAMYT, y la fila ya no dice nada de ella.
+  'org_members.invited_by_user_id': 'conservar',
+  'org_invitations.invited_by_user_id': 'conservar',
+  'org_club_invitations.invited_by_user_id': 'conservar',
+  'org_join_requests.responded_by_user_id': 'conservar',
+  'subscription_payments.registered_by_user_id': 'conservar',
+  // Las suscripciones y los pagos de DINAMYT (obligación contable).
+  'user_subscriptions.user_id': 'conservar',
+};
+
 /** Lo que hace falta de la base: vale `db` o la `tx` de una transacción. */
 export type Escritor = Pick<PostgresJsDatabase<typeof schema>, 'select' | 'update' | 'delete'>;
 
