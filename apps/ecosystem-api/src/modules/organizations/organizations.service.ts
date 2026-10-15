@@ -1315,6 +1315,42 @@ export class OrganizationsService {
   }
 
   /** Lanza 403 si el usuario no es super admin ni gestor de la org. */
+  /**
+   * Las organizaciones activas que esta persona administra SOLA: si se fuera,
+   * nadie podría gestionarlas. Es la regla 2 de `exigirQueNoSeRompaElMando`
+   * vista desde la persona y no desde un club, para borrar una cuenta.
+   */
+  async dondeEsElUnicoGestor(userId: string): Promise<string[]> {
+    const mias = await db
+      .select({
+        orgId: orgMembers.orgId,
+        role: orgMembers.role,
+        name: organizations.name,
+        isActive: organizations.isActive,
+      })
+      .from(orgMembers)
+      .innerJoin(organizations, eq(organizations.id, orgMembers.orgId))
+      .where(eq(orgMembers.userId, userId));
+
+    const solas: string[] = [];
+    for (const m of mias) {
+      if (!esRolGestor(m.role) || m.isActive === false) continue;
+      const [otro] = await db
+        .select({ id: orgMembers.id })
+        .from(orgMembers)
+        .where(
+          and(
+            eq(orgMembers.orgId, m.orgId),
+            ne(orgMembers.userId, userId),
+            inArray(orgMembers.role, ROLES_GESTOR),
+          ),
+        )
+        .limit(1);
+      if (!otro) solas.push(m.name);
+    }
+    return solas;
+  }
+
   async exigirGestorDe(userId: string, orgId: string, esSuper: boolean) {
     if (esSuper) return;
     if (!(await this.esGestorDe(userId, orgId))) {

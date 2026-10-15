@@ -500,6 +500,8 @@ export type MotivoCierre =
   | 'salir-todas'
   | 'cambio-contrasena'
   | 'recuperacion'
+  /** Pidió borrar su cuenta: se le cierra todo, por si quien lo pidió no era él. */
+  | 'borrado'
   | 'inactividad'
   | 'caducada'
   | 'admin'

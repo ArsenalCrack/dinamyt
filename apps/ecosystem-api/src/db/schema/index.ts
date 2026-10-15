@@ -264,6 +264,14 @@ export const users = eco.table('users', {
   theme: varchar('theme', { length: 10 }).default('sistema').notNull(),
   /** ¿El idioma lo eligió a mano? Gemela de `timezoneManual`, y por lo mismo. */
   localeManual: boolean('locale_manual').default(false),
+  /**
+   * Cuándo se borrará la cuenta, si su dueño lo pidió. Mientras tenga fecha la
+   * cuenta sigue entera: son los siete días para arrepentirse (migración 0024,
+   * `modules/supresion`).
+   */
+  borrarEl: timestamp('borrar_el', { withTimezone: true }),
+  /** Cuándo se borró. La fila queda vaciada: de ella cuelgan pagos y suscripciones. */
+  borradaEl: timestamp('borrada_el', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

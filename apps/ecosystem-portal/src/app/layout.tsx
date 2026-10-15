@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Archivo, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { AplicarApariencia } from '@/components/AplicarApariencia';
+import { AvisoBorradoPendiente } from '@/components/AvisoBorradoPendiente';
 import { BarraPortal } from '@/components/BarraPortal';
 import { ControlesApariencia } from '@/components/ControlesApariencia';
 import { PieDePagina } from '@/components/PieDePagina';
@@ -191,6 +192,9 @@ export default function RootLayout({
               en todas, y porque colgar el desplegable de la BARRA es lo que
               impide que se salga por el borde derecho. Ver el componente. */}
           <BarraPortal />
+          {/* «Tu cuenta se borrará el…»: en todas las pantallas mientras dure el
+              plazo, antes de cualquier otra cosa. Ver el componente. */}
+          <AvisoBorradoPendiente />
           <div className="pagina">{children}</div>
           {/* El globo de tema e idioma, solo donde NO hay navegación: la
               portada, el login, el registro. Dentro ya está el botón de

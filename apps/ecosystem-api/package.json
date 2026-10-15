@@ -27,6 +27,8 @@
     "fotos:al-disco": "node scripts/fotos-al-disco.mjs",
     "notas:cifrar": "node scripts/cifrar-notas-medicas.mjs",
     "notas:ensayo": "node scripts/probar-cifrado-notas.mjs",
+    "supresion:ensayo": "node scripts/probar-supresion.mjs",
+    "suprimir:persona": "node scripts/suprimir-persona.mjs",
     "fotos:ensayo": "node scripts/probar-fotos-al-disco.mjs",
     "espejo:sembrar": "node scripts/sembrar-fichas-membresias.mjs",
     "db:studio": "drizzle-kit studio",

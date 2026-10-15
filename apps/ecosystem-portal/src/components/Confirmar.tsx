@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -22,10 +23,6 @@ import { createPortal } from 'react-dom';
  * 40 px pegados unos a otros en una lista que en el celular se recorre con el
  * pulgar.
  *
- * Membresías lleva tiempo preguntando antes de borrar una clase; esto es lo
- * mismo traído al portal, y ampliado: **no solo al eliminar**, sino en todo lo
- * que le cambia el acceso, el rol o el dinero a alguien que no está delante.
- *
  * ── Por qué un diálogo propio y no `window.confirm` ──
  *
  * El `confirm` del navegador tenía a su favor lo que importa —no se pulsa sin
@@ -38,6 +35,14 @@ import { createPortal } from 'react-dom';
  * Este conserva la propiedad que valía: es modal, tapa la lista entera, y **el
  * foco arranca en «Cancelar»**. Quien venía dando Enter a ciegas, cancela.
  * Confirmar exige mirar y apuntar.
+ *
+ * ── Lo irreversible se ve distinto ──
+ *
+ * `tono: 'irreversible'` pone el borde rojo, el icono de alerta y una franja
+ * que dice que no se puede deshacer: lo que hace un aviso del sistema, y por
+ * eso se reconoce antes de leerlo. Para lo que además pide escribir algo —una
+ * contraseña, una palabra—, `ModalAccesible` es la misma caja con el mismo
+ * comportamiento (ver `BorrarMiCuenta`).
  *
  * ── Cómo se usa ──
  *
@@ -58,7 +63,12 @@ import { createPortal } from 'react-dom';
  * Devuelve una promesa, así que el sitio donde se pregunta es el mismo donde se
  * actúa: no hay que guardar en un estado «qué estaba a punto de hacer», que es
  * de donde salen los diálogos que borran la fila equivocada.
+ *
+ * Membresías tiene una copia de este archivo (mismo nombre): si se cambia aquí,
+ * se cambia allá.
  */
+
+export type TonoConfirmar = 'normal' | 'peligro' | 'irreversible';
 
 export interface PeticionConfirmar {
   /** La pregunta, con el nombre propio dentro. «¿Quitar a Pablo del club?» */
@@ -67,8 +77,10 @@ export interface PeticionConfirmar {
   detalle?: ReactNode;
   textoOk?: string;
   textoCancelar?: string;
-  /** `peligro` pinta el botón en rojo. Para lo que no se puede deshacer. */
-  tono?: 'peligro' | 'normal';
+  /** `peligro` pinta el botón en rojo; `irreversible`, además, avisa que no hay vuelta atrás. */
+  tono?: TonoConfirmar;
+  /** La franja de `irreversible`. Por defecto: «Esta acción no se puede deshacer.» */
+  textoIrreversible?: string;
 }
 
 export function useConfirmar() {
@@ -116,32 +128,100 @@ function DialogoConfirmar({
   onCerrar: (ok: boolean) => void;
 }) {
   const cancelarRef = useRef<HTMLButtonElement>(null);
+  const tono = peticion.tono ?? 'normal';
+
+  return (
+    <ModalAccesible
+      titulo={peticion.titulo}
+      tono={tono}
+      focoInicial={cancelarRef}
+      onCancelar={() => onCerrar(false)}
+      textoIrreversible={peticion.textoIrreversible}
+      botones={
+        <>
+          <button
+            type="button"
+            ref={cancelarRef}
+            className="btn btn-outline"
+            onClick={() => onCerrar(false)}
+          >
+            {peticion.textoCancelar ?? 'Cancelar'}
+          </button>
+          <button
+            type="button"
+            className={tono === 'normal' ? 'btn btn-gold' : 'btn btn-danger'}
+            onClick={() => onCerrar(true)}
+          >
+            {peticion.textoOk ?? 'Sí, continuar'}
+          </button>
+        </>
+      }
+    >
+      {peticion.detalle && <div className="confirmar-detalle">{peticion.detalle}</div>}
+    </ModalAccesible>
+  );
+}
+
+/**
+ * La caja modal y todo lo que la hace usable: el foco entra en lo seguro y se
+ * devuelve al cerrar, el tabulador no se sale, Escape y tocar fuera cancelan,
+ * y la página de detrás no se mueve.
+ *
+ * `botones` va el «Cancelar» PRIMERO: la hoja de estilos los invierte en
+ * pantalla (ver `.confirmar-botones` en la hoja compartida). `campos` va
+ * DESPUÉS de la franja de lo irreversible: se lee la advertencia antes de
+ * empezar a escribir.
+ */
+export function ModalAccesible({
+  titulo,
+  tono = 'normal',
+  focoInicial,
+  onCancelar,
+  textoIrreversible,
+  campos,
+  botones,
+  children,
+}: {
+  titulo: string;
+  tono?: TonoConfirmar;
+  focoInicial: RefObject<HTMLElement | null>;
+  onCancelar: () => void;
+  textoIrreversible?: string;
+  /** Lo que hay que escribir para confirmar (contraseña, palabra). */
+  campos?: ReactNode;
+  botones: ReactNode;
+  children?: ReactNode;
+}) {
   const cajaRef = useRef<HTMLDivElement>(null);
+  // La última versión de `onCancelar`, para que Escape y el fondo no llamen a
+  // la del primer render (que puede saber, por ejemplo, que todavía no se
+  // estaba enviando nada).
+  const cancelar = useRef(onCancelar);
+  cancelar.current = onCancelar;
 
   useEffect(() => {
     // De dónde venía el foco, para devolvérselo al cerrar: si no, quien navega
     // con teclado vuelve al principio de la página cada vez que cancela.
     const antes = document.activeElement as HTMLElement | null;
-    cancelarRef.current?.focus();
+    focoInicial.current?.focus();
 
-    // La página de detrás no se mueve mientras la pregunta está abierta.
-    // Sin esto, el gesto de desplazar sobre el fondo oscuro seguía recorriendo
-    // la lista: se leía la pregunta sobre una fila y al cerrar se estaba en
-    // otra parte del panel, sin saber a quién se acababa de responder. En el
-    // celular es peor, porque el pulgar cae justo encima del fondo.
+    // La página de detrás no se mueve mientras la pregunta está abierta: se
+    // leía la pregunta sobre una fila y al cerrar se estaba en otra.
     const scrollPrevio = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     function alTeclear(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onCerrar(false);
+        cancelar.current();
         return;
       }
       // El foco no se sale de la caja: por detrás está la misma lista de
       // botones que acaba de dispararla.
       if (e.key !== 'Tab' || !cajaRef.current) return;
-      const focos = cajaRef.current.querySelectorAll<HTMLElement>('button');
+      const focos = Array.from(
+        cajaRef.current.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href]'),
+      ).filter((el) => !el.hasAttribute('disabled'));
       if (focos.length === 0) return;
       const primero = focos[0];
       const ultimo = focos[focos.length - 1];
@@ -160,46 +240,39 @@ function DialogoConfirmar({
       document.body.style.overflow = scrollPrevio;
       antes?.focus?.();
     };
-  }, [onCerrar]);
+    // Es de montar y desmontar: lo que cambia entre renders se lee de las refs.
+  }, [focoInicial]);
 
   return createPortal(
     <div
       className="confirmar-fondo"
       // Tocar fuera cancela: es el gesto que ya espera todo el mundo, y hacia
       // el lado seguro.
-      onClick={() => onCerrar(false)}
+      onClick={() => cancelar.current()}
     >
       <div
         ref={cajaRef}
         className="confirmar-caja"
+        data-tono={tono}
         role="alertdialog"
         aria-modal="true"
-        aria-label={peticion.titulo}
+        aria-label={titulo}
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="confirmar-titulo">{peticion.titulo}</p>
-        {peticion.detalle && (
-          <div className="confirmar-detalle">{peticion.detalle}</div>
+        {tono === 'irreversible' && (
+          <div className="confirmar-icono" aria-hidden="true">
+            ⚠
+          </div>
         )}
-        <div className="confirmar-botones">
-          <button
-            type="button"
-            ref={cancelarRef}
-            className="btn btn-outline"
-            onClick={() => onCerrar(false)}
-          >
-            {peticion.textoCancelar ?? 'Cancelar'}
-          </button>
-          <button
-            type="button"
-            className={
-              peticion.tono === 'peligro' ? 'btn btn-danger' : 'btn btn-gold'
-            }
-            onClick={() => onCerrar(true)}
-          >
-            {peticion.textoOk ?? 'Sí, continuar'}
-          </button>
-        </div>
+        <p className="confirmar-titulo">{titulo}</p>
+        {children}
+        {tono === 'irreversible' && (
+          <p className="confirmar-irreversible">
+            {textoIrreversible ?? 'Esta acción no se puede deshacer.'}
+          </p>
+        )}
+        {campos}
+        <div className="confirmar-botones">{botones}</div>
       </div>
     </div>,
     document.body,

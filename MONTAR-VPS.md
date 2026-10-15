@@ -943,6 +943,8 @@ DATABASE_URL=postgresql://dinamyt_eco:CLAVE_ECO@127.0.0.1:5432/dinamyt
 DB_SCHEMA=ecosystem
 JWT_PRIVATE_KEY_PATH=./keys/private.pem
 JWT_PUBLIC_KEY_PATH=./keys/public.pem
+# El canal para borrar cuentas en Campeonatos (OPERAR §1.4 y §4.15).
+CAMPEONATOS_SYNC_URL=https://campeonatos.dinamyt.org
 # Cifra las notas médicas. Sin ella NO se pueden guardar, y si se pierde lo
 # cifrado no se recupera: guárdala también fuera del servidor (OPERAR §1.4).
 # Se genera con: openssl rand -base64 48 | tr -d '\n/+='

@@ -8,6 +8,7 @@ import { validarContrasena, LIM } from '@/lib/validacion';
 import { CampoContrasena } from '@/components/CampoContrasena';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
 import { DispositivosConectados } from '@/components/DispositivosConectados';
+import { BorrarMiCuenta } from '@/components/BorrarMiCuenta';
 import { ZonaHoraria } from '@/components/ZonaHoraria';
 import { Apariencia } from '@/components/Apariencia';
 import { useI18n } from '@/lib/i18n';
@@ -212,6 +213,9 @@ export default function ConfiguracionPage() {
       </form>
 
       <DispositivosConectados />
+
+      {/* Lo último de la pantalla, y aparte: no es un ajuste más. */}
+      <BorrarMiCuenta />
     </main>
   );
 }

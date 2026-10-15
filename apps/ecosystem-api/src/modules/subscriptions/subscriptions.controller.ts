@@ -18,12 +18,15 @@ import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt.service';
 import { SessionsService } from '../auth/sessions.service';
+import { SupresionService } from '../supresion/supresion.service';
 
 @Controller('subscriptions')
 export class SubscriptionsController {
   constructor(
     private readonly subsService: SubscriptionsService,
     private readonly sessions: SessionsService,
+    // Opcional solo para las pruebas que construyen el controlador a mano.
+    private readonly supresion?: SupresionService,
   ) {}
 
   // ── POST /subscriptions — crear suscripción org (solo super admin) ────────
@@ -175,11 +178,21 @@ export class SubscriptionsController {
       importes = { error: e instanceof Error ? e.message : 'falló el recálculo' };
     }
 
+    // Y las cuentas cuyo plazo para arrepentirse ya pasó. Envuelto igual: si
+    // falla, esas cuentas esperan a mañana enteras, que es el lado seguro.
+    let supresiones: unknown = null;
+    try {
+      supresiones = (await this.supresion?.ejecutarVencidas()) ?? null;
+    } catch (e) {
+      supresiones = { error: e instanceof Error ? e.message : 'falló el borrado' };
+    }
+
     return {
       ...(await this.subsService.avisarVencimientos()),
       limpiadas,
       planes,
       importes,
+      supresiones,
     };
   }
 

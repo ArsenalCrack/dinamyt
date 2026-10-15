@@ -814,4 +814,66 @@ export class MailerService {
       `DINAMYT — ${plazo}\n\nLa suscripción de ${datos.club} (${datos.plan}) ${vencida ? 'venció' : 'vence'} el ${fecha}.\n\nEscríbenos a ${MailerService.soporte()} para renovarla.`,
     );
   }
+
+  /**
+   * «Tu cuenta se borrará el…». Sale al pedir el borrado, al correo de la
+   * cuenta: es lo que le avisa al dueño de verdad si quien lo pidió no era él,
+   * y por eso dice cómo cancelarlo antes que nada.
+   */
+  async avisarBorradoProgramado(datos: {
+    to: string;
+    nombre?: string | null;
+    borrarEl: Date;
+    /** La zona de la persona; sin ella, la de Colombia. */
+    zona?: string | null;
+  }): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.warn(`[SIN CORREO] Borrado programado para ${datos.to}`);
+      return false;
+    }
+    const saludo = (datos.nombre ?? '').trim().split(/\s+/)[0] || null;
+    let fecha: string;
+    try {
+      fecha = datos.borrarEl.toLocaleString('es-CO', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+        hourCycle: 'h23',
+        timeZone: datos.zona || 'America/Bogota',
+      });
+    } catch {
+      fecha = datos.borrarEl.toLocaleString('es-CO', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+        hourCycle: 'h23',
+        timeZone: 'America/Bogota',
+      });
+    }
+    const entrar = `${MailerService.portal()}/login`;
+
+    const cuerpo = `<p style="margin:0;">Pediste borrar tu cuenta de DINAMYT. Se borrará el
+         <b>${MailerService.escapar(fecha)}</b>, y cerramos todas tus sesiones.</p>
+       ${MailerService.aviso(
+         '<b>¿No fuiste tú?</b> Entra ya, pulsa «Cancelar el borrado» y cambia tu contraseña: alguien la conoce.',
+       )}
+       ${MailerService.lista([
+         'Hasta esa fecha tu cuenta sigue entera. Si cambias de opinión, entra y cancélalo.',
+         'Después se borran tus datos personales de DINAMYT, de Membresías y de Campeonatos.',
+         'Se conservan los pagos que recibió tu club y los resultados oficiales de tus competencias.',
+       ])}
+       ${MailerService.boton(entrar, 'Entrar a DINAMYT')}`;
+
+    return this.enviar(
+      datos.to,
+      'Tu cuenta de DINAMYT se borrará en 7 días',
+      MailerService.plantilla({
+        etiqueta: 'Borrar la cuenta',
+        titulo: 'Tu cuenta se borrará en 7 días',
+        avance: `Se borrará el ${fecha}. Si no fuiste tú, entra y cancélalo.`,
+        saludo,
+        cuerpo,
+        pie: 'Recibes esto porque se pidió borrar tu cuenta de DINAMYT.',
+      }),
+      `DINAMYT — Tu cuenta se borrará el ${fecha}.\n\nSi no fuiste tú, entra en ${entrar}, cancela el borrado y cambia tu contraseña.\n\nSe conservan los pagos que recibió tu club y los resultados oficiales de tus competencias.`,
+    );
+  }
 }

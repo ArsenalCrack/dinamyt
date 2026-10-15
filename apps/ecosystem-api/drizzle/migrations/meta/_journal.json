@@ -169,6 +169,13 @@
       "when": 1788300500000,
       "tag": "0023_roles_campeonatos",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792035218455,
+      "tag": "0024_borrar_cuenta",
+      "breakpoints": true
     }
   ]
 }

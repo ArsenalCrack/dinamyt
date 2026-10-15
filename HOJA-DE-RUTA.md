@@ -32,6 +32,7 @@
 | Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 6) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
 | Política de privacidad | Reescrita contra el código el 13 oct (terceros, IA, qué se cifra, qué se conserva). **En git, sin desplegar**: rama `feat/privacidad-completa` aquí y `feat/aviso-ia` en Membresías y Campeonatos |
+| Borrar mi cuenta | **En código, sin fusionar** (14 oct): Configuración → «Borrar mi cuenta», 7 días de gracia, borrado en las tres apps (migración `0024` del ecosistema). Necesita `CAMPEONATOS_SYNC_URL` y Campeonatos desplegado (`OPERAR.md` §4.15) |
 | Eliminar del club | **En git, sin desplegar** (14 oct): `POST /users/:id/eliminar` en Membresías (migración `0022`) y `POST /sync/baja` en el ecosistema. Despliega el ecosistema **antes** que Membresías (`OPERAR.md` §4.15) |
 
 ---
@@ -54,8 +55,8 @@
 | — | [En espera: WhatsApp y F9](#en-espera) | — | — |
 
 **Por qué este orden.** El 0 va delante porque es lo único de la lista que
-puede acabar en un reclamo ante la SIC: la política promete borrar una cuenta y
-no existe con qué hacerlo. Del 1 al 4 cuestan minutos y cierran riesgos que ya
+puede acabar en un reclamo ante la SIC: lo que la política promete tiene que
+sostenerlo el código, y lo que falta ahí es tuyo (0.1). Del 1 al 4 cuestan minutos y cierran riesgos que ya
 existen hoy. El 5 y el 6 son seguridad de lo que está en producción todos los
 días. La arquitectura del evento ya está entera en código —el candado de sede y
 la publicación en vivo, `OPERAR.md` §4.25—; lo que le falta es la prueba a mano
@@ -100,43 +101,7 @@ guardarlas sin clave, así que el orden importa:
   alumnos que nunca aceptaron nada), si aplica el Registro Nacional de Bases de
   Datos, y cuánto tiempo se conservan pagos y resultados.
 
-### 0.2 · Borrar una cuenta de verdad
-
-**Hoy no existe.** Ni en el portal, ni en ningún guion: `users.controller.ts`
-no tiene `DELETE`, y la política manda escribir a `admin@`. Atender una
-solicitud sería SQL a mano sobre 20 tablas de `ecosystem` (14 con llave foránea
-a `users`, 13 de ellas sin `ON DELETE`), más la ficha de Membresías, el usuario y el
-competidor de Campeonatos, y las tablas de Academy.
-
-Decidido el 14 oct 2026:
-
-| Decisión | Qué se hace |
-|---|---|
-| Resultados de campeonatos de quien se va | Conservar los oficiales ya publicados, con nombre: es el registro del evento. Borrar inscripciones que no llegaron a competir |
-| Pagos que el club le cobró | Conservarlos sin datos personales: la contabilidad del club no puede cambiar de total |
-| Botón «Eliminar mi cuenta» o solo por soporte | Primero un guion (`scripts/suprimir-persona.mjs`, con `--ensayo` que solo cuenta filas); el botón, después y con 7 días de gracia |
-
-Cómo: el ecosistema manda, como en el resto del espejo. Borra lo suyo y avisa
-con `POST /sync/supresion` a Membresías y a Campeonatos (el secreto por app de
-la tarea 5); Academy se limpia por `ecosystem_user_id`. Deja una fila de
-constancia sin datos personales: es la prueba de que se atendió.
-
-Trampas ya vistas:
-
-- **Tres copias que no caen solas.** `org_member_bajas` sí se borra en cascada,
-  pero su `removed_by_user_id` no tiene `ON DELETE`; `org_notifications.data`
-  guarda nombre y correo dentro de un `jsonb`; y `org_invitations.email` no
-  tiene llave foránea.
-- **Las fotos van por hash de contenido** (§4.20): se borra el archivo solo si
-  nadie más apunta a él.
-- **El PC del evento vuelve a publicar** (decisión 9): un competidor borrado
-  arriba reaparece si el local lo sube otra vez.
-- **Los respaldos guardan 14 días.** La política ya lo dice; restaurar uno
-  obliga a repetir las supresiones de esos días, y para eso sirve la constancia.
-
-**Se despliega con un respaldo recién hecho delante** (`OPERAR.md` §2.5).
-
-### 0.3 · Lo que la política dice y nada obliga
+### 0.2 · Lo que la política dice y nada obliga
 
 - **El contacto de emergencia y el tipo de sangre no van cifrados.** La
   política ya lo dice así. Cifrarlos es posible en el ecosistema; la copia de
@@ -160,9 +125,13 @@ Trampas ya vistas:
 - **Membresías sola, sin portal, no enlaza ninguna política.**
 - **La casilla del registro** está escrita a mano en castellano (tarea 8).
 
-### 0.4 · Antes de encender Academy (tarea 7)
+### 0.3 · Antes de encender Academy (tarea 7)
 
 - No tiene pie: ni privacidad, ni soporte, ni la línea de IA.
+- **No borra nada cuando se borra una cuenta.** Antes de encenderla, una
+  `POST /sync/supresion` que limpie por `ecosystem_user_id` (intentos,
+  respuestas, vistas, avisos, actividad y archivos subidos), y añadirla al
+  barrido de `SupresionService` como las otras dos.
 - Los videos se incrustan desde `www.youtube.com` y `drive.google.com`, que
   ponen sus cookies. Pasar a `youtube-nocookie.com` y nombrar a los dos en la
   política.
@@ -171,7 +140,7 @@ Trampas ya vistas:
   menores: hoy la política dice que la aplicación no usa IA, y deja de ser
   verdad el día que esto se encienda.
 
-### 0.5 · Revisar el código que ya existe
+### 0.4 · Revisar el código que ya existe
 
 - **thermos** (dos revisores: fallos y seguridad, y calidad) sobre cada rama
   antes de fusionarla. Se lanza con `/thermos`.

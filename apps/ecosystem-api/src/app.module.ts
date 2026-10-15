@@ -9,6 +9,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { PushModule } from './modules/push/push.module';
+import { SupresionModule } from './modules/supresion/supresion.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PushModule } from './modules/push/push.module';
     SubscriptionsModule,
     SyncModule,
     PushModule,
+    SupresionModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
