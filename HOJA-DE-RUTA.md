@@ -31,8 +31,8 @@
 | Google | Propiedad verificada (etiqueta y TXT) |
 | Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 5) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
-| Política de privacidad | En línea desde el 15 oct. **Sin fusionar**: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo y tu nombre como responsable |
-| Borrar mi cuenta | **En código, sin fusionar** (rama `feat/borrar-cuenta` en los tres repos): Configuración → «Borrar mi cuenta», 7 días de gracia, borrado en las tres apps y en Academy (migración `0024` del ecosistema). `CAMPEONATOS_SYNC_URL` ya está en la VPS (`OPERAR.md` §4.15) |
+| Política de privacidad | En línea desde el 15 oct. **En `main`, sin desplegar**: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo, tu nombre como responsable y el borrado sin promesas de más |
+| Borrar mi cuenta | **En `main`, sin desplegar** (15 oct, revisado con thermos): Configuración → «Borrar mi cuenta», 7 días de gracia, vencido el plazo ya no se cancela, borrado en las tres apps y en Academy (migración `0024` del ecosistema). `CAMPEONATOS_SYNC_URL` ya está en la VPS (`OPERAR.md` §4.15) |
 
 ---
 
