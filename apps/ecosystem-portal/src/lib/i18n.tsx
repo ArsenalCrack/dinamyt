@@ -382,11 +382,12 @@ const es = {
   // Cada frase de aquí describe algo que el código hace, y se cambia con él:
   // lo único cifrado campo a campo es `medical_notes` (`users.service.ts`), los
   // proveedores son los de OPERAR §3.5 y MONTAR-VPS, y los 14 días son los del
-  // respaldo diario (OPERAR §2.5). «Cifradas» solo es verdad con
+  // respaldo diario (OPERAR §2.5); Carlstadt y los 10 días salen del panel de
+  // Contabo (región US East y el complemento Auto Backup). «Cifradas» solo es verdad con
   // `FIELD_ENCRYPTION_KEY` puesta en la VPS (OPERAR §1.4).
   'priv.ley': 'Ley 1581 de 2012 · Colombia',
   'priv.titulo': 'Política de privacidad',
-  'priv.actualizado': 'Última actualización: octubre de 2026 · Responsable: DINAMYT Ecosystem',
+  'priv.actualizado': 'Última actualización: octubre de 2026 · Responsable: Amir Daniel Sarmiento Avellaneda (DINAMYT)',
   'priv.queDatos': 'Qué datos tratamos',
   'priv.identificacion': 'Identificación:',
   'priv.identificacionTexto': 'nombre, documento, correo, teléfono, fecha de nacimiento, género y foto de perfil.',
@@ -411,8 +412,8 @@ const es = {
   'priv.conQuien': 'Con quién se comparten',
   'priv.conQuienTexto': 'Con tu club o federación: sus administradores ven a sus propios miembros. En campeonatos, los resultados son públicos con tu nombre y tu club, como en cualquier evento deportivo. No vendemos tus datos ni los entregamos a nadie para publicidad.',
   'priv.proveedores': 'Proveedores que tratan datos por encargo nuestro',
-  'priv.proveedoresIntro': 'Para funcionar, DINAMYT usa los servicios de estas empresas. Son extranjeras, así que tus datos pueden tratarse fuera de Colombia.',
-  'priv.prov1': 'Contabo GmbH (Alemania): el servidor donde corre DINAMYT y donde está la base de datos.',
+  'priv.proveedoresIntro': 'Para funcionar, DINAMYT usa los servicios de estas empresas. Son extranjeras, y tus datos se guardan y se tratan fuera de Colombia, sobre todo en Estados Unidos.',
+  'priv.prov1': 'Contabo GmbH (Alemania): el servidor donde corre DINAMYT y donde está la base de datos. La máquina está en Estados Unidos (Carlstadt, Nueva Jersey), y Contabo guarda además una copia diaria del servidor entero durante 10 días.',
   'priv.prov2': 'Resend (Estados Unidos): entrega los correos de tu cuenta, como el código de verificación, las invitaciones y el cambio de contraseña. Recibe tu dirección de correo y el contenido de ese mensaje.',
   'priv.prov3': 'Cloudflare (Estados Unidos): todo lo que envías y recibes pasa por su red antes de llegar a nuestro servidor. También resuelve el dominio dinamyt.org y recibe los correos que escribes a nuestras direcciones de soporte.',
   'priv.prov4': 'Google (Estados Unidos): el buzón de Gmail donde leemos esos correos de soporte.',
@@ -430,7 +431,7 @@ const es = {
   'priv.derechosD': '. Los menores de edad se registran y gestionan con autorización de su acudiente.',
   'priv.sic': 'Si la respuesta no te satisface, puedes acudir a la Superintendencia de Industria y Comercio.',
   'priv.supresion': 'Qué pasa cuando pides borrar tu cuenta',
-  'priv.supresionTexto': 'Al pedirlo se cierran todas tus sesiones y tienes 7 días para arrepentirte: si vuelves a entrar, puedes cancelarlo. Pasado ese plazo eliminamos tu cuenta y tus datos personales de DINAMYT, de Membresías y de Campeonatos. Se conservan los registros que el club y el organizador deben guardar: los pagos que recibió tu club y los resultados oficiales de las competencias en las que participaste, que son públicos y llevan tu nombre. Las copias de seguridad diarias se conservan 14 días. Guardamos además copias fuera del servidor, que se renuevan con menos frecuencia: tus datos pueden seguir en ellas hasta que se sustituyan.',
+  'priv.supresionTexto': 'Al pedirlo se cierran todas tus sesiones y tienes 7 días para arrepentirte: si vuelves a entrar, puedes cancelarlo. Pasado ese plazo eliminamos tu cuenta y tus datos personales de DINAMYT, de Membresías y de Campeonatos. Se conservan los registros que el club y el organizador deben guardar: los pagos que recibió tu club y los resultados oficiales de las competencias en las que participaste, que son públicos y llevan tu nombre. Nuestras copias de seguridad diarias se conservan 14 días, y las de Contabo, 10. Guardamos además copias fuera del servidor, que se renuevan con menos frecuencia: tus datos pueden seguir en ellas hasta que se sustituyan.',
   'priv.seguridad': 'Seguridad y conservación',
   'priv.seguridadTexto': 'Contraseñas con hash (bcrypt), notas médicas cifradas, acceso por roles y comunicación por HTTPS. Los datos se conservan mientras tu cuenta exista. El historial deportivo es inmutable por diseño: registra lo que ocurrió en cada competencia.',
   'priv.volver': '← Volver al inicio',
@@ -837,7 +838,7 @@ const en: Record<ClaveTexto, string> = {
   'borrar.error': 'That did not work. Please try again.',
   'priv.ley': 'Ley 1581 de 2012 · Colombia',
   'priv.titulo': 'Privacy policy',
-  'priv.actualizado': 'Last updated: October 2026 · Data controller: DINAMYT Ecosystem',
+  'priv.actualizado': 'Last updated: October 2026 · Data controller: Amir Daniel Sarmiento Avellaneda (DINAMYT)',
   'priv.queDatos': 'What data we process',
   'priv.identificacion': 'Identification:',
   'priv.identificacionTexto': 'name, ID number, email, phone, date of birth, gender and profile photo.',
@@ -862,8 +863,8 @@ const en: Record<ClaveTexto, string> = {
   'priv.conQuien': 'Who we share them with',
   'priv.conQuienTexto': 'With your club or federation: its administrators see their own members. In championships, results are public with your name and your club, as at any sporting event. We do not sell your data or hand it to anyone for advertising.',
   'priv.proveedores': 'Providers that process data on our behalf',
-  'priv.proveedoresIntro': 'To work, DINAMYT uses the services of these companies. They are foreign, so your data may be processed outside Colombia.',
-  'priv.prov1': 'Contabo GmbH (Germany): the server DINAMYT runs on and where the database lives.',
+  'priv.proveedoresIntro': 'To work, DINAMYT uses the services of these companies. They are foreign, and your data is stored and processed outside Colombia, mainly in the United States.',
+  'priv.prov1': 'Contabo GmbH (Germany): the server DINAMYT runs on and where the database lives. The machine is in the United States (Carlstadt, New Jersey), and Contabo also keeps a daily copy of the whole server for 10 days.',
   'priv.prov2': 'Resend (United States): delivers your account emails, such as the verification code, invitations and password changes. It receives your email address and the content of that message.',
   'priv.prov3': 'Cloudflare (United States): everything you send and receive passes through its network before it reaches our server. It also resolves the dinamyt.org domain and receives the emails you write to our support addresses.',
   'priv.prov4': 'Google (United States): the Gmail inbox where we read those support emails.',
@@ -881,7 +882,7 @@ const en: Record<ClaveTexto, string> = {
   'priv.derechosD': '. Minors are registered and managed with their guardian\'s authorisation.',
   'priv.sic': 'If the reply does not satisfy you, you can take the matter to the Superintendencia de Industria y Comercio.',
   'priv.supresion': 'What happens when you ask us to delete your account',
-  'priv.supresionTexto': 'When you ask, all your sessions are closed and you have 7 days to change your mind: if you sign in again, you can cancel it. After that we delete your account and your personal data from DINAMYT, Memberships and Championships. We keep the records the club and the organiser are required to keep: the payments your club received and the official results of the competitions you took part in, which are public and carry your name. Daily backups are kept for 14 days. We also keep copies outside the server, which are replaced less often: your data may remain in them until they are replaced.',
+  'priv.supresionTexto': 'When you ask, all your sessions are closed and you have 7 days to change your mind: if you sign in again, you can cancel it. After that we delete your account and your personal data from DINAMYT, Memberships and Championships. We keep the records the club and the organiser are required to keep: the payments your club received and the official results of the competitions you took part in, which are public and carry your name. Our daily backups are kept for 14 days, and Contabo’s for 10. We also keep copies outside the server, which are replaced less often: your data may remain in them until they are replaced.',
   'priv.seguridad': 'Security and retention',
   'priv.seguridadTexto': 'Hashed passwords (bcrypt), encrypted medical notes, role-based access and HTTPS. Data is kept for as long as your account exists. The sporting history is immutable by design: it records what happened at each competition.',
   'priv.volver': '← Back to home',

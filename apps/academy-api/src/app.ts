@@ -21,6 +21,7 @@ import { figurasRoutes } from './routes/figuras';
 import { historialRoutes } from './routes/historial';
 import { uploadsRoutes } from './routes/uploads';
 import { bancoRoutes } from './routes/banco';
+import { syncRoutes } from './routes/sync';
 
 export interface BuildAppDeps {
   /** Verificador de tokens. Por defecto usa el JWKS remoto del ecosystem;
@@ -77,6 +78,7 @@ export function buildApp(deps: BuildAppDeps = {}): FastifyInstance {
   void app.register(historialRoutes);
   void app.register(uploadsRoutes);
   void app.register(bancoRoutes);
+  void app.register(syncRoutes);
 
   return app;
 }

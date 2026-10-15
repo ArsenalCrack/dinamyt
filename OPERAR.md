@@ -88,10 +88,11 @@ nunca depende de que alguien se acordara de sincronizar.
 | `PORTAL_URL` | ecosystem-api | El enlace de invitación lleva a una página que no existe, y el pie de los correos apunta a ninguna parte |
 | `SMTP_HOST` | ecosystem-api | No hay correo — **y eso es un estado válido**: ver §3 |
 | `CRON_SECRET` | ecosystem-api | El aviso diario de suscripciones **no existe** (la ruta responde 404). El botón del panel sigue funcionando |
-| `SYNC_SECRET_MEMBRESIAS` · `SYNC_SECRET_CAMPEONATOS` (ecosystem-api) ↔ `ECOSYSTEM_SYNC_SECRET` (en cada app) | las tres APIs | **Un secreto por app** (`common/secreto-sync.ts`): cada variable del ecosistema vale lo mismo que el `ECOSYSTEM_SYNC_SECRET` de SU app, y el de una app no abre las rutas de la otra (ni pide sus altas). Un `ECOSYSTEM_SYNC_SECRET` en el ecosistema es el compartido de antes: se acepta en todo con un `WARN [SecretoSync]` hasta que se quite. Si falta: en Membresías: la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan — el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7). En **Campeonatos**: el tema y el idioma **no viajan en ninguna de las dos direcciones** (§4.21), y el juez que se da de alta en `/admin` nace con contraseña de allí, **sin cuenta de DINAMYT** (§4.4). Es a propósito que el PC del evento NO la lleve |
+| `SYNC_SECRET_MEMBRESIAS` · `SYNC_SECRET_CAMPEONATOS` · `SYNC_SECRET_ACADEMY` (ecosystem-api) ↔ `ECOSYSTEM_SYNC_SECRET` (en cada app) | las cuatro APIs | **Un secreto por app** (`common/secreto-sync.ts`): cada variable del ecosistema vale lo mismo que el `ECOSYSTEM_SYNC_SECRET` de SU app, y el de una app no abre las rutas de la otra (ni pide sus altas). Un `ECOSYSTEM_SYNC_SECRET` en el ecosistema es el compartido de antes: se acepta en todo con un `WARN [SecretoSync]` hasta que se quite. Si falta: en Membresías: la foto, el escudo, el cinturón, la contraseña **y el rol** que se guardan en el portal no llegan — el carnet se sigue imprimiendo con lo que hubiera, la contraseña vieja sigue valiendo, y cambiar a alguien a maestro no se nota allí (§4.7). En **Campeonatos**: el tema y el idioma **no viajan en ninguna de las dos direcciones** (§4.21), y el juez que se da de alta en `/admin` nace con contraseña de allí, **sin cuenta de DINAMYT** (§4.4). Es a propósito que el PC del evento NO la lleve |
 | `MEMBRESIAS_SYNC_URL` | ecosystem-api | Lo mismo: el portal no sabe a quién avisar. Es el origen de membresias-api (`https://membresias-api.dinamyt.org`), sin barra final |
 | `MEDIA_PUBLIC_URL` | ecosystem-api | **El interruptor de las fotos en disco** (§4.20). Sin ella no falla nada: las imágenes se siguen guardando incrustadas en la fila, como siempre. Con ella van al disco **y** el espejo las manda absolutas — las dos cosas a la vez, y por eso es una sola variable. ⚠️ **Tiene que ser `https://`**: Membresías solo acepta `data:` o `https://`, y su rechazo es mudo |
 | `CAMPEONATOS_SYNC_URL` | ecosystem-api | **Ninguna cuenta se borra en producción**: el barrido aplaza cada borrado vencido con «falta CAMPEONATOS_SYNC_URL». Es el origen de campeonatos-api (`https://campeonatos.dinamyt.org`), sin barra final, y va con `SYNC_SECRET_CAMPEONATOS` (o el compartido). Con la variable puesta y Campeonatos sin la ruta desplegada, se aplaza igual (404) |
+| `ACADEMY_SYNC_URL` | ecosystem-api | **Borrar una cuenta no llega a Academy, y nadie se entera**: sin ella el barrido no espera, porque hoy Academy no está encendida. Se pone **el mismo día que se enciende**: `http://127.0.0.1:3007` (la misma máquina, sin pasar por Caddy), con `SYNC_SECRET_ACADEMY` aquí y ese valor como `ECOSYSTEM_SYNC_SECRET` en academy-api (MONTAR-VPS, Anexo B) |
 | `FIELD_ENCRYPTION_KEY` | ecosystem-api | **Las notas médicas no se pueden guardar**: el perfil contesta 503 y el arranque deja un `WARN [Cifrado]`. Es a propósito: hasta el 13 oct 2026 se guardaban **en claro y sin avisar** mientras la política decía «cifradas». La guarda solo actúa con `NODE_ENV=production`. ⚠️ **No está en el respaldo diario, y si se pierde lo cifrado no se recupera con nada**: guárdala también fuera del servidor. Lo que quedó en claro de antes se cifra con `pnpm --filter @dinamyt/ecosystem-api notas:cifrar` (ensayo) y `notas:cifrar --aplicar` |
 
 ## 1.5 Lo que nunca se hace
@@ -1893,17 +1894,20 @@ soporte con `pnpm --filter @dinamyt/ecosystem-api suprimir:persona --correo …`
   `users.borrar_el` queda a 7 días. La cuenta sigue entera; entrar y pulsar
   «Cancelar el borrado» lo deshace.
 - **El barrido diario de las 08:00** (`/subscriptions/avisos/cron`) borra las
-  vencidas: primero `POST /sync/supresion` a Membresías y
-  `POST /api/sync/supresion` a Campeonatos, y solo si las dos confirman, lo
-  del ecosistema (`borrar-de-la-base.ts`). Si una no contesta, la cuenta espera
+  vencidas: primero `POST /sync/supresion` a Membresías,
+  `POST /api/sync/supresion` a Campeonatos y `POST /sync/supresion` a Academy,
+  y solo si confirman, lo del ecosistema (`borrar-de-la-base.ts`). Si una no contesta, la cuenta espera
   entera al día siguiente; la respuesta del cron dice cuáles y por qué.
 - **En producción, un canal sin configurar también espera** (ver
   `CAMPEONATOS_SYNC_URL` en §1.4). Borrar solo en una app desmentiría la
-  política.
+  política. **Academy no**: sin `ACADEMY_SYNC_URL` se salta, porque no está
+  encendida; la variable va con ella el día que se encienda.
 - **Qué se queda**: la fila de `users` vaciada (de ella cuelgan suscripciones
   y pagos de DINAMYT), los pagos que recibió el club y los resultados
   oficiales con su nombre. En Campeonatos la ficha que compitió se queda con
-  nombre y club; la que no, se borra.
+  nombre y club; la que no, se borra. En Academy, lo que un maestro publicó
+  (contenidos, evaluaciones, figuras de referencia, anuncios) se queda sin su
+  nombre (`lib/suprimir-persona.ts`).
 - **No lo puede pedir** un super administrador ni la única persona que
   administra un club.
 - **Después de restaurar un respaldo** hay que repetir los borrados de esos

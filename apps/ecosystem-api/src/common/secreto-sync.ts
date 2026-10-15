@@ -18,6 +18,7 @@ import { timingSafeEqual } from 'crypto';
  * |----------------------------|---------------------------------------------|
  * | `SYNC_SECRET_MEMBRESIAS`   | membresias-api                              |
  * | `SYNC_SECRET_CAMPEONATOS`  | campeonatos-api                             |
+ * | `SYNC_SECRET_ACADEMY`      | academy-api                                 |
  *
  * Las dos apps no cambian de código: solo del VALOR que llevan.
  *
@@ -27,11 +28,12 @@ import { timingSafeEqual } from 'crypto';
  * rutas —como antes— y deja un WARN en el registro. Cuando el registro lleve
  * un día sin ese aviso, se quita. Ver `OPERAR.md` §1.4.
  */
-export type AppSync = 'membresias' | 'campeonatos';
+export type AppSync = 'membresias' | 'campeonatos' | 'academy';
 
 const VARIABLE: Record<AppSync, string> = {
   membresias: 'SYNC_SECRET_MEMBRESIAS',
   campeonatos: 'SYNC_SECRET_CAMPEONATOS',
+  academy: 'SYNC_SECRET_ACADEMY',
 };
 
 const log = new Logger('SecretoSync');

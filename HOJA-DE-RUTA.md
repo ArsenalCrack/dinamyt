@@ -16,24 +16,23 @@
 
 ## Dónde estamos
 
-*(1 de octubre de 2026, comprobado por SSH y `curl`)*
+*(15 de octubre de 2026, comprobado por SSH y `curl`)*
 
 | Pieza | Estado |
 |---|---|
-| Portal + identidad | En la VPS con `a9a898e` (desplegado el 26 sep, 13:03) |
-| Campeonatos | En la VPS con `aa975c3` (26 sep, 13:02): el plan entero **y el candado de sede**. `POST /api/campeonatos/:id/sede` da 401. **La publicación en vivo (1 oct) está en git, sin desplegar** |
-| Membresías | En la VPS con `5736acd` (26 sep, 13:04) |
-| Academy | **No está montada**: ni servicios, ni `.env`, ni Caddy, ni DNS. En código, entera: 24/24 pruebas |
+| Portal + identidad | En la VPS con `3d2befb` (15 oct): la política nueva, la línea de IA, la clave de cifrado puesta (las 6 notas médicas, cifradas) y `POST /sync/baja` |
+| Campeonatos | En la VPS con `7c6ff7b` (15 oct): el plan entero, el candado de sede, **la publicación en vivo** y la línea de IA en el pie |
+| Membresías | En la VPS con `4002076` (15 oct): eliminar a alguien del club y la línea de IA en el pie |
+| Academy | **No está montada**: ni servicios, ni `.env`, ni Caddy, ni DNS. En código, entera: 28/28 pruebas (con el borrado de cuentas) |
 | Fotos en disco | **Encendidas**: `MEDIA_PUBLIC_URL` y `MEDIA_DIR` puestos, 30 imágenes en `/srv/dinamyt-media`. Las sirve Node, no Caddy |
-| Respaldos diarios | **Funcionan desde el 13 oct**: `dinamyt-respaldo.timer` a las 03:00. El primero pesa 718 KB (53 tablas con datos, `pg_restore` lo lee) y lleva 30 archivos de 30. Falta sacar una copia del servidor (tarea 3) |
-| Secretos de sync por app | Sin poner: el `.env` del ecosistema no tiene ningún `SYNC_SECRET_*` (tarea 5) |
+| Respaldos diarios | **Funcionan desde el 13 oct**: `dinamyt-respaldo.timer` a las 03:00. El primero pesa 718 KB (53 tablas con datos, `pg_restore` lo lee) y lleva 30 archivos de 30. La copia fuera del servidor: la del 15 oct está en tu PC, con la misma huella SHA-256 (tarea 3, cada semana) |
+| Secretos de sync por app | Sin poner: el `.env` del ecosistema no tiene ningún `SYNC_SECRET_*` (tarea 4) |
 | DMARC | Sigue en `p=none` (tocaba subirlo desde el 12 sep) |
 | Google | Propiedad verificada (etiqueta y TXT) |
-| Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 6) |
+| Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 5) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
-| Política de privacidad | Reescrita contra el código el 13 oct (terceros, IA, qué se cifra, qué se conserva). **En git, sin desplegar**: rama `feat/privacidad-completa` aquí y `feat/aviso-ia` en Membresías y Campeonatos |
-| Borrar mi cuenta | **En código, sin fusionar** (14 oct): Configuración → «Borrar mi cuenta», 7 días de gracia, borrado en las tres apps (migración `0024` del ecosistema). Necesita `CAMPEONATOS_SYNC_URL` y Campeonatos desplegado (`OPERAR.md` §4.15) |
-| Eliminar del club | **En git, sin desplegar** (14 oct): `POST /users/:id/eliminar` en Membresías (migración `0022`) y `POST /sync/baja` en el ecosistema. Despliega el ecosistema **antes** que Membresías (`OPERAR.md` §4.15) |
+| Política de privacidad | En línea desde el 15 oct. **Sin fusionar**: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo y tu nombre como responsable |
+| Borrar mi cuenta | **En código, sin fusionar** (rama `feat/borrar-cuenta` en los tres repos): Configuración → «Borrar mi cuenta», 7 días de gracia, borrado en las tres apps y en Academy (migración `0024` del ecosistema). `CAMPEONATOS_SYNC_URL` ya está en la VPS (`OPERAR.md` §4.15) |
 
 ---
 
@@ -45,19 +44,18 @@
 | 1 | [Probar lo desplegado](#1--probar-lo-desplegado), candado y publicación en vivo incluidos | A mano | 2–3 h |
 | 2 | [DMARC a `quarantine`](#2--dmarc-a-quarantine) | DNS | 15 min, y mirar informes antes |
 | 3 | [La copia del respaldo fuera del servidor, y lo que queda de las fotos](#3--la-copia-del-respaldo-fuera-del-servidor-y-lo-que-queda-de-las-fotos) | **Tú**: un `scp` a la semana | 5 min |
-| 4 | [Rotar o cerrar los proyectos de Supabase](#4--rotar-o-cerrar-los-proyectos-de-supabase) | Cuentas | 15 min |
-| 5 | [Un secreto de sincronización por app](#5--un-secreto-de-sincronización-por-app--falta-ponerlo-en-la-vps) | **Tú**: poner los valores | 20 min |
-| 6 | [La CSP, de informe a estricta](#6--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Desde el 3 oct |
-| 7 | [**Encender Academy**](#7--encender-academy) | Pruebas + servidor | 1–2 días, y una semana de uso |
-| 8 | [**Traducir lo que falta**](#8--traducir-lo-que-falta) | Código | Por pantallas |
-| 9 | [Fase 2: precios, plan gratuito, multi-arte](#9--fase-2) | Negocio + código | Semanas |
-| 10 | [Deuda pequeña](#10--deuda-pequeña) | Varios | Cuando toque |
+| 4 | [Un secreto de sincronización por app](#4--un-secreto-de-sincronización-por-app--falta-ponerlo-en-la-vps) | **Tú**: poner los valores | 20 min |
+| 5 | [La CSP, de informe a estricta](#5--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Desde el 3 oct |
+| 6 | [**Encender Academy**](#6--encender-academy) | Pruebas + servidor | 1–2 días, y una semana de uso |
+| 7 | [**Traducir lo que falta**](#7--traducir-lo-que-falta) | Código | Por pantallas |
+| 8 | [Fase 2: precios, plan gratuito, multi-arte](#8--fase-2) | Negocio + código | Semanas |
+| 9 | [Deuda pequeña](#9--deuda-pequeña) | Varios | Cuando toque |
 | — | [En espera: WhatsApp y F9](#en-espera) | — | — |
 
 **Por qué este orden.** El 0 va delante porque es lo único de la lista que
 puede acabar en un reclamo ante la SIC: lo que la política promete tiene que
-sostenerlo el código, y lo que falta ahí es tuyo (0.1). Del 1 al 4 cuestan minutos y cierran riesgos que ya
-existen hoy. El 5 y el 6 son seguridad de lo que está en producción todos los
+sostenerlo el código, y lo que falta ahí es tuyo (0.1). Del 1 al 3 cuestan minutos y cierran riesgos que ya
+existen hoy. El 4 y el 5 son seguridad de lo que está en producción todos los
 días. La arquitectura del evento ya está entera en código —el candado de sede y
 la publicación en vivo, `OPERAR.md` §4.25—; lo que le falta es la prueba a mano
 de la tarea 1. **Si aparece una fecha de campeonato, esa prueba, el ensayo
@@ -73,33 +71,33 @@ política (`/privacidad`, la única de las cuatro apps: las demás la enlazan) y
 describe lo que el código hace. Lo que sigue es lo que el código todavía **no**
 hace, o lo que solo tú puedes decidir.
 
-### 0.0 · Antes de desplegar la política: la clave de cifrado
+### 0.1 · Lo que solo tú puedes poner — 15 min
 
-**Las notas médicas se han guardado en claro**: `FIELD_ENCRYPTION_KEY` no está
-en el `.env` de la VPS (comprobado el 13 oct). El código nuevo se niega a
-guardarlas sin clave, así que el orden importa:
-
-1. Generar la clave, **guardarla en tu gestor de contraseñas** y ponerla en
-   `/srv/dinamyt/apps/ecosystem-api/.env` (`MONTAR-VPS.md` §6.3 y §6.8).
-2. Desplegar el ecosistema (`OPERAR.md` §2.3).
-3. `pnpm --filter @dinamyt/ecosystem-api notas:cifrar`, mirar el conteo, y
-   repetir con `--aplicar`. Tiene que acabar en «no queda ninguna en claro».
-4. Borrar los proyectos de Supabase (tarea 4): mientras existan, hay un
-   proveedor con copia de los datos que la política no nombra.
-
-### 0.1 · Lo que solo tú puedes poner — 20 min
-
-- **Quién es el responsable.** La política dice «DINAMYT Ecosystem» y dos
-  correos. El Decreto 1377 de 2013 (art. 13) pide nombre o razón social,
-  domicilio, dirección y teléfono. Dímelos y van a `priv.actualizado`.
-- **La región del servidor** (panel de Contabo). La política nombra a Contabo
-  GmbH (Alemania) como empresa; falta saber dónde está la máquina.
-- **Borrar los tres proyectos de Supabase** (tarea 4), no pausarlos: son una
-  copia de datos personales en un proveedor que la política no nombra.
-- **Una consulta con abogado**, con tres preguntas: el reparto
-  responsable/encargado entre DINAMYT y cada club (el maestro da de alta
-  alumnos que nunca aceptaron nada), si aplica el Registro Nacional de Bases de
-  Datos, y cuánto tiempo se conservan pagos y resultados.
+- **El resto de los datos del responsable.** La política ya dice tu nombre
+  (`priv.actualizado`). El Decreto 1377 de 2013 (art. 13) pide además
+  **domicilio** (la ciudad), **dirección** y **teléfono**. Si no quieres
+  publicar la de tu casa, sirve una dirección y un teléfono de contacto.
+- **Las claves que sobraron de Supabase, en tu PC.** Los proyectos ya no
+  existen (15 oct), así que no abren nada, pero no tienen por qué seguir ahí:
+  `D:\dinamyt-migracion\.env.migracion`, y en `apps/ecosystem-api/.env` las
+  tres líneas `SUPABASE_*` y la de `DATABASE_URL` (en local manda
+  `PGLITE_DATA`). Y `D:\dinamyt-migracion\claves-vps.txt`, a tu gestor de
+  contraseñas.
+- **Una consulta con abogado**, con estas preguntas:
+  1. El reparto responsable/encargado entre DINAMYT y cada club: el maestro da
+     de alta alumnos que nunca aceptaron nada, y el alumno con carnet QR o PIN
+     no tiene cuenta. ¿Hace falta un contrato de transmisión con cada club?
+  2. Los datos salen a Estados Unidos. Está en la lista de la SIC (Circular
+     Externa 005 de 2017), pero hay que poder demostrar las medidas: ¿bastan
+     los contratos de encargo (DPA) de Contabo, Resend, Cloudflare y Google?
+  3. Datos de salud y de menores: las notas médicas y el tipo de sangre son
+     sensibles (autorización expresa y opcional), y muchos alumnos son menores
+     (autorización del acudiente, que hoy el registro no exige, ver 0.2).
+  4. Si aplica el Registro Nacional de Bases de Datos (a una persona natural,
+     en principio no).
+  5. Cuánto tiempo se conservan pagos y resultados.
+  6. Si faltan términos y condiciones de uso, y qué exige cobrar planes (RUT,
+     factura electrónica).
 
 ### 0.2 · Lo que la política dice y nada obliga
 
@@ -109,9 +107,11 @@ guardarlas sin clave, así que el orden importa:
 - **Lo que no caduca nunca**: `otp_codes`, `org_notifications` y las
   invitaciones y solicitudes ya respondidas. (Las sesiones sí se borran, un mes
   después de caducar; en `audit_auth` no escribe nadie.) Fijar un plazo y purgar.
-- **Las copias que no rotan**: los volcados manuales de `/var/backups/`, la
-  carpeta `D:\dinamyt-migracion\respaldos\` y los snapshots de Contabo. La
-  política dice que se renuevan; falta decidir cada cuánto y borrar los viejos.
+- **Las copias que no rotan**: los volcados manuales de `/var/backups/` y la
+  carpeta `D:\dinamyt-migracion\respaldos\` (con los volcados de Supabase
+  del 19 ago). La política dice que se renuevan; falta decidir cada cuánto y
+  borrar los viejos. El Auto Backup de Contabo sí rota solo: 10 días, y la
+  política ya lo dice.
 - **«Los menores se registran con autorización de su acudiente»** es una
   costumbre (§1.5), no una regla: el registro valida la fecha (entre 3 y 100
   años) pero no distingue a quien tiene menos de 18.
@@ -123,15 +123,18 @@ guardarlas sin clave, así que el orden importa:
 - **El alumno sin cuenta** (carnet QR o PIN) nunca aceptó la política. Va en la
   consulta de 0.1.
 - **Membresías sola, sin portal, no enlaza ninguna política.**
-- **La casilla del registro** está escrita a mano en castellano (tarea 8).
+- **La casilla del registro** está escrita a mano en castellano (tarea 7).
 
-### 0.3 · Antes de encender Academy (tarea 7)
+### 0.3 · Antes de encender Academy (tarea 6)
 
 - No tiene pie: ni privacidad, ni soporte, ni la línea de IA.
-- **No borra nada cuando se borra una cuenta.** Antes de encenderla, una
-  `POST /sync/supresion` que limpie por `ecosystem_user_id` (intentos,
-  respuestas, vistas, avisos, actividad y archivos subidos), y añadirla al
-  barrido de `SupresionService` como las otras dos.
+- **La política no la nombra.** «Qué pasa cuando pides borrar tu cuenta» dice
+  DINAMYT, Membresías y Campeonatos: añadir Academy, y que lo que un maestro
+  publicó (contenidos, evaluaciones, figuras, anuncios) se queda sin su
+  nombre. El borrado ya está en código (`POST /sync/supresion`, OPERAR §4.15).
+- **Las evidencias subidas y nunca entregadas** no tienen dueño en la base
+  (`evidencias/<uuid>`), así que no se borran con la cuenta. Un barrido que
+  borre las que ninguna respuesta nombra.
 - Los videos se incrustan desde `www.youtube.com` y `drive.google.com`, que
   ponen sus cookies. Pasar a `youtube-nocookie.com` y nombrar a los dos en la
   política.
@@ -145,7 +148,8 @@ guardarlas sin clave, así que el orden importa:
 - **thermos** (dos revisores: fallos y seguridad, y calidad) sobre cada rama
   antes de fusionarla. Se lanza con `/thermos`.
 - **anti-slop en modo «after»**, una app cada vez: portal, Membresías,
-  Campeonatos, Academy. Deja una lista numerada en `anti-slop/`, tú eliges los
+  Campeonatos, Academy. Se pide en el chat: «audita el portal con antislop
+  en modo after». Deja una lista numerada en `anti-slop/`, tú eliges los
   números y solo esos se tocan.
 - **`/claude-api prompt-audit`** al cambiar de modelo. El 13 oct salió limpio.
   La skill `frontend-design` del repo va por detrás de la de `anthropics/skills`.
@@ -226,6 +230,9 @@ misma máquina no es un respaldo**. Una vez por semana, desde tu PC:
 scp dinamyt@80.190.78.70:/var/backups/dinamyt/*-$(Get-Date -Format yyyy-MM-dd).* D:\dinamyt-migracion\respaldos\
 ```
 
+La última, la del 15 de octubre de 2026: la misma huella SHA-256 que en el
+servidor (`Get-FileHash` aquí, `sha256sum` allí).
+
 **Y lo que queda de las fotos**, cuando haya un rato:
 
 - Que no quede nada incrustado. En seco, que solo cuenta:
@@ -251,24 +258,7 @@ scp dinamyt@80.190.78.70:/var/backups/dinamyt/*-$(Get-Date -Format yyyy-MM-dd).*
 
 ---
 
-## 4 · Rotar o cerrar los proyectos de Supabase
-
-Las contraseñas de los tres proyectos viejos (Membresías, Campeonatos y el del
-ecosistema) **viajaron por chat en agosto**, y una contraseña que viajó se
-cambia. Hoy ninguno tiene datos que la VPS no tenga.
-
-- Si ya no se usan: **pausarlos o borrarlos** desde el panel de Supabase, que
-  es mejor que rotarlos. (Membresías independiente puede instalarse en Supabase
-  para otro club: eso son proyectos **nuevos**, no estos.)
-- Si alguno se sigue usando: rotar su contraseña.
-- Comprobar que no quedó un `.env.migracion` en ninguna parte.
-
-*(El `.env.bak-2026-08-30` de `/srv/campeonatos/backend/` ya no existe: comprobado
-el 26 sep.)*
-
----
-
-## 5 · Un secreto de sincronización por app — falta ponerlo en la VPS
+## 4 · Un secreto de sincronización por app — falta ponerlo en la VPS
 
 **El código ya está** (26 sep 2026, `common/secreto-sync.ts`): el ecosistema
 sabe quién llama por el secreto que trae, el de Membresías no abre las rutas de
@@ -308,7 +298,7 @@ El PC del evento sigue sin llevar ninguno (D8).
 
 ---
 
-## 6 · La CSP, de informe a estricta
+## 5 · La CSP, de informe a estricta
 
 **Desplegado el 26 sep 2026, 13:03** (`OPERAR.md` §4.24): el portal,
 Campeonatos y Membresías mandan las cabeceras de seguridad y la CSP en **modo
@@ -333,14 +323,14 @@ nonces si compensan.
 
 ---
 
-## 7 · Encender Academy
+## 6 · Encender Academy
 
 **Lo que hay hoy:** código completo contra los RF-ACA-01…28 del documento de
 requisitos (`DINAMYT_Academy_DocumentoPrincipal_v2.docx`): artes marciales y
 programas, contenidos por grado con bloqueo de lo superior, evaluaciones de
 opción múltiple y de evidencia con nota ponderada, avance de grado con historial
 inmutable, certificados, tablero del maestro, notas, calendario, avisos,
-administración y reportes. **24/24 pruebas en verde** contra PGlite (26 sep). El
+administración y reportes. **28/28 pruebas en verde** contra PGlite (15 oct). El
 login va contra el ecosistema; Academy no tiene contraseñas propias.
 
 **Lo que no hay:** ni un solo byte en la VPS (`OPERAR.md` §4.14), el botón del
@@ -379,6 +369,11 @@ Caddy → **y solo entonces** el registro `A academy` en Cloudflare, en naranja.
   montaje): `sudo -u postgres psql -d dinamyt -c '\du dinamyt_acad'`;
 - `free -h` antes y después: son dos servicios Node más sobre los seis que ya
   hay en 8 GB;
+- `ACADEMY_SYNC_URL` y `SYNC_SECRET_ACADEMY` en el ecosistema, y ese valor
+  como `ECOSYSTEM_SYNC_SECRET` en academy-api (Anexo B): sin eso, borrar una
+  cuenta no llega a Academy. Comprobación:
+  `curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:3007/sync/supresion`
+  da 401, no 404;
 - `curl -s https://academy.dinamyt.org/api/health` al final;
 - que `/srv/uploads/academy` salga en el `archivos-….tar.gz` de la mañana
   siguiente (el respaldo ya empaqueta `/srv/uploads` entero).
@@ -386,7 +381,7 @@ Caddy → **y solo entonces** el registro `A academy` en Cloudflare, en naranja.
 ### C · Configurarla
 
 - Qué organizaciones abren Academy: el «Plan Academy» de la base es de relleno
-  (tarea 9).
+  (tarea 8).
 - Un administrador de Academy (su `local_role` manda sobre el del pase).
 - Los maestros con su arte asignada.
 - Los videos del programa oficial por cinturón (`D:\hapkido\Programa Cambio de
@@ -401,7 +396,7 @@ recompilar el portal (§2.3). **Solo cuando A, B y C estén hechos.**
 
 | Hueco | Qué hacer |
 |---|---|
-| **Casi nada está traducido**: 16 de sus 17 pantallas no usan `useI18n` | Tarea 8. Conviene hacerlo **antes** de abrir |
+| **Casi nada está traducido**: 16 de sus 17 pantallas no usan `useI18n` | Tarea 7. Conviene hacerlo **antes** de abrir |
 | No pregunta la preferencia de tema e idioma al ecosistema (las otras tres sí) | Copiar el `GET /users/me/apariencia` del portal en `AplicarApariencia` (`OPERAR.md` §4.21) |
 | Un cambio de rol en el portal no le llega después de la primera entrada | Decidir: como Campeonatos (D9, `roles_del_portal`) o dejar que mande el rol local |
 | El portal no enseña `GET /users/:id/academy-summary` (RF-ACA-04: cinturón, evaluaciones, último avance) | Decidir dónde (el perfil del alumno) y **con qué credencial**: el requisito pide un token de servicio y hoy la ruta acepta el pase del usuario |
@@ -415,7 +410,7 @@ la usan una semana, el botón está encendido y `OPERAR.md` §4.14 se reescribe.
 
 ---
 
-## 8 · Traducir lo que falta
+## 7 · Traducir lo que falta
 
 **Lo que ya existe:** las cuatro webs tienen diccionario español/inglés
 (`lib/i18n.tsx`), la cookie compartida `.dinamyt.org` que cruza la elección
@@ -449,7 +444,7 @@ fuera del diccionario; incluye algún comentario y la lista de ciudades de
 **El orden:**
 
 1. Fechas y números según `locale` — lo más barato, y lo que más se nota.
-2. **Academy**, antes de abrirla (tarea 7): ahora cuesta menos que con gente
+2. **Academy**, antes de abrirla (tarea 6): ahora cuesta menos que con gente
    usándola.
 3. Lo que falta del portal; `/admin` al final, que solo lo ve el super-admin.
 4. Membresías y Campeonatos (en SUS repositorios, `OPERAR.md` §1.1), carnet
@@ -465,9 +460,9 @@ pantalla, correo, aviso ni impreso de las cuatro webs.
 
 ---
 
-## 9 · Fase 2
+## 8 · Fase 2
 
-### 9.1 Los precios de verdad en `/planes`, y la portada
+### 8.1 Los precios de verdad en `/planes`, y la portada
 
 El **mecanismo** ya existe (`OPERAR.md` §4.18): cobro por persona,
 `price_per_user` y `min_users` en «Tarifa de cada plan» de `/admin`. Lo que
@@ -480,7 +475,7 @@ con capturas reales; y en Google Search Console, enviar el sitemap y pedir la
 indexación (`OPERAR.md` §3.6). Lo que Google guarde el primer día es lo que
 enseñará semanas.
 
-### 9.2 El plan gratuito
+### 8.2 El plan gratuito
 
 Que quien entre vea las pantallas y entienda a qué escala llega el producto, sin
 operar un club entero gratis.
@@ -497,7 +492,7 @@ operar un club entero gratis.
 - Al llegar al tope: qué falta, cuánto cuesta el siguiente plan, y un botón. No
   un error.
 
-### 9.3 Varias artes marciales en Membresías — lo fácil
+### 8.3 Varias artes marciales en Membresías — lo fácil
 
 Hoy los 11 cinturones de hapkido GHA son una constante duplicada en
 `lib/cinturones.ts` (API y web de Membresías).
@@ -510,7 +505,7 @@ Hoy los 11 cinturones de hapkido GHA son una constante duplicada en
 - `lib/cinturones.ts` pasa a una consulta por club, cacheada. Hacen falta
   `orgs.arte_marcial` y una tabla de grados por club: **no existen todavía**.
 
-### 9.4 Varias artes marciales en Campeonatos — lo difícil
+### 8.4 Varias artes marciales en Campeonatos — lo difícil
 
 Todo gira alrededor de un reglamento que hoy está repartido por el código:
 `engine/combate_engine.py` (782 líneas), `sockets/combate_ns.py` (1.821),
@@ -531,7 +526,7 @@ Es **el trabajo más grande de todos**, más que la identidad.
 
 ---
 
-## 10 · Deuda pequeña
+## 9 · Deuda pequeña
 
 | Qué | Por qué | Dónde |
 |---|---|---|

@@ -13,6 +13,7 @@ import { organizations, users } from '../../db/schema';
 import { directorioMedia, esRutaMedia } from '../../common/almacen-imagenes';
 import { pedirSupresionAMembresias } from '../../common/espejo-membresias';
 import { pedirSupresionACampeonatos } from '../../common/espejo-campeonatos';
+import { pedirSupresionAAcademy } from '../../common/espejo-academy';
 import { MailerService } from '../auth/mailer.service';
 import { SessionsService } from '../auth/sessions.service';
 import { OrganizationsService } from '../organizations/organizations.service';
@@ -43,10 +44,10 @@ type Pendiente = { id: string; motivo: string };
  * ── Hacerlo ──
  *
  * El barrido diario (`POST /subscriptions/avisos/cron`) borra las vencidas.
- * Primero en Membresías y Campeonatos, después aquí: con la fila todavía
- * entera, el `eco_sub` y el documento siguen sirviendo para encontrarla allí,
- * y si una de las dos no contesta, la cuenta espera al día siguiente sin
- * haber perdido nada. Qué se borra y qué se queda: `borrar-de-la-base.ts`.
+ * Primero en Membresías, Campeonatos y Academy, después aquí: con la fila
+ * todavía entera, el `eco_sub` y el documento siguen sirviendo para
+ * encontrarla allí, y si una no contesta, la cuenta espera al día siguiente
+ * sin haber perdido nada. Qué se borra y qué se queda: `borrar-de-la-base.ts`.
  */
 @Injectable()
 export class SupresionService {
@@ -191,6 +192,12 @@ export class SupresionService {
     if (campeonatos === 'sin-espejo' && enProduccion) {
       return 'falta CAMPEONATOS_SYNC_URL o su secreto (OPERAR §4.15)';
     }
+    // Academy sin canal no espera, ni en producción: no está encendida
+    // (HOJA-DE-RUTA, «Encender Academy»), así que allí no hay nada de nadie.
+    // `ACADEMY_SYNC_URL` se pone el mismo día que se enciende (MONTAR-VPS,
+    // Anexo B); un error suyo sí espera, como los de las otras dos.
+    const academy = await pedirSupresionAAcademy(persona.id);
+    if (academy === 'fallo') return 'Academy no confirmó';
 
     await db.transaction((tx) => borrarDeLaBase(tx, persona));
     await this.borrarFotoSiNadieLaUsa(persona.avatarUrl);

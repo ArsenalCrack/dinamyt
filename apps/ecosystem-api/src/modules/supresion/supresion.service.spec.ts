@@ -14,12 +14,14 @@
 jest.mock('../../db', () => ({ db: {} }));
 jest.mock('../../common/espejo-membresias', () => ({ pedirSupresionAMembresias: jest.fn() }));
 jest.mock('../../common/espejo-campeonatos', () => ({ pedirSupresionACampeonatos: jest.fn() }));
+jest.mock('../../common/espejo-academy', () => ({ pedirSupresionAAcademy: jest.fn() }));
 jest.mock('./borrar-de-la-base', () => ({ borrarDeLaBase: jest.fn() }));
 
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { db } from '../../db';
 import { pedirSupresionAMembresias } from '../../common/espejo-membresias';
 import { pedirSupresionACampeonatos } from '../../common/espejo-campeonatos';
+import { pedirSupresionAAcademy } from '../../common/espejo-academy';
 import { borrarDeLaBase } from './borrar-de-la-base';
 import { DIAS_DE_GRACIA, SupresionService } from './supresion.service';
 import type { UsersService } from '../users/users.service';
@@ -165,15 +167,17 @@ describe('SupresionService.ejecutarVencidas', () => {
   const vencida = { id: ANA, email: 'ana@correo.com', documentId: '1010', avatarUrl: null };
   const membresias = pedirSupresionAMembresias as jest.Mock;
   const campeonatos = pedirSupresionACampeonatos as jest.Mock;
+  const academy = pedirSupresionAAcademy as jest.Mock;
   const borrar = borrarDeLaBase as jest.Mock;
 
   beforeEach(() => {
     membresias.mockReset();
     campeonatos.mockReset();
+    academy.mockReset().mockResolvedValue('hecha');
     borrar.mockReset();
   });
 
-  it('Membresías y Campeonatos primero, con el documento; después aquí', async () => {
+  it('Membresías, Campeonatos y Academy primero, con el documento; después aquí', async () => {
     base([[vencida]]);
     membresias.mockResolvedValue('hecha');
     campeonatos.mockResolvedValue('hecha');
@@ -181,7 +185,35 @@ describe('SupresionService.ejecutarVencidas', () => {
     await expect(servicio.ejecutarVencidas()).resolves.toEqual({ suprimidas: 1, pendientes: [] });
     expect(membresias).toHaveBeenCalledWith(ANA);
     expect(campeonatos).toHaveBeenCalledWith({ ecoSub: ANA, documento: '1010' });
+    expect(academy).toHaveBeenCalledWith(ANA);
     expect(borrar).toHaveBeenCalledTimes(1);
+  });
+
+  it('si Academy no confirma, tampoco', async () => {
+    base([[vencida]]);
+    membresias.mockResolvedValue('hecha');
+    campeonatos.mockResolvedValue('hecha');
+    academy.mockResolvedValue('fallo');
+    const { servicio } = armar();
+    const r = await servicio.ejecutarVencidas();
+    expect(r.pendientes[0].motivo).toMatch(/Academy/);
+    expect(borrar).not.toHaveBeenCalled();
+  });
+
+  it('en producción, Academy sin canal no espera: no está encendida', async () => {
+    const entorno = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      base([[vencida]]);
+      membresias.mockResolvedValue('hecha');
+      campeonatos.mockResolvedValue('hecha');
+      academy.mockResolvedValue('sin-espejo');
+      const { servicio } = armar();
+      await expect(servicio.ejecutarVencidas()).resolves.toEqual({ suprimidas: 1, pendientes: [] });
+      expect(borrar).toHaveBeenCalledTimes(1);
+    } finally {
+      process.env.NODE_ENV = entorno;
+    }
   });
 
   it('si Membresías no confirma, aquí no se borra nada', async () => {

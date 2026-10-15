@@ -1462,8 +1462,8 @@ vieja sin que nadie lo note.
 > ⚠️ **Todavía no está montada** *(comprobado el 26 sep 2026)*: en la VPS no hay
 > servicios `academy-*`, ni `.env`, ni bloque en el Caddyfile, y
 > `academy.dinamyt.org` no existe en el DNS — se borró a propósito al encender
-> la nube naranja (Anexo D.2) para no dar un 525. Encenderla es la tarea A de
-> `HOJA-DE-RUTA.md`, y empieza aquí.
+> la nube naranja (Anexo D.2) para no dar un 525. Encenderla está en
+> `HOJA-DE-RUTA.md` («Encender Academy»), y empieza aquí.
 >
 > **El orden**, para no estrenar un error a la vista de todos: `.env` →
 > compilar y migrar → servicios → bloque de Caddy → **y solo entonces** el
@@ -1476,6 +1476,17 @@ nano /srv/dinamyt/packages/academy-db/.env
 ```bash
 ACADEMY_DATABASE_URL=postgresql://dinamyt_acad:CLAVE_ACAD@127.0.0.1:5432/dinamyt
 ```
+
+Primero el canal con el ecosistema, para que **borrar una cuenta llegue
+también a Academy** (OPERAR §1.4 y §4.15). Sin él, el barrido se la salta
+sin avisar:
+
+```bash
+cd /srv/dinamyt/apps/ecosystem-api && printf 'ACADEMY_SYNC_URL=http://127.0.0.1:3007\nSYNC_SECRET_ACADEMY=%s\n' "$(openssl rand -hex 32)" >> .env && grep '^SYNC_SECRET_ACADEMY=' .env
+```
+
+El valor que imprime es el `ECOSYSTEM_SYNC_SECRET` de academy-api, abajo. El
+ecosistema lo lee al reiniciar (`sudo systemctl restart dinamyt-id`).
 
 ```bash
 nano /srv/dinamyt/apps/academy-api/.env
@@ -1491,6 +1502,7 @@ CORS_ORIGINS=https://dinamyt.org,https://academy.dinamyt.org
 ACADEMY_DATABASE_URL=postgresql://dinamyt_acad:CLAVE_ACAD@127.0.0.1:5432/dinamyt
 ACADEMY_UPLOADS_DIR=/srv/uploads/academy
 FIGURAS_SERVICE_URL=http://127.0.0.1:3009
+ECOSYSTEM_SYNC_SECRET=EL_SYNC_SECRET_ACADEMY_DE_ARRIBA
 ```
 
 ```bash
