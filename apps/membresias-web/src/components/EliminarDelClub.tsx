@@ -4,11 +4,15 @@ import { useState } from 'react';
 import { api, mensajeError } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { avisoError, avisoOk } from '@/lib/toast';
+import { useConfirmar } from './Confirmar';
 
 /**
  * El segundo gesto de la ficha: sacar a alguien del club de verdad (ver
- * `lib/eliminar-del-club.ts` en la API). Se pregunta antes y se dice qué se
- * borra y qué queda (§4.9-bis): son los datos de otra persona.
+ * `lib/eliminar-del-club.ts` en la API).
+ *
+ * Se pregunta con el aviso de lo irreversible (§4.9-bis): el nombre en la
+ * pregunta, lo que se borra y lo que queda, y el foco arrancando en
+ * «Cancelar». Son los datos de otra persona.
  *
  * Va al final de la ficha y fuera del `<fieldset disabled>`: a quien ya se le
  * cortó el acceso también se le puede eliminar, y suele ser justo a ese.
@@ -26,10 +30,26 @@ export function EliminarDelClub({
   onEliminado: () => void;
 }) {
   const { t } = useI18n();
-  const [preguntando, setPreguntando] = useState(false);
+  const { confirmar, dialogo } = useConfirmar();
   const [enviando, setEnviando] = useState(false);
 
   async function eliminar() {
+    const seguro = await confirmar({
+      titulo: `${t('eliminar.tituloA')}${nombre}${t('eliminar.tituloB')}`,
+      detalle: (
+        <ul>
+          <li>{t('eliminar.queBorra')}</li>
+          <li>{t('eliminar.queQueda')}</li>
+          {enDinamyt && <li>{t('eliminar.portal')}</li>}
+        </ul>
+      ),
+      tono: 'irreversible',
+      textoIrreversible: t('eliminar.sinVuelta'),
+      textoOk: t('eliminar.si'),
+      textoCancelar: t('comun.cancelar'),
+    });
+    if (!seguro) return;
+
     setEnviando(true);
     try {
       await api.post(`/users/${id}/eliminar`);
@@ -50,48 +70,16 @@ export function EliminarDelClub({
       <p className="muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
         {t('eliminar.ayuda')}
       </p>
-
-      {!preguntando ? (
-        <button
-          type="button"
-          className="btn btn-outline btn-sm"
-          style={{ marginTop: '0.7rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-          onClick={() => setPreguntando(true)}
-        >
-          {t('eliminar.boton')}
-        </button>
-      ) : (
-        <div role="alertdialog" aria-live="polite" style={{ marginTop: '0.7rem' }}>
-          <p style={{ fontWeight: 700 }}>
-            {t('eliminar.pregunta')} <span className="mono">{nombre}</span>
-          </p>
-          <p style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>{t('eliminar.queBorra')}</p>
-          {enDinamyt && (
-            <p style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>{t('eliminar.portal')}</p>
-          )}
-          <p style={{ fontSize: '0.82rem', marginTop: '0.35rem', color: 'var(--danger)' }}>
-            {t('eliminar.sinVuelta')}
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.7rem' }}>
-            <button
-              type="button"
-              className="btn btn-danger btn-sm"
-              disabled={enviando}
-              onClick={() => void eliminar()}
-            >
-              {enviando ? t('comun.guardando') : t('eliminar.si')}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              disabled={enviando}
-              onClick={() => setPreguntando(false)}
-            >
-              {t('comun.cancelar')}
-            </button>
-          </div>
-        </div>
-      )}
+      <button
+        type="button"
+        className="btn btn-danger btn-sm"
+        style={{ marginTop: '0.7rem' }}
+        disabled={enviando}
+        onClick={() => void eliminar()}
+      >
+        {enviando ? t('comun.guardando') : t('eliminar.boton')}
+      </button>
+      {dialogo}
     </div>
   );
 }
