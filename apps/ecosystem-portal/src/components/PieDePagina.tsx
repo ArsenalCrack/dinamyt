@@ -76,14 +76,21 @@ export function PieDePagina() {
                 el pie imprimia los literales en espaniol al lado de un
                 `t('pie.ayuda')` que si traducia. Media traduccion es peor que
                 ninguna, porque nadie la busca. */}
-            <Link href="/planes">{t('pie.planes')}</Link>
-            <Link href="/privacidad">{t('pie.privacidad')}</Link>
-            <a href={`${CAMPEONATOS_URL}/pantalla`}>{t('pie.resultados')}</a>
+            {/* `pie-enlace`: 44 px de alto en pantallas táctiles (estilos.css, «El pulgar»). */}
+            <Link href="/planes" className="pie-enlace">
+              {t('pie.planes')}
+            </Link>
+            <Link href="/privacidad" className="pie-enlace">
+              {t('pie.privacidad')}
+            </Link>
+            <a href={`${CAMPEONATOS_URL}/pantalla`} className="pie-enlace">
+              {t('pie.resultados')}
+            </a>
           </span>
           <a
             href={`mailto:${CORREO_SOPORTE}`}
             style={{ color: 'var(--gold)' }}
-            className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
+            className="pie-enlace inline-flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
           >
             <span aria-hidden="true">✉</span>
             <span style={{ color: 'var(--text-muted)' }}>{t('pie.ayuda')}</span>

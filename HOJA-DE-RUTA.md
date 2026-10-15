@@ -25,13 +25,13 @@
 | Membresías | En la VPS con `4002076` (15 oct): eliminar a alguien del club y la línea de IA en el pie |
 | Academy | **No está montada**: ni servicios, ni `.env`, ni Caddy, ni DNS. En código, entera: 28/28 pruebas (con el borrado de cuentas) |
 | Fotos en disco | **Encendidas**: `MEDIA_PUBLIC_URL` y `MEDIA_DIR` puestos, 30 imágenes en `/srv/dinamyt-media`. Las sirve Node, no Caddy |
-| Respaldos diarios | **Funcionan desde el 13 oct**: `dinamyt-respaldo.timer` a las 03:00. El primero pesa 718 KB (53 tablas con datos, `pg_restore` lo lee) y lleva 30 archivos de 30. La copia fuera del servidor: la del 15 oct está en tu PC, con la misma huella SHA-256 (tarea 3, cada semana) |
-| Secretos de sync por app | Sin poner: el `.env` del ecosistema no tiene ningún `SYNC_SECRET_*` (tarea 4) |
+| Respaldos diarios | **Funcionan desde el 13 oct**: `dinamyt-respaldo.timer` a las 03:00. El primero pesa 718 KB (53 tablas con datos, `pg_restore` lo lee) y lleva 30 archivos de 30. La copia fuera del servidor es **automática desde el 15 oct**: una tarea de Windows en tu PC, los domingos, que guarda 8 (`OPERAR.md` §2.5) |
+| Secretos de sync por app | **Puestos el 15 oct**: las dos parejas con la misma huella. Falta quitar el compartido (tarea 4) |
 | DMARC | Sigue en `p=none` (tocaba subirlo desde el 12 sep) |
 | Google | Propiedad verificada (etiqueta y TXT) |
 | Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 5) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
-| Política de privacidad | En línea desde el 15 oct. **En `main`, sin desplegar**: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo, tu nombre como responsable y el borrado sin promesas de más |
+| Política de privacidad | En línea desde el 15 oct. **Sin desplegar**: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo y el responsable completo (nombre, domicilio, dirección, correo y teléfono) |
 | Borrar mi cuenta | **En `main`, sin desplegar** (15 oct, revisado con thermos): Configuración → «Borrar mi cuenta», 7 días de gracia, vencido el plazo ya no se cancela, borrado en las tres apps y en Academy (migración `0024` del ecosistema). `CAMPEONATOS_SYNC_URL` ya está en la VPS (`OPERAR.md` §4.15) |
 
 ---
@@ -43,8 +43,8 @@
 | 0 | [**Cumplir lo que la política promete**](#0--cumplir-lo-que-la-política-promete), y revisar el código con thermos y anti-slop | Decisiones tuyas + código | Días, por fases |
 | 1 | [Probar lo desplegado](#1--probar-lo-desplegado), candado y publicación en vivo incluidos | A mano | 2–3 h |
 | 2 | [DMARC a `quarantine`](#2--dmarc-a-quarantine) | DNS | 15 min, y mirar informes antes |
-| 3 | [La copia del respaldo fuera del servidor, y lo que queda de las fotos](#3--la-copia-del-respaldo-fuera-del-servidor-y-lo-que-queda-de-las-fotos) | **Tú**: un `scp` a la semana | 5 min |
-| 4 | [Un secreto de sincronización por app](#4--un-secreto-de-sincronización-por-app--falta-ponerlo-en-la-vps) | **Tú**: poner los valores | 20 min |
+| 3 | [Lo que queda de las fotos](#3--lo-que-queda-de-las-fotos) | Servidor | 20 min |
+| 4 | [Un secreto de sincronización por app](#4--un-secreto-de-sincronización-por-app--falta-quitar-el-compartido) | **Tú**: quitar el compartido | 5 min, desde el 16 oct |
 | 5 | [La CSP, de informe a estricta](#5--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Desde el 3 oct |
 | 6 | [**Encender Academy**](#6--encender-academy) | Pruebas + servidor | 1–2 días, y una semana de uso |
 | 7 | [**Traducir lo que falta**](#7--traducir-lo-que-falta) | Código | Por pantallas |
@@ -71,19 +71,12 @@ política (`/privacidad`, la única de las cuatro apps: las demás la enlazan) y
 describe lo que el código hace. Lo que sigue es lo que el código todavía **no**
 hace, o lo que solo tú puedes decidir.
 
-### 0.1 · Lo que solo tú puedes poner — 15 min
+### 0.1 · Lo que solo tú puedes poner
 
-- **El resto de los datos del responsable.** La política ya dice tu nombre
-  (`priv.actualizado`). El Decreto 1377 de 2013 (art. 13) pide además
-  **domicilio** (la ciudad), **dirección** y **teléfono**. Si no quieres
-  publicar la de tu casa, sirve una dirección y un teléfono de contacto.
-- **Las claves que sobraron de Supabase, en tu PC.** Los proyectos ya no
-  existen (15 oct), así que no abren nada, pero no tienen por qué seguir ahí:
-  `D:\dinamyt-migracion\.env.migracion`, y en `apps/ecosystem-api/.env` las
-  tres líneas `SUPABASE_*` y la de `DATABASE_URL` (en local manda
-  `PGLITE_DATA`). Y `D:\dinamyt-migracion\claves-vps.txt`, a tu gestor de
-  contraseñas.
-- **Una consulta con abogado**, con estas preguntas:
+- **Una consulta con abogado**, con estas preguntas y con el **borrador de los
+  Términos y condiciones y del acuerdo con cada club** (15 oct) para que lo
+  corrija antes de publicarlo. Sin Términos, `/planes` vende algo sin
+  condiciones escritas (antislop, auditoría 001, nº 6):
   1. El reparto responsable/encargado entre DINAMYT y cada club: el maestro da
      de alta alumnos que nunca aceptaron nada, y el alumno con carnet QR o PIN
      no tiene cuenta. ¿Hace falta un contrato de transmisión con cada club?
@@ -107,11 +100,10 @@ hace, o lo que solo tú puedes decidir.
 - **Lo que no caduca nunca**: `otp_codes`, `org_notifications` y las
   invitaciones y solicitudes ya respondidas. (Las sesiones sí se borran, un mes
   después de caducar; en `audit_auth` no escribe nadie.) Fijar un plazo y purgar.
-- **Las copias que no rotan**: los volcados manuales de `/var/backups/` y la
-  carpeta `D:\dinamyt-migracion\respaldos\` (con los volcados de Supabase
-  del 19 ago). La política dice que se renuevan; falta decidir cada cuánto y
-  borrar los viejos. El Auto Backup de Contabo sí rota solo: 10 días, y la
-  política ya lo dice.
+- **Las copias que no rotan**: los volcados manuales de `/var/backups/` y los
+  de Supabase del 19 ago que siguen en `D:\dinamyt-migracion\respaldos\`.
+  La copia semanal del PC sí rota (guarda 8) y el Auto Backup de Contabo
+  también (10 días): las dos ya son verdad en la política.
 - **«Los menores se registran con autorización de su acudiente»** es una
   costumbre (§1.5), no una regla: el registro valida la fecha (entre 3 y 100
   años) pero no distingue a quien tiene menos de 18.
@@ -148,8 +140,10 @@ hace, o lo que solo tú puedes decidir.
 - **thermos** (dos revisores: fallos y seguridad, y calidad) sobre cada rama
   antes de fusionarla. Se lanza con `/thermos`. El 15 oct revisó
   `feat/borrar-cuenta`: lo que quedó para después está en 0.5.
-- **anti-slop en modo «after»**, una app cada vez: portal, Membresías,
-  Campeonatos, Academy. Se pide en el chat: «audita el portal con antislop
+- **anti-slop en modo «after»**, una app cada vez. **El portal, hecho el 15
+  oct** (`anti-slop/audit-001-2026-10-15.md`): las altas y medias corregidas;
+  las **bajas 11 a 16 esperan que elijas números**. Siguen Membresías,
+  Campeonatos y Academy. Se pide en el chat: «audita Membresías con antislop
   en modo after». Deja una lista numerada en `anti-slop/`, tú eliges los
   números y solo esos se tocan.
 - **`/claude-api prompt-audit`** al cambiar de modelo. El 13 oct salió limpio.
@@ -207,7 +201,10 @@ delante**. La publicación en vivo (1 oct) entra en cuanto se despliegue.
    ```
 
    Tiene que decir «pase RS256 y espejo: los dos ENCENDIDOS».
-2. El ensayo de punta a punta, `OPERAR.md` §2.9, **y anotar la fila** en su
+2. **En una tableta**, la pantalla del tatami (`/tatami/<id>`): desde el 15
+   oct los `btn-sm` miden 44 px con pantalla táctil (antislop, auditoría 001,
+   nº 4). Que nada se descuadre ni tape los `combat-btn`, que no cambiaron.
+3. El ensayo de punta a punta, `OPERAR.md` §2.9, **y anotar la fila** en su
    tabla. Con la bajada «para el evento» (`-ParaElEvento`) y con
    `CAMPEONATOS_ONLINE_URL` en el `.env` del PC: el marcador de
    `campeonatos.dinamyt.org/resultados` tiene que moverse con el evento y
@@ -253,20 +250,9 @@ se actualiza `OPERAR.md` §3.1 y §3.5 y esto se borra.
 
 ---
 
-## 3 · La copia del respaldo fuera del servidor, y lo que queda de las fotos
+## 3 · Lo que queda de las fotos
 
-El respaldo diario funciona desde el 13 de octubre de 2026 (`OPERAR.md` §2.5).
-Lo que no hace solo es salir del servidor, y **un respaldo que solo vive en la
-misma máquina no es un respaldo**. Una vez por semana, desde tu PC:
-
-```powershell
-scp dinamyt@80.190.78.70:/var/backups/dinamyt/*-$(Get-Date -Format yyyy-MM-dd).* D:\dinamyt-migracion\respaldos\
-```
-
-La última, la del 15 de octubre de 2026: la misma huella SHA-256 que en el
-servidor (`Get-FileHash` aquí, `sha256sum` allí).
-
-**Y lo que queda de las fotos**, cuando haya un rato:
+Cuando haya un rato:
 
 - Que no quede nada incrustado. En seco, que solo cuenta:
   `cd /srv/dinamyt && pnpm --filter @dinamyt/ecosystem-api fotos:al-disco`. Si
@@ -291,45 +277,29 @@ servidor (`Get-FileHash` aquí, `sha256sum` allí).
 
 ---
 
-## 4 · Un secreto de sincronización por app — falta ponerlo en la VPS
+## 4 · Un secreto de sincronización por app — falta quitar el compartido
 
-**El código ya está** (26 sep 2026, `common/secreto-sync.ts`): el ecosistema
-sabe quién llama por el secreto que trae, el de Membresías no abre las rutas de
-Campeonatos ni al revés, y `/sync/alta` solo pide altas de la app que firma.
-Mientras el `ECOSYSTEM_SYNC_SECRET` compartido siga en el `.env` del
-ecosistema, **todo sigue funcionando como hoy** y el registro dice
-`WARN [SecretoSync]`. Lo que falta es tuyo, en la VPS, **después** de desplegar
-el ecosistema:
+Los secretos propios están puestos desde el 15 oct de 2026: las dos parejas con
+la misma huella y los tres servicios reiniciados justo después. Mientras el
+`ECOSYSTEM_SYNC_SECRET` compartido siga en el `.env` del ecosistema, se acepta
+con un `WARN [SecretoSync]`. Queda un paso:
 
-1. Genera dos valores distintos (en tu PC o en el servidor):
-
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
-   ```
-
-2. **Membresías**, las dos puntas seguidas (entre un reinicio y el otro el
-   espejo de ida falla unos segundos):
-   - en `/srv/dinamyt/apps/ecosystem-api/.env`, añade
-     `SYNC_SECRET_MEMBRESIAS=<valor 1>`;
-   - en `/srv/membresias/apps/membresias-api/.env`, cambia
-     `ECOSYSTEM_SYNC_SECRET=<valor 1>`;
-   - `sudo systemctl restart dinamyt-id membresias-api`.
-3. **Campeonatos** (el ecosistema solo le llama en el barrido de las 08:00,
-   para borrar cuentas: si le pilla entre los dos reinicios, esa cuenta espera
-   a mañana):
-   - en el `.env` del ecosistema, añade `SYNC_SECRET_CAMPEONATOS=<valor 2>` y
-     `sudo systemctl restart dinamyt-id`;
-   - en `/srv/campeonatos/backend/.env`, cambia `ECOSYSTEM_SYNC_SECRET=<valor 2>`
-     y `sudo systemctl restart campeonatos-api`.
-4. Comprueba: `bash /srv/dinamyt/scripts/ensayo.sh estado` enseña las dos
-   parejas de huellas **iguales**, y
-   `cd /srv/dinamyt/apps/ecosystem-api && pnpm espejo:diagnostico` dice
-   `EL CANAL ESTÁ ABIERTO`.
-5. Un día después, si `sudo journalctl -u dinamyt-id --since "1 day ago" | grep SecretoSync`
-   no sale nada, **borra** `ECOSYSTEM_SYNC_SECRET` del `.env` del ecosistema y
+1. Un día después, si
+   `sudo journalctl -u dinamyt-id --since "1 day ago" | grep SecretoSync` no
+   saca nada, **borra** `ECOSYSTEM_SYNC_SECRET` del `.env` del ecosistema
+   —solo de ese: en Membresías y Campeonatos es ya su secreto propio— y
    `sudo systemctl restart dinamyt-id`.
 
-El PC del evento sigue sin llevar ninguno (D8).
+Las parejas, sin `sudo` y sin enseñar ningún valor (cada una tiene que dar la
+misma huella):
+
+```bash
+h(){ sed -n "s/^$2=//p" "$1" | tr -d '\r"' | tail -1 | sha256sum | cut -c1-8; }; E=/srv/dinamyt/apps/ecosystem-api/.env
+echo "$(h $E SYNC_SECRET_MEMBRESIAS) $(h /srv/membresias/apps/membresias-api/.env ECOSYSTEM_SYNC_SECRET)  ·  $(h $E SYNC_SECRET_CAMPEONATOS) $(h /srv/campeonatos/backend/.env ECOSYSTEM_SYNC_SECRET)"
+```
+
+(`ensayo.sh estado` dice «SIN PONER» si se corre sin `sudo`: no puede leer los
+`.env`.) El PC del evento sigue sin llevar ninguno (D8).
 
 ---
 

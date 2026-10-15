@@ -334,7 +334,7 @@ export default function DashboardPage() {
       {invitaciones.length > 0 && (
         <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
           <h2 className="mb-1 text-lg font-semibold">
-            ✉ Te invitaron a un club
+            Te invitaron a un club
           </h2>
           <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
             Decides tú. Si aceptas, tu ficha se crea sola en Membresías y verás
@@ -489,8 +489,8 @@ export default function DashboardPage() {
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Tu maestro lo retiró desde Membresías. Sigues siendo parte del
-                  club y no se ha perdido nada tuyo —tu ficha, tus pagos y tus
-                  asistencias están ahí—: pídele que te lo devuelva.
+                  club y no se ha perdido nada tuyo: tu ficha, tus pagos y tus
+                  asistencias siguen ahí. Pídele que te lo devuelva.
                 </span>
               </div>
             ) : (

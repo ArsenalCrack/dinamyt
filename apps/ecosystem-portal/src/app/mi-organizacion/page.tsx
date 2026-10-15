@@ -423,7 +423,7 @@ export default function MiOrganizacionPage() {
       {/* ── Invitaciones RECIBIDAS por mis clubes (aceptar / rechazar) ────── */}
       {recibidas.length > 0 && (
         <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
-          <h2 className="mb-2 text-lg font-semibold">✉ Invitaciones para tu club</h2>
+          <h2 className="mb-2 text-lg font-semibold">Invitaciones para tu club</h2>
           <ul className="flex flex-col gap-2">
             {recibidas.map((inv) => (
               <li
@@ -564,7 +564,7 @@ export default function MiOrganizacionPage() {
                           className="btn btn-outline"
                           title={h.isActive === false ? 'Activar club' : 'Desactivar club'}
                         >
-                          {h.isActive === false ? '▶' : '⏸'}
+                          {h.isActive === false ? 'Activar' : 'Desactivar'}
                         </button>
                         <button
                           onClick={() =>
@@ -572,7 +572,7 @@ export default function MiOrganizacionPage() {
                               {
                                 titulo: `¿Eliminar ${h.name}?`,
                                 detalle:
-                                  'Desaparece del ecosistema y no se puede deshacer. Solo se puede si ya está vacío —sin miembros ni suscripciones—; si todavía tiene gente, desactívalo en su lugar.',
+                                  'Desaparece del ecosistema y no se puede deshacer. Solo se puede si ya está vacío, sin miembros ni suscripciones. Si todavía tiene gente, desactívalo en su lugar.',
                                 textoOk: 'Eliminar el club',
                                 tono: 'peligro',
                               },
@@ -764,7 +764,7 @@ export default function MiOrganizacionPage() {
           <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
             {esOrgGrande(orgSel.type)
               ? 'Quien ya está dentro. Aquí cambias su rol y editas su ficha; para sumar a alguien, invítalo desde «Entrada al club».'
-              : 'Quien ya está dentro. Aquí cambias su rol y editas su ficha; para sumar a alguien, usa «Entrada al club» — tu código o una invitación.'}
+              : 'Quien ya está dentro. Aquí cambias su rol y editas su ficha; para sumar a alguien, usa «Entrada al club»: tu código o una invitación.'}
           </p>
         )}
         {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría «sin
@@ -902,7 +902,7 @@ export default function MiOrganizacionPage() {
                       style={{ color: 'var(--text-muted)' }}
                       title={t('org.noTeSacas')}
                     >
-                      —
+                      {t('org.tu')}
                     </span>
                   ) : (
                   <button

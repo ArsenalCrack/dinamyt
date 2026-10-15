@@ -425,7 +425,7 @@ export default function RegistroPage() {
                   valor: g.valor,
                   etiqueta: g.etiqueta,
                 }))}
-                placeholder="— Selecciona —"
+                placeholder="Selecciona…"
                 etiquetaAria="Género"
               />
             </Campo>

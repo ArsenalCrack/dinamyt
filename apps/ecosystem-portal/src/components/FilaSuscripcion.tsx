@@ -71,7 +71,7 @@ const PAGO: Record<string, { texto: string; clase: string }> = {
 
 const dinero = (v: string | null) =>
   v == null || v === ''
-    ? '—'
+    ? 'Sin dato'
     : new Intl.NumberFormat('es-CO', {
         style: 'currency',
         currency: 'COP',
@@ -296,7 +296,7 @@ export function FilaSuscripcion({
               className="btn btn-outline btn-sm"
               title="Vuelve a calcular el importe con la gente que tiene el club hoy"
             >
-              ↻ Actualizar monto
+              Actualizar monto
             </button>
           )}
           <button
@@ -544,7 +544,7 @@ export function FilaSuscripcion({
                           : 'Abono'}
                       </td>
                       <td className="py-1.5" style={{ color: 'var(--text-muted)' }}>
-                        {pg.registradoPor ?? '—'}
+                        {pg.registradoPor ?? 'Sin dato'}
                       </td>
                     </tr>
                   ))}

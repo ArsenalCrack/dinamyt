@@ -591,7 +591,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         disabled={ocupado || !nueva.email.trim()}
         className="btn btn-gold mt-3"
       >
-        ✉ Enviar invitación
+        Enviar invitación
       </button>
 
       {enlaceSuelto && (

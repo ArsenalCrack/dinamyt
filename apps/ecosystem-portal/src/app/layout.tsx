@@ -68,7 +68,7 @@ export const metadata: Metadata = {
    * dentro, cada una con su `layout.tsx` de dos líneas.
    */
   title: {
-    default: 'DINAMYT — El ecosistema digital del Hapkido',
+    default: 'DINAMYT · El ecosistema digital del Hapkido',
     template: '%s · DINAMYT',
   },
   description:
@@ -84,14 +84,14 @@ export const metadata: Metadata = {
     siteName: 'DINAMYT',
     locale: 'es_CO',
     url: PORTAL,
-    title: 'DINAMYT — El ecosistema digital del Hapkido',
+    title: 'DINAMYT · El ecosistema digital del Hapkido',
     description:
       'Una sola cuenta para el club y el campeonato: mensualidades y asistencia, y torneos con puntuación en vivo desde el tatami.',
     images: [{ url: '/icon-512.png', width: 512, height: 512, alt: 'DINAMYT' }],
   },
   twitter: {
     card: 'summary',
-    title: 'DINAMYT — El ecosistema digital del Hapkido',
+    title: 'DINAMYT · El ecosistema digital del Hapkido',
     description:
       'Una sola cuenta para el club y el campeonato: mensualidades, asistencia y torneos en vivo.',
     images: ['/icon-512.png'],

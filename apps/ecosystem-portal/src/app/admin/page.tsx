@@ -662,7 +662,7 @@ export default function AdminEcosistemaPage() {
                 el rol aquí <strong>reemplaza los de cada app</strong> (las
                 insignias de la fila) y viaja a Membresías traducido: un maestro
                 es el dueño de su club allí. En Campeonatos y Academy el rol
-                local manda a partir de la primera entrada — §4.7 de OPERAR.
+                local manda a partir de la primera entrada (§4.7 de OPERAR).
               </p>
 
               {/* El silencio que había que romper: una organización sin nadie
@@ -754,7 +754,7 @@ export default function AdminEcosistemaPage() {
                           style={{ color: 'var(--text-muted)' }}
                           title="No puedes sacarte a ti mismo de una organización que administras: perderías su panel y no podrías devolvértelo."
                         >
-                          —
+                          Tú
                         </span>
                       ) : (
                       <button
@@ -1089,7 +1089,7 @@ export default function AdminEcosistemaPage() {
         <h2 className="mb-1 text-lg font-semibold">Suscripciones personales</h2>
         <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
           Planes sueltos, sin organización detrás. <strong>Ya no se crean desde
-          aquí</strong> —para dar acceso a alguien, «Accesos rápidos»—, pero
+          aquí</strong> (para dar acceso a alguien, «Accesos rápidos»), pero
           éstas siguen abriendo aplicaciones y se pueden retirar.
         </p>
         <ul className="mb-4 flex flex-col gap-2">
@@ -1336,7 +1336,7 @@ function ClubesDeLaFederacion({
         federación, desde «Mi organización», sí tiene que invitar.
       </p>
       <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
-        ⏱️ No es instantáneo: los planes viajan dentro del pase, que dura 30
+        No es instantáneo: los planes viajan dentro del pase, que dura 30
         minutos. Quien necesite verlo ya, que salga y entre.
       </p>
 
@@ -1705,7 +1705,7 @@ function AccesosRapidos({
   return (
     <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
       <h2 className="mb-1 text-lg font-semibold" style={{ color: 'var(--gold)' }}>
-        ⚡ Accesos rápidos
+        Accesos rápidos
       </h2>
       <p className="mb-2 text-sm" style={{ color: 'var(--text-muted)' }}>
         Busca a la persona, elige la app y el rol, y dale acceso con un clic
@@ -1888,7 +1888,7 @@ function AccesosRapidos({
               disabled={ocupado || !orgId}
               className="btn btn-gold"
             >
-              ⚡ Dar acceso
+              Dar acceso
             </button>
             <button onClick={() => setSel(null)} className="btn btn-outline">
               Cancelar
@@ -1992,7 +1992,7 @@ function EspejoDeMembresias() {
     <section className="card mb-5 p-5">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold">🔗 Membresías — quién la abre</h2>
+          <h2 className="text-lg font-semibold">Membresías: quién la abre</h2>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             Los clubes con plan aparecen en Membresías solos y enlazados; los que
             vencen quedan allí <strong>en pausa</strong> hasta que paguen. Pasa cada
@@ -2059,23 +2059,23 @@ function EspejoDeMembresias() {
               style={{ borderColor: 'var(--warn)', background: 'rgba(255, 140, 0, 0.08)' }}
             >
               <p className="mb-1 text-sm font-semibold">
-                🛡 {escudos.length} club{escudos.length === 1 ? '' : 'es'} sin escudo en
+                {escudos.length} club{escudos.length === 1 ? '' : 'es'} sin escudo en
                 Membresías
               </p>
               <ul className="flex flex-col gap-1">
                 {escudos.map((c) => (
                   <li key={c.id} className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    <strong style={{ color: 'var(--text)' }}>{c.name}</strong>{' '}
+                    <strong style={{ color: 'var(--text)' }}>{c.name}</strong>
                     {c.escudo === 'sin-escudo' ? (
                       <>
-                        — <strong>no tiene escudo en esta ficha</strong>. Si lo subiste y
+                        : <strong>no tiene escudo en esta ficha</strong>. Si lo subiste y
                         no se ve, está guardado en la ficha de otra organización: ábrela
                         en «Mi organización», elige ESTE club en el selector de arriba y
                         súbelo ahí.
                       </>
                     ) : (
                       <>
-                        — Membresías rechazó el escudo. Si en la base está como ruta
+                        : Membresías rechazó el escudo. Si en la base está como ruta
                         <code> /media/…</code>, falta <code>MEDIA_PUBLIC_URL</code> en el
                         ecosystem: viajó relativa y allí solo valen <code>data:</code> y
                         <code> https://</code>.
@@ -2165,7 +2165,7 @@ function Vencimientos({
     <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold">⏳ Vencimientos</h2>
+          <h2 className="text-lg font-semibold">Vencimientos</h2>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             {vencidas.length > 0 && (
               <span style={{ color: 'var(--danger)' }}>
@@ -2206,7 +2206,7 @@ function Vencimientos({
           className="btn btn-outline btn-sm"
           title="Manda el correo de vencimiento a los maestros. No repite el mismo aviso antes de una semana."
         >
-          ✉ Avisar a los maestros
+          Avisar a los maestros
         </button>
       </div>
 
@@ -2279,7 +2279,7 @@ function Vencimientos({
                 // formulario de la fila de abajo.
                 title={`Renueva ${v.renewalMonths ?? 1} mes al precio del plan y lo da por pagado`}
               >
-                ↻ Renovar
+                Renovar
               </button>
               {v.orgEmail && (
                 <a
@@ -2390,7 +2390,7 @@ function TarifasDeLosPlanes({
             El cobro es <strong>por persona activa del club</strong>, y se cuenta{' '}
             <strong>el día que el club renueva</strong>: sabe cuánto paga antes de
             pagar, y quitar gente la víspera no le baja la factura. Se aplica en la{' '}
-            <strong>próxima</strong> renovación — lo ya cobrado no se reescribe.
+            <strong>próxima</strong> renovación: lo ya cobrado no se reescribe.
             Vaciar el precio devuelve el plan a su importe fijo.
           </p>
 
@@ -2487,7 +2487,7 @@ function TarifasDeLosPlanes({
                       ) : (
                         <>
                           Sin precio por persona: vuelve a su importe fijo (
-                          {p.priceMonthly ?? '—'} al mes).
+                          {p.priceMonthly ?? 'sin dato'} al mes).
                         </>
                       )}
                     </p>

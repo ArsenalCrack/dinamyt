@@ -353,11 +353,11 @@ export default function MiClubPage() {
               </div>
               <div>
                 <dt style={{ color: 'var(--text-muted)' }}>{t('club.telefono')}</dt>
-                <dd className="font-semibold">{club.phone ?? '—'}</dd>
+                <dd className="font-semibold">{club.phone ?? t('comun.sinDato')}</dd>
               </div>
               <div>
                 <dt style={{ color: 'var(--text-muted)' }}>Correo</dt>
-                <dd className="font-semibold">{club.email ?? '—'}</dd>
+                <dd className="font-semibold">{club.email ?? t('comun.sinDato')}</dd>
               </div>
             </dl>
 
@@ -372,7 +372,7 @@ export default function MiClubPage() {
                     rel="noopener noreferrer"
                     className="btn btn-outline btn-sm"
                   >
-                    🔗 {etiquetaRed(url)}
+                    {etiquetaRed(url)}
                   </a>
                 ))}
               </div>

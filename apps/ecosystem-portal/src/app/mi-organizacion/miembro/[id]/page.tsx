@@ -341,7 +341,7 @@ export default function EditarMiembroPage() {
                   etiqueta: g.etiqueta,
                 }))}
                 etiquetaAria="Género"
-                placeholder="— Sin registrar —"
+                placeholder="Sin registrar"
               />
             </div>
           </div>
@@ -353,7 +353,7 @@ export default function EditarMiembroPage() {
                 onChange={(v) => setForm({ ...form, bloodType: v })}
                 opciones={TIPOS_SANGRE.map((t) => ({ valor: t, etiqueta: t }))}
                 etiquetaAria="Tipo de sangre"
-                placeholder="— Selecciona —"
+                placeholder="Selecciona…"
               />
             </div>
           </div>
@@ -374,7 +374,7 @@ export default function EditarMiembroPage() {
                   ...CINTURONES_GRADO.map((c) => ({ valor: c, etiqueta: c })),
                 ]}
                 etiquetaAria="Cinturón"
-                placeholder="— Sin grado —"
+                placeholder="Sin grado"
               />
             </div>
           </div>
@@ -445,7 +445,7 @@ export default function EditarMiembroPage() {
                 }
                 opciones={PARENTESCOS.map((p) => ({ valor: p, etiqueta: p }))}
                 etiquetaAria="Parentesco"
-                placeholder="— Selecciona —"
+                placeholder="Selecciona…"
               />
             </div>
           </div>

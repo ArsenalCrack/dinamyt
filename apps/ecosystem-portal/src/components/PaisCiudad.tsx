@@ -103,7 +103,7 @@ export function PaisCiudad({
               valor={ciudad}
               etiquetaAria="Ciudad"
               disabled={!pais}
-              placeholder={pais ? '— Elige la ciudad —' : '— Elige antes el país —'}
+              placeholder={pais ? 'Elige la ciudad…' : 'Elige antes el país…'}
               onChange={(v) => {
                 // La escapatoria: el catálogo no tiene todas las ciudades del
                 // mundo, y sin esto un club de un municipio pequeño no tendría

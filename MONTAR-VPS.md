@@ -971,7 +971,8 @@ MAIL_FROM=DINAMYT <no-reply@dinamyt.org>
 MAIL_REPLY_TO=soporte@dinamyt.org
 MAIL_DAILY_MAX=90
 CRON_SECRET=
-MEMBRESIAS_SYNC_URL=https://membresias-api.dinamyt.org
+# La misma máquina, sin pasar por Caddy: no existe un nombre público para la API.
+MEMBRESIAS_SYNC_URL=http://127.0.0.1:3004
 ECOSYSTEM_SYNC_SECRET=
 ADMIN_EMAIL=admin@dinamyt.org
 ADMIN_PASSWORD=UNA_CLAVE_FUERTE

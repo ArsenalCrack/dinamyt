@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { CORREO_ADMIN, CORREO_SOPORTE } from '@/lib/contacto';
+import { CORREO_ADMIN, CORREO_SOPORTE, RESPONSABLE } from '@/lib/contacto';
 import { useI18n } from '@/lib/i18n';
 
 /** Un apartado de la política: el título se escribe igual en todos. */
@@ -67,6 +67,37 @@ export function PoliticaPrivacidad() {
         className="flex flex-col gap-6 text-sm leading-relaxed"
         style={{ color: 'var(--text-muted)' }}
       >
+        {/* Lo que pide el Decreto 1377 (art. 13). Los datos, en `lib/contacto.ts`. */}
+        <Seccion titulo={t('priv.responsable')}>
+          <p className="mb-2">{t('priv.responsableIntro')}</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              <strong style={{ color: 'var(--text)' }}>{t('priv.respNombre')}</strong>{' '}
+              {RESPONSABLE.nombre}
+            </li>
+            <li>
+              <strong style={{ color: 'var(--text)' }}>{t('priv.respDomicilio')}</strong>{' '}
+              {RESPONSABLE.domicilio}
+            </li>
+            <li>
+              <strong style={{ color: 'var(--text)' }}>{t('priv.respDireccion')}</strong>{' '}
+              {RESPONSABLE.direccion}
+            </li>
+            <li>
+              <strong style={{ color: 'var(--text)' }}>{t('priv.respCorreo')}</strong>{' '}
+              <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
+                {CORREO_ADMIN}
+              </a>
+            </li>
+            <li>
+              <strong style={{ color: 'var(--text)' }}>{t('priv.respTelefono')}</strong>{' '}
+              <a href={RESPONSABLE.telefonoEnlace} style={{ color: 'var(--gold)' }}>
+                {RESPONSABLE.telefono}
+              </a>
+            </li>
+          </ul>
+        </Seccion>
+
         <Seccion titulo={t('priv.queDatos')}>
           <ul className="list-disc space-y-1 pl-5">
             <li>

@@ -451,8 +451,8 @@ export function CampanaOrg() {
                         igual en el PC, y llamarlo celular hacía pensar que
                         desde el computador no era para uno. */}
                     {push === 'activo'
-                      ? '🔕 No avisarme en este dispositivo'
-                      : '🔔 Avisarme en este dispositivo'}
+                      ? 'No avisarme en este dispositivo'
+                      : 'Avisarme en este dispositivo'}
                   </button>
                 )}
                 {msgPush && (

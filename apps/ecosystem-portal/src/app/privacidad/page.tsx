@@ -10,7 +10,7 @@ import { PoliticaPrivacidad } from '@/components/PoliticaPrivacidad';
  * vive en `components/PoliticaPrivacidad.tsx`.
  */
 export const metadata: Metadata = {
-  title: 'Política de privacidad — DINAMYT',
+  title: 'Política de privacidad',
   description:
     'Cómo DINAMYT trata los datos personales de deportistas, maestros, jueces y organizaciones (Ley 1581 de 2012, Colombia).',
 };

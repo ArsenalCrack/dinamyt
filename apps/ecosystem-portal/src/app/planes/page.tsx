@@ -102,7 +102,7 @@ export default function PlanesPage() {
   }, []);
 
   const asunto = (nombre: string) =>
-    encodeURIComponent(`DINAMYT — Cotización: ${nombre}`);
+    encodeURIComponent(`DINAMYT · Cotización: ${nombre}`);
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
