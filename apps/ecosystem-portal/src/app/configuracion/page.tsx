@@ -13,6 +13,7 @@ import { ZonaHoraria } from '@/components/ZonaHoraria';
 import { Apariencia } from '@/components/Apariencia';
 import { useI18n } from '@/lib/i18n';
 import { Cargando } from '@/components/Cargando';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -68,7 +69,10 @@ export default function ConfiguracionPage() {
   // Cambio de contraseña.
   const [passActual, setPassActual] = useState('');
   const [passNueva, setPassNueva] = useState('');
-  const [passMsg, setPassMsg] = useState('');
+  // Con su tono aparte. Se decidía buscando «actualizada» en el texto, así
+  // que en inglés («Password updated.») el éxito salía en rojo.
+  const [passMsg, setPassMsg] = useState<{ tono: 'ok' | 'error'; texto: string } | null>(null);
+  const [cambiando, setCambiando] = useState(false);
 
   const cargar = useCallback(async () => {
     const pase = obtenerToken();
@@ -97,17 +101,34 @@ export default function ConfiguracionPage() {
 
   async function cambiarPassword(e: FormEvent) {
     e.preventDefault();
-    setPassMsg('');
+    setPassMsg(null);
+    // El botón ya no se apaga antes de escribir: apagado no decía por qué no
+    // se podía pulsar (auditoría 003, nº 15). Se valida aquí, se dice qué
+    // falta y el foco va al campo que hay que arreglar.
+    if (!passActual) {
+      setPassMsg({ tono: 'error', texto: t('config.faltaActual') });
+      document.getElementById('cfg-actual')?.focus();
+      return;
+    }
+    const nueva = validarContrasena(passNueva);
+    if (!nueva.ok) {
+      setPassMsg({ tono: 'error', texto: nueva.error ?? t('config.contrasenaNueva') });
+      document.getElementById('cfg-nueva')?.focus();
+      return;
+    }
+    setCambiando(true);
     try {
       await api.post('/auth/change-password', {
         currentPassword: passActual,
         newPassword: passNueva,
       });
-      setPassMsg(t('config.contrasenaLista'));
+      setPassMsg({ tono: 'ok', texto: t('config.contrasenaLista') });
       setPassActual('');
       setPassNueva('');
     } catch (e2) {
-      setPassMsg(extraerError(e2, 'No se pudo cambiar la contraseña.'));
+      setPassMsg({ tono: 'error', texto: extraerError(e2, 'No se pudo cambiar la contraseña.') });
+    } finally {
+      setCambiando(false);
     }
   }
 
@@ -115,7 +136,7 @@ export default function ConfiguracionPage() {
     return (
       <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
         {error ? (
-          <p style={{ color: 'var(--danger)' }}>{error}</p>
+          <p className="text-danger">{error}</p>
         ) : (
           <Cargando />
         )}
@@ -124,12 +145,12 @@ export default function ConfiguracionPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-4 py-10 sm:px-6">
+    <main className="mx-auto min-h-screen max-w-2xl px-4 py-10 sm:px-6 lg:max-w-5xl">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="eyebrow mb-1">{t('config.eyebrow')}</p>
           <h1 className="display text-3xl">{t('config.titulo')}</h1>
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-2 text-sm text-muted">
             {t('config.desc')}
           </p>
         </div>
@@ -146,6 +167,11 @@ export default function ConfiguracionPage() {
       {/* «Cómo veo DINAMYT»: el tema, el idioma y la hora responden la misma
           pregunta, así que van juntos y en este orden — los dos primeros se
           ven al instante, la hora explica algo que pasa cuando no estás. */}
+      {/* En escritorio, dos columnas: son tarjetas que no dependen una de otra,
+          y en una sola dejaban dos tercios de la pantalla vacíos (003, nº 7).
+          El hueco entre ellas lo pone la rejilla, así que el margen de arriba
+          de cada tarjeta se anula; «Borrar mi cuenta» va a lo ancho, al final. */}
+      <div className="grid gap-4 [&>*]:mt-0 lg:grid-cols-2 lg:items-start [&>*:last-child]:lg:col-span-2">
       <Apariencia
         usuarioId={cuenta.id}
         temaGuardado={cuenta.theme}
@@ -161,29 +187,33 @@ export default function ConfiguracionPage() {
       {/* ── Seguridad ── */}
       <form onSubmit={cambiarPassword} className="card mt-4 flex flex-col gap-4 p-5">
         <h2 className="text-lg font-semibold">{t('perfil.cambiarContrasena')}</h2>
-        <p className="-mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="-mt-2 text-sm text-muted">
           {t('config.seguridadDesc')}
         </p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        {/* Lado a lado en tableta; en escritorio la tarjeta va a media
+            pantalla (la rejilla de abajo) y los dos campos se apilan. */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('config.contrasenaActual')}</span>
+            <span className="text-muted">{t('config.contrasenaActual')}</span>
             <span className="mt-1 block">
               <CampoContrasena
+                id="cfg-actual"
+                name="current-password"
                 value={passActual}
                 onChange={(e) => setPassActual(e.target.value)}
-                required
                 autoComplete="current-password"
               />
             </span>
           </label>
           <div>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>{t('config.contrasenaNueva')}</span>
+              <span className="text-muted">{t('config.contrasenaNueva')}</span>
               <span className="mt-1 block">
                 <CampoContrasena
+                  id="cfg-nueva"
+                  name="new-password"
                   value={passNueva}
                   onChange={(e) => setPassNueva(e.target.value)}
-                  required
                   maxLength={LIM.password}
                   autoComplete="new-password"
                 />
@@ -195,20 +225,9 @@ export default function ConfiguracionPage() {
             <MedidorContrasena clave={passNueva} />
           </div>
         </div>
-        {passMsg && (
-          <p
-            className="text-sm"
-            style={{ color: passMsg.includes('actualizada') ? 'var(--ok)' : 'var(--danger)' }}
-          >
-            {passMsg}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={!passActual || !validarContrasena(passNueva).ok}
-          className="btn btn-outline self-start"
-        >
-          {t('config.actualizarContrasena')}
+        <MensajeVivo tono={passMsg?.tono ?? 'ok'} texto={passMsg?.texto} className="text-sm" />
+        <button type="submit" disabled={cambiando} className="btn btn-outline self-start">
+          {cambiando ? t('config.actualizando') : t('config.actualizarContrasena')}
         </button>
       </form>
 
@@ -216,6 +235,7 @@ export default function ConfiguracionPage() {
 
       {/* Lo último de la pantalla, y aparte: no es un ajuste más. */}
       <BorrarMiCuenta />
+      </div>
     </main>
   );
 }

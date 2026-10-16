@@ -17,7 +17,7 @@ function Seccion({
 }) {
   return (
     <section id={id}>
-      <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text)' }}>
+      <h2 className="mb-2 text-lg font-semibold text-ink">
         {titulo}
       </h2>
       {children}
@@ -58,30 +58,29 @@ export function PoliticaPrivacidad() {
       <header className="mb-8">
         <p className="eyebrow mb-1">{t('priv.ley')}</p>
         <h1 className="display text-3xl">{t('priv.titulo')}</h1>
-        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-2 text-sm text-muted">
           {t('priv.actualizado')}
         </p>
       </header>
 
       <div
-        className="flex flex-col gap-6 text-sm leading-relaxed"
-        style={{ color: 'var(--text-muted)' }}
+        className="flex flex-col gap-6 text-base leading-relaxed text-muted"
       >
         {/* Lo que pide el Decreto 1377 (art. 13). Los datos, en `lib/contacto.ts`. */}
         <Seccion titulo={t('priv.responsable')}>
           <p className="mb-2">{t('priv.responsableIntro')}</p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.respNombre')}</strong>{' '}
+              <strong className="text-ink">{t('priv.respNombre')}</strong>{' '}
               {RESPONSABLE.nombre}
             </li>
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.respDomicilio')}</strong>{' '}
+              <strong className="text-ink">{t('priv.respDomicilio')}</strong>{' '}
               {RESPONSABLE.domicilio}
             </li>
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.respCorreo')}</strong>{' '}
-              <a href={`mailto:${RESPONSABLE.correo}`} style={{ color: 'var(--gold)' }}>
+              <strong className="text-ink">{t('priv.respCorreo')}</strong>{' '}
+              <a href={`mailto:${RESPONSABLE.correo}`} className="text-gold">
                 {RESPONSABLE.correo}
               </a>
             </li>
@@ -91,24 +90,24 @@ export function PoliticaPrivacidad() {
         <Seccion titulo={t('priv.queDatos')}>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.identificacion')}</strong>{' '}
+              <strong className="text-ink">{t('priv.identificacion')}</strong>{' '}
               {t('priv.identificacionTexto')}
             </li>
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.deportivos')}</strong>{' '}
+              <strong className="text-ink">{t('priv.deportivos')}</strong>{' '}
               {t('priv.deportivosTexto')}
             </li>
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.sensibles')}</strong>{' '}
+              <strong className="text-ink">{t('priv.sensibles')}</strong>{' '}
               {t('priv.sensiblesA')} <strong>{t('priv.cifrados')}</strong>{' '}
               {t('priv.sensiblesB')}
             </li>
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.pago')}</strong>{' '}
+              <strong className="text-ink">{t('priv.pago')}</strong>{' '}
               {t('priv.pagoA')} <strong>{t('priv.noProcesa')}</strong> {t('priv.pagoB')}
             </li>
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.tecnicos')}</strong>{' '}
+              <strong className="text-ink">{t('priv.tecnicos')}</strong>{' '}
               {t('priv.tecnicosTexto')}
             </li>
           </ul>
@@ -154,15 +153,15 @@ export function PoliticaPrivacidad() {
         <Seccion titulo={t('priv.derechos')}>
           <p>
             {t('priv.derechosA')}{' '}
-            <Link href="/perfil" style={{ color: 'var(--gold)' }}>
+            <Link href="/perfil" className="text-gold">
               {t('priv.miPerfil')}
             </Link>
             {t('priv.derechosB')}{' '}
-            <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
+            <a href={`mailto:${CORREO_ADMIN}`} className="text-gold">
               {CORREO_ADMIN}
             </a>{' '}
             {t('priv.derechosC')}{' '}
-            <a href={`mailto:${CORREO_SOPORTE}`} style={{ color: 'var(--gold)' }}>
+            <a href={`mailto:${CORREO_SOPORTE}`} className="text-gold">
               {CORREO_SOPORTE}
             </a>
             {t('priv.derechosD')}
@@ -179,7 +178,7 @@ export function PoliticaPrivacidad() {
         </Seccion>
       </div>
 
-      <footer className="mt-10 border-t pt-6" style={{ borderColor: 'var(--border)' }}>
+      <footer className="mt-10 border-t pt-6 border-line">
         <Link href="/" className="btn btn-outline">
           {t('priv.volver')}
         </Link>

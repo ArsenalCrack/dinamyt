@@ -153,6 +153,19 @@
      Se asignan por identidad y en orden fijo, nunca ciclados. */
   --serie-1: #b88d00;
   --serie-2: #3f86e8;
+
+  /* La franja de cinturones, la firma del ecosistema (DESIGN.md, «Formas»).
+     Es un token para que la misma franja salga en `.cinturon` y encima de la
+     tarjeta del login sin escribir dos veces los seis colores. */
+  --franja: linear-gradient(
+    90deg,
+    #f3f1e8 0 16.66%,
+    #f0b800 16.66% 33.33%,
+    #3ecf8e 33.33% 50%,
+    #2266ff 50% 66.66%,
+    #e8002a 66.66% 83.33%,
+    #454545 83.33% 100%
+  );
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -289,11 +302,13 @@ html[data-theme='light'] .card {
 }
 /* Y al pasar por encima de una tarjeta que ES un enlace, la sombra crece en
    vez de encenderse el borde (que en claro no se ve). */
-html[data-theme='light'] a.card:hover,
-html[data-theme='light'] button.card:hover {
-  box-shadow:
-    0 2px 4px rgba(23, 27, 42, 0.06),
-    0 8px 20px rgba(23, 27, 42, 0.12);
+@media (hover: hover) {
+  html[data-theme='light'] a.card:hover,
+  html[data-theme='light'] button.card:hover {
+    box-shadow:
+      0 2px 4px rgba(23, 27, 42, 0.06),
+      0 8px 20px rgba(23, 27, 42, 0.12);
+  }
 }
 
 /* El botón de marca conserva su brillo dorado, pero la sombra en claro no
@@ -318,8 +333,8 @@ html[data-theme='light'] textarea:focus {
 /* La franja de cinturones es la firma de la marca y en claro se comía el
    blanco: sobre fondo claro, el primero (hueso #f3f1e8) desaparecía. Se le
    pone un gris de contorno en su lugar. */
-html[data-theme='light'] .cinturon {
-  background: linear-gradient(
+html[data-theme='light'] {
+  --franja: linear-gradient(
     90deg,
     #c9c6b8 0 16.66%,
     #f0b800 16.66% 33.33%,
@@ -342,11 +357,9 @@ html[data-theme='light'] .confirmar-caja {
   box-shadow: 0 8px 24px rgba(22, 22, 31, 0.14);
 }
 
-html[data-theme='light'] .btn-danger {
-  background: var(--danger);
-  color: #ffffff;
-  border-color: var(--danger);
-}
+/* `.btn-danger` es CONTORNO en los dos temas. Era relleno en claro, y el modo
+   claro «no es otro diseño» (arriba): cambiaba la forma del botón, no solo su
+   luz. `--danger` en claro (#e00028) da 5:1 sobre blanco como letra. */
 
 /* Las insignias, con más tinte todavía (0.14 → 0.20) y el borde en el color
    VIVO. Al 10 % sobre blanco las tres se veían igual de grises; al 14 % ya se
@@ -378,10 +391,12 @@ html[data-theme='light'] .badge-gold {
 }
 /* El botón de contorno, al pasar por encima, tira del oro vivo y no del
    oscuro: sobre blanco, un borde `#9f5e00` no se distingue de uno gris. */
-html[data-theme='light'] .btn-outline:hover:not(:disabled) {
-  border-color: var(--gold-fill);
-  color: var(--gold);
-  background: rgba(240, 184, 0, 0.08);
+@media (hover: hover) {
+  html[data-theme='light'] .btn-outline:hover:not(:disabled) {
+    border-color: var(--gold-fill);
+    color: var(--gold);
+    background: rgba(240, 184, 0, 0.08);
+  }
 }
 
 html[data-theme='light'] .badge-danger {
@@ -421,6 +436,7 @@ body {
   font-family: var(--font-body), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* La barra es sticky y tapa los primeros 57 px: sin esto, saltar a un ancla
@@ -451,6 +467,20 @@ html { scroll-padding-top: 4.5rem; }
    funcionar sobre enlaces: antes también las anulaba. */
 @layer base {
   a { color: inherit; text-decoration: none; }
+
+  /* ── El toque ──
+     Sin esto, Android pinta un recuadro gris encima de cada cosa que se toca
+     (el «tap highlight»), y el navegador espera ~300 ms por si es un doble
+     toque para hacer zoom. `manipulation` deja el desplazamiento y el
+     pellizco, y quita solo esa espera. La respuesta al toque la dan los
+     propios botones (`:active`). */
+  html { -webkit-tap-highlight-color: transparent; }
+  a, button, input, select, textarea, label, summary, [role='button'], [role='tab'] {
+    touch-action: manipulation;
+  }
+
+  /* Un titular que parte en dos renglones no deja una palabra sola abajo. */
+  h1, h2, h3 { text-wrap: balance; }
 }
 
 ::selection { background: var(--gold); color: #14141e; }
@@ -485,6 +515,11 @@ input[type="password"]::-ms-clear { display: none; }
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
+/* El destino de «Saltar al contenido» (`.saltar`) recibe el foco para que el
+   siguiente Tab siga desde ahí, pero no es un control: rodear la página
+   entera de oro no dice nada. Va sin capa, como la regla de arriba, porque
+   tiene que ganarle. */
+#contenido:focus-visible { outline: none; }
 
 @layer components {
   /* ── Tipografía de rol ──────────────────────────────────────────────── */
@@ -495,6 +530,7 @@ input[type="password"]::-ms-clear { display: none; }
     text-transform: uppercase;
     letter-spacing: -0.015em;
     line-height: 0.98;
+    text-wrap: balance;
   }
   /* La etiqueta corta encima de un título. Monoespaciada, en mayúsculas y
      abierta a propósito: es la voz de IBM Plex Mono que ya llevan los códigos
@@ -551,16 +587,17 @@ input[type="password"]::-ms-clear { display: none; }
     font-size: 1.1rem;
     cursor: pointer;
     opacity: 0.65;
-    transition: var(--transition, all 0.15s ease);
+    transition: opacity 0.15s ease, border-color 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  .pubctl-toggle:hover,
   .pubctl-toggle:focus-visible {
     opacity: 1;
     border-color: var(--border-strong);
-    outline: none;
+  }
+  @media (hover: hover) {
+    .pubctl-toggle:hover { opacity: 1; border-color: var(--border-strong); }
   }
   .pubctl-panel {
     background: var(--bg-card);
@@ -584,12 +621,11 @@ input[type="password"]::-ms-clear { display: none; }
     font-size: 0.9rem;
     cursor: pointer;
     text-align: left;
-    transition: var(--transition, all 0.15s ease);
+    transition: background-color 0.15s ease;
   }
-  .pubctl-item:hover,
-  .pubctl-item:focus-visible {
-    background: var(--bg-elevated);
-    outline: none;
+  .pubctl-item:focus-visible { background: var(--bg-elevated); }
+  @media (hover: hover) {
+    .pubctl-item:hover { background: var(--bg-elevated); }
   }
   .pubctl-langs { display: flex; gap: 6px; }
   .pubctl-lang {
@@ -603,13 +639,14 @@ input[type="password"]::-ms-clear { display: none; }
     font-weight: 600;
     font-size: 0.85rem;
     cursor: pointer;
-    transition: var(--transition, all 0.15s ease);
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
-  .pubctl-lang:hover,
   .pubctl-lang:focus-visible {
     color: var(--text);
     background: var(--bg-elevated);
-    outline: none;
+  }
+  @media (hover: hover) {
+    .pubctl-lang:hover { color: var(--text); background: var(--bg-elevated); }
   }
   .pubctl-lang[data-activo='true'] {
     background: var(--gold-bg, var(--gold-soft));
@@ -617,6 +654,24 @@ input[type="password"]::-ms-clear { display: none; }
     color: var(--gold);
     font-weight: 800;
   }
+
+  /* ── «SALTAR AL CONTENIDO» ─────────────────────────────────────────────
+     El primer enlace de cada página, fuera de la pantalla hasta que el
+     tabulador llega a él. Lleva a `#contenido`, el envoltorio de lo que es de
+     cada pantalla (DESIGN.md; auditoría 003, nº 18). */
+  .saltar {
+    position: absolute;
+    left: 0.75rem;
+    top: -4rem;
+    z-index: 100;
+    padding: 0.6rem 1rem;
+    border-radius: 0.5rem;
+    background: var(--gold-fill);
+    color: #14141e;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  .saltar:focus { top: 0.75rem; }
 
   /* ── LA PANTALLA DE CARGA, la misma en las cuatro webs ────────────────
   
@@ -744,7 +799,9 @@ input[type="password"]::-ms-clear { display: none; }
   /* `flex-basis: 100%` = su propio renglón, debajo de los enlaces cortos.
      A partir de `sm` se suelta y entra en la fila con los demás. */
   .pie-enlaces > .pie-soporte { flex-basis: 100%; }
-  .pie-enlaces a:hover { color: var(--text); }
+  @media (hover: hover) {
+    .pie-enlaces a:hover { color: var(--text); }
+  }
   .pie-soporte {
     display: inline-flex;
     flex-wrap: wrap;
@@ -766,6 +823,54 @@ input[type="password"]::-ms-clear { display: none; }
       gap: 0.5rem 1.1rem;
     }
     .pie-enlaces > .pie-soporte { flex-basis: auto; }
+  }
+  /* ── El tema y el idioma, en el pie ───────────────────────────────────
+     Para las pantallas SIN sesión (con sesión están en el menú de la cuenta).
+     Era un botón 🌐 flotante abajo a la derecha, y en un teléfono de 390 px
+     tapaba lo que pasara por debajo: el borde de un campo, una letra del
+     marcador de la portada (auditoría 003, nº 1). Aquí no tapa nada y se ve
+     sin abrir nada: dos selectores, el tema y el idioma. */
+  .pie-apariencia {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem 1rem;
+    margin-top: 1rem;
+  }
+  .pie-opciones {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.15rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  .pie-opciones-nombre {
+    margin-right: 0.35rem;
+    padding-left: 0.5rem;
+  }
+  .pie-opcion {
+    padding: 0.25rem 0.7rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .pie-opcion[aria-pressed='true'] {
+    background: var(--gold-soft);
+    color: var(--gold);
+  }
+  @media (hover: hover) {
+    .pie-opcion:hover:not([aria-pressed='true']) { color: var(--text); }
+  }
+  @media (min-width: 640px) {
+    .pie-apariencia { justify-content: flex-end; }
   }
   .pie-legal {
     margin-top: 1.1rem;
@@ -810,6 +915,7 @@ input[type="password"]::-ms-clear { display: none; }
     max-width: 26rem;
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 1.25rem;
     background: var(--bg-card);
     border: 1px solid var(--gold-dim);
@@ -1037,7 +1143,10 @@ input[type="password"]::-ms-clear { display: none; }
     margin-top: 0.18em;
     font-family: var(--font-mono), ui-monospace, monospace;
     font-stretch: normal;
-    font-size: 0.46em;
+    /* `max`: en la barra (1.125 rem) el 0.46 em daba 8,3 px, que en una
+       pantalla normal es una raya gris. Nada que se lea baja de 11 px
+       (DESIGN.md, «Tipografía»). */
+    font-size: max(0.46em, 0.6875rem);
     font-weight: 500;
     letter-spacing: 0.14em;
     line-height: 1;
@@ -1048,15 +1157,7 @@ input[type="password"]::-ms-clear { display: none; }
   .cinturon {
     height: 4px;
     border: 0;
-    background: linear-gradient(
-      90deg,
-      #f3f1e8 0 16.66%,
-      #f0b800 16.66% 33.33%,
-      #3ecf8e 33.33% 50%,
-      #2266ff 50% 66.66%,
-      #e8002a 66.66% 83.33%,
-      #454545 83.33% 100%
-    );
+    background: var(--franja);
   }
 
   /* ── Botones ────────────────────────────────────────────────────────── */
@@ -1075,7 +1176,12 @@ input[type="password"]::-ms-clear { display: none; }
     white-space: nowrap;
   }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn:hover:not(:disabled) { filter: brightness(1.12); }
+  /* Los `:hover` van solo con ratón. En el celular un toque deja el estado
+     «encima» pegado hasta que se toca otra cosa: la tarjeta seguía levantada
+     y el botón de contorno dorado. El toque lo responde `:active`. */
+  @media (hover: hover) {
+    .btn:hover:not(:disabled) { filter: brightness(1.12); }
+  }
   .btn:active:not(:disabled) { transform: translateY(1px); }
   /* Accion primaria (antes oro neon): jade profundo legible. La clase
      conserva su nombre historico para no tocar cada pagina. */
@@ -1087,11 +1193,14 @@ input[type="password"]::-ms-clear { display: none; }
   /* El hover sube al verde vivo en vez de aclarar con `filter`. Aclarar un
      verde profundo lo LAVA —le quita croma— y el botón parecía desactivarse al
      pasar por encima, que es lo contrario de lo que tiene que decir. */
-  .btn-gold:hover:not(:disabled) {
-    background: var(--accion-hover);
-    box-shadow: 0 0 0 3px rgba(0, 135, 90, 0.3);
-    filter: none;
+  @media (hover: hover) {
+    .btn-gold:hover:not(:disabled) {
+      background: var(--accion-hover);
+      box-shadow: 0 0 0 3px rgba(0, 135, 90, 0.3);
+      filter: none;
+    }
   }
+  .btn-gold:active:not(:disabled) { background: var(--accion-hover); }
   /* CTA de marca (login "Ingresar" y portadas): el oro original. */
   .btn-cta {
     background: var(--gold-fill);
@@ -1099,16 +1208,20 @@ input[type="password"]::-ms-clear { display: none; }
     box-shadow: 0 2px 14px rgba(240, 184, 0, 0.25);
   }
   .btn-outline { background: transparent; border-color: var(--border-strong); color: var(--text); }
-  .btn-outline:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  @media (hover: hover) {
+    .btn-outline:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  }
   /* Acción destructiva (cerrar sesión, eliminar): SIEMPRE distinta del resto */
   .btn-danger {
     background: transparent;
     border-color: var(--danger);
     color: var(--danger);
   }
-  .btn-danger:hover:not(:disabled) {
-    background: rgba(255, 85, 119, 0.12);
-    filter: none;
+  @media (hover: hover) {
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(255, 85, 119, 0.12);
+      filter: none;
+    }
   }
   .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.75rem; }
 
@@ -1180,10 +1293,12 @@ input[type="password"]::-ms-clear { display: none; }
     padding: 1rem;
     transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   }
-  a.card:hover, button.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    border-color: var(--gold-dim);
+  @media (hover: hover) {
+    a.card:hover, button.card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      border-color: var(--gold-dim);
+    }
   }
 
   /* ── Badges ─────────────────────────────────────────────────────────── */
@@ -1194,7 +1309,7 @@ input[type="password"]::-ms-clear { display: none; }
     border-radius: 999px;
     padding: 0.15rem 0.6rem;
     font-family: var(--font-mono), ui-monospace, monospace;
-    font-size: 0.68rem;
+    font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -1243,6 +1358,7 @@ input[type="password"]::-ms-clear { display: none; }
      `login` es un nombre que cualquiera de las cuatro puede volver a usar.) */
   .eco-login {
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1252,6 +1368,25 @@ input[type="password"]::-ms-clear { display: none; }
     padding: 1.75rem;
     width: 100%;
     max-width: 380px;
+  }
+  /* La franja de cinturones en el borde de arriba: en escritorio la tarjeta
+     está sola en mitad de la pantalla, y es lo único que dice «DINAMYT» sin
+     palabras. Va dentro del borde (por eso el radio es 1 px menor) y sin
+     `overflow: hidden`, para no recortar nada de lo que se abra dentro.
+     `.con-franja` es la misma firma para las tarjetas de entrar que no miden
+     380 px (el registro, la recuperación). */
+  .eco-login-caja,
+  .con-franja {
+    position: relative;
+  }
+  .eco-login-caja::before,
+  .con-franja::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 4px;
+    border-radius: calc(0.75rem - 1px) calc(0.75rem - 1px) 0 0;
+    background: var(--franja);
   }
   /* 56 px, y en bloque para que el enlace al portal no lo desalinee. */
   .eco-login-logo {
@@ -1372,7 +1507,9 @@ input[type="password"]::-ms-clear { display: none; }
   white-space: nowrap;
   color: var(--text-muted);
 }
-.navbar-link:hover { color: var(--text); }
+@media (hover: hover) {
+  .navbar-link:hover { color: var(--text); }
+}
 .navbar-link[data-activo='true'] { background: var(--bg-elevated); color: var(--gold); }
 .navbar-derecha {
   margin-left: auto;
@@ -1409,8 +1546,10 @@ input[type="password"]::-ms-clear { display: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.navbar-toggle:hover,
 .navbar-toggle[aria-expanded='true'] { border-color: var(--gold); color: var(--gold); }
+@media (hover: hover) {
+  .navbar-toggle:hover { border-color: var(--gold); color: var(--gold); }
+}
 .navbar-rayas { position: relative; width: 18px; height: 12px; flex-shrink: 0; }
 .navbar-rayas span {
   position: absolute;
@@ -1419,14 +1558,16 @@ input[type="password"]::-ms-clear { display: none; }
   height: 2px;
   background: currentColor;
   border-radius: 2px;
-  transition: transform 0.2s ease, opacity 0.2s ease, top 0.2s ease;
+  /* Solo `transform` y `opacity`: animar `top` recalculaba la página en cada
+     cuadro. Las rayas se quedan en su sitio y se mueven con `translateY`. */
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 .navbar-rayas span:nth-child(1) { top: 0; }
 .navbar-rayas span:nth-child(2) { top: 5px; }
 .navbar-rayas span:nth-child(3) { top: 10px; }
-.navbar-rayas[data-abierto='true'] span:nth-child(1) { top: 5px; transform: rotate(45deg); }
+.navbar-rayas[data-abierto='true'] span:nth-child(1) { transform: translateY(5px) rotate(45deg); }
 .navbar-rayas[data-abierto='true'] span:nth-child(2) { opacity: 0; }
-.navbar-rayas[data-abierto='true'] span:nth-child(3) { top: 5px; transform: rotate(-45deg); }
+.navbar-rayas[data-abierto='true'] span:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
 
 /* ── El panel ── */
 .navbar-panel {
@@ -1494,8 +1635,10 @@ input[type="password"]::-ms-clear { display: none; }
 /* Sin `outline: none`: esta regla está fuera de capas y le ganaba al anillo
    dorado de `:focus-visible`; con Tab, el foco solo se notaba por un fondo a
    1.09:1 (WCAG 2.4.7). */
-.navbar-item:hover,
 .navbar-item:focus-visible { background: var(--bg-elevated); }
+@media (hover: hover) {
+  .navbar-item:hover { background: var(--bg-elevated); }
+}
 .navbar-item[data-activo='true'] { color: var(--gold); }
 .navbar-sep { height: 1px; margin: 0.35rem 0; background: var(--border); }
 .navbar-panel-links { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -1514,7 +1657,9 @@ input[type="password"]::-ms-clear { display: none; }
   font-size: 0.78rem;
   cursor: pointer;
 }
-.navbar-idioma:hover { color: var(--text); background: var(--bg-elevated); }
+@media (hover: hover) {
+  .navbar-idioma:hover { color: var(--text); background: var(--bg-elevated); }
+}
 .navbar-idioma[data-activo='true'] {
   background: var(--gold-soft);
   border-color: var(--gold-dim);
@@ -1524,7 +1669,7 @@ input[type="password"]::-ms-clear { display: none; }
 .navbar-etiqueta {
   padding: 0.35rem 0.55rem 0;
   font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.66rem;
+  font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--text-muted);
@@ -1567,6 +1712,21 @@ input[type="password"]::-ms-clear { display: none; }
   .navbar-panel { right: 1rem; }
 }
 
+/* ── Reducir movimiento, en las cuatro webs ────────────────────────────────
+   El portal, Membresías y Academy lo tenían cada una en su `globals.css`;
+   Campeonatos no, y le llegaban todas las animaciones de esta hoja (el panel
+   que aparece, la tarjeta que se levanta, el botón que baja). Aquí vale para
+   todas. Las animaciones siguen terminando —una alerta se ve igual—, solo que
+   sin recorrido. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ── El pulgar ─────────────────────────────────────────────────────────────
    En una pantalla táctil todo lo que se pulsa mide al menos 44 px: con el
    ratón se acierta un botón de 38, con el dedo no (WCAG 2.5.5, antislop R-03).
@@ -1592,6 +1752,7 @@ input[type="password"]::-ms-clear { display: none; }
   .navbar-idioma,
   .pubctl-item,
   .pubctl-lang,
+  .pie-opcion,
   .filtros-toggle {
     min-height: 44px;
   }

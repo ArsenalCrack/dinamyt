@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import api, { extraerError } from '@/lib/api';
+import { MensajeVivo } from '@/components/MensajeVivo';
 import {
   aplicarTema,
   getTema,
@@ -149,7 +150,7 @@ export function Apariencia({
   return (
     <section className="card mt-4 p-5">
       <h2 className="text-lg font-semibold">{t('perfil.apariencia')}</h2>
-      <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-1 text-sm text-muted">
         {t('perfil.aparienciaDesc')}
       </p>
 
@@ -181,7 +182,7 @@ export function Apariencia({
           ))}
         </div>
         {tema === 'sistema' && (
-          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-2 text-xs text-muted">
             {/* Sin esto, «Como el sistema» es la única opción que no dice qué
                 hace: las otras dos se ven al pulsarlas. */}
             {temaDelSistema() === 'claro'
@@ -220,8 +221,8 @@ export function Apariencia({
         </div>
       </div>
 
-      {msg && <p className="msg-ok mt-3 text-sm">{msg}</p>}
-      {error && <p className="msg-error mt-3 text-sm">{error}</p>}
+      <MensajeVivo tono="ok" texto={msg} className="mt-3 text-sm" />
+      <MensajeVivo tono="error" texto={error} className="mt-3 text-sm" />
     </section>
   );
 }

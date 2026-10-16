@@ -52,6 +52,7 @@ import { Paginacion, usePorPagina } from '@/components/Paginacion';
 import { Ampliable } from '@/components/VisorImagen';
 import { useI18n } from '@/lib/i18n';
 import { Cargando } from '@/components/Cargando';
+import { Icono } from '@/components/Icono';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -346,10 +347,10 @@ export default function MiOrganizacionPage() {
   if (orgs.length === 0) {
     return (
       <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
-        <Link href="/dashboard" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          ← Dashboard
+        <Link href="/dashboard" className="btn btn-outline">
+          {t('perfil.misApps')}
         </Link>
-        <div className="card mt-4 p-8 text-center" style={{ color: 'var(--text-muted)' }}>
+        <div className="card mt-4 p-8 text-center text-muted">
           <p className="mb-2 font-bold">{t('org.sinOrganizacion')}</p>
           <p className="mb-4 text-sm">
             ¿Eres maestro? Funda tu propio club y adminístralo desde aquí.
@@ -400,19 +401,22 @@ export default function MiOrganizacionPage() {
           era justo lo que esta copia venía a resolver cuando la barra no
           existía. Con las dos puestas salían dos campanas a la vez en esta
           pantalla, una encima de la otra. Ver `BarraPortal`. */}
-      <div className="flex items-start justify-between gap-3">
-        <Link href="/dashboard" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          ← Dashboard
+      {/* La misma cabecera que el resto del portal (auditoría 003, nº 2): era
+          un título dorado en minúscula, otra gramática para el mismo nivel. */}
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="eyebrow mb-1">{soloClubes ? 'Gestión del club' : 'Gestión de la organización'}</p>
+          <h1 className="display text-3xl">{soloClubes ? 'Mi club' : 'Mi organización'}</h1>
+          <p className="mt-2 text-sm text-muted">
+            {soloClubes
+              ? 'Tu club agrega a sus maestros, coaches y alumnos, y llena su ficha. Los jueces los asigna la organización o federación.'
+              : 'La organización afilia clubes y agrega administradores y jueces; cada club agrega a sus maestros, coaches y alumnos.'}
+          </p>
+        </div>
+        <Link href="/dashboard" className="btn btn-outline shrink-0">
+          {t('perfil.misApps')}
         </Link>
-      </div>
-      <h1 className="mb-1 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-        {soloClubes ? 'Mi club' : 'Mi organización'}
-      </h1>
-      <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-        {soloClubes
-          ? 'Tu club agrega a sus maestros, coaches y alumnos, y llena su ficha. Los jueces los asigna la organización o federación.'
-          : 'La organización afilia clubes y agrega administradores y jueces; cada club agrega a sus maestros, coaches y alumnos.'}
-      </p>
+      </header>
 
       {/* Flotante, y no un párrafo aquí arriba. La lista de gente está dos
           pantallas más abajo, y desde ahí este renglón no se veía nunca: se
@@ -422,19 +426,18 @@ export default function MiOrganizacionPage() {
 
       {/* ── Invitaciones RECIBIDAS por mis clubes (aceptar / rechazar) ────── */}
       {recibidas.length > 0 && (
-        <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
+        <section className="card mb-5 p-5 border-gold">
           <h2 className="mb-2 text-lg font-semibold">Invitaciones para tu club</h2>
           <ul className="flex flex-col gap-2">
             {recibidas.map((inv) => (
               <li
                 key={inv.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: 'var(--border)' }}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm border-line"
               >
                 <span>
                   <strong>{inv.orgName}</strong>{' '}
                   <span className="badge ml-1">{TIPO[inv.orgType ?? ''] ?? inv.orgType}</span>{' '}
-                  <span style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-muted">
                     invita a tu club a afiliarse.
                   </span>
                 </span>
@@ -584,8 +587,9 @@ export default function MiOrganizacionPage() {
                           className="btn btn-outline"
                           style={{ color: 'var(--danger)' }}
                           title={t('org.eliminarClub')}
+                          aria-label={t('org.eliminarClub')}
                         >
-                          ✕
+                          <Icono nombre="cerrar" />
                         </button>
                       </li>
                     ))}
@@ -603,8 +607,7 @@ export default function MiOrganizacionPage() {
               pero tampoco se encuentra. */}
           {federaciones.length > 0 && !federacionActiva && (
             <p
-              className="mt-5 border-t pt-4 text-sm"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+              className="mt-5 border-t pt-4 text-sm border-line text-muted"
             >
               Para crear o afiliar clubes, elige arriba tu{' '}
               {federaciones.length === 1
@@ -615,14 +618,16 @@ export default function MiOrganizacionPage() {
           )}
 
           {federacionActiva && (
-            <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-              <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+            <div className="mt-5 border-t pt-4 border-line">
+              <h3 className="mb-2 text-sm font-semibold text-muted">
                 Nuevo club de {federacionActiva.name}
               </h3>
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="block text-sm sm:col-span-2">
-                  <span style={{ color: 'var(--text-muted)' }}>Nombre del club *</span>
+                  <span className="text-muted">Nombre del club *</span>
                   <input
+                    name="club"
+                    autoComplete="off"
                     className="mt-1"
                     maxLength={200}
                     value={nuevoClub.name}
@@ -659,33 +664,45 @@ export default function MiOrganizacionPage() {
               </button>
 
               {/* Invitar un club existente (el maestro acepta o rechaza) */}
-              <h3 className="mb-2 mt-5 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+              <h3 className="mb-2 mt-5 text-sm font-semibold text-muted">
                 {t('org.invitarClub')}
               </h3>
-              <div className="flex flex-wrap gap-2">
+              {/* Un `<form role="search">`: Enter busca (antes solo el botón)
+                  y el teclado del celular muestra «Buscar». */}
+              <form
+                role="search"
+                className="flex flex-wrap gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void buscarClubes();
+                }}
+              >
                 <input
+                  enterKeyHint="search"
+                  name="club"
+                  autoComplete="off"
+                  aria-label="Buscar club por nombre"
                   placeholder="Buscar club por nombre…"
                   maxLength={LIM.busqueda}
                   value={busquedaClub}
                   onChange={(e) => setBusquedaClub(e.target.value)}
                   className="min-w-0 flex-1"
                 />
-                <button onClick={() => void buscarClubes()} className="btn btn-outline">
+                <button type="submit" className="btn btn-outline">
                   Buscar
                 </button>
-              </div>
+              </form>
               {clubesEncontrados.length > 0 && (
                 <ul className="mt-2 flex flex-col gap-1.5">
                   {clubesEncontrados.map((c) => (
                     <li
                       key={c.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-sm"
-                      style={{ borderColor: 'var(--border)' }}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-sm border-line"
                     >
                       <span className="min-w-0 truncate">
                         <strong>{c.name}</strong>
                         {c.city && (
-                          <span style={{ color: 'var(--text-muted)' }}> · {c.city}</span>
+                          <span className="text-muted"> · {c.city}</span>
                         )}
                       </span>
                       <button
@@ -712,7 +729,7 @@ export default function MiOrganizacionPage() {
                 </ul>
               )}
               {enviadas.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                <ul className="mt-3 flex flex-col gap-1 text-xs text-muted">
                   {enviadas.map((inv) => (
                     <li key={inv.id}>
                       {inv.clubName}:{' '}
@@ -760,7 +777,7 @@ export default function MiOrganizacionPage() {
           {orgSel ? `Gente de ${orgSel.name}` : 'Miembros'}
         </h2>
         {orgSel && (
-          <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-3 text-xs text-muted">
             {esOrgGrande(orgSel.type)
               ? 'Quien ya está dentro. Aquí cambias su rol y editas su ficha; para sumar a alguien, invítalo desde «Entrada al club».'
               : 'Quien ya está dentro. Aquí cambias su rol y editas su ficha; para sumar a alguien, usa «Entrada al club»: tu código o una invitación.'}
@@ -769,6 +786,8 @@ export default function MiOrganizacionPage() {
         {/* Al escribir se vuelve a la página 1: buscar desde la 4 diría «sin
             miembros» con los resultados esperando en la 1. */}
         <input
+          name="buscar"
+          autoComplete="off"
           value={busquedaGente}
           maxLength={LIM.busqueda}
           onChange={(e) => {
@@ -887,7 +906,7 @@ export default function MiOrganizacionPage() {
                     {/* En pantalla estrecha solo el icono: «Perfil» son 44 px
                         que le hacen falta al nombre de al lado, y el `title` y
                         el `aria-label` siguen diciendo qué es. */}
-                    <span aria-hidden="true">✎</span>
+                    <Icono nombre="lapiz" />
                     <span className="ml-1 hidden @xs:inline">
                       {m.userId === yo ? 'Mi perfil' : 'Perfil'}
                     </span>
@@ -895,15 +914,9 @@ export default function MiOrganizacionPage() {
                       {m.userId === yo ? 'Editar mi perfil' : 'Editar perfil'}
                     </span>
                   </Link>
-                  {m.userId === yo ? (
-                    <span
-                      className="shrink-0 px-1 text-xs"
-                      style={{ color: 'var(--text-muted)' }}
-                      title={t('org.noTeSacas')}
-                    >
-                      {t('org.tu')}
-                    </span>
-                  ) : (
+                  {/* Tu fila no lleva ✕: el motivo lo dice la propia fila,
+                      debajo del correo (`FilaMiembro`). */}
+                  {m.userId === yo ? null : (
                   <button
                     onClick={() =>
                       void confirmarYHacer(
@@ -934,7 +947,7 @@ export default function MiOrganizacionPage() {
                     }}
                     title={`Quitar a ${m.fullName} del club`}
                   >
-                    <span aria-hidden="true">✕</span>
+                    <Icono nombre="cerrar" />
                     <span className="sr-only">{t('org.quitarDelClub')}</span>
                   </button>
                   )}
@@ -943,7 +956,7 @@ export default function MiOrganizacionPage() {
             />
           ))}
           {miembros.length === 0 && (
-            <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <li className="text-sm text-muted">
               {busquedaGente
                 ? `Nadie coincide con «${busquedaGente}».`
                 : 'Sin miembros todavía.'}
@@ -971,8 +984,7 @@ export default function MiOrganizacionPage() {
         {(sinAcceso > 0 || verSinAcceso) && (
           <button
             type="button"
-            className="mt-2 text-xs underline"
-            style={{ color: 'var(--text-muted)' }}
+            className="mt-2 text-xs underline text-muted"
             onClick={() => {
               setVerSinAcceso((v) => !v);
               setOffsetGente(0);
@@ -995,11 +1007,10 @@ export default function MiOrganizacionPage() {
             viene a mirar, y una segunda lista abierta debajo con los que ya
             no están la duplicaría. */}
         {bajas.length > 0 && (
-          <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
+          <div className="mt-4 border-t pt-3 border-line">
             <button
               type="button"
-              className="text-xs underline"
-              style={{ color: 'var(--text-muted)' }}
+              className="text-xs underline text-muted"
               onClick={() => setVerBajas((v) => !v)}
             >
               {verBajas
@@ -1012,20 +1023,19 @@ export default function MiOrganizacionPage() {
                 {bajas.map((b) => (
                   <li
                     key={b.userId}
-                    className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
-                    style={{ borderColor: 'var(--border)' }}
+                    className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between border-line"
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-2.5">
                       <Avatar src={b.avatarUrl} nombre={b.fullName} size={34} ampliable />
                       <div className="min-w-0" style={{ overflowWrap: 'anywhere' }}>
                         <p className="font-semibold">{b.fullName}</p>
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-xs text-muted">
                           {b.email}
                         </p>
                         {/* La fecha y el autor son la mitad del valor de esta
                             lista: «¿y éste por qué no está?» se contesta con
                             quién lo sacó y cuándo, no con un nombre suelto. */}
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-xs text-muted">
                           Era {nombreRol(b.role)} · salió el{' '}
                           {new Date(b.removedAt).toLocaleDateString()}
                           {b.removedByName ? ` · lo hizo ${b.removedByName}` : ''}
@@ -1073,8 +1083,9 @@ export default function MiOrganizacionPage() {
                         disabled={ocupado}
                         className="btn btn-outline btn-sm"
                         title={t('org.quitarBaja')}
+                        aria-label={t('org.quitarBaja')}
                       >
-                        ✕
+                        <Icono nombre="cerrar" />
                       </button>
                     </div>
                   </li>
@@ -1093,7 +1104,7 @@ export default function MiOrganizacionPage() {
       {orgSel && (
         <section className="card mt-5 p-5">
           <h2 className="mb-1 text-lg font-semibold">Ficha de {orgSel.name}</h2>
-          <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-4 text-xs text-muted">
             Esta información la ven todos los miembros en «Mi club»: escudo,
             sede, horarios, contacto y redes.
           </p>
@@ -1116,10 +1127,10 @@ export default function MiOrganizacionPage() {
               </Ampliable>
             ) : (
               <div
-                className="flex h-16 w-16 items-center justify-center rounded-xl text-2xl"
+                className="flex h-16 w-16 items-center justify-center rounded-xl text-muted"
                 style={{ background: 'var(--bg-elevated)', border: '2px dashed var(--border)' }}
               >
-                🛡
+                <Icono nombre="escudo" tamano={28} />
               </div>
             )}
             <label className="btn btn-outline btn-sm cursor-pointer">
@@ -1150,8 +1161,10 @@ export default function MiOrganizacionPage() {
 
           <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>{t('org.direccion')}</span>
+              <span className="text-muted">{t('org.direccion')}</span>
               <input
+                name="direccion"
+                autoComplete="off"
                 className="mt-1"
                 value={ficha.address}
                 maxLength={LIM.direccion}
@@ -1159,8 +1172,10 @@ export default function MiOrganizacionPage() {
               />
             </label>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>{t('org.telefonoDigitos')}</span>
+              <span className="text-muted">{t('org.telefonoDigitos')}</span>
               <input
+                name="telefono"
+                autoComplete="off"
                 className="mt-1"
                 type="tel"
                 inputMode="tel"
@@ -1178,8 +1193,10 @@ export default function MiOrganizacionPage() {
               onChange={(country, city) => setFicha({ ...ficha, country, city })}
             />
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>{t('org.correoContacto')}</span>
+              <span className="text-muted">{t('org.correoContacto')}</span>
               <input
+                name="correo"
+                autoComplete="off"
                 className="mt-1"
                 {...PROPS_CORREO}
                 value={ficha.email}
@@ -1187,8 +1204,10 @@ export default function MiOrganizacionPage() {
               />
             </label>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Red social (enlace)</span>
+              <span className="text-muted">Red social (enlace)</span>
               <input
+                name="red1"
+                autoComplete="off"
                 className="mt-1"
                 type="url"
                 value={ficha.red1}
@@ -1198,8 +1217,10 @@ export default function MiOrganizacionPage() {
               />
             </label>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Otra red social (enlace)</span>
+              <span className="text-muted">Otra red social (enlace)</span>
               <input
+                name="red2"
+                autoComplete="off"
                 className="mt-1"
                 type="url"
                 value={ficha.red2}
@@ -1212,8 +1233,10 @@ export default function MiOrganizacionPage() {
 
           <div className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Horarios de clase</span>
+              <span className="text-muted">Horarios de clase</span>
               <textarea
+                name="horarios"
+                autoComplete="off"
                 className="mt-1"
                 rows={3}
                 value={ficha.schedule}
@@ -1223,8 +1246,10 @@ export default function MiOrganizacionPage() {
               />
             </label>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Descripción</span>
+              <span className="text-muted">Descripción</span>
               <textarea
+                name="descripcion"
+                autoComplete="off"
                 className="mt-1"
                 rows={3}
                 value={ficha.description}
@@ -1251,7 +1276,7 @@ export default function MiOrganizacionPage() {
             />
             <span>
               {t('org.enDirectorio')}
-              <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span className="block text-xs text-muted">
                 Se publican el nombre, la ciudad, el contacto y el escudo. Tus
                 alumnos no aparecen nunca.
               </span>

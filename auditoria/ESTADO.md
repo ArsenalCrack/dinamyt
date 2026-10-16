@@ -9,12 +9,16 @@
 
 ## Siguiente paso
 
-**Fase 1, auditar Membresías** con las tres skills (antislop en modo «after»,
-`web-design-guidelines`, `redesign-existing-projects`), en su repositorio
-`dinamyt-membresias`, sobre sus 36 capturas. Después Campeonatos (ya se sabe
-que bloquea el zoom: 002, «Visto de paso») y Academy. El portal y los estilos
-compartidos ya están (001, 002, 003); sus números los elige el dueño al cerrar
-la fase 1, o antes si quiere.
+**El dueño lanza thermos** sobre la rama del portal, con esta línea:
+
+> `/thermos revisa la rama feat/diseno-portal del repo dinamyt contra main`
+
+Después: lo de «antes de fusionar», fusionar, desplegar el portal
+(`OPERAR.md` §2.3) y seguir con **Membresías** (auditar con las tres skills en
+`dinamyt-membresias`, sobre sus 36 capturas; corregir en una rama; repartir
+ahí los estilos compartidos nuevos). Luego Campeonatos (bloquea el zoom: 002,
+«Visto de paso»; y es la otra web que usa el globo flotante `.pubctl`) y
+Academy.
 
 ## Cómo retomar en una sesión nueva
 
@@ -29,6 +33,13 @@ la fase 1, o antes si quiere.
    encuentra `node`.
 4. Al terminar un paso: su celda y «Siguiente paso». Si deja una regla, va a
    `DESIGN.md` (o a `OPERAR.md` si es de operación), no aquí.
+5. **Un cambio que no debe verse** (pasar estilos a clases, mover código) se
+   comprueba con capturas antes y después y
+   `py -3.12 auditoria/herramientas/comparar.py <app> <fase-a> <fase-b>`:
+   lo que salga distinto es un fallo (el reloj y la versión del pie cambian
+   solos). **Ojo con Turbopack**: guarda el CSS de Tailwind según el contenido
+   de `globals.css`, y tras editar muchos `.tsx` puede servir clases viejas;
+   un cambio de contenido en `globals.css` lo obliga a reconstruirlo.
 
 ## Lo que decidió el dueño (15 oct 2026)
 
@@ -73,14 +84,16 @@ en su inspector esas reglas van con `--allow`. Tampoco se toman de
 
 | Pieza | Capturas antes | antislop | Guías | Diseño | Correcciones | thermos | Capturas después | Desplegado |
 |---|---|---|---|---|---|---|---|---|
-| Estilos compartidos (`packages/shared/estilos.css`, las cuatro webs) | ✓ (son las de las webs) | (dentro de la 001) | ✓ 002 | ✓ 003 | — | — | — | — |
-| Portal | ✓ 80 | ✓ 001 (bajas 11–17 sin hacer) | ✓ 002 | ✓ 003 | — | — | — | — |
+| Estilos compartidos (`packages/shared/estilos.css`, las cuatro webs) | ✓ (son las de las webs) | (dentro de la 001) | ✓ 002 | ✓ 003 | ✓ en el monorepo (`feat/diseno-portal`); **falta repartirlos** a Membresías y Campeonatos, en la pasada de cada una | — | — | — |
+| Portal | ✓ 80 | ✓ 001 | ✓ 002 | ✓ 003 | ✓ todo: 001 nº 11–17, 002 nº 1–15, 003 nº 1–20 (`feat/diseno-portal`) | — (el dueño) | ✓ 88, comparadas | — |
 | Membresías | ✓ 36 | — | — | — | — | — | — | — |
 | Campeonatos | ◐ 76 (falta el tatami en combate) | — | — | — | — | — | — | — |
 | Academy (sin montar en la VPS) | ◐ 48 (faltan las tres de detalle) | — | — | — | — | — | — | no aplica |
 | `/ayuda` (nueva, en el portal) | no aplica | — | — | — | — | — | — | — |
 
-`DESIGN.md`: — (va entre la fase 1 y la 3).
+`DESIGN.md`: ✓ escrito el 16 oct, en la raíz, con lo decidido y lo que dejaron
+las auditorías 001–003. Se amplía con lo que salga de Membresías, Campeonatos y
+Academy.
 
 ## Las fases
 
@@ -88,7 +101,7 @@ en su inspector esas reglas van con `--allow`. Tampoco se toman de
 |---|---|---|
 | **0 · Preparar** ✓ | Skills instaladas, grafo al día, este archivo, `launch.json` ordenado y 240 capturas «antes» (16 oct). Lo que faltó, en «Huecos de las capturas» | Hecho |
 | **1 · Auditar** | Las tres auditorías de cada app, sin tocar código. El dueño elige qué números se corrigen (o «altas y medias», como en la 001) | Un informe por app y skill en esta carpeta |
-| **2 · `DESIGN.md`** | Lo decidido en `estilos.css` y en las notas (los tres oros, dónde van mayúsculas, el tatami aparte, el color en modo claro) más lo que salga de la fase 1. El dueño lo aprueba | `DESIGN.md` en la raíz, enlazado desde `README.md` |
+| **2 · `DESIGN.md`** ✓ | Lo decidido en `estilos.css` y en las notas (los tres oros, dónde van mayúsculas, el tatami aparte, el color en modo claro) más lo que salió de la fase 1 | Hecho; enlazado desde `README.md` |
 | **3 · Corregir** | Primero los estilos compartidos (`repartir-estilos.ps1`), luego portal, Membresías, Campeonatos y Academy, una rama cada una: cambios → capturas «después» → thermos → fusionar → desplegar (`OPERAR.md` Parte 2; nunca durante un campeonato) | Cada fila de la tabla en ✓ |
 | **4 · `/ayuda`** | La página de los videos, con el diseño ya hecho | En línea con los videos que estén listos |
 | **5 · Traducir** | La tarea 7 de la hoja de ruta, entera | Con «English» no queda texto en español en pantallas, correos, avisos ni impresos |

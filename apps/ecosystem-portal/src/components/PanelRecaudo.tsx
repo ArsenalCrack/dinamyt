@@ -8,6 +8,7 @@ import {
   type ResumenSuscripciones,
 } from '@/lib/api';
 import { dinero } from '@/lib/formato';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * **Cuánto entró, cuánto falta y cómo están los clubes.**
@@ -127,7 +128,7 @@ export function PanelRecaudo() {
   if (cargando && !datos) {
     return (
       <section className="card mb-5 p-5">
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm text-muted">
           Cargando el resumen…
         </p>
       </section>
@@ -178,11 +179,11 @@ export function PanelRecaudo() {
               veían igual, así que no había forma de saber qué producto
               sostiene el negocio. Las cifras por app cuentan la herencia: un
               club afiliado abre con el plan de su federación. */}
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm text-muted">
             {clubes.total} club{clubes.total === 1 ? '' : 'es'} ·{' '}
             {personas.total} cuenta{personas.total === 1 ? '' : 's'}
             {personas.nuevasEsteMes > 0 && (
-              <span style={{ color: 'var(--ok)' }}>
+              <span className="text-ok">
                 {' '}
                 (+{personas.nuevasEsteMes} este mes)
               </span>
@@ -213,8 +214,7 @@ export function PanelRecaudo() {
             ‹
           </button>
           <span
-            className="min-w-[9.5rem] text-center text-sm font-semibold"
-            style={{ color: 'var(--gold)' }}
+            className="min-w-[9.5rem] text-center text-sm font-semibold text-gold"
           >
             {mesLargo(datos.mes)}
           </span>
@@ -278,7 +278,7 @@ export function PanelRecaudo() {
 
       {/* ── El gráfico ─────────────────────────────────────────────────── */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+        <h3 className="text-sm font-semibold text-muted">
           Últimos {d.porMes.length} meses
         </h3>
         {/* Con dos series la leyenda va siempre: la identidad no puede
@@ -291,8 +291,7 @@ export function PanelRecaudo() {
 
       {!hayDinero ? (
         <p
-          className="rounded-lg border border-dashed px-3 py-6 text-center text-sm"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+          className="rounded-lg border border-dashed px-3 py-6 text-center text-sm border-line text-muted"
         >
           Todavía no hay ningún pago registrado. Aparecerán aquí en cuanto
           renueves la primera suscripción.
@@ -430,7 +429,7 @@ export function PanelRecaudo() {
                 <Punto color="var(--serie-2)" /> Devengado{' '}
                 <b>{dinero(detalle.devengado)}</b>
               </p>
-              <p style={{ color: 'var(--text-muted)' }}>
+              <p className="text-muted">
                 {detalle.pagos} pago{detalle.pagos === 1 ? '' : 's'}
               </p>
             </div>
@@ -442,13 +441,13 @@ export function PanelRecaudo() {
           de llegar a un dato. */}
       {hayDinero && (
         <details className="mt-3 text-xs">
-          <summary className="cursor-pointer" style={{ color: 'var(--gold-dim)' }}>
+          <summary className="cursor-pointer text-gold-dim">
             Ver los números
           </summary>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-xs" style={{ minWidth: '26rem' }}>
               <thead>
-                <tr style={{ color: 'var(--text-muted)' }}>
+                <tr className="text-muted">
                   <th className="py-1 pr-3 text-left font-medium">Mes</th>
                   <th className="py-1 pr-3 text-right font-medium">Recaudado</th>
                   <th className="py-1 pr-3 text-right font-medium">Devengado</th>
@@ -473,7 +472,7 @@ export function PanelRecaudo() {
       {/* ── Estado de los clubes · cómo pagaron ────────────────────────── */}
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <div>
-          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <h3 className="mb-2 text-sm font-semibold text-muted">
             Cómo están los clubes
           </h3>
           <ul className="flex flex-col gap-1.5">
@@ -488,7 +487,7 @@ export function PanelRecaudo() {
                   <span className="flex min-w-0 items-center gap-2">
                     <Punto color={e.color} />
                     <span className="truncate">{e.etiqueta}</span>
-                    <span className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <span className="truncate text-xs text-muted">
                       · {e.nota}
                     </span>
                   </span>
@@ -500,11 +499,11 @@ export function PanelRecaudo() {
         </div>
 
         <div>
-          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <h3 className="mb-2 text-sm font-semibold text-muted">
             Cómo pagaron en {mesLargo(datos.mes)}
           </h3>
           {d.porMetodo.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm text-muted">
               Sin pagos este mes.
             </p>
           ) : (
@@ -512,12 +511,11 @@ export function PanelRecaudo() {
               {d.porMetodo.map((m) => (
                 <li
                   key={m.metodo}
-                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: 'var(--border)' }}
+                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm border-line"
                 >
                   <span className="truncate">
                     {nombreMetodo(m.metodo)}
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <span className="text-xs text-muted">
                       {' '}
                       · {m.pagos} pago{m.pagos === 1 ? '' : 's'}
                     </span>
@@ -533,11 +531,11 @@ export function PanelRecaudo() {
       {/* ── Por plan · quién debe ──────────────────────────────────────── */}
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <div>
-          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <h3 className="mb-2 text-sm font-semibold text-muted">
             Por plan
           </h3>
           {porPlan.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm text-muted">
               Ningún club tiene suscripción todavía.
             </p>
           ) : (
@@ -545,12 +543,11 @@ export function PanelRecaudo() {
               {porPlan.map((p) => (
                 <li
                   key={p.planId}
-                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: 'var(--border)' }}
+                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm border-line"
                 >
                   <span className="min-w-0 truncate">
                     {p.name}
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <span className="text-xs text-muted">
                       {' '}
                       · {p.clubes} club{p.clubes === 1 ? '' : 'es'}
                     </span>
@@ -563,11 +560,11 @@ export function PanelRecaudo() {
         </div>
 
         <div>
-          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <h3 className="mb-2 text-sm font-semibold text-muted">
             Quién debe
           </h3>
           {porCobrar.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--ok)' }}>
+            <p className="text-sm text-ok">
               Nadie. Todo lo facturado está cobrado.
             </p>
           ) : (
@@ -583,12 +580,12 @@ export function PanelRecaudo() {
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-semibold">{c.orgName}</span>
-                    <span className="block truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <span className="block truncate text-xs text-muted">
                       {c.planName}
                       {c.venceEl ? ` · hasta ${c.venceEl}` : ''}
                     </span>
                   </span>
-                  <b className="shrink-0" style={{ color: 'var(--danger)' }}>
+                  <b className="shrink-0 text-danger">
                     {dinero(c.debe)}
                   </b>
                 </li>
@@ -598,7 +595,7 @@ export function PanelRecaudo() {
         </div>
       </div>
 
-      {error && <p className="msg-error mt-3 text-sm">{error}</p>}
+      <MensajeVivo tono="error" texto={error} className="mt-3 text-sm" />
     </section>
   );
 }
@@ -617,10 +614,9 @@ function Cifra({
 }) {
   return (
     <div
-      className="rounded-lg border px-3 py-3"
-      style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}
+      className="rounded-lg border px-3 py-3 border-line bg-elevated"
     >
-      <p className="eyebrow mb-1" style={{ color: 'var(--text-muted)' }}>
+      <p className="eyebrow mb-1 text-muted">
         {titulo}
       </p>
       {/* La cifra en mono tabular: así los miles no bailan de una tarjeta a
@@ -631,7 +627,7 @@ function Cifra({
       >
         {valor}
       </p>
-      <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-0.5 text-xs text-muted">
         {nota}
       </p>
     </div>
@@ -656,7 +652,7 @@ function Punto({ color }: { color: string }) {
 
 function Leyenda({ color, texto }: { color: string; texto: string }) {
   return (
-    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+    <span className="flex items-center gap-1.5 text-muted">
       <Punto color={color} />
       {texto}
     </span>

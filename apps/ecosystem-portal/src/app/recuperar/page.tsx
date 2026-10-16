@@ -20,6 +20,7 @@ import { Campo } from '@/components/Campo';
 import { CabeceraAuth } from '@/components/CabeceraAuth';
 import { useI18n } from '@/lib/i18n';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * Recuperar la contraseña.
@@ -140,7 +141,7 @@ function Recuperar() {
         {paso === 'correo' && (
           <form onSubmit={pedirCodigo} noValidate>
             <h1 className="display eco-login-titulo">{t('login.olvidada2')}</h1>
-            <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="mb-5 text-sm text-muted">
               Escribe el correo de tu cuenta y te enviamos un código de{' '}
               {CODIGO_DIGITOS} dígitos para elegir una nueva.
             </p>
@@ -161,17 +162,13 @@ function Recuperar() {
               />
             </Campo>
 
-            {error && (
-              <p className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>
-                {error}
-              </p>
-            )}
+            <MensajeVivo tono="error" texto={error} className="mb-3 text-sm" />
 
             <button type="submit" disabled={cargando} className="btn btn-cta w-full">
               {cargando ? 'Enviando…' : 'Enviarme el código'}
             </button>
-            <p className="mt-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-              <Link href="/login" style={{ color: 'var(--gold)' }}>
+            <p className="mt-4 text-center text-sm text-muted">
+              <Link href="/login" className="text-gold">
                 {t('recuperar.volverAlLogin')}
               </Link>
             </p>
@@ -181,8 +178,8 @@ function Recuperar() {
         {paso === 'codigo' && (
           <form onSubmit={cambiar} noValidate>
             <h1 className="display eco-login-titulo">{t('recuperar.nuevaContrasena')}</h1>
-            <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-              Si <b style={{ color: 'var(--text)' }}>{email}</b> tiene una cuenta
+            <p className="mb-4 text-sm text-muted">
+              Si <b className="text-ink">{email}</b> tiene una cuenta
               de DINAMYT, ahí está el código. Vence en 10 minutos.
             </p>
 
@@ -215,8 +212,11 @@ function Recuperar() {
                     : null
                 }
                 ok={repetida && coinciden && claveValida.ok ? 'Coinciden.' : null}
+                htmlFor="rec-repetida"
               >
                 <CampoContrasena
+                  id="rec-repetida"
+                  name="repetida"
                   value={repetida}
                   onChange={(e) => setRepetida(e.target.value)}
                   onBlur={() => setTocado((t) => ({ ...t, repetida: true }))}
@@ -225,13 +225,9 @@ function Recuperar() {
               </Campo>
             </div>
 
-            {error && (
-              <p className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>
-                {error}
-              </p>
-            )}
+            <MensajeVivo tono="error" texto={error} className="mb-3 text-sm" />
             {aviso && !error && (
-              <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <p className="mb-3 text-xs text-muted">
                 {aviso}
               </p>
             )}
@@ -250,12 +246,11 @@ function Recuperar() {
             </button>
 
             {/* Retroceder un paso SIN tocar el historial del navegador. */}
-            <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-4 text-center text-xs text-muted">
               ¿Ese no es tu correo?{' '}
               <button
                 type="button"
-                className="underline"
-                style={{ color: 'var(--gold)' }}
+                className="underline text-gold"
                 onClick={() => {
                   setPaso('correo');
                   setCode('');
@@ -272,7 +267,7 @@ function Recuperar() {
         {paso === 'listo' && (
           <div>
             <h1 className="display eco-login-titulo">Listo</h1>
-            <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="mb-5 text-sm text-muted">
               Tu contraseña quedó cambiada. Con ella entras a todo DINAMYT:
               Membresías, Campeonatos y Academy.
             </p>

@@ -89,13 +89,13 @@ export function AvisoBorradoPendiente() {
         {pendiente?.enCurso ? (
           <p className="text-sm">
             {t('borrar.enCursoA')}
-            <strong style={{ color: 'var(--danger)' }}>{fecha}</strong>
+            <strong className="text-danger">{fecha}</strong>
             {t('borrar.enCursoB')}
           </p>
         ) : pendiente ? (
           <>
             <p className="text-sm">
-              <strong style={{ color: 'var(--danger)' }}>
+              <strong className="text-danger">
                 {t('borrar.pendienteA')}
                 {fecha}
               </strong>

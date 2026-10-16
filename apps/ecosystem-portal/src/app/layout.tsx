@@ -4,8 +4,8 @@ import './globals.css';
 import { AplicarApariencia } from '@/components/AplicarApariencia';
 import { AvisoBorradoPendiente } from '@/components/AvisoBorradoPendiente';
 import { BarraPortal } from '@/components/BarraPortal';
-import { ControlesApariencia } from '@/components/ControlesApariencia';
 import { PieDePagina } from '@/components/PieDePagina';
+import { SaltarAlContenido } from '@/components/SaltarAlContenido';
 import { RegistrarServiceWorker } from '@/components/RegistrarServiceWorker';
 import { VigilanteDeSesion } from '@/components/VigilanteDeSesion';
 import { I18nProvider } from '@/lib/i18n';
@@ -87,14 +87,24 @@ export const metadata: Metadata = {
     title: 'DINAMYT · El ecosistema digital del Hapkido',
     description:
       'Una sola cuenta para el club y el campeonato: mensualidades y asistencia, y torneos con puntuación en vivo desde el tatami.',
-    images: [{ url: '/icon-512.png', width: 512, height: 512, alt: 'DINAMYT' }],
+    // La tarjeta de 1200 × 630 con el titular de la portada: con el ícono
+    // cuadrado, WhatsApp enseñaba solo el escudo (auditoría 003, nº 17). La
+    // dibuja `auditoria/herramientas/og-imagen.mjs`.
+    images: [
+      {
+        url: '/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'DINAMYT: se acabó el cuaderno del club. Mensualidades, asistencia y campeonatos en un solo sitio.',
+      },
+    ],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'DINAMYT · El ecosistema digital del Hapkido',
     description:
       'Una sola cuenta para el club y el campeonato: mensualidades, asistencia y torneos en vivo.',
-    images: ['/icon-512.png'],
+    images: ['/og.png'],
   },
   /** Que los buscadores puedan entrar. Lo fino lo decide `robots.ts`. */
   robots: { index: true, follow: true },
@@ -178,6 +188,10 @@ export default function RootLayout({
       </head>
       <body>
         <I18nProvider>
+          {/* Lo primero que alcanza el tabulador: sin esto, con teclado cada
+              pantalla obliga a recorrer la barra entera antes de llegar a lo
+              que se vino a hacer (auditoría 003, nº 18). Ver `.saltar`. */}
+          <SaltarAlContenido />
           {/* El tema y el idioma, en TODAS las pantallas. Estaba solo en el
               perfil, que es la razón de que cambiarlos en Membresías no se
               notara aquí hasta entrar justo ahí. Ver el componente. */}
@@ -195,11 +209,9 @@ export default function RootLayout({
           {/* «Tu cuenta se borrará el…»: en todas las pantallas mientras dure el
               plazo, antes de cualquier otra cosa. Ver el componente. */}
           <AvisoBorradoPendiente />
-          <div className="pagina">{children}</div>
-          {/* El globo de tema e idioma, solo donde NO hay navegación: la
-              portada, el login, el registro. Dentro ya está el botón de
-              Configuración en la cabecera. Ver el componente. */}
-          <ControlesApariencia />
+          <div className="pagina" id="contenido" tabIndex={-1}>
+            {children}
+          </div>
           {/* El pie va aquí por el mismo motivo que el reloj: para que salga
               en todas las pantallas. La de soporte tiene que verse sobre todo
               en login y registro, donde no hay menú al que ir. */}

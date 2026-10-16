@@ -20,6 +20,7 @@ import { Avatar } from '@/components/Avatar';
 import { CampoFecha } from '@/components/CampoFecha';
 import { SelectMenu } from '@/components/SelectMenu';
 import { useI18n } from '@/lib/i18n';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 interface PerfilMiembro {
   id: string;
@@ -227,7 +228,7 @@ export default function EditarMiembroPage() {
   if (!perfil) {
     return (
       <main className="mx-auto min-h-screen max-w-2xl px-6 py-10">
-        <Link href="/mi-organizacion" className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        <Link href="/mi-organizacion" className="text-sm text-muted">
           ← Mi organización
         </Link>
         <p className="mt-4" style={{ color: error ? 'var(--danger)' : 'var(--text-muted)' }}>
@@ -239,7 +240,7 @@ export default function EditarMiembroPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-4 py-10 sm:px-6">
-      <Link href="/mi-organizacion" className="text-sm" style={{ color: 'var(--text-muted)' }}>
+      <Link href="/mi-organizacion" className="text-sm text-muted">
         ← Mi organización
       </Link>
 
@@ -247,10 +248,10 @@ export default function EditarMiembroPage() {
         <Avatar src={perfil.avatarUrl} nombre={perfil.fullName} size={72} ampliable />
         <div className="min-w-0 flex-1">
           <p className="eyebrow mb-1">{t('miembro.edicionStaff')}</p>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--gold)' }}>
+          <h1 className="text-2xl font-bold text-gold">
             {perfil.fullName}
           </h1>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm text-muted">
             {perfil.email} · Documento {perfil.documentId}
           </p>
           {/* La foto, aquí y no dentro del formulario: se guarda sola al
@@ -291,7 +292,7 @@ export default function EditarMiembroPage() {
       </header>
 
       <form onSubmit={guardar} className="card flex flex-col gap-4 p-5">
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm text-muted">
           Como maestro/administrador puedes corregir aquí lo que la persona no
           puede tocar por su cuenta: su nombre, su fecha de nacimiento, su tipo
           de sangre y su cinturón.
@@ -299,8 +300,10 @@ export default function EditarMiembroPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Nombre completo</span>
+            <span className="text-muted">Nombre completo</span>
             <input
+              name="nombre"
+              autoComplete="off"
               className="mt-1"
               value={form.fullName}
               maxLength={LIM.nombrePersona}
@@ -311,7 +314,7 @@ export default function EditarMiembroPage() {
             />
           </label>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.nacimiento')}</span>
+            <span className="text-muted">{t('miembro.nacimiento')}</span>
             <div className="mt-1">
               <CampoFecha
                 valor={form.birthDate}
@@ -329,7 +332,7 @@ export default function EditarMiembroPage() {
               navegador, y en Android con su propia hoja a pantalla completa—
               dentro de una ficha que no es nada de eso. */}
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.genero')}</span>
+            <span className="text-muted">{t('miembro.genero')}</span>
             {/* Aquí SÍ se puede corregir: es el maestro. En el perfil de la
                 persona el campo se cierra una vez puesto. */}
             <div className="mt-1">
@@ -346,7 +349,7 @@ export default function EditarMiembroPage() {
             </div>
           </div>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.tipoSangre')}</span>
+            <span className="text-muted">{t('miembro.tipoSangre')}</span>
             <div className="mt-1">
               <SelectMenu
                 valor={form.bloodType}
@@ -358,7 +361,7 @@ export default function EditarMiembroPage() {
             </div>
           </div>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.cinturonPromocion')}</span>
+            <span className="text-muted">{t('miembro.cinturonPromocion')}</span>
             <div className="mt-1">
               {/* El grado que ya lleva la persona va SIEMPRE en la lista,
                   aunque no esté en el catálogo: un desplegable cuyo valor no
@@ -379,8 +382,10 @@ export default function EditarMiembroPage() {
             </div>
           </div>
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('miembro.telefono')}</span>
+            <span className="text-muted">{t('miembro.telefono')}</span>
             <input
+              name="telefono"
+              autoComplete="off"
               className="mt-1"
               type="tel"
               inputMode="tel"
@@ -396,7 +401,7 @@ export default function EditarMiembroPage() {
               es de esta semana. Membresías la imprime en el carnet; la recibe
               del portal como la foto y el grado. */}
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Entrena desde</span>
+            <span className="text-muted">Entrena desde</span>
             <div className="mt-1">
               <CampoFecha
                 valor={desde}
@@ -412,8 +417,10 @@ export default function EditarMiembroPage() {
         <h2 className="mt-2 text-lg font-semibold">{t('miembro.emergencia')}</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Nombre</span>
+            <span className="text-muted">Nombre</span>
             <input
+              name="emergencia-nombre"
+              autoComplete="off"
               className="mt-1"
               value={form.emergencyContactName}
               maxLength={LIM.nombrePersona}
@@ -423,8 +430,10 @@ export default function EditarMiembroPage() {
             />
           </label>
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Teléfono</span>
+            <span className="text-muted">Teléfono</span>
             <input
+              name="emergencia-telefono"
+              autoComplete="off"
               className="mt-1"
               type="tel"
               inputMode="tel"
@@ -436,7 +445,7 @@ export default function EditarMiembroPage() {
             />
           </label>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>Parentesco</span>
+            <span className="text-muted">Parentesco</span>
             <div className="mt-1">
               <SelectMenu
                 valor={form.emergencyContactRelationship}
@@ -452,10 +461,12 @@ export default function EditarMiembroPage() {
         </div>
 
         <label className="block text-sm">
-          <span style={{ color: 'var(--text-muted)' }}>
+          <span className="text-muted">
             {t('miembro.notasMedicas')}
           </span>
           <textarea
+            name="notas-medicas"
+            autoComplete="off"
             className="mt-1"
             rows={3}
             value={form.medicalNotes}
@@ -464,8 +475,8 @@ export default function EditarMiembroPage() {
           />
         </label>
 
-        {error && <p className="msg-error text-sm">{error}</p>}
-        {ok && <p className="msg-ok text-sm">{ok}</p>}
+        <MensajeVivo tono="error" texto={error} className="text-sm" />
+        <MensajeVivo tono="ok" texto={ok} className="text-sm" />
         <button type="submit" disabled={guardando} className="btn btn-gold self-start">
           {guardando ? 'Guardando…' : 'Guardar cambios'}
         </button>

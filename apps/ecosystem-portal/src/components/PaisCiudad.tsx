@@ -50,7 +50,7 @@ export function PaisCiudad({
           panel se abra hacia arriba cuando no cabe abajo, que es lo que este
           hace y el nativo de Android no. */}
       <div className="block text-sm">
-        <span style={{ color: 'var(--text-muted)' }}>País{requerido ? ' *' : ''}</span>
+        <span className="text-muted">País{requerido ? ' *' : ''}</span>
         <div className="mt-1">
           <SelectMenu
             valor={pais}
@@ -74,11 +74,14 @@ export function PaisCiudad({
       </div>
 
       <div className="block text-sm">
-        <span style={{ color: 'var(--text-muted)' }}>Ciudad</span>
+        <span className="text-muted">Ciudad</span>
         {aMano ? (
           <div className="mt-1 flex gap-2">
             <input
               className="min-w-0 flex-1"
+              aria-label="Ciudad"
+              name="ciudad"
+              autoComplete="off"
               value={ciudad}
               maxLength={LIM.ciudad}
               placeholder={t('geo.escribeCiudad')}
@@ -93,6 +96,7 @@ export function PaisCiudad({
                 onChange(pais, '');
               }}
               title={t('geo.volverLista')}
+              aria-label={t('geo.volverLista')}
             >
               ↺
             </button>

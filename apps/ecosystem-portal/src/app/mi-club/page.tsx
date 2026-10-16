@@ -20,6 +20,9 @@ import { PaisCiudad } from '@/components/PaisCiudad';
 import { Ampliable } from '@/components/VisorImagen';
 import { useI18n } from '@/lib/i18n';
 import { Cargando } from '@/components/Cargando';
+import { Icono } from '@/components/Icono';
+import { MensajeVivo } from '@/components/MensajeVivo';
+import { iniciales } from '@/lib/iniciales';
 
 const TIPO: Record<string, string> = {
   FEDERATION: 'Federación',
@@ -133,7 +136,9 @@ export default function MiClubPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-4 py-10 sm:px-6">
+    <main
+      className={`mx-auto min-h-screen max-w-2xl px-4 py-10 sm:px-6 ${clubes.length > 1 ? 'lg:max-w-5xl' : ''}`}
+    >
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="eyebrow mb-1">Tu casa deportiva</p>
@@ -144,11 +149,11 @@ export default function MiClubPage() {
         </Link>
       </header>
 
-      {error && <p className="msg-error mb-4 text-sm">{error}</p>}
+      <MensajeVivo tono="error" texto={error} className="mb-4 text-sm" />
 
       {clubes.length === 0 && (
         <>
-          <div className="card p-8 text-center" style={{ color: 'var(--text-muted)' }}>
+          <div className="card p-8 text-center text-muted">
             <p className="mb-2 font-bold">{t('club.sinClub')}</p>
             <p className="text-sm">
               Pide a tu maestro que te agregue con tu correo, o si eres maestro,
@@ -160,7 +165,7 @@ export default function MiClubPage() {
               puede invitarlo a afiliarse) */}
           <form onSubmit={fundarClub} className="card mt-4 flex flex-col gap-3 p-5">
             <h2 className="text-lg font-semibold">Fundar mi club</h2>
-            <p className="-mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="-mt-1 text-sm text-muted">
               Quedas como maestro del club: podrás agregar a tus alumnos y
               coaches, llenar su información y aceptar la invitación de una
               federación o liga.
@@ -180,10 +185,10 @@ export default function MiClubPage() {
                 </Ampliable>
               ) : (
                 <div
-                  className="flex h-20 w-20 items-center justify-center rounded-xl text-3xl"
+                  className="flex h-20 w-20 items-center justify-center rounded-xl text-muted"
                   style={{ background: 'var(--bg-elevated)', border: '2px dashed var(--border)' }}
                 >
-                  🛡
+                  <Icono nombre="escudo" tamano={34} />
                 </div>
               )}
               <div className="flex flex-col gap-2">
@@ -215,8 +220,10 @@ export default function MiClubPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>{t('club.nombre')}</span>
+                <span className="text-muted">{t('club.nombre')}</span>
                 <input
+                  name="club"
+                  autoComplete="organization"
                   className="mt-1"
                   value={nuevo.name}
                   onChange={(e) => setNuevo({ ...nuevo, name: e.target.value })}
@@ -225,8 +232,10 @@ export default function MiClubPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>{t('club.telefonoContacto')}</span>
+                <span className="text-muted">{t('club.telefonoContacto')}</span>
                 <input
+                  name="telefono"
+                  autoComplete="tel"
                   className="mt-1"
                   type="tel"
                   inputMode="tel"
@@ -246,8 +255,10 @@ export default function MiClubPage() {
                 onChange={(country, city) => setNuevo({ ...nuevo, country, city })}
               />
               <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>Red social (enlace)</span>
+                <span className="text-muted">Red social (enlace)</span>
                 <input
+                  name="red1"
+                  autoComplete="url"
                   className="mt-1"
                   type="url"
                   value={nuevo.red1}
@@ -257,8 +268,10 @@ export default function MiClubPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>Otra red social (enlace)</span>
+                <span className="text-muted">Otra red social (enlace)</span>
                 <input
+                  name="red2"
+                  autoComplete="url"
                   className="mt-1"
                   type="url"
                   value={nuevo.red2}
@@ -269,8 +282,10 @@ export default function MiClubPage() {
               </label>
             </div>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>{t('club.descripcion')}</span>
+              <span className="text-muted">{t('club.descripcion')}</span>
               <textarea
+                name="descripcion"
+                autoComplete="off"
                 className="mt-1"
                 rows={2}
                 value={nuevo.description}
@@ -279,7 +294,7 @@ export default function MiClubPage() {
                 placeholder={t('club.descripcionPh')}
               />
             </label>
-            {msg && <p className="text-sm" style={{ color: 'var(--gold)' }}>{msg}</p>}
+            <MensajeVivo tono="info" texto={msg} className="text-sm text-gold" />
             <button
               type="submit"
               disabled={creando || !nuevo.name.trim()}
@@ -294,12 +309,14 @@ export default function MiClubPage() {
       {/* `p-0` a proposito: la cabecera de estas tarjetas va a ras del borde,
           con su propio fondo. Desde que `.card` trae relleno por defecto, sin
           esto quedaria un marco de 1rem alrededor de esa franja de color. */}
+      {/* En escritorio, los clubes lado a lado (003, nº 7). Con uno solo la
+          pantalla se queda en una columna, como el resto de lo de una tarea. */}
+      <div className={`grid gap-4 ${clubes.length > 1 ? 'lg:grid-cols-2 lg:items-start' : ''}`}>
       {clubes.map((club) => (
-        <section key={club.id} className="card mb-4 overflow-hidden p-0">
+        <section key={club.id} className="card overflow-hidden p-0">
           {/* Cabecera con el escudo/logo del club como identidad */}
           <div
-            className="flex flex-wrap items-center gap-4 border-b p-5"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}
+            className="flex flex-wrap items-center gap-4 border-b p-5 border-line bg-elevated"
           >
             {club.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -314,20 +331,20 @@ export default function MiClubPage() {
                 className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl text-3xl font-extrabold"
                 style={{ background: 'var(--bg-card)', border: '2px solid var(--gold-dim)', color: 'var(--gold)' }}
               >
-                {club.name.slice(0, 2).toUpperCase()}
+                {iniciales(club.name)}
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold" style={{ color: 'var(--gold)' }}>
+              <h2 className="text-xl font-bold text-gold">
                 {club.name}
               </h2>
-              <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-0.5 text-sm text-muted">
                 {[TIPO[club.type] ?? club.type, club.city, club.country]
                   .filter(Boolean)
                   .join(' · ')}
               </p>
               {club.organizacionPadre && (
-                <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-1 text-xs text-muted">
                   Afiliado a <strong>{club.organizacionPadre}</strong>
                 </p>
               )}
@@ -342,22 +359,20 @@ export default function MiClubPage() {
               className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2"
             >
               <div>
-                <dt style={{ color: 'var(--text-muted)' }}>{t('club.sede')}</dt>
-                <dd className="font-semibold">{club.address ?? 'Por definir'}</dd>
+                <dt className="text-muted">{t('club.sede')}</dt>
+                <Valor texto={club.address} vacio={t('club.porDefinir')} />
               </div>
               <div>
-                <dt style={{ color: 'var(--text-muted)' }}>{t('club.horarios')}</dt>
-                <dd className="whitespace-pre-line font-semibold">
-                  {club.schedule ?? 'Por definir'}
-                </dd>
+                <dt className="text-muted">{t('club.horarios')}</dt>
+                <Valor texto={club.schedule} vacio={t('club.porDefinir')} multilinea />
               </div>
               <div>
-                <dt style={{ color: 'var(--text-muted)' }}>{t('club.telefono')}</dt>
-                <dd className="font-semibold">{club.phone ?? t('comun.sinDato')}</dd>
+                <dt className="text-muted">{t('club.telefono')}</dt>
+                <Valor texto={club.phone} vacio={t('comun.sinDato')} />
               </div>
               <div>
-                <dt style={{ color: 'var(--text-muted)' }}>Correo</dt>
-                <dd className="font-semibold">{club.email ?? t('comun.sinDato')}</dd>
+                <dt className="text-muted">Correo</dt>
+                <Valor texto={club.email} vacio={t('comun.sinDato')} />
               </div>
             </dl>
 
@@ -379,8 +394,8 @@ export default function MiClubPage() {
             )}
 
             {club.gestores.length > 0 && (
-              <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-                <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+              <div className="mt-4 border-t pt-4 border-line">
+                <h3 className="mb-2 text-sm font-semibold text-muted">
                   {t('club.maestros')}
                 </h3>
                 <ul className="flex flex-col gap-1.5 text-sm">
@@ -396,8 +411,7 @@ export default function MiClubPage() {
                           <strong className="truncate">{g.fullName}</strong>
                         </p>
                         <p
-                          className="truncate text-xs"
-                          style={{ color: 'var(--text-muted)' }}
+                          className="truncate text-xs text-muted"
                           title={`${g.email}${g.phone ? ` · ${g.phone}` : ''}`}
                         >
                           {g.email}
@@ -418,6 +432,25 @@ export default function MiClubPage() {
           </div>
         </section>
       ))}
+      </div>
     </main>
   );
+}
+
+/**
+ * Un dato de la ficha del club. El vacío se ve vacío —en gris y sin negrita—,
+ * no como un dato más: «Por definir» en negrita se leía igual que una
+ * dirección de verdad (auditoría 003, nº 11).
+ */
+function Valor({
+  texto,
+  vacio,
+  multilinea = false,
+}: {
+  texto: string | null | undefined;
+  vacio: string;
+  multilinea?: boolean;
+}) {
+  if (!texto) return <dd className="text-muted">{vacio}</dd>;
+  return <dd className={multilinea ? 'whitespace-pre-line font-semibold' : 'font-semibold'}>{texto}</dd>;
 }

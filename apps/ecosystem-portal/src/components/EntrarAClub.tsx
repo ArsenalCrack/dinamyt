@@ -9,6 +9,7 @@ import {
 } from '@/lib/api';
 import { LIM } from '@/lib/validacion';
 import { useI18n } from '@/lib/i18n';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * «Tengo el código de mi club» — el camino C de §2.1 del plan.
@@ -86,11 +87,10 @@ export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
 
   return (
     <section
-      className="rounded-xl border p-5"
-      style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+      className="rounded-xl border p-5 bg-card border-line"
     >
       <h2 className="mb-1 text-lg font-semibold">{t('club.entrarTitulo')}</h2>
-      <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-4 text-sm text-muted">
         Si tu maestro te dio un código, escríbelo aquí. Él lo aprueba y tu club
         aparece solo en Membresías y en Campeonatos.
       </p>
@@ -100,8 +100,7 @@ export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
           {pendientes.map((s) => (
             <li
               key={s.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: 'var(--border)' }}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm border-line"
             >
               <span className="min-w-0 truncate font-semibold">{s.orgName}</span>
               <span className="badge">{t('club.esperando')}</span>
@@ -145,8 +144,8 @@ export function EntrarAClub({ onEntrado }: { onEntrado?: () => void }) {
         />
       </label>
 
-      {error && <p className="msg-error mt-3 text-sm">{error}</p>}
-      {ok && <p className="msg-ok mt-3 text-sm">{ok}</p>}
+      <MensajeVivo tono="error" texto={error} className="mt-3 text-sm" />
+      <MensajeVivo tono="ok" texto={ok} className="mt-3 text-sm" />
     </section>
   );
 }

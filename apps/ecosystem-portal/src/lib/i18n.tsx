@@ -250,7 +250,8 @@ const es = {
   'perfil.misApps': '← Mis aplicaciones',
   'perfil.progreso': 'Tu perfil está al',
   'perfil.completo': '✓ Completo',
-  'perfil.pendientes': 'pendiente(s)',
+  'perfil.pendiente': 'pendiente',
+  'perfil.pendientes': 'pendientes',
   'perfil.teFalta': 'Te falta:',
   'perfil.requisito':
     'Un perfil completo es requisito para inscribirte a campeonatos.',
@@ -306,6 +307,8 @@ const es = {
   'config.contrasenaNueva': 'Nueva contraseña',
   'config.actualizarContrasena': 'Actualizar contraseña',
   'config.contrasenaLista': 'Contraseña actualizada.',
+  'config.faltaActual': 'Escribe tu contraseña actual.',
+  'config.actualizando': 'Actualizando…',
   'config.cargando': 'Cargando…',
   'panel.abrirAdmin': 'Abrir panel de administración',
   'panel.adminDesc': 'Organizaciones, miembros con su rol y suscripciones a planes.',
@@ -320,6 +323,21 @@ const es = {
   'config.sinOtrasSesiones': 'No hay ninguna otra sesión abierta.',
   'comun.cerrarAviso': 'Cerrar el aviso',
   'comun.sinDato': 'Sin dato',
+  'e404.titulo': 'Esta pantalla no existe',
+  'e404.desc':
+    'La dirección que abriste no corresponde a ninguna pantalla de DINAMYT. Puede que el enlace esté mal copiado o que la página se haya movido.',
+  'e404.ruta': 'Dirección que pediste',
+  'e404.inicio': 'Ir a mi inicio',
+  'e404.volver': '← Volver atrás',
+  'error.eyebrow': 'Algo se rompió',
+  'error.titulo': 'No se pudo cargar esta pantalla',
+  'error.texto': 'Tu sesión sigue abierta. Reintenta; si vuelve a pasar, recarga la página.',
+  'error.reintentar': 'Reintentar',
+  'error.recargar': 'Recargar la página',
+  'error.volverEntrar': 'Volver a entrar',
+  'planes.todoLoDe': 'Todo lo de',
+  'planes.enUnaSuscripcion': 'en una sola suscripción.',
+  'club.porDefinir': 'Por definir',
 
   'menu.superAdmin': 'Super administrador',
   'club.sinClub': 'Aún no perteneces a un club.',
@@ -348,7 +366,9 @@ const es = {
   'poner.titulo': 'Pon tu contraseña',
   'salir.cerrando': 'Cerrando tu sesión de DINAMYT…',
   'pie.derechos': 'Todos los derechos reservados.',
-  'pie.obra': 'DINAMYT Ecosystem es una obra protegida por el derecho de autor.',
+  'pie.obra': 'DINAMYT Ecosistema es una obra protegida por el derecho de autor.',
+  'pie.marca': 'DINAMYT Ecosistema · Hapkido',
+  'comun.saltarAlContenido': 'Saltar al contenido',
   'pie.ia': 'Desarrollado con asistencia de inteligencia artificial.',
   // ── Borrar la cuenta (`BorrarMiCuenta`, `AvisoBorradoPendiente`) ──
   'borrar.titulo': 'Borrar mi cuenta',
@@ -537,6 +557,7 @@ const es = {
   'geo.volverLista': 'Volver a la lista de ciudades',
   'geo.eligePais': 'Elige el país…',
   'org.eresTu': 'Eres tú: tu propio rol no lo cambias desde aquí',
+  'org.tuFilaNota': 'Tu rol y tu acceso los cambia otra persona que administre, o el super administrador.',
   'fecha.cambiarVista': 'Cambiar entre días y años',
 
   'org.sinOrganizacion': 'No gestionas ninguna organización.',
@@ -555,7 +576,7 @@ const es = {
   'org.direccion': 'Dirección / sede',
   'org.telefonoDigitos': 'Teléfono (solo números)',
   'org.enDirectorio': 'Mostrar este club en el directorio público de DINAMYT',
-  'miembro.edicionStaff': 'Edición del staff',
+  'miembro.edicionStaff': 'Ficha del miembro',
   'miembro.cinturonPromocion': 'Cinturón (promoción)',
   'miembro.emergencia': 'Contacto de emergencia',
   'miembro.nacimiento': 'Fecha de nacimiento',
@@ -738,6 +759,7 @@ const en: Record<ClaveTexto, string> = {
   'perfil.misApps': '← My apps',
   'perfil.progreso': 'Your profile is',
   'perfil.completo': '✓ Complete',
+  'perfil.pendiente': 'missing',
   'perfil.pendientes': 'missing',
   'perfil.teFalta': 'Still missing:',
   'perfil.requisito':
@@ -785,6 +807,8 @@ const en: Record<ClaveTexto, string> = {
   'config.contrasenaNueva': 'New password',
   'config.actualizarContrasena': 'Update password',
   'config.contrasenaLista': 'Password updated.',
+  'config.faltaActual': 'Type your current password.',
+  'config.actualizando': 'Updating…',
   'config.cargando': 'Loading…',
   'panel.abrirAdmin': 'Open the admin panel',
   'panel.adminDesc': 'Organizations, members with their role, and plan subscriptions.',
@@ -799,6 +823,21 @@ const en: Record<ClaveTexto, string> = {
   'config.sinOtrasSesiones': 'No other session is open.',
   'comun.cerrarAviso': 'Dismiss',
   'comun.sinDato': 'Not set',
+  'e404.titulo': 'This screen does not exist',
+  'e404.desc':
+    'The address you opened does not match any DINAMYT screen. The link may be mistyped, or the page may have moved.',
+  'e404.ruta': 'Address you requested',
+  'e404.inicio': 'Go to my home',
+  'e404.volver': '← Go back',
+  'error.eyebrow': 'Something broke',
+  'error.titulo': 'This screen could not load',
+  'error.texto': 'Your session is still open. Try again; if it keeps happening, reload the page.',
+  'error.reintentar': 'Try again',
+  'error.recargar': 'Reload the page',
+  'error.volverEntrar': 'Sign in again',
+  'planes.todoLoDe': 'Everything in',
+  'planes.enUnaSuscripcion': 'in a single subscription.',
+  'club.porDefinir': 'Not set yet',
   'menu.superAdmin': 'Super administrator',
   'club.sinClub': 'You do not belong to a club yet.',
   'club.editarFicha': 'Edit the club information',
@@ -827,6 +866,8 @@ const en: Record<ClaveTexto, string> = {
   'salir.cerrando': 'Signing you out of DINAMYT…',
   'pie.derechos': 'All rights reserved.',
   'pie.obra': 'DINAMYT Ecosystem is a work protected by copyright.',
+  'pie.marca': 'DINAMYT Ecosystem · Hapkido',
+  'comun.saltarAlContenido': 'Skip to content',
   'pie.ia': 'Built with the help of artificial intelligence.',
   'borrar.titulo': 'Delete my account',
   'borrar.ayuda': 'Deletes your DINAMYT account and your personal data in every app. You have 7 days to change your mind.',
@@ -986,6 +1027,7 @@ const en: Record<ClaveTexto, string> = {
   'geo.volverLista': 'Back to the city list',
   'geo.eligePais': 'Choose the country…',
   'org.eresTu': 'This is you: you do not change your own role here',
+  'org.tuFilaNota': 'Your role and access are changed by another administrator, or the super administrator.',
   'fecha.cambiarVista': 'Switch between days and years',
   'org.sinOrganizacion': 'You do not manage any organization.',
   'org.invitarClub': 'Invite an existing club',
@@ -1003,7 +1045,7 @@ const en: Record<ClaveTexto, string> = {
   'org.direccion': 'Address / venue',
   'org.telefonoDigitos': 'Phone (digits only)',
   'org.enDirectorio': 'Show this club in the public DINAMYT directory',
-  'miembro.edicionStaff': 'Staff editing',
+  'miembro.edicionStaff': 'Member profile',
   'miembro.cinturonPromocion': 'Belt (promotion)',
   'miembro.emergencia': 'Emergency contact',
   'miembro.nacimiento': 'Date of birth',
@@ -1121,6 +1163,29 @@ function idiomaDelNavegador(): Idioma {
     if (corto === 'es') return 'es';
   }
   return 'es';
+}
+
+/**
+ * El idioma elegido, FUERA de React, en el mismo orden que `I18nProvider`: la
+ * cookie compartida, la copia local y el navegador. Para `lib/fechas.ts` y
+ * `lib/roles.ts`, que son funciones sueltas y no pueden usar el hook.
+ */
+export function idiomaActual(): Idioma {
+  if (typeof window === 'undefined') return 'es';
+  const compartido = idiomaDeLaCookie();
+  if (compartido) return compartido;
+  try {
+    const guardado = localStorage.getItem(STORAGE_KEY);
+    if (guardado === 'es' || guardado === 'en') return guardado;
+  } catch {
+    /* modo incógnito: se sigue con la detección */
+  }
+  return idiomaDelNavegador();
+}
+
+/** Un texto del diccionario fuera de React (ver `idiomaActual`). */
+export function textoFueraDeReact(clave: ClaveTexto): string {
+  return DICCIONARIOS[idiomaActual()][clave] ?? es[clave] ?? clave;
 }
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {

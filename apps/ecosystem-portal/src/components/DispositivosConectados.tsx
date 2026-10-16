@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { haceCuanto, lugarDeSesion } from '@/lib/fechas';
 import { useI18n } from '@/lib/i18n';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * Desde dónde está abierta tu cuenta, y el botón para cerrarlo.
@@ -97,27 +98,19 @@ export function DispositivosConectados() {
       >
         {t('config.dispositivos')}
       </h2>
-      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-3 text-sm text-muted">
         {t('config.dispositivosDesc')}
       </p>
 
       {sesiones === null && !error && (
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm text-muted">
           Consultando…
         </p>
       )}
 
-      {error && (
-        <p className="text-sm" style={{ color: 'var(--danger)' }}>
-          {error}
-        </p>
-      )}
+      <MensajeVivo tono="error" texto={error} className="text-sm" />
 
-      {aviso && (
-        <p className="mb-3 text-sm" style={{ color: 'var(--ok)' }}>
-          {aviso}
-        </p>
-      )}
+      <MensajeVivo tono="ok" texto={aviso} className="mb-3 text-sm" />
 
       {sesiones && sesiones.length > 0 && (
         <ul className="flex flex-col gap-2">
@@ -126,8 +119,7 @@ export function DispositivosConectados() {
             return (
             <li
               key={s.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2.5"
-              style={{ borderColor: 'var(--border)' }}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2.5 border-line"
             >
               <div>
                 <p className="font-semibold">
@@ -145,7 +137,7 @@ export function DispositivosConectados() {
                     La IP se queda porque para quien sabe leerla es la prueba, y
                     para quien no, no estorba: va debajo y en gris. Ver
                     `lugarDeSesion`. */}
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-sm text-muted">
                   {/* La hora se pinta en la zona de quien mira: el navegador ya
                       lo hace solo, y es la correcta por definición. */}
                   Activa {haceCuanto(s.lastSeenAt)}
@@ -187,7 +179,7 @@ export function DispositivosConectados() {
       )}
 
       {sesiones && otras.length === 0 && !error && (
-        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-2 text-sm text-muted">
           {t('config.sinOtrasSesiones')}
         </p>
       )}

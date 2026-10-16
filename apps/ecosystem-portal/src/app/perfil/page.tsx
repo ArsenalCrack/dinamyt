@@ -26,6 +26,7 @@ import { SelectMenu } from '@/components/SelectMenu';
 import { Avatar } from '@/components/Avatar';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { Cargando } from '@/components/Cargando';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 interface Disciplina {
   id: string;
@@ -313,7 +314,7 @@ export default function PerfilPage() {
     props: Record<string, unknown> = {},
   ) => (
     <label className="block text-sm">
-      <span style={{ color: 'var(--text-muted)' }}>{etiqueta}</span>
+      <span className="text-muted">{etiqueta}</span>
       <input
         className="mt-1"
         value={valor}
@@ -329,7 +330,7 @@ export default function PerfilPage() {
         {/* Con error se enseña el error, no la espera: seguir «cargando» algo
             que ya falló hace esperar de balde. */}
         {error ? (
-          <p style={{ color: 'var(--danger)' }}>{error}</p>
+          <p className="text-danger">{error}</p>
         ) : (
           <Cargando mensaje={t('perfil.cargando')} />
         )}
@@ -352,7 +353,7 @@ export default function PerfilPage() {
         <div>
           <p className="eyebrow mb-1">{t('perfil.eyebrow')}</p>
           <h1 className="display text-3xl">{t('perfil.titulo')}</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-1 text-sm text-muted">
             {perfil.email} · {t('perfil.documento')} {perfil.documentId}
           </p>
         </div>
@@ -380,28 +381,32 @@ export default function PerfilPage() {
                 <span className="badge badge-ok">{t('perfil.completo')}</span>
               ) : (
                 <span className="badge badge-gold">
-                  {faltan.length} {t('perfil.pendientes')}
+                  {/* El plural con el número, no «pendiente(s)» (003, nº 12). */}
+                  {faltan.length}{' '}
+                  {t(faltan.length === 1 ? 'perfil.pendiente' : 'perfil.pendientes')}
                 </span>
               )}
             </div>
             <div
-              className="h-2.5 w-full overflow-hidden rounded-full"
+              className="h-2.5 w-full overflow-hidden rounded-full bg-elevated"
               role="progressbar"
               aria-valuenow={prog.pct}
               aria-valuemin={0}
               aria-valuemax={100}
-              style={{ background: 'var(--bg-elevated)' }}
             >
+              {/* Crece con `scaleX` y no con el ancho: solo `transform` va por
+                  la tarjeta gráfica (auditoría 002, nº 11). La barra entera
+                  mide el 100 % y se encoge desde la izquierda. */}
               <div
-                className="h-full rounded-full transition-all"
+                className="h-full w-full origin-left rounded-full transition-transform duration-500"
                 style={{
-                  width: `${prog.pct}%`,
+                  transform: `scaleX(${prog.pct / 100})`,
                   background: prog.pct === 100 ? 'var(--ok)' : 'var(--gold)',
                 }}
               />
             </div>
             {faltan.length > 0 && (
-              <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-2 text-xs text-muted">
                 {t('perfil.teFalta')}{' '}
                 {faltan.map((f) => t(f.etiqueta)).join(' · ')}.{' '}
                 {t('perfil.requisito')}
@@ -436,7 +441,7 @@ export default function PerfilPage() {
           />
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold">{t('perfil.foto')}</h2>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm text-muted">
               {t('perfil.fotoDesc')}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -468,7 +473,7 @@ export default function PerfilPage() {
               )}
             </div>
             {fotoMsg && (
-              <p className="mt-2 text-xs" style={{ color: 'var(--gold)' }}>
+              <p className="mt-2 text-xs text-gold">
                 {fotoMsg}
               </p>
             )}
@@ -476,15 +481,14 @@ export default function PerfilPage() {
         </div>
 
         <dl
-          className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t pt-4 text-sm sm:grid-cols-2"
-          style={{ borderColor: 'var(--border)' }}
+          className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t pt-4 text-sm sm:grid-cols-2 border-line"
         >
           <div className="flex justify-between gap-2">
-            <dt style={{ color: 'var(--text-muted)' }}>Documento</dt>
+            <dt className="text-muted">Documento</dt>
             <dd className="font-semibold">{perfil.documentId}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt style={{ color: 'var(--text-muted)' }}>{t('perfil.correoVerificado')}</dt>
+            <dt className="text-muted">{t('perfil.correoVerificado')}</dt>
             <dd>
               <span className={`badge ${perfil.isEmailVerified ? 'badge-ok' : ''}`}>
                 {perfil.isEmailVerified ? 'Sí' : 'No'}
@@ -492,7 +496,7 @@ export default function PerfilPage() {
             </dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt style={{ color: 'var(--text-muted)' }}>{t('perfil.miembroDesde')}</dt>
+            <dt className="text-muted">{t('perfil.miembroDesde')}</dt>
             <dd className="font-semibold">
               {perfil.createdAt
                 ? new Date(perfil.createdAt).toLocaleDateString('es')
@@ -507,12 +511,14 @@ export default function PerfilPage() {
         <h2 className="text-lg font-semibold">{t('perfil.datosPersonales')}</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.nombreCompleto')}</span>
+            <span className="text-muted">{t('perfil.nombreCompleto')}</span>
             {/* Editable solo para quien gestiona un club. No es un permiso
                 nuevo: es el que el servidor ya daba y que obligaba al maestro a
                 irse a la pantalla de administrar a su gente para corregirse el
                 propio nombre. Ver el bloque de arriba del archivo. */}
             <input
+              name="nombre"
+              autoComplete="name"
               className="mt-1"
               value={form.fullName}
               readOnly={!puedeGestor}
@@ -524,7 +530,7 @@ export default function PerfilPage() {
               maxLength={LIM.nombrePersona}
               style={puedeGestor ? undefined : { opacity: 0.7 }}
             />
-            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span className="mt-1 block text-xs text-muted">
               {puedeGestor
                 ? 'Como gestionas un club, puedes corregirlo. Se guarda en mayúsculas.'
                 : t('perfil.nombreLoCorrigeMaestro')}
@@ -537,12 +543,14 @@ export default function PerfilPage() {
             {
               type: 'tel',
               inputMode: 'tel',
+              name: 'telefono',
+              autoComplete: 'tel',
               placeholder: '300 123 4567',
               maxLength: LIM.telefono,
             },
           )}
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.nacimiento')}</span>
+            <span className="text-muted">{t('perfil.nacimiento')}</span>
             {/* El calendario propio, el mismo de Membresías y Campeonatos: el
                 nativo de Android solo avanza mes a mes y un año de nacimiento
                 son trescientos toques. */}
@@ -557,7 +565,7 @@ export default function PerfilPage() {
                 etiquetaAria={t('perfil.nacimiento')}
               />
             </div>
-            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span className="mt-1 block text-xs text-muted">
               {puedeGestor
                 ? 'Gestionas un club: puedes corregirla.'
                 : perfil.birthDate
@@ -566,7 +574,7 @@ export default function PerfilPage() {
             </span>
           </div>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.genero')}</span>
+            <span className="text-muted">{t('perfil.genero')}</span>
             {/* Se puede rellenar si falta —las cuentas importadas llegan sin
                 él— pero no cambiar: Campeonatos ya armó categorías con este
                 dato, y moverlo a mitad de temporada mueve la llave. */}
@@ -583,7 +591,7 @@ export default function PerfilPage() {
                 }))}
               />
             </div>
-            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span className="mt-1 block text-xs text-muted">
               {puedeGestor
                 ? 'Gestionas un club: puedes corregirlo. Mueve tu categoría en Campeonatos.'
                 : perfil.gender
@@ -592,7 +600,7 @@ export default function PerfilPage() {
             </span>
           </div>
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.tipoSangre')}</span>
+            <span className="text-muted">{t('perfil.tipoSangre')}</span>
             {/* ── Se puede rellenar si falta; cambiarlo, no ──
                 Era un campo de solo lectura que decía «Por registrar» y no
                 dejaba registrar nada: la única salida era pedírselo al
@@ -611,7 +619,7 @@ export default function PerfilPage() {
                 opciones={TIPOS_SANGRE.map((s) => ({ valor: s, etiqueta: s }))}
               />
             </div>
-            <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span className="mt-1 block text-xs text-muted">
               {puedeGestor
                 ? 'Gestionas un club: puedes corregirlo. Va impreso en tu carnet.'
                 : perfil.bloodType
@@ -627,16 +635,22 @@ export default function PerfilPage() {
             t('perfil.nombreSoloLetras'),
             form.emergencyContactName,
             (v) => setForm({ ...form, emergencyContactName: soloLetras(v) }),
-            { maxLength: LIM.nombrePersona },
+            { maxLength: LIM.nombrePersona, name: 'emergencia-nombre', autoComplete: 'off' },
           )}
           {campo(
             t('perfil.telefonoSoloNumeros'),
             form.emergencyContactPhone,
             (v) => setForm({ ...form, emergencyContactPhone: soloTelefono(v) }),
-            { type: 'tel', inputMode: 'tel', maxLength: LIM.telefono },
+            {
+              type: 'tel',
+              inputMode: 'tel',
+              maxLength: LIM.telefono,
+              name: 'emergencia-telefono',
+              autoComplete: 'off',
+            },
           )}
           <div className="block text-sm">
-            <span style={{ color: 'var(--text-muted)' }}>{t('perfil.parentesco')}</span>
+            <span className="text-muted">{t('perfil.parentesco')}</span>
             <div className="mt-1">
               <SelectMenu
                 valor={form.emergencyContactRelationship}
@@ -652,10 +666,12 @@ export default function PerfilPage() {
         </div>
 
         <label className="block text-sm">
-          <span style={{ color: 'var(--text-muted)' }}>
+          <span className="text-muted">
             {t('perfil.notasMedicasEtq')}
           </span>
           <textarea
+            name="notas-medicas"
+            autoComplete="off"
             className="mt-1"
             rows={3}
             value={form.medicalNotes}
@@ -665,8 +681,8 @@ export default function PerfilPage() {
           />
         </label>
 
-        {error && <p className="msg-error text-sm">{error}</p>}
-        {ok && <p className="msg-ok text-sm">{ok}</p>}
+        <MensajeVivo tono="error" texto={error} className="text-sm" />
+        <MensajeVivo tono="ok" texto={ok} className="text-sm" />
         <button type="submit" disabled={guardando} className="btn btn-gold self-start">
           {guardando ? t('perfil.guardando') : t('perfil.guardarCambios')}
         </button>
@@ -683,7 +699,7 @@ export default function PerfilPage() {
           cosas. El botón de guardar es el mismo, que es lo que importa. */}
       <section className="card mt-4 p-5">
         <h2 className="text-lg font-semibold">{t('perfil.disciplinas')}</h2>
-        <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mb-3 text-sm text-muted">
           {puedeGestor
             ? 'Gestionas un club, así que tu propio grado lo registras aquí.'
             : 'El cinturón lo actualiza tu maestro cuando te promueve.'}
@@ -692,7 +708,7 @@ export default function PerfilPage() {
         {puedeGestor ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>{t('perfil.cinturon')}</span>
+              <span className="text-muted">{t('perfil.cinturon')}</span>
               <div className="mt-1">
                 <SelectMenu
                   valor={cinturon}
@@ -704,7 +720,7 @@ export default function PerfilPage() {
               </div>
             </div>
             <div className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>{t('perfil.entrenaDesde')}</span>
+              <span className="text-muted">{t('perfil.entrenaDesde')}</span>
               <div className="mt-1">
                 <CampoFecha
                   valor={desde}
@@ -713,16 +729,16 @@ export default function PerfilPage() {
                   etiquetaAria="Entrena desde"
                 />
               </div>
-              <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span className="mt-1 block text-xs text-muted">
                 {t('perfil.enTuCarnet')}
               </span>
             </div>
-            <p className="text-xs sm:col-span-2" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs sm:col-span-2 text-muted">
               Se guarda con el botón «{t('perfil.guardarCambios')}» de arriba.
             </p>
           </div>
         ) : perfil.disciplines.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm text-muted">
             {t('perfil.sinDisciplinas')}
           </p>
         ) : (
@@ -730,8 +746,7 @@ export default function PerfilPage() {
             {perfil.disciplines.map((d) => (
               <li
                 key={d.id}
-                className="flex items-center justify-between rounded-lg border px-4 py-2.5"
-                style={{ borderColor: 'var(--border)' }}
+                className="flex items-center justify-between rounded-lg border px-4 py-2.5 border-line"
               >
                 <span className="font-semibold capitalize">{d.discipline}</span>
                 <span className="badge badge-gold">{d.currentGrade ?? 'Sin grado'}</span>

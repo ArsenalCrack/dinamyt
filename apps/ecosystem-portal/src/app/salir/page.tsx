@@ -78,7 +78,7 @@ function Salir() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 py-10">
       <p className="display text-lg">{t('salir.cerrando')}</p>
-      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="text-sm text-muted">
         {destino ? `Volviendo a ${destino.nombre}.` : 'Un momento.'}
       </p>
     </main>

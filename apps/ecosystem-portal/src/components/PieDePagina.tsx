@@ -2,6 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
+import { ControlesApariencia } from '@/components/ControlesApariencia';
+import { Icono } from '@/components/Icono';
 import { Version } from '@/components/Version';
 import { CORREO_SOPORTE } from '@/lib/contacto';
 import { useI18n } from '@/lib/i18n';
@@ -64,14 +66,16 @@ export function PieDePagina() {
   const años = ahora > AÑO_INICIAL ? `${AÑO_INICIAL}–${ahora}` : String(AÑO_INICIAL);
 
   return (
-    <footer className="border-t py-8" style={{ borderColor: 'var(--border)' }}>
+    <footer className="border-t py-8 border-line">
       <div
-        className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-4 text-center text-sm sm:flex-row sm:justify-between sm:gap-4 sm:px-6 sm:text-left"
-        style={{ color: 'var(--text-muted)' }}
+        className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-4 text-center text-sm sm:flex-row sm:justify-between sm:gap-4 sm:px-6 sm:text-left text-muted"
       >
-        <span className="inline-flex items-center gap-2">
+        {/* `translate="no"`: el traductor de Chrome convertía la marca y
+            «Hapkido» en otra cosa (auditoría 002, nº 14). El idioma lo pone
+            el diccionario, no el navegador. */}
+        <span className="inline-flex items-center gap-2" translate="no">
           <img src="/logo.png" alt="" width={22} height={22} />
-          DINAMYT Ecosystem · Hapkido
+          {t('pie.marca')}
         </span>
         <nav className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-x-4 sm:gap-y-2">
           <span className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
@@ -94,21 +98,26 @@ export function PieDePagina() {
             style={{ color: 'var(--gold)' }}
             className={`${ENLACE} inline-flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5`}
           >
-            <span aria-hidden="true">✉</span>
-            <span style={{ color: 'var(--text-muted)' }}>{t('pie.ayuda')}</span>
+            <Icono nombre="correo" />
+            <span className="text-muted">{t('pie.ayuda')}</span>
             <span className="break-all">{CORREO_SOPORTE}</span>
           </a>
         </nav>
       </div>
 
+      {/* El tema y el idioma, solo en las pantallas sin sesión (con sesión
+          están en el menú de la cuenta). Ver el componente. */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <ControlesApariencia />
+      </div>
+
       {/* La franja de derechos, separada por una raya: no es navegación, es un
           aviso legal, y va debajo de todo lo que sí se toca. */}
       <div
-        className="mx-auto mt-6 max-w-6xl border-t px-4 pt-4 text-center sm:px-6"
-        style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+        className="mx-auto mt-6 max-w-6xl border-t px-4 pt-4 text-center sm:px-6 border-line text-muted"
       >
         <p className="text-xs">
-          © {años} <strong style={{ color: 'var(--text)' }}>{AUTOR}</strong> ·{' '}
+          © {años} <strong className="text-ink">{AUTOR}</strong> ·{' '}
           {t('pie.derechos')}
         </p>
         <p className="mt-0.5 text-xs opacity-75">

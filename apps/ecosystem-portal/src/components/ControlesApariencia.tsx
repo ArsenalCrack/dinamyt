@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { aplicarTema, getTema, temaEfectivo, type Tema } from '@/lib/tema';
+import { aplicarTema, getTema, temaEfectivo } from '@/lib/tema';
 import { IDIOMAS, useI18n } from '@/lib/i18n';
 import { guardarAparienciaEnLaCuenta } from '@/lib/api';
 import { tieneBarra } from '@/lib/rutas';
 
 /**
- * El globo 🌐 de tema e idioma, para las pantallas SIN navegación.
+ * El tema y el idioma, en el pie de las pantallas SIN navegación.
  *
  * ── El hueco que cierra ────────────────────────────────────────────────────
  *
@@ -19,16 +19,19 @@ import { tieneBarra } from '@/lib/rutas';
  * entrado —o no tiene cuenta— se come el oscuro sin remedio, en la primera
  * pantalla que ve de DINAMYT.
  *
- * Campeonatos ya resolvía esto para su marcador público con este mismo botón.
- * Ahora es el mismo control, con las mismas medidas: `.pubctl*` vive en
- * `packages/shared/estilos.css`, o sea que es un solo archivo para las cuatro
- * webs.
+ * ── Por qué en el pie y no flotando ────────────────────────────────────────
+ *
+ * Fue un botón 🌐 fijo abajo a la derecha (el `.pubctl` de Campeonatos), y en
+ * un teléfono de 390 px tapaba lo que pasara por debajo: el borde del campo
+ * «Teléfono» del registro, una tarjeta de `/planes`, la última letra del
+ * marcador de la portada (auditoría 003, nº 1). En el pie no tapa nada, y son
+ * dos selectores a la vista en vez de un menú que hay que descubrir: el pie es
+ * además donde la gente busca el idioma. DESIGN.md, «Componentes».
  *
  * ── Dónde NO sale ──────────────────────────────────────────────────────────
  *
- * En las pantallas de dentro. Ahí ya hay un botón de «Configuración» en la
- * cabecera, y un flotante encima sería un segundo sitio para lo mismo — que es
- * exactamente lo que se acaba de quitar del perfil.
+ * En las pantallas de dentro: ahí el menú de la cuenta ya trae el tema y el
+ * idioma, y un segundo sitio para lo mismo sobra.
  *
  * ── Y sí escribe en la cuenta ──────────────────────────────────────────────
  *
@@ -40,92 +43,59 @@ import { tieneBarra } from '@/lib/rutas';
 export function ControlesApariencia() {
   const { t, idioma, setIdioma } = useI18n();
   const pathname = usePathname();
-  const [tema, setTema] = useState<Tema>('sistema');
-  const [abierto, setAbierto] = useState(false);
+  // El tema que SE VE, y solo después de montar. En el servidor no hay
+  // `matchMedia`, así que «como el sistema» salía siempre «oscuro» en el HTML;
+  // al hidratar, React no corrige un atributo distinto y el selector se
+  // quedaba marcando «Oscuro» con la página en claro. Hasta montar no se marca
+  // ninguno.
+  const [efectivo, setEfectivo] = useState<'claro' | 'oscuro' | null>(null);
 
-  // El servidor pinta siempre el oscuro; el de verdad se lee tras montar.
   useEffect(() => {
-    setTema(getTema());
+    setEfectivo(temaEfectivo(getTema()));
   }, []);
 
-  useEffect(() => {
-    if (!abierto) return;
-    const alTocar = (e: MouseEvent | TouchEvent) => {
-      const raiz = document.querySelector('.pubctl');
-      if (raiz && !raiz.contains(e.target as Node)) setAbierto(false);
-    };
-    const alTeclear = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setAbierto(false);
-    };
-    document.addEventListener('mousedown', alTocar);
-    document.addEventListener('touchstart', alTocar);
-    document.addEventListener('keydown', alTeclear);
-    return () => {
-      document.removeEventListener('mousedown', alTocar);
-      document.removeEventListener('touchstart', alTocar);
-      document.removeEventListener('keydown', alTeclear);
-    };
-  }, [abierto]);
-
-  /**
-   * Donde HAY barra no hay globo: el tema y el idioma están dentro de su menú,
-   * y un flotante encima sería el segundo sitio para lo mismo.
-   *
-   * La lista de rutas es la misma que usa la barra (`lib/rutas.ts`), leída al
-   * revés. Antes cada uno llevaba la suya y cualquier pantalla que se les
-   * escapara a los dos se quedaba sin forma de cambiar el modo — que es
-   * literalmente lo que se reportó.
-   */
   if (tieneBarra(pathname)) return null;
 
-  function cambiarTema() {
-    // Dos estados y no tres: `sistema` es un punto de partida, no un destino al
-    // que alguien quiera volver pulsando. Las tres escritas están en
-    // Configuración, que es donde se elige de verdad.
-    const nuevo: Tema = temaEfectivo(tema) === 'claro' ? 'oscuro' : 'claro';
+  function ponerTema(nuevo: 'claro' | 'oscuro') {
     aplicarTema(nuevo);
-    setTema(nuevo);
+    setEfectivo(nuevo);
     void guardarAparienciaEnLaCuenta({ theme: nuevo });
   }
 
   return (
-    <div className="pubctl">
-      {abierto && (
-        <div className="pubctl-panel" role="group" aria-label={t('menu.apariencia')}>
-          <button type="button" className="pubctl-item" onClick={cambiarTema}>
-            {temaEfectivo(tema) === 'oscuro' ? t('menu.modoClaro') : t('menu.modoOscuro')}
+    <div className="pie-apariencia">
+      <div className="pie-opciones" role="group" aria-label={t('perfil.tema')}>
+        {(['oscuro', 'claro'] as const).map((valor) => (
+          <button
+            key={valor}
+            type="button"
+            className="pie-opcion"
+            aria-pressed={efectivo === valor}
+            onClick={() => ponerTema(valor)}
+          >
+            {t(valor === 'oscuro' ? 'perfil.temaOscuro' : 'perfil.temaClaro')}
           </button>
-          <div className="pubctl-langs">
-            {IDIOMAS.map((l) => (
-              <button
-                key={l.codigo}
-                type="button"
-                className="pubctl-lang"
-                data-activo={idioma === l.codigo}
-                aria-pressed={idioma === l.codigo}
-                onClick={() => {
-                  setIdioma(l.codigo);
-                  void guardarAparienciaEnLaCuenta({
-                    locale: l.codigo === 'en' ? 'en-US' : 'es-CO',
-                  });
-                }}
-              >
-                {l.etiqueta}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      <button
-        type="button"
-        className="pubctl-toggle"
-        aria-label={t('menu.apariencia')}
-        aria-expanded={abierto}
-        title={t('menu.apariencia')}
-        onClick={() => setAbierto((a) => !a)}
-      >
-        🌐
-      </button>
+        ))}
+      </div>
+      <div className="pie-opciones" role="group" aria-label={t('menu.idioma')}>
+        {IDIOMAS.map((l) => (
+          <button
+            key={l.codigo}
+            type="button"
+            className="pie-opcion"
+            lang={l.codigo}
+            aria-pressed={idioma === l.codigo}
+            onClick={() => {
+              setIdioma(l.codigo);
+              void guardarAparienciaEnLaCuenta({
+                locale: l.codigo === 'en' ? 'en-US' : 'es-CO',
+              });
+            }}
+          >
+            {l.etiqueta}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

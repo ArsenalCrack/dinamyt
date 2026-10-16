@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { PoliticaPrivacidad } from '@/components/PoliticaPrivacidad';
+import { BarraPublica } from '@/components/BarraPublica';
 
 /**
  * Los metadatos se quedan en español y a propósito.
@@ -21,8 +22,11 @@ export const metadata: Metadata = {
  */
 export default function PrivacidadPage() {
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-6 py-10">
-      <PoliticaPrivacidad />
-    </main>
+    <>
+      <BarraPublica />
+      <main className="mx-auto min-h-screen max-w-3xl px-6 py-10">
+        <PoliticaPrivacidad />
+      </main>
+    </>
   );
 }

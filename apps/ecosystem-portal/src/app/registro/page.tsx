@@ -32,6 +32,7 @@ import { CabeceraAuth } from '@/components/CabeceraAuth';
 import { useI18n } from '@/lib/i18n';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
 import { SelectMenu } from '@/components/SelectMenu';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * Crear cuenta en DINAMYT.
@@ -254,7 +255,7 @@ export default function RegistroPage() {
         ref={formRef}
         onSubmit={onSubmit}
         noValidate
-        className="card w-full max-w-md p-7"
+        className="card con-franja w-full max-w-md p-7"
       >
         <CabeceraAuth
           antetitulo={t('registro.eyebrow')}
@@ -274,6 +275,7 @@ export default function RegistroPage() {
             htmlFor="reg-nombre"
           >
             <input
+              name="nombre"
               id="reg-nombre"
               value={form.fullName}
               onChange={set('fullName')}
@@ -314,6 +316,7 @@ export default function RegistroPage() {
             }
           >
             <input
+              name="email"
               id="reg-correo"
               {...PROPS_CORREO}
               value={form.email}
@@ -345,7 +348,7 @@ export default function RegistroPage() {
 
         {/* ── Tus datos deportivos ──────────────────────────────────────── */}
         <h2 className="eyebrow mb-1">Tus datos deportivos</h2>
-        <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <p className="mb-3 text-xs text-muted">
           Con esto tu club y tus campeonatos te reconocen sin volver a
           preguntártelo cada vez.
         </p>
@@ -364,6 +367,8 @@ export default function RegistroPage() {
               }
             >
               <input
+                name="documento"
+                autoComplete="off"
                 id="reg-documento"
                 value={form.documentId}
                 onChange={set('documentId')}
@@ -378,6 +383,7 @@ export default function RegistroPage() {
           <div data-campo="phone">
             <Campo etiqueta="Teléfono" error={fallo('phone')} htmlFor="reg-telefono">
               <input
+                name="telefono"
                 id="reg-telefono"
                 value={form.phone}
                 onChange={set('phone')}
@@ -434,8 +440,7 @@ export default function RegistroPage() {
 
         <div data-campo="consent">
           <label
-            className="mt-2 flex items-start gap-2 text-xs"
-            style={{ color: 'var(--text-muted)' }}
+            className="mt-2 flex items-start gap-2 text-xs text-muted"
           >
             <input
               type="checkbox"
@@ -448,7 +453,7 @@ export default function RegistroPage() {
             />
             <span>
               Acepto el tratamiento de mis datos personales según la{' '}
-              <Link href="/privacidad" target="_blank" style={{ color: 'var(--gold)' }}>
+              <Link href="/privacidad" target="_blank" className="text-gold">
                 política de privacidad
               </Link>{' '}
               (Ley 1581 de 2012).
@@ -462,11 +467,7 @@ export default function RegistroPage() {
           )}
         </div>
 
-        {error && (
-          <p className="mb-3 mt-4 text-sm" style={{ color: 'var(--danger)' }}>
-            {error}
-          </p>
-        )}
+        <MensajeVivo tono="error" texto={error} className="mb-3 mt-4 text-sm" />
 
         {/* El botón NO se deshabilita mientras falte algo: un botón apagado no
             dice qué falta, y en un formulario largo eso deja a la persona
@@ -474,13 +475,13 @@ export default function RegistroPage() {
         <button type="submit" disabled={cargando} className="btn btn-cta mt-4 w-full">
           {cargando ? 'Creando…' : 'Crear cuenta'}
         </button>
-        <p className="mt-3 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-3 text-center text-xs text-muted">
           Te enviaremos un código a tu correo para confirmarlo. La cuenta se crea
           cuando lo escribas.
         </p>
-        <p className="mt-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-4 text-center text-sm text-muted">
           ¿Ya tienes cuenta?{' '}
-          <Link href="/login" style={{ color: 'var(--gold)' }}>
+          <Link href="/login" className="text-gold">
             {t('registro.iniciaSesion')}
           </Link>
         </p>

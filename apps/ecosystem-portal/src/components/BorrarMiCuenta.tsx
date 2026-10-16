@@ -74,11 +74,10 @@ export function BorrarMiCuenta() {
 
   return (
     <section
-      className="card mt-4 flex flex-col gap-3 p-5"
-      style={{ borderColor: 'var(--danger)' }}
+      className="card mt-4 flex flex-col gap-3 p-5 border-danger"
     >
       <h2 className="text-lg font-semibold">{t('borrar.titulo')}</h2>
-      <p className="-mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="-mt-1 text-sm text-muted">
         {t('borrar.ayuda')}
       </p>
       <button type="button" className="btn btn-danger self-start" onClick={() => setAbierto(true)}>

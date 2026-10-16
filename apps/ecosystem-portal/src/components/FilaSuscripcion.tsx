@@ -191,15 +191,14 @@ export function FilaSuscripcion({
 
   return (
     <li
-      className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm"
-      style={{ borderColor: 'var(--border)' }}
+      className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm border-line"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="font-semibold">{sub.planName}</p>
           <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
             <span className={pago.clase}>{pago.texto}</span>
-            <span style={{ color: 'var(--text-muted)' }}>
+            <span className="text-muted">
               {dinero(sub.paidAmount)} de {dinero(sub.totalAmount)}
             </span>
             <span
@@ -362,10 +361,9 @@ export function FilaSuscripcion({
           de pago deja de significar nada. */}
       {renovando && (
         <div
-          className="flex flex-col gap-2 border-t pt-2"
-          style={{ borderColor: 'var(--border)' }}
+          className="flex flex-col gap-2 border-t pt-2 border-line"
         >
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs text-muted">
             {vencida
               ? 'Está vencida: el periodo nuevo empieza hoy.'
               : `Le quedan días: el periodo nuevo empieza el ${fechaCivil(sub.endsAt)} y no pierde ninguno.`}
@@ -373,7 +371,7 @@ export function FilaSuscripcion({
           {/* De dónde sale el número que ya viene puesto. Sin esto, «cuánto
               costó» es una cifra que aparece sola y que nadie sabe si revisar. */}
           {cotizacion?.porPersona && (
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-muted">
               Hoy son <strong>{cotizacion.personas}</strong>{' '}
               {cotizacion.personas === 1 ? 'persona activa' : 'personas activas'}
               {cotizacion.facturadas !== cotizacion.personas && (
@@ -384,7 +382,7 @@ export function FilaSuscripcion({
           )}
           <div className="grid gap-2 sm:grid-cols-4">
             <label className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Meses</span>
+              <span className="text-muted">Meses</span>
               <input
                 className="mt-1"
                 inputMode="numeric"
@@ -399,7 +397,7 @@ export function FilaSuscripcion({
               />
             </label>
             <label className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Cuánto costó</span>
+              <span className="text-muted">Cuánto costó</span>
               <div className="mt-1">
                 <CampoDinero
                   valor={renovacion.precio}
@@ -413,7 +411,7 @@ export function FilaSuscripcion({
               </div>
             </label>
             <label className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Cuánto entregó</span>
+              <span className="text-muted">Cuánto entregó</span>
               {/* Éste sí va VACÍO, y es lo contrario del de al lado: el precio
                   lo sabe el sistema y la entrega no. Vacío significa «pagó
                   todo», que es el 95 %, y una cifra menor deja la suscripción
@@ -428,7 +426,7 @@ export function FilaSuscripcion({
               </div>
             </label>
             <div className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Cómo pagó</span>
+              <span className="text-muted">Cómo pagó</span>
               <div className="mt-1">
                 <SelectMenu
                   valor={renovacion.method}
@@ -442,13 +440,13 @@ export function FilaSuscripcion({
               </div>
             </div>
           </div>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs text-muted">
             «Cuánto costó» viene calculado y se puede corregir. Deja{' '}
             <strong>«cuánto entregó» vacío si pagó completo</strong>; escribe una
             cifra menor para registrar un abono y que quede la deuda.
           </p>
           <label className="block text-xs">
-            <span style={{ color: 'var(--text-muted)' }}>Nota (opcional)</span>
+            <span className="text-muted">Nota (opcional)</span>
             <input
               className="mt-1"
               maxLength={300}
@@ -502,10 +500,10 @@ export function FilaSuscripcion({
           qué meses compró y quién lo recibió. Es lo que se mira cuando un club
           dice que ya pagó. */}
       {(pagos || errorPagos) && (
-        <div className="border-t pt-2" style={{ borderColor: 'var(--border)' }}>
+        <div className="border-t pt-2 border-line">
           {errorPagos && <p className="msg-error text-xs">{errorPagos}</p>}
           {pagos && pagos.length === 0 && (
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-muted">
               Todavía no hay ningún pago registrado.
             </p>
           )}
@@ -515,7 +513,7 @@ export function FilaSuscripcion({
             <div className="overflow-x-auto">
               <table className="w-full text-xs" style={{ minWidth: '34rem' }}>
                 <thead>
-                  <tr style={{ color: 'var(--text-muted)' }}>
+                  <tr className="text-muted">
                     <th className="py-1 pr-3 text-left font-medium">Fecha</th>
                     <th className="py-1 pr-3 text-right font-medium">Monto</th>
                     <th className="py-1 pr-3 text-left font-medium">Cómo</th>
@@ -535,7 +533,7 @@ export function FilaSuscripcion({
                         {dinero(pg.amount)}
                       </td>
                       <td className="py-1.5 pr-3">{nombreMetodo(pg.method)}</td>
-                      <td className="py-1.5 pr-3 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                      <td className="py-1.5 pr-3 whitespace-nowrap text-muted">
                         {/* `periodos: 0` es un abono: paga deuda, no compra
                             meses. Enseñarlo como un periodo vacío haría creer
                             que ese dinero extendió la fecha. */}
@@ -543,7 +541,7 @@ export function FilaSuscripcion({
                           ? `${pg.periodoDesde} → ${pg.periodoHasta}`
                           : 'Abono'}
                       </td>
-                      <td className="py-1.5" style={{ color: 'var(--text-muted)' }}>
+                      <td className="py-1.5 text-muted">
                         {pg.registradoPor ?? 'Sin dato'}
                       </td>
                     </tr>
@@ -556,10 +554,10 @@ export function FilaSuscripcion({
       )}
 
       {editando && (
-        <div className="flex flex-col gap-2 border-t pt-2" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex flex-col gap-2 border-t pt-2 border-line">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Plan</span>
+              <span className="text-muted">Plan</span>
               <div className="mt-1">
                 <SelectMenu
                   valor={form.planId}
@@ -571,7 +569,7 @@ export function FilaSuscripcion({
               </div>
             </div>
             <label className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Monto total</span>
+              <span className="text-muted">Monto total</span>
               <div className="mt-1">
                 <CampoDinero
                   valor={form.totalAmount}
@@ -581,7 +579,7 @@ export function FilaSuscripcion({
               </div>
             </label>
             <div className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Desde</span>
+              <span className="text-muted">Desde</span>
               <div className="mt-1">
                 <CampoFecha
                   valor={form.startsAt}
@@ -592,7 +590,7 @@ export function FilaSuscripcion({
               </div>
             </div>
             <div className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Hasta</span>
+              <span className="text-muted">Hasta</span>
               <div className="mt-1">
                 <CampoFecha
                   valor={form.endsAt}
@@ -604,7 +602,7 @@ export function FilaSuscripcion({
             </div>
           </div>
           <label className="block text-xs">
-            <span style={{ color: 'var(--text-muted)' }}>Notas</span>
+            <span className="text-muted">Notas</span>
             <input
               className="mt-1"
               value={form.notes}
@@ -640,11 +638,10 @@ export function FilaSuscripcion({
               Suma al pagado y recalcula el estado de pago; no lo sustituye.
               Se escribe lo que entró HOY, que es como lo cuenta quien cobra. */}
           <div
-            className="flex flex-wrap items-end gap-2 border-t pt-2"
-            style={{ borderColor: 'var(--border)' }}
+            className="flex flex-wrap items-end gap-2 border-t pt-2 border-line"
           >
             <label className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Registrar un abono</span>
+              <span className="text-muted">Registrar un abono</span>
               <div className="mt-1" style={{ width: '11rem' }}>
                 <CampoDinero
                   valor={abono}
@@ -655,7 +652,7 @@ export function FilaSuscripcion({
               </div>
             </label>
             <div className="block text-xs">
-              <span style={{ color: 'var(--text-muted)' }}>Cómo pagó</span>
+              <span className="text-muted">Cómo pagó</span>
               <div className="mt-1">
                 <SelectMenu
                   valor={metodoAbono}

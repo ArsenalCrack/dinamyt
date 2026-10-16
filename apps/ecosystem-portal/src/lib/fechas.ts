@@ -30,6 +30,15 @@
  * mismo motivo.
  */
 
+import { textoFueraDeReact } from './i18n';
+
+/**
+ * Lo que se pinta cuando no hay fecha: «Sin dato» / «Not set», del
+ * diccionario. Era una raya larga (—) escrita aquí, fuera de `i18n` y de
+ * `comun.sinDato` (auditoría 001, nº 17).
+ */
+const sinDato = () => textoFueraDeReact('comun.sinDato');
+
 /** Cómo se escriben las cosas si el navegador no dice otra cosa. */
 const IDIOMA = 'es-CO';
 
@@ -56,7 +65,7 @@ export function fechaCivil(
   opciones: Intl.DateTimeFormatOptions = { dateStyle: 'medium' },
 ): string {
   const iso = comoIso(valor);
-  if (!iso) return '—';
+  if (!iso) return sinDato();
   const [a, m, d] = iso.split('-').map(Number);
   return new Intl.DateTimeFormat(idioma(), {
     ...opciones,
@@ -79,9 +88,9 @@ export function instante(
     timeStyle: 'short',
   },
 ): string {
-  if (!valor) return '—';
+  if (!valor) return sinDato();
   const d = valor instanceof Date ? valor : new Date(valor);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return sinDato();
   return new Intl.DateTimeFormat(idioma(), opciones).format(d);
 }
 
@@ -96,9 +105,9 @@ export function haceCuanto(
   valor: string | Date | null | undefined,
   ahora: Date = new Date(),
 ): string {
-  if (!valor) return '—';
+  if (!valor) return sinDato();
   const d = valor instanceof Date ? valor : new Date(valor);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return sinDato();
   const rtf = new Intl.RelativeTimeFormat(idioma(), { numeric: 'auto' });
   const tramos: [Intl.RelativeTimeFormatUnit, number][] = [
     ['second', 60],

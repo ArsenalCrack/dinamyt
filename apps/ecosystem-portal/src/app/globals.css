@@ -13,6 +13,31 @@
    tipografía, espaciado y sus componentes. Ver §4.9 y §6.2. */
 @import '@dinamyt/shared/estilos.css';
 
+/* ── Los tokens del ecosistema, como colores de Tailwind ────────────────────
+   Para escribir `text-muted` en vez de `style={{ color: 'var(--text-muted)' }}`,
+   que el portal repetía 274 veces (auditoría 003, nº 6). `inline` hace que la
+   utilidad apunte a la variable misma, así que cambia con el tema igual que el
+   estilo en línea. Ojo con la cascada (DESIGN.md): una utilidad gana a
+   `@layer components` pero pierde contra lo que va sin capa (`.navbar-*`,
+   `.fecha-*`, `.selectmenu-*`, los campos). */
+@theme inline {
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-gold: var(--gold);
+  --color-gold-grande: var(--gold-grande);
+  --color-gold-dim: var(--gold-dim);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --color-warn: var(--warn);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-card: var(--bg-card);
+  --color-elevated: var(--bg-elevated);
+  --color-accion: var(--accion);
+  --color-accion-texto: var(--accion-texto);
+}
+
 
 /* El `body` base —fondo, color, tipografía— lo pone
    `packages/shared/estilos.css`. Aquí solo va lo que es del portal: la pantalla
@@ -153,14 +178,7 @@ body > .pagina {
   to { opacity: 1; transform: translateY(0); }
 }
 main { animation: aparecer 0.3s ease; }
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+/* «Reducir movimiento» lo apaga la hoja compartida, para las cuatro webs. */
 
 /* ── Selector de fecha (components/CampoFecha.tsx) ────────────────────────
    FUERA de `@layer components` a propósito: una clase que Tailwind no
@@ -249,7 +267,7 @@ main { animation: aparecer 0.3s ease; }
 }
 .fecha-semana span {
   text-align: center;
-  font-size: 0.62rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text-muted);
@@ -372,6 +390,7 @@ main { animation: aparecer 0.3s ease; }
   list-style: none;
   max-height: 17rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--bg-card);
   border: 1px solid var(--gold-dim);
   border-radius: 0.6rem;
@@ -535,7 +554,7 @@ main { animation: aparecer 0.3s ease; }
   background: var(--danger);
   color: #fff;
   font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.65rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   line-height: 1;
 }
@@ -675,7 +694,7 @@ main { animation: aparecer 0.3s ease; }
   display: block;
   margin-top: 0.1rem;
   font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.66rem;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 @media (min-width: 768px) {

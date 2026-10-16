@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { activarPush, estadoPush } from '@/lib/push';
 import { useI18n } from '@/lib/i18n';
+import { Icono } from '@/components/Icono';
 
 /**
  * ── «¿Te avisamos?», la primera vez ─────────────────────────────────────────
@@ -139,16 +140,16 @@ export function PedirAvisos({ activo }: { activo: boolean }) {
         onClick={(e) => e.stopPropagation()}
       >
         <p className="pedir-avisos-icono" aria-hidden="true">
-          🔔
+          <Icono nombre="campana" tamano={30} />
         </p>
         <p className="confirmar-titulo">{t('avisos.pedir')}</p>
         <div className="confirmar-detalle">
           {estado === 'listo' ? (
-            <p style={{ color: 'var(--ok)' }}>
+            <p className="text-ok">
               {t('avisos.listo')}
             </p>
           ) : estado === 'falló' ? (
-            <p style={{ color: 'var(--danger)' }}>{motivo}</p>
+            <p className="text-danger">{motivo}</p>
           ) : (
             <>
               <p>

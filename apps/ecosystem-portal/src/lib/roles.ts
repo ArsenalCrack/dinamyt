@@ -1,3 +1,5 @@
+import { textoFueraDeReact } from './i18n';
+
 /**
  * El catálogo de roles del portal. **Uno solo, y esta es la razón:**
  *
@@ -38,8 +40,9 @@ export const NOMBRE_ROL: Record<string, string> = {
   member: 'Miembro',
 };
 
+/** Sin rol: «Sin dato» del diccionario, no una raya (auditoría 001, nº 17). */
 export const nombreRol = (rol: string | null | undefined): string =>
-  rol ? (NOMBRE_ROL[rol] ?? rol) : '—';
+  rol ? (NOMBRE_ROL[rol] ?? rol) : textoFueraDeReact('comun.sinDato');
 
 /**
  * Reparto de roles asignables (decisión de producto, y el backend valida lo

@@ -11,6 +11,7 @@ punta a punta.
 |---|---|
 | **[OPERAR.md](OPERAR.md)** | **Empieza aquí.** Desplegar, migrar, el correo, los respaldos, cómo funciona esto por dentro y las trampas que ya costaron una tarde |
 | [HOJA-DE-RUTA.md](HOJA-DE-RUTA.md) | Lo que queda por hacer, en orden |
+| [DESIGN.md](DESIGN.md) | El sistema de diseño de las cuatro webs: colores, tipografía, componentes y lo que no se hace. Manda sobre cualquier skill de diseño |
 | [MONTAR-VPS.md](MONTAR-VPS.md) | El servidor desde cero. Solo si hay que rehacerlo |
 | `productos/campeonatos/INICIAR-LOCAL.md` | El PC del evento: el campeonato sin internet, y qué hacer si se cae cada cosa |
 

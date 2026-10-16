@@ -18,6 +18,7 @@ import { Campo } from '@/components/Campo';
 import { PROPS_CORREO, validarCorreo } from '@/lib/validacion';
 import { useI18n } from '@/lib/i18n';
 import { CabeceraAuth } from '@/components/CabeceraAuth';
+import { MensajeVivo } from '@/components/MensajeVivo';
 import {
   destinoSeguro,
   fueUnaRecarga,
@@ -346,28 +347,23 @@ function LoginForm() {
       )}
 
       {abierta ? (
-        <section className="card w-full max-w-sm p-6">
+        <section className="card con-franja w-full max-w-sm p-6">
           <h1 className="display mb-1 text-2xl">{t('login.yaHaySesion')}</h1>
-          <p className="mb-5 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-5 text-sm text-muted">
             {destino && destino.fresca
               ? `${destino.nombre} está pidiendo entrar con tu cuenta DINAMYT.`
               : 'Esta es la cuenta con la que estás dentro ahora mismo.'}
           </p>
           <div
-            className="mb-5 rounded-lg border p-3"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}
+            className="mb-5 rounded-lg border p-3 border-line bg-elevated"
           >
             <p className="font-semibold">{abierta.fullName}</p>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm text-muted">
               {abierta.email}
               {abierta.is_super_admin ? ' · Super administrador' : ''}
             </p>
           </div>
-          {error && (
-            <p className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>
-              {error}
-            </p>
-          )}
+          <MensajeVivo tono="error" texto={error} className="mb-3 text-sm" />
           <button
             type="button"
             onClick={() => continuarConLaSesionAbierta(!elSubmitVuelve)}
@@ -452,22 +448,18 @@ function LoginForm() {
           <p className="mt-2 text-right text-sm">
             <Link
               href={`/recuperar${email ? `?email=${encodeURIComponent(email)}` : ''}`}
-              style={{ color: 'var(--gold)' }}
+              className="text-gold"
             >
               {t('login.olvidada')}
             </Link>
           </p>
-          {error && (
-            <p className="mb-1 mt-3 text-sm" style={{ color: 'var(--danger)' }}>
-              {error}
-            </p>
-          )}
+          <MensajeVivo tono="error" texto={error} className="mb-1 mt-3 text-sm" />
           {faltaVerificar && (
-            <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="mb-3 text-sm text-muted">
               Puedes desbloquearla ahora mismo:{' '}
               <Link
                 href={`/recuperar${email ? `?email=${encodeURIComponent(email)}` : ''}`}
-                style={{ color: 'var(--gold)' }}
+                className="text-gold"
               >
                 cambia tu contraseña con un código
               </Link>
@@ -517,11 +509,10 @@ function LoginForm() {
             </button>
           )}
           <p
-            className="mt-4 text-center text-sm"
-            style={{ color: 'var(--text-muted)' }}
+            className="mt-4 text-center text-sm text-muted"
           >
             ¿No tienes cuenta?{' '}
-            <Link href="/registro" style={{ color: 'var(--gold)' }}>
+            <Link href="/registro" className="text-gold">
               {t('login.registrate')}
             </Link>
           </p>

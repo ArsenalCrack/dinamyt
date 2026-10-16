@@ -9,6 +9,7 @@ import { Campo } from '@/components/Campo';
 import { MedidorContrasena } from '@/components/MedidorContrasena';
 import { validarContrasena } from '@/lib/validacion';
 import { useI18n } from '@/lib/i18n';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * Donde aterriza el enlace de invitación del maestro (camino B, §2.1).
@@ -58,8 +59,7 @@ function PonerContrasena() {
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <div
-        className="w-full max-w-sm rounded-xl border p-6"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        className="card con-franja w-full max-w-sm p-6"
       >
         {/* `.display` + `.acento`: la tipografía de rol y el oro de TITULAR.
             Iba con `--gold`, que es el de texto pequeño, y a 24 px en negrita
@@ -83,15 +83,14 @@ function PonerContrasena() {
             </p>
             <Link
               href="/login"
-              className="inline-block rounded-lg px-4 py-2 font-semibold"
-              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
+              className="inline-block rounded-lg px-4 py-2 font-semibold bg-accion text-accion-texto"
             >
               {t('comun.iniciarSesion2')}
             </Link>
           </div>
         ) : (
           <form onSubmit={onSubmit} noValidate>
-            <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="mb-4 text-sm text-muted">
               Tu club ya creó tu cuenta. Elige una contraseña y con ella entras a
               todo DINAMYT.
             </p>
@@ -125,8 +124,11 @@ function PonerContrasena() {
                   : null
               }
               ok={repetida && coinciden && claveValida.ok ? 'Coinciden.' : null}
+              htmlFor="pc-repetida"
             >
               <CampoContrasena
+                id="pc-repetida"
+                name="repetida"
                 value={repetida}
                 onChange={(e) => setRepetida(e.target.value)}
                 onBlur={() => setTocado((t) => ({ ...t, repetida: true }))}
@@ -134,17 +136,12 @@ function PonerContrasena() {
               />
             </Campo>
 
-            {error && (
-              <p className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>
-                {error}
-              </p>
-            )}
+            <MensajeVivo tono="error" texto={error} className="mb-3 text-sm" />
 
             <button
               type="submit"
               disabled={cargando}
-              className="w-full rounded-lg px-4 py-2 font-semibold"
-              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
+              className="w-full rounded-lg px-4 py-2 font-semibold bg-accion text-accion-texto"
             >
               {cargando ? 'Guardando…' : 'Guardar contraseña'}
             </button>

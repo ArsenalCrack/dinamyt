@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PROPS_CORREO,
+import {
+  PROPS_CORREO,
+  validarCorreo,
   LIM,
   soloLetras,
 } from '@/lib/validacion';
@@ -23,6 +25,7 @@ import { SelectMenu } from '@/components/SelectMenu';
 import { nombreRol } from '@/lib/roles';
 import { useConfirmar } from '@/components/Confirmar';
 import { useI18n } from '@/lib/i18n';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * **Entrada al club: las dos puertas, juntas.**
@@ -127,6 +130,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
    * la reparte.
    */
   const [enlaceSuelto, setEnlaceSuelto] = useState<string | null>(null);
+  const [errorCorreo, setErrorCorreo] = useState<string | null>(null);
 
   const cargarSolicitudes = useCallback(async () => {
     try {
@@ -213,6 +217,16 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
   async function invitar() {
     setEnlaceSuelto(null);
+    // El botón ya no se apaga mientras el correo esté vacío: apagado no decía
+    // por qué (auditoría 003, nº 15). Se comprueba aquí, el error sale debajo
+    // del campo y el foco vuelve a él.
+    const revision = validarCorreo(nueva.email);
+    if (!revision.ok) {
+      setErrorCorreo(revision.error ?? t('codigo.correoInvitado'));
+      document.getElementById('inv-correo')?.focus();
+      return;
+    }
+    setErrorCorreo(null);
     const correo = nueva.email.trim();
     const r = await accion(
       () =>
@@ -285,8 +299,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       // ella, el aviso dejaba al maestro arriba de una pantalla larga
       // buscando dónde estaba lo que le acababan de decir.
       id="solicitudes"
-      className="card p-5"
-      style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+      className="card p-5 bg-card border-line"
     >
       <button
         type="button"
@@ -303,13 +316,13 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
             </span>
           )}
         </span>
-        <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>
+        <span aria-hidden="true" className="text-muted">
           {abierta ? '▾' : '▸'}
         </span>
       </button>
 
       {!abierta && (
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 text-sm text-muted">
           Tu código y tus invitaciones.{' '}
           {esperando > 0
             ? 'Hay gente esperando respuesta.'
@@ -319,14 +332,13 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
       {abierta && (
         <>
-      <p className="mb-5 mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-5 mt-1 text-sm text-muted">
         {t('codigo.intro')}
       </p>
 
       {/* ══ Puerta 1 · El código ════════════════════════════════════════ */}
       <h3
-        className="eyebrow mb-2"
-        style={{ color: 'var(--gold-dim)' }}
+        className="eyebrow mb-2 text-gold-dim"
       >
         {t('codigo.tuCodigo')}
       </h3>
@@ -342,8 +354,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       ) : codigo ? (
         <div className="flex flex-wrap items-center gap-3">
           <code
-            className="rounded-lg border px-4 py-2 font-mono text-xl tracking-[0.35em]"
-            style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+            className="rounded-lg border px-4 py-2 font-mono text-xl tracking-[0.35em] border-gold text-gold"
           >
             {codigo}
           </code>
@@ -399,7 +410,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm text-muted">
             {t('codigo.sinCodigo')}
           </p>
           <button
@@ -419,12 +430,12 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       )}
 
       {/* ── La bandeja del código ──────────────────────────────────────── */}
-      <h4 className="mb-2 mt-5 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+      <h4 className="mb-2 mt-5 text-sm font-semibold text-muted">
         {t('codigo.pidenEntrar')} ({solicitudes.length})
       </h4>
 
       {solicitudes.length === 0 && (
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm text-muted">
           {t('codigo.nadieEspera')}
         </p>
       )}
@@ -433,8 +444,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         {solicitudes.map((s) => (
           <li
             key={s.id}
-            className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
-            style={{ borderColor: 'var(--border)' }}
+            className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between border-line"
           >
             {/* Mismo recorte que en `FilaMiembro`: un correo largo no puede
                 empujar los botones fuera de la tarjeta. */}
@@ -445,8 +455,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                   {s.fullName}
                 </p>
                 <p
-                  className="truncate text-xs"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="truncate text-xs text-muted"
                   title={s.email}
                 >
                   {s.email}
@@ -518,12 +527,12 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       </ul>
 
       {/* ══ Puerta 2 · La invitación ════════════════════════════════════ */}
-      <hr className="my-6" style={{ borderColor: 'var(--border)' }} />
+      <hr className="my-6 border-line" />
 
-      <h3 className="eyebrow mb-2" style={{ color: 'var(--gold-dim)' }}>
+      <h3 className="eyebrow mb-2 text-gold-dim">
         2 · Invitar por correo
       </h3>
-      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-3 text-sm text-muted">
         {t('codigo.leLlega')} <b>No entra hasta que
         acepte</b>: aquí se pregunta, no se agrega. Si todavía no tiene cuenta,
         se la creamos y le mandamos el enlace para que ponga su contraseña.
@@ -531,11 +540,20 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
 
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <input
+          id="inv-correo"
+          name="correo-invitado"
+          // La ficha es de OTRA persona: que el navegador no ofrezca el tuyo.
+          autoComplete="off"
           placeholder="correo@persona.com"
           {...PROPS_CORREO}
           value={nueva.email}
-          onChange={(e) => setNueva({ ...nueva, email: e.target.value })}
+          onChange={(e) => {
+            setNueva({ ...nueva, email: e.target.value });
+            if (errorCorreo) setErrorCorreo(null);
+          }}
           aria-label={t('codigo.correoInvitado')}
+          aria-invalid={errorCorreo ? true : undefined}
+          aria-describedby={errorCorreo ? 'inv-correo-error' : undefined}
           className="min-w-0"
         />
         <SelectMenu
@@ -547,10 +565,15 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           style={{ minWidth: 'min(11rem, 100%)' }}
         />
       </div>
+      {errorCorreo && (
+        <p id="inv-correo-error" className="msg-error mt-1 text-xs" role="alert">
+          {errorCorreo}
+        </p>
+      )}
 
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <label className="block text-xs">
-          <span style={{ color: 'var(--text-muted)' }}>
+          <span className="text-muted">
             {t('codigo.nombreSiNoTiene')}
           </span>
           {/* `soloLetras` y no texto libre: este nombre nace como el de una
@@ -561,6 +584,8 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
               sale en el carnet, y verlo distinto hace dudar de si quedó bien. */}
           <input
             className="mt-1"
+            name="nombre-invitado"
+            autoComplete="off"
             maxLength={LIM.nombrePersona}
             value={nueva.fullName}
             onChange={(e) =>
@@ -573,11 +598,13 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           />
         </label>
         <label className="block text-xs">
-          <span style={{ color: 'var(--text-muted)' }}>
+          <span className="text-muted">
             {t('codigo.mensajeOpcional')}
           </span>
           <input
             className="mt-1"
+            name="mensaje-invitacion"
+            autoComplete="off"
             maxLength={LIM.nota}
             value={nueva.note}
             onChange={(e) => setNueva({ ...nueva, note: e.target.value })}
@@ -587,8 +614,9 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
       </div>
 
       <button
+        type="button"
         onClick={() => void invitar()}
-        disabled={ocupado || !nueva.email.trim()}
+        disabled={ocupado}
         className="btn btn-gold mt-3"
       >
         Enviar invitación
@@ -600,19 +628,19 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
           style={{ borderColor: 'var(--gold-dim)', background: 'var(--bg-elevated)' }}
         >
           <p className="mb-1 font-semibold">{t('codigo.pasaEnlace')}</p>
-          <p className="break-all" style={{ color: 'var(--gold)' }}>
+          <p className="break-all text-gold">
             {enlaceSuelto}
           </p>
         </div>
       )}
 
       {/* ── Las invitaciones en el aire ─────────────────────────────────── */}
-      <h4 className="mb-2 mt-5 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+      <h4 className="mb-2 mt-5 text-sm font-semibold text-muted">
         Invitaciones sin responder ({enElAire.length})
       </h4>
 
       {enElAire.length === 0 && (
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm text-muted">
           No tienes ninguna esperando.
         </p>
       )}
@@ -621,8 +649,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         {enElAire.map((i) => (
           <li
             key={i.id}
-            className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
-            style={{ borderColor: 'var(--border)' }}
+            className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between border-line"
           >
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <Avatar src={i.avatarUrl} nombre={i.fullName ?? i.email} size={32} />
@@ -631,8 +658,7 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
                   {i.fullName ?? i.email}
                 </p>
                 <p
-                  className="truncate text-xs"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="truncate text-xs text-muted"
                   title={i.email}
                 >
                   {i.email} · {nombreRol(i.role)}
@@ -683,8 +709,8 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
         </>
       )}
 
-      {error && <p className="msg-error mt-3 text-sm">{error}</p>}
-      {ok && <p className="msg-ok mt-3 text-sm">{ok}</p>}
+      <MensajeVivo tono="error" texto={error} className="mt-3 text-sm" />
+      <MensajeVivo tono="ok" texto={ok} className="mt-3 text-sm" />
       {dialogo}
     </section>
   );

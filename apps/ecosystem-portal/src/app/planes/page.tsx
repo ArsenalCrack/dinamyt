@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { listPlanesAPI, type Plan } from '@/lib/api';
 import { CORREO_ADMIN } from '@/lib/contacto';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { Cargando } from '@/components/Cargando';
+import { BarraPublica } from '@/components/BarraPublica';
 
 const NOMBRE_APP: Record<string, string> = {
   academy: 'Academy',
@@ -77,7 +77,7 @@ const QUE_INCLUYE: Record<string, ClaveTexto[]> = {
  * `/admin`; lo que se oculta es el escaparate.
  */
 export default function PlanesPage() {
-  const { t } = useI18n();
+  const { t, idioma } = useI18n();
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [estado, setEstado] = useState<'cargando' | 'ok' | 'error'>('cargando');
 
@@ -105,15 +105,14 @@ export default function PlanesPage() {
     encodeURIComponent(`DINAMYT · Cotización: ${nombre}`);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
-      <header className="mb-8 flex items-center justify-between gap-4">
-        <div>
-          <p className="eyebrow mb-1">{t('planes.eyebrow')}</p>
-          <h1 className="display text-3xl">{t('planes.titulo')}</h1>
-        </div>
-        <Link href="/" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          {t('planes.inicio')}
-        </Link>
+    <>
+    {/* La barra de las páginas públicas: la marca, que lleva a la portada, y
+        la puerta de entrar. Antes solo había un «← Inicio» (003, nº 9). */}
+    <BarraPublica conPlanes={false} />
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-10 sm:px-6">
+      <header className="mb-8">
+        <p className="eyebrow mb-1">{t('planes.eyebrow')}</p>
+        <h1 className="display text-3xl">{t('planes.titulo')}</h1>
       </header>
 
       {/* ── Cómo se cobra, antes de las tarjetas ─────────────────────────
@@ -123,7 +122,7 @@ export default function PlanesPage() {
           respuesta, no un contrato. */}
       <section className="card mb-8 p-5 sm:p-6" style={{ borderColor: 'var(--gold-dim)' }}>
         <h2 className="text-lg font-bold">{t('planes.comoSeCobra')}</h2>
-        <dl className="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+        <dl className="mt-4 grid gap-x-8 gap-y-3 text-base sm:grid-cols-2">
           {(
             [
               ['planes.porOrg', 'planes.porOrgDetalle'],
@@ -133,10 +132,10 @@ export default function PlanesPage() {
             ] as [ClaveTexto, ClaveTexto][]
           ).map(([titulo, detalle]) => (
             <div key={titulo} className="flex flex-wrap items-baseline gap-x-2">
-              <dt className="font-bold" style={{ color: 'var(--text)' }}>
+              <dt className="font-bold text-ink">
                 {t(titulo)}
               </dt>
-              <dd className="m-0" style={{ color: 'var(--text-muted)' }}>
+              <dd className="m-0 text-muted">
                 {t(detalle)}
               </dd>
             </div>
@@ -154,18 +153,24 @@ export default function PlanesPage() {
 
       {estado === 'cargando' && <Cargando encajado />}
       {estado === 'error' && (
-        <p style={{ color: 'var(--danger)' }}>
+        <p className="text-danger">
           {t('planes.errorCargar')}{' '}
-          <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
+          <a href={`mailto:${CORREO_ADMIN}`} className="text-gold">
             {CORREO_ADMIN}
           </a>{' '}
           {t('planes.errorCargar2')}
         </p>
       )}
 
-      <ul className="grid gap-4 sm:grid-cols-2">
+      {/* Tres columnas en escritorio: con dos, el tercer plan quedaba solo en
+          su fila (003, nº 8). En tableta, el que junta varias apps va a lo
+          ancho debajo de los sencillos. */}
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {planes.map((plan) => (
-          <li key={plan.id} className="card flex flex-col p-5">
+          <li
+            key={plan.id}
+            className={`card flex flex-col p-5 ${plan.appsIncluded.length > 1 ? 'sm:col-span-2 lg:col-span-1' : ''}`}
+          >
             <div className="flex flex-wrap gap-1.5">
               {plan.appsIncluded.map((app) => (
                 <span key={app} className="badge badge-gold">
@@ -175,21 +180,36 @@ export default function PlanesPage() {
             </div>
             <h3 className="mt-3 text-xl font-semibold">{plan.name}</h3>
             {plan.description && (
-              <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-1 text-base leading-relaxed text-muted">
                 {plan.description}
               </p>
             )}
 
-            <ul className="mt-4 flex-1 space-y-1.5 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              {plan.appsIncluded.flatMap((app) =>
-                (QUE_INCLUYE[app] ?? []).map((clave) => (
-                  <li key={`${app}-${clave}`} className="flex gap-2">
-                    <span aria-hidden="true" style={{ color: 'var(--ok)' }}>
+            <ul className="mt-4 flex-1 space-y-1.5 text-base leading-relaxed text-muted">
+              {plan.appsIncluded.length > 1 ? (
+                // El que junta varias apps no repite sus diez líneas: dice que
+                // trae las de los otros, que están justo al lado.
+                <li className="flex gap-2">
+                  <span aria-hidden="true" className="text-ok">
+                    ✓
+                  </span>
+                  <span>
+                    {t('planes.todoLoDe')}{' '}
+                    <strong className="text-ink">
+                      {listaDeApps(plan.appsIncluded, idioma)}
+                    </strong>
+                    , {t('planes.enUnaSuscripcion')}
+                  </span>
+                </li>
+              ) : (
+                (QUE_INCLUYE[plan.appsIncluded[0]] ?? []).map((clave) => (
+                  <li key={clave} className="flex gap-2">
+                    <span aria-hidden="true" className="text-ok">
                       ✓
                     </span>
                     <span>{t(clave)}</span>
                   </li>
-                )),
+                ))
               )}
             </ul>
 
@@ -209,13 +229,21 @@ export default function PlanesPage() {
         ))}
       </ul>
 
-      <p className="mt-8 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-8 text-base text-muted">
         {t('planes.dudas')}{' '}
-        <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
+        <a href={`mailto:${CORREO_ADMIN}`} className="text-gold">
           {CORREO_ADMIN}
         </a>
         .
       </p>
     </main>
+    </>
+  );
+}
+
+/** «Campeonatos y Membresías» / «Campeonatos and Membresías». */
+function listaDeApps(apps: string[], idioma: string): string {
+  return new Intl.ListFormat(idioma, { type: 'conjunction' }).format(
+    apps.map((a) => NOMBRE_APP[a] ?? a),
   );
 }

@@ -23,6 +23,7 @@ import { useI18n } from '@/lib/i18n';
 import { PedirAvisos } from '@/components/PedirAvisos';
 import { EntrarAClub } from '@/components/EntrarAClub';
 import { Cargando } from '@/components/Cargando';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 const CAMPEONATOS_URL =
   process.env.NEXT_PUBLIC_CAMPEONATOS_URL || 'http://localhost:3003';
@@ -228,7 +229,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-2xl px-6 py-10">
+    <main className="mx-auto min-h-screen w-full max-w-2xl px-6 py-10 lg:max-w-5xl">
       {/* «¿Te avisamos?», una sola vez y solo a quien lleva un club: los avisos
           de aquí no le llegan a un alumno, así que pedirle permiso sería gastar
           la única pregunta que el navegador deja hacer. Se pinta aquí porque
@@ -307,14 +308,11 @@ export default function DashboardPage() {
             por el borde derecho. Ver `BarraPortal`. */}
       </header>
 
-      {msg && (
-        <p
-          className="mb-4 text-sm"
-          style={{ color: msg.tipo === 'ok' ? 'var(--ok)' : 'var(--danger)' }}
-        >
-          {msg.texto}
-        </p>
-      )}
+      <MensajeVivo
+        tono={msg?.tipo === 'ok' ? 'ok' : 'error'}
+        texto={msg?.texto}
+        className="mb-4 text-sm"
+      />
 
       {avisoCampeonatos && (
         <div
@@ -332,11 +330,11 @@ export default function DashboardPage() {
           todo lo demás. Antes no existía —el maestro te metía en su club sin
           preguntarte— y ese era justamente el problema. */}
       {invitaciones.length > 0 && (
-        <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
+        <section className="card mb-5 p-5 border-gold">
           <h2 className="mb-1 text-lg font-semibold">
             Te invitaron a un club
           </h2>
-          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-3 text-sm text-muted">
             Decides tú. Si aceptas, tu ficha se crea sola en Membresías y verás
             los horarios y la sede de tu club.
           </p>
@@ -344,8 +342,7 @@ export default function DashboardPage() {
             {invitaciones.map((inv) => (
               <li
                 key={inv.id}
-                className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
-                style={{ borderColor: 'var(--border)' }}
+                className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between border-line"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-2.5">
                   <Avatar src={inv.orgLogoUrl} nombre={inv.orgName} size={36} />
@@ -353,7 +350,7 @@ export default function DashboardPage() {
                     <p className="truncate font-semibold" title={inv.orgName}>
                       {inv.orgName}
                     </p>
-                    <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <p className="truncate text-xs text-muted">
                       Te invita como {nombreRol(inv.role)}
                       {inv.orgCity ? ` · ${inv.orgCity}` : ''}
                     </p>
@@ -413,9 +410,12 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* En escritorio, «Tus aplicaciones» y «Mi organización» lado a lado:
+          una columna de 640 px en medio de 1440 dejaba dos tercios de la
+          pantalla vacíos (auditoría 003, nº 7). */}
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
       <section
-        className="rounded-xl border p-5"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        className="rounded-xl border p-5 bg-card border-line"
       >
         <h2 className="mb-4 text-lg font-semibold">{t('panel.tusApps')}</h2>
 
@@ -443,8 +443,7 @@ export default function DashboardPage() {
             (payload.is_super_admin || entraACampeonatos(payload) ? (
               <a
                 href={`${CAMPEONATOS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
-                className="rounded-lg px-4 py-3 font-semibold"
-                style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
+                className="rounded-lg px-4 py-3 font-semibold bg-accion text-accion-texto"
               >
                 Entrar a Campeonatos
                 {/* El nombre del papel DENTRO de Campeonatos: ahí `competitor`
@@ -456,11 +455,10 @@ export default function DashboardPage() {
             ) : (
               <a
                 href={`${CAMPEONATOS_URL}/campeonatos`}
-                className="rounded-lg border px-4 py-3"
-                style={{ borderColor: 'var(--border)' }}
+                className="rounded-lg border px-4 py-3 border-line"
               >
                 <span className="block font-semibold">{t('panel.verCampeonatos')}</span>
-                <span className="mt-0.5 block text-xs" style={{ color: 'var(--text-muted)' }}>
+                <span className="mt-0.5 block text-xs text-muted">
                   Tu club tiene Campeonatos, pero tu cuenta no tiene ningún papel
                   ahí. Aquí ves los campeonatos abiertos y sus resultados, sin
                   escribir contraseña.
@@ -478,15 +476,13 @@ export default function DashboardPage() {
               // devolvérselo, desde Membresías. Nada suyo se ha perdido: la
               // ficha, los pagos y la asistencia siguen enteros.
               <div
-                className="rounded-lg border px-4 py-3"
-                style={{ borderColor: 'var(--danger)' }}
+                className="rounded-lg border px-4 py-3 border-danger"
               >
                 <span className="block font-semibold">
                   {t('panel.membresiasCortado')}
                 </span>
                 <span
-                  className="mt-0.5 block text-xs"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="mt-0.5 block text-xs text-muted"
                 >
                   Tu maestro lo retiró desde Membresías. Sigues siendo parte del
                   club y no se ha perdido nada tuyo: tu ficha, tus pagos y tus
@@ -498,8 +494,7 @@ export default function DashboardPage() {
               // el token al aterrizar en /login#token=… sin segundo formulario.
               <a
                 href={`${MEMBRESIAS_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
-                className="rounded-lg px-4 py-3 font-semibold"
-                style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
+                className="rounded-lg px-4 py-3 font-semibold bg-accion text-accion-texto"
               >
                 Entrar a Membresías
                 {payload.role_membresias ? ` (${nombreRol(payload.role_membresias)})` : ''}
@@ -514,8 +509,7 @@ export default function DashboardPage() {
             // en /login#token=… sin segundo formulario.
             <a
               href={`${ACADEMY_URL}/login#token=${encodeURIComponent(obtenerToken() ?? '')}`}
-              className="rounded-lg px-4 py-3 font-semibold"
-              style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
+              className="rounded-lg px-4 py-3 font-semibold bg-accion text-accion-texto"
             >
               Entrar a Academy
               {payload.role_academy ? ` (${nombreRol(payload.role_academy)})` : ''}
@@ -534,7 +528,7 @@ export default function DashboardPage() {
              * verdad ocurre —falta la suscripción del club— y que su app sigue
              * funcionando por su dirección de siempre.
              */
-            <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-sm text-muted">
               {payload.role_membresias ||
               payload.role_campeonatos ||
               payload.role_academy ? (
@@ -560,7 +554,7 @@ export default function DashboardPage() {
               ) : (
                 <p>
                   No tienes aplicaciones habilitadas todavía.{' '}
-                  <Link href="/planes" style={{ color: 'var(--gold)' }}>
+                  <Link href="/planes" className="text-gold">
                     Ver planes disponibles
                   </Link>
                 </p>
@@ -574,38 +568,30 @@ export default function DashboardPage() {
           «Mi club» con su información (la llena el maestro/admin del club). */}
       {gestiona ? (
         <section
-          className="mt-4 rounded-xl border p-5"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+          className="rounded-xl border p-5 bg-card border-line"
         >
           <h2 className="mb-1 text-lg font-semibold">{t('panel.miOrganizacion')}</h2>
-          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-3 text-sm text-muted">
             Gestiona tus clubes y tu gente, la ficha de tu club y las
             invitaciones entre organización y clubes.
           </p>
-          <Link
-            href="/mi-organizacion"
-            className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
-            style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
-          >
+          {/* `.btn-outline`, la gramática de lo secundario (DESIGN.md): era un
+              botón armado a mano con borde dorado. */}
+          <Link href="/mi-organizacion" className="btn btn-outline">
             {t('panel.abrirOrganizacion2')}
           </Link>
         </section>
       ) : gestiona === false ? (
         <section
-          className="mt-4 rounded-xl border p-5"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+          className="rounded-xl border p-5 bg-card border-line"
         >
           <h2 className="mb-1 text-lg font-semibold">{t('panel.miClub')}</h2>
-          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-3 text-sm text-muted">
             {nombreClub
               ? `Perteneces a ${nombreClub}: mira sus horarios, sede y contactos.`
               : 'Cuando tu maestro te agregue a su club, aquí verás su información. ¿Eres maestro? Funda tu club.'}
           </p>
-          <Link
-            href="/mi-club"
-            className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold"
-            style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
-          >
+          <Link href="/mi-club" className="btn btn-outline">
             {nombreClub ? t('panel.verMiClub') : t('panel.miClub')}
           </Link>
         </section>
@@ -613,22 +599,18 @@ export default function DashboardPage() {
 
       {payload.is_super_admin && (
         <section
-          className="mt-4 rounded-xl border p-5"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+          className="rounded-xl border p-5 bg-card border-line"
         >
           <h2 className="mb-1 text-lg font-semibold">{t('panel.admin')}</h2>
-          <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-3 text-sm text-muted">
             {t('panel.adminDesc')}
           </p>
-          <Link
-            href="/admin"
-            className="inline-block rounded-lg px-4 py-2 text-sm font-semibold"
-            style={{ background: 'var(--accion)', color: 'var(--accion-texto)' }}
-          >
+          <Link href="/admin" className="btn btn-gold">
             {t('panel.abrirAdmin')}
           </Link>
         </section>
       )}
+      </div>
     </main>
   );
 }

@@ -289,7 +289,7 @@ export function BarraPortal() {
             pantalla, y es lo que faltaba para no perderse entre paneles. */}
         <Link href="/dashboard" className="navbar-marca">
           <img src="/logo.png" alt="DINAMYT" width={30} height={30} />
-          <span className="marca">
+          <span className="marca" translate="no">
             DINAMYT<span className="marca-app">{t('menu.ecosistema')}</span>
           </span>
         </Link>

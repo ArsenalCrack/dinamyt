@@ -93,12 +93,11 @@ export function VigilanteDeSesion() {
       className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-4"
     >
       <div
-        className="card flex w-full max-w-md flex-col gap-3 p-4 shadow-lg"
-        style={{ borderColor: 'var(--gold)' }}
+        className="card flex w-full max-w-md flex-col gap-3 p-4 shadow-lg border-gold"
       >
         <div>
           <p className="display text-lg">{t('sesion.porCerrarse')}</p>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-1 text-sm text-muted">
             Llevas un rato sin actividad. Se cerrará en{' '}
             <strong>{restan}</strong> segundo{restan === 1 ? '' : 's'} para que
             nadie más pueda usar tu cuenta desde este equipo.

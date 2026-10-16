@@ -17,6 +17,7 @@ import { CODIGO_DIGITOS, PROPS_CORREO, validarCorreo } from '@/lib/validacion';
 import { CampoCodigo } from '@/components/CampoCodigo';
 import { Campo } from '@/components/Campo';
 import { useI18n } from '@/lib/i18n';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * Confirmar el correo. **Aquí es donde nace la cuenta.**
@@ -164,28 +165,27 @@ export default function VerificarPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <div
-        className="w-full max-w-sm rounded-xl border p-6"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        className="card con-franja w-full max-w-sm p-6"
       >
-        <h1 className="mb-1 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
+        <h1 className="mb-1 text-2xl font-bold text-gold">
           {t('verificar.titulo')}
         </h1>
 
         {pendiente === undefined ? (
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm text-muted">
             Un momento…
           </p>
         ) : (
           <>
             {sinRegistro ? (
-              <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+              <p className="mb-4 text-sm text-muted">
                 Escribe el correo al que te llegó el código de{' '}
                 {CODIGO_DIGITOS} dígitos.
               </p>
             ) : (
-              <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+              <p className="mb-4 text-sm text-muted">
                 Te enviamos un código de {CODIGO_DIGITOS} dígitos a{' '}
-                <b style={{ color: 'var(--text)' }}>{correo}</b>. Escríbelo aquí
+                <b className="text-ink">{correo}</b>. Escríbelo aquí
                 para crear tu cuenta.
               </p>
             )}
@@ -204,8 +204,10 @@ export default function VerificarPage() {
             )}
 
             {sinRegistro && (
-              <Campo etiqueta="Tu correo">
+              <Campo etiqueta="Tu correo" htmlFor="ver-correo">
                 <input
+                  id="ver-correo"
+                  name="email"
                   {...PROPS_CORREO}
                   value={correoAMano}
                   onChange={(e) => setCorreoAMano(e.target.value)}
@@ -236,13 +238,9 @@ export default function VerificarPage() {
               </p>
             )}
 
-            {error && (
-              <p className="mt-3 text-center text-sm" style={{ color: 'var(--danger)' }}>
-                {error}
-              </p>
-            )}
+            <MensajeVivo tono="error" texto={error} className="mt-3 text-center text-sm" />
             {aviso && !error && (
-              <p className="mt-3 text-center text-sm" style={{ color: 'var(--ok)' }}>
+              <p className="mt-3 text-center text-sm text-ok">
                 {aviso}
               </p>
             )}
@@ -269,7 +267,7 @@ export default function VerificarPage() {
                   : 'No me llegó: reenviar el código'}
             </button>
 
-            <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-4 text-center text-xs text-muted">
               Revisa también la carpeta de correo no deseado. ¿Escribiste mal tu
               correo?{' '}
               {/* Empezar de nuevo BORRA el registro guardado: si no, al volver
@@ -277,7 +275,7 @@ export default function VerificarPage() {
               <Link
                 href="/registro"
                 onClick={olvidarRegistroPendiente}
-                style={{ color: 'var(--gold)' }}
+                className="text-gold"
               >
                 Vuelve a registrarte
               </Link>

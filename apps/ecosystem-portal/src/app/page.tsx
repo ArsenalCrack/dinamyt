@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
 import { CORREO_ADMIN } from '@/lib/contacto';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
+import { BarraPublica } from '@/components/BarraPublica';
 
 const CAMPEONATOS_API =
   process.env.NEXT_PUBLIC_CAMPEONATOS_API_URL || 'http://localhost:3002';
@@ -90,33 +91,10 @@ export default function HomePage() {
           la tinta del tema oscuro, así que con el modo claro puesto la barra
           se quedaba negra sobre una página blanca — y en Android dejaba
           además una raya pálida arriba. Ver la clase. */}
-      <header className="barra-superior">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <span className="inline-flex items-center gap-2.5">
-            <img src="/logo.png" alt="DINAMYT" width={30} height={30} />
-            {/* La marca del ecosistema, con la clase compartida. El portal no
-                lleva sufijo de aplicación: él ES DINAMYT. */}
-            <span className="marca text-lg">DINAMYT</span>
-          </span>
-          <nav className="flex items-center gap-2">
-            <a
-              href={`${CAMPEONATOS_URL}/resultados`}
-              className="btn btn-outline hidden sm:inline-flex"
-            >
-              {t('pie.resultados')}
-            </a>
-            <Link href="/planes" className="btn btn-outline hidden sm:inline-flex">
-              {t('planes.titulo')}
-            </Link>
-            <Link href="/login" className="btn btn-gold">
-              {t('portada.entrar')}
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <BarraPublica />
 
       {/* ── Hero ───────────────────────────────────────────────────────── */}
-      <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-20 lg:grid-cols-[1fr_1fr] lg:gap-12">
+      <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-20 lg:grid-cols-[1fr_1fr] lg:gap-12 xl:grid-cols-[7fr_5fr]">
         <div>
           <p className="eyebrow mb-4">{t('portada.eyebrow')}</p>
           {/* El titular nombra al rival de verdad, que no es otro software: es
@@ -135,9 +113,12 @@ export default function HomePage() {
                   se rompe; a `2rem` mide 258 y entra.
                 · **lg** → la rejilla parte el hero en dos y la columna baja a
                   ~464 px. `text-5xl` cabe; `text-6xl` no.
-                · **xl** → la columna llega a ~528 px y ahí sí entra `text-6xl`,
-                  que es donde el titular tiene el tamaño que merece. */}
-          <h1 className="display text-[2rem] sm:text-5xl xl:text-6xl">
+                · **xl** → con la rejilla en 7/5 (el texto gana ancho al
+                  marcador) la columna llega a ~640 px, y ahí entran 4.25 rem
+                  (68 px): «EL CUADERNO» mide ~600. Era `text-6xl` en una
+                  columna de 528, y el titular pesaba lo mismo que el marcador
+                  de al lado (auditoría 003, nº 20). */}
+          <h1 className="display text-[2rem] sm:text-5xl xl:text-[4.25rem]">
             {t('portada.titulo1')}
             <br />
             <span className="acento">{t('portada.titulo2')}</span>
@@ -145,8 +126,7 @@ export default function HomePage() {
             {t('portada.titulo3')}
           </h1>
           <p
-            className="mt-5 max-w-md text-base leading-relaxed sm:text-lg"
-            style={{ color: 'var(--text-muted)' }}
+            className="mt-5 max-w-md text-base leading-relaxed sm:text-lg text-muted"
           >
             {t('portada.sub')}
           </p>
@@ -161,9 +141,9 @@ export default function HomePage() {
               {t('portada.verResultados')}
             </a>
           </div>
-          <p className="mt-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-4 text-base text-muted">
             {t('portada.gratis')}{' '}
-            <Link href="/planes" style={{ color: 'var(--gold)' }}>
+            <Link href="/planes" className="text-gold">
               {t('portada.comoSeCobra')}
             </Link>
             .
@@ -193,7 +173,7 @@ export default function HomePage() {
                 className="card p-5"
               >
                 <h3 className="text-lg font-semibold">{c.nombre}</h3>
-                <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-1 text-sm text-muted">
                   {t('portada.tiempoReal')}
                 </p>
               </a>
@@ -214,8 +194,7 @@ export default function HomePage() {
           {t('portada.empieza')}
         </h2>
         <p
-          className="mx-auto mt-3 max-w-md text-sm leading-relaxed"
-          style={{ color: 'var(--text-muted)' }}
+          className="mx-auto mt-3 max-w-md text-base leading-relaxed text-muted"
         >
           {t('portada.empiezaSub')}
         </p>
@@ -271,8 +250,7 @@ function Cifras() {
                 {valor}
               </span>
               <span
-                className="mt-2 block text-xs leading-snug"
-                style={{ color: 'var(--text-muted)' }}
+                className="mt-2 block text-sm leading-snug text-muted"
               >
                 {t(clave)}
               </span>
@@ -357,6 +335,25 @@ const APPS: AppInfo[] = [
 function Aplicaciones() {
   const { t } = useI18n();
   const [activa, setActiva] = useState(APPS[0].id);
+  const pestanas = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // El patrón de pestañas que anuncian `role="tab"`: ← → (y Inicio, Fin)
+  // pasan de una a otra, y solo la activa está en el orden del tabulador
+  // (auditoría 002, nº 12). Antes se llegaba con Tab a cada una, que no es lo
+  // que el lector de pantalla promete.
+  function alTeclear(e: React.KeyboardEvent, i: number) {
+    const ultimo = APPS.length - 1;
+    const destino =
+      e.key === 'ArrowRight' ? (i === ultimo ? 0 : i + 1)
+      : e.key === 'ArrowLeft' ? (i === 0 ? ultimo : i - 1)
+      : e.key === 'Home' ? 0
+      : e.key === 'End' ? ultimo
+      : null;
+    if (destino === null) return;
+    e.preventDefault();
+    setActiva(APPS[destino].id);
+    pestanas.current[destino]?.focus();
+  }
   const app = APPS.find((a) => a.id === activa) ?? APPS[0];
 
   return (
@@ -365,13 +362,18 @@ function Aplicaciones() {
       <h2 className="display mb-6 text-3xl sm:text-4xl">Una cuenta, tus apps</h2>
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Aplicaciones">
-        {APPS.map((a) => {
+        {APPS.map((a, i) => {
           const seleccionada = a.id === activa;
           return (
             <button
               key={a.id}
+              ref={(el) => {
+                pestanas.current[i] = el;
+              }}
               role="tab"
               type="button"
+              tabIndex={seleccionada ? 0 : -1}
+              onKeyDown={(e) => alTeclear(e, i)}
               aria-selected={seleccionada}
               aria-controls={`panel-${a.id}`}
               id={`tab-${a.id}`}
@@ -407,12 +409,11 @@ function Aplicaciones() {
           {app.lineas.map((linea) => (
             <li
               key={linea}
-              className="flex items-start gap-2.5 text-sm leading-snug"
-              style={{ color: 'var(--text-muted)' }}
+              className="flex items-start gap-2.5 text-base leading-snug text-muted"
             >
               <span
                 aria-hidden="true"
-                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
                 style={{ background: 'var(--gold-fill)' }}
               />
               <span>{t(linea)}</span>
@@ -424,9 +425,9 @@ function Aplicaciones() {
             {t(app.cta.texto)}
           </a>
         ) : (
-          <p className="mt-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-6 text-base text-muted">
             {t('apps.noSeOfrece')}{' '}
-            <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
+            <a href={`mailto:${CORREO_ADMIN}`} className="text-gold">
               {t('portada.escribenos')}
             </a>{' '}
             {t('apps.teAvisamos')}
@@ -438,8 +439,7 @@ function Aplicaciones() {
           sistema se usa en polideportivos con wifi de coliseo. Va aparte y en
           dos líneas. */}
       <div
-        className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 text-sm"
-        style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+        className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 text-base border-line text-muted"
       >
         <span className="badge badge-gold">{t('portada.sinRed')}</span>
         <span>{t('portada.sinRedSub')}</span>
@@ -529,11 +529,12 @@ function MarcadorDemo() {
   const ss = String(segundos % 60).padStart(2, '0');
 
   return (
-    <div>
+    // `translate="no"`: KyongGo, GamJeum, Hong y Chung son reglamento, y el
+    // traductor del navegador los cambiaba por otra cosa (002, nº 14).
+    <div translate="no">
       <figure className="m-0">
         <figcaption
-          className="eyebrow mb-2 flex items-center gap-2"
-          style={{ color: 'var(--text-muted)' }}
+          className="eyebrow mb-2 flex items-center gap-2 text-muted"
         >
           <span
             aria-hidden="true"
@@ -543,12 +544,11 @@ function MarcadorDemo() {
         </figcaption>
         <div className="marcador">
         <div className="marcador-head">
-          <span className="eyebrow" style={{ color: 'var(--text-muted)' }}>
+          <span className="eyebrow text-muted">
             {t('demo.tatami')}
           </span>
           <span
-            className="mono text-lg font-semibold"
-            style={{ color: 'var(--gold)' }}
+            className="mono text-lg font-semibold text-gold"
           >
             {mm}:{ss}
           </span>
@@ -561,7 +561,7 @@ function MarcadorDemo() {
           />
           <div className="min-w-0">
             <p className="font-semibold">S. Rodríguez</p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-muted">
               Chung · Liga del Valle
             </p>
           </div>
@@ -577,7 +577,7 @@ function MarcadorDemo() {
           />
           <div className="min-w-0">
             <p className="font-semibold">J. Valencia</p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-muted">
               Hong · Liga de Antioquia
             </p>
           </div>
@@ -587,13 +587,12 @@ function MarcadorDemo() {
         </div>
 
         <div
-          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-4 py-2.5"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}
+          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-4 py-2.5 border-line bg-elevated"
         >
-          <span className="mono text-xs" style={{ color: 'var(--text-muted)' }}>
+          <span className="mono text-xs text-muted">
             KyongGo 1 · GamJeum 0
           </span>
-          <span className="mono text-xs" style={{ color: 'var(--text-muted)' }}>
+          <span className="mono text-xs text-muted">
             {t('demo.jueces')}
           </span>
           </div>
@@ -605,8 +604,7 @@ function MarcadorDemo() {
           donde seguía viva la huella que se retiró del producto. */}
       <figure className="m-0 mt-7 sm:ml-8 lg:ml-14">
         <figcaption
-          className="eyebrow mb-2 flex items-center gap-2"
-          style={{ color: 'var(--text-muted)' }}
+          className="eyebrow mb-2 flex items-center gap-2 text-muted"
         >
           <span
             aria-hidden="true"
@@ -628,7 +626,7 @@ function MarcadorDemo() {
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold">{t('demo.marco')}</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs text-muted">
                 {t('demo.conCarnet')}
               </p>
             </div>

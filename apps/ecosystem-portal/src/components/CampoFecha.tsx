@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n } from '@/lib/i18n';
+import { Icono } from '@/components/Icono';
 
 /**
  * Selector de fecha propio, con año y mes a un toque.
@@ -299,7 +300,7 @@ export function CampoFecha({
         <span className="fecha-btn-label" data-vacio={!valor ? true : undefined}>
           {etiqueta}
         </span>
-        <span aria-hidden="true">📅</span>
+        <Icono nombre="calendario" className="shrink-0 opacity-70" />
       </button>
 
       {abierto &&

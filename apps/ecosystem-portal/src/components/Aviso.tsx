@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n } from '@/lib/i18n';
+import { Icono } from '@/components/Icono';
 
 /**
  * El resultado de una acción, donde se pueda ver desde donde se pulsó.
@@ -100,7 +101,7 @@ export function Aviso({
           padding: '0.15rem',
         }}
       >
-        ✕
+        <Icono nombre="cerrar" />
       </button>
     </div>,
     document.body,

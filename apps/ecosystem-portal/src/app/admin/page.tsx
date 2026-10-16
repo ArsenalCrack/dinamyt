@@ -69,6 +69,8 @@ import { dinero } from '@/lib/formato';
 import { Avatar } from '@/components/Avatar';
 import { fechaCivil, haceCuanto, instante } from '@/lib/fechas';
 import { Cargando } from '@/components/Cargando';
+import { Icono } from '@/components/Icono';
+import { MensajeVivo } from '@/components/MensajeVivo';
 import {
   LIM,
   PROPS_CORREO,
@@ -369,17 +371,23 @@ export default function AdminEcosistemaPage() {
     // gente y de suscripciones, no un formulario. Las 128 px de más son las que
     // hacen que un nombre completo y un correo quepan en la misma línea.
     <main className="mx-auto min-h-screen max-w-7xl px-4 py-8 sm:px-6">
-      <Link href="/dashboard" className="text-sm" style={{ color: 'var(--text-muted)' }}>
-        ← Dashboard
-      </Link>
-      <h1 className="mb-1 mt-2 text-2xl font-bold" style={{ color: 'var(--gold)' }}>
-        Administración del ecosistema
-      </h1>
-      <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Flujo de acceso: crea la organización → invita a sus miembros con su rol
-        → activa una suscripción con el plan adecuado. El rol del miembro viaja
-        en su token como <code>role_campeonatos</code> / <code>role_academy</code>.
-      </p>
+      {/* La misma cabecera que el resto del portal: antetítulo, titular y
+          la salida a la derecha (auditoría 003, nº 2). Era un título dorado en
+          minúscula, otra gramática para el mismo nivel. */}
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="eyebrow mb-1">Todo el ecosistema</p>
+          <h1 className="display text-3xl">Administración</h1>
+          <p className="mt-2 text-sm text-muted">
+            Para dar acceso: crea la organización, invita a sus miembros con su
+            rol y activa una suscripción con el plan adecuado. Cada miembro
+            entra a las aplicaciones que su rol le abre.
+          </p>
+        </div>
+        <Link href="/dashboard" className="btn btn-outline shrink-0">
+          ← Mis aplicaciones
+        </Link>
+      </header>
 
       {/* Flotante, y no un párrafo aquí arriba: la lista de gente y la de
           clubes están dos pantallas más abajo, y desde ahí este renglón no se
@@ -522,8 +530,7 @@ export default function AdminEcosistemaPage() {
                       orden. */}
                   {abierta && (
                     <ul
-                      className="ml-3 mt-1 flex flex-col gap-1 border-l pl-3"
-                      style={{ borderColor: 'var(--border)' }}
+                      className="ml-3 mt-1 flex flex-col gap-1 border-l pl-3 border-line"
                     >
                       {clubes.map((c) => (
                         <li key={c.id}>
@@ -533,7 +540,7 @@ export default function AdminEcosistemaPage() {
                         </li>
                       ))}
                       {clubes.length === 0 && (
-                        <li className="py-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        <li className="py-1 text-xs text-muted">
                           Sin clubes afiliados.
                         </li>
                       )}
@@ -542,7 +549,7 @@ export default function AdminEcosistemaPage() {
                   {/* Plegada pero con el seleccionado dentro: se dice, para que
                       no parezca que el botón no hizo nada. */}
                   {cerrada && tieneAlSeleccionado && (
-                    <p className="ml-6 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <p className="ml-6 mt-1 text-xs text-muted">
                       Recogida, pero se enseña porque tiene el club seleccionado.
                     </p>
                   )}
@@ -553,8 +560,7 @@ export default function AdminEcosistemaPage() {
             {huerfanos.length > 0 && (
               <div>
                 <h3
-                  className="mb-1 text-xs font-semibold uppercase tracking-wide"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted"
                 >
                   Sin federación
                 </h3>
@@ -571,13 +577,13 @@ export default function AdminEcosistemaPage() {
             )}
 
             {orgs.length === 0 && (
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm text-muted">
                 Aún no hay organizaciones.
               </p>
             )}
           </div>
 
-          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <h3 className="mb-2 text-sm font-semibold text-muted">
             Nueva organización
           </h3>
           {/* ── Por qué esto dejó de ser cuatro `input` ──
@@ -593,7 +599,7 @@ export default function AdminEcosistemaPage() {
               encontrar en ninguna lista. */}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Nombre *</span>
+              <span className="text-muted">Nombre *</span>
               <input
                 className="mt-1"
                 placeholder="Club Dinamyt"
@@ -606,13 +612,13 @@ export default function AdminEcosistemaPage() {
                   y con el botón ya pulsado, «el nombre es muy corto» obliga a
                   adivinar cuánto falta. */}
               {errorNombreOrg && (
-                <span className="mt-1 block text-xs" style={{ color: 'var(--danger)' }}>
+                <span className="mt-1 block text-xs text-danger">
                   {errorNombreOrg}
                 </span>
               )}
             </label>
             <label className="block text-sm">
-              <span style={{ color: 'var(--text-muted)' }}>Tipo *</span>
+              <span className="text-muted">Tipo *</span>
               <div className="mt-1">
                 <SelectMenu
                   valor={nuevaOrg.type}
@@ -637,7 +643,7 @@ export default function AdminEcosistemaPage() {
           >
             + Crear organización
           </button>
-          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-2 text-xs text-muted">
             Nace vacía. Añádele enseguida a quien la administre: sin nadie
             dentro no le sale a ningún usuario en «Mi organización».
           </p>
@@ -649,15 +655,15 @@ export default function AdminEcosistemaPage() {
             {orgSel ? `Miembros de ${orgSel.name}` : 'Miembros'}
           </h2>
           {!orgSel && (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Selecciona una organización a la izquierda.
+            <p className="text-sm text-muted">
+              Elige una organización de la lista para ver a su gente.
             </p>
           )}
           {orgSel && (
             <>
               {/* El otro rótulo de alcance (ver «Accesos rápidos» arriba): esta
                   caja NO sale de la organización seleccionada. */}
-              <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <p className="mb-2 text-xs text-muted">
                 Alcance: solo dentro de <strong>{orgSel.name}</strong>. Cambiar
                 el rol aquí <strong>reemplaza los de cada app</strong> (las
                 insignias de la fila) y viaja a Membresías traducido: un maestro
@@ -671,8 +677,7 @@ export default function AdminEcosistemaPage() {
                   más que para esta pantalla. */}
               {orgSinNadie && (
                 <p
-                  className="mb-3 rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}
+                  className="mb-3 rounded-lg border px-3 py-2 text-sm border-gold text-gold"
                 >
                   Nadie está dentro de {orgSel.name} todavía, así que nadie la
                   administra: no le sale a ningún usuario en «Mi organización».
@@ -748,15 +753,9 @@ export default function AdminEcosistemaPage() {
                       )
                     }
                     acciones={
-                      m.userId === yo ? (
-                        <span
-                          className="shrink-0 px-1 text-xs"
-                          style={{ color: 'var(--text-muted)' }}
-                          title="No puedes sacarte a ti mismo de una organización que administras: perderías su panel y no podrías devolvértelo."
-                        >
-                          Tú
-                        </span>
-                      ) : (
+                      // Tu fila no lleva ✕: el motivo lo dice la propia fila,
+                      // debajo del correo (`FilaMiembro`).
+                      m.userId === yo ? null : (
                       <button
                         onClick={() =>
                           void confirmarYHacer(
@@ -782,7 +781,7 @@ export default function AdminEcosistemaPage() {
                         }}
                         title={`Quitar a ${m.fullName} de la organización`}
                       >
-                        <span aria-hidden="true">✕</span>
+                        <Icono nombre="cerrar" />
                         <span className="sr-only">Quitar de la organización</span>
                       </button>
                       )
@@ -790,7 +789,7 @@ export default function AdminEcosistemaPage() {
                   />
                 ))}
                 {miembros.length === 0 && (
-                  <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  <li className="text-sm text-muted">
                     {busquedaGente
                       ? `Nadie coincide con «${busquedaGente}».`
                       : 'Sin miembros todavía.'}
@@ -813,8 +812,7 @@ export default function AdminEcosistemaPage() {
               {(sinAcceso > 0 || verSinAcceso) && (
                 <button
                   type="button"
-                  className="mt-2 text-xs underline"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="mt-2 text-xs underline text-muted"
                   onClick={() => {
                     setVerSinAcceso((v) => !v);
                     setOffsetGente(0);
@@ -834,6 +832,9 @@ export default function AdminEcosistemaPage() {
                     y admitían texto sin fin. */}
                 <input
                   {...PROPS_CORREO}
+                  name="correo-invitacion"
+                  autoComplete="off"
+                  aria-label="Correo de la persona a invitar"
                   placeholder="email@usuario.com"
                   value={invitacion.email}
                   onChange={(e) => setInvitacion({ ...invitacion, email: e.target.value })}
@@ -870,7 +871,7 @@ export default function AdminEcosistemaPage() {
                 </button>
               </div>
 
-              <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+              <h3 className="mb-2 text-sm font-semibold text-muted">
                 Suscripciones de la organización
               </h3>
               <ul className="mb-3 flex flex-col gap-2">
@@ -884,7 +885,7 @@ export default function AdminEcosistemaPage() {
                   />
                 ))}
                 {subsDeOrg.length === 0 && (
-                  <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  <li className="text-sm text-muted">
                     Sin suscripciones.
                   </li>
                 )}
@@ -897,7 +898,7 @@ export default function AdminEcosistemaPage() {
                   el desplegable deja de ser un control sin nombre. */}
               <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
                 <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Plan *</span>
+                  <span className="text-muted">Plan *</span>
                   <div className="mt-1">
                     <SelectMenu
                       valor={nuevaSub.planId}
@@ -915,7 +916,7 @@ export default function AdminEcosistemaPage() {
                     alguien se equivocó de casilla. Sigue habiendo fechas
                     editables debajo para el caso raro. */}
                 <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Tipo *</span>
+                  <span className="text-muted">Tipo *</span>
                   <div className="mt-1">
                     <SelectMenu
                       valor={nuevaSub.meses}
@@ -950,7 +951,7 @@ export default function AdminEcosistemaPage() {
                     vacío ya no significa «sin importe», significa «el que
                     calculó el servidor». */}
                 <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-muted">
                     Monto {cotizacion?.porPersona ? '(calculado)' : ''}
                   </span>
                   <div className="mt-1">
@@ -963,7 +964,7 @@ export default function AdminEcosistemaPage() {
                   </div>
                 </label>
                 <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Desde</span>
+                  <span className="text-muted">Desde</span>
                   <div className="mt-1">
                     <CampoFecha
                       valor={nuevaSub.startsAt}
@@ -982,7 +983,7 @@ export default function AdminEcosistemaPage() {
                   </div>
                 </label>
                 <label className="block text-sm">
-                  <span style={{ color: 'var(--text-muted)' }}>Hasta (calculado)</span>
+                  <span className="text-muted">Hasta (calculado)</span>
                   <div className="mt-1">
                     <CampoFecha
                       valor={nuevaSub.endsAt}
@@ -997,7 +998,7 @@ export default function AdminEcosistemaPage() {
                   porque no son lo mismo cuando hay mínimo, y verlo es lo que
                   hace que el mínimo se entienda sin que nadie lo explique. */}
               {cotizacion && (
-                <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-2 text-xs text-muted">
                   {cotizacion.porPersona ? (
                     <>
                       <strong>{cotizacion.personas}</strong>{' '}
@@ -1087,7 +1088,7 @@ export default function AdminEcosistemaPage() {
       {subsPersonales.length > 0 && (
       <section className="card mt-5 p-5">
         <h2 className="mb-1 text-lg font-semibold">Suscripciones personales</h2>
-        <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mb-3 text-sm text-muted">
           Planes sueltos, sin organización detrás. <strong>Ya no se crean desde
           aquí</strong> (para dar acceso a alguien, «Accesos rápidos»), pero
           éstas siguen abriendo aplicaciones y se pueden retirar.
@@ -1096,16 +1097,14 @@ export default function AdminEcosistemaPage() {
           {subsPersonales.map((s) => (
             <li
               key={s.id}
-              className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
-              style={{ borderColor: 'var(--border)' }}
+              className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between border-line"
             >
               <div className="min-w-0">
                 <p className="truncate font-semibold" title={s.userFullName}>
                   {s.userFullName}
                 </p>
                 <p
-                  className="truncate text-xs"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="truncate text-xs text-muted"
                   title={s.userEmail}
                 >
                   {s.userEmail}
@@ -1227,7 +1226,7 @@ function FilaOrg({
         <strong className="truncate">{org.name}</strong>
         {children}
       </span>
-      <span style={{ color: 'var(--text-muted)' }}>{sel ? '▲' : '▼'}</span>
+      <span className="text-muted">{sel ? '▲' : '▼'}</span>
     </button>
   );
 }
@@ -1329,13 +1328,13 @@ function ClubesDeLaFederacion({
   return (
     <section className="card mt-5 p-5">
       <h2 className="mb-1 text-lg font-semibold">Clubes de {org.name}</h2>
-      <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-4 text-sm text-muted">
         Un club afiliado hereda los planes que contrate {org.name} (§4.5).
         Desde aquí se afilia <strong>directo</strong>, sin invitación y sin
         esperar a que su maestro responda: este panel monta la estructura. La
         federación, desde «Mi organización», sí tiene que invitar.
       </p>
-      <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-4 text-xs text-muted">
         No es instantáneo: los planes viajan dentro del pase, que dura 30
         minutos. Quien necesite verlo ya, que salga y entre.
       </p>
@@ -1344,12 +1343,11 @@ function ClubesDeLaFederacion({
         {clubes.map((c) => (
           <li
             key={c.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-sm"
-            style={{ borderColor: 'var(--border)' }}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-sm border-line"
           >
             <span className="min-w-0 truncate">
               <strong>{c.name}</strong>
-              {c.city && <span style={{ color: 'var(--text-muted)' }}> · {c.city}</span>}
+              {c.city && <span className="text-muted"> · {c.city}</span>}
             </span>
             <span className="flex items-center gap-2">
               <span className="badge">{c.type}</span>
@@ -1383,7 +1381,7 @@ function ClubesDeLaFederacion({
           </li>
         ))}
         {clubes.length === 0 && (
-          <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <li className="text-sm text-muted">
             Todavía no hay ningún club afiliado.
           </li>
         )}
@@ -1392,35 +1390,42 @@ function ClubesDeLaFederacion({
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         {/* ── Invitar uno que ya existe ─────────────────────────────────── */}
         <div>
-          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <h3 className="mb-2 text-sm font-semibold text-muted">
             Afiliar un club existente
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <form
+            role="search"
+            className="flex flex-wrap gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void buscar();
+            }}
+          >
             <input
+              enterKeyHint="search"
+              name="club"
+              autoComplete="off"
+              aria-label="Buscar club por nombre"
               placeholder="Buscar club por nombre…"
               maxLength={LIM.busqueda}
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void buscar();
-              }}
               className="min-w-0 flex-1"
             />
-            <button onClick={() => void buscar()} disabled={buscando} className="btn btn-outline">
+            <button type="submit" disabled={buscando} className="btn btn-outline">
               {buscando ? 'Buscando…' : 'Buscar'}
             </button>
-          </div>
+          </form>
 
           <ul className="mt-2 flex flex-col gap-1.5">
             {encontrados.map((c) => (
               <li
                 key={c.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-sm"
-                style={{ borderColor: 'var(--border)' }}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-sm border-line"
               >
                 <span className="min-w-0 truncate">
                   <strong>{c.name}</strong>
-                  {c.city && <span style={{ color: 'var(--text-muted)' }}> · {c.city}</span>}
+                  {c.city && <span className="text-muted"> · {c.city}</span>}
                 </span>
                 <button
                   onClick={() =>
@@ -1453,7 +1458,7 @@ function ClubesDeLaFederacion({
               </li>
             ))}
             {encontrados.length === 0 && busqueda && !buscando && (
-              <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              <li className="text-sm text-muted">
                 Ningún club <strong>sin federación</strong> coincide con «
                 {busqueda}». Los que ya cuelgan de una no salen aquí: para
                 mover uno, sácalo primero de la suya.
@@ -1467,12 +1472,11 @@ function ClubesDeLaFederacion({
                   organización». Se siguen enseñando porque una invitación
                   esperando explica por qué un club todavía no está dentro. */}
               <h3
-                className="mb-1 mt-4 text-sm font-semibold"
-                style={{ color: 'var(--text-muted)' }}
+                className="mb-1 mt-4 text-sm font-semibold text-muted"
               >
                 Invitaciones que envió la federación
               </h3>
-              <ul className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <ul className="flex flex-col gap-1 text-xs text-muted">
                 {enviadas.map((inv) => (
                   <li key={inv.id}>
                     {inv.clubName}:{' '}
@@ -1497,7 +1501,7 @@ function ClubesDeLaFederacion({
 
         {/* ── O crear uno nuevo, ya colgando de ella ─────────────────────── */}
         <div>
-          <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <h3 className="mb-2 text-sm font-semibold text-muted">
             Crear un club nuevo dentro
           </h3>
           {/* Mismas reglas que «Nueva organización»: el club que nace aquí es
@@ -1505,7 +1509,7 @@ function ClubesDeLaFederacion({
               tener una validación más floja. */}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm sm:col-span-2">
-              <span style={{ color: 'var(--text-muted)' }}>Nombre del club *</span>
+              <span className="text-muted">Nombre del club *</span>
               <input
                 className="mt-1"
                 placeholder="Club Dinamyt"
@@ -1515,7 +1519,7 @@ function ClubesDeLaFederacion({
                 onChange={(e) => setNuevoClub({ ...nuevoClub, name: e.target.value })}
               />
               {errorNombreClub && (
-                <span className="mt-1 block text-xs" style={{ color: 'var(--danger)' }}>
+                <span className="mt-1 block text-xs text-danger">
                   {errorNombreClub}
                 </span>
               )}
@@ -1545,10 +1549,10 @@ function ClubesDeLaFederacion({
           >
             + Crear club
           </button>
-          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-2 text-xs text-muted">
             Este sí queda afiliado en el acto: no hay maestro a quien preguntar
-            porque el club no existía hasta ahora. Selecciónalo a la izquierda
-            para ponerle el suyo.
+            porque el club no existía hasta ahora. Elígelo en la lista para
+            ponerle el suyo.
           </p>
         </div>
       </div>
@@ -1589,17 +1593,13 @@ function CuentasBloqueadas({ ocupado }: { ocupado: boolean }) {
           ⟳ Refrescar
         </button>
       </div>
-      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-3 text-sm text-muted">
         Una cuenta se bloquea 15 minutos tras 5 contraseñas incorrectas.
         Desde aquí la desbloqueas de inmediato.
       </p>
-      {msg && (
-        <p className="mb-3 text-sm" style={{ color: 'var(--gold)' }}>
-          {msg}
-        </p>
-      )}
+      <MensajeVivo tono="info" texto={msg} className="mb-3 text-sm text-gold" />
       {bloqueadas.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm text-muted">
           No hay cuentas bloqueadas en este momento.
         </p>
       ) : (
@@ -1607,12 +1607,11 @@ function CuentasBloqueadas({ ocupado }: { ocupado: boolean }) {
           {bloqueadas.map((c) => (
             <li
               key={c.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: 'var(--danger)' }}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm border-danger"
             >
               <span className="min-w-0 flex-1">
                 <strong>{c.fullName}</strong>
-                <span className="ml-1" style={{ color: 'var(--text-muted)' }}>
+                <span className="ml-1 text-muted">
                   · {c.email} · {c.failedLoginAttempts ?? 0} intentos
                   {c.lockedUntil
                     ? ` · hasta ${instante(c.lockedUntil, { timeStyle: 'short' })}`
@@ -1703,11 +1702,11 @@ function AccesosRapidos({
   }, [busqueda]);
 
   return (
-    <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
-      <h2 className="mb-1 text-lg font-semibold" style={{ color: 'var(--gold)' }}>
+    <section className="card mb-5 p-5 border-gold">
+      <h2 className="mb-1 text-lg font-semibold text-gold">
         Accesos rápidos
       </h2>
-      <p className="mb-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-2 text-sm text-muted">
         Busca a la persona, elige la app y el rol, y dale acceso con un clic
         (membresía + suscripción activa, todo en uno).
       </p>
@@ -1718,7 +1717,7 @@ function AccesosRapidos({
           acompañado de otros veinte de clubes ajenos parece un fallo — y al
           revés, no encontrar aquí a alguien parece que no existe. El alcance de
           cada ruta está escrito en `common/busqueda.ts` de la API. */}
-      <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-3 text-xs text-muted">
         Alcance: <strong>todo el ecosistema</strong>, no una organización.
       </p>
 
@@ -1742,23 +1741,23 @@ function AccesosRapidos({
           sin nada que enseñar, y lo que parecía es que el buscador no
           funcionaba. */}
       {!sel && busqueda.trim().length > 0 && busqueda.trim().length < 2 && (
-        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-2 text-xs text-muted">
           Escribe una letra más para buscar.
         </p>
       )}
       {!sel && buscando && (
-        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-2 text-xs text-muted">
           Buscando en todo el ecosistema…
         </p>
       )}
       {!sel && !buscando && buscado.length >= 2 && resultados.length === 0 && (
-        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-2 text-xs text-muted">
           Nadie coincide con «{buscado}». Si es alguien nuevo, primero necesita
           una cuenta: se crea desde «Miembros» de su organización.
         </p>
       )}
       {!sel && !buscando && resultados.length > 0 && (
-        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-2 text-xs text-muted">
           {resultados.length === 1
             ? '1 persona encontrada. Púlsala para elegirla.'
             : `${resultados.length} personas encontradas. Pulsa una para elegirla.`}
@@ -1779,8 +1778,7 @@ function AccesosRapidos({
                 onClick={() => setSel(u)}
                 role="option"
                 aria-selected={false}
-                className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm"
-                style={{ borderColor: 'var(--border)' }}
+                className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm border-line"
               >
                 {/* Las iniciales, no la foto: `buscarUsuariosAPI` no devuelve
                     `avatarUrl` y pedirla obligaría a mover una data-URL de
@@ -1792,8 +1790,7 @@ function AccesosRapidos({
                   <span className="min-w-0">
                     <strong className="block truncate">{u.fullName}</strong>
                     <span
-                      className="block truncate text-xs"
-                      style={{ color: 'var(--text-muted)' }}
+                      className="block truncate text-xs text-muted"
                     >
                       {u.email}
                     </span>
@@ -1816,7 +1813,7 @@ function AccesosRapidos({
         </ul>
       )}
       {busqueda.trim().length >= 2 && resultados.length === 0 && !sel && (
-        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-2 text-sm text-muted">
           Sin resultados para «{busqueda}».
         </p>
       )}
@@ -1824,12 +1821,11 @@ function AccesosRapidos({
       {/* Usuario elegido → dar acceso */}
       {sel && (
         <div
-          className="mt-3 rounded-lg border p-3"
-          style={{ borderColor: 'var(--gold)' }}
+          className="mt-3 rounded-lg border p-3 border-gold"
         >
           <p className="mb-2 text-sm">
             <strong>{sel.fullName}</strong>{' '}
-            <span style={{ color: 'var(--text-muted)' }}>· {sel.email}</span>
+            <span className="text-muted">· {sel.email}</span>
             {sel.membresias.map((m, i) => (
               <span key={i} className="badge ml-1">
                 {m.org}: {nombreRol(m.role)}
@@ -1993,7 +1989,7 @@ function EspejoDeMembresias() {
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold">Membresías: quién la abre</h2>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm text-muted">
             Los clubes con plan aparecen en Membresías solos y enlazados; los que
             vencen quedan allí <strong>en pausa</strong> hasta que paguen. Pasa cada
             mañana a las 8 y cada vez que se toca una suscripción. Esto lo hace{' '}
@@ -2011,11 +2007,7 @@ function EspejoDeMembresias() {
         </button>
       </div>
 
-      {error && (
-        <p className="text-sm" style={{ color: 'var(--danger)' }}>
-          {error}
-        </p>
-      )}
+      <MensajeVivo tono="error" texto={error} className="text-sm" />
 
       {r && (
         <>
@@ -2026,7 +2018,7 @@ function EspejoDeMembresias() {
               <>
                 {' '}
                 ·{' '}
-                <span style={{ color: 'var(--gold)' }}>
+                <span className="text-gold">
                   <strong>{r.creados}</strong> creados allí ahora mismo
                 </span>
               </>
@@ -2037,7 +2029,7 @@ function EspejoDeMembresias() {
               <>
                 {' '}
                 ·{' '}
-                <span style={{ color: 'var(--danger)' }}>
+                <span className="text-danger">
                   <strong>{r.noLlego}</strong> avisos no salieron
                 </span>
               </>
@@ -2045,7 +2037,7 @@ function EspejoDeMembresias() {
           </p>
 
           {r.noLlego > 0 && (
-            <p className="mb-3 text-xs" style={{ color: 'var(--danger)' }}>
+            <p className="mb-3 text-xs text-danger">
               Un aviso que no sale no es un problema de datos: falta{' '}
               <code>MEMBRESIAS_SYNC_URL</code> o <code>SYNC_SECRET_MEMBRESIAS</code> en
               el ecosystem, o Membresías no respondió. Mientras tanto, allí se ve lo
@@ -2064,8 +2056,8 @@ function EspejoDeMembresias() {
               </p>
               <ul className="flex flex-col gap-1">
                 {escudos.map((c) => (
-                  <li key={c.id} className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    <strong style={{ color: 'var(--text)' }}>{c.name}</strong>
+                  <li key={c.id} className="text-xs text-muted">
+                    <strong className="text-ink">{c.name}</strong>
                     {c.escudo === 'sin-escudo' ? (
                       <>
                         : <strong>no tiene escudo en esta ficha</strong>. Si lo subiste y
@@ -2088,7 +2080,7 @@ function EspejoDeMembresias() {
           )}
 
           {problemas.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm text-muted">
               Ningún club con plan de Membresías se ha quedado fuera.
             </p>
           ) : (
@@ -2105,14 +2097,14 @@ function EspejoDeMembresias() {
                   <p className="truncate font-semibold" title={c.name}>
                     {c.name}
                   </p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs text-muted">
                     {/* Sin motivo y en pausa: el club vive en Membresías y no
                         tiene con qué abrirla. Es el caso del que se fue. */}
                     {c.motivo ??
                       'no tiene ningún plan que incluya Membresías, y allí sí existe: su gente queda en pausa hasta que contrate uno.'}
                   </p>
                   {c.resultado === 'no-llego' && (
-                    <p className="text-xs" style={{ color: 'var(--danger)' }}>
+                    <p className="text-xs text-danger">
                       Y su aviso no llegó: en Membresías sigue como estaba.
                     </p>
                   )}
@@ -2162,13 +2154,13 @@ function Vencimientos({
   };
 
   return (
-    <section className="card mb-5 p-5" style={{ borderColor: 'var(--gold)' }}>
+    <section className="card mb-5 p-5 border-gold">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold">Vencimientos</h2>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm text-muted">
             {vencidas.length > 0 && (
-              <span style={{ color: 'var(--danger)' }}>
+              <span className="text-danger">
                 {vencidas.length} vencida{vencidas.length === 1 ? '' : 's'}
               </span>
             )}
@@ -2223,7 +2215,7 @@ function Vencimientos({
               <p className="truncate font-semibold" title={v.orgName}>
                 {v.orgName}
               </p>
-              <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+              <p className="truncate text-xs text-muted">
                 {v.planName} ·{' '}
                 <span
                   style={{
@@ -2237,7 +2229,7 @@ function Vencimientos({
               {/* Saber si ya se le escribió evita el correo de más y la llamada
                   de menos. */}
               {v.lastReminderAt && (
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-xs text-muted">
                   {/* Cuándo se le escribió es un instante: va en la hora de
                       quien está mirando el panel. */}
                   Avisado {haceCuanto(v.lastReminderAt)}
@@ -2286,8 +2278,9 @@ function Vencimientos({
                   href={`mailto:${v.orgEmail}`}
                   className="btn btn-outline btn-sm"
                   title={v.orgEmail}
+                  aria-label={`Escribir a ${v.orgEmail}`}
                 >
-                  ✉
+                  <Icono nombre="correo" />
                 </a>
               )}
             </div>
@@ -2368,7 +2361,7 @@ function TarifasDeLosPlanes({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold">Tarifa de cada plan</h2>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm text-muted">
             {planes.length} {planes.length === 1 ? 'plan' : 'planes'} ·{' '}
             <strong>{porPersonaHoy}</strong> por persona ·{' '}
             {planes.length - porPersonaHoy} de importe fijo
@@ -2386,7 +2379,7 @@ function TarifasDeLosPlanes({
 
       {abierto && (
         <>
-          <p className="mt-3 mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-3 mb-3 text-sm text-muted">
             El cobro es <strong>por persona activa del club</strong>, y se cuenta{' '}
             <strong>el día que el club renueva</strong>: sabe cuánto paga antes de
             pagar, y quitar gente la víspera no le baja la factura. Se aplica en la{' '}
@@ -2407,8 +2400,7 @@ function TarifasDeLosPlanes({
               return (
                 <li
                   key={p.id}
-                  className="rounded-lg border px-3 py-2"
-                  style={{ borderColor: 'var(--border)' }}
+                  className="rounded-lg border px-3 py-2 border-line"
                 >
                   <div className="flex flex-wrap items-end gap-2">
                     <div className="min-w-0 flex-1">
@@ -2424,7 +2416,7 @@ function TarifasDeLosPlanes({
                       </p>
                     </div>
                     <label className="block text-xs" style={{ width: '9.5rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Por persona/mes</span>
+                      <span className="text-muted">Por persona/mes</span>
                       <div className="mt-1">
                         <CampoDinero
                           valor={c.precio}
@@ -2437,7 +2429,7 @@ function TarifasDeLosPlanes({
                       </div>
                     </label>
                     <label className="block text-xs" style={{ width: '6rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Mínimo</span>
+                      <span className="text-muted">Mínimo</span>
                       <input
                         className="mt-1"
                         inputMode="numeric"
@@ -2475,7 +2467,7 @@ function TarifasDeLosPlanes({
                   {/* Solo mientras se edita: es la cifra que contesta «¿me
                       pasé?» en el momento de teclearla. */}
                   {cambiado && (
-                    <p className="mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1.5 text-xs text-muted">
                       {porPersona ? (
                         <>
                           Un club de 40 personas pagaría{' '}
@@ -2496,7 +2488,7 @@ function TarifasDeLosPlanes({
               );
             })}
             {planes.length === 0 && (
-              <li className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              <li className="text-sm text-muted">
                 No hay planes todavía.
               </li>
             )}

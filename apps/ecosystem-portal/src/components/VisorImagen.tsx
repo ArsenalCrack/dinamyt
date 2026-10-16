@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { urlImagen } from '@/lib/api';
+import { Icono } from '@/components/Icono';
 
 /**
  * Ver una imagen en grande, como en WhatsApp: se toca la foto y se abre encima
@@ -220,7 +221,7 @@ export function VisorImagen({
         onClick={onCerrar}
         aria-label="Cerrar"
       >
-        ✕
+        <Icono nombre="cerrar" tamano={20} />
       </button>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

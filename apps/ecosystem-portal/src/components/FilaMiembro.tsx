@@ -144,8 +144,7 @@ function PapelesCampeonatos({
     return (
       <button
         type="button"
-        className="text-xs underline"
-        style={{ color: 'var(--text-muted)' }}
+        className="text-xs underline text-muted"
         onClick={() => {
           setMarcados(actuales);
           setAbierto(true);
@@ -162,11 +161,10 @@ function PapelesCampeonatos({
 
   return (
     <fieldset
-      className="mt-2 rounded-md border px-3 py-2"
-      style={{ borderColor: 'var(--border)' }}
+      className="mt-2 rounded-md border px-3 py-2 border-line"
       disabled={bloqueado}
     >
-      <legend className="px-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+      <legend className="px-1 text-xs text-muted">
         Papeles en Campeonatos
       </legend>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -184,8 +182,7 @@ function PapelesCampeonatos({
             {NOMBRE_PAPEL_CAMPEONATOS[r] ?? r}
             {!disponibles.includes(r) && (
               <span
-                className="text-xs"
-                style={{ color: 'var(--text-muted)' }}
+                className="text-xs text-muted"
                 title="Ya lo tenía. Aquí se le puede quitar, pero no dárselo a otra persona."
               >
                 (ya lo tenía)
@@ -194,7 +191,7 @@ function PapelesCampeonatos({
           </label>
         ))}
       </div>
-      <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-1 text-xs text-muted">
         Se suman: puede ser maestro y competir a la vez. Sin marcar nada, vale lo
         que dice su rol general.
       </p>
@@ -271,8 +268,7 @@ export function FilaMiembro({
 
   return (
     <li
-      className="@container rounded-lg border px-3 py-2.5 text-sm"
-      style={{ borderColor: 'var(--border)' }}
+      className="@container rounded-lg border px-3 py-2.5 text-sm border-line"
     >
       <div className="flex flex-col gap-2 @md:flex-row @md:items-center @md:justify-between @md:gap-3">
       {/* Identidad. `min-w-0` en los dos niveles: sin él, el hijo de un flex
@@ -296,12 +292,19 @@ export function FilaMiembro({
             )}
           </p>
           <p
-            className="truncate text-xs"
-            style={{ color: 'var(--text-muted)' }}
+            className="truncate text-xs text-muted"
             title={m.email}
           >
             {m.email}
           </p>
+          {/* Por qué tu fila no tiene botón ni desplegable. Estaba solo en dos
+              `title`, y en el celular un `title` no se ve (auditoría 001,
+              nº 14). */}
+          {esUnoMismo && (
+            <p className="mt-0.5 text-xs text-muted">
+              {t('org.tuFilaNota')}
+            </p>
+          )}
           {tieneApps && (
             <p className="mt-1 flex flex-wrap gap-1">
               <InsigniaApp

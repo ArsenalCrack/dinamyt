@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { Icono } from '@/components/Icono';
 
 /**
  * «¿Seguro?» — la pregunta que faltaba antes de las acciones que se notan.
@@ -172,6 +173,30 @@ function DialogoConfirmar({
  * DESPUÉS de la franja de lo irreversible: se lee la advertencia antes de
  * empezar a escribir.
  */
+/**
+ * El último control que se tocó con el dedo o el ratón.
+ *
+ * Safari no enfoca un botón al hacerle clic, así que al abrirse el diálogo
+ * `document.activeElement` es el `<body>` y al cerrarlo el foco caía al
+ * principio de la página: quien venía con el teclado perdía su sitio
+ * (auditoría 001, nº 16). Esto recuerda qué se tocó, para devolverle el foco
+ * a eso cuando el navegador no lo hizo. En fase de captura, antes de que
+ * ningún `onClick` abra nada.
+ */
+let ultimoTocado: HTMLElement | null = null;
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      const el = (e.target as Element | null)?.closest?.(
+        'button, a[href], input, select, textarea, [tabindex]',
+      );
+      if (el instanceof HTMLElement) ultimoTocado = el;
+    },
+    true,
+  );
+}
+
 export function ModalAccesible({
   titulo,
   tono = 'normal',
@@ -202,7 +227,8 @@ export function ModalAccesible({
   useEffect(() => {
     // De dónde venía el foco, para devolvérselo al cerrar: si no, quien navega
     // con teclado vuelve al principio de la página cada vez que cancela.
-    const antes = document.activeElement as HTMLElement | null;
+    const activo = document.activeElement as HTMLElement | null;
+    const antes = activo && activo !== document.body ? activo : ultimoTocado;
     focoInicial.current?.focus();
 
     // La página de detrás no se mueve mientras la pregunta está abierta: se
@@ -238,7 +264,9 @@ export function ModalAccesible({
     return () => {
       document.removeEventListener('keydown', alTeclear);
       document.body.style.overflow = scrollPrevio;
-      antes?.focus?.();
+      // `isConnected`: si la acción borró la fila de donde salió la
+      // pregunta, ese botón ya no existe y enfocarlo no hace nada útil.
+      if (antes?.isConnected) antes.focus();
     };
     // Es de montar y desmontar: lo que cambia entre renders se lee de las refs.
   }, [focoInicial]);
@@ -261,7 +289,7 @@ export function ModalAccesible({
       >
         {tono === 'irreversible' && (
           <div className="confirmar-icono" aria-hidden="true">
-            ⚠
+            <Icono nombre="alerta" tamano={22} />
           </div>
         )}
         <p className="confirmar-titulo">{titulo}</p>

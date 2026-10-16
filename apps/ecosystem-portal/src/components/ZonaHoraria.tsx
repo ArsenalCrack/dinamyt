@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import api, { extraerError } from '@/lib/api';
 import { nombreDeZona, zonaDelNavegador, instante } from '@/lib/fechas';
 import { useI18n } from '@/lib/i18n';
+import { MensajeVivo } from '@/components/MensajeVivo';
 
 /**
  * A qué hora se te escribe.
@@ -73,14 +74,14 @@ export function ZonaHoraria({
   return (
     <section className="card mt-4 p-5">
       <h2 className="text-lg font-semibold">Tu hora</h2>
-      <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-3 text-sm text-muted">
         Con esta zona te escribimos los correos y los avisos. En pantalla las
         horas ya salen en la de tu dispositivo, siempre.
       </p>
 
       <dl className="flex flex-col gap-2 text-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <dt style={{ color: 'var(--text-muted)' }}>Zona guardada</dt>
+          <dt className="text-muted">Zona guardada</dt>
           <dd className="font-semibold">
             {nombreDeZona(zona)}
             {aMano && (
@@ -89,32 +90,24 @@ export function ZonaHoraria({
           </dd>
         </div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <dt style={{ color: 'var(--text-muted)' }}>
+          <dt className="text-muted">
             {t('zona.deEsteDispositivo')}
           </dt>
           <dd>{nombreDeZona(detectada)}</dd>
         </div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <dt style={{ color: 'var(--text-muted)' }}>Ahora mismo son</dt>
+          <dt className="text-muted">Ahora mismo son</dt>
           {/* La prueba de que está bien puesta, en una línea: si esta hora no
               es la del reloj de la pared, la zona está mal. */}
           <dd className="font-mono">{instante(new Date())}</dd>
         </div>
       </dl>
 
-      {msg && (
-        <p className="mt-3 text-sm" style={{ color: 'var(--ok)' }}>
-          {msg}
-        </p>
-      )}
-      {error && (
-        <p className="mt-3 text-sm" style={{ color: 'var(--danger)' }}>
-          {error}
-        </p>
-      )}
+      <MensajeVivo tono="ok" texto={msg} className="mt-3 text-sm" />
+      <MensajeVivo tono="error" texto={error} className="mt-3 text-sm" />
 
       {distinta && !aMano && (
-        <p className="mt-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-3 text-sm text-muted">
           Este dispositivo está en otra zona. Se guardará sola la próxima vez
           que entres; si quieres que sea esta desde ya, fíjala.
         </p>

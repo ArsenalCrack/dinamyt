@@ -109,7 +109,7 @@ export function Paginacion({
         arriba ? 'mb-3' : 'mt-3'
       }`}
     >
-      <span style={{ color: 'var(--text-muted)' }}>
+      <span className="text-muted">
         {desde}–{hasta} {t('pag.de')} {total}
       </span>
       <div className="flex gap-1.5">

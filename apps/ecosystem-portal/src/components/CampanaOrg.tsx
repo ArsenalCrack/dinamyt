@@ -14,6 +14,7 @@ import { nombreRol } from '@/lib/roles';
 import { haceCuanto } from '@/lib/fechas';
 import { activarPush, desactivarPush, estadoPush, type EstadoPush } from '@/lib/push';
 import { useI18n } from '@/lib/i18n';
+import { Icono } from '@/components/Icono';
 
 /**
  * La campana de quien lleva un club.
@@ -316,7 +317,7 @@ export function CampanaOrg() {
         }
         title={t('avisos.deTuClub2')}
       >
-        🔔
+        <Icono nombre="campana" tamano={18} />
         {sinLeer > 0 && <span className="avisos-org-badge">{sinLeer}</span>}
       </button>
 
@@ -349,8 +350,9 @@ export function CampanaOrg() {
                   type="button"
                   className="btn btn-outline btn-sm"
                   onClick={() => setAbierto(false)}
+                  aria-label={t('comun.cerrar')}
                 >
-                  ✕
+                  <Icono nombre="cerrar" />
                 </button>
               </div>
             </div>
@@ -359,7 +361,7 @@ export function CampanaOrg() {
               // «Al día» y no «no ha pasado nada»: lo leído se va de aquí, así
               // que este vacío casi siempre significa que ya lo miraste todo.
               // Lo que pasó sigue en su sitio, y se dice dónde.
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm text-muted">
                 Estás al día. Aquí aparecen las solicitudes de entrada y los
                 cambios de gente en tu club, y desaparecen cuando las lees.
               </p>
@@ -437,7 +439,7 @@ export function CampanaOrg() {
             {push !== 'imposible' && (
               <div className="avisos-org-push">
                 {push === 'bloqueado' ? (
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs text-muted">
                     Los avisos están bloqueados en este navegador. Se vuelven a
                     permitir desde el candado junto a la dirección.
                   </p>
@@ -457,8 +459,7 @@ export function CampanaOrg() {
                 )}
                 {msgPush && (
                   <p
-                    className="mt-2 text-xs"
-                    style={{ color: 'var(--text-muted)' }}
+                    className="mt-2 text-xs text-muted"
                   >
                     {msgPush}
                   </p>
