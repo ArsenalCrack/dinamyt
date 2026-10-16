@@ -1022,7 +1022,7 @@ VAPID_SUBJECT=mailto:soporte@dinamyt.org
 >   y la contraseña cambiada en el portal no vale en el club.
 >
 > · `MEMBRESIAS_SYNC_URL` — a dónde va ese aviso. El origen de `membresias-api`,
->   **sin barra final**.
+>   **sin barra final**: en la VPS, `http://127.0.0.1:3004`.
 
 ```bash
 nano /srv/dinamyt/apps/ecosystem-portal/.env.production

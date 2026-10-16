@@ -61,10 +61,18 @@ $archivos = '^archivos-(\d{4}-\d{2}-\d{2})\.tar\.gz$'
 New-Item -ItemType Directory -Force -Path $Destino | Out-Null
 
 if ($Registrar) {
-    $copia = Join-Path (Split-Path -Parent $Destino) 'copiar-respaldo.ps1'
-    Copy-Item -Force -Path $PSCommandPath -Destination $copia
+    $copia = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Destino) 'copiar-respaldo.ps1'))
+    # Corriendo desde la propia copia no hay nada que copiar.
+    if ([IO.Path]::GetFullPath($PSCommandPath) -ne $copia) {
+        Copy-Item -Force -Path $PSCommandPath -Destination $copia
+    }
+    # La tarea corre con lo mismo que se pidió aquí (menos -Registrar): un
+    # `-Guardar 4` o un `-Destino` distinto tienen que llegar a cada domingo.
+    $extra = foreach ($p in $PSBoundParameters.GetEnumerator()) {
+        if ($p.Key -ne 'Registrar') { "-$($p.Key) `"$($p.Value)`"" }
+    }
     $accion = New-ScheduledTaskAction -Execute (Get-Command pwsh).Source `
-        -Argument "-NoProfile -WindowStyle Hidden -File `"$copia`""
+        -Argument ("-NoProfile -WindowStyle Hidden -File `"$copia`" " + ($extra -join ' ')).Trim()
     $cuando = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 11:00
     $ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable `
         -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `

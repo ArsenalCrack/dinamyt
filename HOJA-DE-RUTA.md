@@ -91,6 +91,9 @@ hace, o lo que solo tú puedes decidir.
   5. Cuánto tiempo se conservan pagos y resultados.
   6. Si faltan términos y condiciones de uso, y qué exige cobrar planes (RUT,
      factura electrónica).
+  7. Si basta la dirección como esquina («Calle 17 con Avenida 19, barrio Valle
+     Esther») o hace falta la nomenclatura completa con número, para que sirva
+     de dirección de notificaciones.
 
 ### 0.2 · Lo que la política dice y nada obliga
 
@@ -142,8 +145,10 @@ hace, o lo que solo tú puedes decidir.
   `feat/borrar-cuenta`: lo que quedó para después está en 0.5.
 - **anti-slop en modo «after»**, una app cada vez. **El portal, hecho el 15
   oct** (`anti-slop/audit-001-2026-10-15.md`): las altas y medias corregidas;
-  las **bajas 11 a 16 esperan que elijas números**. Siguen Membresías,
-  Campeonatos y Academy. Se pide en el chat: «audita Membresías con antislop
+  las **bajas 11 a 17 esperan que elijas números**. Siguen Membresías,
+  Campeonatos y Academy. En Campeonatos ya se sabe algo: sus campos llevan
+  `className="input"`, que pone su propio borde a 1.22:1, y su desplegable usa
+  `--border-light`; el 3:1 de `--border-campo` no les llega. Se pide en el chat: «audita Membresías con antislop
   en modo after». Deja una lista numerada en `anti-slop/`, tú eliges los
   números y solo esos se tocan.
 - **`/claude-api prompt-audit`** al cambiar de modelo. El 13 oct salió limpio.
@@ -201,10 +206,7 @@ delante**. La publicación en vivo (1 oct) entra en cuanto se despliegue.
    ```
 
    Tiene que decir «pase RS256 y espejo: los dos ENCENDIDOS».
-2. **En una tableta**, la pantalla del tatami (`/tatami/<id>`): desde el 15
-   oct los `btn-sm` miden 44 px con pantalla táctil (antislop, auditoría 001,
-   nº 4). Que nada se descuadre ni tape los `combat-btn`, que no cambiaron.
-3. El ensayo de punta a punta, `OPERAR.md` §2.9, **y anotar la fila** en su
+2. El ensayo de punta a punta, `OPERAR.md` §2.9, **y anotar la fila** en su
    tabla. Con la bajada «para el evento» (`-ParaElEvento`) y con
    `CAMPEONATOS_ONLINE_URL` en el `.env` del PC: el marcador de
    `campeonatos.dinamyt.org/resultados` tiene que moverse con el evento y

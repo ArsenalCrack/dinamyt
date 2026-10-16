@@ -187,7 +187,7 @@ main { animation: aparecer 0.3s ease; }
   cursor: pointer;
   transition: border-color 0.15s ease;
 }
-.fecha-btn:hover:not(:disabled) { border-color: var(--border-strong); }
+.fecha-btn:hover:not(:disabled) { border-color: var(--text-muted); } /* más que --border-campo, nunca menos */
 .fecha-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .fecha-btn[aria-expanded='true'] {
   border-color: var(--gold);
@@ -335,7 +335,7 @@ main { animation: aparecer 0.3s ease; }
   cursor: pointer;
   transition: border-color 0.15s ease;
 }
-.selectmenu-btn:hover:not(:disabled) { border-color: var(--border-strong); }
+.selectmenu-btn:hover:not(:disabled) { border-color: var(--text-muted); } /* más que --border-campo, nunca menos */
 .selectmenu-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .selectmenu-btn[aria-expanded='true'] {
   border-color: var(--gold);

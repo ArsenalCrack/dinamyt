@@ -71,7 +71,7 @@ try {
 
   No es un problema de secretos: la petición ni siquiera llegó. Comprueba que
   membresias-api esté viva y que MEMBRESIAS_SYNC_URL sea su origen, sin barra
-  final (por ejemplo https://membresias-api.dinamyt.org).
+  final (en la VPS, http://127.0.0.1:3004: no hay nombre público para esa API).
 `);
   process.exit(1);
 }
