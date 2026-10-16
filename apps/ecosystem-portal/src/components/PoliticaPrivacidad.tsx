@@ -80,19 +80,9 @@ export function PoliticaPrivacidad() {
               {RESPONSABLE.domicilio}
             </li>
             <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.respDireccion')}</strong>{' '}
-              {RESPONSABLE.direccion}
-            </li>
-            <li>
               <strong style={{ color: 'var(--text)' }}>{t('priv.respCorreo')}</strong>{' '}
               <a href={`mailto:${RESPONSABLE.correo}`} style={{ color: 'var(--gold)' }}>
                 {RESPONSABLE.correo}
-              </a>
-            </li>
-            <li>
-              <strong style={{ color: 'var(--text)' }}>{t('priv.respTelefono')}</strong>{' '}
-              <a href={RESPONSABLE.telefonoEnlace} style={{ color: 'var(--gold)' }}>
-                {RESPONSABLE.telefono}
               </a>
             </li>
           </ul>

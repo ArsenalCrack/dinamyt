@@ -91,9 +91,10 @@ hace, o lo que solo tú puedes decidir.
   5. Cuánto tiempo se conservan pagos y resultados.
   6. Si faltan términos y condiciones de uso, y qué exige cobrar planes (RUT,
      factura electrónica).
-  7. Si basta la dirección como esquina («Calle 17 con Avenida 19, barrio Valle
-     Esther») o hace falta la nomenclatura completa con número, para que sirva
-     de dirección de notificaciones.
+  7. Qué dirección y qué teléfono publicar como responsable sin exponer la casa
+     ni el celular personal (el repositorio es público): dirección de
+     notificaciones, apartado postal, su oficina o una línea aparte. Hasta
+     entonces la política dice nombre, Cúcuta y el correo.
 
 ### 0.2 · Lo que la política dice y nada obliga
 

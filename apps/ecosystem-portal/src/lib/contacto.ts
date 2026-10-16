@@ -25,15 +25,16 @@ export const CORREO_ADMIN =
 
 /**
  * Quién responde por los datos, como pide el Decreto 1377 de 2013 (art. 13):
- * nombre, domicilio, dirección, correo y teléfono. DINAMYT lo opera una
- * persona natural; los dio el 15 oct 2026. La política los lee de aquí: si
- * cambian, se cambian aquí y en ningún otro sitio.
+ * nombre, domicilio, dirección, correo y teléfono. La política los lee de
+ * aquí: si cambian, se cambian aquí y en ningún otro sitio.
+ *
+ * ⚠️ La dirección y el teléfono faltan A PROPÓSITO. DINAMYT lo opera una
+ * persona natural, y este repositorio es público: aquí no van ni su casa ni su
+ * celular personal. Van una dirección de notificaciones y una línea de
+ * contacto cuando las tenga, y lo que diga el abogado (HOJA-DE-RUTA §0.1).
  */
 export const RESPONSABLE = {
   nombre: 'Amir Daniel Sarmiento Avellaneda',
   correo: CORREO_ADMIN,
   domicilio: 'Cúcuta, Norte de Santander, Colombia',
-  direccion: 'Calle 17 con Avenida 19, barrio Valle Esther',
-  telefono: '320 345 0467',
-  telefonoEnlace: 'tel:+573203450467',
 } as const;
