@@ -9,9 +9,12 @@
 
 ## Siguiente paso
 
-**Fase 1, auditar:** primero los estilos compartidos y el portal
-(`web-design-guidelines` y `redesign-existing-projects`; antislop ya está), y
-luego Membresías, Campeonatos y Academy con las tres.
+**Fase 1, auditar Membresías** con las tres skills (antislop en modo «after»,
+`web-design-guidelines`, `redesign-existing-projects`), en su repositorio
+`dinamyt-membresias`, sobre sus 36 capturas. Después Campeonatos (ya se sabe
+que bloquea el zoom: 002, «Visto de paso») y Academy. El portal y los estilos
+compartidos ya están (001, 002, 003); sus números los elige el dueño al cerrar
+la fase 1, o antes si quiere.
 
 ## Cómo retomar en una sesión nueva
 
@@ -70,8 +73,8 @@ en su inspector esas reglas van con `--allow`. Tampoco se toman de
 
 | Pieza | Capturas antes | antislop | Guías | Diseño | Correcciones | thermos | Capturas después | Desplegado |
 |---|---|---|---|---|---|---|---|---|
-| Estilos compartidos (`packages/shared/estilos.css`, las cuatro webs) | ✓ (son las de las webs) | — | — | — | — | — | — | — |
-| Portal | ✓ 80 | ✓ 001 (bajas 11–17 sin hacer) | — | — | — | — | — | — |
+| Estilos compartidos (`packages/shared/estilos.css`, las cuatro webs) | ✓ (son las de las webs) | (dentro de la 001) | ✓ 002 | ✓ 003 | — | — | — | — |
+| Portal | ✓ 80 | ✓ 001 (bajas 11–17 sin hacer) | ✓ 002 | ✓ 003 | — | — | — | — |
 | Membresías | ✓ 36 | — | — | — | — | — | — | — |
 | Campeonatos | ◐ 76 (falta el tatami en combate) | — | — | — | — | — | — | — |
 | Academy (sin montar en la VPS) | ◐ 48 (faltan las tres de detalle) | — | — | — | — | — | — | no aplica |
@@ -125,6 +128,10 @@ node auditoria/herramientas/capturar.mjs portal antes         # o despues; y una
 - **Membresías** tiene sus propias cuentas locales: con su API apagada,
   `node auditoria/herramientas/membresias-cuentas.mjs --poner "Dojo Peñalosa"`
   les pone una contraseña de prueba y la escribe en `cuentas.json`.
+- Para mirar una pantalla de un vistazo,
+  `py -3.12 auditoria/herramientas/hoja.py <app> antes <pantalla> <rol>` pone
+  la de escritorio (oscuro) y la de celular (claro) lado a lado en
+  `_hoja__<pantalla>__<rol>.png`.
 - **Campeonatos** no traía ningún campeonato en su base local:
   `campeonatos-demo.py` siembra dos, inventados, y las capturas usan sus ids.
 
