@@ -1051,7 +1051,7 @@ a.avisos-item:focus-visible { background: var(--gold-soft); }
   width: 100%;
   padding: 0.55rem 0.75rem;
   background: var(--bg-input);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-campo); /* 3:1, como input y select (estilos.css) */
   border-radius: 0.5rem;
   color: var(--text);
   font: inherit;
@@ -1060,7 +1060,7 @@ a.avisos-item:focus-visible { background: var(--gold-soft); }
   cursor: pointer;
   transition: border-color 0.15s ease;
 }
-.selectmenu-btn:hover:not(:disabled) { border-color: var(--border-strong); }
+.selectmenu-btn:hover:not(:disabled) { border-color: var(--text-muted); } /* más que --border-campo, nunca menos */
 .selectmenu-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .selectmenu-btn[aria-expanded='true'] {
   border-color: var(--gold);
