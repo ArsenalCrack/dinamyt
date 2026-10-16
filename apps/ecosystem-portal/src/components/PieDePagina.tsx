@@ -55,6 +55,9 @@ const AUTOR = 'Amir Sarmiento';
  * demasiado largo para 320 px, y un correo partido por la mitad no se puede
  * ni leer ni copiar.
  */
+/** 44 px de alto con pantalla táctil, como todo lo que se pulsa (estilos.css, «El pulgar»). */
+const ENLACE = 'pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center';
+
 export function PieDePagina() {
   const { t } = useI18n();
   const ahora = new Date().getFullYear();
@@ -76,21 +79,20 @@ export function PieDePagina() {
                 el pie imprimia los literales en espaniol al lado de un
                 `t('pie.ayuda')` que si traducia. Media traduccion es peor que
                 ninguna, porque nadie la busca. */}
-            {/* `pie-enlace`: 44 px de alto en pantallas táctiles (estilos.css, «El pulgar»). */}
-            <Link href="/planes" className="pie-enlace">
+            <Link href="/planes" className={ENLACE}>
               {t('pie.planes')}
             </Link>
-            <Link href="/privacidad" className="pie-enlace">
+            <Link href="/privacidad" className={ENLACE}>
               {t('pie.privacidad')}
             </Link>
-            <a href={`${CAMPEONATOS_URL}/pantalla`} className="pie-enlace">
+            <a href={`${CAMPEONATOS_URL}/pantalla`} className={ENLACE}>
               {t('pie.resultados')}
             </a>
           </span>
           <a
             href={`mailto:${CORREO_SOPORTE}`}
             style={{ color: 'var(--gold)' }}
-            className="pie-enlace inline-flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
+            className={`${ENLACE} inline-flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5`}
           >
             <span aria-hidden="true">✉</span>
             <span style={{ color: 'var(--text-muted)' }}>{t('pie.ayuda')}</span>

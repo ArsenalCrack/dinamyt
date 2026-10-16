@@ -315,10 +315,15 @@ systemctl status dinamyt-respaldo --no-pager | head -5 && ls -lh /var/backups/di
 **La copia fuera del servidor** la hace sola una tarea programada de Windows en
 el PC del dueño, «DINAMYT - copia semanal del respaldo»: los domingos a las
 11:00, o en cuanto el PC se encienda si estaba apagado. Corre
-`scripts/copiar-respaldo.ps1`, que trae el volcado y los archivos de la fecha
-más reciente que tenga los dos, compara su SHA-256 con el del servidor, deja
-las últimas 8 en `D:\dinamyt-migracion\respaldos\` (las más viejas, a la
-Papelera) y apunta cada vez en `copias.log`. Mirar la última, o correrla ya:
+`D:\dinamyt-migracion\copiar-respaldo.ps1`, una COPIA de
+`scripts/copiar-respaldo.ps1` (cambiar de rama en el repo no la borra), que
+trae el volcado y los archivos de la fecha más reciente que tenga los dos,
+compara su SHA-256 con el del servidor, deja las últimas 8 fechas en
+`D:\dinamyt-migracion\respaldos\` (las más viejas, a la Papelera) y apunta
+cada vez en `copias.log`. **Si cambia el guion del repo**, hay que volver a
+registrar la tarea para que la copia se actualice:
+`pwsh -File scripts\copiar-respaldo.ps1 -Registrar`. Mirar la última, o
+correrla ya:
 
 ```powershell
 Get-Content D:\dinamyt-migracion\respaldos\copias.log -Tail 4
@@ -329,7 +334,9 @@ Start-ScheduledTask -TaskName 'DINAMYT - copia semanal del respaldo'
 > si pidiera contraseña, falla en vez de quedarse esperando) o el PC sin red.
 > Las 8 son lo que la política llama «copias fuera del servidor que se
 > renuevan»: si cambia `-Guardar`, cambia cuánto tarda en irse de ellas quien
-> pidió borrar su cuenta.
+> pidió borrar su cuenta. **Ojo: en la Papelera siguen hasta que se vacía.**
+> Vaciarla de vez en cuando (o activar el Sensor de almacenamiento de Windows)
+> es parte de que esa frase sea verdad.
 
 ## 2.6 Diagnóstico de la base
 

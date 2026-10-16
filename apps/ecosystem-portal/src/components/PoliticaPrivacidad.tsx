@@ -85,8 +85,8 @@ export function PoliticaPrivacidad() {
             </li>
             <li>
               <strong style={{ color: 'var(--text)' }}>{t('priv.respCorreo')}</strong>{' '}
-              <a href={`mailto:${CORREO_ADMIN}`} style={{ color: 'var(--gold)' }}>
-                {CORREO_ADMIN}
+              <a href={`mailto:${RESPONSABLE.correo}`} style={{ color: 'var(--gold)' }}>
+                {RESPONSABLE.correo}
               </a>
             </li>
             <li>

@@ -562,9 +562,8 @@ export default function MiOrganizacionPage() {
                           }
                           disabled={ocupado}
                           className="btn btn-outline"
-                          title={h.isActive === false ? 'Activar club' : 'Desactivar club'}
                         >
-                          {h.isActive === false ? 'Activar' : 'Desactivar'}
+                          {h.isActive === false ? t('org.activar') : t('org.desactivar')}
                         </button>
                         <button
                           onClick={() =>

@@ -2486,8 +2486,8 @@ function TarifasDeLosPlanes({
                         </>
                       ) : (
                         <>
-                          Sin precio por persona: vuelve a su importe fijo (
-                          {p.priceMonthly ?? 'sin dato'} al mes).
+                          Sin precio por persona: vuelve a su importe fijo
+                          {p.priceMonthly ? ` (${p.priceMonthly} al mes)` : ''}.
                         </>
                       )}
                     </p>

@@ -178,7 +178,7 @@ main { animation: aparecer 0.3s ease; }
   width: 100%;
   padding: 0.55rem 0.75rem;
   background: var(--bg-input);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-campo); /* 3:1, como input y select (estilos.css) */
   border-radius: 0.5rem;
   color: var(--text);
   font: inherit;
@@ -327,7 +327,7 @@ main { animation: aparecer 0.3s ease; }
   width: 100%;
   padding: 0.6rem 0.8rem;
   background: var(--bg-input);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-campo); /* 3:1, como input y select (estilos.css) */
   border-radius: 0.5rem;
   color: var(--text);
   font: inherit;

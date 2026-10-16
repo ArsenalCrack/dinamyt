@@ -103,8 +103,6 @@ export function PanelRecaudo() {
   const [error, setError] = useState('');
   /** El mes sobre el que está el ratón, en el gráfico. */
   const [encima, setEncima] = useState<number | null>(null);
-  /** El mes que tiene el foco del teclado: ese lleva el borde dorado. */
-  const [enfocado, setEnfocado] = useState<number | null>(null);
 
   const cargar = useCallback(async (m: string | null) => {
     setCargando(true);
@@ -346,14 +344,12 @@ export function PanelRecaudo() {
                 <g
                   key={m.mes}
                   onMouseEnter={() => setEncima(i)}
-                  onFocus={() => {
-                    setEncima(i);
-                    setEnfocado(i);
-                  }}
-                  onBlur={() => setEnfocado(null)}
+                  onFocus={() => setEncima(i)}
                   tabIndex={0}
                   // El anillo del navegador no sigue la forma de un <g>: el
-                  // foco lo marca el borde del rectángulo de abajo.
+                  // foco de TECLADO lo marca el borde del rectángulo de abajo
+                  // (`group-focus-visible`; un clic no lo deja puesto).
+                  className="group"
                   style={{ cursor: 'default', outline: 'none' }}
                 >
                   {/* Zona sensible de todo el grupo: el ratón no tiene que
@@ -365,9 +361,10 @@ export function PanelRecaudo() {
                     height={plotH}
                     fill={encima === i ? 'var(--bg-elevated)' : 'transparent'}
                     fillOpacity={0.55}
-                    stroke={enfocado === i ? 'var(--gold)' : 'none'}
+                    stroke="none"
                     strokeWidth={2}
                     rx={4}
+                    className="group-focus-visible:stroke-[var(--gold)]"
                   />
                   {/* Extremos redondeados de 4 px, anclados a la base: la
                       barra crece desde el cero, no flota. */}
