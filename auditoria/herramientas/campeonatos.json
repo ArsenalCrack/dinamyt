@@ -1,0 +1,138 @@
+{
+ "app": "campeonatos",
+ "base": "http://localhost:3003",
+ "login": {
+  "tipo": "sso",
+  "api": "http://localhost:3001/auth/login",
+  "ruta": "/login"
+ },
+ "pantallas": [
+  {
+   "ruta": "/",
+   "roles": [
+    "anon"
+   ]
+  },
+  {
+   "ruta": "/acceso",
+   "roles": [
+    "anon"
+   ]
+  },
+  {
+   "ruta": "/login",
+   "roles": [
+    "anon"
+   ]
+  },
+  {
+   "ruta": "/campeonatos",
+   "roles": [
+    "anon"
+   ]
+  },
+  {
+   "ruta": "/campeonatos/[id]",
+   "roles": [
+    "anon"
+   ],
+   "url": "/campeonatos/1"
+  },
+  {
+   "ruta": "/resultados",
+   "roles": [
+    "anon"
+   ]
+  },
+  {
+   "ruta": "/pantalla",
+   "roles": [
+    "anon"
+   ]
+  },
+  {
+   "ruta": "/local",
+   "roles": [
+    "anon"
+   ]
+  },
+  {
+   "ruta": "/mi-panel",
+   "roles": [
+    "competidor"
+   ]
+  },
+  {
+   "ruta": "/maestro",
+   "roles": [
+    "coach"
+   ]
+  },
+  {
+   "ruta": "/juez",
+   "roles": [
+    "juez"
+   ]
+  },
+  {
+   "ruta": "/tatami/[id]",
+   "roles": [
+    "juez"
+   ],
+   "url": "/tatami/1"
+  },
+  {
+   "ruta": "/admin",
+   "roles": [
+    "super"
+   ]
+  },
+  {
+   "ruta": "/admin/competidores",
+   "roles": [
+    "super"
+   ]
+  },
+  {
+   "ruta": "/admin/importar-resultados",
+   "roles": [
+    "super"
+   ]
+  },
+  {
+   "ruta": "/admin/campeonato/[id]",
+   "roles": [
+    "super"
+   ],
+   "url": "/admin/campeonato/1"
+  },
+  {
+   "ruta": "/admin/campeonato/[id]/inscripciones",
+   "roles": [
+    "super"
+   ],
+   "url": "/admin/campeonato/2/inscripciones"
+  },
+  {
+   "ruta": "/admin/campeonato/[id]/llaves",
+   "roles": [
+    "super"
+   ],
+   "url": "/admin/campeonato/1/llaves"
+  },
+  {
+   "ruta": "/admin/campeonato/[id]/generar-llaves",
+   "roles": [
+    "super"
+   ],
+   "url": "/admin/campeonato/2/generar-llaves"
+  },
+  {
+   "ruta": "/admin/campeonato/[id]/reportes",
+   "roles": [
+    "super"
+   ],
+   "url": "/admin/campeonato/1/reportes"
+  }
+ ]
+}

@@ -20,9 +20,9 @@
 
 | Pieza | Estado |
 |---|---|
-| Portal + identidad | En la VPS con `3d2befb` (15 oct): la política nueva, la línea de IA, la clave de cifrado puesta (las 6 notas médicas, cifradas) y `POST /sync/baja` |
-| Campeonatos | En la VPS con `7c6ff7b` (15 oct): el plan entero, el candado de sede, **la publicación en vivo** y la línea de IA en el pie |
-| Membresías | En la VPS con `4002076` (15 oct): eliminar a alguien del club y la línea de IA en el pie |
+| Portal + identidad | En la VPS con `daf35c4` (15 oct): la política completa, «Borrar mi cuenta» (la ruta `users/me/borrado` responde), la línea de IA, la clave de cifrado puesta (las 6 notas médicas, cifradas), `POST /sync/baja` y los arreglos de la auditoría antislop 001 |
+| Campeonatos | En la VPS con `8af4e64` (15 oct): el plan entero, el candado de sede, **la publicación en vivo**, la línea de IA en el pie y los estilos compartidos al día |
+| Membresías | En la VPS con `23e9bc6` (15 oct): eliminar a alguien del club, la baja de cuentas, la línea de IA en el pie y los estilos compartidos al día |
 | Academy | **No está montada**: ni servicios, ni `.env`, ni Caddy, ni DNS. En código, entera: 28/28 pruebas (con el borrado de cuentas) |
 | Fotos en disco | **Encendidas**: `MEDIA_PUBLIC_URL` y `MEDIA_DIR` puestos, 30 imágenes en `/srv/dinamyt-media`. Las sirve Node, no Caddy |
 | Respaldos diarios | **Funcionan desde el 13 oct**: `dinamyt-respaldo.timer` a las 03:00. El primero pesa 718 KB (53 tablas con datos, `pg_restore` lo lee) y lleva 30 archivos de 30. La copia fuera del servidor es **automática desde el 15 oct**: una tarea de Windows en tu PC, los domingos, que guarda 8 (`OPERAR.md` §2.5) |
@@ -31,8 +31,8 @@
 | Google | Propiedad verificada (etiqueta y TXT) |
 | Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 5) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
-| Política de privacidad | En línea desde el 15 oct. **Sin desplegar**: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo y el responsable completo (nombre, domicilio, dirección, correo y teléfono) |
-| Borrar mi cuenta | **En `main`, sin desplegar** (15 oct, revisado con thermos): Configuración → «Borrar mi cuenta», 7 días de gracia, vencido el plazo ya no se cancela, borrado en las tres apps y en Academy (migración `0024` del ecosistema). `CAMPEONATOS_SYNC_URL` ya está en la VPS (`OPERAR.md` §4.15) |
+| Política de privacidad | Al día con el código desde el 15 oct: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo y el responsable con nombre, domicilio (Cúcuta) y correo. **Sin dirección ni teléfono a propósito** hasta que lo diga el abogado (0.1, pregunta 7) |
+| El repositorio `dinamyt` | **Sigue público** en GitHub, y el historial guarda la dirección y el teléfono que se quitaron (commit `1b4e70e`). Pasarlo a privado es tuyo: Settings → Danger Zone → Change visibility |
 
 ---
 
@@ -144,14 +144,13 @@ hace, o lo que solo tú puedes decidir.
 - **thermos** (dos revisores: fallos y seguridad, y calidad) sobre cada rama
   antes de fusionarla. Se lanza con `/thermos`. El 15 oct revisó
   `feat/borrar-cuenta`: lo que quedó para después está en 0.5.
-- **anti-slop en modo «after»**, una app cada vez. **El portal, hecho el 15
-  oct** (`anti-slop/audit-001-2026-10-15.md`): las altas y medias corregidas;
-  las **bajas 11 a 17 esperan que elijas números**. Siguen Membresías,
-  Campeonatos y Academy. En Campeonatos ya se sabe algo: sus campos llevan
-  `className="input"`, que pone su propio borde a 1.22:1, y su desplegable usa
-  `--border-light`; el 3:1 de `--border-campo` no les llega. Se pide en el chat: «audita Membresías con antislop
-  en modo after». Deja una lista numerada en `anti-slop/`, tú eliges los
-  números y solo esos se tocan.
+- **La campaña de diseño de las cuatro webs** (15 oct): antislop, las guías
+  web de Vercel, la skill de rediseño, un `DESIGN.md` y capturas de antes y
+  después, app por app. **Dónde va y qué falta: `auditoria/ESTADO.md`.** El
+  portal ya pasó antislop (`auditoria/001-portal-antislop.md`). En Campeonatos
+  ya se sabe algo: sus campos llevan `className="input"`, que pone su propio
+  borde a 1.22:1, y su desplegable usa `--border-light`; el 3:1 de
+  `--border-campo` no les llega.
 - **`/claude-api prompt-audit`** al cambiar de modelo. El 13 oct salió limpio.
   La skill `frontend-design` del repo va por detrás de la de `anthropics/skills`.
 

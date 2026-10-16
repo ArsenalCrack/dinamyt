@@ -1,0 +1,21 @@
+{
+  "app": "academy",
+  "base": "http://localhost:3008",
+  "login": { "tipo": "sso", "api": "http://localhost:3001/auth/login", "ruta": "/login" },
+  "pantallas": [
+    { "ruta": "/", "roles": ["anon"] },
+    { "ruta": "/login", "roles": ["anon"] },
+    { "ruta": "/aprender", "roles": ["estudiante"] },
+    { "ruta": "/evaluaciones", "roles": ["estudiante"] },
+    { "ruta": "/evaluaciones/[id]", "roles": ["estudiante"], "descubrir": { "desde": "/evaluaciones", "patron": "/evaluaciones/" } },
+    { "ruta": "/figuras", "roles": ["estudiante"] },
+    { "ruta": "/progreso", "roles": ["estudiante"] },
+    { "ruta": "/certificados/[id]", "roles": ["estudiante"], "descubrir": { "desde": "/progreso", "patron": "/certificados/" } },
+    { "ruta": "/notas", "roles": ["estudiante"] },
+    { "ruta": "/calendario", "roles": ["estudiante", "profesor"] },
+    { "ruta": "/tablero", "roles": ["profesor"] },
+    { "ruta": "/maestro", "roles": ["profesor"] },
+    { "ruta": "/maestro/revisar/[id]", "roles": ["profesor"], "descubrir": { "desde": "/maestro", "patron": "/maestro/revisar/" } },
+    { "ruta": "/admin", "roles": ["super"] }
+  ]
+}

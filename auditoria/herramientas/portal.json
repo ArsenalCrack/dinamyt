@@ -1,0 +1,28 @@
+{
+  "app": "portal",
+  "base": "http://localhost:3000",
+  "login": {
+    "ruta": "/login",
+    "correo": "#login-correo",
+    "clave": "input[autocomplete=\"current-password\"]",
+    "enviar": "form.eco-login-caja button[type=submit]"
+  },
+  "pantallas": [
+    { "ruta": "/", "roles": ["anon"] },
+    { "ruta": "/planes", "roles": ["anon"] },
+    { "ruta": "/privacidad", "roles": ["anon"] },
+    { "ruta": "/login", "roles": ["anon"] },
+    { "ruta": "/registro", "roles": ["anon"] },
+    { "ruta": "/verificar", "roles": ["anon"] },
+    { "ruta": "/recuperar", "roles": ["anon"] },
+    { "ruta": "/poner-contrasena", "roles": ["anon"] },
+    { "ruta": "/salir", "roles": ["anon"] },
+    { "ruta": "/dashboard", "roles": ["alumno", "maestro", "orgadmin", "super"] },
+    { "ruta": "/perfil", "roles": ["alumno"] },
+    { "ruta": "/configuracion", "roles": ["alumno"] },
+    { "ruta": "/mi-club", "roles": ["alumno"] },
+    { "ruta": "/mi-organizacion", "roles": ["orgadmin", "maestro"] },
+    { "ruta": "/mi-organizacion/miembro/[id]", "roles": ["orgadmin"], "descubrir": { "desde": "/mi-organizacion", "patron": "/mi-organizacion/miembro/" } },
+    { "ruta": "/admin", "roles": ["super"] }
+  ]
+}

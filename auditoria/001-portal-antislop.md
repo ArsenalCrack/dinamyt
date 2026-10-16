@@ -1,8 +1,9 @@
 # antislop · auditoría 001 · portal (`apps/ecosystem-portal`) · 15 oct 2026
 
 > **Informe con fecha, no lista viva.** Lo que quedó pendiente (la nº 6 y las
-> bajas 11 a 17) se sigue en `HOJA-DE-RUTA.md` §0.1 y §0.4; este archivo no se
-> actualiza. La próxima auditoría es otro archivo (`audit-002-…`).
+> bajas 11 a 17) se sigue en `auditoria/ESTADO.md` (y la nº 6 en
+> `HOJA-DE-RUTA.md` §0.1); este archivo no se actualiza. La próxima auditoría
+> es otro archivo de esta carpeta.
 
 Modo **después** (auditoría de lo que ya existe), elegido por el dueño en esta
 sesión. Prioridad por el tipo de regla: Hard Gate = ALTA, Purpose-Gate = MEDIA,

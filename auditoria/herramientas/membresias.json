@@ -1,0 +1,22 @@
+{
+  "app": "membresias",
+  "base": "http://localhost:3006",
+  "login": {
+    "ruta": "/login",
+    "correo": "#email",
+    "clave": "#password",
+    "enviar": "button[type=submit]"
+  },
+  "pantallas": [
+    { "ruta": "/", "roles": ["anon"] },
+    { "ruta": "/login", "roles": ["anon"] },
+    { "ruta": "/alumnos", "roles": ["dueno"] },
+    { "ruta": "/alumnos/[id]", "roles": ["dueno"], "descubrir": { "desde": "/alumnos", "patron": "/alumnos/" } },
+    { "ruta": "/asistencia", "roles": ["dueno"] },
+    { "ruta": "/calendario", "roles": ["dueno", "alumno"] },
+    { "ruta": "/estadisticas", "roles": ["dueno"] },
+    { "ruta": "/planes", "roles": ["dueno"] },
+    { "ruta": "/mi", "roles": ["alumno"] },
+    { "ruta": "/admin", "roles": ["super"] }
+  ]
+}

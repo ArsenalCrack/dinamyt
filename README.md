@@ -163,8 +163,9 @@ pnpm --dir D:\Repositorios\dinamyt-membresias\apps\membresias-api dev
 pnpm --dir D:\Repositorios\dinamyt-membresias\apps\membresias-web dev
 ```
 
-`.claude/launch.json` ya trae esas dos entradas resueltas
-(`standalone-membresias-api` y `-web`), y ahí están todos los puertos.
+`.claude/launch.json` ya trae esas dos entradas resueltas (`membresias-api` y
+`-web`), las de Campeonatos desde `dinamyt-combat` (`campeonatos-api` en :5000 y
+`-web` en :3003) y todos los puertos.
 
 **Figuras con IA** (opcional). La primera vez:
 `cd apps/academy-figuras && python -m venv .venv && .venv\Scripts\pip install -r requirements-service.txt`. Luego:

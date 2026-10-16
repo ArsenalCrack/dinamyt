@@ -43,3 +43,14 @@ __pycache__/
 
 # Grafo de conocimiento (graphify) — se regenera con `/graphify . --update`
 graphify-out/
+
+# Campaña de diseño: capturas de antes y después (se regeneran con
+# playwright-cli, auditoria/ESTADO.md) y los archivos de trabajo de la skill
+# design-taste-frontend
+auditoria/capturas/
+.taste-skill/
+
+# El proyecto de los videos instructivos vive en su propio repositorio
+dinamyt-videos-proyecto.zip
+# Las contraseñas de prueba de las capturas (las genera auditoria/herramientas)
+auditoria/herramientas/cuentas.json
