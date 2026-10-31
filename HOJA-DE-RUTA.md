@@ -16,11 +16,12 @@
 
 ## Dónde estamos
 
-*(15 de octubre de 2026, comprobado por SSH y `curl`)*
+*(15 de octubre de 2026, comprobado por SSH y `curl`. El 31 de octubre, por
+SSH: los mismos tres commits en la VPS y los seis servicios activos.)*
 
 | Pieza | Estado |
 |---|---|
-| Portal + identidad | En la VPS con `daf35c4` (15 oct): la política completa, «Borrar mi cuenta» (la ruta `users/me/borrado` responde), la línea de IA, la clave de cifrado puesta (las 6 notas médicas, cifradas), `POST /sync/baja` y los arreglos de la auditoría antislop 001 |
+| Portal + identidad | En la VPS con `daf35c4` (15 oct): la política completa, «Borrar mi cuenta» (la ruta `users/me/borrado` responde), la línea de IA, la clave de cifrado puesta (las 6 notas médicas, cifradas), `POST /sync/baja` y los arreglos de la auditoría antislop 001. **En `main` va `933519b` (31 oct), sin desplegar**: el diseño del portal (auditorías 001–003, revisado con thermos) y la portada multiarte. Es solo el portal: ni API ni migraciones (`OPERAR.md` §2.3) |
 | Campeonatos | En la VPS con `8af4e64` (15 oct): el plan entero, el candado de sede, **la publicación en vivo**, la línea de IA en el pie y los estilos compartidos al día |
 | Membresías | En la VPS con `23e9bc6` (15 oct): eliminar a alguien del club, la baja de cuentas, la línea de IA en el pie y los estilos compartidos al día |
 | Academy | **No está montada**: ni servicios, ni `.env`, ni Caddy, ni DNS. En código, entera: 28/28 pruebas (con el borrado de cuentas) |
@@ -30,7 +31,7 @@
 | DMARC | Sigue en `p=none` (tocaba subirlo desde el 12 sep) |
 | Google | Propiedad verificada (etiqueta y TXT) |
 | Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 6) |
-| Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
+| Estilos compartidos | **Desfasados a propósito desde el 31 oct**: `main` trae la hoja nueva del diseño del portal, y `repartir-estilos.ps1 -Comprobar` marca Membresías y Campeonatos como DESFASADO. **No se reparten sueltos**: cada una la recibe en su pasada de diseño, con capturas y thermos (`auditoria/ESTADO.md`) |
 | Política de privacidad | Al día con el código desde el 15 oct: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo y el responsable con nombre, domicilio (Cúcuta) y correo. **Sin dirección ni teléfono a propósito** hasta que lo diga el abogado (0.1, pregunta 7) |
 | El repositorio `dinamyt` | **Sigue público** en GitHub, y el historial guarda la dirección y el teléfono que se quitaron (commit `1b4e70e`). Pasarlo a privado es tuyo: Settings → Danger Zone → Change visibility |
 

@@ -84,7 +84,7 @@ en su inspector esas reglas van con `--allow`. Tampoco se toman de
 
 | Pieza | Capturas antes | antislop | Guías | Diseño | Correcciones | thermos | Capturas después | Desplegado |
 |---|---|---|---|---|---|---|---|---|
-| Estilos compartidos (`packages/shared/estilos.css`, las cuatro webs) | ✓ (son las de las webs) | (dentro de la 001) | ✓ 002 | ✓ 003 | ✓ en `main`; **falta repartirlos** a Membresías y Campeonatos, en la pasada de cada una | ✓ 31 oct | — | — |
+| Estilos compartidos (`packages/shared/estilos.css`, las cuatro webs) | ✓ (son las de las webs) | (dentro de la 001) | ✓ 002 | ✓ 003 | ✓ en `main`; **falta repartirlos** a Membresías y Campeonatos, en la pasada de cada una (hasta entonces `repartir-estilos.ps1 -Comprobar` las marca DESFASADO, y es a propósito) | ✓ 31 oct | — | — |
 | Portal | ✓ 80 | ✓ 001 | ✓ 002 | ✓ 003 | ✓ todo: 001 nº 11–17, 002 nº 1–15, 003 nº 1–20 (en `main`) | ✓ 31 oct (lo de después: hoja de ruta §0.6) | ✓ 88, comparadas | — |
 | Membresías | ✓ 36 | — | — | — | — | — | — | — |
 | Campeonatos | ◐ 76 (falta el tatami en combate) | — | — | — | — | — | — | — |
