@@ -566,7 +566,14 @@ input[type="password"]::-ms-clear { display: none; }
      
      Porque estaba solo en Campeonatos, escrito dentro de un `<style>` de su
      propio componente, y el portal lo necesitaba igual. Copiarlo habría sido la
-     tercera copia de algo que ya estaba decidido. */
+     tercera copia de algo que ya estaba decidido.
+
+     ── Hoy ──
+
+     El portal ya no lo usa: el tema y el idioma van en el pie (`.pie-opcion`,
+     auditoría 003, nº 1), y DESIGN.md prohíbe el botón flotante. Queda por
+     Campeonatos (`PublicControls.tsx`) hasta su pasada de diseño; cuando lo
+     deje, se borra. */
   .pubctl {
     position: fixed;
     right: 14px;
@@ -846,10 +853,6 @@ input[type="password"]::-ms-clear { display: none; }
     border: 1px solid var(--border);
     border-radius: 999px;
   }
-  .pie-opciones-nombre {
-    margin-right: 0.35rem;
-    padding-left: 0.5rem;
-  }
   .pie-opcion {
     padding: 0.25rem 0.7rem;
     border: 0;
@@ -866,6 +869,9 @@ input[type="password"]::-ms-clear { display: none; }
     background: var(--gold-soft);
     color: var(--gold);
   }
+  /* En claro, el oro de letra sobre el oro suave daba 4.04:1 (thermos, 31 oct
+     2026). El oro oscuro da 5.78:1; lo vigila `contraste.test.mts`. */
+  html[data-theme='light'] .pie-opcion[aria-pressed='true'] { color: var(--gold-dim); }
   @media (hover: hover) {
     .pie-opcion:hover:not([aria-pressed='true']) { color: var(--text); }
   }

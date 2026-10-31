@@ -475,11 +475,13 @@ export default function EditarMiembroPage() {
           />
         </label>
 
-        <MensajeVivo tono="error" texto={error} className="text-sm" />
-        <MensajeVivo tono="ok" texto={ok} className="text-sm" />
-        <button type="submit" disabled={guardando} className="btn btn-gold self-start">
-          {guardando ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        <div>
+          <MensajeVivo tono="error" texto={error} className="mb-4 text-sm" />
+          <MensajeVivo tono="ok" texto={ok} className="mb-4 text-sm" />
+          <button type="submit" disabled={guardando} className="btn btn-gold">
+            {guardando ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        </div>
       </form>
     </main>
   );

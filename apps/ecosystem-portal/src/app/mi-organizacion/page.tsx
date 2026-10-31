@@ -405,8 +405,10 @@ export default function MiOrganizacionPage() {
           un título dorado en minúscula, otra gramática para el mismo nivel. */}
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="eyebrow mb-1">{soloClubes ? 'Gestión del club' : 'Gestión de la organización'}</p>
-          <h1 className="display text-3xl">{soloClubes ? 'Mi club' : 'Mi organización'}</h1>
+          <p className="eyebrow mb-1">
+            {t(soloClubes ? 'org.gestionClub' : 'org.gestionOrganizacion')}
+          </p>
+          <h1 className="display text-3xl">{t(soloClubes ? 'menu.miClub' : 'menu.miOrganizacion')}</h1>
           <p className="mt-2 text-sm text-muted">
             {soloClubes
               ? 'Tu club agrega a sus maestros, coaches y alumnos, y llena su ficha. Los jueces los asigna la organización o federación.'
@@ -681,8 +683,8 @@ export default function MiOrganizacionPage() {
                   enterKeyHint="search"
                   name="club"
                   autoComplete="off"
-                  aria-label="Buscar club por nombre"
-                  placeholder="Buscar club por nombre…"
+                  aria-label={t('org.buscarClub')}
+                  placeholder={`${t('org.buscarClub')}…`}
                   maxLength={LIM.busqueda}
                   value={busquedaClub}
                   onChange={(e) => setBusquedaClub(e.target.value)}

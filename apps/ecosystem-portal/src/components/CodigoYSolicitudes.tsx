@@ -222,7 +222,11 @@ export function CodigoYSolicitudes({ orgId }: { orgId: string }) {
     // del campo y el foco vuelve a él.
     const revision = validarCorreo(nueva.email);
     if (!revision.ok) {
-      setErrorCorreo(revision.error ?? t('codigo.correoInvitado'));
+      // Vacío, `validarCorreo` dice «Escribe tu correo.», y el correo es el de
+      // la otra persona (thermos, 31 oct 2026).
+      setErrorCorreo(
+        nueva.email.trim() ? (revision.error ?? t('codigo.correoFalta')) : t('codigo.correoFalta'),
+      );
       document.getElementById('inv-correo')?.focus();
       return;
     }

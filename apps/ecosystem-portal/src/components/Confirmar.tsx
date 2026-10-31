@@ -164,16 +164,6 @@ function DialogoConfirmar({
 }
 
 /**
- * La caja modal y todo lo que la hace usable: el foco entra en lo seguro y se
- * devuelve al cerrar, el tabulador no se sale, Escape y tocar fuera cancelan,
- * y la página de detrás no se mueve.
- *
- * `botones` va el «Cancelar» PRIMERO: la hoja de estilos los invierte en
- * pantalla (ver `.confirmar-botones` en la hoja compartida). `campos` va
- * DESPUÉS de la franja de lo irreversible: se lee la advertencia antes de
- * empezar a escribir.
- */
-/**
  * El último control que se tocó con el dedo o el ratón.
  *
  * Safari no enfoca un botón al hacerle clic, así que al abrirse el diálogo
@@ -181,7 +171,8 @@ function DialogoConfirmar({
  * principio de la página: quien venía con el teclado perdía su sitio
  * (auditoría 001, nº 16). Esto recuerda qué se tocó, para devolverle el foco
  * a eso cuando el navegador no lo hizo. En fase de captura, antes de que
- * ningún `onClick` abra nada.
+ * ningún `onClick` abra nada. El oyente se pone una vez, al importar este
+ * módulo, y no se quita nunca.
  */
 let ultimoTocado: HTMLElement | null = null;
 if (typeof document !== 'undefined') {
@@ -197,6 +188,16 @@ if (typeof document !== 'undefined') {
   );
 }
 
+/**
+ * La caja modal y todo lo que la hace usable: el foco entra en lo seguro y se
+ * devuelve al cerrar, el tabulador no se sale, Escape y tocar fuera cancelan,
+ * y la página de detrás no se mueve.
+ *
+ * `botones` va el «Cancelar» PRIMERO: la hoja de estilos los invierte en
+ * pantalla (ver `.confirmar-botones` en la hoja compartida). `campos` va
+ * DESPUÉS de la franja de lo irreversible: se lee la advertencia antes de
+ * empezar a escribir.
+ */
 export function ModalAccesible({
   titulo,
   tono = 'normal',

@@ -225,10 +225,12 @@ export default function ConfiguracionPage() {
             <MedidorContrasena clave={passNueva} />
           </div>
         </div>
-        <MensajeVivo tono={passMsg?.tono ?? 'ok'} texto={passMsg?.texto} className="text-sm" />
-        <button type="submit" disabled={cambiando} className="btn btn-outline self-start">
-          {cambiando ? t('config.actualizando') : t('config.actualizarContrasena')}
-        </button>
+        <div>
+          <MensajeVivo tono={passMsg?.tono ?? 'ok'} texto={passMsg?.texto} className="mb-4 text-sm" />
+          <button type="submit" disabled={cambiando} className="btn btn-outline">
+            {cambiando ? t('config.actualizando') : t('config.actualizarContrasena')}
+          </button>
+        </div>
       </form>
 
       <DispositivosConectados />

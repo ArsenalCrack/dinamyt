@@ -146,7 +146,8 @@ hace, o lo que solo tú puedes decidir.
 
 - **thermos** (dos revisores: fallos y seguridad, y calidad) sobre cada rama
   antes de fusionarla. Se lanza con `/thermos`. El 15 oct revisó
-  `feat/borrar-cuenta`: lo que quedó para después está en 0.5.
+  `feat/borrar-cuenta` y el 31 oct el portal: lo que quedó para después está
+  en 0.5 y 0.6.
 - **La campaña de diseño de las cuatro webs** (15 oct): antislop, las guías
   web de Vercel, la skill de rediseño, un `DESIGN.md` y capturas de antes y
   después, app por app. **Dónde va y qué falta: `auditoria/ESTADO.md`.** El
@@ -189,6 +190,46 @@ antes de fusionar se hizo; esto quedó:
   pregunta al cambiar de pantalla; `dondeEsElUnicoGestor` hace una consulta
   por club.
 
+### 0.6 · Lo que thermos dejó para después (31 oct, el portal)
+
+La revisión de `feat/diseno-portal` y `feat/portada-multiarte`, juntas (dos
+revisores: fallos y calidad). Lo de antes de fusionar se hizo; esto quedó:
+
+- **Un solo modelo de aviso.** Conviven `Mensaje` de `Aviso.tsx`
+  (`{ tipo, texto }`), `MensajeVivo` (`tono` + `texto`) y otro
+  `{ tipo, texto }` en el panel: 28 llamadas en 17 archivos. Que `MensajeVivo`
+  reciba un `Mensaje` y pinte él sus dos regiones; así el rol tampoco cambia
+  en el mismo render que el texto (Configuración, panel). `<Campo>` inserta su
+  `aria-live` ya con el texto, que es lo que `MensajeVivo` explica que no
+  todos los lectores anuncian.
+- **La cabecera de pantalla está copiada en cinco páginas** (admin,
+  mi-organización, configuración, perfil, mi-club) y ya no es igual en todas.
+  Un `<CabeceraPantalla>` y el contenedor de «Layout» de DESIGN.md como clase.
+- **`i18n.tsx` pasa de 1.250 líneas**: los diccionarios e `idiomaActual` a un
+  módulo sin React. `global-error.tsx` lee la cookie con su propia expresión y
+  tiene sus textos fuera del diccionario; `fechas.ts` y `roles.ts` importan un
+  módulo `'use client'`.
+- **`admin/page.tsx` tiene 2.500 líneas**, con siete secciones que ya son
+  funciones: moverlas a archivos. Y que `FilaMiembro` pinte su ✕
+  (`btn-danger`) cuando la fila no es tuya: hoy lo copian admin y
+  mi-organización con un estilo en línea.
+- **Una segunda pasada «por significado»**: tarjetas, botones y filas armados
+  con clases sueltas en vez de `.card`, `.btn` y una `.fila`; al `@theme` del
+  portal le faltan `gold-fill`, `gold-soft`, `bg-input`, `hong` y `chung`; y
+  `--text-dim` no existe en el portal (`DispositivosConectados.tsx`).
+- **El oro sobre oro suave en claro (4,04:1)** sigue en `.badge-gold`, en las
+  pestañas de la portada y en `.navbar-idioma`; ya estaba antes de esta rama.
+- **Tres botones de enviar siguen apagándose antes de escribir**, contra
+  DESIGN.md: fundar club (`mi-club`), buscar club (`mi-organizacion`) y
+  `EntrarAClub`.
+- **Accesibilidad, sin probar**: «Saltar al contenido» no salta la barra
+  pública; en Safari el foco puede volver a `#contenido` al cerrar un diálogo;
+  `global-error.tsx` no lleva `<meta name="viewport">`.
+- Menores: `CAMPEONATOS_URL` definida cinco veces; `'en' ? 'en-US' : 'es-CO'`
+  cinco veces; `layout.tsx` repite el título y la descripción; `iniciales.ts`
+  sin prueba; el `?? 'hapkido'` de perfil y de la ficha del miembro, repetido
+  (va con la fase 2 de `PLAN-MULTIARTE.md`).
+
 ---
 
 ## 1 · Varias artes marciales
@@ -198,8 +239,9 @@ hapkido. El plan entero (las fases, lo que hoy es solo de hapkido pieza por
 pieza, la recomendación para los cinturones y las preguntas que faltan) vive en
 **`PLAN-MULTIARTE.md`**, un archivo de trabajo como `auditoria/ESTADO.md`.
 
-1. **La portada**: hecha en la rama `feat/portada-multiarte`, encima de
-   `feat/diseno-portal`. Se fusiona después de esa.
+1. **La portada**: en `main` desde el 31 oct; sale en dinamyt.org al
+   desplegar el portal (`OPERAR.md` §2.3). Las artes que nombra, y cuáles
+   tienen reglamento, salen de `apps/ecosystem-portal/src/lib/artes.ts`.
 2. **El catálogo** de artes y listas de cinturones, en el ecosistema.
 3. **Membresías**: el club elige sus artes y sus cinturones.
 4. **Campeonatos**: el campeonato elige arte, reglamento y modalidades.

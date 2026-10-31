@@ -17,9 +17,8 @@
    primera tanda y su lista oficial de cinturones. Con eso se escriben la
    migración del catálogo y sus plantillas. P5b (clases y planes por arte)
    hace falta antes de la fase 2.
-2. Mientras tanto, la fase 0 sigue su camino: la rama `feat/portada-multiarte`
-   está encima de `feat/diseno-portal` (que espera thermos). Se revisa y se
-   fusiona **después** de esa, y se despliega el portal (`OPERAR.md` §2.3).
+2. Mientras tanto, desplegar el portal (`OPERAR.md` §2.3): la portada
+   multiarte está en `main` desde el 31 oct.
 
 ## Lo que decidió el dueño (31 oct 2026)
 
@@ -32,12 +31,16 @@
   en cada una (P5).
 - **Todos los clubes de hoy son de hapkido GHA** (P6): la migración los deja
   en hapkido con la lista GHA y nadie nota el cambio.
+- **La portada no se reescribe por arte** (P11): la frase de entrada dice
+  «artes marciales» y no nombra ninguna. Las artes, y cuáles tienen
+  reglamento de competencia, salen de `apps/ecosystem-portal/src/lib/artes.ts`
+  (la fila «Para tu arte» y la nota de la pestaña de Campeonatos).
 
 ## Las fases
 
 | Fase | Qué | Estado |
 |---|---|---|
-| 0 | La portada habla de artes marciales, no solo de hapkido | Hecha en la rama `feat/portada-multiarte`, sin fusionar |
+| 0 | La portada habla de artes marciales, no solo de hapkido | En `main` (31 oct); falta desplegar el portal |
 | 1 | El catálogo: artes y listas de cinturones, en el ecosistema | Decidido el modelo; esperando P2 y P3 |
 | 2 | Membresías: el club elige sus artes y sus cinturones | Después de la 1 |
 | 3 | Campeonatos: el campeonato elige arte, reglamento y modalidades | Después de la 2; es la más grande |
@@ -49,27 +52,13 @@ Lo que hoy es solo de hapkido, pieza por pieza:
 
 | Pieza | Hoy | Dónde |
 |---|---|---|
-| Portada del portal | Multiarte en la rama: nombra hapkido, taekwondo y kickboxing; la pestaña de Campeonatos dice «Por ahora, con el reglamento de hapkido» | `apps/ecosystem-portal/src/app/page.tsx`, `lib/i18n.tsx`, `layout.tsx` |
+| Portada del portal | Multiarte en `main`: la frase dice «artes marciales»; la fila «Para tu arte» enseña las cinco de la primera tanda y la pestaña de Campeonatos dice «Reglamentos de competencia: hapkido» | `apps/ecosystem-portal/src/lib/artes.ts`, `app/page.tsx` |
 | Perfil y ficha del miembro, en el portal | El cinturón se elige de los 11 de hapkido y la disciplina se guarda como `hapkido` | `lib/validacion.ts` (`CINTURONES_GRADO`), `perfil/page.tsx:284`, `mi-organizacion/miembro/[id]/page.tsx:214` |
 | Ecosistema (la base) | `user_disciplines` **ya admite varias artes por persona** (`discipline` + `current_grade`, texto libre). El club no tiene arte. Las organizaciones ya cuelgan unas de otras (`type` FEDERATION, LEAGUE, CLUB, ACADEMY y `parent_id`) | `apps/ecosystem-api/src/db/schema/index.ts` |
 | Membresías | Los 11 cinturones de hapkido, en dos constantes (API y web); `users.belt` es una sola columna; el club no tiene arte. El pie dice «DINAMYT Membresías · Hapkido» | `lib/cinturones.ts` (las dos), `packages/membresias-db/src/schema/identidad.ts:105`, `components/PieLegal.tsx:63` |
 | Campeonatos | El reglamento de hapkido, mitad en datos (`seed_categorias.py`: puntos, faltas, rondas, jueces) y mitad en código (`combate_engine.py` repite los topes de faltas; `sockets/combate_ns.py`). Los cinturones de hapkido se convierten en 5 grupos de competencia (BLANCO, PRINCIPIANTE, INTERMEDIO, AVANZADO, NEGRO) | `dinamyt-combat`: `backend/app/models/competidor.py:20-43`, `backend/app/engine/`, `frontend/src/lib/api.ts:1030` |
 | Textos de Campeonatos que dicen hapkido | Descripción, manifiesto, pie, pantalla del juez y encabezado de reportes («Global Hapkido Association»). Hoy son verdad: cambian en la fase 3 | `frontend/src/app/layout.tsx:58`, `public/manifest.webmanifest`, `components/PieDePagina.tsx:65`, `app/juez/page.tsx:166`, `backend/app/api/reportes.py:906` |
 | Academy | **Ya es multiarte en su base**: `martial_arts` (con federación), `grades` (orden y `group_name`, el mismo grupo de Campeonatos) y `teacher_martial_arts` | `packages/academy-db/src/schema/artes.ts` |
-
-## Fase 0 · La portada
-
-Hecho en `feat/portada-multiarte` (31 oct): el antetítulo dice «Artes
-marciales · Colombia», la frase de entrada nombra hapkido, taekwondo y
-kickboxing, el `<title>` y las descripciones para Google y WhatsApp dicen
-«artes marciales», el pie del portal también, y la imagen para compartir
-(`og.png`) se volvió a dibujar. **Lo que la portada no promete**: la pestaña
-de Campeonatos aclara que el reglamento, por ahora, es el de hapkido; y no
-nombra los cinturones de Membresías (siguen siendo los de hapkido hasta la
-fase 2). El porqué está en el comentario de `page.tsx`.
-
-Falta: thermos, fusionar después de `feat/diseno-portal`, desplegar el portal.
-Cuando entre otro reglamento a Campeonatos, cambia `apps.camp.nota`.
 
 ## Fase 1 · El catálogo de artes y cinturones
 
@@ -116,6 +105,8 @@ club), los grados de cada lista, y qué lista usa cada club en cada arte.
 - **Campeonatos** toma el grupo de competencia del grado, en vez de su tabla de
   hapkido.
 - **Academy** lee el catálogo en vez de tener el suyo (fase 4).
+- **La portada** también: `lib/artes.ts` del portal deja de ser una lista
+  escrita a mano y lee las artes del catálogo.
 
 **Descartado:** lo que decía la hoja de ruta (§8.3, hasta el 31 oct): el arte
 como texto libre y los grados por club, solo en Membresías. Cada maestro de
@@ -154,8 +145,9 @@ hapkido que ya existía no nota ninguna diferencia.
 
 **Al crear el campeonato se elige el arte, el reglamento y las modalidades**
 (el «modo»), y no cambian después: los combates ya puntuados dejarían de
-cuadrar. Hoy ya existen las modalidades (`campeonato.config.modalidades`) y la
-puntuación de cada una en datos (`config_puntuacion`); lo que falta es que el
+cuadrar. Hoy ya existen en datos las modalidades (la columna
+`config_categorias` del campeonato: `{"modalidades": […]}`) y la puntuación de
+cada categoría (`config_puntuacion`, en `categorias`); lo que falta es que el
 reglamento entero sea un paquete elegible.
 
 **Un paquete de reglamento declara**, en datos siempre que se pueda: sus
@@ -184,7 +176,10 @@ taekwondo, pero eso no hace iguales los reglamentos. Nada de taekwondo se da
 por igual al hapkido sin leer su reglamento.
 
 Los textos que hoy dicen «Hapkido» o «Global Hapkido Association» pasan a
-salir del arte y del organizador de cada campeonato.
+salir del arte y del organizador de cada campeonato. **Al estrenar un
+reglamento**, se marca `campeonatos: true` en su línea de
+`apps/ecosystem-portal/src/lib/artes.ts` (o en el catálogo, si ya existe): la
+nota de la portada cambia sola.
 
 **Hecho cuando:** un campeonato de taekwondo se crea, se puntúa en vivo y se
 imprime con su reglamento, y los campeonatos de hapkido dan lo mismo que antes.
@@ -198,7 +193,7 @@ cinturón de un alumno sea el mismo en las cuatro webs.
 ## Preguntas abiertas
 
 Al responderse, la respuesta pasa a «Lo que decidió el dueño» y la pregunta
-se borra de aquí. (P1, P4, P5 y P6 se respondieron el 31 oct.)
+se borra de aquí.
 
 **Para la fase 1 (catálogo) y la 2 (Membresías):**
 
@@ -218,10 +213,3 @@ se borra de aquí. (P1, P4, P5 y P6 se respondieron el 31 oct.)
 - **P9.** Kickboxing: ¿qué modalidades (tatami: point fighting, light contact,
   kick light; ring: full contact, low kick, K1; formas musicales)?
 - **P10.** Los reglamentos que se usan en Colombia para cada arte, en PDF.
-
-**Para la portada:**
-
-- **P11.** La portada nombra hapkido, taekwondo y kickboxing; la primera
-  tanda suma karate y judo. ¿Se nombran también, o la frase se queda con
-  tres? ¿Y la nota «Por ahora, con el reglamento de hapkido» se queda hasta
-  que entre taekwondo?

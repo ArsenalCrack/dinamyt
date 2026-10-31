@@ -50,11 +50,11 @@ export function PaisCiudad({
           panel se abra hacia arriba cuando no cabe abajo, que es lo que este
           hace y el nativo de Android no. */}
       <div className="block text-sm">
-        <span className="text-muted">País{requerido ? ' *' : ''}</span>
+        <span className="text-muted">{t('geo.pais')}{requerido ? ' *' : ''}</span>
         <div className="mt-1">
           <SelectMenu
             valor={pais}
-            etiquetaAria="País"
+            etiquetaAria={t('geo.pais')}
             placeholder={t('geo.eligePais')}
             // Cambiar de país vacía la ciudad: dejar «Medellín» debajo de
             // «México» es peor que dejarlo en blanco.
@@ -74,12 +74,12 @@ export function PaisCiudad({
       </div>
 
       <div className="block text-sm">
-        <span className="text-muted">Ciudad</span>
+        <span className="text-muted">{t('geo.ciudad')}</span>
         {aMano ? (
           <div className="mt-1 flex gap-2">
             <input
               className="min-w-0 flex-1"
-              aria-label="Ciudad"
+              aria-label={t('geo.ciudad')}
               name="ciudad"
               autoComplete="off"
               value={ciudad}
@@ -105,7 +105,7 @@ export function PaisCiudad({
           <div className="mt-1">
             <SelectMenu
               valor={ciudad}
-              etiquetaAria="Ciudad"
+              etiquetaAria={t('geo.ciudad')}
               disabled={!pais}
               placeholder={pais ? 'Elige la ciudad…' : 'Elige antes el país…'}
               onChange={(v) => {

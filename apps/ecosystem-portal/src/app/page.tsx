@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ACADEMY_EN_EL_PORTAL } from '@/lib/apps';
+import { ARTES, enLista } from '@/lib/artes';
 import { CORREO_ADMIN } from '@/lib/contacto';
 import { useI18n, type ClaveTexto } from '@/lib/i18n';
 import { BarraPublica } from '@/components/BarraPublica';
@@ -54,19 +55,24 @@ interface CampeonatoVivo {
  *     (`ACADEMY_EN_EL_PORTAL`, §4.14 de OPERAR); al encender ese interruptor,
  *     la insignia y la puerta aparecen solas.
  *
- * ── Las artes: se nombran las que caben, y se dice lo que falta ───────────
+ * ── Las artes: una lista, y ningún texto que reescribir ───────────────────
  *
  * Desde el 31 de octubre de 2026 la portada habla de artes marciales y no
- * solo de hapkido. Nombra hapkido, taekwondo y kickboxing porque lo que la
- * portada promete de Membresías (cobrar, pasar lista, avisar) le sirve hoy a
- * cualquier club. Lo que sigue siendo solo de hapkido se dice, no se esconde:
+ * solo de hapkido. La frase de entrada dice «artes marciales» y no nombra
+ * ninguna: si nombrara tres, prometería campeonatos de las tres, y habría que
+ * reescribirla con cada arte nueva. Las artes salen de `lib/artes.ts`:
  *
- *   · **El reglamento de Campeonatos.** El motor puntúa con el de hapkido
- *     (`seeds/seed_categorias.py` en `dinamyt-combat`), y la pestaña lo dice
- *     en su `nota`. El día que entre otro reglamento, la nota cambia.
- *   · **Los cinturones de Membresías** siguen siendo los 11 de hapkido. La
- *     portada no los nombra; que cada arte traiga los suyos es el plan de
- *     `PLAN-MULTIARTE.md`.
+ *   · **La fila «Para tu arte»** las enseña todas, porque lo que la portada
+ *     promete de Membresías (cobrar, pasar lista, avisar) le sirve a
+ *     cualquier club.
+ *   · **La nota de la pestaña de Campeonatos** dice con cuáles hay reglamento
+ *     de competencia (hoy, solo hapkido: `seeds/seed_categorias.py` en
+ *     `dinamyt-combat`). Al estrenar otro, se marca en la lista y la nota
+ *     cambia sola.
+ *
+ * Los cinturones de Membresías siguen siendo los 11 de hapkido. La portada no
+ * los nombra; que cada arte traiga los suyos es el plan de
+ * `PLAN-MULTIARTE.md`.
  *
  * ── Regla 2: la verdad se cuenta con números, no con párrafos ─────────────
  *
@@ -139,8 +145,8 @@ export default function HomePage() {
             <br />
             {t('portada.titulo3')}
           </h1>
-          {/* `text-pretty`: con las tres artes la frase creció, y en un
-              celular de 375 px dejaba el «tú.» final solo en su renglón. */}
+          {/* `text-pretty`: que el último renglón no se quede con una palabra
+              sola en el celular (le pasaba al «tú.» final a 375 px). */}
           <p
             className="mt-5 max-w-md text-base leading-relaxed text-pretty sm:text-lg text-muted"
           >
@@ -202,7 +208,7 @@ export default function HomePage() {
 
       <Aplicaciones />
 
-      <Roles />
+      <ArtesYRoles />
 
       {/* ── Cierre ─────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-4 py-14 text-center sm:px-6">
@@ -290,8 +296,9 @@ interface AppInfo {
   nombre: string;
   titulo: ClaveTexto;
   lineas: ClaveTexto[];
-  /** Una línea aparte, debajo de la lista: lo que hoy acota a la app. */
-  nota?: ClaveTexto;
+  /** Una línea aparte, debajo de la lista: lo que hoy acota a la app. Es un
+   *  componente porque se arma con datos (`NotaDeReglamentos`). */
+  nota?: React.ComponentType;
   /** Sin `cta` la pestaña no ofrece puerta: es lo que hace «Próximamente». */
   cta?: { texto: ClaveTexto; href: string };
   proximamente?: boolean;
@@ -336,7 +343,7 @@ const APPS: AppInfo[] = [
     nombre: 'Campeonatos',
     titulo: 'apps.camp.titulo',
     lineas: ['apps.camp.l1', 'apps.camp.l2', 'apps.camp.l3', 'apps.camp.l4', 'apps.camp.l5'],
-    nota: 'apps.camp.nota',
+    nota: NotaDeReglamentos,
     cta: { texto: 'apps.camp.cta', href: `${CAMPEONATOS_URL}/campeonatos` },
   },
   {
@@ -439,7 +446,11 @@ function Aplicaciones() {
             </li>
           ))}
         </ul>
-        {app.nota && <p className="mt-5 text-base text-muted">{t(app.nota)}</p>}
+        {app.nota && (
+          <p className="mt-5 text-base text-muted">
+            <app.nota />
+          </p>
+        )}
         {app.cta ? (
           <a href={app.cta.href} className="btn btn-outline mt-6">
             {t(app.cta.texto)}
@@ -469,13 +480,17 @@ function Aplicaciones() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
-   Los roles — solo que existen
+   Las artes y los roles — solo que existen
    ════════════════════════════════════════════════════════════════════════
-   Empezaron siendo seis tarjetas con su párrafo, luego seis líneas, y ahora
-   son seis palabras. Quien mira la portada no está eligiendo permisos: solo
-   quiere saber si el sistema contempla a su gente —el acudiente que paga, el
-   auxiliar que pasa lista—, y para eso basta con ver su palabra escrita. El
-   detalle de qué puede hacer cada uno vive donde se usa, no aquí. */
+   Los roles empezaron siendo seis tarjetas con su párrafo, luego seis líneas,
+   y ahora son seis palabras. Quien mira la portada no está eligiendo
+   permisos: solo quiere saber si el sistema contempla a su gente —el
+   acudiente que paga, el auxiliar que pasa lista—, y para eso basta con ver
+   su palabra escrita. El detalle de qué puede hacer cada uno vive donde se
+   usa, no aquí.
+
+   Las artes van igual, en la fila de encima: quien enseña taekwondo busca su
+   palabra. Salen de `lib/artes.ts`, como la nota de Campeonatos. */
 const ROLES: ClaveTexto[] = [
   'rol.federacion',
   'rol.maestro',
@@ -485,26 +500,60 @@ const ROLES: ClaveTexto[] = [
   'rol.juez',
 ];
 
-function Roles() {
+function ArtesYRoles() {
   const { t } = useI18n();
   return (
     <section
       className="border-y py-8"
       style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}
     >
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 px-4 sm:px-6">
-        <p className="eyebrow" style={{ marginBottom: 0 }}>
-          {t('portada.cadaQuien')}
-        </p>
-        <ul className="flex flex-wrap gap-2">
-          {ROLES.map((rol) => (
-            <li key={rol} className="badge">
-              {t(rol)}
-            </li>
-          ))}
-        </ul>
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 sm:px-6">
+        {/* `translate="no"`: los nombres de las artes se dicen igual en los dos
+            idiomas, y el traductor del navegador los cambiaba (002, nº 14). */}
+        <FilaDeInsignias
+          titulo={t('portada.paraTuArte')}
+          textos={ARTES.map((a) => a.nombre)}
+          sinTraducir
+        />
+        <FilaDeInsignias titulo={t('portada.cadaQuien')} textos={ROLES.map((rol) => t(rol))} />
       </div>
     </section>
+  );
+}
+
+function FilaDeInsignias({
+  titulo,
+  textos,
+  sinTraducir = false,
+}: {
+  titulo: string;
+  textos: string[];
+  sinTraducir?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+      <p className="eyebrow" style={{ marginBottom: 0 }}>
+        {titulo}
+      </p>
+      <ul className="flex flex-wrap gap-2" translate={sinTraducir ? 'no' : undefined}>
+        {textos.map((texto) => (
+          <li key={texto} className="badge">
+            {texto}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** «Reglamentos de competencia: hapkido.», armada con `lib/artes.ts`. */
+function NotaDeReglamentos() {
+  const { t, idioma } = useI18n();
+  const conReglamento = ARTES.filter((a) => a.campeonatos).map((a) => a.nombre);
+  return (
+    <>
+      {t('apps.camp.reglamentos')} <span translate="no">{enLista(conReglamento, idioma)}</span>.
+    </>
   );
 }
 

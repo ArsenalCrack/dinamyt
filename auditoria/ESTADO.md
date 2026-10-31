@@ -9,20 +9,16 @@
 
 ## Siguiente paso
 
-**El dueño lanza thermos** sobre la rama del portal, con esta línea:
+**Desplegar el portal** (`OPERAR.md` §2.3). El portal y los estilos
+compartidos pasaron thermos el 31 oct y están en `main`, junto con la portada
+multiarte (`PLAN-MULTIARTE.md`); lo que thermos dejó para después está en la
+hoja de ruta, §0.6.
 
-> `/thermos revisa la rama feat/diseno-portal del repo dinamyt contra main`
-
-Después: lo de «antes de fusionar», fusionar, desplegar el portal
-(`OPERAR.md` §2.3) y seguir con **Membresías** (auditar con las tres skills en
-`dinamyt-membresias`, sobre sus 36 capturas; corregir en una rama; repartir
-ahí los estilos compartidos nuevos). Luego Campeonatos (bloquea el zoom: 002,
-«Visto de paso»; y es la otra web que usa el globo flotante `.pubctl`) y
+Después, **Membresías** (auditar con las tres skills en `dinamyt-membresias`,
+sobre sus 36 capturas; corregir en una rama; repartir ahí los estilos
+compartidos nuevos). Luego Campeonatos (bloquea el zoom: 002, «Visto de
+paso»; y es la única web que sigue usando el globo flotante `.pubctl`) y
 Academy.
-
-Encima de esta rama va otra: `feat/portada-multiarte` (los textos de la
-portada para varias artes marciales, fase 0 de `PLAN-MULTIARTE.md`). No es de
-la campaña de diseño: se revisa y se fusiona después de `feat/diseno-portal`.
 
 ## Cómo retomar en una sesión nueva
 
@@ -88,8 +84,8 @@ en su inspector esas reglas van con `--allow`. Tampoco se toman de
 
 | Pieza | Capturas antes | antislop | Guías | Diseño | Correcciones | thermos | Capturas después | Desplegado |
 |---|---|---|---|---|---|---|---|---|
-| Estilos compartidos (`packages/shared/estilos.css`, las cuatro webs) | ✓ (son las de las webs) | (dentro de la 001) | ✓ 002 | ✓ 003 | ✓ en el monorepo (`feat/diseno-portal`); **falta repartirlos** a Membresías y Campeonatos, en la pasada de cada una | — | — | — |
-| Portal | ✓ 80 | ✓ 001 | ✓ 002 | ✓ 003 | ✓ todo: 001 nº 11–17, 002 nº 1–15, 003 nº 1–20 (`feat/diseno-portal`) | — (el dueño) | ✓ 88, comparadas | — |
+| Estilos compartidos (`packages/shared/estilos.css`, las cuatro webs) | ✓ (son las de las webs) | (dentro de la 001) | ✓ 002 | ✓ 003 | ✓ en `main`; **falta repartirlos** a Membresías y Campeonatos, en la pasada de cada una | ✓ 31 oct | — | — |
+| Portal | ✓ 80 | ✓ 001 | ✓ 002 | ✓ 003 | ✓ todo: 001 nº 11–17, 002 nº 1–15, 003 nº 1–20 (en `main`) | ✓ 31 oct (lo de después: hoja de ruta §0.6) | ✓ 88, comparadas | — |
 | Membresías | ✓ 36 | — | — | — | — | — | — | — |
 | Campeonatos | ◐ 76 (falta el tatami en combate) | — | — | — | — | — | — | — |
 | Academy (sin montar en la VPS) | ◐ 48 (faltan las tres de detalle) | — | — | — | — | — | — | no aplica |

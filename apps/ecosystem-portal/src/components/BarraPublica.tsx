@@ -27,7 +27,7 @@ export function BarraPublica({ conPlanes = true }: { conPlanes?: boolean }) {
   return (
     <header className="barra-superior">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <Link href="/" className="inline-flex items-center gap-2.5" aria-label="DINAMYT, inicio">
+        <Link href="/" className="inline-flex items-center gap-2.5" aria-label={t('comun.inicioDinamyt')}>
           <img src="/logo.png" alt="" width={30} height={30} />
           {/* La marca del ecosistema, con la clase compartida. El portal no
               lleva sufijo de aplicación: él ES DINAMYT. */}

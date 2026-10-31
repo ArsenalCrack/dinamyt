@@ -174,7 +174,9 @@ export function DispositivosConectados() {
         >
           {ocupado
             ? 'Cerrando…'
-            : `Cerrar las otras ${otras.length === 1 ? 'sesión' : `${otras.length} sesiones`}`}
+            : otras.length === 1
+              ? 'Cerrar la otra sesión'
+              : `Cerrar las otras ${otras.length} sesiones`}
         </button>
       )}
 

@@ -681,11 +681,13 @@ export default function PerfilPage() {
           />
         </label>
 
-        <MensajeVivo tono="error" texto={error} className="text-sm" />
-        <MensajeVivo tono="ok" texto={ok} className="text-sm" />
-        <button type="submit" disabled={guardando} className="btn btn-gold self-start">
-          {guardando ? t('perfil.guardando') : t('perfil.guardarCambios')}
-        </button>
+        <div>
+          <MensajeVivo tono="error" texto={error} className="mb-4 text-sm" />
+          <MensajeVivo tono="ok" texto={ok} className="mb-4 text-sm" />
+          <button type="submit" disabled={guardando} className="btn btn-gold">
+            {guardando ? t('perfil.guardando') : t('perfil.guardarCambios')}
+          </button>
+        </div>
       </form>
 
       {/* ── Disciplinas y grado ──────────────────────────────────────────────

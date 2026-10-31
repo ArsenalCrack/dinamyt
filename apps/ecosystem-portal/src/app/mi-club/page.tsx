@@ -294,14 +294,16 @@ export default function MiClubPage() {
                 placeholder={t('club.descripcionPh')}
               />
             </label>
-            <MensajeVivo tono="info" texto={msg} className="text-sm text-gold" />
-            <button
-              type="submit"
-              disabled={creando || !nuevo.name.trim()}
-              className="btn btn-gold self-start"
-            >
-              {creando ? 'Creando…' : '+ Fundar club'}
-            </button>
+            <div>
+              <MensajeVivo tono="info" texto={msg} className="mb-3 text-sm text-gold" />
+              <button
+                type="submit"
+                disabled={creando || !nuevo.name.trim()}
+                className="btn btn-gold"
+              >
+                {creando ? 'Creando…' : '+ Fundar club'}
+              </button>
+            </div>
           </form>
         </>
       )}

@@ -70,9 +70,9 @@ export function PieDePagina() {
       <div
         className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-4 text-center text-sm sm:flex-row sm:justify-between sm:gap-4 sm:px-6 sm:text-left text-muted"
       >
-        {/* `translate="no"`: el traductor de Chrome convertía la marca y
-            «Hapkido» en otra cosa (auditoría 002, nº 14). El idioma lo pone
-            el diccionario, no el navegador. */}
+        {/* `translate="no"`: el traductor de Chrome convertía la marca en
+            otra cosa (auditoría 002, nº 14). El idioma lo pone el
+            diccionario, no el navegador. */}
         <span className="inline-flex items-center gap-2" translate="no">
           <img src="/logo.png" alt="" width={22} height={22} />
           {t('pie.marca')}

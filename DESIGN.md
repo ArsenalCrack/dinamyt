@@ -1,7 +1,7 @@
 ---
 version: 1
 name: DINAMYT
-description: "Ecosistema de cuatro webs (portal, Membresías, Campeonatos y Academy) para clubes de artes marciales en Colombia, de hapkido, taekwondo o kickboxing, que tienen que sentirse una sola casa. Tinta casi negra (#0e0e15) con un modo claro completo, un oro de marca que son tres (letra, titular y relleno), un verde de acción con letra blanca, y la franja de cinturones como firma. Titulares en Archivo ExtraBold ancha y en mayúsculas; cuerpo en Instrument Sans; etiquetas, cifras y códigos en IBM Plex Mono. Deportivo, directo y sin adornos: se refina lo que hay, no se rediseña."
+description: "Ecosistema de cuatro webs (portal, Membresías, Campeonatos y Academy) para clubes de artes marciales en Colombia que tienen que sentirse una sola casa. Tinta casi negra (#0e0e15) con un modo claro completo, un oro de marca que son tres (letra, titular y relleno), un verde de acción con letra blanca, y la franja de cinturones como firma. Titulares en Archivo ExtraBold ancha y en mayúsculas; cuerpo en Instrument Sans; etiquetas, cifras y códigos en IBM Plex Mono. Deportivo, directo y sin adornos: se refina lo que hay, no se rediseña."
 
 colors:
   # Oscuro (por defecto). El claro está en «Colores».
@@ -196,7 +196,7 @@ despliegue.
 | **Cifras y códigos** (`.mono`) | IBM Plex Mono con `tabular-nums` | Montos, marcadores, códigos de club, versiones | Las cifras que se comparan, siempre en columnas iguales |
 
 **Mayúsculas solo en esos tres papeles** (titular, antetítulo, nombre de un
-dato). Todo lo demás va como se escribe, y en español con **frase capital**:
+dato) **y en las insignias** (`.badge`, más abajo). Todo lo demás va como se escribe, y en español con **frase capital**:
 «Crear campeonato», no «Crear Campeonato». Sí llevan mayúscula los nombres
 propios y el vocabulario del deporte: «Juez Central», «Hong», «Chung».
 
@@ -271,7 +271,9 @@ portal), con `name` y `autocomplete` (los datos de quien escribe: `tel`,
 
 **Avisos**: los de un campo, debajo del campo y con `aria-live`. Los de una
 acción («Guardado», el error de guardar), con `role="status"` o `role="alert"`
-(`<Mensaje>` en el portal) para que también los oiga quien no ve la pantalla.
+(`<MensajeVivo>` en el portal) para que también los oiga quien no ve la
+pantalla. Su región está siempre, vacía o no: va en un bloque con el botón que
+la provoca, nunca suelta en un `gap` (sumaría el hueco aunque esté vacía).
 
 **Insignias** (`.badge`): pastilla, mono en mayúsculas, el color por el estado
 (`-ok`, `-gold`, `-danger`, `-info`, `-warn`).

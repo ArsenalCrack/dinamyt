@@ -39,8 +39,41 @@ function contraste(a: string, b: string): number {
   return (claro + 0.05) / (oscuro + 0.05);
 }
 
+/**
+ * El color que se ve de un token `rgba(…)` puesto sobre un fondo. El oro suave
+ * (`--gold-soft`) es transparente, así que su contraste depende de lo que tenga
+ * debajo.
+ */
+function sobre(selector: string, token: string, fondo: string): string {
+  const inicio = css.indexOf(`${selector} {`);
+  const bloque = css.slice(inicio, css.indexOf('\n}', inicio));
+  const m = bloque.match(
+    new RegExp(`--${token}:\\s*rgba\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*([\\d.]+)\\)`),
+  );
+  assert.ok(m, `no encuentro --${token} en ${selector}`);
+  const a = Number(m[4]);
+  const base = [1, 3, 5].map((i) => parseInt(fondo.slice(i, i + 2), 16));
+  return `#${[m[1], m[2], m[3]]
+    .map((c, i) => Math.round(Number(c) * a + base[i] * (1 - a)).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
 const oscuro = tokens(':root');
 const claro = { ...oscuro, ...tokens("html[data-theme='light']") };
+
+// La opción elegida del pie (tema, idioma) lleva el oro suave de fondo. En
+// claro, `--gold` daba 4.04:1 sobre la página; por eso allí va `--gold-dim`.
+test('la opción elegida sobre el oro suave pasa 4.5:1 en los dos temas', () => {
+  for (const [tema, selector, c, letra] of [
+    ['oscuro', ':root', oscuro, 'gold'],
+    ['claro', "html[data-theme='light']", claro, 'gold-dim'],
+  ] as const) {
+    for (const fondo of ['bg', 'bg-card']) {
+      const r = contraste(c[letra], sobre(selector, 'gold-soft', c[fondo]));
+      assert.ok(r >= 4.5, `${tema}: --${letra} sobre --gold-soft y --${fondo}: ${r.toFixed(2)}:1`);
+    }
+  }
+});
 
 for (const [tema, c] of [
   ['oscuro', oscuro],
