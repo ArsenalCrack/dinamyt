@@ -367,7 +367,7 @@ const es = {
   'salir.cerrando': 'Cerrando tu sesión de DINAMYT…',
   'pie.derechos': 'Todos los derechos reservados.',
   'pie.obra': 'DINAMYT Ecosistema es una obra protegida por el derecho de autor.',
-  'pie.marca': 'DINAMYT Ecosistema · Hapkido',
+  'pie.marca': 'DINAMYT Ecosistema · Artes marciales',
   'comun.saltarAlContenido': 'Saltar al contenido',
   'pie.ia': 'Desarrollado con asistencia de inteligencia artificial.',
   // ── Borrar la cuenta (`BorrarMiCuenta`, `AvisoBorradoPendiente`) ──
@@ -468,15 +468,16 @@ const es = {
   // Era la única pantalla grande del portal escrita entera a mano. Es la puerta
   // de entrada de todo el mundo, así que era también la más visible sin traducir.
   //
-  // Lo que NO se traduce y no es descuido: «Hapkido», «Hong», «Chung»,
-  // «KyongGo» y «GamJeum» son del arte, no del idioma; los nombres de las ligas
-  // y de las personas del ejemplo son nombres propios.
+  // Lo que NO se traduce y no es descuido: «hapkido», «taekwondo» y
+  // «kickboxing» se dicen igual en los dos idiomas; «Hong», «Chung», «KyongGo»
+  // y «GamJeum» son del reglamento, no del idioma; los nombres de las ligas y
+  // de las personas del ejemplo son nombres propios.
   'portada.entrar': 'Iniciar sesión',
-  'portada.eyebrow': 'Hapkido · Colombia',
+  'portada.eyebrow': 'Artes marciales · Colombia',
   'portada.titulo1': 'Se acabó',
   'portada.titulo2': 'el cuaderno',
   'portada.titulo3': 'del club.',
-  'portada.sub': 'Mensualidades, asistencia y campeonatos en un solo sitio. Tus alumnos entran con la misma cuenta que tú.',
+  'portada.sub': 'Mensualidades, asistencia y campeonatos para tu club de hapkido, taekwondo o kickboxing. Tus alumnos entran con la misma cuenta que tú.',
   'portada.crearCuenta': 'Crear mi cuenta',
   'portada.verResultados': 'Ver resultados',
   'portada.gratis': 'La cuenta es gratis. Las apps van con la suscripción del club:',
@@ -525,6 +526,7 @@ const es = {
   'apps.camp.l4': 'El público sigue el marcador en vivo',
   'apps.camp.l5': 'Al terminar, los resultados quedan publicados',
   'apps.camp.cta': 'Ver campeonatos',
+  'apps.camp.nota': 'Por ahora, con el reglamento de hapkido.',
   'apps.acad.titulo': 'La formación del practicante',
   'apps.acad.l1': 'Cada alumno ve qué le falta para el próximo cinturón',
   'apps.acad.l2': 'Sus evaluaciones de grado quedan en su historial',
@@ -866,7 +868,7 @@ const en: Record<ClaveTexto, string> = {
   'salir.cerrando': 'Signing you out of DINAMYT…',
   'pie.derechos': 'All rights reserved.',
   'pie.obra': 'DINAMYT Ecosystem is a work protected by copyright.',
-  'pie.marca': 'DINAMYT Ecosystem · Hapkido',
+  'pie.marca': 'DINAMYT Ecosystem · Martial arts',
   'comun.saltarAlContenido': 'Skip to content',
   'pie.ia': 'Built with the help of artificial intelligence.',
   'borrar.titulo': 'Delete my account',
@@ -947,11 +949,11 @@ const en: Record<ClaveTexto, string> = {
   'priv.seguridadTexto': 'Hashed passwords (bcrypt), encrypted medical notes, role-based access and HTTPS. Data is kept for as long as your account exists. The sporting history is immutable by design: it records what happened at each competition.',
   'priv.volver': '← Back to home',
   'portada.entrar': 'Sign in',
-  'portada.eyebrow': 'Hapkido · Colombia',
+  'portada.eyebrow': 'Martial arts · Colombia',
   'portada.titulo1': 'No more',
   'portada.titulo2': 'paper',
   'portada.titulo3': 'ledgers.',
-  'portada.sub': 'Memberships, attendance and championships in one place. Your students sign in with the same account you do.',
+  'portada.sub': 'Memberships, attendance and championships for your hapkido, taekwondo or kickboxing club. Your students sign in with the same account you do.',
   'portada.crearCuenta': 'Create my account',
   'portada.verResultados': 'See results',
   'portada.gratis': 'The account is free. The apps come with the club subscription:',
@@ -963,7 +965,7 @@ const en: Record<ClaveTexto, string> = {
   'portada.empiezaSub': 'Create your account, set up your club and share the code with your students.',
   'portada.escribenos': 'Write to us',
   'portada.sinRed': 'No connection needed',
-  'portada.sinRedSub': 'If the arena loses its internet, the championship carries on. If the dojang loses its own, so does the class.',
+  'portada.sinRedSub': 'If the arena loses its internet, the championship carries on. If the club loses its own, so does the class.',
   'portada.cadaQuien': 'Everyone sees their own',
   'portada.cifra.tatamis': 'mats at once',
   'portada.cifra.jueces': 'judges per mat',
@@ -997,6 +999,7 @@ const en: Record<ClaveTexto, string> = {
   'apps.camp.l4': 'The public follows the scoreboard live',
   'apps.camp.l5': 'When it ends, the results stay published',
   'apps.camp.cta': 'See championships',
+  'apps.camp.nota': 'For now, under hapkido rules.',
   'apps.acad.titulo': "The practitioner's training",
   'apps.acad.l1': 'Every student sees what is left for the next belt',
   'apps.acad.l2': 'Their grading assessments stay in their history',

@@ -26,10 +26,10 @@
 | Academy | **No está montada**: ni servicios, ni `.env`, ni Caddy, ni DNS. En código, entera: 28/28 pruebas (con el borrado de cuentas) |
 | Fotos en disco | **Encendidas**: `MEDIA_PUBLIC_URL` y `MEDIA_DIR` puestos, 30 imágenes en `/srv/dinamyt-media`. Las sirve Node, no Caddy |
 | Respaldos diarios | **Funcionan desde el 13 oct**: `dinamyt-respaldo.timer` a las 03:00. El primero pesa 718 KB (53 tablas con datos, `pg_restore` lo lee) y lleva 30 archivos de 30. La copia fuera del servidor es **automática desde el 15 oct**: una tarea de Windows en tu PC, los domingos, que guarda 8 (`OPERAR.md` §2.5) |
-| Secretos de sync por app | **Puestos el 15 oct**: las dos parejas con la misma huella. Falta quitar el compartido (tarea 4) |
+| Secretos de sync por app | **Puestos el 15 oct**: las dos parejas con la misma huella. Falta quitar el compartido (tarea 5) |
 | DMARC | Sigue en `p=none` (tocaba subirlo desde el 12 sep) |
 | Google | Propiedad verificada (etiqueta y TXT) |
-| Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 5) |
+| Cabeceras de seguridad | En el portal, Campeonatos y Membresías desde el 26 sep, con la CSP **en modo informe** (tarea 6) |
 | Estilos compartidos | Al día en las cuatro webs (`repartir-estilos.ps1 -Comprobar`) |
 | Política de privacidad | Al día con el código desde el 15 oct: el servidor en Estados Unidos (Carlstadt), el Auto Backup de Contabo y el responsable con nombre, domicilio (Cúcuta) y correo. **Sin dirección ni teléfono a propósito** hasta que lo diga el abogado (0.1, pregunta 7) |
 | El repositorio `dinamyt` | **Sigue público** en GitHub, y el historial guarda la dirección y el teléfono que se quitaron (commit `1b4e70e`). Pasarlo a privado es tuyo: Settings → Danger Zone → Change visibility |
@@ -41,24 +41,27 @@
 | # | Qué | De qué es | Tamaño |
 |---|---|---|---|
 | 0 | [**Cumplir lo que la política promete**](#0--cumplir-lo-que-la-política-promete), y revisar el código con thermos y anti-slop | Decisiones tuyas + código | Días, por fases |
-| 1 | [Probar lo desplegado](#1--probar-lo-desplegado), candado y publicación en vivo incluidos | A mano | 2–3 h |
-| 2 | [DMARC a `quarantine`](#2--dmarc-a-quarantine) | DNS | 15 min, y mirar informes antes |
-| 3 | [Lo que queda de las fotos](#3--lo-que-queda-de-las-fotos) | Servidor | 20 min |
-| 4 | [Un secreto de sincronización por app](#4--un-secreto-de-sincronización-por-app--falta-quitar-el-compartido) | **Tú**: quitar el compartido | 5 min, desde el 16 oct |
-| 5 | [La CSP, de informe a estricta](#5--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Desde el 3 oct |
-| 6 | [**Encender Academy**](#6--encender-academy) | Pruebas + servidor | 1–2 días, y una semana de uso |
-| 7 | [**Traducir lo que falta**](#7--traducir-lo-que-falta) | Código | Por pantallas |
-| 8 | [Fase 2: precios, plan gratuito, multi-arte](#8--fase-2) | Negocio + código | Semanas |
-| 9 | [Deuda pequeña](#9--deuda-pequeña) | Varios | Cuando toque |
+| 1 | [**Varias artes marciales**](#1--varias-artes-marciales): portada, Membresías, Campeonatos y Academy | Decisiones tuyas + código | Semanas, por fases |
+| 2 | [Probar lo desplegado](#2--probar-lo-desplegado), candado y publicación en vivo incluidos | A mano | 2–3 h |
+| 3 | [DMARC a `quarantine`](#3--dmarc-a-quarantine) | DNS | 15 min, y mirar informes antes |
+| 4 | [Lo que queda de las fotos](#4--lo-que-queda-de-las-fotos) | Servidor | 20 min |
+| 5 | [Un secreto de sincronización por app](#5--un-secreto-de-sincronización-por-app--falta-quitar-el-compartido) | **Tú**: quitar el compartido | 5 min, desde el 16 oct |
+| 6 | [La CSP, de informe a estricta](#6--la-csp-de-informe-a-estricta) | **Tú**: mirar informes; yo, corregir | Desde el 3 oct |
+| 7 | [**Encender Academy**](#7--encender-academy) | Pruebas + servidor | 1–2 días, y una semana de uso |
+| 8 | [**Traducir lo que falta**](#8--traducir-lo-que-falta) | Código | Por pantallas |
+| 9 | [Fase 2: precios y plan gratuito](#9--fase-2) | Negocio + código | Semanas |
+| 10 | [Deuda pequeña](#10--deuda-pequeña) | Varios | Cuando toque |
 | — | [En espera: WhatsApp y F9](#en-espera) | — | — |
 
 **Por qué este orden.** El 0 va delante porque es lo único de la lista que
 puede acabar en un reclamo ante la SIC: lo que la política promete tiene que
-sostenerlo el código, y lo que falta ahí es tuyo (0.1). Del 1 al 3 cuestan minutos y cierran riesgos que ya
-existen hoy. El 4 y el 5 son seguridad de lo que está en producción todos los
+sostenerlo el código, y lo que falta ahí es tuyo (0.1). El 1 es la prioridad
+que pusiste el 31 de octubre: lo frenan tus respuestas, no el servidor, así que
+avanza a la vez que lo de abajo. Del 2 al 4 cuestan minutos y cierran riesgos que ya
+existen hoy. El 5 y el 6 son seguridad de lo que está en producción todos los
 días. La arquitectura del evento ya está entera en código —el candado de sede y
 la publicación en vivo, `OPERAR.md` §4.25—; lo que le falta es la prueba a mano
-de la tarea 1. **Si aparece una fecha de campeonato, esa prueba, el ensayo
+de la tarea 2. **Si aparece una fecha de campeonato, esa prueba, el ensayo
 (`OPERAR.md` §2.9) y el simulacro (`INICIAR-LOCAL.md` §0) pasan delante de
 todo.**
 
@@ -119,9 +122,9 @@ hace, o lo que solo tú puedes decidir.
 - **El alumno sin cuenta** (carnet QR o PIN) nunca aceptó la política. Va en la
   consulta de 0.1.
 - **Membresías sola, sin portal, no enlaza ninguna política.**
-- **La casilla del registro** está escrita a mano en castellano (tarea 7).
+- **La casilla del registro** está escrita a mano en castellano (tarea 8).
 
-### 0.3 · Antes de encender Academy (tarea 6)
+### 0.3 · Antes de encender Academy (tarea 7)
 
 - No tiene pie: ni privacidad, ni soporte, ni la línea de IA.
 - **La política no la nombra.** «Qué pasa cuando pides borrar tu cuenta» dice
@@ -188,7 +191,27 @@ antes de fusionar se hizo; esto quedó:
 
 ---
 
-## 1 · Probar lo desplegado
+## 1 · Varias artes marciales
+
+La prioridad desde el 31 de octubre de 2026: que DINAMYT deje de ser solo de
+hapkido. El plan entero (las fases, lo que hoy es solo de hapkido pieza por
+pieza, la recomendación para los cinturones y las preguntas que faltan) vive en
+**`PLAN-MULTIARTE.md`**, un archivo de trabajo como `auditoria/ESTADO.md`.
+
+1. **La portada**: hecha en la rama `feat/portada-multiarte`, encima de
+   `feat/diseno-portal`. Se fusiona después de esa.
+2. **El catálogo** de artes y listas de cinturones, en el ecosistema.
+3. **Membresías**: el club elige sus artes y sus cinturones.
+4. **Campeonatos**: el campeonato elige arte, reglamento y modalidades.
+5. **Academy** lee el mismo catálogo antes de encenderse (tarea 7).
+
+**Hecho cuando:** un club de taekwondo usa Membresías y Campeonatos con sus
+cinturones y su reglamento, y uno de hapkido no nota la diferencia. Entonces se
+borran esto y el plan, y sus reglas pasan a `OPERAR.md`.
+
+---
+
+## 2 · Probar lo desplegado
 
 Todo el plan de Campeonatos está en la VPS desde el 26 de septiembre —el
 candado de sede incluido— y **nadie lo ha recorrido todavía con una persona
@@ -217,7 +240,7 @@ tarea, y una fila nueva en la tabla de §2.9.
 
 ---
 
-## 2 · DMARC a `quarantine`
+## 3 · DMARC a `quarantine`
 
 `p=none` se publicó el 29 de agosto; con dos semanas de informes ya se puede
 subir. Es un TXT y la vuelta atrás es inmediata.
@@ -252,7 +275,7 @@ se actualiza `OPERAR.md` §3.1 y §3.5 y esto se borra.
 
 ---
 
-## 3 · Lo que queda de las fotos
+## 4 · Lo que queda de las fotos
 
 Cuando haya un rato:
 
@@ -279,7 +302,7 @@ Cuando haya un rato:
 
 ---
 
-## 4 · Un secreto de sincronización por app — falta quitar el compartido
+## 5 · Un secreto de sincronización por app — falta quitar el compartido
 
 Los secretos propios están puestos desde el 15 oct de 2026: las dos parejas con
 la misma huella y los tres servicios reiniciados justo después. Mientras el
@@ -305,7 +328,7 @@ echo "$(h $E SYNC_SECRET_MEMBRESIAS) $(h /srv/membresias/apps/membresias-api/.en
 
 ---
 
-## 5 · La CSP, de informe a estricta
+## 6 · La CSP, de informe a estricta
 
 **Desplegado el 26 sep 2026, 13:03** (`OPERAR.md` §4.24): el portal,
 Campeonatos y Membresías mandan las cabeceras de seguridad y la CSP en **modo
@@ -330,7 +353,7 @@ nonces si compensan.
 
 ---
 
-## 6 · Encender Academy
+## 7 · Encender Academy
 
 **Lo que hay hoy:** código completo contra los RF-ACA-01…28 del documento de
 requisitos (`DINAMYT_Academy_DocumentoPrincipal_v2.docx`): artes marciales y
@@ -388,7 +411,7 @@ Caddy → **y solo entonces** el registro `A academy` en Cloudflare, en naranja.
 ### C · Configurarla
 
 - Qué organizaciones abren Academy: el «Plan Academy» de la base es de relleno
-  (tarea 8).
+  (tarea 9).
 - Un administrador de Academy (su `local_role` manda sobre el del pase).
 - Los maestros con su arte asignada.
 - Los videos del programa oficial por cinturón (`D:\hapkido\Programa Cambio de
@@ -403,7 +426,7 @@ recompilar el portal (§2.3). **Solo cuando A, B y C estén hechos.**
 
 | Hueco | Qué hacer |
 |---|---|
-| **Casi nada está traducido**: 16 de sus 17 pantallas no usan `useI18n` | Tarea 7. Conviene hacerlo **antes** de abrir |
+| **Casi nada está traducido**: 16 de sus 17 pantallas no usan `useI18n` | Tarea 8. Conviene hacerlo **antes** de abrir |
 | No pregunta la preferencia de tema e idioma al ecosistema (las otras tres sí) | Copiar el `GET /users/me/apariencia` del portal en `AplicarApariencia` (`OPERAR.md` §4.21) |
 | Un cambio de rol en el portal no le llega después de la primera entrada | Decidir: como Campeonatos (D9, `roles_del_portal`) o dejar que mande el rol local |
 | El portal no enseña `GET /users/:id/academy-summary` (RF-ACA-04: cinturón, evaluaciones, último avance) | Decidir dónde (el perfil del alumno) y **con qué credencial**: el requisito pide un token de servicio y hoy la ruta acepta el pase del usuario |
@@ -417,7 +440,7 @@ la usan una semana, el botón está encendido y `OPERAR.md` §4.14 se reescribe.
 
 ---
 
-## 7 · Traducir lo que falta
+## 8 · Traducir lo que falta
 
 **Lo que ya existe:** las cuatro webs tienen diccionario español/inglés
 (`lib/i18n.tsx`), la cookie compartida `.dinamyt.org` que cruza la elección
@@ -451,7 +474,7 @@ fuera del diccionario; incluye algún comentario y la lista de ciudades de
 **El orden:**
 
 1. Fechas y números según `locale` — lo más barato, y lo que más se nota.
-2. **Academy**, antes de abrirla (tarea 6): ahora cuesta menos que con gente
+2. **Academy**, antes de abrirla (tarea 7): ahora cuesta menos que con gente
    usándola.
 3. Lo que falta del portal; `/admin` al final, que solo lo ve el super-admin.
 4. Membresías y Campeonatos (en SUS repositorios, `OPERAR.md` §1.1), carnet
@@ -467,9 +490,9 @@ pantalla, correo, aviso ni impreso de las cuatro webs.
 
 ---
 
-## 8 · Fase 2
+## 9 · Fase 2
 
-### 8.1 Los precios de verdad en `/planes`, y la portada
+### 9.1 Los precios de verdad en `/planes`, y la portada
 
 El **mecanismo** ya existe (`OPERAR.md` §4.18): cobro por persona,
 `price_per_user` y `min_users` en «Tarifa de cada plan» de `/admin`. Lo que
@@ -482,7 +505,7 @@ con capturas reales; y en Google Search Console, enviar el sitemap y pedir la
 indexación (`OPERAR.md` §3.6). Lo que Google guarde el primer día es lo que
 enseñará semanas.
 
-### 8.2 El plan gratuito
+### 9.2 El plan gratuito
 
 Que quien entre vea las pantallas y entienda a qué escala llega el producto, sin
 operar un club entero gratis.
@@ -499,41 +522,9 @@ operar un club entero gratis.
 - Al llegar al tope: qué falta, cuánto cuesta el siguiente plan, y un botón. No
   un error.
 
-### 8.3 Varias artes marciales en Membresías — lo fácil
-
-Hoy los 11 cinturones de hapkido GHA son una constante duplicada en
-`lib/cinturones.ts` (API y web de Membresías).
-
-- Al crear el club, el maestro escribe su arte (texto libre) y **ordena sus
-  grados** (nombre, orden, color), con plantillas de partida —hapkido GHA,
-  taekwondo, karate— o en blanco.
-- Un club puede no usar cinturones: la lista vacía quita el campo de la ficha y
-  del carnet.
-- `lib/cinturones.ts` pasa a una consulta por club, cacheada. Hacen falta
-  `orgs.arte_marcial` y una tabla de grados por club: **no existen todavía**.
-
-### 8.4 Varias artes marciales en Campeonatos — lo difícil
-
-Todo gira alrededor de un reglamento que hoy está repartido por el código:
-`engine/combate_engine.py` (782 líneas), `sockets/combate_ns.py` (1.821),
-`engine/secciones_engine.py` (236) y `engine/figuras_engine.py` (573).
-
-- Un **paquete de reglamento** declara, en datos siempre que se pueda:
-  categorías, formato del combate, puntuación, faltas y sanciones, fin
-  anticipado, desempate, tipo de llaves e impresos.
-- **`hapkido-gha` es el primero, extraído sin cambiar ni un comportamiento.** La
-  prueba de que salió bien: un campeonato viejo, recalculado con el paquete, da
-  exactamente los mismos resultados. Antes, el motor cubierto de pruebas.
-- El campeonato elige arte y reglamento al crearse (columnas
-  `arte_marcial` y `reglamento`, que no existen todavía) y no cambia después:
-  los combates puntuados dejarían de cuadrar.
-- Después, `taekwondo-wt` y `karate-wkf` contra sus reglamentos publicados.
-
-Es **el trabajo más grande de todos**, más que la identidad.
-
 ---
 
-## 9 · Deuda pequeña
+## 10 · Deuda pequeña
 
 | Qué | Por qué | Dónde |
 |---|---|---|

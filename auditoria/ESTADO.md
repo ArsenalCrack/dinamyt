@@ -20,6 +20,10 @@ ahí los estilos compartidos nuevos). Luego Campeonatos (bloquea el zoom: 002,
 «Visto de paso»; y es la otra web que usa el globo flotante `.pubctl`) y
 Academy.
 
+Encima de esta rama va otra: `feat/portada-multiarte` (los textos de la
+portada para varias artes marciales, fase 0 de `PLAN-MULTIARTE.md`). No es de
+la campaña de diseño: se revisa y se fusiona después de `feat/diseno-portal`.
+
 ## Cómo retomar en una sesión nueva
 
 1. Leer este archivo entero: la tabla dice qué app y qué paso tocan.
@@ -51,7 +55,7 @@ Academy.
   rama `standalone` se borró el 15 oct (no tenía nada que `main` no tuviera).
 - **Las traducciones no se mezclan con el diseño**, para que cada rama que
   revisa thermos sea pequeña. Todo texto que se escriba nuevo entra ya al
-  diccionario (`lib/i18n.tsx`). Al final de la campaña va la tarea 7 de la hoja
+  diccionario (`lib/i18n.tsx`). Al final de la campaña va la tarea 8 de la hoja
   de ruta entera: con «English» no queda nada en español.
 - **Videos instructivos:** página pública `dinamyt.org/ayuda` en el portal, con
   enlaces desde cada pantalla; MP4 en la VPS, en un subdominio que no pase por
@@ -104,7 +108,7 @@ Academy.
 | **2 · `DESIGN.md`** ✓ | Lo decidido en `estilos.css` y en las notas (los tres oros, dónde van mayúsculas, el tatami aparte, el color en modo claro) más lo que salió de la fase 1 | Hecho; enlazado desde `README.md` |
 | **3 · Corregir** | Primero los estilos compartidos (`repartir-estilos.ps1`), luego portal, Membresías, Campeonatos y Academy, una rama cada una: cambios → capturas «después» → thermos → fusionar → desplegar (`OPERAR.md` Parte 2; nunca durante un campeonato) | Cada fila de la tabla en ✓ |
 | **4 · `/ayuda`** | La página de los videos, con el diseño ya hecho | En línea con los videos que estén listos |
-| **5 · Traducir** | La tarea 7 de la hoja de ruta, entera | Con «English» no queda texto en español en pantallas, correos, avisos ni impresos |
+| **5 · Traducir** | La tarea 8 de la hoja de ruta, entera | Con «English» no queda texto en español en pantallas, correos, avisos ni impresos |
 
 ## Las pantallas
 
@@ -153,6 +157,6 @@ node auditoria/herramientas/capturar.mjs portal antes         # o despues; y una
 | Dónde | Qué falta | Cómo se llena |
 |---|---|---|
 | Campeonatos, `/tatami/1` | Sale «desactivado»: una llave solo se activa desde el panel del juez central, en vivo | A mano en la fase 1: activar la llave del tatami 1 y fotografiar el marcador con el navegador |
-| Academy, `/evaluaciones/[id]`, `/certificados/[id]`, `/maestro/revisar/[id]` | La base local no tiene evaluaciones, certificados ni entregas | Crear una evaluación y una entrega de prueba en la fase 1 (es parte del recorrido de la tarea 6.A) |
+| Academy, `/evaluaciones/[id]`, `/certificados/[id]`, `/maestro/revisar/[id]` | La base local no tiene evaluaciones, certificados ni entregas | Crear una evaluación y una entrega de prueba en la fase 1 (es parte del recorrido de la tarea 7.A) |
 | Membresías | El club local tiene **un** alumno: las listas se ven más vacías que en un club de verdad | Dar de alta unos alumnos inventados antes de las capturas «después», para comparar con densidad real |
 | Portal, `/poner-contrasena` y `/verificar` | Sin enlace válido, enseñan su estado de error | Así está bien: es lo que ve quien llega con un enlace vencido |

@@ -54,6 +54,20 @@ interface CampeonatoVivo {
  *     (`ACADEMY_EN_EL_PORTAL`, §4.14 de OPERAR); al encender ese interruptor,
  *     la insignia y la puerta aparecen solas.
  *
+ * ── Las artes: se nombran las que caben, y se dice lo que falta ───────────
+ *
+ * Desde el 31 de octubre de 2026 la portada habla de artes marciales y no
+ * solo de hapkido. Nombra hapkido, taekwondo y kickboxing porque lo que la
+ * portada promete de Membresías (cobrar, pasar lista, avisar) le sirve hoy a
+ * cualquier club. Lo que sigue siendo solo de hapkido se dice, no se esconde:
+ *
+ *   · **El reglamento de Campeonatos.** El motor puntúa con el de hapkido
+ *     (`seeds/seed_categorias.py` en `dinamyt-combat`), y la pestaña lo dice
+ *     en su `nota`. El día que entre otro reglamento, la nota cambia.
+ *   · **Los cinturones de Membresías** siguen siendo los 11 de hapkido. La
+ *     portada no los nombra; que cada arte traiga los suyos es el plan de
+ *     `PLAN-MULTIARTE.md`.
+ *
  * ── Regla 2: la verdad se cuenta con números, no con párrafos ─────────────
  *
  * La primera versión de esta reescritura era honesta y **era un muro de
@@ -125,8 +139,10 @@ export default function HomePage() {
             <br />
             {t('portada.titulo3')}
           </h1>
+          {/* `text-pretty`: con las tres artes la frase creció, y en un
+              celular de 375 px dejaba el «tú.» final solo en su renglón. */}
           <p
-            className="mt-5 max-w-md text-base leading-relaxed sm:text-lg text-muted"
+            className="mt-5 max-w-md text-base leading-relaxed text-pretty sm:text-lg text-muted"
           >
             {t('portada.sub')}
           </p>
@@ -274,6 +290,8 @@ interface AppInfo {
   nombre: string;
   titulo: ClaveTexto;
   lineas: ClaveTexto[];
+  /** Una línea aparte, debajo de la lista: lo que hoy acota a la app. */
+  nota?: ClaveTexto;
   /** Sin `cta` la pestaña no ofrece puerta: es lo que hace «Próximamente». */
   cta?: { texto: ClaveTexto; href: string };
   proximamente?: boolean;
@@ -318,6 +336,7 @@ const APPS: AppInfo[] = [
     nombre: 'Campeonatos',
     titulo: 'apps.camp.titulo',
     lineas: ['apps.camp.l1', 'apps.camp.l2', 'apps.camp.l3', 'apps.camp.l4', 'apps.camp.l5'],
+    nota: 'apps.camp.nota',
     cta: { texto: 'apps.camp.cta', href: `${CAMPEONATOS_URL}/campeonatos` },
   },
   {
@@ -420,6 +439,7 @@ function Aplicaciones() {
             </li>
           ))}
         </ul>
+        {app.nota && <p className="mt-5 text-base text-muted">{t(app.nota)}</p>}
         {app.cta ? (
           <a href={app.cta.href} className="btn btn-outline mt-6">
             {t(app.cta.texto)}

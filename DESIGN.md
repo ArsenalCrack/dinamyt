@@ -1,7 +1,7 @@
 ---
 version: 1
 name: DINAMYT
-description: "Ecosistema de cuatro webs para clubes de hapkido en Colombia (portal, Membresías, Campeonatos y Academy) que tienen que sentirse una sola casa. Tinta casi negra (#0e0e15) con un modo claro completo, un oro de marca que son tres (letra, titular y relleno), un verde de acción con letra blanca, y la franja de cinturones como firma. Titulares en Archivo ExtraBold ancha y en mayúsculas; cuerpo en Instrument Sans; etiquetas, cifras y códigos en IBM Plex Mono. Deportivo, directo y sin adornos: se refina lo que hay, no se rediseña."
+description: "Ecosistema de cuatro webs (portal, Membresías, Campeonatos y Academy) para clubes de artes marciales en Colombia, de hapkido, taekwondo o kickboxing, que tienen que sentirse una sola casa. Tinta casi negra (#0e0e15) con un modo claro completo, un oro de marca que son tres (letra, titular y relleno), un verde de acción con letra blanca, y la franja de cinturones como firma. Titulares en Archivo ExtraBold ancha y en mayúsculas; cuerpo en Instrument Sans; etiquetas, cifras y códigos en IBM Plex Mono. Deportivo, directo y sin adornos: se refina lo que hay, no se rediseña."
 
 colors:
   # Oscuro (por defecto). El claro está en «Colores».

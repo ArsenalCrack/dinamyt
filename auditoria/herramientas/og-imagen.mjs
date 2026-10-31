@@ -37,7 +37,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8">
   <div class="caja">
     <div class="marca"><img src="data:image/png;base64,${logo}" alt=""><span>DINAMYT</span></div>
     <div>
-      <div class="eyebrow">Hapkido · Colombia</div>
+      <div class="eyebrow">Artes marciales · Colombia</div>
       <h1>Se acabó<br><em>el cuaderno</em><br>del club.</h1>
       <p>Mensualidades, asistencia y campeonatos en un solo sitio.</p>
     </div>

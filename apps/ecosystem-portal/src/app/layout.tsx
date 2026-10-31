@@ -68,11 +68,11 @@ export const metadata: Metadata = {
    * dentro, cada una con su `layout.tsx` de dos líneas.
    */
   title: {
-    default: 'DINAMYT · El ecosistema digital del Hapkido',
+    default: 'DINAMYT · El ecosistema digital de las artes marciales',
     template: '%s · DINAMYT',
   },
   description:
-    'Una sola cuenta para el club y el campeonato: mensualidades y asistencia con Membresías, y torneos con puntuación en vivo desde el tatami con Campeonatos.',
+    'Una sola cuenta para tu club de artes marciales y sus campeonatos: mensualidades y asistencia con Membresías, y torneos con puntuación en vivo desde el tatami con Campeonatos.',
   /** La dirección buena de esta página. Evita que se indexe dos veces. */
   alternates: { canonical: '/' },
   /**
@@ -84,9 +84,9 @@ export const metadata: Metadata = {
     siteName: 'DINAMYT',
     locale: 'es_CO',
     url: PORTAL,
-    title: 'DINAMYT · El ecosistema digital del Hapkido',
+    title: 'DINAMYT · El ecosistema digital de las artes marciales',
     description:
-      'Una sola cuenta para el club y el campeonato: mensualidades y asistencia, y torneos con puntuación en vivo desde el tatami.',
+      'Una sola cuenta para tu club de artes marciales y sus campeonatos: mensualidades y asistencia, y torneos con puntuación en vivo desde el tatami.',
     // La tarjeta de 1200 × 630 con el titular de la portada: con el ícono
     // cuadrado, WhatsApp enseñaba solo el escudo (auditoría 003, nº 17). La
     // dibuja `auditoria/herramientas/og-imagen.mjs`.
@@ -101,9 +101,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'DINAMYT · El ecosistema digital del Hapkido',
+    title: 'DINAMYT · El ecosistema digital de las artes marciales',
     description:
-      'Una sola cuenta para el club y el campeonato: mensualidades, asistencia y torneos en vivo.',
+      'Una sola cuenta para tu club de artes marciales: mensualidades, asistencia y torneos en vivo.',
     images: ['/og.png'],
   },
   /** Que los buscadores puedan entrar. Lo fino lo decide `robots.ts`. */
